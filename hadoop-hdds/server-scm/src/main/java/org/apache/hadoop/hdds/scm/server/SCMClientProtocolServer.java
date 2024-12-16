@@ -160,7 +160,8 @@ public class SCMClientProtocolServer implements
     protocolMetrics = ProtocolMessageMetrics
         .create("ScmContainerLocationProtocol",
             "SCM ContainerLocation protocol metrics",
-            StorageContainerLocationProtocolProtos.Type.values());
+            StorageContainerLocationProtocolProtos.Type.values(),
+            conf);
 
     // SCM Container Service RPC
     BlockingService storageProtoPbService =

@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -29,16 +30,21 @@ import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsTag;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.MutableQuantiles;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /**
  * Metrics to count all the subtypes of a specific message.
  */
-public class ProtocolMessageMetrics<KEY> implements MetricsSource {
+public final class ProtocolMessageMetrics<KEY> implements MetricsSource {
 
   private final String name;
 
   private final String description;
+
+  private final boolean quantileEnable;
 
   private final Map<KEY, AtomicLong> counters =
       new ConcurrentHashMap<>();
@@ -46,26 +52,52 @@ public class ProtocolMessageMetrics<KEY> implements MetricsSource {
   private final Map<KEY, AtomicLong> elapsedTimes =
       new ConcurrentHashMap<>();
 
+  private final Map<KEY, MutableQuantiles[]> quantiles =
+      new ConcurrentHashMap<>();
+
   private final AtomicInteger concurrency = new AtomicInteger(0);
 
   public static <KEY> ProtocolMessageMetrics<KEY> create(String name,
-      String description, KEY[] types) {
-    return new ProtocolMessageMetrics<KEY>(name, description, types);
+      String description, KEY[] types, ConfigurationSource conf) {
+    return new ProtocolMessageMetrics<KEY>(name, description, types, conf);
   }
 
-  public ProtocolMessageMetrics(String name, String description,
-      KEY[] values) {
+  private ProtocolMessageMetrics(String name, String description,
+      KEY[] values, ConfigurationSource conf) {
     this.name = name;
     this.description = description;
+    int[] intervals = conf.getInts(
+        OzoneConfigKeys.OZONE_PROTOCOL_MESSAGE_METRICS_PERCENTILES_INTERVALS);
+    quantileEnable = (intervals.length > 0);
     for (KEY value : values) {
       counters.put(value, new AtomicLong(0));
       elapsedTimes.put(value, new AtomicLong(0));
+      if (quantileEnable) {
+        MetricsRegistry registry =
+            new MetricsRegistry(value.toString() + "MessageMetrics");
+        MutableQuantiles[] mutableQuantiles =
+            new MutableQuantiles[intervals.length];
+        quantiles.put(value, mutableQuantiles);
+        for (int i = 0; i < intervals.length; i++) {
+          mutableQuantiles[i] = registry.newQuantiles(
+              intervals[i] + "s",
+              value.toString() + "rpc time in milli second",
+              "ops", "latencyMs", intervals[i]);
+        }
+      }
     }
   }
 
   public void increment(KEY key, long duration) {
     counters.get(key).incrementAndGet();
     elapsedTimes.get(key).addAndGet(duration);
+    if (quantileEnable) {
+      MutableQuantiles[] mutableQuantiles = quantiles.get(key);
+      for (MutableQuantiles q : mutableQuantiles) {
+        q.add(duration);
+      }
+      quantiles.put(key, mutableQuantiles);
+    }
   }
 
   public UncheckedAutoCloseable measure(KEY key) {
@@ -74,7 +106,15 @@ public class ProtocolMessageMetrics<KEY> implements MetricsSource {
     return () -> {
       concurrency.decrementAndGet();
       counters.get(key).incrementAndGet();
-      elapsedTimes.get(key).addAndGet(System.currentTimeMillis() - startTime);
+      long delta = System.currentTimeMillis() - startTime;
+      elapsedTimes.get(key).addAndGet(delta);
+      if (quantileEnable) {
+        MutableQuantiles[] mutableQuantiles = quantiles.get(key);
+        for (MutableQuantiles q : mutableQuantiles) {
+          q.add(delta);
+        }
+        quantiles.put(key, mutableQuantiles);
+      }
     };
   }
 
@@ -90,8 +130,7 @@ public class ProtocolMessageMetrics<KEY> implements MetricsSource {
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
     counters.forEach((key, value) -> {
-      MetricsRecordBuilder builder =
-          collector.addRecord(name);
+      MetricsRecordBuilder builder = collector.addRecord(name);
       builder.add(
           new MetricsTag(Interns.info("type", "Message type"), key.toString()));
       builder.addCounter(new MetricName("counter", "Number of distinct calls"),
@@ -99,8 +138,12 @@ public class ProtocolMessageMetrics<KEY> implements MetricsSource {
       builder.addCounter(
           new MetricName("time", "Sum of the duration of the calls"),
           elapsedTimes.get(key).longValue());
+      if (quantileEnable) {
+        for (MutableQuantiles mutableQuantiles : quantiles.get(key)) {
+          mutableQuantiles.snapshot(builder, all);
+        }
+      }
       builder.endRecord();
-
     });
     MetricsRecordBuilder builder = collector.addRecord(name);
     builder.addCounter(new MetricName("concurrency",
