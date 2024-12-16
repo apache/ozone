@@ -64,7 +64,7 @@ It makes use of a UNIX domain socket, a special path in the filesystem. You will
 
 The DataNode needs to be able to create this path. On the other hand, it should not be possible for any user except the Ozone user(user who launches Ozone service) or root to create this path. For this reason, paths under `/var/run` or `/var/lib` are often used， just like the current default value `/var/lib/ozone_dn_socket`.
 
-If you configure the `ozone.domain.socket.path` to another value, for example `/dir1/dir2/ozone_dn_socket`, please make sure that both `dir1` and `dir2` are exiting directories, but the file `ozone_dn_socket` does not exist under `dir2`. `ozone_dn_socket` will be created by Ozone Datanode later during its startup.
+If you configure the `ozone.domain.socket.path` to another value, for example `/dir1/dir2/ozone_dn_socket`, please make sure that both `dir1` and `dir2` are existing directories, but the file `ozone_dn_socket` does not exist under `dir2`. `ozone_dn_socket` will be created by Ozone Datanode later during its startup.
 
 ### Security Consideration
 
