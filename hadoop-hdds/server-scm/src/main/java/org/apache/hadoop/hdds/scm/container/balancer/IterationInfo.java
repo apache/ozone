@@ -16,30 +16,32 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug;
-
-import org.apache.hadoop.hdds.cli.DebugSubcommand;
-import org.apache.hadoop.hdds.cli.ExtensibleParentCommand;
-import org.apache.hadoop.hdds.cli.GenericCli;
-import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-
-import picocli.CommandLine;
+package org.apache.hadoop.hdds.scm.container.balancer;
 
 /**
- * Ozone Debug Command line tool.
+ * Information about the iteration.
  */
-@CommandLine.Command(name = "ozone debug",
-        description = "Developer tools for Ozone Debug operations",
-        versionProvider = HddsVersionProvider.class,
-        mixinStandardHelpOptions = true)
-public class OzoneDebug extends GenericCli implements ExtensibleParentCommand {
+public class IterationInfo {
 
-  public static void main(String[] argv) {
-    new OzoneDebug().run(argv);
+  private final Integer iterationNumber;
+  private final String iterationResult;
+  private final Long iterationDuration;
+
+  public IterationInfo(Integer iterationNumber, String iterationResult, long iterationDuration) {
+    this.iterationNumber = iterationNumber;
+    this.iterationResult = iterationResult;
+    this.iterationDuration = iterationDuration;
   }
 
-  @Override
-  public Class<?> subcommandType() {
-    return DebugSubcommand.class;
+  public Integer getIterationNumber() {
+    return iterationNumber;
+  }
+
+  public String getIterationResult() {
+    return iterationResult;
+  }
+
+  public Long getIterationDuration() {
+    return iterationDuration;
   }
 }

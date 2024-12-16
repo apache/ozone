@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.hdds.cli;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -25,6 +26,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.security.UserGroupInformation;
 import picocli.CommandLine;
 import picocli.CommandLine.ExitCode;
 import picocli.CommandLine.Model.CommandSpec;
@@ -48,25 +50,20 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
   private String configurationPath;
 
   private final CommandLine cmd;
+  private OzoneConfiguration conf;
+  private UserGroupInformation user;
 
   public GenericCli() {
-    this(null);
+    this(CommandLine.defaultFactory());
   }
 
-  public GenericCli(Class<?> type) {
-    this(type, CommandLine.defaultFactory());
-  }
-
-  public GenericCli(Class<?> type, CommandLine.IFactory factory) {
+  public GenericCli(CommandLine.IFactory factory) {
     cmd = new CommandLine(this, factory);
     cmd.setExecutionExceptionHandler((ex, commandLine, parseResult) -> {
       printError(ex);
       return EXECUTION_ERROR_EXIT_CODE;
     });
 
-    if (type != null) {
-      SubcommandWithParent.addSubcommands(getCmd(), type);
-    }
     ExtensibleParentCommand.addSubcommands(cmd);
   }
 
@@ -120,6 +117,20 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
       }
     }
     return ozoneConf;
+  }
+
+  public OzoneConfiguration getOzoneConf() {
+    if (conf == null) {
+      conf = createOzoneConfiguration();
+    }
+    return conf;
+  }
+
+  public UserGroupInformation getUser() throws IOException {
+    if (user == null) {
+      user = UserGroupInformation.getCurrentUser();
+    }
+    return user;
   }
 
   @VisibleForTesting

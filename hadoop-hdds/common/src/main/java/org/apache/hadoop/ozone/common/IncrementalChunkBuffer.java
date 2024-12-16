@@ -280,11 +280,7 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
 
   @Override
   public long writeTo(GatheringByteChannel channel) throws IOException {
-    long written = 0;
-    for (ByteBuffer buf : buffers) {
-      written += BufferUtils.writeFully(channel, buf);
-    }
-    return written;
+    return BufferUtils.writeFully(channel, buffers);
   }
 
   @Override

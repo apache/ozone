@@ -129,8 +129,7 @@
     <jetty.version>9.4.56.v20240826</jetty.version>
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
-    <!-- should match version via picocli-shell-jline3 -->
-    <jline.version>3.23.0</jline.version>
+    <jline.version>3.28.0</jline.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
     <jnr-posix.version>3.1.20</jnr-posix.version>
     <joda.time.version>2.12.7</joda.time.version>
