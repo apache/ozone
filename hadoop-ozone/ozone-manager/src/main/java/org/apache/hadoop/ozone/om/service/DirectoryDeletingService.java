@@ -221,7 +221,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             LOG.debug("Running DirectoryDeletingService");
           }
           isRunningOnAOS.set(true);
-          long rnCnt = getRunCount().incrementAndGet();
           long dirNum = 0L;
           long subDirNum = 0L;
           long subFileNum = 0L;
@@ -252,35 +251,35 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
                 continue;
               }
 
-            PurgePathRequest request = prepareDeleteDirRequest(remainNum,
-                pendingDeletedDirInfo.getValue(),
-                pendingDeletedDirInfo.getKey(), allSubDirList,
-                getOzoneManager().getKeyManager(), remainingBufLimit);
-            remainingBufLimit -= request.getSerializedSize();
-            currentPurgePathRequestList.add(request);
-            if (remainingBufLimit <= 0) {
-              remainingBufLimit = ratisByteLimit;
-              purgeRequestListBatches.add(currentPurgePathRequestList);
-              currentPurgePathRequestList = new ArrayList<>();
+              PurgePathRequest request = prepareDeleteDirRequest(remainNum,
+                  pendingDeletedDirInfo.getValue(),
+                  pendingDeletedDirInfo.getKey(), allSubDirList,
+                  getOzoneManager().getKeyManager(), remainingBufLimit);
+              remainingBufLimit -= request.getSerializedSize();
+              currentPurgePathRequestList.add(request);
+              if (remainingBufLimit <= 0) {
+                remainingBufLimit = ratisByteLimit;
+                purgeRequestListBatches.add(currentPurgePathRequestList);
+                currentPurgePathRequestList = new ArrayList<>();
+              }
+              // reduce remain count for self, sub-files, and sub-directories
+              remainNum = remainNum - 1;
+              remainNum = remainNum - request.getDeletedSubFilesCount();
+              remainNum = remainNum - request.getMarkDeletedSubDirsCount();
+              // Count up the purgeDeletedDir, subDirs and subFiles
+              if (request.getDeletedDir() != null
+                  && !request.getDeletedDir().isEmpty()) {
+                dirNum++;
+              }
+              subDirNum += request.getMarkDeletedSubDirsCount();
+              subFileNum += request.getDeletedSubFilesCount();
             }
-            // reduce remain count for self, sub-files, and sub-directories
-            remainNum = remainNum - 1;
-            remainNum = remainNum - request.getDeletedSubFilesCount();
-            remainNum = remainNum - request.getMarkDeletedSubDirsCount();
-            // Count up the purgeDeletedDir, subDirs and subFiles
-            if (request.getDeletedDir() != null
-                && !request.getDeletedDir().isEmpty()) {
-              dirNum++;
-            }
-            subDirNum += request.getMarkDeletedSubDirsCount();
-            subFileNum += request.getDeletedSubFilesCount();
-          }
 
-          optimizeDirDeletesAndSubmitRequest(
-              remainNum, dirNum, subDirNum, subFileNum,
-              allSubDirList, currentPurgePathRequestList, null, startTime,
-              remainingBufLimit, ratisByteLimit,
-              getOzoneManager().getKeyManager(), expectedPreviousSnapshotId, purgeRequestListBatches);
+            optimizeDirDeletesAndSubmitRequest(remainNum, dirNum, subDirNum,
+                subFileNum, allSubDirList, currentPurgePathRequestList, null,
+                startTime, remainingBufLimit, ratisByteLimit,
+                getOzoneManager().getKeyManager(), expectedPreviousSnapshotId,
+                purgeRequestListBatches);
 
           } catch (IOException e) {
             LOG.error(

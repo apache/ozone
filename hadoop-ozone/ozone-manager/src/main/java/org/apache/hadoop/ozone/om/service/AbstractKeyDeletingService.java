@@ -406,13 +406,12 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       String snapTableKey, long startTime,
       long remainingBufLimit, long maxBufLimit, KeyManager keyManager,
       UUID expectedPreviousSnapshotId,
-      List<List<PurgePathRequest>> purgeRequestListBatches, long rnCnt) {
+      List<List<PurgePathRequest>> purgeRequestListBatches) {
 
     // Optimization to handle delete sub-dir and keys to remove quickly
     // This case will be useful to handle when depth of directory is high
     int subdirDelNum = 0;
     int subDirRecursiveCnt = 0;
-    int consumedSize = 0;
     while (remainNum > 0 && subDirRecursiveCnt < allSubDirList.size()) {
       try {
         Pair<String, OmKeyInfo> stringOmKeyInfoPair
@@ -421,7 +420,6 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
             remainNum, stringOmKeyInfoPair.getValue(),
             stringOmKeyInfoPair.getKey(), allSubDirList,
             keyManager, remainingBufLimit);
-        consumedSize += request.getSerializedSize();
         remainingBufLimit -= request.getSerializedSize();
         currentPurgePathRequestList.add(request);
         if (remainingBufLimit <= 0) {
@@ -455,11 +453,12 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
     // tracking for metrics
     boolean purgeRequestSent = false;
+    long callId = 0;
     for (List<PurgePathRequest> purgePathRequestBatch : purgeRequestListBatches) {
       if (!purgePathRequestBatch.isEmpty()) {
-        submitPurgePaths(purgePathRequestBatch, snapTableKey, expectedPreviousSnapshotId,rnCnt);
+        callId = getRunCount().getAndIncrement();
+        submitPurgePaths(purgePathRequestBatch, snapTableKey, expectedPreviousSnapshotId, callId);
         purgeRequestSent = true;
-        runCount.getAndIncrement();
       }
     }
     if (purgeRequestSent) {
@@ -476,7 +475,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
               "DeletedDirectoryTable, iteration elapsed: {}ms," +
               " totalRunCount: {}",
           dirNum, subdirDelNum, subFileNum, (subDirNum - subdirDelNum),
-          Time.monotonicNow() - startTime, rnCnt);
+          Time.monotonicNow() - startTime, callId);
     }
     return remainNum;
   }
