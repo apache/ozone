@@ -257,10 +257,6 @@ public class OpenKeyCleanupService extends BackgroundService {
       LOG.info("Number of expired open keys submitted for deletion: {},"
               + " for commit: {}, cleanupLimit: {}, elapsed time: {}ms",
           numOpenKeys, numHsyncKeys, cleanupLimitPerTask, Time.monotonicNow() - startTime);
-      if ((numOpenKeys + numHsyncKeys) >= cleanupLimitPerTask) {
-        LOG.warn("Limit for no. of openKeys that can be cleaned Up in one iteration is reached. Current limit: {} = {}",
-            OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_LIMIT_PER_TASK, cleanupLimitPerTask);
-      }
       final int numKeys = numOpenKeys + numHsyncKeys;
       submittedOpenKeyCount.addAndGet(numKeys);
       return () -> numKeys;

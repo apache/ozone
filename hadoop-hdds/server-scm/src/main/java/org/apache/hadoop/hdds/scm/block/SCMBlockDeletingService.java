@@ -210,10 +210,6 @@ public class SCMBlockDeletingService extends BackgroundService
               included.size(),
               blockDeletionLimit,
               Time.monotonicNow() - startTime);
-          if (transactions.getBlocksDeleted() >= blockDeletionLimit) {
-            LOG.warn("Limit for no. of keys that can be deleted in one iteration is reached. Current limit: {} = {}",
-                "hdds.scm.block.deletion.per-interval.max", blockDeletionLimit);
-          }
           deletedBlockLog.incrementCount(new ArrayList<>(processedTxIDs));
         } catch (NotLeaderException nle) {
           LOG.warn("Skip current run, since not leader any more.", nle);

@@ -461,13 +461,6 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
               " totalRunCount: {}",
           dirNum, subdirDelNum, subFileNum, (subDirNum - subdirDelNum), limit,
           timeTakenInIteration, getRunCount());
-      if (remainNum <= 0) {
-        LOG.warn("Limit for no. of directory+files that can be deleted in one iteration is reached. " +
-                "Current limit: {} = {}",
-            OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK, ozoneManager.getConfiguration()
-                .getInt(OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK,
-                    OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT));
-      }
     }
     return remainNum;
   }
