@@ -31,6 +31,12 @@ import java.io.IOException;
  * Factory for XceiverClientSpi implementations.  Client instances are not cached.
  */
 public class XceiverClientCreator implements XceiverClientFactory {
+  private static ErrorInjector errorInjector;
+
+  public static void enableErrorInjection(ErrorInjector injector) {
+    errorInjector = injector;
+  }
+
   private final ConfigurationSource conf;
   private final boolean topologyAwareRead;
   private final ClientTrustManager trustManager;
@@ -60,7 +66,7 @@ public class XceiverClientCreator implements XceiverClientFactory {
     XceiverClientSpi client;
     switch (pipeline.getType()) {
     case RATIS:
-      client = XceiverClientRatis.newXceiverClientRatis(pipeline, conf, trustManager);
+      client = XceiverClientRatis.newXceiverClientRatis(pipeline, conf, trustManager, errorInjector);
       break;
     case STAND_ALONE:
       client = new XceiverClientGrpc(pipeline, conf, trustManager);

@@ -65,7 +65,7 @@ public class GetTokenHandler extends Handler {
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
-      throws IOException, OzoneClientException {
+      throws IOException {
 
     Token<OzoneTokenIdentifier> token = client.getObjectStore()
         .getDelegationToken(new Text(renewer.getValue()));

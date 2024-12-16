@@ -83,16 +83,14 @@ class TestGrpcReplicationService {
 
   @BeforeEach
   public void setUp() throws Exception {
-    init(false);
+    init();
   }
 
-  public void init(boolean isZeroCopy) throws Exception {
+  public void init() throws Exception {
     conf = new OzoneConfiguration();
 
     ReplicationServer.ReplicationConfig replicationConfig =
         conf.getObject(ReplicationServer.ReplicationConfig.class);
-
-    replicationConfig.setZeroCopyEnable(isZeroCopy);
 
     SecurityConfig secConf = new SecurityConfig(conf);
 
@@ -104,11 +102,9 @@ class TestGrpcReplicationService {
             .setPersistedOpState(HddsProtos.NodeOperationalState.IN_SERVICE)
             .setPersistedOpStateExpiry(0);
     DatanodeDetails.Port containerPort =
-        DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE,
-            OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
+        DatanodeDetails.newStandalonePort(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
     DatanodeDetails.Port ratisPort =
-        DatanodeDetails.newPort(DatanodeDetails.Port.Name.RATIS,
-            OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT_DEFAULT);
+        DatanodeDetails.newRatisPort(OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT_DEFAULT);
     DatanodeDetails.Port replicationPort =
         DatanodeDetails.newPort(DatanodeDetails.Port.Name.REPLICATION,
             replicationConfig.getPort());
@@ -230,7 +226,7 @@ class TestGrpcReplicationService {
     };
     ContainerImporter importer = mock(ContainerImporter.class);
     GrpcReplicationService subject =
-        new GrpcReplicationService(source, importer, false);
+        new GrpcReplicationService(source, importer);
 
     CopyContainerRequestProto request = CopyContainerRequestProto.newBuilder()
         .setContainerID(1)

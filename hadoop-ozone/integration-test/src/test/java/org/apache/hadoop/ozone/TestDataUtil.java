@@ -164,21 +164,57 @@ public final class TestDataUtil {
   public static OzoneBucket createBucket(OzoneClient client,
       String vol, BucketArgs bucketArgs, String bukName)
       throws IOException {
+    return createBucket(client, vol, bucketArgs, bukName, false);
+  }
+
+  public static OzoneBucket createBucket(OzoneClient client,
+                                         String vol, BucketArgs bucketArgs, String bukName,
+                                         boolean createLinkedBucket)
+      throws IOException {
     ObjectStore objectStore = client.getObjectStore();
     OzoneVolume volume = objectStore.getVolume(vol);
-    volume.createBucket(bukName, bucketArgs);
-    return volume.getBucket(bukName);
+    String sourceBucket = bukName;
+    if (createLinkedBucket) {
+      sourceBucket = bukName + RandomStringUtils.randomNumeric(5);
+    }
+    volume.createBucket(sourceBucket, bucketArgs);
+    OzoneBucket ozoneBucket = volume.getBucket(sourceBucket);
+    if (createLinkedBucket) {
+      ozoneBucket = createLinkedBucket(client, vol, sourceBucket, bukName);
+    }
+    return ozoneBucket;
+  }
+
+  public static OzoneBucket createLinkedBucket(OzoneClient client, String vol, String sourceBucketName,
+                                               String linkedBucketName) throws IOException {
+    BucketArgs.Builder bb = new BucketArgs.Builder()
+        .setStorageType(StorageType.DEFAULT)
+        .setVersioning(false)
+        .setSourceVolume(vol)
+        .setSourceBucket(sourceBucketName);
+    return createBucket(client, vol, bb.build(), linkedBucketName);
   }
 
   public static OzoneBucket createVolumeAndBucket(OzoneClient client,
-      BucketLayout bucketLayout) throws IOException {
+                                                  BucketLayout bucketLayout)
+      throws IOException {
+    return createVolumeAndBucket(client, bucketLayout, false);
+  }
+
+  public static OzoneBucket createVolumeAndBucket(OzoneClient client,
+      BucketLayout bucketLayout, boolean createLinkedBucket) throws IOException {
     final int attempts = 5;
     for (int i = 0; i < attempts; i++) {
       try {
         String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
         String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
-        return createVolumeAndBucket(client, volumeName, bucketName,
+        OzoneBucket ozoneBucket = createVolumeAndBucket(client, volumeName, bucketName,
             bucketLayout);
+        if (createLinkedBucket) {
+          String targetBucketName = ozoneBucket.getName() + RandomStringUtils.randomNumeric(5);
+          ozoneBucket = createLinkedBucket(client, volumeName, bucketName, targetBucketName);
+        }
+        return ozoneBucket;
       } catch (OMException e) {
         if (e.getResult() != OMException.ResultCodes.VOLUME_ALREADY_EXISTS
             && e.getResult() != OMException.ResultCodes.BUCKET_ALREADY_EXISTS) {

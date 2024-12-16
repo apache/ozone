@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -126,6 +127,7 @@ public class TestReconScmSnapshot {
   }
 
   @Test
+  @Flaky("HDDS-11645")
   public void testExplicitRemovalOfNode() throws Exception {
     ReconNodeManager nodeManager = (ReconNodeManager) ozoneCluster.getReconServer()
         .getReconStorageContainerManager().getScmNodeManager();

@@ -99,7 +99,6 @@ public final class BlockUtils {
    * opened by this thread, the other thread will get a RocksDB exception.
    * @param containerData The container data
    * @param conf Configuration
-   * @return
    * @throws IOException
    */
   public static DatanodeStore getUncachedDatanodeStore(
@@ -248,7 +247,9 @@ public final class BlockUtils {
   public static void verifyReplicaIdx(Container container, BlockID blockID)
       throws IOException {
     Integer containerReplicaIndex = container.getContainerData().getReplicaIndex();
-    if (containerReplicaIndex > 0 && !containerReplicaIndex.equals(blockID.getReplicaIndex())) {
+    Integer blockReplicaIndex = blockID.getReplicaIndex();
+    if (containerReplicaIndex > 0 && blockReplicaIndex != null && blockReplicaIndex != 0 &&
+        !containerReplicaIndex.equals(blockReplicaIndex)) {
       throw new StorageContainerException(
           "Unable to find the Container with replicaIdx " + blockID.getReplicaIndex() + ". Container "
               + container.getContainerData().getContainerID() + " replicaIdx is "

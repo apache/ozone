@@ -19,8 +19,10 @@
 package org.apache.hadoop.hdds.protocol;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -74,7 +76,8 @@ public class DatanodeDetails extends NodeImpl implements
   private static final Codec<DatanodeDetails> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(ExtendedDatanodeDetailsProto.getDefaultInstance()),
       DatanodeDetails::getFromProtoBuf,
-      DatanodeDetails::getExtendedProtoBufMessage);
+      DatanodeDetails::getExtendedProtoBufMessage,
+      DatanodeDetails.class);
 
   public static Codec<DatanodeDetails> getCodec() {
     return CODEC;
@@ -93,7 +96,6 @@ public class DatanodeDetails extends NodeImpl implements
   private String version;
   private long setupTime;
   private String revision;
-  private String buildDate;
   private volatile HddsProtos.NodeOperationalState persistedOpState;
   private volatile long persistedOpStateExpiryEpochSec;
   private int initialVersion;
@@ -111,7 +113,6 @@ public class DatanodeDetails extends NodeImpl implements
     version = b.version;
     setupTime = b.setupTime;
     revision = b.revision;
-    buildDate = b.buildDate;
     persistedOpState = b.persistedOpState;
     persistedOpStateExpiryEpochSec = b.persistedOpStateExpiryEpochSec;
     initialVersion = b.initialVersion;
@@ -140,7 +141,6 @@ public class DatanodeDetails extends NodeImpl implements
     this.version = datanodeDetails.version;
     this.setupTime = datanodeDetails.setupTime;
     this.revision = datanodeDetails.revision;
-    this.buildDate = datanodeDetails.buildDate;
     this.persistedOpState = datanodeDetails.getPersistedOpState();
     this.persistedOpStateExpiryEpochSec =
         datanodeDetails.getPersistedOpStateExpiryEpochSec();
@@ -236,6 +236,18 @@ public class DatanodeDetails extends NodeImpl implements
     setPort(new Port(name, port));
   }
 
+  public void setRatisPort(int port) {
+    setPort(Name.RATIS, port);
+  }
+
+  public void setRestPort(int port) {
+    setPort(Name.REST, port);
+  }
+
+  public void setStandalonePort(int port) {
+    setPort(Name.STANDALONE, port);
+  }
+
   /**
    * Returns all the Ports used by DataNode.
    *
@@ -326,19 +338,51 @@ public class DatanodeDetails extends NodeImpl implements
    * @return Port
    */
   public synchronized Port getPort(Port.Name name) {
+    Port ratisPort = null;
     for (Port port : ports) {
       if (port.getName().equals(name)) {
         return port;
       }
+      if (port.getName().equals(Name.RATIS)) {
+        ratisPort = port;
+      }
     }
-    // if no separate admin/server/datastream port, return single Ratis one for
-    // compat
+    // if no separate admin/server/datastream port,
+    // return single Ratis one for compatibility
     if (name == Name.RATIS_ADMIN || name == Name.RATIS_SERVER ||
         name == Name.RATIS_DATASTREAM) {
-      return getPort(Name.RATIS);
+      return ratisPort;
     }
     return null;
   }
+
+  /**
+   * Helper method to get the Ratis port.
+   * 
+   * @return Port
+   */
+  public Port getRatisPort() {
+    return getPort(Name.RATIS);
+  }
+
+  /**
+   * Helper method to get the REST port.
+   *
+   * @return Port
+   */
+  public Port getRestPort() {
+    return getPort(Name.REST);
+  }
+
+  /**
+   * Helper method to get the Standalone port.
+   *
+   * @return Port
+   */
+  public Port getStandalonePort() {
+    return getPort(Name.STANDALONE);
+  }
+
 
   /**
    * Starts building a new DatanodeDetails from the protobuf input.
@@ -391,6 +435,9 @@ public class DatanodeDetails extends NodeImpl implements
     }
     if (datanodeDetailsProto.hasCurrentVersion()) {
       builder.setCurrentVersion(datanodeDetailsProto.getCurrentVersion());
+    } else {
+      // fallback to version 1 if not present
+      builder.setCurrentVersion(DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE.toProtoValue());
     }
     return builder;
   }
@@ -429,9 +476,6 @@ public class DatanodeDetails extends NodeImpl implements
     if (extendedDetailsProto.hasRevision()) {
       builder.setRevision(extendedDetailsProto.getRevision());
     }
-    if (extendedDetailsProto.hasBuildDate()) {
-      builder.setBuildDate(extendedDetailsProto.getBuildDate());
-    }
     return builder.build();
   }
 
@@ -445,11 +489,24 @@ public class DatanodeDetails extends NodeImpl implements
   }
 
   public HddsProtos.DatanodeDetailsProto toProto(int clientVersion) {
-    return toProtoBuilder(clientVersion).build();
+    return toProtoBuilder(clientVersion, Collections.emptySet()).build();
   }
 
+  public HddsProtos.DatanodeDetailsProto toProto(int clientVersion, Set<Port.Name> filterPorts) {
+    return toProtoBuilder(clientVersion, filterPorts).build();
+  }
+
+  /**
+   * Converts the current DatanodeDetails instance into a proto {@link HddsProtos.DatanodeDetailsProto.Builder} object.
+   *
+   * @param clientVersion - The client version.
+   * @param filterPorts   - A set of {@link Port.Name} specifying ports to include.
+   *                        If empty, all available ports will be included.
+   * @return A {@link HddsProtos.DatanodeDetailsProto.Builder} Object.
+   */
+
   public HddsProtos.DatanodeDetailsProto.Builder toProtoBuilder(
-      int clientVersion) {
+      int clientVersion, Set<Port.Name> filterPorts) {
 
     HddsProtos.UUID uuid128 = HddsProtos.UUID.newBuilder()
         .setMostSigBits(uuid.getMostSignificantBits())
@@ -488,14 +545,24 @@ public class DatanodeDetails extends NodeImpl implements
     final boolean handlesUnknownPorts =
         ClientVersion.fromProtoValue(clientVersion)
         .compareTo(VERSION_HANDLES_UNKNOWN_DN_PORTS) >= 0;
+    final int requestedPortCount = filterPorts.size();
+    final boolean maySkip = requestedPortCount > 0;
     for (Port port : ports) {
-      if (handlesUnknownPorts || Name.V0_PORTS.contains(port.getName())) {
+      if (maySkip && !filterPorts.contains(port.getName())) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Skip adding {} port {} to proto message",
+                  port.getName(), port.getValue());
+        }
+      } else if (handlesUnknownPorts || Name.V0_PORTS.contains(port.getName())) {
         builder.addPorts(port.toProto());
       } else {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Skip adding {} port {} to proto message for client v{}",
-              port.getName(), port.getValue(), clientVersion);
+                  port.getName(), port.getValue(), clientVersion);
         }
+      }
+      if (maySkip && builder.getPortsCount() == requestedPortCount) {
+        break;
       }
     }
 
@@ -522,9 +589,6 @@ public class DatanodeDetails extends NodeImpl implements
 
     if (!Strings.isNullOrEmpty(getRevision())) {
       extendedBuilder.setRevision(getRevision());
-    }
-    if (!Strings.isNullOrEmpty(getBuildDate())) {
-      extendedBuilder.setBuildDate(getBuildDate());
     }
 
     return extendedBuilder.build();
@@ -584,6 +648,20 @@ public class DatanodeDetails extends NodeImpl implements
         uuid.equals(((DatanodeDetails) obj).uuid);
   }
 
+
+  /**
+   * Checks hostname, ipAddress and port of the 2 nodes are the same.
+   * @param datanodeDetails dnDetails object to compare with.
+   * @return true if the values match otherwise false.
+   */
+  public boolean compareNodeValues(DatanodeDetails datanodeDetails) {
+    if (this == datanodeDetails || super.equals(datanodeDetails)) {
+      return true;
+    }
+    return Objects.equals(ipAddress, datanodeDetails.ipAddress)
+        && Objects.equals(hostName, datanodeDetails.hostName) && Objects.equals(ports, datanodeDetails.ports);
+  }
+
   @Override
   public int hashCode() {
     return uuid.hashCode();
@@ -618,7 +696,6 @@ public class DatanodeDetails extends NodeImpl implements
     private String version;
     private long setupTime;
     private String revision;
-    private String buildDate;
     private HddsProtos.NodeOperationalState persistedOpState;
     private long persistedOpStateExpiryEpochSec = 0;
     private int initialVersion;
@@ -650,7 +727,6 @@ public class DatanodeDetails extends NodeImpl implements
       this.version = details.getVersion();
       this.setupTime = details.getSetupTime();
       this.revision = details.getRevision();
-      this.buildDate = details.getBuildDate();
       this.persistedOpState = details.getPersistedOpState();
       this.persistedOpStateExpiryEpochSec =
           details.getPersistedOpStateExpiryEpochSec();
@@ -798,18 +874,6 @@ public class DatanodeDetails extends NodeImpl implements
     }
 
     /**
-     * Sets the DataNode build date.
-     *
-     * @param date the build date of DataNode.
-     *
-     * @return DatanodeDetails.Builder
-     */
-    public Builder setBuildDate(String date) {
-      this.buildDate = date;
-      return this;
-    }
-
-    /**
      * Sets the DataNode setup time.
      *
      * @param time the setup time of DataNode.
@@ -883,6 +947,36 @@ public class DatanodeDetails extends NodeImpl implements
   }
 
   /**
+   * Constructs a new Ratis Port with the given port number.
+   *
+   * @param portNumber Port number
+   * @return the {@link Port} instance
+   */
+  public static Port newRatisPort(Integer portNumber) {
+    return newPort(Name.RATIS, portNumber);
+  }
+
+  /**
+   * Constructs a new REST Port with the given port number.
+   *
+   * @param portNumber Port number
+   * @return the {@link Port} instance
+   */
+  public static Port newRestPort(Integer portNumber) {
+    return newPort(Name.REST, portNumber);
+  }
+
+  /**
+   * Constructs a new Standalone Port with the given port number.
+   *
+   * @param portNumber Port number
+   * @return the {@link Port} instance
+   */
+  public static Port newStandalonePort(Integer portNumber) {
+    return newPort(Name.STANDALONE, portNumber);
+  }
+
+  /**
    * Container to hold DataNode Port details.
    */
   public static final class Port {
@@ -905,6 +999,9 @@ public class DatanodeDetails extends NodeImpl implements
           Name.values());
       public static final Set<Name> V0_PORTS = ImmutableSet.copyOf(
           EnumSet.of(STANDALONE, RATIS, REST));
+
+      public static final Set<Name> IO_PORTS = ImmutableSet.copyOf(
+          EnumSet.of(STANDALONE, RATIS, RATIS_DATASTREAM));
     }
 
     private final Name name;
@@ -1050,29 +1147,11 @@ public class DatanodeDetails extends NodeImpl implements
     this.revision = rev;
   }
 
-  /**
-   * Returns the DataNode build date.
-   *
-   * @return DataNode build date
-   */
-  public String getBuildDate() {
-    return buildDate;
-  }
-
-  /**
-   * Set DataNode build date.
-   *
-   * @param date DataNode build date
-   */
-  public void setBuildDate(String date) {
-    this.buildDate = date;
-  }
-
   @Override
   public HddsProtos.NetworkNode toProtobuf(
       int clientVersion) {
     return HddsProtos.NetworkNode.newBuilder()
-        .setDatanodeDetails(toProtoBuilder(clientVersion).build())
+        .setDatanodeDetails(toProtoBuilder(clientVersion, Collections.emptySet()).build())
         .build();
   }
 }

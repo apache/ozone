@@ -17,10 +17,12 @@
  */
 package org.apache.hadoop.ozone.client;
 
+import java.io.IOException;
+
 /**
  * This exception is thrown by the Ozone Clients.
  */
-public class OzoneClientException extends Exception {
+public class OzoneClientException extends IOException {
   public OzoneClientException() {
   }
 
@@ -36,8 +38,4 @@ public class OzoneClientException extends Exception {
     super(throwable);
   }
 
-  public OzoneClientException(String s, Throwable throwable, boolean b,
-      boolean b1) {
-    super(s, throwable, b, b1);
-  }
 }

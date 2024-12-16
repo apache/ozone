@@ -33,11 +33,11 @@ import java.util.Set;
  * principal.
  */
 public final class OmDBUserPrincipalInfo {
-  private static final Codec<OmDBUserPrincipalInfo> CODEC
-      = new DelegatedCodec<>(
-          Proto2Codec.get(TenantUserPrincipalInfo.getDefaultInstance()),
-          OmDBUserPrincipalInfo::getFromProtobuf,
-          OmDBUserPrincipalInfo::getProtobuf);
+  private static final Codec<OmDBUserPrincipalInfo> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(TenantUserPrincipalInfo.getDefaultInstance()),
+      OmDBUserPrincipalInfo::getFromProtobuf,
+      OmDBUserPrincipalInfo::getProtobuf,
+      OmDBUserPrincipalInfo.class);
 
   public static Codec<OmDBUserPrincipalInfo> getCodec() {
     return CODEC;
@@ -90,7 +90,6 @@ public final class OmDBUserPrincipalInfo {
   /**
    * Builder for OmDBUserPrincipalInfo.
    */
-  @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
     private Set<String> accessIds;
 

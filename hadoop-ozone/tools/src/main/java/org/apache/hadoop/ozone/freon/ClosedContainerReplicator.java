@@ -34,6 +34,8 @@ import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStoreImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
@@ -82,11 +84,22 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
   private ContainerReplicator replicator;
 
   private Timer timer;
+  private WitnessedContainerMetadataStore witnessedContainerMetadataStore;
 
   private List<ReplicationTask> replicationTasks;
 
   @Override
   public Void call() throws Exception {
+    try {
+      return replicate();
+    } finally {
+      if (witnessedContainerMetadataStore != null) {
+        witnessedContainerMetadataStore.close();
+      }
+    }
+  }
+
+  public Void replicate() throws Exception {
 
     OzoneConfiguration conf = createOzoneConfiguration();
 
@@ -101,7 +114,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
         new ContainerOperationClient(conf);
 
     final List<ContainerInfo> containerInfos =
-        containerOperationClient.listContainer(0L, 1_000_000);
+        containerOperationClient.listContainer(0L, 1_000_000).getContainerInfoList();
 
     //logic same as the download+import on the destination datanode
     initializeReplicationSupervisor(conf, containerInfos.size() * 2);
@@ -173,8 +186,10 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     if (fakeDatanodeUuid.isEmpty()) {
       fakeDatanodeUuid = UUID.randomUUID().toString();
     }
-
-    ContainerSet containerSet = new ContainerSet(1000);
+    WitnessedContainerMetadataStore referenceCountedDS =
+        WitnessedContainerMetadataStoreImpl.get(conf);
+    this.witnessedContainerMetadataStore = referenceCountedDS;
+    ContainerSet containerSet = new ContainerSet(referenceCountedDS.getContainerIdsTable(), 1000);
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);
 

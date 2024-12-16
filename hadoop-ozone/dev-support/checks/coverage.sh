@@ -53,4 +53,5 @@ find target/coverage-classes -type d \( -name proto -or -name proto3 -or -name g
   | xargs rm -rf
 
 #generate the reports
-jacoco report "$REPORT_DIR/jacoco-all.exec" --classfiles target/coverage-classes --html "$REPORT_DIR/all" --xml "$REPORT_DIR/all.xml"
+src=$(find hadoop-* -path '*/src/main/java' | sed 's/^/--sourcefiles /g' | xargs echo)
+jacoco report "$REPORT_DIR/jacoco-all.exec" $src --classfiles target/coverage-classes --html "$REPORT_DIR/all" --xml "$REPORT_DIR/all.xml"

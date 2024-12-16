@@ -56,6 +56,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
@@ -375,10 +377,19 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
   }
 
-  @Test
-  public void testRejectHsyncIfNotEnabled() throws Exception {
+  /**
+   * In these scenarios below, OM should reject key commit with HSync requested from a client:
+   * 1. ozone.hbase.enhancements.allowed = false, ozone.fs.hsync.enabled = false
+   * 2. ozone.hbase.enhancements.allowed = false, ozone.fs.hsync.enabled = true
+   * 3. ozone.hbase.enhancements.allowed = true,  ozone.fs.hsync.enabled = false
+   */
+  @ParameterizedTest
+  @CsvSource({"false,false", "false,true", "true,false"})
+  public void testRejectHsyncIfNotEnabled(boolean hbaseEnhancementsEnabled, boolean fsHsyncEnabled) throws Exception {
     OzoneConfiguration conf = ozoneManager.getConfiguration();
-    conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, false);
+    conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, hbaseEnhancementsEnabled);
+    conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
+    conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, fsHsyncEnabled);
     BucketLayout bucketLayout = getBucketLayout();
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
@@ -392,6 +403,9 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     // Regular key commit should still work
     doKeyCommit(false, allocatedKeyLocationList.subList(0, 5));
 
+    // Restore config after this test run
+    conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
+    conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
   }
 

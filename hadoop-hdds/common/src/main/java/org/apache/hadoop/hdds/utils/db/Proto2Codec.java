@@ -47,10 +47,17 @@ public final class Proto2Codec<M extends MessageLite>
     return (Codec<T>) codec;
   }
 
+  private final Class<M> clazz;
   private final Parser<M> parser;
 
   private Proto2Codec(M m) {
+    this.clazz = (Class<M>) m.getClass();
     this.parser = (Parser<M>) m.getParserForType();
+  }
+
+  @Override
+  public Class<M> getTypeClass() {
+    return clazz;
   }
 
   @Override

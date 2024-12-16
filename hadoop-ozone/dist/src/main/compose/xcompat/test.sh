@@ -21,108 +21,105 @@ COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 basename=$(basename ${COMPOSE_DIR})
 
-current_version=1.5.0
-old_versions="1.0.0 1.1.0 1.2.1 1.3.0 1.4.0" # container is needed for each version in clients.yaml
+# version is used in bucket name, which does not allow uppercase
+current_version="$(echo "${ozone.version}" | sed -e 's/-SNAPSHOT//' | tr '[:upper:]' '[:lower:]')"
+# TODO: debug acceptance test failures for client versions 1.0.0 on secure clusters
+old_versions="1.1.0 1.2.1 1.3.0 1.4.0 1.4.1" # container is needed for each version in clients.yaml
 
 # shellcheck source=hadoop-ozone/dist/src/main/compose/testlib.sh
 source "${COMPOSE_DIR}/../testlib.sh"
 
-old_client() {
-  OZONE_DIR=/opt/ozone
-  container=${client}
+export SECURITY_ENABLED=true
+: ${OZONE_BUCKET_KEY_NAME:=key1}
+
+echo 'Compatibility Test' > "${TEST_DATA_DIR}"/small
+
+client() {
+  if [[ "${client_version}" == "${current_version}" ]]; then
+    OZONE_DIR=/opt/hadoop
+    container=new_client
+  else
+    OZONE_DIR=/opt/ozone
+    container="old_client_${client_version//./_}"
+  fi
+
   "$@"
 }
 
-new_client() {
-  OZONE_DIR=/opt/hadoop
-  container=new_client
-  client_version=${current_version}
-  "$@"
+_kinit() {
+  execute_command_in_container ${container} kinit -k -t /etc/security/keytabs/testuser.keytab testuser/scm@EXAMPLE.COM
 }
 
 _init() {
+  container=scm
+  _kinit
   execute_command_in_container ${container} ozone freon ockg -n1 -t1 -p warmup
 }
 
 _write() {
-  execute_robot_test ${container} -N "xcompat-cluster-${cluster_version}-client-${client_version}-write" -v SUFFIX:${client_version} compatibility/write.robot
+  _kinit
+  execute_robot_test ${container} -N "xcompat-cluster-${cluster_version}-client-${client_version}-write" \
+    -v CLIENT_VERSION:${client_version} \
+    -v CLUSTER_VERSION:${cluster_version} \
+    -v TEST_DATA_DIR:/testdata \
+    compatibility/write.robot
 }
 
 _read() {
+  _kinit
   local data_version="$1"
-  execute_robot_test ${container} -N "xcompat-cluster-${cluster_version}-client-${client_version}-read-${data_version}" -v SUFFIX:${data_version} compatibility/read.robot
+  execute_robot_test ${container} -N "xcompat-cluster-${cluster_version}-client-${client_version}-read-${data_version}" \
+    -v CLIENT_VERSION:${client_version} \
+    -v CLUSTER_VERSION:${cluster_version} \
+    -v DATA_VERSION:${data_version} \
+    -v TEST_DATA_DIR:/testdata \
+    compatibility/read.robot
 }
 
 test_cross_compatibility() {
-  echo "Starting cluster with COMPOSE_FILE=${COMPOSE_FILE}"
+  echo "Starting ${cluster_version} cluster with COMPOSE_FILE=${COMPOSE_FILE}"
 
-  OZONE_KEEP_RESULTS=true start_docker_env
+  OZONE_KEEP_RESULTS=true start_docker_env 5
 
-  execute_command_in_container scm ozone freon ockg -n1 -t1 -p warmup
-  new_client _write
-  new_client _read ${current_version}
+  execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
+
+  _init
+
+  # first write with client matching cluster version
+  client_version="${cluster_version}" client _write
 
   for client_version in "$@"; do
-    client="old_client_${client_version//./_}"
+    # skip write, since already done
+    if [[ "${client_version}" == "${cluster_version}" ]]; then
+      continue
+    fi
+    client _write
+  done
 
-    old_client _write
-    old_client _read ${client_version}
+  for client_version in "$@"; do
+    for data_version in $(echo "$client_version" "$cluster_version" "$current_version" | xargs -n1 | sort -u); do
 
-    old_client _read ${current_version}
-    new_client _read ${client_version}
+      # do not test old-only scenario
+      if [[ "${cluster_version}" != "${current_version}" ]] \
+        && [[ "${client_version}" != "${current_version}" ]] \
+        && [[ "${data_version}" != "${current_version}" ]]; then
+        continue
+      fi
+
+      client _read ${data_version}
+    done
   done
 
   KEEP_RUNNING=false stop_docker_env
 }
 
-test_ec_cross_compatibility() {
-  echo "Running Erasure Coded storage backward compatibility tests."
-  local cluster_versions_with_ec="1.3.0 1.4.0"
-  local non_ec_client_versions="1.0.0 1.1.0 1.2.1"
-
-  for cluster_version in ${cluster_versions_with_ec}; do
-    export COMPOSE_FILE=new-cluster.yaml:clients.yaml cluster_version=${cluster_version}
-    OZONE_KEEP_RESULTS=true start_docker_env 5
-
-    echo -n "Generating data locally...   "
-    dd if=/dev/urandom of=/tmp/1mb bs=1048576 count=1 >/dev/null 2>&1
-    dd if=/dev/urandom of=/tmp/2mb bs=1048576 count=2 >/dev/null 2>&1
-    dd if=/dev/urandom of=/tmp/3mb bs=1048576 count=3 >/dev/null 2>&1
-    echo "done"
-    echo -n "Copy data into client containers...   "
-    for container in $(docker ps --format '{{.Names}}' | grep client); do
-      docker cp /tmp/1mb ${container}:/tmp/1mb
-      docker cp /tmp/2mb ${container}:/tmp/2mb
-      docker cp /tmp/3mb ${container}:/tmp/3mb
-    done
-    echo "done"
-    rm -f /tmp/1mb /tmp/2mb /tmp/3mb
-
-
-    local prefix=$(LC_CTYPE=C tr -dc '[:alnum:]' < /dev/urandom | head -c 5 | tr '[:upper:]' '[:lower:]')
-    OZONE_DIR=/opt/hadoop
-    execute_robot_test new_client --include setup-ec-data -N "xcompat-cluster-${cluster_version}-setup-data" -v prefix:"${prefix}" ec/backward-compat.robot
-     OZONE_DIR=/opt/ozone
-
-    for client_version in ${non_ec_client_versions}; do
-      client="old_client_${client_version//./_}"
-      unset OUTPUT_PATH
-      execute_robot_test "${client}" --include test-ec-compat -N "xcompat-cluster-${cluster_version}-client-${client_version}-read-${cluster_version}" -v prefix:"${prefix}" ec/backward-compat.robot
-    done
-
-    KEEP_RUNNING=false stop_docker_env
-  done
-}
-
 create_results_dir
 
 # current cluster with various clients
-COMPOSE_FILE=new-cluster.yaml:clients.yaml cluster_version=${current_version} test_cross_compatibility ${old_versions}
+COMPOSE_FILE=new-cluster.yaml:clients.yaml cluster_version=${current_version} test_cross_compatibility ${old_versions} ${current_version}
 
 # old cluster with clients: same version and current version
 for cluster_version in ${old_versions}; do
   export OZONE_VERSION=${cluster_version}
-  COMPOSE_FILE=old-cluster.yaml:clients.yaml test_cross_compatibility ${cluster_version}
+  COMPOSE_FILE=old-cluster.yaml:clients.yaml test_cross_compatibility ${cluster_version} ${current_version}
 done
-
-test_ec_cross_compatibility

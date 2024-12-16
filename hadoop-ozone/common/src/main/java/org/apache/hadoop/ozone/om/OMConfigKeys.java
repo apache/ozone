@@ -73,6 +73,9 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_DECOMMISSIONED_NODES_KEY =
       "ozone.om.decommissioned.nodes";
 
+  public static final String OZONE_OM_FEATURES_DISABLED =
+      "ozone.om.features.disabled";
+
   public static final String OZONE_OM_ADDRESS_KEY =
       "ozone.om.address";
   public static final String OZONE_OM_BIND_HOST_DEFAULT =
@@ -400,6 +403,8 @@ public final class OMConfigKeys {
   /**
    * Configuration properties for Snapshot Directory Service.
    */
+  public static final String OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED = "ozone.snapshot.deep.cleaning.enabled";
+  public static final boolean OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED_DEFAULT = false;
   public static final String OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL =
       "ozone.snapshot.directory.service.interval";
   public static final String OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL_DEFAULT
@@ -415,6 +420,11 @@ public final class OMConfigKeys {
   // 4KB size (considering acls, key/file name, and other meata)  * 6000
   // resulting 24MB
   public static final int OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT = 6000;
+
+  public static final String OZONE_THREAD_NUMBER_DIR_DELETION =
+      "ozone.thread.number.dir.deletion";
+
+  public static final int OZONE_THREAD_NUMBER_DIR_DELETION_DEFAULT = 10;
 
   public static final String SNAPSHOT_SST_DELETING_LIMIT_PER_TASK =
       "ozone.snapshot.filtering.limit.per.task";
@@ -620,4 +630,9 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_MAX_BUCKET =
       "ozone.om.max.buckets";
   public static final int OZONE_OM_MAX_BUCKET_DEFAULT = 100000;
+  /**
+   * Configuration property to configure the max server side response size for list calls.
+   */
+  public static final String OZONE_OM_SERVER_LIST_MAX_SIZE = "ozone.om.server.list.max.size";
+  public static final int OZONE_OM_SERVER_LIST_MAX_SIZE_DEFAULT = 1000;
 }

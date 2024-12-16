@@ -72,6 +72,7 @@ public class RatisBlockOutputStream extends BlockOutputStream
   @SuppressWarnings("checkstyle:ParameterNumber")
   public RatisBlockOutputStream(
       BlockID blockID,
+      long blockSize,
       XceiverClientFactory xceiverClientManager,
       Pipeline pipeline,
       BufferPool bufferPool,
@@ -80,7 +81,7 @@ public class RatisBlockOutputStream extends BlockOutputStream
       ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
       Supplier<ExecutorService> blockOutputStreamResourceProvider
   ) throws IOException {
-    super(blockID, xceiverClientManager, pipeline,
+    super(blockID, blockSize, xceiverClientManager, pipeline,
         bufferPool, config, token, clientMetrics, streamBufferArgs, blockOutputStreamResourceProvider);
     this.commitWatcher = new CommitWatcher(bufferPool, getXceiverClient());
   }
@@ -101,8 +102,8 @@ public class RatisBlockOutputStream extends BlockOutputStream
   }
 
   @Override
-  XceiverClientReply sendWatchForCommit(long commitIndex) throws IOException {
-    return commitWatcher.watchForCommit(commitIndex);
+  CompletableFuture<XceiverClientReply> sendWatchForCommit(long index) {
+    return commitWatcher.watchForCommitAsync(index);
   }
 
   @Override

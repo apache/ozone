@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React from 'react';
+import React, { HTMLAttributes } from 'react';
 import { Card, Row, Table } from 'antd';
 
 import { ColumnType } from 'antd/es/table';
@@ -39,6 +39,7 @@ type OverviewTableCardProps = {
   data?: string | React.ReactElement;
   linkToUrl?: string;
   showHeader?: boolean;
+  state?: Record<string, any>;
 }
 
 // ------------- Styles -------------- //
@@ -63,15 +64,18 @@ const OverviewSummaryCard: React.FC<OverviewTableCardProps> = ({
   columns = [],
   tableData = [],
   linkToUrl = '',
-  showHeader = false
+  showHeader = false,
+  state
 }) => {
-
   const titleElement = (linkToUrl)
     ? (
       <div className='card-title-div'>
         {title}
         <Link
-          to={linkToUrl}
+          to={{
+            pathname: linkToUrl,
+            state: state
+          }}
           style={{
             fontWeight: 400
           }}>View Insights</Link>
@@ -100,7 +104,10 @@ const OverviewSummaryCard: React.FC<OverviewTableCardProps> = ({
         size="small"
         pagination={false}
         dataSource={tableData}
-        columns={columns} />
+        columns={columns}
+        onRow={(record: TableData) => ({
+          'data-testid': `overview-${title}-${record.name}`
+        } as HTMLAttributes<HTMLElement>)}/>
     </Card>
   )
 }

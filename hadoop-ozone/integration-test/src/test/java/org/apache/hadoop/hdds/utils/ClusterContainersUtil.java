@@ -19,12 +19,12 @@ package org.apache.hadoop.hdds.utils;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -65,18 +65,10 @@ public final class ClusterContainersUtil {
     // the container.
     KeyValueContainerData containerData =
         (KeyValueContainerData) container.getContainerData();
-    try (DBHandle db = BlockUtils.getDB(containerData, cluster.getConf());
-         BlockIterator<BlockData> keyValueBlockIterator =
-             db.getStore().getBlockIterator(containerID)) {
-      // Find the block corresponding to the key we put. We use the localID of
-      // the BlockData to identify out key.
-      BlockData blockData = null;
-      while (keyValueBlockIterator.hasNext()) {
-        blockData = keyValueBlockIterator.nextBlock();
-        if (blockData.getBlockID().getLocalID() == localID) {
-          break;
-        }
-      }
+    try (DBHandle db = BlockUtils.getDB(containerData, cluster.getConf())) {
+      BlockID blockID = new BlockID(containerID, localID);
+      String blockKey = containerData.getBlockKey(localID);
+      BlockData blockData = db.getStore().getBlockByID(blockID, blockKey);
       assertNotNull(blockData, "Block not found");
 
       // Get the location of the chunk file

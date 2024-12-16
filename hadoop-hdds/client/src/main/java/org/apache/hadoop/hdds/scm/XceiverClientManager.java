@@ -61,6 +61,7 @@ import org.slf4j.LoggerFactory;
 public class XceiverClientManager extends XceiverClientCreator {
   private static final Logger LOG =
       LoggerFactory.getLogger(XceiverClientManager.class);
+
   private final Cache<String, XceiverClientSpi> clientCache;
   private final CacheMetrics cacheMetrics;
 
@@ -184,8 +185,7 @@ public class XceiverClientManager extends XceiverClientCreator {
         // Standalone port is chosen since all datanodes should have a
         // standalone port regardless of version and this port should not
         // have any collisions.
-        key += closestNode.getHostName() + closestNode.getPort(
-            DatanodeDetails.Port.Name.STANDALONE);
+        key += closestNode.getHostName() + closestNode.getStandalonePort();
       } catch (IOException e) {
         LOG.error("Failed to get closest node to create pipeline cache key:" +
             e.getMessage());
