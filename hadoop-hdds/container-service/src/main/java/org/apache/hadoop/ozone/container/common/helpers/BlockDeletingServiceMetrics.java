@@ -196,10 +196,6 @@ public final class BlockDeletingServiceMetrics {
     return totalLockTimeoutTransactionCount.value();
   }
 
-  public long getReceivedTransactionCount() {
-    return receivedTransactionCount.value();
-  }
-
   public long getProcessedTransactionSuccessCount() {
     return processedTransactionSuccessCount.value();
   }

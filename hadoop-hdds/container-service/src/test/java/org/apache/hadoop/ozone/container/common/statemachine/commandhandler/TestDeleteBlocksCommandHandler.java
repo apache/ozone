@@ -331,7 +331,6 @@ public class TestDeleteBlocksCommandHandler {
         assertEquals(cmdStatus.getProtoBufMessage().getBlockDeletionAck().getResultsCount(), 0);
       }
     }
-    blockDeleteMetrics = handler.getBlockDeleteMetrics();
   }
 
   @ContainerTestVersionInfo.ContainerTest
