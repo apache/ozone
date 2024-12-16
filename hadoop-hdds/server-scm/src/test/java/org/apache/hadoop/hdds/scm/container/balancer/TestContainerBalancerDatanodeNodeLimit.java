@@ -528,7 +528,6 @@ public class TestContainerBalancerDatanodeNodeLimit {
     CompletableFuture<MoveManager.MoveResult> future2 =
         CompletableFuture.supplyAsync(() -> MoveManager.MoveResult.DELETION_FAIL_TIME_OUT);
 
-    // Try the same test with MoveManager instead of LegacyReplicationManager.
     when(mockedSCM.getMoveManager()
         .move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class)))
         .thenReturn(future).thenAnswer(invocation -> future2);

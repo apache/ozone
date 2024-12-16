@@ -136,10 +136,6 @@ public class TestContainerBalancerTask {
         .thenReturn(CompletableFuture.completedFuture(
             MoveManager.MoveResult.COMPLETED));
 
-    /*
-    Disable LegacyReplicationManager. This means balancer should select RATIS
-     as well as EC containers for balancing. Also, MoveManager will be used.
-     */
     when(replicationManager.getConfig()).thenReturn(rmConf);
     // these configs will usually be specified in each test
     balancerConfiguration =
