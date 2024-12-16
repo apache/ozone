@@ -55,7 +55,6 @@ For this,
 - Bucket resource is handled in such a way that its visible only after db changes are flushed. This is required as quota is shared between different keys operating parallel.
 Note: For incremental changes, quota count will be available immediately for read for compatibility with older flow till all flows are migrated to new flow.
 
-
 ### Quota handling
 
 Earlier, bucket level lock is taken, quota validation is performed and updated with-in lock in cache in all nodes.
@@ -80,13 +79,38 @@ refer [request-process-distribution](request-persist-distribution.md)
 refer [request-replay-handling](request-replay.md)
 
 ### Granular locking
+Gateway: Perform lock as per below strategy for OBS/FSO
+On lock success, trigger execution of request to respective executor queue
+
+#### OBS Locking
+
+Just need to take a write lock over key, and Stripped locks to be used.
+
+```
+Volume and Bucket: Read lock
+Key: Write lock
+```
+
+**Note**: Multiple keys locking (like delete multiple keys or rename operation), lock needs to be taken in order, i.e. using StrippedLocking order to avoid dead lock.
+
+Stripped locking ordering:
+- Strip lock is obtained over a hash bucket.
+- All keys needs to be ordered with hash bucket
+- And then need take lock in sequence order
+
+#### FSO Locking
+
+TODO
+
+#### Legacy Locking:
+Not-in-scope
 
 ### Optimized new flow
 
 Currently, a request is handled as:
 - Pre-execute: does request static validation, authorization
 - validateAndUpdateCache: locking, handle request, update cache
-- Double buffer to update DB using cache happening in backgound
+- Double buffer to update DB using cache happening in background
 
 Request execution Template: every request handling need follow below template of request execution.
 
@@ -103,6 +127,37 @@ Request execution Template: every request handling need follow below template of
   - Metrics update
 - Request validator annotation: similar to existing, where compatibility check with ozone manager feature version and client feature version, and update request to support compatibility if any.
 
+Detailed request processing:
+OBS:
+- [Create key](request/obs-create-key.md)
+- [Commit key](request/obs-commit-key.md)
+
+
+### Testability framework
+
+With rework on flow, a testability framework for better test coverage for request processing.
+
+Complexity in existing framework for request:
+1. Flow handling is different 1 node / 3 node HA deployment
+2. Check for double buffer cache flush
+3. cache related behaviour testing
+3. Ratis sync and failure handling
+4. Too much mocking for unit testing
+
+Proposed handling:
+Since execution is leader side and only db update is synchronized to all other nodes, so unit test will focus behavior, but not on env.
+
+1. Test data preparation
+  - Utility to prepare Key, File, volume, bucket
+  - Insert to DB to different table
+2. Short-circuit for db update (without ratis)
+3. simplified mocking for ranger authorization (just mock a method)
+4. behavior test from End-to-End perspective
+
+This will have the following advantages:
+- Speed of test scenarios (sync wait and double buffer flush wait will be avoided)
+- optimized test cases (avoid duplicate test cases)
+- test code complexity will be less
 
 ### Step-by-step integration of existing request
 
