@@ -1403,7 +1403,7 @@ public class ReplicationManager implements SCMService {
   }
 
   public boolean isContainerReplicatingOrDeleting(ContainerID containerID) {
-      return !getPendingReplicationOps(containerID).isEmpty();
+    return !getPendingReplicationOps(containerID).isEmpty();
   }
 
   private ContainerReplicaCount getContainerReplicaCount(
