@@ -144,7 +144,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         container, context, connectionManager);
     try {
       deleteCommandQueues.add(cmd);
-      blockDeleteMetrics.incrTotalCommandsReceived(1);
     } catch (IllegalStateException e) {
       String dnId = context.getParent().getDatanodeDetails().getUuidString();
       Consumer<CommandStatus> updateFailure = (cmdStatus) -> {
@@ -158,7 +157,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       };
       updateCommandStatus(cmd.getContext(), cmd.getCmd(), updateFailure, LOG);
       LOG.warn("Command is discarded because of the command queue is full");
-      blockDeleteMetrics.incrTotalCommandsDiscarded(1);
     }
   }
 
@@ -392,8 +390,14 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           LOG.debug("Sending following block deletion ACK to SCM");
           for (DeleteBlockTransactionResult result : blockDeletionACK
               .getResultsList()) {
+            boolean success = result.getSuccess();
             LOG.debug("TxId = {} : ContainerId = {} : {}",
-                result.getTxID(), result.getContainerID(), result.getSuccess());
+                result.getTxID(), result.getContainerID(), success);
+            if (success) {
+              blockDeleteMetrics.incrProcessedTransactionSuccessCount(1);
+            } else {
+              blockDeleteMetrics.incrProcessedTransactionFailCount(1);
+            }
           }
         }
       }
@@ -464,7 +468,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       Future<DeleteBlockTransactionExecutionResult> future =
           executor.submit(new ProcessTransactionTask(tx));
       futures.add(future);
-      blockDeleteMetrics.incrProcessedTransactionCount(1);
     }
     return futures;
   }
@@ -653,7 +656,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           containerData.getDeleteTransactionId()));
     } else if (delTX.getTxID() == containerData.getDeleteTransactionId()) {
       duplicate = true;
-      metrics.incrTotalTransactionsDiscarded(1);
       LOG.info(String.format("Delete blocks with txID %d for containerId: %d"
               + " is retried.", delTX.getTxID(), containerId));
     } else {
