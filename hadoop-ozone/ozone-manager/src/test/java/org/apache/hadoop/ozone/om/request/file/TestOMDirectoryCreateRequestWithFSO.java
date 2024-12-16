@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateD
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import jakarta.annotation.Nonnull;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -97,6 +98,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     OMRequestTestUtils.configureFSOptimizedPaths(ozoneConfiguration, true);
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
+    when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     auditLogger = mock(AuditLogger.class);
@@ -168,7 +170,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     omDirCreateRequestFSO =
         new OMDirectoryCreateRequestWithFSO(modifiedOmReq,
             BucketLayout.FILE_SYSTEM_OPTIMIZED);
-
+    omDirCreateRequestFSO.setUGI(UserGroupInformation.getCurrentUser());
     OMClientResponse omClientResponse =
         omDirCreateRequestFSO.validateAndUpdateCache(ozoneManager, 100L);
 
@@ -208,6 +210,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     omDirCreateRequestFSO =
         new OMDirectoryCreateRequestWithFSO(modifiedOmReq,
             BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    omDirCreateRequestFSO.setUGI(UserGroupInformation.getCurrentUser());
     OMClientResponse omClientResponse =
         omDirCreateRequestFSO.validateAndUpdateCache(ozoneManager, 100L);
     assertSame(omClientResponse.getOMResponse().getStatus(),
@@ -316,7 +319,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
-
+    omDirCreateReqFSO.setUGI(UserGroupInformation.getCurrentUser());
     OMClientResponse omClientResponse =
         omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L);
 
@@ -569,6 +572,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    omDirCreateReqFSO.setUGI(UserGroupInformation.getCurrentUser());
 
     assertEquals(0L, omMetrics.getNumKeys());
     OMClientResponse omClientResponse =
@@ -603,7 +607,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
-
+    omDirCreateReqFSO.setUGI(UserGroupInformation.getCurrentUser());
     assertEquals(0L, omMetrics.getNumKeys());
     OMClientResponse omClientResponse =
         omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L);
@@ -642,6 +646,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    omDirCreateReqFSO.setUGI(UserGroupInformation.getCurrentUser());
 
     assertEquals(0L, omMetrics.getNumKeys());
     OMClientResponse omClientResponse =
@@ -694,7 +699,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     omDirCreateReqFSO = new OMDirectoryCreateRequestWithFSO(modifiedOmReq,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
-
+    omDirCreateReqFSO.setUGI(UserGroupInformation.getCurrentUser());
     OMClientResponse omClientResponse =
         omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L);
     assertSame(omClientResponse.getOMResponse().getStatus(),
@@ -729,7 +734,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
       System.out.println(
           "  subdir acls : " + omDirInfo + " ==> " + omDirAcls);
 
-      assertEquals(expectedInheritAcls, omDirAcls,
+      assertTrue(omDirAcls.containsAll(expectedInheritAcls),
           "Failed to inherit parent DEFAULT acls!");
 
       parentID = omDirInfo.getObjectID();

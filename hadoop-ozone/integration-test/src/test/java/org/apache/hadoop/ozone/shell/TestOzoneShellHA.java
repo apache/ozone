@@ -40,7 +40,6 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.hdds.cli.GenericCli;
@@ -112,6 +111,7 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
@@ -136,12 +136,13 @@ public class TestOzoneShellHA {
       LoggerFactory.getLogger(TestOzoneShellHA.class);
 
   private static final String DEFAULT_ENCODING = UTF_8.name();
-
-  private static File baseDir;
+  @TempDir
+  private static java.nio.file.Path path;
+  @TempDir
+  private static File kmsDir;
   private static File testFile;
   private static String testFilePathString;
   private static MiniOzoneHAClusterImpl cluster = null;
-  private static File testDir;
   private static MiniKMS miniKMS;
   private static OzoneClient client;
   private OzoneShell ozoneShell = null;
@@ -173,20 +174,12 @@ public class TestOzoneShellHA {
   }
 
   protected static void startKMS() throws Exception {
-    testDir = GenericTestUtils.getTestDir(
-        TestOzoneShellHA.class.getSimpleName());
-    File kmsDir = new File(testDir, UUID.randomUUID().toString());
-    assertTrue(kmsDir.mkdirs());
     MiniKMS.Builder miniKMSBuilder = new MiniKMS.Builder();
     miniKMS = miniKMSBuilder.setKmsConfDir(kmsDir).build();
     miniKMS.start();
   }
 
   protected static void startCluster(OzoneConfiguration conf) throws Exception {
-    String path = GenericTestUtils.getTempPath(
-        TestOzoneShellHA.class.getSimpleName());
-    baseDir = new File(path);
-    baseDir.mkdirs();
 
     testFilePathString = path + OZONE_URI_DELIMITER + "testFile";
     testFile = new File(testFilePathString);
@@ -225,20 +218,12 @@ public class TestOzoneShellHA {
     if (miniKMS != null) {
       miniKMS.stop();
     }
-
-    if (baseDir != null) {
-      FileUtil.fullyDelete(baseDir, true);
-    }
-
-    if (testDir != null) {
-      FileUtil.fullyDelete(testDir, true);
-    }
   }
 
   @BeforeEach
   public void setup() throws UnsupportedEncodingException {
     ozoneShell = new OzoneShell();
-    ozoneAdminShell = new OzoneAdmin(ozoneConfiguration);
+    ozoneAdminShell = new OzoneAdmin();
     System.setOut(new PrintStream(out, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(err, false, DEFAULT_ENCODING));
   }

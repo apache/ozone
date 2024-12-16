@@ -32,7 +32,6 @@ import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
@@ -60,7 +59,6 @@ import org.slf4j.event.Level;
 
 import java.io.IOException;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -73,16 +71,16 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.anyString;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -118,7 +116,7 @@ public class TestContainerBalancerTask {
   private static final ThreadLocalRandom RANDOM = ThreadLocalRandom.current();
 
   private StatefulServiceStateManager serviceStateManager;
-  private static final long STORAGE_UNIT = OzoneConsts.GB;
+  static final long STORAGE_UNIT = OzoneConsts.GB;
 
   /**
    * Sets up configuration values and creates a mock cluster.
@@ -335,229 +333,6 @@ public class TestContainerBalancerTask {
     assertEquals(moveTimeout, cbConf.getMoveTimeout().toMinutes());
     assertEquals(replicationTimeout,
         cbConf.getMoveReplicationTimeout().toMinutes());
-  }
-
-  @Test
-  public void checkIterationResult()
-      throws NodeNotFoundException, IOException,
-      IllegalContainerBalancerStateException,
-      InvalidContainerBalancerConfigurationException,
-      TimeoutException {
-    balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setIterations(1);
-    balancerConfiguration.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
-    balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
-    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    rmConf.setEnableLegacy(true);
-
-    startBalancer(balancerConfiguration);
-
-    /*
-    According to the setup and configurations, this iteration's result should
-    be ITERATION_COMPLETED.
-     */
-    assertEquals(
-        ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
-        containerBalancerTask.getIterationResult());
-    stopBalancer();
-
-    /*
-    Now, limit maxSizeToMovePerIteration but fail all container moves. The
-    result should still be ITERATION_COMPLETED.
-     */
-    when(replicationManager.move(any(ContainerID.class),
-            any(DatanodeDetails.class),
-            any(DatanodeDetails.class)))
-        .thenReturn(CompletableFuture.completedFuture(
-            MoveManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY));
-    balancerConfiguration.setMaxSizeToMovePerIteration(10 * STORAGE_UNIT);
-
-    startBalancer(balancerConfiguration);
-
-    assertEquals(
-        ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
-        containerBalancerTask.getIterationResult());
-    stopBalancer();
-
-    /*
-    Try the same but use MoveManager for container move instead of legacy RM.
-     */
-    rmConf.setEnableLegacy(false);
-    startBalancer(balancerConfiguration);
-    assertEquals(
-        ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
-        containerBalancerTask.getIterationResult());
-    stopBalancer();
-  }
-
-  /**
-   * Tests the situation where some container moves time out because they
-   * take longer than "move.timeout".
-   */
-  @Test
-  public void checkIterationResultTimeout()
-      throws NodeNotFoundException, IOException,
-      IllegalContainerBalancerStateException,
-      InvalidContainerBalancerConfigurationException,
-      TimeoutException {
-
-    CompletableFuture<MoveManager.MoveResult> completedFuture =
-        CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED);
-    when(replicationManager.move(any(ContainerID.class),
-            any(DatanodeDetails.class),
-            any(DatanodeDetails.class)))
-        .thenReturn(completedFuture)
-        .thenAnswer(invocation -> genCompletableFuture(2000));
-
-    balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setIterations(1);
-    balancerConfiguration.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
-    balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
-    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerConfiguration.setMoveTimeout(Duration.ofMillis(500));
-    rmConf.setEnableLegacy(true);
-    startBalancer(balancerConfiguration);
-
-    /*
-    According to the setup and configurations, this iteration's result should
-    be ITERATION_COMPLETED.
-     */
-    assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
-        containerBalancerTask.getIterationResult());
-    assertEquals(1, containerBalancerTask.getMetrics().getNumContainerMovesCompletedInLatestIteration());
-    assertThat(containerBalancerTask.getMetrics()
-            .getNumContainerMovesTimeoutInLatestIteration()).isGreaterThan(1);
-    stopBalancer();
-
-    /*
-    Test the same but use MoveManager instead of LegacyReplicationManager.
-    The first move being 10ms falls within the timeout duration of 500ms. It
-    should be successful. The rest should fail.
-     */
-    rmConf.setEnableLegacy(false);
-    when(moveManager.move(any(ContainerID.class),
-            any(DatanodeDetails.class),
-            any(DatanodeDetails.class)))
-        .thenReturn(completedFuture)
-        .thenAnswer(invocation -> genCompletableFuture(2000));
-
-    startBalancer(balancerConfiguration);
-    assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
-        containerBalancerTask.getIterationResult());
-    assertEquals(1, containerBalancerTask.getMetrics().getNumContainerMovesCompletedInLatestIteration());
-    assertThat(containerBalancerTask.getMetrics()
-        .getNumContainerMovesTimeoutInLatestIteration()).isGreaterThan(1);
-    stopBalancer();
-  }
-
-  @Test
-  public void checkIterationResultTimeoutFromReplicationManager()
-      throws NodeNotFoundException, IOException,
-      IllegalContainerBalancerStateException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
-    CompletableFuture<MoveManager.MoveResult> future
-        = CompletableFuture.supplyAsync(() ->
-        MoveManager.MoveResult.REPLICATION_FAIL_TIME_OUT);
-    CompletableFuture<MoveManager.MoveResult> future2
-        = CompletableFuture.supplyAsync(() ->
-        MoveManager.MoveResult.DELETION_FAIL_TIME_OUT);
-    when(replicationManager.move(any(ContainerID.class),
-            any(DatanodeDetails.class),
-            any(DatanodeDetails.class)))
-        .thenReturn(future, future2);
-
-    balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setIterations(1);
-    balancerConfiguration.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
-    balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
-    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerConfiguration.setMoveTimeout(Duration.ofMillis(500));
-    rmConf.setEnableLegacy(true);
-    startBalancer(balancerConfiguration);
-
-    assertThat(containerBalancerTask.getMetrics()
-        .getNumContainerMovesTimeoutInLatestIteration()).isGreaterThan(0);
-    assertEquals(0, containerBalancerTask.getMetrics().getNumContainerMovesCompletedInLatestIteration());
-    stopBalancer();
-
-    /*
-    Try the same test with MoveManager instead of LegacyReplicationManager.
-     */
-    when(moveManager.move(any(ContainerID.class),
-            any(DatanodeDetails.class),
-            any(DatanodeDetails.class)))
-        .thenReturn(future).thenAnswer(invocation -> future2);
-
-    rmConf.setEnableLegacy(false);
-    startBalancer(balancerConfiguration);
-    assertThat(containerBalancerTask.getMetrics()
-        .getNumContainerMovesTimeoutInLatestIteration()).isGreaterThan(0);
-    assertEquals(0, containerBalancerTask.getMetrics().getNumContainerMovesCompletedInLatestIteration());
-    stopBalancer();
-  }
-
-  @Test
-  public void checkIterationResultException()
-      throws NodeNotFoundException, IOException,
-      IllegalContainerBalancerStateException,
-      InvalidContainerBalancerConfigurationException,
-      TimeoutException {
-
-    CompletableFuture<MoveManager.MoveResult> future =
-        new CompletableFuture<>();
-    future.completeExceptionally(new RuntimeException("Runtime Exception"));
-    when(replicationManager.move(any(ContainerID.class),
-            any(DatanodeDetails.class),
-            any(DatanodeDetails.class)))
-        .thenReturn(CompletableFuture.supplyAsync(() -> {
-          try {
-            Thread.sleep(1);
-          } catch (Exception ignored) {
-          }
-          throw new RuntimeException("Runtime Exception after doing work");
-        }))
-        .thenThrow(new ContainerNotFoundException("Test Container not found"))
-        .thenReturn(future);
-
-    balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setIterations(1);
-    balancerConfiguration.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
-    balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
-    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    balancerConfiguration.setMoveTimeout(Duration.ofMillis(500));
-    rmConf.setEnableLegacy(true);
-
-    startBalancer(balancerConfiguration);
-
-    assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
-        containerBalancerTask.getIterationResult());
-    assertThat(containerBalancerTask.getMetrics().getNumContainerMovesFailed())
-        .isGreaterThanOrEqualTo(3);
-    stopBalancer();
-
-    /*
-    Try the same test but with MoveManager instead of ReplicationManager.
-     */
-    when(moveManager.move(any(ContainerID.class),
-            any(DatanodeDetails.class),
-            any(DatanodeDetails.class)))
-        .thenReturn(CompletableFuture.supplyAsync(() -> {
-          try {
-            Thread.sleep(1);
-          } catch (Exception ignored) {
-          }
-          throw new RuntimeException("Runtime Exception after doing work");
-        }))
-        .thenThrow(new ContainerNotFoundException("Test Container not found"))
-        .thenReturn(future);
-
-    rmConf.setEnableLegacy(false);
-    startBalancer(balancerConfiguration);
-    assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
-        containerBalancerTask.getIterationResult());
-    assertThat(containerBalancerTask.getMetrics().getNumContainerMovesFailed())
-        .isGreaterThanOrEqualTo(3);
-    stopBalancer();
   }
 
   @Test

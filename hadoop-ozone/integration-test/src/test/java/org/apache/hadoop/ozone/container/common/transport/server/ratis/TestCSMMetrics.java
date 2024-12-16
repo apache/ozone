@@ -22,8 +22,8 @@ import static org.apache.ozone.test.MetricsAsserts.assertCounter;
 import static org.apache.ozone.test.MetricsAsserts.getDoubleGauge;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.ArrayList;
 
@@ -49,7 +49,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.transport.server
       .XceiverServerSpi;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
@@ -66,14 +65,14 @@ import java.util.function.BiConsumer;
 import org.apache.ratis.util.function.CheckedBiFunction;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * This class tests the metrics of ContainerStateMachine.
  */
 public class TestCSMMetrics {
-  private static final String TEST_DIR =
-      GenericTestUtils.getTestDir("dfs").getAbsolutePath()
-          + File.separator;
+  @TempDir
+  private static Path testDir;
 
   @BeforeAll
   public static void setup() {
@@ -154,6 +153,14 @@ public class TestCSMMetrics {
       assertCounter("NumContainerNotOpenVerifyFailures", 0L, metric);
       assertCounter("WriteChunkMsNumOps", 1L, metric);
 
+      applyTransactionLatency = getDoubleGauge(
+          "ApplyTransactionNsAvgTime", metric);
+      assertThat(applyTransactionLatency).isGreaterThan(0.0);
+      writeStateMachineLatency = getDoubleGauge(
+          "WriteStateMachineDataNsAvgTime", metric);
+      assertThat(writeStateMachineLatency).isGreaterThan(0.0);
+
+
       //Read Chunk
       ContainerProtos.ContainerCommandRequestProto readChunkRequest =
           ContainerTestHelper.getReadChunkRequest(pipeline, writeChunkRequest
@@ -166,12 +173,6 @@ public class TestCSMMetrics {
           RaftGroupId.valueOf(pipeline.getId().getId()));
       assertCounter("NumQueryStateMachineOps", 1L, metric);
       assertCounter("NumApplyTransactionOps", 1L, metric);
-      applyTransactionLatency = getDoubleGauge(
-          "ApplyTransactionNsAvgTime", metric);
-      assertThat(applyTransactionLatency).isGreaterThan(0.0);
-      writeStateMachineLatency = getDoubleGauge(
-          "WriteStateMachineDataNsAvgTime", metric);
-      assertThat(writeStateMachineLatency).isGreaterThan(0.0);
 
     } finally {
       if (client != null) {
@@ -184,8 +185,8 @@ public class TestCSMMetrics {
   static XceiverServerRatis newXceiverServerRatis(
       DatanodeDetails dn, OzoneConfiguration conf) throws IOException {
     conf.setInt(OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT,
-        dn.getPort(DatanodeDetails.Port.Name.RATIS).getValue());
-    final String dir = TEST_DIR + dn.getUuid();
+        dn.getRatisPort().getValue());
+    final String dir = testDir.resolve(dn.getUuidString()).toString();
     conf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
 
     final ContainerDispatcher dispatcher = new TestContainerDispatcher();

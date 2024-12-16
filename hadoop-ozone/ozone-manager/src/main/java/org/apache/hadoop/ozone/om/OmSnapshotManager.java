@@ -38,6 +38,7 @@ import java.util.stream.Collectors;
 import java.util.UUID;
 
 import com.google.common.cache.RemovalListener;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -98,8 +99,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_CLE
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_SNAPSHOT_ERROR;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager.getSnapshotRootPath;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
@@ -351,7 +352,8 @@ public final class OmSnapshotManager implements AutoCloseable {
         // If it happens, then either snapshot has been purged in between or SnapshotChain is corrupted
         // and missing some entries which needs investigation.
         if (snapshotTableKey == null) {
-          throw new IOException("No snapshot exist with snapshotId: " + snapshotId);
+          throw new OMException("Snapshot " + snapshotId +
+              " is not found in the snapshot chain.", FILE_NOT_FOUND);
         }
 
         final SnapshotInfo snapshotInfo = getSnapshotInfo(snapshotTableKey);
@@ -624,7 +626,12 @@ public final class OmSnapshotManager implements AutoCloseable {
     String[] keyParts = keyName.split(OM_KEY_PREFIX);
     if (isSnapshotKey(keyParts)) {
       String snapshotName = keyParts[1];
-
+      // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
+      // permission check, since linked bucket permissions and source bucket permissions could be different.
+      ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(Pair.of(volumeName,
+          bucketName), false, false);
+      volumeName = resolvedBucket.realVolume();
+      bucketName = resolvedBucket.realBucket();
       return (ReferenceCounted<IOmMetadataReader>) (ReferenceCounted<?>)
           getActiveSnapshot(volumeName, bucketName, snapshotName);
     } else {
@@ -656,7 +663,6 @@ public final class OmSnapshotManager implements AutoCloseable {
       // don't allow snapshot indicator without snapshot name
       throw new OMException(INVALID_KEY_NAME);
     }
-
     String snapshotTableKey = SnapshotInfo.getTableKey(volumeName,
         bucketName, snapshotName);
 
@@ -740,7 +746,7 @@ public final class OmSnapshotManager implements AutoCloseable {
       snapshotInfo = ozoneManager.getMetadataManager().getSnapshotInfoTable().getSkipCache(snapshotKey);
     }
     if (snapshotInfo == null) {
-      throw new OMException("Snapshot '" + snapshotKey + "' is not found.", INVALID_SNAPSHOT_ERROR);
+      throw new OMException("Snapshot '" + snapshotKey + "' is not found.", FILE_NOT_FOUND);
     }
     return snapshotInfo;
   }

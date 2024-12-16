@@ -42,7 +42,7 @@ DEFAULT_SRC="target/generated-sources/license/THIRD-PARTY.txt"
 src="${1:-${DEFAULT_SRC}}"
 
 if [[ ! -e ${src} ]]; then
-  MAVEN_OPTIONS="-B -fae -Dskip.npx -Dskip.installnpx --no-transfer-progress ${MAVEN_OPTIONS:-}"
+  MAVEN_OPTIONS="-B -fae -DskipRecon --no-transfer-progress ${MAVEN_OPTIONS:-}"
   mvn ${MAVEN_OPTIONS} license:aggregate-add-third-party | tee "${REPORT_DIR}/output.log"
   src="${DEFAULT_SRC}"
 fi
@@ -67,9 +67,7 @@ grep '(' ${src} \
     || true ) \
   | sort -u \
   | tee "${REPORT_FILE}"
+rc=$?
 
-wc -l "${REPORT_FILE}" | awk '{ print $1 }' > "${REPORT_DIR}/failures"
-
-if [[ -s "${REPORT_FILE}" ]]; then
-   exit 1
-fi
+ERROR_PATTERN=""
+source "${DIR}/_post_process.sh"

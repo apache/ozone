@@ -23,6 +23,10 @@ import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 /**
  * Ozone ACL config pojo.
  * */
@@ -40,7 +44,7 @@ public class OzoneAclConfig {
   private String userDefaultRights;
 
   @Config(key = "group.rights",
-      defaultValue = "ALL",
+      defaultValue = "READ, LIST",
       type = ConfigType.STRING,
       tags = {ConfigTag.OM, ConfigTag.SECURITY},
       description = "Default group permissions set for an object in " +
@@ -48,18 +52,26 @@ public class OzoneAclConfig {
   )
   private String groupDefaultRights;
 
-  public ACLType getUserDefaultRights() {
+  public ACLType[] getUserDefaultRights() {
+    List<ACLType> types = new ArrayList();
     if (userDefaultRights == null) {
-      return ACLType.ALL;
+      types.add(ACLType.ALL);
+    } else {
+      String[] array = userDefaultRights.trim().split(",");
+      Arrays.stream(array).forEach(t -> types.add(ACLType.valueOf(t.trim())));
     }
-    return ACLType.valueOf(userDefaultRights);
+    return types.toArray(new ACLType[0]);
   }
 
-  public ACLType getGroupDefaultRights() {
+  public ACLType[] getGroupDefaultRights() {
+    List<ACLType> types = new ArrayList();
     if (groupDefaultRights == null) {
-      return ACLType.ALL;
+      types.add(ACLType.READ);
+      types.add(ACLType.LIST);
+    } else {
+      String[] array = groupDefaultRights.trim().split(",");
+      Arrays.stream(array).forEach(t -> types.add(ACLType.valueOf(t.trim())));
     }
-    return ACLType.valueOf(groupDefaultRights);
+    return types.toArray(new ACLType[0]);
   }
-
 }

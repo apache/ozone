@@ -19,8 +19,6 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
-import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import java.util.concurrent.Callable;
@@ -37,8 +35,7 @@ import java.util.concurrent.Callable;
         DecommissionStatusSubCommand.class
     })
 
-@MetaInfServices(SubcommandWithParent.class)
-public class StatusSubCommand implements Callable<Void>, SubcommandWithParent {
+public class StatusSubCommand implements Callable<Void> {
 
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
@@ -47,10 +44,5 @@ public class StatusSubCommand implements Callable<Void>, SubcommandWithParent {
   public Void call() throws Exception {
     GenericCli.missingSubcommand(spec);
     return null;
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return DatanodeCommands.class;
   }
 }
