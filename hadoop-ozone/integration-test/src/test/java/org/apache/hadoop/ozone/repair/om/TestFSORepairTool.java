@@ -97,7 +97,7 @@ public class TestFSORepairTool {
     dbPath = new File(OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME).getPath();
 
     // Build multiple connected and disconnected trees
-    FSORepairTool.Report report1 = buildConnectedTree("vol1", "bucket1");
+    FSORepairTool.Report report1 = buildConnectedTree("vol1", "bucket1", 10);
     FSORepairTool.Report report2 = buildDisconnectedTree("vol2", "bucket1", 10);
     FSORepairTool.Report report3 = buildConnectedTree("vol2", "bucket2", 10);
     FSORepairTool.Report report4 = buildEmptyTree();
@@ -343,8 +343,34 @@ public class TestFSORepairTool {
     Assertions.assertTrue(cliOutput1.contains("Unreferenced:\n\tDirectories: 0\n\tFiles: 0\n\tBytes: 0"));
   }
 
-  private static FSORepairTool.Report buildConnectedTree(String volume, String bucket) throws Exception {
-    return buildConnectedTree(volume, bucket, 0);
+  /**
+   * Validate cluster state after OM restart by checking the tables.
+   * @throws Exception
+   */
+  @Order(7)
+  @Test
+  public void validateClusterAfterRestart() throws Exception {
+    cluster.getOzoneManager().restart();
+
+    // 4 volumes (/s3v, /vol1, /vol2, /vol-empty)
+    assertEquals(4, countTableEntries(cluster.getOzoneManager().getMetadataManager().getVolumeTable()));
+    // 6 buckets (vol1/bucket1, vol2/bucket1, vol2/bucket2, vol-empty/bucket-empty, vol/legacy-bucket, vol1/obs-bucket)
+    assertEquals(6, countTableEntries(cluster.getOzoneManager().getMetadataManager().getBucketTable()));
+    // 1 directory is unreferenced and moved to the deletedDirTable during repair mode.
+    assertEquals(1, countTableEntries(cluster.getOzoneManager().getMetadataManager().getDeletedDirTable()));
+    // 3 files are unreferenced and moved to the deletedTable during repair mode.
+    assertEquals(3, countTableEntries(cluster.getOzoneManager().getMetadataManager().getDeletedTable()));
+  }
+
+  private <K, V> int countTableEntries(Table<K, V> table) throws Exception {
+    int count = 0;
+    try (TableIterator<K, ? extends Table.KeyValue<K, V>> iterator = table.iterator()) {
+      while (iterator.hasNext()) {
+        iterator.next();
+        count++;
+      }
+    }
+    return count;
   }
 
   private String extractRelevantSection(String cliOutput) {
@@ -450,10 +476,6 @@ public class TestFSORepairTool {
     Assertions.assertTrue(fs.exists(file2));
     Assertions.assertTrue(fs.exists(file3));
     Assertions.assertTrue(fs.exists(file4));
-  }
-
-  private static FSORepairTool.Report buildDisconnectedTree(String volume, String bucket) throws Exception {
-    return buildDisconnectedTree(volume, bucket, 0);
   }
 
   /**
