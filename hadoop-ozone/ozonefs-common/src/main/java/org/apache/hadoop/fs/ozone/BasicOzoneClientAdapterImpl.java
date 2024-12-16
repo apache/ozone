@@ -69,6 +69,7 @@ import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -77,6 +78,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
@@ -436,15 +438,22 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   @Override
   public List<FileStatusAdapter> listStatus(String keyName, boolean recursive,
       String startKey, long numEntries, URI uri,
-      Path workingDir, String username) throws IOException {
+      Path workingDir, String username, boolean lite) throws IOException {
     try {
       incrementCounter(Statistic.OBJECTS_LIST, 1);
-      List<OzoneFileStatus> statuses = bucket
-          .listStatus(keyName, recursive, startKey, numEntries);
-
       List<FileStatusAdapter> result = new ArrayList<>();
-      for (OzoneFileStatus status : statuses) {
-        result.add(toFileStatusAdapter(status, username, uri, workingDir));
+      if (lite) {
+        List<OzoneFileStatusLight> statuses = bucket
+            .listStatusLight(keyName, recursive, startKey, numEntries);
+        for (OzoneFileStatusLight status : statuses) {
+          result.add(toFileStatusAdapter(status, username, uri, workingDir));
+        }
+      } else {
+        List<OzoneFileStatus> statuses = bucket
+            .listStatus(keyName, recursive, startKey, numEntries);
+        for (OzoneFileStatus status : statuses) {
+          result.add(toFileStatusAdapter(status, username, uri, workingDir));
+        }
       }
       return result;
     } catch (OMException e) {
@@ -545,6 +554,31 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
         null,
         getBlockLocations(status),
         OzoneClientUtils.isKeyEncrypted(keyInfo),
+        OzoneClientUtils.isKeyErasureCode(keyInfo)
+    );
+  }
+
+  private FileStatusAdapter toFileStatusAdapter(OzoneFileStatusLight status,
+                                                String owner, URI defaultUri, Path workingDir) {
+    BasicOmKeyInfo keyInfo = status.getKeyInfo();
+    short replication = (short) keyInfo.getReplicationConfig()
+        .getRequiredNodes();
+    return new FileStatusAdapter(
+        keyInfo.getDataSize(),
+        keyInfo.getReplicatedSize(),
+        new Path(OZONE_URI_DELIMITER + keyInfo.getKeyName())
+            .makeQualified(defaultUri, workingDir),
+        status.isDirectory(),
+        replication,
+        status.getBlockSize(),
+        keyInfo.getModificationTime(),
+        keyInfo.getModificationTime(),
+        status.isDirectory() ? (short) 00777 : (short) 00666,
+        StringUtils.defaultIfEmpty(keyInfo.getOwnerName(), owner),
+        owner,
+        null,
+        getBlockLocations(null),
+        false,
         OzoneClientUtils.isKeyErasureCode(keyInfo)
     );
   }

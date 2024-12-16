@@ -38,6 +38,8 @@
     <module>ozonefs-common</module>
     <module>ozonefs</module>
     <module>datanode</module>
+    <module>recon</module>
+    <module>recon-codegen</module>
     <module>s3gateway</module>
     <module>dist</module>
     <module>csi</module>
@@ -46,13 +48,6 @@
     <module>httpfsgateway</module>
     <module>s3-secret-store</module>
   </modules>
-
-  <repositories>
-    <repository>
-      <id>apache.snapshots.https</id>
-      <url>https://repository.apache.org/content/repositories/snapshots</url>
-    </repository>
-  </repositories>
 
   <dependencyManagement>
 
@@ -394,18 +389,6 @@
       <modules>
         <module>ozonefs-shaded</module>
         <module>ozonefs-hadoop2</module>
-      </modules>
-    </profile>
-    <profile>
-      <id>build-with-recon</id>
-      <activation>
-        <property>
-          <name>!skipRecon</name>
-        </property>
-      </activation>
-      <modules>
-        <module>recon</module>
-        <module>recon-codegen</module>
       </modules>
     </profile>
     <profile>

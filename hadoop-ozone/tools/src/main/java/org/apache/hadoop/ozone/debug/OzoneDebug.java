@@ -19,6 +19,8 @@
 package org.apache.hadoop.ozone.debug;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.cli.DebugSubcommand;
+import org.apache.hadoop.hdds.cli.ExtensibleParentCommand;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 
@@ -32,7 +34,7 @@ import picocli.CommandLine;
         description = "Developer tools for Ozone Debug operations",
         versionProvider = HddsVersionProvider.class,
         mixinStandardHelpOptions = true)
-public class OzoneDebug extends GenericCli {
+public class OzoneDebug extends GenericCli implements ExtensibleParentCommand {
 
   private OzoneConfiguration ozoneConf;
 
@@ -62,5 +64,10 @@ public class OzoneDebug extends GenericCli {
   public static void main(String[] argv) throws Exception {
 
     new OzoneDebug().run(argv);
+  }
+
+  @Override
+  public Class<?> subcommandType() {
+    return DebugSubcommand.class;
   }
 }

@@ -46,6 +46,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -150,7 +153,7 @@ public class TestHadoopDirTreeGenerator {
     FileStatus[] fileStatuses = fileSystem.listStatus(rootDir);
     // verify the num of peer directories, expected span count is 1
     // as it has only one dir at root.
-    verifyActualSpan(1, fileStatuses);
+    verifyActualSpan(1, Arrays.asList(fileStatuses));
     for (FileStatus fileStatus : fileStatuses) {
       int actualDepth =
           traverseToLeaf(fileSystem, fileStatus.getPath(), 1, depth, span,
@@ -164,14 +167,16 @@ public class TestHadoopDirTreeGenerator {
                              int expectedFileCnt, StorageSize perFileSize)
           throws IOException {
     FileStatus[] fileStatuses = fs.listStatus(dirPath);
+    List<FileStatus> fileStatusList = new ArrayList<>();
+    Collections.addAll(fileStatusList, fileStatuses);
     // check the num of peer directories except root and leaf as both
     // has less dirs.
     if (depth < expectedDepth - 1) {
-      verifyActualSpan(expectedSpanCnt, fileStatuses);
+      verifyActualSpan(expectedSpanCnt, fileStatusList);
     }
     int actualNumFiles = 0;
     ArrayList <String> files = new ArrayList<>();
-    for (FileStatus fileStatus : fileStatuses) {
+    for (FileStatus fileStatus : fileStatusList) {
       if (fileStatus.isDirectory()) {
         ++depth;
         return traverseToLeaf(fs, fileStatus.getPath(), depth, expectedDepth,
@@ -192,7 +197,7 @@ public class TestHadoopDirTreeGenerator {
   }
 
   private int verifyActualSpan(int expectedSpanCnt,
-                               FileStatus[] fileStatuses) {
+                               List<FileStatus> fileStatuses) {
     int actualSpan = 0;
     for (FileStatus fileStatus : fileStatuses) {
       if (fileStatus.isDirectory()) {

@@ -281,7 +281,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
   protected void submitPurgePaths(List<PurgePathRequest> requests,
                                   String snapTableKey,
-                                  UUID expectedPreviousSnapshotId) {
+                                  UUID expectedPreviousSnapshotId, long rnCnt) {
     OzoneManagerProtocolProtos.PurgeDirectoriesRequest.Builder purgeDirRequest =
         OzoneManagerProtocolProtos.PurgeDirectoriesRequest.newBuilder();
 
@@ -306,7 +306,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
     // Submit Purge paths request to OM
     try {
-      OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, runCount.get());
+      OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, rnCnt);
     } catch (ServiceException e) {
       LOG.error("PurgePaths request failed. Will retry at next run.", e);
     }
@@ -406,7 +406,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       String snapTableKey, long startTime,
       long remainingBufLimit, long maxBufLimit, KeyManager keyManager,
       UUID expectedPreviousSnapshotId,
-      List<List<PurgePathRequest>> purgeRequestListBatches) {
+      List<List<PurgePathRequest>> purgeRequestListBatches, long rnCnt) {
 
     // Optimization to handle delete sub-dir and keys to remove quickly
     // This case will be useful to handle when depth of directory is high
@@ -457,7 +457,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     boolean purgeRequestSent = false;
     for (List<PurgePathRequest> purgePathRequestBatch : purgeRequestListBatches) {
       if (!purgePathRequestBatch.isEmpty()) {
-        submitPurgePaths(purgePathRequestBatch, snapTableKey, expectedPreviousSnapshotId);
+        submitPurgePaths(purgePathRequestBatch, snapTableKey, expectedPreviousSnapshotId,rnCnt);
         purgeRequestSent = true;
         runCount.getAndIncrement();
       }
@@ -476,7 +476,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
               "DeletedDirectoryTable, iteration elapsed: {}ms," +
               " totalRunCount: {}",
           dirNum, subdirDelNum, subFileNum, (subDirNum - subdirDelNum),
-          Time.monotonicNow() - startTime, getRunCount());
+          Time.monotonicNow() - startTime, rnCnt);
     }
     return remainNum;
   }

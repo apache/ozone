@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.cli;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.ServiceLoader;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.fs.Path;
@@ -27,7 +26,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import com.google.common.annotations.VisibleForTesting;
 import picocli.CommandLine;
-import picocli.CommandLine.Command;
 import picocli.CommandLine.ExitCode;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
@@ -52,30 +50,24 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
   private final CommandLine cmd;
 
   public GenericCli() {
-    cmd = new CommandLine(this);
+    this(null);
+  }
+
+  public GenericCli(Class<?> type) {
+    this(type, CommandLine.defaultFactory());
+  }
+
+  public GenericCli(Class<?> type, CommandLine.IFactory factory) {
+    cmd = new CommandLine(this, factory);
     cmd.setExecutionExceptionHandler((ex, commandLine, parseResult) -> {
       printError(ex);
       return EXECUTION_ERROR_EXIT_CODE;
     });
-  }
 
-  public GenericCli(Class<?> type) {
-    this();
-    addSubcommands(getCmd(), type);
-  }
-
-  private void addSubcommands(CommandLine cli, Class<?> type) {
-    ServiceLoader<SubcommandWithParent> registeredSubcommands =
-        ServiceLoader.load(SubcommandWithParent.class);
-    for (SubcommandWithParent subcommand : registeredSubcommands) {
-      if (subcommand.getParentType().equals(type)) {
-        final Command commandAnnotation =
-            subcommand.getClass().getAnnotation(Command.class);
-        CommandLine subcommandCommandLine = new CommandLine(subcommand);
-        addSubcommands(subcommandCommandLine, subcommand.getClass());
-        cli.addSubcommand(commandAnnotation.name(), subcommandCommandLine);
-      }
+    if (type != null) {
+      SubcommandWithParent.addSubcommands(getCmd(), type);
     }
+    ExtensibleParentCommand.addSubcommands(cmd);
   }
 
   /**

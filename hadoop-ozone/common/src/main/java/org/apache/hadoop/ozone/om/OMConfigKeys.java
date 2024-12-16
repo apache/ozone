@@ -421,6 +421,11 @@ public final class OMConfigKeys {
   // resulting 24MB
   public static final int OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT = 6000;
 
+  public static final String OZONE_THREAD_NUMBER_DIR_DELETION =
+      "ozone.thread.number.dir.deletion";
+
+  public static final int OZONE_THREAD_NUMBER_DIR_DELETION_DEFAULT = 10;
+
   public static final String SNAPSHOT_SST_DELETING_LIMIT_PER_TASK =
       "ozone.snapshot.filtering.limit.per.task";
   public static final int SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT = 2;
@@ -625,4 +630,9 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_MAX_BUCKET =
       "ozone.om.max.buckets";
   public static final int OZONE_OM_MAX_BUCKET_DEFAULT = 100000;
+  /**
+   * Configuration property to configure the max server side response size for list calls.
+   */
+  public static final String OZONE_OM_SERVER_LIST_MAX_SIZE = "ozone.om.server.list.max.size";
+  public static final int OZONE_OM_SERVER_LIST_MAX_SIZE_DEFAULT = 1000;
 }
