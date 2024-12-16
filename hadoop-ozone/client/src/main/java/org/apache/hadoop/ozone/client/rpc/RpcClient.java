@@ -1622,7 +1622,6 @@ public class RpcClient implements ClientProtocol {
             .setFileChecksum(keyInfo.getFileChecksum())
             .setOwnerName(keyInfo.getOwnerName())
             .build();
-
         dnKeyInfo.setMetadata(keyInfo.getMetadata());
         dnKeyInfo.setKeyLocationVersions(keyLocationInfoGroups);
 
