@@ -156,10 +156,8 @@ public class BlockDeletingService extends BackgroundService {
       }
       metrics.incrTotalBlockChosenCount(totalBlocks);
       metrics.incrTotalContainerChosenCount(containers.size());
-      if (containers.size() > 0) {
-        LOG.info("In this iteration, blocksLimit was {}, elapsed time {}ms.", blocksLimitPerInterval,
-            Time.monotonicNow() - startTime);
-      }
+      LOG.info("In this iteration, blocksLimit was {}, elapsed time {}ms.", blocksLimitPerInterval,
+          Time.monotonicNow() - startTime);
     } catch (StorageContainerException e) {
       LOG.warn("Failed to initiate block deleting tasks, "
           + "caused by unable to get containers info. "
