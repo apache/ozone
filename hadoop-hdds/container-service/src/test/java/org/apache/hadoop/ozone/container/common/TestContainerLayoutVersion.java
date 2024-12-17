@@ -31,7 +31,7 @@ public class TestContainerLayoutVersion {
 
   @Test
   public void testVersionCount() {
-    assertEquals(2, ContainerLayoutVersion.getAllVersions().size());
+    assertEquals(1, ContainerLayoutVersion.getAllVersions().size());
   }
 
   @Test
