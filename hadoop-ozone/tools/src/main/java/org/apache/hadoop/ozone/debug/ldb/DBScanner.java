@@ -581,7 +581,7 @@ public class DBScanner implements Callable<Void> {
     dbPath = removeTrailingSlashIfNeeded(dbPath);
     DBDefinitionFactory.setDnDBSchemaVersion(dnDBSchemaVersion);
     DBDefinition dbDefinition = DBDefinitionFactory.getDefinition(
-        Paths.get(dbPath), new OzoneConfiguration());
+        Paths.get(dbPath), new OzoneConfiguration(), parent.getDbDefinition());
     if (dbDefinition == null) {
       err().println("Error: Incorrect DB Path");
       return false;

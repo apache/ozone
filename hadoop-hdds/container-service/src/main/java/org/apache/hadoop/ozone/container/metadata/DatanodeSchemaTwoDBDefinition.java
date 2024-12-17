@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
@@ -77,6 +78,10 @@ public class DatanodeSchemaTwoDBDefinition
   public DatanodeSchemaTwoDBDefinition(String dbPath,
       ConfigurationSource config) {
     super(dbPath, config);
+  }
+
+  public DatanodeSchemaTwoDBDefinition(String dbPath) {
+    super(dbPath, new OzoneConfiguration());
   }
 
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>

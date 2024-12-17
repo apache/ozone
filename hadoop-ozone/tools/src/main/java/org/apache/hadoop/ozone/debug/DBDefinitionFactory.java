@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.debug;
 
+import java.lang.reflect.Constructor;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
@@ -96,6 +97,36 @@ public final class DBDefinitionFactory {
       }
     }
     return getDefinition(dbName);
+  }
+
+  public static DBDefinition getDefinition(Path dbName, ConfigurationSource config, String overrideDBDef) {
+    if (overrideDBDef == null) {
+      return getDefinition(dbName, config);
+    }
+    try {
+      Class<?> clazz = Class.forName(overrideDBDef);
+      if (DBDefinition.class.isAssignableFrom(clazz)) {
+        DBDefinition instance;
+        try {
+          Constructor<?> noParamConstructor = clazz.getDeclaredConstructor();
+          noParamConstructor.setAccessible(true);
+          instance = (DBDefinition) noParamConstructor.newInstance();
+        } catch (NoSuchMethodException e) {
+          Constructor<?> stringParamConstructor = clazz.getDeclaredConstructor(String.class);
+          stringParamConstructor.setAccessible(true);
+          instance = (DBDefinition) stringParamConstructor.newInstance(dbName.toAbsolutePath().toString());
+        }
+        return instance;
+      } else {
+        System.err.println("Class does not implement DBDefinition: " + overrideDBDef);
+      }
+    } catch (ClassNotFoundException e) {
+      System.err.println("Class not found: " + overrideDBDef);
+    } catch (InstantiationException | IllegalAccessException | NoSuchMethodException |
+             SecurityException | java.lang.reflect.InvocationTargetException e) {
+      System.err.println("Error creating instance: " + e.getMessage());
+    }
+    return null;
   }
 
   private static DBDefinition getReconDBDefinition(String dbName) {
