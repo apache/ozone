@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.node;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -44,8 +45,12 @@ public interface NodeManagerMXBean {
 
   /**
    * @return Get the NodeStatus table information  like hostname,
-   * Commissioned State & Operational State column for dataNode
+   * Commissioned State and Operational State column for dataNode
    */
   Map<String, Map<String, String>> getNodeStatusInfo();
+
+  default Map<String, String> getNodeStatistics() {
+    return new HashMap<>();
+  }
 
 }

@@ -210,7 +210,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           .setOmKeyLocationInfos(Collections.singletonList(
               new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
           .setAcls(getAclsForKey(keyArgs, bucketInfo, pathInfo,
-              ozoneManager.getPrefixManager()))
+              ozoneManager.getPrefixManager(), ozoneManager.getConfiguration()))
           .setObjectID(objectID)
           .setUpdateID(transactionLogIndex)
           .setFileEncryptionInfo(keyArgs.hasFileEncryptionInfo() ?
@@ -265,7 +265,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       Map<String, String> auditMap, String volumeName, String bucketName,
       String keyName, Exception exception, Result result) {
     // audit log
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.INITIATE_MULTIPART_UPLOAD, auditMap,
         exception, getOmRequest().getUserInfo()));
 

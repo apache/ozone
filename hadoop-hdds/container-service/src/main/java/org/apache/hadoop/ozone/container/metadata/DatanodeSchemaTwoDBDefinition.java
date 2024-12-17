@@ -18,9 +18,9 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
+import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
@@ -43,28 +43,36 @@ public class DatanodeSchemaTwoDBDefinition
           BLOCK_DATA =
           new DBColumnFamilyDefinition<>(
                   "block_data",
-                  String.class,
                   StringCodec.get(),
-                  BlockData.class,
                   BlockData.getCodec());
 
   public static final DBColumnFamilyDefinition<String, Long>
           METADATA =
           new DBColumnFamilyDefinition<>(
           "metadata",
-          String.class,
           StringCodec.get(),
-          Long.class,
           LongCodec.get());
 
   public static final DBColumnFamilyDefinition<Long, DeletedBlocksTransaction>
       DELETE_TRANSACTION =
       new DBColumnFamilyDefinition<>(
           "delete_txns",
-          Long.class,
           LongCodec.get(),
-          StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.class,
           Proto2Codec.get(DeletedBlocksTransaction.getDefaultInstance()));
+
+  public static final DBColumnFamilyDefinition<String, Long>
+      FINALIZE_BLOCKS =
+      new DBColumnFamilyDefinition<>(
+          "finalize_blocks",
+          FixedLengthStringCodec.get(),
+          LongCodec.get());
+
+  public static final DBColumnFamilyDefinition<String, BlockData>
+      LAST_CHUNK_INFO =
+      new DBColumnFamilyDefinition<>(
+          "last_chunk_info",
+          FixedLengthStringCodec.get(),
+          BlockData.getCodec());
 
   public DatanodeSchemaTwoDBDefinition(String dbPath,
       ConfigurationSource config) {
@@ -75,7 +83,9 @@ public class DatanodeSchemaTwoDBDefinition
       COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
           BLOCK_DATA,
           METADATA,
-          DELETE_TRANSACTION);
+          DELETE_TRANSACTION,
+          FINALIZE_BLOCKS,
+          LAST_CHUNK_INFO);
 
   @Override
   public Map<String, DBColumnFamilyDefinition<?, ?>> getMap() {
@@ -93,8 +103,18 @@ public class DatanodeSchemaTwoDBDefinition
     return METADATA;
   }
 
+  @Override
+  public DBColumnFamilyDefinition<String, BlockData>
+      getLastChunkInfoColumnFamily() {
+    return LAST_CHUNK_INFO;
+  }
+
   public DBColumnFamilyDefinition<Long, DeletedBlocksTransaction>
       getDeleteTransactionsColumnFamily() {
     return DELETE_TRANSACTION;
+  }
+
+  public DBColumnFamilyDefinition<String, Long> getFinalizeBlocksColumnFamily() {
+    return FINALIZE_BLOCKS;
   }
 }

@@ -366,7 +366,10 @@ public final class HddsConfigKeys {
   public static final int HDDS_DATANODE_CLIENT_PORT_DEFAULT = 19864;
   public static final String HDDS_DATANODE_HANDLER_COUNT_KEY =
       "hdds.datanode.handler.count";
-  public static final int HDDS_DATANODE_HANDLER_COUNT_DEFAULT = 1;
+  public static final int HDDS_DATANODE_HANDLER_COUNT_DEFAULT = 10;
+  public static final String HDDS_DATANODE_READ_THREADPOOL_KEY =
+      "hdds.datanode.read.threadpool";
+  public static final int HDDS_DATANODE_READ_THREADPOOL_DEFAULT = 10;
   public static final String HDDS_DATANODE_HTTP_BIND_HOST_DEFAULT = "0.0.0.0";
   public static final int HDDS_DATANODE_HTTP_BIND_PORT_DEFAULT = 9882;
   public static final int HDDS_DATANODE_HTTPS_BIND_PORT_DEFAULT = 9883;
@@ -398,4 +401,7 @@ public final class HddsConfigKeys {
       "hdds.datanode.slow.op.warning.threshold";
   public static final String HDDS_DATANODE_SLOW_OP_WARNING_THRESHOLD_DEFAULT =
       "500ms";
+
+  public static final String OZONE_DATANODE_IO_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY =
+      "ozone.volume.io.percentiles.intervals.seconds";
 }

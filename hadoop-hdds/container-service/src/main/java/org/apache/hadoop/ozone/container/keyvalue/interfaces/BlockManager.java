@@ -91,10 +91,16 @@ public interface BlockManager {
   long getCommittedBlockLength(Container container, BlockID blockID)
       throws IOException;
 
+  void finalizeBlock(Container container, BlockID blockId)
+      throws IOException;
+
   int getDefaultReadBufferCapacity();
 
   /** @return the threshold to read using memory mapped buffers. */
   int getReadMappedBufferThreshold();
+
+  /** @return the max count of memory mapped buffers to read. */
+  int getReadMappedBufferMaxCount();
 
   /**
    * Shutdown ContainerManager.

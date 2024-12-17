@@ -37,6 +37,11 @@ public final class BooleanCodec implements Codec<Boolean> {
   }
 
   @Override
+  public Class<Boolean> getTypeClass() {
+    return Boolean.class;
+  }
+
+  @Override
   public boolean supportCodecBuffer() {
     return true;
   }

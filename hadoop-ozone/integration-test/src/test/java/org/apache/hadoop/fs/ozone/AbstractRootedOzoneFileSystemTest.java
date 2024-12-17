@@ -237,7 +237,10 @@ abstract class AbstractRootedOzoneFileSystemTest {
     conf.setFloat(FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
     conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, TRASH_INTERVAL / 2);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
+    conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
+    conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
+    conf.set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "0s");
     if (bucketLayout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
       conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
           bucketLayout.name());
@@ -1068,7 +1071,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
   private List<FileStatus> callAdapterListStatus(String pathStr,
       boolean recursive, String startPath, long numEntries) throws IOException {
     return adapter.listStatus(pathStr, recursive, startPath, numEntries,
-        ofs.getUri(), ofs.getWorkingDirectory(), ofs.getUsername())
+        ofs.getUri(), ofs.getWorkingDirectory(), ofs.getUsername(), false)
         .stream().map(ofs::convertFileStatus).collect(Collectors.toList());
   }
 
@@ -1204,7 +1207,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     ClientProtocol proxy = objectStore.getClientProxy();
     // Get default acl rights for user
     OzoneAclConfig aclConfig = conf.getObject(OzoneAclConfig.class);
-    ACLType userRights = aclConfig.getUserDefaultRights();
+    ACLType[] userRights = aclConfig.getUserDefaultRights();
     // Construct ACL for world access
     // ACL admin owner, world read+write
     EnumSet<ACLType> aclRights = EnumSet.of(READ, WRITE);
@@ -1307,7 +1310,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     ClientProtocol proxy = objectStore.getClientProxy();
     // Get default acl rights for user
     OzoneAclConfig aclConfig = conf.getObject(OzoneAclConfig.class);
-    ACLType userRights = aclConfig.getUserDefaultRights();
+    ACLType[] userRights = aclConfig.getUserDefaultRights();
     // Construct ACL for world access
     OzoneAcl aclWorldAccess = new OzoneAcl(ACLIdentityType.WORLD, "",
         ACCESS, userRights);
@@ -2308,7 +2311,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
     // Get default acl rights for user
     OzoneAclConfig aclConfig = conf.getObject(OzoneAclConfig.class);
-    ACLType userRights = aclConfig.getUserDefaultRights();
+    ACLType[] userRights = aclConfig.getUserDefaultRights();
     // Construct ACL for world access
     OzoneAcl aclWorldAccess = new OzoneAcl(ACLIdentityType.WORLD, "",
         ACCESS, userRights);

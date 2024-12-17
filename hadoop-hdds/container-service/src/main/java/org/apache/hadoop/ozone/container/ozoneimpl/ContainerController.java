@@ -159,6 +159,28 @@ public class ContainerController {
     getHandler(container).closeContainer(container);
   }
 
+  /**
+   * Returns the Container given a container id.
+   *
+   * @param containerId ID of the container
+   */
+  public void addFinalizedBlock(final long containerId,
+      final long localId) {
+    Container container = containerSet.getContainer(containerId);
+    if (container != null) {
+      getHandler(container).addFinalizedBlock(container, localId);
+    }
+  }
+
+  public boolean isFinalizedBlockExist(final long containerId,
+      final long localId) {
+    Container container = containerSet.getContainer(containerId);
+    if (container != null) {
+      return getHandler(container).isFinalizedBlockExist(container, localId);
+    }
+    return false;
+  }
+
   public Container importContainer(
       final ContainerData containerData,
       final InputStream rawContainerStream,
@@ -211,6 +233,16 @@ public class ContainerController {
    */
   public Iterator<Container<?>> getContainers(HddsVolume volume) {
     return containerSet.getContainerIterator(volume);
+  }
+
+  /**
+   * Get the number of containers based on the given volume.
+   *
+   * @param volume hdds volume.
+   * @return number of containers.
+   */
+  public long getContainerCount(HddsVolume volume) {
+    return containerSet.containerCount(volume);
   }
 
   void updateDataScanTimestamp(long containerId, Instant timestamp)

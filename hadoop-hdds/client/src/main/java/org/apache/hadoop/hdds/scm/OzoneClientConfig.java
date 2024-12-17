@@ -156,7 +156,7 @@ public class OzoneClientConfig {
       description =
           "Indicates the time duration in seconds a client will wait "
               + "before retrying a read key request on encountering "
-              + "a connectivity excepetion from Datanodes . "
+              + "a connectivity exception from Datanodes. "
               + "By default the interval is 1 second",
       tags = ConfigTag.CLIENT)
   private int readRetryInterval = 1;
@@ -247,6 +247,52 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private String fsDefaultBucketLayout = "FILE_SYSTEM_OPTIMIZED";
 
+  // ozone.client.hbase.enhancements.allowed
+  @Config(key = "hbase.enhancements.allowed",
+      defaultValue = "false",
+      description = "When set to false, client-side HBase enhancement-related Ozone (experimental) features " +
+          "are disabled (not allowed to be enabled) regardless of whether those configs are set.\n" +
+          "\n" +
+          "Here is the list of configs and values overridden when this config is set to false:\n" +
+          "1. ozone.fs.hsync.enabled = false\n" +
+          "2. ozone.client.incremental.chunk.list = false\n" +
+          "3. ozone.client.stream.putblock.piggybacking = false\n" +
+          "4. ozone.client.key.write.concurrency = 1\n" +
+          "\n" +
+          "A warning message will be printed if any of the above configs are overridden by this.",
+      tags = ConfigTag.CLIENT)
+  private boolean hbaseEnhancementsAllowed = false;
+
+  // ozone.client.incremental.chunk.list
+  @Config(key = "incremental.chunk.list",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      description = "Client PutBlock request can choose incremental chunk " +
+          "list rather than full chunk list to optimize performance. " +
+          "Critical to HBase. EC does not support this feature. " +
+          "Can be enabled only when ozone.client.hbase.enhancements.allowed = true",
+      tags = ConfigTag.CLIENT)
+  private boolean incrementalChunkList = false;
+
+  // ozone.client.stream.putblock.piggybacking
+  @Config(key = "stream.putblock.piggybacking",
+          defaultValue = "false",
+          type = ConfigType.BOOLEAN,
+          description = "Allow PutBlock to be piggybacked in WriteChunk requests if the chunk is small. " +
+              "Can be enabled only when ozone.client.hbase.enhancements.allowed = true",
+          tags = ConfigTag.CLIENT)
+  private boolean enablePutblockPiggybacking = false;
+
+  // ozone.client.key.write.concurrency
+  @Config(key = "key.write.concurrency",
+      defaultValue = "1",
+      description = "Maximum concurrent writes allowed on each key. " +
+          "Defaults to 1 which matches the behavior before HDDS-9844. " +
+          "For unlimited write concurrency, set this to -1 or any negative integer value. " +
+          "Any value other than 1 is effective only when ozone.client.hbase.enhancements.allowed = true",
+      tags = ConfigTag.CLIENT)
+  private int maxConcurrentWritePerKey = 1;
+
   @PostConstruct
   public void validate() {
     Preconditions.checkState(streamBufferSize > 0);
@@ -273,6 +319,34 @@ public class OzoneClientConfig {
           OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE;
     }
 
+    // Verify client configs related to HBase enhancements
+    // Enforce check on ozone.client.hbase.enhancements.allowed
+    if (!hbaseEnhancementsAllowed) {
+      // ozone.client.hbase.enhancements.allowed = false
+      if (incrementalChunkList) {
+        LOG.warn("Ignoring ozone.client.incremental.chunk.list = true " +
+            "because HBase enhancements are disallowed. " +
+            "To enable it, set ozone.client.hbase.enhancements.allowed = true.");
+        incrementalChunkList = false;
+        LOG.debug("Final ozone.client.incremental.chunk.list = {}", incrementalChunkList);
+      }
+      if (enablePutblockPiggybacking) {
+        LOG.warn("Ignoring ozone.client.stream.putblock.piggybacking = true " +
+            "because HBase enhancements are disallowed. " +
+            "To enable it, set ozone.client.hbase.enhancements.allowed = true.");
+        enablePutblockPiggybacking = false;
+        LOG.debug("Final ozone.client.stream.putblock.piggybacking = {}", enablePutblockPiggybacking);
+      }
+      if (maxConcurrentWritePerKey != 1) {
+        LOG.warn("Ignoring ozone.client.key.write.concurrency = {} " +
+            "because HBase enhancements are disallowed. " +
+            "To enable it, set ozone.client.hbase.enhancements.allowed = true.",
+            maxConcurrentWritePerKey);
+        maxConcurrentWritePerKey = 1;
+        LOG.debug("Final ozone.client.key.write.concurrency = {}", maxConcurrentWritePerKey);
+      }
+      // Note: ozone.fs.hsync.enabled is enforced by OzoneFSUtils#canEnableHsync, not here
+    }
   }
 
   public long getStreamBufferFlushSize() {
@@ -445,11 +519,43 @@ public class OzoneClientConfig {
     return fsDefaultBucketLayout;
   }
 
+  public void setEnablePutblockPiggybacking(boolean enablePutblockPiggybacking) {
+    this.enablePutblockPiggybacking = enablePutblockPiggybacking;
+  }
+
+  public boolean getEnablePutblockPiggybacking() {
+    return enablePutblockPiggybacking;
+  }
+
   public boolean isDatastreamPipelineMode() {
     return datastreamPipelineMode;
   }
 
   public void setDatastreamPipelineMode(boolean datastreamPipelineMode) {
     this.datastreamPipelineMode = datastreamPipelineMode;
+  }
+
+  public void setHBaseEnhancementsAllowed(boolean isHBaseEnhancementsEnabled) {
+    this.hbaseEnhancementsAllowed = isHBaseEnhancementsEnabled;
+  }
+
+  public boolean getHBaseEnhancementsAllowed() {
+    return this.hbaseEnhancementsAllowed;
+  }
+
+  public void setIncrementalChunkList(boolean enable) {
+    this.incrementalChunkList = enable;
+  }
+
+  public boolean getIncrementalChunkList() {
+    return this.incrementalChunkList;
+  }
+
+  public void setMaxConcurrentWritePerKey(int maxConcurrentWritePerKey) {
+    this.maxConcurrentWritePerKey = maxConcurrentWritePerKey;
+  }
+
+  public int getMaxConcurrentWritePerKey() {
+    return this.maxConcurrentWritePerKey;
   }
 }

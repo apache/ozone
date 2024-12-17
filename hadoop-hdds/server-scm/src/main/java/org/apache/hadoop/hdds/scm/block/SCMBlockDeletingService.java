@@ -192,6 +192,7 @@ public class SCMBlockDeletingService extends BackgroundService
                   new CommandForDatanode<>(dnId, command));
               metrics.incrBlockDeletionCommandSent();
               metrics.incrBlockDeletionTransactionSent(dnTXs.size());
+              metrics.incrDNCommandsSent(dnId, 1);
               if (LOG.isDebugEnabled()) {
                 LOG.debug(
                     "Added delete block command for datanode {} in the queue,"
@@ -203,9 +204,10 @@ public class SCMBlockDeletingService extends BackgroundService
             }
           }
           LOG.info("Totally added {} blocks to be deleted for"
-                  + " {} datanodes, task elapsed time: {}ms",
+                  + " {} datanodes / {} totalnodes, task elapsed time: {}ms",
               transactions.getBlocksDeleted(),
               transactions.getDatanodeTransactionMap().size(),
+              included.size(),
               Time.monotonicNow() - startTime);
           deletedBlockLog.incrementCount(new ArrayList<>(processedTxIDs));
         } catch (NotLeaderException nle) {

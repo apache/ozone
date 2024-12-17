@@ -66,7 +66,6 @@ public class DeleteTenantState {
   /**
    * Builder for TenantDeleted.
    */
-  @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
     private String volumeName;
     private long volRefCount;

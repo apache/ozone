@@ -56,7 +56,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import java.util.stream.Stream;
 
 /**
  * Tests failure detection and handling in BlockOutputStream Class.
@@ -79,10 +82,19 @@ class TestBlockOutputStreamWithFailures {
     }
   }
 
+  private static Stream<Arguments> clientParameters() {
+    return Stream.of(
+        Arguments.of(true, true),
+        Arguments.of(true, false),
+        Arguments.of(false, true),
+        Arguments.of(false, false)
+    );
+  }
+
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void testContainerClose(boolean flushDelay) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
+  @MethodSource("clientParameters")
+  void testContainerClose(boolean flushDelay, boolean enablePiggybacking) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       testWatchForCommitWithCloseContainerException(client);
       testWatchForCommitWithSingleNodeRatis(client);
@@ -174,10 +186,10 @@ class TestBlockOutputStreamWithFailures {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
+  @MethodSource("clientParameters")
   @Flaky("HDDS-6113")
-  void testWatchForCommitDatanodeFailure(boolean flushDelay) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
+  void testWatchForCommitDatanodeFailure(boolean flushDelay, boolean enablePiggybacking) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       String keyName = getKeyName();
       OzoneOutputStream key = createKey(client, keyName);
@@ -259,9 +271,10 @@ class TestBlockOutputStreamWithFailures {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void test2DatanodesFailure(boolean flushDelay) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
+  @MethodSource("clientParameters")
+  @Flaky("HDDS-11849")
+  void test2DatanodesFailure(boolean flushDelay, boolean enablePiggybacking) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       String keyName = getKeyName();
       OzoneOutputStream key = createKey(client, keyName);
@@ -373,7 +386,8 @@ class TestBlockOutputStreamWithFailures {
         assertInstanceOf(RatisBlockOutputStream.class,
             keyOutputStream.getStreamEntries().get(0).getOutputStream());
 
-    assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertThat(blockOutputStream.getBufferPool().getSize())
+        .isLessThanOrEqualTo(4);
     assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
     assertEquals(400, blockOutputStream.getTotalDataFlushedLength());
@@ -429,7 +443,8 @@ class TestBlockOutputStreamWithFailures {
         assertInstanceOf(RatisBlockOutputStream.class,
             keyOutputStream.getStreamEntries().get(0).getOutputStream());
 
-    assertEquals(2, blockOutputStream.getBufferPool().getSize());
+    assertThat(blockOutputStream.getBufferPool().getSize())
+        .isLessThanOrEqualTo(2);
     assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
     assertEquals(0, blockOutputStream.getTotalDataFlushedLength());
@@ -442,7 +457,8 @@ class TestBlockOutputStreamWithFailures {
     // Since the data in the buffer is already flushed, flush here will have
     // no impact on the counters and data structures
 
-    assertEquals(2, blockOutputStream.getBufferPool().getSize());
+    assertThat(blockOutputStream.getBufferPool().getSize())
+        .isLessThanOrEqualTo(2);
     assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
     assertEquals(dataLength, blockOutputStream.getTotalDataFlushedLength());
@@ -493,9 +509,10 @@ class TestBlockOutputStreamWithFailures {
             keyOutputStream.getStreamEntries().get(0).getOutputStream());
 
     // we have just written data more than flush Size(2 chunks), at this time
-    // buffer pool will have 4 buffers allocated worth of chunk size
+    // buffer pool will have up to 4 buffers allocated worth of chunk size
 
-    assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertThat(blockOutputStream.getBufferPool().getSize())
+        .isLessThanOrEqualTo(4);
     // writtenDataLength as well flushedDataLength will be updated here
     assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
@@ -518,7 +535,8 @@ class TestBlockOutputStreamWithFailures {
     // Since the data in the buffer is already flushed, flush here will have
     // no impact on the counters and data structures
 
-    assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertThat(blockOutputStream.getBufferPool().getSize())
+        .isLessThanOrEqualTo(4);
     assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
     assertEquals(dataLength, blockOutputStream.getTotalDataFlushedLength());
@@ -560,10 +578,10 @@ class TestBlockOutputStreamWithFailures {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
+  @MethodSource("clientParameters")
   @Flaky("HDDS-6113")
-  void testDatanodeFailureWithSingleNode(boolean flushDelay) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
+  void testDatanodeFailureWithSingleNode(boolean flushDelay, boolean enablePiggybacking) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       String keyName = getKeyName();
       OzoneOutputStream key =
@@ -650,10 +668,10 @@ class TestBlockOutputStreamWithFailures {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void testDatanodeFailureWithPreAllocation(boolean flushDelay)
+  @MethodSource("clientParameters")
+  void testDatanodeFailureWithPreAllocation(boolean flushDelay, boolean enablePiggybacking)
       throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       String keyName = getKeyName();
       OzoneOutputStream key =

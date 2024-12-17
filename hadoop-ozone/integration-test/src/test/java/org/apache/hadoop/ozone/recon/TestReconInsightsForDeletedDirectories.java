@@ -476,7 +476,7 @@ public class TestReconInsightsForDeletedDirectories {
     return count.get() == expectedCount;
   }
 
-  private void syncDataFromOM() {
+  private void syncDataFromOM() throws IOException {
     // Sync data from Ozone Manager to Recon.
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
         cluster.getReconServer().getOzoneManagerServiceProvider();

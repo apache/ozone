@@ -30,6 +30,7 @@ OZONE_ROOT=$(pwd -P)
 source "${DIR}/_lib.sh"
 
 REPORT_DIR=${OUTPUT_DIR:-"${OZONE_ROOT}/target/acceptance"}
+REPORT_FILE="$REPORT_DIR/summary.txt"
 
 OZONE_VERSION=$(mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout -Dscan=false)
 DIST_DIR="${OZONE_ROOT}/hadoop-ozone/dist/target/ozone-$OZONE_VERSION"
@@ -49,19 +50,17 @@ if [[ "${OZONE_ACCEPTANCE_SUITE}" == "s3a" ]]; then
     export HADOOP_AWS_DIR=${OZONE_ROOT}/target/hadoop-src
   fi
 
-  download_hadoop_aws "${HADOOP_AWS_DIR}"
-fi
-
-if [[ "${OZONE_ACCEPTANCE_TEST_TYPE}" == "robot" ]]; then
-  install_virtualenv
-  install_robot
+  if ! download_hadoop_aws "${HADOOP_AWS_DIR}"; then
+    echo "Failed to download Hadoop ${HADOOP_VERSION}" > "${REPORT_FILE}"
+    exit 1
+  fi
 fi
 
 export OZONE_ACCEPTANCE_SUITE OZONE_ACCEPTANCE_TEST_TYPE
 
 cd "$DIST_DIR/compose" || exit 1
 ./test-all.sh 2>&1 | tee "${REPORT_DIR}/output.log"
-RES=$?
+rc=$?
 
 if [[ "${OZONE_ACCEPTANCE_TEST_TYPE}" == "maven" ]]; then
   pushd result
@@ -69,14 +68,13 @@ if [[ "${OZONE_ACCEPTANCE_TEST_TYPE}" == "maven" ]]; then
   find . -name junit -print0 | xargs -r -0 rm -frv
   cp -rv * "${REPORT_DIR}"/
   popd
+  ERROR_PATTERN="\[ERROR\]"
 else
   cp -rv result/* "$REPORT_DIR/"
-  if [[ -f "${REPORT_DIR}/log.html" ]]; then
-    cp "$REPORT_DIR/log.html" "$REPORT_DIR/summary.html"
-  fi
-  grep -A1 FAIL "${REPORT_DIR}/output.log" | grep -v '^Output' > "${REPORT_DIR}/summary.txt"
+  grep -A1 FAIL "${REPORT_DIR}/output.log" | grep -v '^Output' > "${REPORT_FILE}"
+  ERROR_PATTERN="FAIL"
 fi
 
 find "$REPORT_DIR" -type f -empty -not -name summary.txt -print0 | xargs -0 rm -v
 
-exit $RES
+source "${DIR}/_post_process.sh"

@@ -20,14 +20,18 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone-main</artifactId>
-    <version>1.5.0-SNAPSHOT</version>
+    <version>2.0.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>hdds</artifactId>
-  <version>1.5.0-SNAPSHOT</version>
+  <version>2.0.0-SNAPSHOT</version>
   <description>Apache Ozone Distributed Data Store Project</description>
   <name>Apache Ozone HDDS</name>
   <packaging>pom</packaging>
+
+  <properties>
+    <sort.skip>true</sort.skip>
+  </properties>
 
   <modules>
     <module>annotations</module>
@@ -54,18 +58,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <module>rocks-native</module>
   </modules>
 
-  <repositories>
-    <repository>
-      <id>apache.snapshots.https</id>
-      <url>https://repository.apache.org/content/repositories/snapshots</url>
-    </repository>
-  </repositories>
-  <pluginRepositories>
-    <pluginRepository>
-      <id>apache.snapshots.https</id>
-      <url>https://repository.apache.org/content/repositories/snapshots</url>
-    </pluginRepository>
-  </pluginRepositories>
   <dependencyManagement>
     <dependencies>
 
@@ -247,6 +239,30 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           </execution>
         </executions>
       </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-remote-resources-plugin</artifactId>
+        <configuration>
+          <resourceBundles>
+            <resourceBundle>org.apache.ozone:ozone-dev-support:${ozone.version}</resourceBundle>
+          </resourceBundles>
+        </configuration>
+        <dependencies>
+          <dependency>
+            <groupId>org.apache.ozone</groupId>
+            <artifactId>ozone-dev-support</artifactId>
+            <version>${ozone.version}</version>
+          </dependency>
+        </dependencies>
+        <executions>
+          <execution>
+            <goals>
+              <goal>process</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 
@@ -294,37 +310,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <test.unique.fork.id>fork-${surefire.forkNumber}</test.unique.fork.id>
               </systemPropertyVariables>
             </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>add-classpath-descriptor</id>
-      <activation>
-        <file>
-          <exists>src/main/java</exists>
-        </file>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-dependency-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>add-classpath-descriptor</id>
-                <phase>prepare-package</phase>
-                <goals>
-                  <goal>build-classpath</goal>
-                </goals>
-                <configuration>
-                  <outputFile>${project.build.outputDirectory}/${project.artifactId}.classpath</outputFile>
-                  <prefix>$HDDS_LIB_JARS_DIR</prefix>
-                  <outputFilterFile>true</outputFilterFile>
-                  <includeScope>runtime</includeScope>
-                </configuration>
-              </execution>
-            </executions>
           </plugin>
         </plugins>
       </build>

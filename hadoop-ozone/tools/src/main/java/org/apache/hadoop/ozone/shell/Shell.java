@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.shell;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import picocli.CommandLine;
+import picocli.shell.jline3.PicocliCommands.PicocliCommandsFactory;
 
 /**
  * Ozone user interface commands.
@@ -27,6 +29,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
  * This class uses dispatch method to make calls
  * to appropriate handlers that execute the ozone functions.
  */
+@CommandLine.Command
 public abstract class Shell extends GenericCli {
 
   public static final String OZONE_URI_DESCRIPTION =
@@ -46,15 +49,48 @@ public abstract class Shell extends GenericCli {
           "Any unspecified information will be identified from\n" +
           "the config files.\n";
 
+  private String name;
+
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
+
+  @CommandLine.Option(names = { "--interactive" }, description = "Run in interactive mode")
+  private boolean interactive;
+
   public Shell() {
+    super(new PicocliCommandsFactory());
   }
 
-  public Shell(Class<?> type) {
-    super(type);
+  public String name() {
+    return name;
+  }
+
+  // override if custom prompt is needed
+  public String prompt() {
+    return name();
   }
 
   @Override
-  protected void printError(Throwable errorArg) {
+  public void run(String[] argv) {
+    name = spec.name();
+
+    try {
+      // parse args to check if interactive mode is requested
+      getCmd().parseArgs(argv);
+    } catch (Exception ignored) {
+      // failure will be reported by regular, non-interactive run
+    }
+
+    if (interactive) {
+      spec.name(""); // use short name (e.g. "token get" instead of "ozone sh token get")
+      new REPL(this, getCmd(), (PicocliCommandsFactory) getCmd().getFactory());
+    } else {
+      super.run(argv);
+    }
+  }
+
+  @Override
+  public void printError(Throwable errorArg) {
     OMException omException = null;
 
     if (errorArg instanceof OMException) {
@@ -77,4 +113,3 @@ public abstract class Shell extends GenericCli {
     }
   }
 }
-

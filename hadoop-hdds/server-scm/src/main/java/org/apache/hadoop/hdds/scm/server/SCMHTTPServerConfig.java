@@ -70,9 +70,10 @@ public class SCMHTTPServerConfig {
    * This static class is required to support other classes
    * that reference the key names and also require attributes.
    * Example: SCMSecurityProtocol where the KerberosInfo references
-   * the old configuration with the annotation shown below:-
-   * @KerberosInfo(serverPrincipal =
-   *    ScmConfigKeys.HDDS_SCM_KERBEROS_PRINCIPAL_KEY)
+   * the old configuration with the annotation shown below:
+   * <br>
+   * {@code KerberosInfo(serverPrincipal =
+   *    ScmConfigKeys.HDDS_SCM_KERBEROS_PRINCIPAL_KEY)}
    */
   public static class ConfigStrings {
     public static final String HDDS_SCM_HTTP_AUTH_CONFIG_PREFIX =

@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ActivatePipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ClosePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ClosePipelineResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerRequestProto;
@@ -114,6 +115,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ResetDeletedBlockRetryCountResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -128,7 +130,7 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
-import org.apache.hadoop.util.ProtobufUtils;
+import org.apache.hadoop.ozone.util.ProtobufUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -600,6 +602,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setContainerBalancerStatusResponse(getContainerBalancerStatus(
                 request.getContainerBalancerStatusRequest()))
             .build();
+      case GetContainerBalancerStatusInfo:
+        return ScmContainerLocationResponse.newBuilder()
+                .setCmdType(request.getCmdType())
+                .setStatus(Status.OK)
+                .setContainerBalancerStatusInfoResponse(getContainerBalancerStatusInfo(
+                        request.getContainerBalancerStatusInfoRequest()))
+                .build();
       case GetPipeline:
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
@@ -849,21 +858,21 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     } else if (request.hasFactor()) {
       factor = request.getFactor();
     }
-    List<ContainerInfo> containerList;
+    ContainerListResult containerListAndTotalCount;
     if (factor != null) {
       // Call from a legacy client
-      containerList =
+      containerListAndTotalCount =
           impl.listContainer(startContainerID, count, state, factor);
     } else {
-      containerList =
-          impl.listContainer(startContainerID, count, state, replicationType,
-              repConfig);
+      containerListAndTotalCount =
+          impl.listContainer(startContainerID, count, state, replicationType, repConfig);
     }
     SCMListContainerResponseProto.Builder builder =
         SCMListContainerResponseProto.newBuilder();
-    for (ContainerInfo container : containerList) {
+    for (ContainerInfo container : containerListAndTotalCount.getContainerInfoList()) {
       builder.addContainers(container.getProtobuf());
     }
+    builder.setContainerCount(containerListAndTotalCount.getTotalCount());
     return builder.build();
   }
 
@@ -993,6 +1002,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .setClusterId(scmInfo.getClusterId())
         .setScmId(scmInfo.getScmId())
         .addAllPeerRoles(scmInfo.getRatisPeerRoles())
+        .setScmRatisEnabled(scmInfo.getScmRatisEnabled())
         .build();
   }
 
@@ -1194,6 +1204,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       throws IOException {
     return ContainerBalancerStatusResponseProto.newBuilder()
         .setIsRunning(impl.getContainerBalancerStatus()).build();
+  }
+
+  public ContainerBalancerStatusInfoResponseProto getContainerBalancerStatusInfo(
+          StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoRequestProto request)
+          throws IOException {
+    return impl.getContainerBalancerStatusInfo();
   }
 
   public DecommissionNodesResponseProto decommissionNodes(

@@ -25,13 +25,14 @@ import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
+import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.ExpiredOpenKeys;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteOpenKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -40,8 +41,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
-import org.apache.ratis.protocol.Message;
-import org.apache.ratis.protocol.RaftClientRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,9 +75,10 @@ public class OpenKeyCleanupService extends BackgroundService {
   // service, not the client.
   private final ClientId clientId = ClientId.randomId();
   private final Duration expireThreshold;
+  private final Duration leaseThreshold;
   private final int cleanupLimitPerTask;
   private final AtomicLong submittedOpenKeyCount;
-  private final AtomicLong runCount;
+  private final AtomicLong callId;
   private final AtomicBoolean suspended;
 
   public OpenKeyCleanupService(long interval, TimeUnit unit, long timeout,
@@ -96,23 +96,25 @@ public class OpenKeyCleanupService extends BackgroundService {
         TimeUnit.MILLISECONDS);
     this.expireThreshold = Duration.ofMillis(expireMillis);
 
+    long leaseHardMillis = conf.getTimeDuration(OMConfigKeys.OZONE_OM_LEASE_HARD_LIMIT,
+        OMConfigKeys.OZONE_OM_LEASE_HARD_LIMIT_DEFAULT, TimeUnit.MILLISECONDS);
+    long leaseSoftMillis = conf.getTimeDuration(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT,
+        OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT_DEFAULT, TimeUnit.MILLISECONDS);
+
+    if (leaseHardMillis < leaseSoftMillis) {
+      String msg = "Hard lease limit cannot be less than Soft lease limit. "
+          + "LeaseHardLimit: " + leaseHardMillis +  " LeaseSoftLimit: " + leaseSoftMillis;
+      throw new IllegalArgumentException(msg);
+    }
+    this.leaseThreshold = Duration.ofMillis(leaseHardMillis);
+
     this.cleanupLimitPerTask = conf.getInt(
         OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_LIMIT_PER_TASK,
         OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_LIMIT_PER_TASK_DEFAULT);
 
     this.submittedOpenKeyCount = new AtomicLong(0);
-    this.runCount = new AtomicLong(0);
+    this.callId = new AtomicLong(0);
     this.suspended = new AtomicBoolean(false);
-  }
-
-  /**
-   * Returns the number of times this Background service has run.
-   *
-   * @return Long, run count.
-   */
-  @VisibleForTesting
-  public long getRunCount() {
-    return runCount.get();
   }
 
   /**
@@ -178,13 +180,11 @@ public class OpenKeyCleanupService extends BackgroundService {
       if (!shouldRun()) {
         return BackgroundTaskResult.EmptyTaskResult.newResult();
       }
-
-      runCount.incrementAndGet();
       long startTime = Time.monotonicNow();
       final ExpiredOpenKeys expiredOpenKeys;
       try {
         expiredOpenKeys = keyManager.getExpiredOpenKeys(expireThreshold,
-            cleanupLimitPerTask, bucketLayout);
+            cleanupLimitPerTask, bucketLayout, leaseThreshold);
       } catch (IOException e) {
         LOG.error("Unable to get hanging open keys, retry in next interval", e);
         return BackgroundTaskResult.EmptyTaskResult.newResult();
@@ -234,6 +234,7 @@ public class OpenKeyCleanupService extends BackgroundService {
           .setCmdType(Type.CommitKey)
           .setCommitKeyRequest(request)
           .setClientId(clientId.toString())
+          .setVersion(ClientVersion.CURRENT_VERSION)
           .build();
     }
 
@@ -255,24 +256,7 @@ public class OpenKeyCleanupService extends BackgroundService {
 
     private OMResponse submitRequest(OMRequest omRequest) {
       try {
-        if (isRatisEnabled()) {
-          OzoneManagerRatisServer server = ozoneManager.getOmRatisServer();
-
-          RaftClientRequest raftClientRequest = RaftClientRequest.newBuilder()
-              .setClientId(clientId)
-              .setServerId(server.getRaftPeerId())
-              .setGroupId(server.getRaftGroupId())
-              .setCallId(runCount.get())
-              .setMessage(Message.valueOf(
-                  OMRatisHelper.convertRequestToByteString(omRequest)))
-              .setType(RaftClientRequest.writeRequestType())
-              .build();
-
-          return server.submitRequest(omRequest, raftClientRequest);
-        } else {
-          return ozoneManager.getOmServerProtocol().submitRequest(
-              null, omRequest);
-        }
+        return OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, callId.incrementAndGet());
       } catch (ServiceException e) {
         LOG.error("Open key " + omRequest.getCmdType()
             + " request failed. Will retry at next run.", e);

@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -121,8 +120,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
           volumeName, bucketName);
 
       // add all missing parents to dir table
-      missingParentInfos = OMDirectoryCreateRequestWithFSO
-          .getAllMissingParentDirInfo(ozoneManager, keyArgs, bucketInfo,
+      missingParentInfos = getAllMissingParentDirInfo(ozoneManager, keyArgs, bucketInfo,
               pathInfoFSO, transactionLogIndex);
 
       // We are adding uploadId to key, because if multiple users try to
@@ -185,7 +183,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
           .setOmKeyLocationInfos(Collections.singletonList(
               new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
           .setAcls(getAclsForKey(keyArgs, bucketInfo, pathInfoFSO,
-              ozoneManager.getPrefixManager()))
+              ozoneManager.getPrefixManager(), ozoneManager.getConfiguration()))
           .setObjectID(pathInfoFSO.getLeafNodeObjectId())
           .setUpdateID(transactionLogIndex)
           .setFileEncryptionInfo(keyArgs.hasFileEncryptionInfo() ?
@@ -208,7 +206,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
               missingParentInfos, null);
 
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-          multipartOpenKey, omKeyInfo, pathInfoFSO.getLeafNodeName(),
+          multipartOpenKey, omKeyInfo, pathInfoFSO.getLeafNodeName(), keyName,
               transactionLogIndex);
 
       // Add to cache

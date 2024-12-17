@@ -30,15 +30,34 @@ fi
 
 source ${_testlib_dir}/compose_v2_compatibility.sh
 
+: ${OZONE_COMPOSE_RUNNING:=false}
 : ${SCM:=scm}
+
+# create temp directory for test data; only once, even if testlib.sh is sourced again
+if [[ -z "${TEST_DATA_DIR:-}" ]] && [[ "${KEEP_RUNNING:-false}" == "false" ]]; then
+  export TEST_DATA_DIR="$(mktemp -d "${TMPDIR:-/tmp}"/robot-data-XXXXXX)"
+  chmod go+rx "${TEST_DATA_DIR}"
+  _compose_delete_test_data() {
+    rm -frv "${TEST_DATA_DIR}"
+  }
+
+  trap _compose_cleanup EXIT HUP INT TERM
+fi
+
+_compose_cleanup() {
+  if [[ "${OZONE_COMPOSE_RUNNING}" == "true" ]]; then
+    stop_docker_env || true
+  fi
+  if [[ "$(type -t _compose_delete_test_data || true)" == "function" ]]; then
+    _compose_delete_test_data
+  fi
+}
 
 ## @description create results directory, purging any prior data
 create_results_dir() {
   #delete previous results
   [[ "${OZONE_KEEP_RESULTS:-}" == "true" ]] || rm -rf "$RESULT_DIR"
   mkdir -p "$RESULT_DIR"
-  #Should be writeable from the docker containers where user is different.
-  chmod ogu+w "$RESULT_DIR"
 }
 
 ## @description find all the test*.sh scripts in the immediate child dirs
@@ -140,15 +159,15 @@ start_docker_env(){
   create_results_dir
   export OZONE_SAFEMODE_MIN_DATANODES="${datanode_count}"
 
-  docker-compose --ansi never down
-
-  trap stop_docker_env EXIT HUP INT TERM
+  docker-compose --ansi never down --remove-orphans
 
   opts=""
   if has_scalable_datanode; then
     opts="--scale datanode=${datanode_count}"
   fi
 
+  OZONE_COMPOSE_RUNNING=true
+  trap _compose_cleanup EXIT HUP INT TERM
   docker-compose --ansi never up -d $opts
 
   wait_for_safemode_exit
@@ -186,11 +205,11 @@ execute_robot_test(){
   local output_name=$(get_output_name)
 
   # find unique filename
-  declare -i i=0
-  OUTPUT_FILE="robot-${output_name}1.xml"
-  while [[ -f $RESULT_DIR/$OUTPUT_FILE ]]; do
-    let ++i
-    OUTPUT_FILE="robot-${output_name}${i}.xml"
+  for ((i=1; i<1000; i++)); do
+    OUTPUT_FILE="robot-${output_name}$(printf "%03d" ${i}).xml"
+    if [[ ! -f $RESULT_DIR/$OUTPUT_FILE ]]; then
+      break;
+    fi
   done
 
   SMOKETEST_DIR_INSIDE="${OZONE_DIR:-/opt/hadoop}/smoketest"
@@ -202,7 +221,7 @@ execute_robot_test(){
   # shellcheck disable=SC2068
   docker-compose exec -T "$CONTAINER" mkdir -p "$RESULT_DIR_INSIDE" \
     && docker-compose exec -T "$CONTAINER" robot \
-      -v KEY_NAME:"${OZONE_BUCKET_KEY_NAME}" \
+      -v ENCRYPTION_KEY:"${OZONE_BUCKET_KEY_NAME}" \
       -v OM_HA_PARAM:"${OM_HA_PARAM}" \
       -v OM_SERVICE_ID:"${OM_SERVICE_ID:-om}" \
       -v OZONE_DIR:"${OZONE_DIR}" \
@@ -304,9 +323,10 @@ get_output_name() {
 
 save_container_logs() {
   local output_name=$(get_output_name)
-  local c
-  for c in $(docker-compose ps -a "$@" | cut -f1 -d' ' | tail -n +3); do
-    docker logs "${c}" >> "$RESULT_DIR/docker-${output_name}${c}.log" 2>&1
+  local id
+  for i in $(docker-compose ps -a -q "$@"); do
+    local c=$(docker ps -a --filter "id=${i}" --format "{{ .Names }}")
+    docker logs "${i}" >> "$RESULT_DIR/docker-${output_name}${c}.log" 2>&1
   done
 }
 
@@ -368,7 +388,8 @@ stop_docker_env(){
     down_repeats=3
     for i in $(seq 1 $down_repeats)
     do
-      if docker-compose --ansi never down; then
+      if docker-compose --ansi never --profile "*" down --remove-orphans; then
+        OZONE_COMPOSE_RUNNING=false
         return
       fi
       if [[ ${i} -eq 1 ]]; then
@@ -389,22 +410,44 @@ cleanup_docker_images() {
   fi
 }
 
+## @description  Run Robot Framework report generator (rebot) in ozone-runner container.
+## @param input directory where source Robot XML files are
+## @param output directory where report should be placed
+## @param rebot options and arguments
+run_rebot() {
+  local input_dir="$(realpath "$1")"
+  local output_dir="$(realpath "$2")"
+
+  shift 2
+
+  local tempdir="$(mktemp -d "${output_dir}"/rebot-XXXXXX)"
+  #Should be writeable from the docker containers where user is different.
+  chmod a+wx "${tempdir}"
+  if docker run --rm -v "${input_dir}":/rebot-input -v "${tempdir}":/rebot-output -w /rebot-input \
+      $(get_runner_image_spec) \
+      bash -c "rebot --nostatusrc -d /rebot-output $@"; then
+    mv -v "${tempdir}"/* "${output_dir}"/
+  fi
+  rmdir "${tempdir}"
+}
+
 ## @description  Generate robot framework reports based on the saved results.
 generate_report(){
   local title="${1:-${COMPOSE_ENV_NAME}}"
   local dir="${2:-${RESULT_DIR}}"
   local xunitdir="${3:-}"
 
-  if command -v rebot > /dev/null 2>&1; then
-     #Generate the combined output and return with the right exit code (note: robot = execute test, rebot = generate output)
-     if [ -z "${xunitdir}" ]; then
-       rebot --reporttitle "${title}" -N "${title}" -d "${dir}" "${dir}/*.xml"
-     else
-       rebot --reporttitle "${title}" -N "${title}" --xunit ${xunitdir}/TEST-ozone.xml -d "${dir}" "${dir}/*.xml"
-     fi
-  else
-     echo "Robot framework is not installed, the reports cannot be generated (sudo pip install robotframework)."
-     exit 1
+  if [[ -n "$(find "${dir}" -mindepth 1 -maxdepth 1 -name "*.xml")" ]]; then
+    xunit_args=""
+    if [[ -n "${xunitdir}" ]] && [[ -e "${xunitdir}" ]]; then
+      xunit_args="--xunit TEST-ozone.xml"
+    fi
+
+    run_rebot "$dir" "$dir" "--reporttitle '${title}' -N '${title}' ${xunit_args} *.xml"
+
+    if [[ -n "${xunit_args}" ]]; then
+      mv -v "${dir}"/TEST-ozone.xml "${xunitdir}"/ || rm -f "${dir}"/TEST-ozone.xml
+    fi
   fi
 }
 
@@ -428,8 +471,8 @@ copy_results() {
     target_dir="${target_dir}/${test_script_name}"
   fi
 
-  if command -v rebot > /dev/null 2>&1 && [[ -n "$(find "${result_dir}" -name "*.xml")" ]]; then
-    rebot --nostatusrc -N "${test_name}" -l NONE -r NONE -o "${all_result_dir}/${test_name}.xml" "${result_dir}"/*.xml \
+  if [[ -n "$(find "${result_dir}" -mindepth 1 -maxdepth 1 -name "*.xml")" ]]; then
+    run_rebot "${result_dir}" "${all_result_dir}" "-N '${test_name}' -l NONE -r NONE -o '${test_name}.xml' *.xml" \
       && rm -fv "${result_dir}"/*.xml "${result_dir}"/log.html "${result_dir}"/report.html
   fi
 
@@ -496,22 +539,33 @@ fix_data_dir_permissions() {
 ## @param `ozone` image version
 prepare_for_binary_image() {
   local v=$1
+  local default_image="${docker.ozone.image}" # set at build-time from Maven property
+  local default_flavor="${docker.ozone.image.flavor}" # set at build-time from Maven property
+  local image="${OZONE_IMAGE:-${default_image}}" # may be specified by user running the test
+  local flavor="${OZONE_IMAGE_FLAVOR:-${default_flavor}}" # may be specified by user running the test
 
   export OZONE_DIR=/opt/ozone
-  export OZONE_IMAGE="apache/ozone:${v}"
+  export OZONE_TEST_IMAGE="${image}:${v}${flavor}"
+}
+
+## @description Define variables required for using `ozone-runner` docker image
+##   (no binaries included)
+## @param `ozone-runner` image version (optional)
+get_runner_image_spec() {
+  local default_version=${docker.ozone-runner.version} # set at build-time from Maven property
+  local runner_version=${OZONE_RUNNER_VERSION:-${default_version}} # may be specified by user running the test
+  local runner_image=${OZONE_RUNNER_IMAGE:-apache/ozone-runner} # may be specified by user running the test
+  local v=${1:-${runner_version}} # prefer explicit argument
+
+  echo "${runner_image}:${v}"
 }
 
 ## @description Define variables required for using `ozone-runner` docker image
 ##   (no binaries included)
 ## @param `ozone-runner` image version (optional)
 prepare_for_runner_image() {
-  local default_version=${docker.ozone-runner.version} # set at build-time from Maven property
-  local runner_version=${OZONE_RUNNER_VERSION:-${default_version}} # may be specified by user running the test
-  local runner_image=${OZONE_RUNNER_IMAGE:-apache/ozone-runner} # may be specified by user running the test
-  local v=${1:-${runner_version}} # prefer explicit argument
-
   export OZONE_DIR=/opt/hadoop
-  export OZONE_IMAGE="${runner_image}:${v}"
+  export OZONE_TEST_IMAGE="$(get_runner_image_spec "$@")"
 }
 
 ## @description Executing the Ozone Debug CLI related robot tests

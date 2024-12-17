@@ -74,17 +74,15 @@ import static org.apache.hadoop.hdds.server.http.HttpServer2.setHttpBaseDir;
         RangeKeysGenerator.class,
         DatanodeSimulator.class,
         OmMetadataGenerator.class,
-        DNRPCLoadGenerator.class
+        DNRPCLoadGenerator.class,
+        HsyncGenerator.class,
+        OzoneClientCreator.class,
     },
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
 public class Freon extends GenericCli {
 
   public static final Logger LOG = LoggerFactory.getLogger(Freon.class);
-
-  public Freon() {
-    super(Freon.class);
-  }
 
   @Option(names = "--server",
       description = "Enable internal http server to provide metric "

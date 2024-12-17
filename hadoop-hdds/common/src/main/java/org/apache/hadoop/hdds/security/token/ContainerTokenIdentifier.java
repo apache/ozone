@@ -21,7 +21,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerTokenSecretProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.util.ProtobufUtils;
+import org.apache.hadoop.ozone.util.ProtobufUtils;
 
 import java.io.DataInput;
 import java.io.DataInputStream;

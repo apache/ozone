@@ -32,9 +32,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.request.validation.OMLayoutVersionValidator;
 import org.apache.ratis.server.protocol.TermIndex;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -94,16 +92,11 @@ public class OMFileCreateRequest extends OMKeyRequest {
     Preconditions.checkNotNull(createFileRequest);
 
     KeyArgs keyArgs = createFileRequest.getKeyArgs();
-
-    // Verify key name
-    OmUtils.verifyKeyNameWithSnapshotReservedWord(keyArgs.getKeyName());
-    final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
-         .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
-                 OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
-    if (checkKeyNameEnabled) {
-      OmUtils.validateKeyName(StringUtils.removeEnd(keyArgs.getKeyName(),
-              OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX));
-    }
+    ValidateKeyArgs validateArgs = new ValidateKeyArgs.Builder()
+        .setSnapshotReservedWord(keyArgs.getKeyName())
+        .setKeyName(StringUtils.removeEnd(keyArgs.getKeyName(),
+            OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX)).build();
+    validateKey(ozoneManager, validateArgs);
 
     UserInfo userInfo = getUserInfo();
     if (keyArgs.getKeyName().length() == 0) {
@@ -255,7 +248,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
           keyArgs.getDataSize(), locations, getFileEncryptionInfo(keyArgs),
           ozoneManager.getPrefixManager(), omBucketInfo, pathInfo, trxnLogIndex,
           ozoneManager.getObjectIdFromTxId(trxnLogIndex),
-          ozoneManager.isRatisEnabled(), repConfig);
+          ozoneManager.isRatisEnabled(), repConfig, ozoneManager.getConfiguration());
       validateEncryptionKeyInfo(omBucketInfo, keyArgs);
 
       long openVersion = omKeyInfo.getLatestVersionLocations().getVersion();
@@ -263,8 +256,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
       String dbOpenKeyName = omMetadataManager.getOpenKey(volumeName,
           bucketName, keyName, clientID);
 
-      missingParentInfos = OMDirectoryCreateRequest
-          .getAllParentInfo(ozoneManager, keyArgs,
+      missingParentInfos = getAllParentInfo(ozoneManager, keyArgs,
               pathInfo.getMissingParents(), omBucketInfo,
               pathInfo, trxnLogIndex);
 
@@ -324,7 +316,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
     }
 
     // Audit Log outside the lock
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.CREATE_FILE, auditMap, exception,
         getOmRequest().getUserInfo()));
 
