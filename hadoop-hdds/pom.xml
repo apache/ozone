@@ -29,6 +29,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <name>Apache Ozone HDDS</name>
   <packaging>pom</packaging>
 
+  <properties>
+    <sort.skip>true</sort.skip>
+  </properties>
+
   <modules>
     <module>annotations</module>
     <module>hadoop-dependency-client</module>

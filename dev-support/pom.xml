@@ -27,6 +27,7 @@
 
   <properties>
     <failIfNoTests>false</failIfNoTests>
+    <sort.skip>true</sort.skip>
   </properties>
   <build>
     <resources>
