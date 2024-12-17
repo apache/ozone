@@ -76,7 +76,7 @@ public class TestOMValidatorProcessor {
           })
           .collect(Collectors.toMap(Function.identity(), annotationClass -> {
             try {
-              return annotationClass.getMethod(RegisterValidator.APPLY_UNTIL_METHOD_NAME).getReturnType();
+              return annotationClass.getMethod(RegisterValidator.APPLY_BEFORE_METHOD_NAME).getReturnType();
             } catch (NoSuchMethodException e) {
               throw new RuntimeException(e);
             }
@@ -502,21 +502,21 @@ public class TestOMValidatorProcessor {
   }
 
   private <V extends Enum<V> & Version> String annotationOf(
-      RequestProcessingPhase phase, Type reqType, Class<?> annotationClass, V applyUntilVersion) {
-    return annotationOf(phase.name(), reqType, annotationClass, applyUntilVersion);
+      RequestProcessingPhase phase, Type reqType, Class<?> annotationClass, V applyBeforeVersion) {
+    return annotationOf(phase.name(), reqType, annotationClass, applyBeforeVersion);
   }
 
   private <V extends Enum<V> & Version> String annotationOf(
       String phase,
       Type reqType,
       Class<?> annotationClass,
-      V applyUntilVersion) {
+      V applyBeforeVersion) {
     StringBuilder annotation = new StringBuilder();
     annotation.append("@" + annotationClass.getName() + "(");
     annotation.append("processingPhase = ").append(phase);
     annotation.append(", requestType = ").append(reqType.name());
-    if (applyUntilVersion != null) {
-      annotation.append(", applyUntil = ").append(applyUntilVersion.name());
+    if (applyBeforeVersion != null) {
+      annotation.append(", applyBefore = ").append(applyBeforeVersion.name());
     }
     annotation.append(" )");
     return annotation.toString();

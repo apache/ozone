@@ -52,11 +52,11 @@ public class RegisterValidatorProcessor extends AbstractProcessor {
   public static final String VERSION_CLASS_NAME = "org.apache.hadoop.ozone.Version";
   public static final String REQUEST_PROCESSING_PHASE_CLASS_NAME = "org.apache.hadoop.ozone.om.request.validation" +
       ".RequestProcessingPhase";
-  public static final String APPLY_UNTIL_METHOD_NAME = "applyUntil";
+  public static final String APPLY_BEFORE_METHOD_NAME = "applyBefore";
   public static final String REQUEST_TYPE_METHOD_NAME = "requestType";
   public static final String PROCESSING_PHASE_METHOD_NAME = "processingPhase";
 
-  public static final String MAX_VERSION_NOT_FOUND_ERROR_MESSAGE = "Method " + APPLY_UNTIL_METHOD_NAME +
+  public static final String MAX_VERSION_NOT_FOUND_ERROR_MESSAGE = "Method " + APPLY_BEFORE_METHOD_NAME +
       " returning an enum implementing " + VERSION_CLASS_NAME + " not found";
   public static final String REQUEST_TYPE_NOT_FOUND_ERROR_MESSAGE = "Method " + REQUEST_TYPE_METHOD_NAME +
       " returning an enum not found";
@@ -104,22 +104,22 @@ public class RegisterValidatorProcessor extends AbstractProcessor {
   private void processElements(Set<? extends Element> annotatedElements) {
     for (Element element : annotatedElements) {
       if (element.getKind().equals(ElementKind.ANNOTATION_TYPE)) {
-        boolean hasApplyUntilMethod = false;
+        boolean hasApplyBeforeMethod = false;
         boolean hasRequestType = false;
         boolean hasRequestProcessPhase =  false;
         for (Element enclosedElement : element.getEnclosedElements()) {
           // Check if the annotation has a method called "validatorName" returning a String
           if (enclosedElement instanceof ExecutableElement) {
             ExecutableElement method = (ExecutableElement) enclosedElement;
-            hasApplyUntilMethod = hasApplyUntilMethod || validateMethod(method, APPLY_UNTIL_METHOD_NAME, ElementKind.ENUM,
-                VERSION_CLASS_NAME);
+            hasApplyBeforeMethod = hasApplyBeforeMethod || validateMethod(method, APPLY_BEFORE_METHOD_NAME,
+                ElementKind.ENUM, VERSION_CLASS_NAME);
             hasRequestType = hasRequestType || validateArrayMethod(method, REQUEST_TYPE_METHOD_NAME, ElementKind.ENUM,
                 null);
             hasRequestProcessPhase = hasRequestProcessPhase || validateMethod(method, PROCESSING_PHASE_METHOD_NAME,
                 ElementKind.ENUM, REQUEST_PROCESSING_PHASE_CLASS_NAME);
           }
         }
-        if (!hasApplyUntilMethod) {
+        if (!hasApplyBeforeMethod) {
           emitErrorMsg(MAX_VERSION_NOT_FOUND_ERROR_MESSAGE + " for " +
               element.getSimpleName().toString());
         }

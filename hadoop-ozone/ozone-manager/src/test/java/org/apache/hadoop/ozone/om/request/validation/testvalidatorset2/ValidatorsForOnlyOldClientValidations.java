@@ -35,7 +35,7 @@ public final class ValidatorsForOnlyOldClientValidations {
   @OMClientVersionValidator(
       processingPhase = PRE_PROCESS,
       requestType = CreateKey,
-      applyUntil = ClientVersion.BUCKET_LAYOUT_SUPPORT)
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT)
   public static OMRequest preProcessCreateKeyBucketLayoutClientValidator(
       OMRequest req, ValidationContext ctx) {
     return req;

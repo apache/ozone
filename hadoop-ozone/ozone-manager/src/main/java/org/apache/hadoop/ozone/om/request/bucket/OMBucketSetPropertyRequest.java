@@ -359,7 +359,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
   @OMLayoutVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.SetBucketProperty,
-      applyUntil = OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT
+      applyBefore = OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT
   )
   public static OMRequest disallowSetBucketPropertyWithECReplicationConfig(
       OMRequest req, ValidationContext ctx) throws OMException {

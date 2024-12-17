@@ -396,7 +396,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
   @OMLayoutVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = CreateFile,
-      applyUntil = OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT
+      applyBefore = OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT
   )
   public static OMRequest disallowCreateFileWithECReplicationConfig(
       OMRequest req, ValidationContext ctx) throws OMException {
@@ -428,7 +428,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
   @OMClientVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.CreateFile,
-      applyUntil = ClientVersion.ERASURE_CODING_SUPPORT
+      applyBefore = ClientVersion.ERASURE_CODING_SUPPORT
   )
   public static OMRequest blockCreateFileWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {

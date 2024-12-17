@@ -101,6 +101,6 @@ public @interface OMLayoutVersionValidator {
    * where the version is older than the excluding of the specified version.
    * @returns the max layout version until which the validator runs excluding the specified version itself.
    */
-  OMLayoutFeature applyUntil();
+  OMLayoutFeature applyBefore();
 
 }

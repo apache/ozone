@@ -283,7 +283,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
   @OMClientVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.DeleteBucket,
-      applyUntil = ClientVersion.ERASURE_CODING_SUPPORT
+      applyBefore = ClientVersion.ERASURE_CODING_SUPPORT
   )
   public static OMRequest blockBucketDeleteWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {

@@ -97,6 +97,6 @@ public @interface OMClientVersionValidator {
    * where the version is older than the excluding of the specified version.
    * @returns the max client version until which the validator runs excluding the specified version itself.
    */
-  ClientVersion applyUntil();
+  ClientVersion applyBefore();
 
 }

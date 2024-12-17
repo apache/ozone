@@ -272,7 +272,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
   @OMClientVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.RenameKey,
-      applyUntil = ClientVersion.ERASURE_CODING_SUPPORT
+      applyBefore = ClientVersion.ERASURE_CODING_SUPPORT
   )
   public static OMRequest blockRenameKeyWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {

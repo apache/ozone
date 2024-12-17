@@ -28,14 +28,14 @@ import java.lang.annotation.Target;
 /**
  * Annotations to register a validator. {@link org.apache.ozone.annotations.RegisterValidatorProcessor}
  * enforces other annotation to have the following methods:
- * applyUntil : Returns an enum which implement {@link Version}
+ * applyBefore : Returns an enum which implement {@link Version}
  * requestType: Returns an Enum value.
  * processingPhase: Returns {@link RequestProcessingPhase}
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.ANNOTATION_TYPE)
 public @interface RegisterValidator {
-  String APPLY_UNTIL_METHOD_NAME = "applyUntil";
+  String APPLY_BEFORE_METHOD_NAME = "applyBefore";
   String REQUEST_TYPE_METHOD_NAME = "requestType";
   String PROCESSING_PHASE_METHOD_NAME = "processingPhase";
 }

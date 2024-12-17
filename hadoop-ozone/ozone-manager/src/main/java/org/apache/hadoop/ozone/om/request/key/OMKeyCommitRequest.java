@@ -436,7 +436,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
   @OMLayoutVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.CommitKey,
-      applyUntil = OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT
+      applyBefore = OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT
   )
   public static OMRequest disallowCommitKeyWithECReplicationConfig(
       OMRequest req, ValidationContext ctx) throws OMException {
@@ -466,7 +466,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
   @OMClientVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.CommitKey,
-      applyUntil = ClientVersion.ERASURE_CODING_SUPPORT
+      applyBefore = ClientVersion.ERASURE_CODING_SUPPORT
   )
   public static OMRequest blockCommitKeyWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
@@ -485,7 +485,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
   @OMLayoutVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.CommitKey,
-      applyUntil = OMLayoutFeature.HSYNC
+      applyBefore = OMLayoutFeature.HSYNC
   )
   public static OMRequest disallowHsync(
       OMRequest req, ValidationContext ctx) throws OMException {
