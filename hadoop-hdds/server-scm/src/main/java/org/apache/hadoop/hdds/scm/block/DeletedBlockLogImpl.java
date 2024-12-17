@@ -492,8 +492,10 @@ public class DeletedBlockLogImpl
           getSCMDeletedBlockTransactionStatusManager()
               .commitTransactions(ackProto.getResultsList(), dnId);
           metrics.incrBlockDeletionCommandSuccess();
+          metrics.incrDNCommandsSuccess(dnId, 1);
         } else if (status == CommandStatus.Status.FAILED) {
           metrics.incrBlockDeletionCommandFailure();
+          metrics.incrDNCommandsFailure(dnId, 1);
         } else {
           LOG.debug("Delete Block Command {} is not executed on the Datanode" +
               " {}.", commandStatus.getCmdId(), dnId);
