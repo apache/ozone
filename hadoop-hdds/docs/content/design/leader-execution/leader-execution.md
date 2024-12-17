@@ -159,7 +159,10 @@ This will have the following advantages:
 - optimized test cases (avoid duplicate test cases)
 - test code complexity will be less
 
-### Step-by-step integration of existing request
+TODO: With echo, define test utils and sample test cases
+- Capture test cases based on behavior.
+
+## Step-by-step integration of existing request
 
 Leader side execution have changes for all flows. This needs to be done incrementally to help better quality, testability.
 This needs below integration points in current code:
@@ -175,3 +178,13 @@ This needs below integration points in current code:
    - New metrics needs to be added
    - Metrics will be updated at leader side now like for key create. At follower node, its just db update, so value will not be udpated.
 
+## Prototype Performance Result:
+
+| sno | item                                     | old flow result               | leader execution result |
+|-----|------------------------------------------|-------------------------------|------------------------|
+| 1   | Operation / Second (key create / commit) | 12k+                          | 40k+                   |
+| 2   | Key Commit / Second                      | 5.9k+                         | 20k+ (3.3 times)       |
+| 3   | CPU Utilization Leader | 16% (unable to increase load) | 33%                    |
+| 4   | CPU Utilization Follower | 6% above                      | 4% below               |
+
+Refer [performance prototype result](performance-prototype-result.pdf)
