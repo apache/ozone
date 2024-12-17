@@ -52,7 +52,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
-import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto.DISK;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageType.DISK_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -485,14 +485,14 @@ public class TestSCMCommonPlacementPolicy {
     // capacity = 200000, used = 90000, remaining = 101000, committed = 500
     StorageContainerDatanodeProtocolProtos.StorageReportProto storageReport1 =
         HddsTestUtils.createStorageReport(UUID.randomUUID(), "/data/hdds",
-                200000, 90000, 101000, DISK).toBuilder()
+                200000, 90000, 101000, DISK_TYPE).toBuilder()
             .setCommitted(500)
             .setFreeSpaceToSpare(10000)
             .build();
     // capacity = 200000, used = 90000, remaining = 101000, committed = 1000
     StorageContainerDatanodeProtocolProtos.StorageReportProto storageReport2 =
         HddsTestUtils.createStorageReport(UUID.randomUUID(), "/data/hdds",
-                200000, 90000, 101000, DISK).toBuilder()
+                200000, 90000, 101000, DISK_TYPE).toBuilder()
             .setCommitted(1000)
             .setFreeSpaceToSpare(100000)
             .build();
