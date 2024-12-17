@@ -646,7 +646,7 @@ public final class ContainerTestHelper {
       break;
     case GetBlock:
       builder.setGetBlock(ContainerProtos.GetBlockRequestProto.newBuilder()
-          .setBlockID(fakeBlockId).build());
+          .setBlockID(fakeBlockId).setRequestShortCircuitAccess(true).build());
       break;
     case GetCommittedBlockLength:
       builder.setGetCommittedBlockLength(

@@ -239,6 +239,19 @@ public final class ContainerProtocolCalls  {
     return response.getGetBlock();
   }
 
+  public static GetBlockResponseProto getBlock(XceiverClientSpi xceiverClient,
+      List<Validator> validators, ContainerCommandRequestProto.Builder builder,
+      DatanodeDetails datanode) throws IOException {
+    String traceId = TracingUtil.exportCurrentSpan();
+    if (traceId != null) {
+      builder.setTraceID(traceId);
+    }
+    final ContainerCommandRequestProto request = builder.setDatanodeUuid(datanode.getUuidString()).build();
+    ContainerCommandResponseProto response = xceiverClient.sendCommand(request, validators);
+    return response.getGetBlock();
+  }
+
+
   /**
    * Calls the container protocol to get the length of a committed block.
    *
@@ -738,6 +751,19 @@ public final class ContainerProtocolCalls  {
   public static EchoResponseProto echo(XceiverClientSpi client, String encodedContainerID,
       long containerID, ByteString payloadReqBytes, int payloadRespSizeKB, int sleepTimeMs, boolean readOnly)
       throws IOException {
+    return echo(client, encodedContainerID, containerID, payloadReqBytes, payloadRespSizeKB,
+        sleepTimeMs, readOnly, null, 0, false);
+  }
+
+  /**
+   * Send an echo to DataNode with clientId and callId in request.
+   *
+   * @return EchoResponseProto
+   */
+  @SuppressWarnings("checkstyle:parameternumber")
+  public static EchoResponseProto echo(XceiverClientSpi client, String encodedContainerID,
+      long containerID, ByteString payloadReqBytes, int payloadRespSizeKB, int sleepTimeMs, boolean readOnly,
+      ByteString clientId, long callID, boolean noValidation) throws IOException {
     ContainerProtos.EchoRequestProto getEcho =
         EchoRequestProto
             .newBuilder()
@@ -754,6 +780,9 @@ public final class ContainerProtocolCalls  {
         .setContainerID(containerID)
         .setDatanodeUuid(id)
         .setEcho(getEcho);
+    if (clientId != null) {
+      builder.setClientId(clientId).setCallId(callID);
+    }
     if (!encodedContainerID.isEmpty()) {
       builder.setEncodedToken(encodedContainerID);
     }
@@ -763,7 +792,7 @@ public final class ContainerProtocolCalls  {
     }
     ContainerCommandRequestProto request = builder.build();
     ContainerCommandResponseProto response =
-        client.sendCommand(request, getValidatorList());
+        client.sendCommand(request, noValidation ? new ArrayList<>() : getValidatorList());
     return response.getEcho();
   }
 

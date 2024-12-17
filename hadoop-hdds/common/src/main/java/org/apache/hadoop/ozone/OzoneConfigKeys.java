@@ -471,8 +471,12 @@ public final class OzoneConfigKeys {
   public static final int OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE = 8 * 1024;
 
   public static final String OZONE_CLIENT_READ_TIMEOUT
-          = "ozone.client.read.timeout";
+      = "ozone.client.read.timeout";
   public static final String OZONE_CLIENT_READ_TIMEOUT_DEFAULT = "30s";
+  public static final String OZONE_CLIENT_WRITE_TIMEOUT
+      = "ozone.client.write.timeout";
+  public static final String OZONE_CLIENT_WRITE_TIMEOUT_DEFAULT = "30s";
+
   public static final String OZONE_ACL_AUTHORIZER_CLASS =
       "ozone.acl.authorizer.class";
   public static final String OZONE_ACL_AUTHORIZER_CLASS_DEFAULT =
