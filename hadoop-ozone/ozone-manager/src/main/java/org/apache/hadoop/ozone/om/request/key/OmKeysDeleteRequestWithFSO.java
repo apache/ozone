@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -41,6 +42,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETED_HSYNC_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_DELETE;
@@ -70,9 +72,14 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
 
   @Override
   protected void addKeyToAppropriateList(List<OmKeyInfo> omKeyInfoList,
-      OmKeyInfo omKeyInfo, List<OmKeyInfo> dirList, OzoneFileStatus keyStatus) {
+      OmKeyInfo omKeyInfo, List<OmKeyInfo> dirList, OzoneFileStatus keyStatus, int version) {
+    LOG.info("client version: {}", version);
     if (keyStatus.isDirectory()) {
-      dirList.add(omKeyInfo);
+      if (ClientVersion.fromProtoValue(version).compareTo(ClientVersion.FSO_BULK_DELETE) < 0) {
+        dirList.add(omKeyInfo);
+      } else if (keyStatus.getKeyInfo().getKeyName().endsWith(PATH_SEPARATOR_STR)) {
+        dirList.add(omKeyInfo);
+      }
     } else {
       omKeyInfoList.add(omKeyInfo);
     }
