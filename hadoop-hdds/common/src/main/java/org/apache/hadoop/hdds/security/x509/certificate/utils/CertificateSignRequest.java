@@ -172,8 +172,7 @@ public final class CertificateSignRequest {
     return str.toString();
   }
 
-  //TODO: this should be private once the server side of removing PKCS10CertReq class is done.
-  public PKCS10CertificationRequest generateCSR() throws IOException {
+  private PKCS10CertificationRequest generateCSR() throws IOException {
     X500Name dnName = getDistinguishedName(subject, scmID, clusterID);
     PKCS10CertificationRequestBuilder p10Builder =
         new JcaPKCS10CertificationRequestBuilder(dnName, keyPair.getPublic());

@@ -77,7 +77,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignReq
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
-import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
+import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.Client;
@@ -644,8 +644,8 @@ final class TestSecureOzoneCluster {
     SecurityConfig securityConfig = new SecurityConfig(conf);
     HDDSKeyGenerator keyGenerator = new HDDSKeyGenerator(securityConfig);
     keyPair = keyGenerator.generateKey();
-    KeyCodec pemWriter = new KeyCodec(securityConfig, COMPONENT);
-    pemWriter.writeKey(keyPair, true);
+    KeyStorage keyStorage = new KeyStorage(securityConfig, COMPONENT);
+    keyStorage.storeKeyPair(keyPair);
   }
 
   /**
@@ -961,11 +961,9 @@ final class TestSecureOzoneCluster {
 
     // save first cert
     final int certificateLifetime = 20; // seconds
-    KeyCodec keyCodec =
-        new KeyCodec(securityConfig, securityConfig.getKeyLocation("om"));
+    KeyStorage keyStorage = new KeyStorage(securityConfig, "om");
     X509Certificate cert = generateSelfSignedX509Cert(securityConfig,
-        new KeyPair(keyCodec.readPublicKey(), keyCodec.readPrivateKey()),
-        null, Duration.ofSeconds(certificateLifetime));
+        keyStorage.readKeyPair(), null, Duration.ofSeconds(certificateLifetime));
     String certId = cert.getSerialNumber().toString();
     omStorage.setOmCertSerialId(certId);
     omStorage.forceInitialize();
@@ -1044,11 +1042,9 @@ final class TestSecureOzoneCluster {
 
     // save first cert
     final int certificateLifetime = 20; // seconds
-    KeyCodec keyCodec =
-        new KeyCodec(securityConfig, securityConfig.getKeyLocation("om"));
+    KeyStorage keyStorage = new KeyStorage(securityConfig, "om");
     X509Certificate certHolder = generateSelfSignedX509Cert(securityConfig,
-        new KeyPair(keyCodec.readPublicKey(), keyCodec.readPrivateKey()),
-        null, Duration.ofSeconds(certificateLifetime));
+        keyStorage.readKeyPair(), null, Duration.ofSeconds(certificateLifetime));
     String certId = certHolder.getSerialNumber().toString();
     certCodec.writeCertificate(certHolder);
     omStorage.setOmCertSerialId(certId);
@@ -1447,13 +1443,12 @@ final class TestSecureOzoneCluster {
     addIpAndDnsDataToBuilder(csrBuilder);
     LocalDateTime start = LocalDateTime.now();
     Duration certDuration = conf.getDefaultCertDuration();
-    //TODO: generateCSR!
     return approver.sign(conf, rootKeyPair.getPrivate(), rootCert,
-            Date.from(start.atZone(ZoneId.systemDefault()).toInstant()),
-            Date.from(start.plus(certDuration)
-                .atZone(ZoneId.systemDefault()).toInstant()),
-            csrBuilder.build().generateCSR(), "test", clusterId,
-            String.valueOf(System.nanoTime()));
+        Date.from(start.atZone(ZoneId.systemDefault()).toInstant()),
+        Date.from(start.plus(certDuration)
+            .atZone(ZoneId.systemDefault()).toInstant()),
+        csrBuilder.build().toEncodedFormat(), "test", clusterId,
+        String.valueOf(System.nanoTime()));
   }
 
   private static void addIpAndDnsDataToBuilder(
