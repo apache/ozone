@@ -124,7 +124,8 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
           handler.handleGetBlock(
               getDummyCommandRequestProto(clientVersion, ContainerProtos.Type.GetBlock, rid),
               container);
-      assertEquals((replicaIndex > 0 && rid != 0 && rid != replicaIndex) ?
+      assertEquals((replicaIndex > 0 && rid != replicaIndex && clientVersion.toProtoValue() >=
+              ClientVersion.EC_REPLICA_INDEX_REQUIRED_IN_BLOCK_REQUEST.toProtoValue()) ?
               ContainerProtos.Result.CONTAINER_NOT_FOUND : UNKNOWN_BCSID,
           response.getResult());
     }
@@ -166,7 +167,8 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
       ContainerProtos.ContainerCommandResponseProto response =
           handler.handleReadChunk(getDummyCommandRequestProto(clientVersion, ContainerProtos.Type.ReadChunk, rid),
               container, null);
-      assertEquals((replicaIndex > 0 && rid != 0 && rid != replicaIndex) ?
+      assertEquals((replicaIndex > 0 && rid != replicaIndex &&
+              clientVersion.toProtoValue() >= ClientVersion.EC_REPLICA_INDEX_REQUIRED_IN_BLOCK_REQUEST.toProtoValue()) ?
               ContainerProtos.Result.CONTAINER_NOT_FOUND : UNKNOWN_BCSID,
           response.getResult());
     }

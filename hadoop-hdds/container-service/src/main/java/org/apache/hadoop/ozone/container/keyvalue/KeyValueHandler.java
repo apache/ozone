@@ -122,6 +122,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.putBlockResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
+import static org.apache.hadoop.ozone.ClientVersion.EC_REPLICA_INDEX_REQUIRED_IN_BLOCK_REQUEST;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 
@@ -666,6 +667,15 @@ public class KeyValueHandler extends Handler {
   }
 
   /**
+   * Checks if a replicaIndex needs to be checked based on the client version for a request.
+   * @param request ContainerCommandRequest object.
+   * @return true if the validation is required for the client version else false.
+   */
+  private boolean replicaIndexCheckRequired(ContainerCommandRequestProto request) {
+    return request.hasVersion() && request.getVersion() >= EC_REPLICA_INDEX_REQUIRED_IN_BLOCK_REQUEST.toProtoValue();
+  }
+
+  /**
    * Handle Get Block operation. Calls BlockManager to process the request.
    */
   ContainerCommandResponseProto handleGetBlock(
@@ -683,7 +693,9 @@ public class KeyValueHandler extends Handler {
     try {
       BlockID blockID = BlockID.getFromProtobuf(
           request.getGetBlock().getBlockID());
-      BlockUtils.verifyReplicaIdx(kvContainer, blockID);
+      if (replicaIndexCheckRequired(request)) {
+        BlockUtils.verifyReplicaIdx(kvContainer, blockID);
+      }
       responseData = blockManager.getBlock(kvContainer, blockID).getProtoBufMessage();
       final long numBytes = responseData.getSerializedSize();
       metrics.incContainerBytesStats(Type.GetBlock, numBytes);
@@ -806,7 +818,9 @@ public class KeyValueHandler extends Handler {
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(request.getReadChunk()
           .getChunkData());
       Preconditions.checkNotNull(chunkInfo);
-      BlockUtils.verifyReplicaIdx(kvContainer, blockID);
+      if (replicaIndexCheckRequired(request)) {
+        BlockUtils.verifyReplicaIdx(kvContainer, blockID);
+      }
       BlockUtils.verifyBCSId(kvContainer, blockID);
 
       if (dispatcherContext == null) {
