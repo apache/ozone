@@ -31,7 +31,7 @@ import java.util.Scanner;
  * Ozone Repair Command line tool.
  */
 @CommandLine.Command(name = "ozone repair",
-    description = "Operational tool to repair Ozone",
+    description = "Repair is an advanced operation and the nodes being repaired should be stopped while it is running",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
 public class OzoneRepair extends GenericCli implements ExtensibleParentCommand {
@@ -46,6 +46,10 @@ public class OzoneRepair extends GenericCli implements ExtensibleParentCommand {
 
   @Override
   public int execute(String[] argv) {
+    if (argv.length == 0 || argv[0].equals("--help") || argv[0].equals("-h")) {
+      return super.execute(argv);
+    }
+
     String currentUser = getSystemUserName();
     if (!("y".equalsIgnoreCase(getConsoleReadLineWithFormat(currentUser)))) {
       System.out.println("Aborting command.");
