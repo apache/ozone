@@ -46,7 +46,6 @@ import org.apache.hadoop.ozone.om.request.volume.OMQuotaRepairRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.volume.OMQuotaRepairResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
@@ -137,16 +136,16 @@ public class TestQuotaRepairTask extends TestOMKeyRequest {
 
   @Test
   public void testQuotaRepairForOldVersionVolumeBucket() throws Exception {
-    when(ozoneManager.isRatisEnabled()).thenReturn(false);
+    when(ozoneManager.isRatisEnabled()).thenReturn(true);
     OzoneManagerProtocolProtos.OMResponse respMock = mock(OzoneManagerProtocolProtos.OMResponse.class);
     when(respMock.getSuccess()).thenReturn(true);
-    OzoneManagerProtocolServerSideTranslatorPB serverMock = mock(OzoneManagerProtocolServerSideTranslatorPB.class);
+    OzoneManagerRatisServer ratisServerMock = mock(OzoneManagerRatisServer.class);
     AtomicReference<OzoneManagerProtocolProtos.OMRequest> ref = new AtomicReference<>();
     doAnswer(invocation -> {
-      ref.set(invocation.getArgument(1, OzoneManagerProtocolProtos.OMRequest.class));
+      ref.set(invocation.getArgument(0, OzoneManagerProtocolProtos.OMRequest.class));
       return respMock;
-    }).when(serverMock).submitRequest(any(), any());
-    when(ozoneManager.getOmServerProtocol()).thenReturn(serverMock);
+    }).when(ratisServerMock).submitRequest(any(), any(), anyLong());
+    when(ozoneManager.getOmRatisServer()).thenReturn(ratisServerMock);
     // add volume with -2 value
     OmVolumeArgs omVolumeArgs =
         OmVolumeArgs.newBuilder().setCreationTime(Time.now())
