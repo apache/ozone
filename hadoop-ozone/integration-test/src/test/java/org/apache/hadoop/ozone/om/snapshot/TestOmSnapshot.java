@@ -204,7 +204,11 @@ public abstract class TestOmSnapshot {
     conf.setBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, enabledFileSystemPaths);
     conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, bucketLayout.name());
     conf.setBoolean(OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF, forceFullSnapshotDiff);
-    conf.setBoolean(OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS, disableNativeDiff);
+    conf.setBoolean(OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS,
+        disableNativeDiff);
+    conf.setBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, enabledFileSystemPaths);
+    conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, bucketLayout.name());
+    conf.setBoolean(OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF, forceFullSnapshotDiff);
     conf.setEnum(HDDS_DB_PROFILE, DBProfile.TEST);
     // Enable filesystem snapshot feature for the test regardless of the default
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
@@ -1477,8 +1481,10 @@ public abstract class TestOmSnapshot {
     String toSnapshotTableKey =
         SnapshotInfo.getTableKey(volumeName, bucketName, toSnapName);
 
-    UUID fromSnapshotID = SnapshotUtils.getSnapshotInfo(ozoneManager, fromSnapshotTableKey).getSnapshotId();
-    UUID toSnapshotID = SnapshotUtils.getSnapshotInfo(ozoneManager, toSnapshotTableKey).getSnapshotId();
+    UUID fromSnapshotID = ozoneManager.getOmSnapshotManager()
+        .getSnapshotInfo(fromSnapshotTableKey).getSnapshotId();
+    UUID toSnapshotID = ozoneManager.getOmSnapshotManager()
+        .getSnapshotInfo(toSnapshotTableKey).getSnapshotId();
 
     // Construct SnapshotDiffJob table key.
     String snapDiffJobKey = fromSnapshotID + DELIMITER + toSnapshotID;

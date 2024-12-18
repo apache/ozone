@@ -99,9 +99,7 @@ abstract class StreamDataChannelBase
     linked.set(true);
   }
 
-  /**
-   * @return true if {@link org.apache.ratis.statemachine.StateMachine.DataChannel} is already linked.
-   */
+  /** @return true iff {@link StateMachine.DataChannel} is already linked. */
   public boolean cleanUp() {
     if (linked.get()) {
       // already linked, nothing to do.

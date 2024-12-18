@@ -198,7 +198,9 @@ public class BlockOutputStream extends OutputStream {
         blkIDBuilder.build()).addMetadata(keyValue);
     this.pipeline = pipeline;
     // tell DataNode I will send incremental chunk list
-    this.supportIncrementalChunkList = canEnableIncrementalChunkList();
+    // EC does not support incremental chunk list.
+    this.supportIncrementalChunkList = config.getIncrementalChunkList() &&
+        this instanceof RatisBlockOutputStream && allDataNodesSupportPiggybacking();
     LOG.debug("incrementalChunkList is {}", supportIncrementalChunkList);
     if (supportIncrementalChunkList) {
       this.containerBlockData.addMetadata(INCREMENTAL_CHUNK_LIST_KV);
@@ -235,49 +237,9 @@ public class BlockOutputStream extends OutputStream {
         config.getBytesPerChecksum());
     this.clientMetrics = clientMetrics;
     this.streamBufferArgs = streamBufferArgs;
-    this.allowPutBlockPiggybacking = canEnablePutblockPiggybacking();
+    this.allowPutBlockPiggybacking = config.getEnablePutblockPiggybacking() &&
+            allDataNodesSupportPiggybacking();
     LOG.debug("PutBlock piggybacking is {}", allowPutBlockPiggybacking);
-  }
-
-  /**
-   * Helper method to check if incremental chunk list can be enabled.
-   * Prints debug messages if it cannot be enabled.
-   */
-  private boolean canEnableIncrementalChunkList() {
-    boolean confEnableIncrementalChunkList = config.getIncrementalChunkList();
-    if (!confEnableIncrementalChunkList) {
-      return false;
-    }
-
-    if (!(this instanceof RatisBlockOutputStream)) {
-      // Note: EC does not support incremental chunk list
-      LOG.debug("Unable to enable incrementalChunkList because BlockOutputStream is not a RatisBlockOutputStream");
-      return false;
-    }
-    if (!allDataNodesSupportPiggybacking()) {
-      // Not all datanodes support piggybacking and incremental chunk list.
-      LOG.debug("Unable to enable incrementalChunkList because not all datanodes support piggybacking");
-      return false;
-    }
-    return confEnableIncrementalChunkList;
-  }
-
-  /**
-   * Helper method to check if PutBlock piggybacking can be enabled.
-   * Prints debug message if it cannot be enabled.
-   */
-  private boolean canEnablePutblockPiggybacking() {
-    boolean confEnablePutblockPiggybacking = config.getEnablePutblockPiggybacking();
-    if (!confEnablePutblockPiggybacking) {
-      return false;
-    }
-
-    if (!allDataNodesSupportPiggybacking()) {
-      // Not all datanodes support piggybacking and incremental chunk list.
-      LOG.debug("Unable to enable PutBlock piggybacking because not all datanodes support piggybacking");
-      return false;
-    }
-    return confEnablePutblockPiggybacking;
   }
 
   private boolean allDataNodesSupportPiggybacking() {
@@ -413,8 +375,10 @@ public class BlockOutputStream extends OutputStream {
   }
 
   private void recordWatchForCommitAsync(CompletableFuture<PutBlockResult> putBlockResultFuture) {
-    final CompletableFuture<Void> flushFuture = putBlockResultFuture.thenCompose(x -> watchForCommit(x.commitIndex));
+    recordFlushFuture(watchForCommitAsync(putBlockResultFuture));
+  }
 
+  private void recordFlushFuture(CompletableFuture<Void> flushFuture) {
     Preconditions.checkState(Thread.holdsLock(this));
     this.lastFlushFuture = flushFuture;
     this.allPendingFlushFutures = allPendingFlushFutures.thenCombine(flushFuture, (last, curr) -> null);
@@ -480,8 +444,7 @@ public class BlockOutputStream extends OutputStream {
         writeChunk(buffer);
         putBlockFuture = executePutBlock(false, false);
       }
-      CompletableFuture<Void> watchForCommitAsync =
-          putBlockFuture.thenCompose(x -> watchForCommit(x.commitIndex));
+      CompletableFuture<Void> watchForCommitAsync = watchForCommitAsync(putBlockFuture);
       try {
         watchForCommitAsync.get();
       } catch (InterruptedException e) {
@@ -514,44 +477,33 @@ public class BlockOutputStream extends OutputStream {
   }
 
   /**
-   * Send a watch request to wait until the given index became committed.
-   * When watch is not needed (e.g. EC), this is a NOOP.
-   *
-   * @param index the log index to wait for.
-   * @return the future of the reply.
+   * Watch for a specific commit index.
    */
-  CompletableFuture<XceiverClientReply> sendWatchForCommit(long index) {
-    return CompletableFuture.completedFuture(null);
+  XceiverClientReply sendWatchForCommit(long commitIndex)
+      throws IOException {
+    return null;
   }
 
-  private CompletableFuture<Void> watchForCommit(long commitIndex) {
+  private void watchForCommit(long commitIndex) throws IOException {
+    checkOpen();
     try {
-      checkOpen();
-    } catch (IOException e) {
-      throw new FlushRuntimeException(e);
-    }
+      LOG.debug("Entering watchForCommit commitIndex = {}", commitIndex);
+      final XceiverClientReply reply = sendWatchForCommit(commitIndex);
+      if (reply != null) {
+        List<DatanodeDetails> dnList = reply.getDatanodes();
+        if (!dnList.isEmpty()) {
+          Pipeline pipe = xceiverClient.getPipeline();
 
-    LOG.debug("Entering watchForCommit commitIndex = {}", commitIndex);
-    return sendWatchForCommit(commitIndex)
-        .thenAccept(this::checkReply)
-        .exceptionally(e -> {
-          throw new FlushRuntimeException(setIoException(e));
-        })
-        .whenComplete((r, e) -> LOG.debug("Leaving watchForCommit commitIndex = {}", commitIndex));
-  }
-
-  private void checkReply(XceiverClientReply reply) {
-    if (reply == null) {
-      return;
+          LOG.warn("Failed to commit BlockId {} on {}. Failed nodes: {}",
+              blockID, pipe, dnList);
+          failedServers.addAll(dnList);
+        }
+      }
+    } catch (IOException ioe) {
+      setIoException(ioe);
+      throw getIoException();
     }
-    final List<DatanodeDetails> dnList = reply.getDatanodes();
-    if (dnList.isEmpty()) {
-      return;
-    }
-
-    LOG.warn("Failed to commit BlockId {} on {}. Failed nodes: {}",
-        blockID, xceiverClient.getPipeline(), dnList);
-    failedServers.addAll(dnList);
+    LOG.debug("Leaving watchForCommit commitIndex = {}", commitIndex);
   }
 
   void updateCommitInfo(XceiverClientReply reply, List<ChunkBuffer> buffers) {
@@ -771,6 +723,16 @@ public class BlockOutputStream extends OutputStream {
     return lastFlushFuture;
   }
 
+  private CompletableFuture<Void> watchForCommitAsync(CompletableFuture<PutBlockResult> putBlockResultFuture) {
+    return putBlockResultFuture.thenAccept(x -> {
+      try {
+        watchForCommit(x.commitIndex);
+      } catch (IOException e) {
+        throw new FlushRuntimeException(e);
+      }
+    });
+  }
+
   @Override
   public void close() throws IOException {
     if (xceiverClientFactory != null && xceiverClient != null) {
@@ -809,7 +771,7 @@ public class BlockOutputStream extends OutputStream {
   }
 
 
-  public IOException setIoException(Throwable e) {
+  public void setIoException(Exception e) {
     IOException ioe = getIoException();
     if (ioe == null) {
       IOException exception =  new IOException(EXCEPTION_MSG + e.toString(), e);
@@ -820,7 +782,6 @@ public class BlockOutputStream extends OutputStream {
               "so subsequent request also encounters " +
               "Storage Container Exception {}", ioe, e);
     }
-    return getIoException();
   }
 
   void cleanup() {

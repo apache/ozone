@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.Clock;
 import java.util.OptionalLong;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -52,7 +53,7 @@ public class DeleteContainerCommandHandler implements CommandHandler {
   private final AtomicInteger invocationCount = new AtomicInteger(0);
   private final AtomicInteger timeoutCount = new AtomicInteger(0);
   private final AtomicLong totalTime = new AtomicLong(0);
-  private final ThreadPoolExecutor executor;
+  private final ExecutorService executor;
   private final Clock clock;
   private int maxQueueSize;
 
@@ -69,7 +70,7 @@ public class DeleteContainerCommandHandler implements CommandHandler {
   }
 
   protected DeleteContainerCommandHandler(Clock clock,
-      ThreadPoolExecutor executor, int queueSize) {
+      ExecutorService executor, int queueSize) {
     this.executor = executor;
     this.clock = clock;
     maxQueueSize = queueSize;
@@ -130,7 +131,7 @@ public class DeleteContainerCommandHandler implements CommandHandler {
 
   @Override
   public int getQueuedCount() {
-    return executor.getQueue().size();
+    return ((ThreadPoolExecutor)executor).getQueue().size();
   }
 
   @Override
@@ -157,16 +158,6 @@ public class DeleteContainerCommandHandler implements CommandHandler {
   @Override
   public long getTotalRunTime() {
     return totalTime.get();
-  }
-
-  @Override
-  public int getThreadPoolMaxPoolSize() {
-    return executor.getMaximumPoolSize();
-  }
-
-  @Override
-  public int getThreadPoolActivePoolSize() {
-    return executor.getActiveCount();
   }
 
   @Override

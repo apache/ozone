@@ -129,6 +129,7 @@ public abstract class OMVolumeRequest extends OMClientRequest {
    * @param dbVolumeKey
    * @param dbUserKey
    * @param transactionLogIndex
+   * @throws IOException
    */
   protected static void createVolume(
       final OMMetadataManager omMetadataManager, OmVolumeArgs omVolumeArgs,

@@ -246,6 +246,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
      * @param tenantId tenant name
      * @param userRoleName user role name
      * @param adminRoleName admin role name
+     * @return Tenant
      * @throws IOException
      */
     @Override

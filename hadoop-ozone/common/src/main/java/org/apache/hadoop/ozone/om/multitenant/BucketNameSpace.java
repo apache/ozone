@@ -74,7 +74,7 @@ public interface BucketNameSpace {
    * Get Space Usage Information for this BucketNameSpace. This can be
    * used for billing purpose. Such Aggregation can also be done lazily
    * by a Recon job. Implementations can decide.
-   * @return SpaceUsageSource
+   * @return
    */
   SpaceUsageSource getSpaceUsage();
 
@@ -88,7 +88,7 @@ public interface BucketNameSpace {
 
   /**
    * Get Quota Information for this BucketNameSpace.
-   * @return OzoneQuota
+   * @return
    */
   OzoneQuota getQuota();
 }

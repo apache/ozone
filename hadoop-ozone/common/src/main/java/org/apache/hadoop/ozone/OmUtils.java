@@ -119,7 +119,7 @@ public final class OmUtils {
    * Return list of OM addresses by service ids - when HA is enabled.
    *
    * @param conf {@link ConfigurationSource}
-   * @return {service.id -&gt; [{@link InetSocketAddress}]}
+   * @return {service.id -> [{@link InetSocketAddress}]}
    */
   public static Map<String, List<InetSocketAddress>> getOmHAAddressesById(
       ConfigurationSource conf) {
@@ -243,10 +243,6 @@ public final class OmUtils {
     case ListKeys:
     case ListKeysLight:
     case ListTrash:
-      // ListTrash is deprecated by HDDS-11251. Keeping this in here
-      // As protobuf currently doesn't support deprecating enum fields
-      // TODO: Remove once migrated to proto3 and mark fields in proto
-      // as deprecated
     case ServiceList:
     case ListOpenFiles:
     case ListMultiPartUploadParts:
@@ -278,8 +274,7 @@ public final class OmUtils {
     case SetSafeMode:
     case PrintCompactionLogDag:
     case GetSnapshotInfo:
-    case GetQuotaRepairStatus:
-    case StartQuotaRepair:
+    case GetServerDefaults:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -309,10 +304,6 @@ public final class OmUtils {
     case AddAcl:
     case PurgeKeys:
     case RecoverTrash:
-      // RecoverTrash is deprecated by HDDS-11251. Keeping this in here
-      // As protobuf currently doesn't support deprecating enum fields
-      // TODO: Remove once migrated to proto3 and mark fields in proto
-      // as deprecated
     case FinalizeUpgrade:
     case Prepare:
     case CancelPrepare:
@@ -332,7 +323,6 @@ public final class OmUtils {
     case DeleteSnapshot:
     case RenameSnapshot:
     case SnapshotMoveDeletedKeys:
-    case SnapshotMoveTableKeys:
     case SnapshotPurge:
     case RecoverLease:
     case SetTimes:
@@ -707,7 +697,7 @@ public final class OmUtils {
    * Look at 'ozone.om.internal.service.id' first. If configured, return that.
    * If the above is not configured, look at 'ozone.om.service.ids'.
    * If count(ozone.om.service.ids) == 1, return that id.
-   * If count(ozone.om.service.ids) &gt; 1 throw exception
+   * If count(ozone.om.service.ids) > 1 throw exception
    * If 'ozone.om.service.ids' is not configured, return null. (Non HA)
    * @param conf configuration
    * @return OM service ID.

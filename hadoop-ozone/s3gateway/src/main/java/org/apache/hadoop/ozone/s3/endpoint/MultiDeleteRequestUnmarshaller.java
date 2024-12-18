@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import javax.ws.rs.Produces;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.ext.MessageBodyReader;
@@ -32,9 +33,6 @@ import java.lang.reflect.Type;
 
 import org.xml.sax.InputSource;
 import org.xml.sax.XMLReader;
-
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
-import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapOS3Exception;
 
 /**
  * Custom unmarshaller to read MultiDeleteRequest w/wo namespace.
@@ -80,7 +78,7 @@ public class MultiDeleteRequestUnmarshaller
       filter.parse(new InputSource(entityStream));
       return (MultiDeleteRequest) unmarshallerHandler.getResult();
     } catch (Exception e) {
-      throw wrapOS3Exception(INVALID_REQUEST.withMessage(e.getMessage()));
+      throw new WebApplicationException("Can't parse request body to XML.", e);
     }
   }
 }

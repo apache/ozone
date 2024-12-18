@@ -146,6 +146,7 @@ public class ReplicationManagerReport {
 
   /**
    * Return a map of all stats and their value as a long.
+   * @return
    */
   public Map<String, Long> getStats() {
     Map<String, Long> result = new HashMap<>();
@@ -158,6 +159,7 @@ public class ReplicationManagerReport {
   /**
    * Return a map of all samples, with the stat as the key and the samples
    * for the stat as a List of Long.
+   * @return
    */
   public Map<String, List<Long>> getSamples() {
     Map<String, List<Long>> result = new HashMap<>();

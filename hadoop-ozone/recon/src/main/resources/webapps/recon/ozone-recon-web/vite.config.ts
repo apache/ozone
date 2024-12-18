@@ -21,7 +21,7 @@
 
 import { defineConfig, splitVendorChunkPlugin } from 'vite';
 import { resolve } from 'path';
-import react from '@vitejs/plugin-react-swc';
+import react from '@vitejs/plugin-react';
 
 function pathResolve(dir: string) {
   return resolve(__dirname, '.', dir)
@@ -29,12 +29,6 @@ function pathResolve(dir: string) {
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [
-    react({
-      devTarget: "es2015" //SWC by default bypasses the build target, set dev target explicitly
-    }),
-    splitVendorChunkPlugin()
-  ],
   build: {
     target: "es2015",
     outDir: 'build',
@@ -54,6 +48,7 @@ export default defineConfig({
       }
     }
   },
+  plugins: [react(), splitVendorChunkPlugin()],
   server: {
     proxy: {
       "/api": {

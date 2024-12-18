@@ -32,7 +32,6 @@ import javax.ws.rs.core.Response;
  */
 @Path("/triggerdbsync")
 @Produces(MediaType.APPLICATION_JSON)
-@AdminOnly
 public class TriggerDBSyncEndpoint {
 
   private OzoneManagerServiceProvider ozoneManagerServiceProvider;

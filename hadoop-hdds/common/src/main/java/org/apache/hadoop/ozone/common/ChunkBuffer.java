@@ -39,12 +39,13 @@ public interface ChunkBuffer extends UncheckedAutoCloseable {
     return allocate(capacity, 0);
   }
 
-  /** Similar to {@link ByteBuffer#allocate(int)}
+  /**
+   * Similar to {@link ByteBuffer#allocate(int)}
    * except that it can specify the increment.
    *
    * @param increment
    *   the increment size so that this buffer is allocated incrementally.
-   *   When increment {@literal <= 0}, entire buffer is allocated in the beginning.
+   *   When increment <= 0, entire buffer is allocated in the beginning.
    */
   static ChunkBuffer allocate(int capacity, int increment) {
     if (increment > 0 && increment < capacity) {
@@ -59,8 +60,7 @@ public interface ChunkBuffer extends UncheckedAutoCloseable {
     return new ChunkBufferImplWithByteBuffer(buffer);
   }
 
-  /** Wrap the given list of {@link ByteBuffer}s as a {@link ChunkBuffer},
-   * with a function called when buffers are released.*/
+  /** Wrap the given list of {@link ByteBuffer}s as a {@link ChunkBuffer}. */
   static ChunkBuffer wrap(List<ByteBuffer> buffers) {
     Objects.requireNonNull(buffers, "buffers == null");
     if (buffers.size() == 1) {

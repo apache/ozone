@@ -193,6 +193,7 @@ public class OzoneFSInputStream extends FSInputStream
   /**
    * @param buf the ByteBuffer to receive the results of the read operation.
    * @param position offset
+   * @return void
    * @throws IOException if there is some error performing the read
    * @throws EOFException if end of file reached before reading fully
    */

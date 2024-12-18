@@ -66,16 +66,6 @@ public class ReplicationTask extends AbstractReplicationTask {
   }
 
   @Override
-  public String getMetricName() {
-    return "ContainerReplications";
-  }
-
-  @Override
-  public String getMetricDescriptionSegment() {
-    return "container replications";
-  }
-
-  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;

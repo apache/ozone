@@ -21,7 +21,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import picocli.CommandLine;
 
 /**
- * Option for {@link org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType}.
+ * Option for {@link OzoneObj.StoreType}.
  */
 public class StoreTypeOption
     implements CommandLine.ITypeConverter<OzoneObj.StoreType> {

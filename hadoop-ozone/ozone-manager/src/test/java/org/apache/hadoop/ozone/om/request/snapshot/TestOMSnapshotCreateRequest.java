@@ -19,8 +19,14 @@
 package org.apache.hadoop.ozone.om.request.snapshot;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -31,15 +37,18 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyRenameResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyRenameResponseWithFSO;
-import org.apache.hadoop.ozone.om.snapshot.TestSnapshotRequestAndResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
 
@@ -55,19 +64,69 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.framework;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
  * Tests OMSnapshotCreateRequest class, which handles CreateSnapshot request.
  */
-public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse {
+public class TestOMSnapshotCreateRequest {
+  @TempDir
+  private File anotherTempDir;
+
+  private OzoneManager ozoneManager;
+  private OMMetrics omMetrics;
+  private OmMetadataManagerImpl omMetadataManager;
+  private BatchOperation batchOperation;
+
+  private String volumeName;
+  private String bucketName;
   private String snapshotName1;
   private String snapshotName2;
 
   @BeforeEach
   public void setup() throws Exception {
+    ozoneManager = mock(OzoneManager.class);
+    omMetrics = OMMetrics.create();
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
+        anotherTempDir.getAbsolutePath());
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
+        ozoneManager);
+    when(ozoneManager.getMetrics()).thenReturn(omMetrics);
+    when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
+    when(ozoneManager.isRatisEnabled()).thenReturn(true);
+    when(ozoneManager.isFilesystemSnapshotEnabled()).thenReturn(true);
+    when(ozoneManager.isAdmin(any())).thenReturn(false);
+    when(ozoneManager.isOwner(any(), any())).thenReturn(false);
+    when(ozoneManager.getBucketOwner(any(), any(),
+        any(), any())).thenReturn("dummyBucketOwner");
+    OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
+    when(lvm.isAllowed(anyString())).thenReturn(true);
+    when(ozoneManager.getVersionManager()).thenReturn(lvm);
+    AuditLogger auditLogger = mock(AuditLogger.class);
+    when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
+    doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
+    batchOperation = omMetadataManager.getStore().initBatchOperation();
+
+    volumeName = UUID.randomUUID().toString();
+    bucketName = UUID.randomUUID().toString();
     snapshotName1 = UUID.randomUUID().toString();
     snapshotName2 = UUID.randomUUID().toString();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager);
+  }
+
+  @AfterEach
+  public void stop() {
+    omMetrics.unRegister();
+    framework().clearInlineMocks();
+    if (batchOperation != null) {
+      batchOperation.close();
+    }
   }
 
   @ValueSource(strings = {
@@ -80,9 +139,9 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
   })
   @ParameterizedTest
   public void testPreExecute(String snapshotName) throws Exception {
-    when(getOzoneManager().isOwner(any(), any())).thenReturn(true);
-    OMRequest omRequest = createSnapshotRequest(getVolumeName(),
-        getBucketName(), snapshotName);
+    when(ozoneManager.isOwner(any(), any())).thenReturn(true);
+    OMRequest omRequest = createSnapshotRequest(volumeName,
+        bucketName, snapshotName);
     doPreExecute(omRequest);
   }
 
@@ -98,9 +157,9 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
   })
   @ParameterizedTest
   public void testPreExecuteFailure(String snapshotName) {
-    when(getOzoneManager().isOwner(any(), any())).thenReturn(true);
-    OMRequest omRequest = createSnapshotRequest(getVolumeName(),
-        getBucketName(), snapshotName);
+    when(ozoneManager.isOwner(any(), any())).thenReturn(true);
+    OMRequest omRequest = createSnapshotRequest(volumeName,
+        bucketName, snapshotName);
     OMException omException =
         assertThrows(OMException.class, () -> doPreExecute(omRequest));
     assertTrue(omException.getMessage()
@@ -110,8 +169,8 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
   @Test
   public void testPreExecuteBadOwner() {
     // Owner is not set for the request.
-    OMRequest omRequest = createSnapshotRequest(getVolumeName(),
-        getBucketName(), snapshotName1);
+    OMRequest omRequest = createSnapshotRequest(volumeName,
+        bucketName, snapshotName1);
 
     OMException omException = assertThrows(OMException.class,
         () -> doPreExecute(omRequest));
@@ -121,29 +180,29 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {
-    when(getOzoneManager().isAdmin(any())).thenReturn(true);
-    OMRequest omRequest = createSnapshotRequest(getVolumeName(),
-        getBucketName(), snapshotName1);
+    when(ozoneManager.isAdmin(any())).thenReturn(true);
+    OMRequest omRequest = createSnapshotRequest(volumeName,
+        bucketName, snapshotName1);
     OMSnapshotCreateRequest omSnapshotCreateRequest = doPreExecute(omRequest);
-    String key = getTableKey(getVolumeName(), getBucketName(), snapshotName1);
-    String bucketKey = getOmMetadataManager().getBucketKey(getVolumeName(), getBucketName());
+    String key = getTableKey(volumeName, bucketName, snapshotName1);
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
 
     // Add a 1000-byte key to the bucket
     OmKeyInfo key1 = addKey("key-testValidateAndUpdateCache", 12345L);
     addKeyToTable(key1);
 
-    OmBucketInfo omBucketInfo = getOmMetadataManager().getBucketTable().get(
+    OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(
         bucketKey);
     long bucketDataSize = key1.getDataSize();
     long bucketUsedBytes = omBucketInfo.getUsedBytes();
     assertEquals(key1.getReplicatedSize(), bucketUsedBytes);
 
     // Value in cache should be null as of now.
-    assertNull(getOmMetadataManager().getSnapshotInfoTable().get(key));
+    assertNull(omMetadataManager.getSnapshotInfoTable().get(key));
 
     // Run validateAndUpdateCache.
     OMClientResponse omClientResponse =
-        omSnapshotCreateRequest.validateAndUpdateCache(getOzoneManager(), 1);
+        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1);
 
     assertNotNull(omClientResponse.getOMResponse());
 
@@ -167,21 +226,20 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
 
     // Get value from cache
     SnapshotInfo snapshotInfoInCache =
-        getOmMetadataManager().getSnapshotInfoTable().get(key);
+        omMetadataManager.getSnapshotInfoTable().get(key);
     assertNotNull(snapshotInfoInCache);
     assertEquals(snapshotInfoFromProto, snapshotInfoInCache);
-    assertEquals(snapshotInfoInCache.getLastTransactionInfo(),
-        TransactionInfo.valueOf(TransactionInfo.getTermIndex(1L)).toByteString());
-    assertEquals(0, getOmMetrics().getNumSnapshotCreateFails());
-    assertEquals(1, getOmMetrics().getNumSnapshotActive());
-    assertEquals(1, getOmMetrics().getNumSnapshotCreates());
+
+    assertEquals(0, omMetrics.getNumSnapshotCreateFails());
+    assertEquals(1, omMetrics.getNumSnapshotActive());
+    assertEquals(1, omMetrics.getNumSnapshotCreates());
   }
 
   @Test
   public void testEntryRenamedKeyTable() throws Exception {
-    when(getOzoneManager().isAdmin(any())).thenReturn(true);
+    when(ozoneManager.isAdmin(any())).thenReturn(true);
     Table<String, String> snapshotRenamedTable =
-        getOmMetadataManager().getSnapshotRenamedTable();
+        omMetadataManager.getSnapshotRenamedTable();
 
     renameKey("key1", "key2", 0);
     renameDir("dir1", "dir2", 5);
@@ -191,17 +249,17 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
 
     // Create snapshot
     createSnapshot(snapshotName1);
-    String snapKey = getTableKey(getVolumeName(),
-        getBucketName(), snapshotName1);
+    String snapKey = getTableKey(volumeName,
+        bucketName, snapshotName1);
     SnapshotInfo snapshotInfo =
-        getOmMetadataManager().getSnapshotInfoTable().get(snapKey);
+        omMetadataManager.getSnapshotInfoTable().get(snapKey);
     assertNotNull(snapshotInfo);
 
     renameKey("key3", "key4", 10);
     renameDir("dir3", "dir4", 15);
 
     // Rename table should have two entries as rename is within snapshot scope.
-    assertEquals(2, getOmMetadataManager()
+    assertEquals(2, omMetadataManager
         .countRowsInTable(snapshotRenamedTable));
 
     // Create snapshot to clear snapshotRenamedTable
@@ -211,33 +269,33 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
 
   @Test
   public void testEntryExists() throws Exception {
-    when(getOzoneManager().isAdmin(any())).thenReturn(true);
+    when(ozoneManager.isAdmin(any())).thenReturn(true);
 
-    String key = getTableKey(getVolumeName(), getBucketName(), snapshotName1);
+    String key = getTableKey(volumeName, bucketName, snapshotName1);
 
     OMRequest omRequest =
-        createSnapshotRequest(getVolumeName(), getBucketName(), snapshotName1);
+        createSnapshotRequest(volumeName, bucketName, snapshotName1);
     OMSnapshotCreateRequest omSnapshotCreateRequest = doPreExecute(omRequest);
 
-    assertNull(getOmMetadataManager().getSnapshotInfoTable().get(key));
-    omSnapshotCreateRequest.validateAndUpdateCache(getOzoneManager(), 1);
+    assertNull(omMetadataManager.getSnapshotInfoTable().get(key));
+    omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1);
 
-    assertNotNull(getOmMetadataManager().getSnapshotInfoTable().get(key));
+    assertNotNull(omMetadataManager.getSnapshotInfoTable().get(key));
 
     // Now try to create again to verify error
-    omRequest = createSnapshotRequest(getVolumeName(), getBucketName(), snapshotName1);
+    omRequest = createSnapshotRequest(volumeName, bucketName, snapshotName1);
     omSnapshotCreateRequest = doPreExecute(omRequest);
     OMClientResponse omClientResponse =
-        omSnapshotCreateRequest.validateAndUpdateCache(getOzoneManager(), 2);
+        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 2);
 
     OMResponse omResponse = omClientResponse.getOMResponse();
     assertNotNull(omResponse.getCreateSnapshotResponse());
     assertEquals(OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS,
         omResponse.getStatus());
 
-    assertEquals(1, getOmMetrics().getNumSnapshotCreateFails());
-    assertEquals(1, getOmMetrics().getNumSnapshotActive());
-    assertEquals(2, getOmMetrics().getNumSnapshotCreates());
+    assertEquals(1, omMetrics.getNumSnapshotCreateFails());
+    assertEquals(1, omMetrics.getNumSnapshotActive());
+    assertEquals(2, omMetrics.getNumSnapshotCreates());
   }
 
   private void renameKey(String fromKey, String toKey, long offset)
@@ -256,15 +314,15 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
         new OMKeyRenameResponse(omResponse, fromKeyInfo.getKeyName(),
             toKeyInfo.getKeyName(), toKeyInfo);
 
-    omKeyRenameResponse.addToDBBatch(getOmMetadataManager(), getBatchOperation());
-    getOmMetadataManager().getStore().commitBatchOperation(getBatchOperation());
+    omKeyRenameResponse.addToDBBatch(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
   }
 
   private void renameDir(String fromKey, String toKey, long offset)
       throws Exception {
     String fromKeyParentName = UUID.randomUUID().toString();
-    OmKeyInfo fromKeyParent = OMRequestTestUtils.createOmKeyInfo(getVolumeName(),
-            getBucketName(), fromKeyParentName, RatisReplicationConfig.getInstance(THREE))
+    OmKeyInfo fromKeyParent = OMRequestTestUtils.createOmKeyInfo(volumeName,
+            bucketName, fromKeyParentName, RatisReplicationConfig.getInstance(THREE))
         .setObjectID(100L)
         .build();
 
@@ -282,32 +340,32 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
         new OMKeyRenameResponseWithFSO(omResponse, getDBKeyName(fromKeyInfo),
             getDBKeyName(toKeyInfo), fromKeyParent, null, toKeyInfo,
             null, true, BucketLayout.FILE_SYSTEM_OPTIMIZED);
-    omKeyRenameResponse.addToDBBatch(getOmMetadataManager(), getBatchOperation());
-    getOmMetadataManager().getStore().commitBatchOperation(getBatchOperation());
+    omKeyRenameResponse.addToDBBatch(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
   }
 
   protected String getDBKeyName(OmKeyInfo keyInfo) throws IOException {
-    return getOmMetadataManager().getOzonePathKey(
-        getOmMetadataManager().getVolumeId(getVolumeName()),
-        getOmMetadataManager().getBucketId(getVolumeName(), getBucketName()),
+    return omMetadataManager.getOzonePathKey(
+        omMetadataManager.getVolumeId(volumeName),
+        omMetadataManager.getBucketId(volumeName, bucketName),
         keyInfo.getParentObjectID(), keyInfo.getKeyName());
   }
 
   private void createSnapshot(String snapName) throws Exception {
     OMRequest omRequest =
         createSnapshotRequest(
-            getVolumeName(), getBucketName(), snapName);
+            volumeName, bucketName, snapName);
     OMSnapshotCreateRequest omSnapshotCreateRequest = doPreExecute(omRequest);
     //create entry
     OMClientResponse omClientResponse =
-        omSnapshotCreateRequest.validateAndUpdateCache(getOzoneManager(), 1);
-    omClientResponse.checkAndUpdateDB(getOmMetadataManager(), getBatchOperation());
-    getOmMetadataManager().getStore().commitBatchOperation(getBatchOperation());
+        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1);
+    omClientResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
   }
 
   private OMSnapshotCreateRequest doPreExecute(
       OMRequest originalRequest) throws Exception {
-    return doPreExecute(originalRequest, getOzoneManager());
+    return doPreExecute(originalRequest, ozoneManager);
   }
 
   /**
@@ -324,15 +382,15 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
   }
 
   private OmKeyInfo addKey(String keyName, long objectId) {
-    return OMRequestTestUtils.createOmKeyInfo(getVolumeName(), getBucketName(), keyName,
+    return OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
             RatisReplicationConfig.getInstance(THREE)).setObjectID(objectId)
         .build();
   }
 
   protected String addKeyToTable(OmKeyInfo keyInfo) throws Exception {
     OMRequestTestUtils.addKeyToTable(false, true, keyInfo, 0, 0L,
-        getOmMetadataManager());
-    return getOmMetadataManager().getOzoneKey(keyInfo.getVolumeName(),
+        omMetadataManager);
+    return omMetadataManager.getOzoneKey(keyInfo.getVolumeName(),
         keyInfo.getBucketName(), keyInfo.getKeyName());
   }
 }

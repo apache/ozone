@@ -495,7 +495,7 @@ public class HeartbeatEndpointTask
     /**
      * Sets the LayoutVersionManager.
      *
-     * @param lvm config
+     * @param versionMgr - config
      * @return Builder
      */
     public Builder setLayoutVersionManager(HDDSLayoutVersionManager lvm) {

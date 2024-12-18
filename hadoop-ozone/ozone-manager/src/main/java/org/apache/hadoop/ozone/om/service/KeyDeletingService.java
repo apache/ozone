@@ -23,9 +23,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -44,9 +42,9 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotSize;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
@@ -69,6 +67,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.protocol.Message;
+import org.apache.ratis.protocol.RaftClientRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,15 +95,11 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private final Map<String, Long> exclusiveReplicatedSizeMap;
   private final Set<String> completedExclusiveSizeSet;
   private final Map<String, String> snapshotSeekMap;
-  private AtomicBoolean isRunningOnAOS;
-  private final boolean deepCleanSnapshots;
-  private final SnapshotChainManager snapshotChainManager;
 
   public KeyDeletingService(OzoneManager ozoneManager,
       ScmBlockLocationProtocol scmClient,
       KeyManager manager, long serviceInterval,
-      long serviceTimeout, ConfigurationSource conf,
-      boolean deepCleanSnapshots) {
+      long serviceTimeout, ConfigurationSource conf) {
     super(KeyDeletingService.class.getSimpleName(), serviceInterval,
         TimeUnit.MILLISECONDS, KEY_DELETING_CORE_POOL_SIZE,
         serviceTimeout, ozoneManager, scmClient);
@@ -118,9 +114,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     this.exclusiveReplicatedSizeMap = new HashMap<>();
     this.completedExclusiveSizeSet = new HashSet<>();
     this.snapshotSeekMap = new HashMap<>();
-    this.isRunningOnAOS = new AtomicBoolean(false);
-    this.deepCleanSnapshots = deepCleanSnapshots;
-    this.snapshotChainManager = ((OmMetadataManagerImpl)manager.getMetadataManager()).getSnapshotChainManager();
   }
 
   /**
@@ -133,14 +126,10 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     return deletedKeyCount;
   }
 
-  public boolean isRunningOnAOS() {
-    return isRunningOnAOS.get();
-  }
-
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
-    queue.add(new KeyDeletingTask(this));
+    queue.add(new KeyDeletingTask());
     return queue;
   }
 
@@ -183,12 +172,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
    * the blocks info in its deletedBlockLog), it removes these keys from the
    * DB.
    */
-  private final class KeyDeletingTask implements BackgroundTask {
-    private final KeyDeletingService deletingService;
-
-    private KeyDeletingTask(KeyDeletingService service) {
-      this.deletingService = service;
-    }
+  private class KeyDeletingTask implements BackgroundTask {
 
     @Override
     public int getPriority() {
@@ -202,7 +186,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       if (shouldRun()) {
         final long run = getRunCount().incrementAndGet();
         LOG.debug("Running KeyDeletingService {}", run);
-        isRunningOnAOS.set(true);
+
         int delCount = 0;
         try {
           // TODO: [SNAPSHOT] HDDS-7968. Reclaim eligible key blocks in
@@ -210,9 +194,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           //  doesn't have enough entries left.
           //  OM would have to keep track of which snapshot the key is coming
           //  from if the above would be done inside getPendingDeletionKeys().
-          // This is to avoid race condition b/w purge request and snapshot chain update. For AOS taking the global
-          // snapshotId since AOS could process multiple buckets in one iteration.
-          UUID expectedPreviousSnapshotId = snapshotChainManager.getLatestGlobalSnapshotId();
+
           PendingKeysDeletion pendingKeysDeletion = manager
               .getPendingDeletionKeys(getKeyLimitPerTask());
           List<BlockGroup> keyBlocksList = pendingKeysDeletion
@@ -220,7 +202,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           if (keyBlocksList != null && !keyBlocksList.isEmpty()) {
             delCount = processKeyDeletes(keyBlocksList,
                 getOzoneManager().getKeyManager(),
-                pendingKeysDeletion.getKeysToModify(), null, expectedPreviousSnapshotId);
+                pendingKeysDeletion.getKeysToModify(), null);
             deletedKeyCount.addAndGet(delCount);
           }
         } catch (IOException e) {
@@ -229,7 +211,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         }
 
         try {
-          if (deepCleanSnapshots && delCount < keyLimitPerTask) {
+          if (delCount < keyLimitPerTask) {
             processSnapshotDeepClean(delCount);
           }
         } catch (Exception e) {
@@ -238,11 +220,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         }
 
       }
-      isRunningOnAOS.set(false);
-      synchronized (deletingService) {
-        this.deletingService.notify();
-      }
-
       // By design, no one cares about the results of this call back.
       return EmptyTaskResult.newResult();
     }
@@ -265,20 +242,12 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         while (delCount < keyLimitPerTask && iterator.hasNext()) {
           List<BlockGroup> keysToPurge = new ArrayList<>();
           HashMap<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
-          SnapshotInfo currSnapInfo = snapshotInfoTable.get(iterator.next().getKey());
+          SnapshotInfo currSnapInfo = iterator.next().getValue();
+
           // Deep clean only on active snapshot. Deleted Snapshots will be
           // cleaned up by SnapshotDeletingService.
-          if (currSnapInfo == null || currSnapInfo.getSnapshotStatus() != SNAPSHOT_ACTIVE ||
+          if (currSnapInfo.getSnapshotStatus() != SNAPSHOT_ACTIVE ||
               currSnapInfo.getDeepClean()) {
-            continue;
-          }
-
-          SnapshotInfo prevSnapInfo = SnapshotUtils.getPreviousSnapshot(getOzoneManager(), snapChainManager,
-              currSnapInfo);
-          if (prevSnapInfo != null &&
-              (prevSnapInfo.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE ||
-                  !OmSnapshotManager.areSnapshotChangesFlushedToDB(getOzoneManager().getMetadataManager(),
-                      prevSnapInfo))) {
             continue;
           }
 
@@ -310,13 +279,13 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             }
 
             String snapshotBucketKey = dbBucketKey + OzoneConsts.OM_KEY_PREFIX;
-            SnapshotInfo previousSnapshot = SnapshotUtils.getPreviousSnapshot(getOzoneManager(), snapChainManager,
-                currSnapInfo);
+            SnapshotInfo previousSnapshot = getPreviousActiveSnapshot(
+                currSnapInfo, snapChainManager, omSnapshotManager);
             SnapshotInfo previousToPrevSnapshot = null;
 
             if (previousSnapshot != null) {
-              previousToPrevSnapshot = SnapshotUtils.getPreviousSnapshot(getOzoneManager(), snapChainManager,
-                  previousSnapshot);
+              previousToPrevSnapshot = getPreviousActiveSnapshot(
+                  previousSnapshot, snapChainManager, omSnapshotManager);
             }
 
             Table<String, OmKeyInfo> previousKeyTable = null;
@@ -445,8 +414,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
               if (!keysToPurge.isEmpty()) {
                 processKeyDeletes(keysToPurge, currOmSnapshot.getKeyManager(),
-                    keysToModify, currSnapInfo.getTableKey(),
-                    Optional.ofNullable(previousSnapshot).map(SnapshotInfo::getSnapshotId).orElse(null));
+                    keysToModify, currSnapInfo.getTableKey());
               }
             } finally {
               IOUtils.closeQuietly(rcPrevOmSnapshot, rcPrevToPrevOmSnapshot);
@@ -515,7 +483,24 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
     public void submitRequest(OMRequest omRequest, ClientId clientId) {
       try {
-        OzoneManagerRatisUtils.submitRequest(getOzoneManager(), omRequest, clientId, getRunCount().get());
+        if (isRatisEnabled()) {
+          OzoneManagerRatisServer server = getOzoneManager().getOmRatisServer();
+
+          RaftClientRequest raftClientRequest = RaftClientRequest.newBuilder()
+              .setClientId(clientId)
+              .setServerId(server.getRaftPeerId())
+              .setGroupId(server.getRaftGroupId())
+              .setCallId(getRunCount().get())
+              .setMessage(Message.valueOf(
+                  OMRatisHelper.convertRequestToByteString(omRequest)))
+              .setType(RaftClientRequest.writeRequestType())
+              .build();
+
+          server.submitRequest(omRequest, raftClientRequest);
+        } else {
+          getOzoneManager().getOmServerProtocol()
+              .submitRequest(null, omRequest);
+        }
       } catch (ServiceException e) {
         LOG.error("Snapshot deep cleaning request failed. " +
             "Will retry at next run.", e);

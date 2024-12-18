@@ -155,7 +155,6 @@ public class ReconStorageContainerManagerFacade
   private final SCMNodeDetails reconNodeDetails;
   private final SCMHAManager scmhaManager;
   private final SequenceIdGenerator sequenceIdGen;
-  private final ContainerHealthTask containerHealthTask;
 
   private DBStore dbStore;
   private ReconNodeManager nodeManager;
@@ -273,7 +272,7 @@ public class ReconStorageContainerManagerFacade
         scmServiceProvider,
         reconTaskStatusDao,
         reconTaskConfig);
-    containerHealthTask = new ContainerHealthTask(
+    ContainerHealthTask containerHealthTask = new ContainerHealthTask(
         containerManager, scmServiceProvider, reconTaskStatusDao,
         containerHealthSchemaManager, containerPlacementPolicy, reconTaskConfig,
         reconContainerMetadataManager, conf);
@@ -742,12 +741,6 @@ public class ReconStorageContainerManagerFacade
   public ContainerSizeCountTask getContainerSizeCountTask() {
     return containerSizeCountTask;
   }
-
-  @VisibleForTesting
-  public ContainerHealthTask getContainerHealthTask() {
-    return containerHealthTask;
-  }
-
   @VisibleForTesting
   public ContainerCountBySizeDao getContainerCountBySizeDao() {
     return containerCountBySizeDao;

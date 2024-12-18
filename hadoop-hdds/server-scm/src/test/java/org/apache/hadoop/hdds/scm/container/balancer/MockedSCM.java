@@ -86,7 +86,7 @@ public final class MockedSCM {
     }
   }
 
-  void init(@Nonnull ContainerBalancerConfiguration balancerConfig, @Nonnull OzoneConfiguration ozoneCfg) {
+  private void init(@Nonnull ContainerBalancerConfiguration balancerConfig, @Nonnull OzoneConfiguration ozoneCfg) {
     ozoneCfg.setFromObject(balancerConfig);
     try {
       doMock(balancerConfig, ozoneCfg);

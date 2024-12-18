@@ -483,10 +483,10 @@ public class OzoneContainer {
     replicationServer.start();
     datanodeDetails.setPort(Name.REPLICATION, replicationServer.getPort());
 
-    hddsDispatcher.init();
-    hddsDispatcher.setClusterId(clusterId);
     writeChannel.start();
     readChannel.start();
+    hddsDispatcher.init();
+    hddsDispatcher.setClusterId(clusterId);
     blockDeletingService.start();
     recoveringContainerScrubbingService.start();
 

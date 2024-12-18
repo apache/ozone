@@ -88,7 +88,6 @@
         <module name="JavadocType">
           <property name="scope" value="public"/>
           <property name="allowMissingParamTags" value="true"/>
-          <property name="allowUnknownTags" value="false"/>
         </module>
         <module name="JavadocStyle"/>
         <module name="MissingJavadocPackage"/>

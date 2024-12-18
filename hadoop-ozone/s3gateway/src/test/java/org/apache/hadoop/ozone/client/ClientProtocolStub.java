@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
@@ -298,6 +299,21 @@ public class ClientProtocolStub implements ClientProtocol {
                                  String keyPrefix, String prevKey,
                                  int maxListResult) throws IOException {
     return null;
+  }
+
+  @Override
+  public List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
+                                           String startKeyName,
+                                           String keyPrefix, int maxKeys)
+      throws IOException {
+    return null;
+  }
+
+  @Override
+  public boolean recoverTrash(String volumeName, String bucketName,
+                              String keyName, String destinationBucket)
+      throws IOException {
+    return false;
   }
 
   @Override

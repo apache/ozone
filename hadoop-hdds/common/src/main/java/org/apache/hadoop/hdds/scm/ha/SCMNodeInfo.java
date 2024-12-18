@@ -67,6 +67,7 @@ public class SCMNodeInfo {
   /**
    * Build SCM Node information from configuration.
    * @param conf
+   * @return
    */
   public static List<SCMNodeInfo> buildNodeInfo(ConfigurationSource conf) {
 

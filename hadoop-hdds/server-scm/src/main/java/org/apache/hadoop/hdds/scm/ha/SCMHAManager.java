@@ -55,6 +55,7 @@ public interface SCMHAManager extends AutoCloseable {
   /**
    * Returns the DBTransactionBuffer as SCMHADBTransactionBuffer if its
    * valid.
+   * @return
    */
   SCMHADBTransactionBuffer asSCMHADBTransactionBuffer();
 

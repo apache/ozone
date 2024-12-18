@@ -47,16 +47,6 @@ public class ReconcileContainerTask extends AbstractReplicationTask {
   }
 
   @Override
-  protected String getMetricName() {
-    return "ContainerReconciliations";
-  }
-
-  @Override
-  protected String getMetricDescriptionSegment() {
-    return "Container Reconciliations";
-  }
-
-  @Override
   public void runTask() {
     long start = Time.monotonicNow();
 

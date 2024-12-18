@@ -24,6 +24,8 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
 
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+
 import io.prometheus.client.CollectorRegistry;
 import io.prometheus.client.exporter.common.TextFormat;
 
@@ -56,6 +58,7 @@ public class PrometheusServlet extends HttpServlet {
         return;
       }
     }
+    DefaultMetricsSystem.instance().publishMetricsNow();
     PrintWriter writer = resp.getWriter();
     getPrometheusSink().writeMetrics(writer);
     writer.write("\n\n#Dropwizard metrics\n\n");

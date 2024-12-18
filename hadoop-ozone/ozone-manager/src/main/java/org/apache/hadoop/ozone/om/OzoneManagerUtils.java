@@ -51,8 +51,6 @@ public final class OzoneManagerUtils {
    * OzoneManagerStateMachine#runCommand function and ensures sequential
    * execution path.
    * Below is the call trace to perform OM client request operation:
-   * <pre>
-   * {@code
    * OzoneManagerStateMachine#applyTransaction ->
    * OzoneManagerStateMachine#runCommand ->
    * OzoneManagerRequestHandler#handleWriteRequest ->
@@ -62,8 +60,6 @@ public final class OzoneManagerUtils {
    * OzoneManagerUtils#getBucketLayout ->
    * OzoneManagerUtils#getOmBucketInfo ->
    * omMetadataManager().getBucketTable().get(buckKey)
-   * }
-   * </pre>
    */
 
   public static OmBucketInfo getBucketInfo(OMMetadataManager metaMgr,
@@ -168,8 +164,12 @@ public final class OzoneManagerUtils {
        * buck-src has the actual BucketLayout that will be used by the
        * links.
        */
-      return resolveBucketInfoLink(metadataManager, buckInfo.getSourceVolume(),
-          buckInfo.getSourceBucket(), visited);
+      try {
+        return resolveBucketInfoLink(metadataManager,
+            buckInfo.getSourceVolume(), buckInfo.getSourceBucket(), visited);
+      } catch (IOException e) {
+        throw e;
+      }
     }
     return buckInfo;
   }

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.s3.signature;
 
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,7 +53,7 @@ public class Credential {
    * Sample credential value:
    * Credential=AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request
    *
-   * @throws MalformedResourceException
+   * @throws OS3Exception
    */
   @SuppressWarnings("StringSplitter")
   public void parseCredential() throws MalformedResourceException {

@@ -195,6 +195,8 @@ public class DefaultCAServer implements CertificateServer {
    *
    * @param certSerialId         - Certificate for this CA.
    * @return X509Certificate
+   * @throws CertificateException - usually thrown if this CA is not
+   * initialized.
    * @throws IOException - on Error.
    */
   @Override

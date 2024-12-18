@@ -157,15 +157,15 @@ public class ContainerEndpoint {
   }
 
   /**
-   * Return {@code org.apache.hadoop.hdds.scm.container}
+   * Return @{@link org.apache.hadoop.hdds.scm.container}
    * for the containers starting from the given "prev-key" query param for the
    * given "limit". The given "prev-key" is skipped from the results returned.
    *
    * @param prevKey the containerID after which results are returned.
-   *                start containerID, &gt;=0,
+   *                start containerID, >=0,
    *                start searching at the head if 0.
    * @param limit   max no. of containers to get.
-   *                count must be &gt;= 0
+   *                count must be >= 0
    *                Usually the count will be replace with a very big
    *                value instead of being unlimited in case the db is very big.
    * @return {@link Response}
@@ -408,18 +408,13 @@ public class ContainerEndpoint {
       summary = containerHealthSchemaManager.getUnhealthyContainersSummary();
       List<UnhealthyContainers> containers = containerHealthSchemaManager
           .getUnhealthyContainers(internalState, offset, limit);
-
-      // Filtering out EMPTY_MISSING and NEGATIVE_SIZE containers from the response.
-      // These container states are not being inserted into the database as they represent
-      // edge cases that are not critical to track as unhealthy containers.
-      List<UnhealthyContainers> filteredContainers = containers.stream()
-          .filter(container -> !container.getContainerState()
-              .equals(UnHealthyContainerStates.EMPTY_MISSING.toString())
-              && !container.getContainerState()
-              .equals(UnHealthyContainerStates.NEGATIVE_SIZE.toString()))
-          .collect(Collectors.toList());
-
-      for (UnhealthyContainers c : filteredContainers) {
+      List<UnhealthyContainers> emptyMissingFiltered = containers.stream()
+          .filter(
+              container -> !container.getContainerState()
+                  .equals(UnHealthyContainerStates.EMPTY_MISSING.toString()))
+          .collect(
+              Collectors.toList());
+      for (UnhealthyContainers c : emptyMissingFiltered) {
         long containerID = c.getContainerId();
         ContainerInfo containerInfo =
             containerManager.getContainer(ContainerID.valueOf(containerID));

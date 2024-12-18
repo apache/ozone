@@ -44,14 +44,12 @@ public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
 
   static {
     Field f = null;
-    if (JavaUtils.isJavaVersionAtMost(8)) {
-      try {
-        f = ByteBuffer.class
-            .getDeclaredField("isReadOnly");
-        f.setAccessible(true);
-      } catch (NoSuchFieldException e) {
-        LOG.error("No isReadOnly field in ByteBuffer", e);
-      }
+    try {
+      f = ByteBuffer.class
+          .getDeclaredField("isReadOnly");
+      f.setAccessible(true);
+    } catch (NoSuchFieldException e) {
+      LOG.error("No isReadOnly field in ByteBuffer", e);
     }
     IS_READY_ONLY_FIELD = f;
 

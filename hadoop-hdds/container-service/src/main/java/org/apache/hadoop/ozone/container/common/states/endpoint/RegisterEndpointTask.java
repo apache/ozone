@@ -244,7 +244,7 @@ public final class RegisterEndpointTask implements
     /**
      * Sets the LayoutVersionManager.
      *
-     * @param lvm config
+     * @param versionMgr - config
      * @return Builder.
      */
     public Builder setLayoutVersionManager(HDDSLayoutVersionManager lvm) {

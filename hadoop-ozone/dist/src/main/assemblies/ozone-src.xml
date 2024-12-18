@@ -67,13 +67,6 @@
     <fileSet>
       <directory>dev-support</directory>
       <useDefaultExcludes>true</useDefaultExcludes>
-      <excludes>
-        <exclude>**/.classpath</exclude>
-        <exclude>**/.project</exclude>
-        <exclude>**/.settings</exclude>
-        <exclude>**/*.iml</exclude>
-        <exclude>**/target/**</exclude>
-      </excludes>
     </fileSet>
     <fileSet>
       <directory>hadoop-hdds</directory>

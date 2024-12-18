@@ -68,7 +68,7 @@ public interface RequestHandler {
   }
 
   /**
-   * Implementation of {@link #handleWriteRequest}.
+   * Implementation of {@link #handleWriteRequest(OMRequest, TermIndex, OzoneManagerDoubleBuffer)}.
    *
    * @param omRequest the write request
    * @param termIndex - ratis transaction term and index

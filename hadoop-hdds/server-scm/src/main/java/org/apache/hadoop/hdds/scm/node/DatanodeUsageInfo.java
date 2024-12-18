@@ -32,7 +32,6 @@ public class DatanodeUsageInfo {
   private DatanodeDetails datanodeDetails;
   private SCMNodeStat scmNodeStat;
   private int containerCount;
-  private int pipelineCount;
 
   /**
    * Constructs a DatanodeUsageInfo with DatanodeDetails and SCMNodeStat.
@@ -46,7 +45,6 @@ public class DatanodeUsageInfo {
     this.datanodeDetails = datanodeDetails;
     this.scmNodeStat = scmNodeStat;
     this.containerCount = -1;
-    this.pipelineCount = -1;
   }
 
   /**
@@ -147,14 +145,6 @@ public class DatanodeUsageInfo {
     this.containerCount = containerCount;
   }
 
-  public int getPipelineCount() {
-    return pipelineCount;
-  }
-
-  public void setPipelineCount(int pipelineCount) {
-    this.pipelineCount = pipelineCount;
-  }
-
   /**
    * Gets Comparator that compares two DatanodeUsageInfo on the basis of
    * their utilization values. Utilization is (capacity - remaining) divided
@@ -220,7 +210,6 @@ public class DatanodeUsageInfo {
     }
 
     builder.setContainerCount(containerCount);
-    builder.setPipelineCount(pipelineCount);
     return builder;
   }
 }

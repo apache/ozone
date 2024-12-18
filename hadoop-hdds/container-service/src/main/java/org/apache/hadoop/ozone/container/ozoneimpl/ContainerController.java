@@ -167,6 +167,7 @@ public class ContainerController {
    * Returns the Container given a container id.
    *
    * @param containerId ID of the container
+   * @return Container
    */
   public void addFinalizedBlock(final long containerId,
       final long localId) {

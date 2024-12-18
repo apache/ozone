@@ -438,6 +438,7 @@ public abstract class OMClientRequest implements RequestAuditor {
    * Return String created from OMRequest userInfo. If userInfo is not
    * set, returns null.
    * @return String
+   * @throws IOException
    */
   @VisibleForTesting
   public String getHostName() {

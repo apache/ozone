@@ -172,7 +172,6 @@ import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.ratis.protocol.RaftPeerId;
-import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.JvmPauseMonitor;
 import org.slf4j.Logger;
@@ -614,8 +613,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * @param conf        HDDS configuration
    * @param configurator SCM configurator
    * @return SCM instance
-   * @throws IOException on Failure,
-   * @throws AuthenticationException
+   * @throws IOException, AuthenticationException
    */
   public static StorageContainerManager createSCM(
       OzoneConfiguration conf, SCMConfigurator configurator)
@@ -628,8 +626,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    *
    * @param conf        HDDS configuration
    * @return SCM instance
-   * @throws IOException on Failure,
-   * @throws AuthenticationException
+   * @throws IOException, AuthenticationException
    */
   public static StorageContainerManager createSCM(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
@@ -1621,7 +1618,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (primaryScmNodeId != null && !primaryScmNodeId.equals(
         scmStorageConfig.getScmId())) {
       List<String> pemEncodedCerts =
-          getScmSecurityClientWithMaxRetry(configuration, getCurrentUser()).listCACertificate();
+          scmCertificateClient.listCA();
+
       // Write the primary SCM CA and Root CA during startup.
       for (String cert : pemEncodedCerts) {
         X509Certificate x509Certificate = CertificateCodec.getX509Certificate(
@@ -2139,54 +2137,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public List<List<String>> getScmRatisRoles() {
+  public String getScmRatisRoles() {
     final SCMRatisServer server = getScmHAManager().getRatisServer();
-
-    // If Ratis is disabled
-    if (server == null) {
-      return getRatisRolesException("Ratis is disabled");
-    }
-
-    // To attempt to find the SCM Leader,
-    // and if the Leader is not found
-    // return Leader is not found message.
-    RaftServer.Division division = server.getDivision();
-    RaftPeerId leaderId = division.getInfo().getLeaderId();
-    if (leaderId == null) {
-      return getRatisRolesException("No leader found");
-    }
-
-    // If the SCMRatisServer is stopped, return a service stopped message.
-    if (server.isStopped()) {
-      return getRatisRolesException("Server is shutting down");
-    }
-
-    // Attempt to retrieve role information.
-    try {
-      List<String> ratisRoles = server.getRatisRoles();
-      List<List<String>> result = new ArrayList<>();
-      for (String role : ratisRoles) {
-        String[] roleArr = role.split(":");
-        List<String> scmInfo = new ArrayList<>();
-        // Host Name
-        scmInfo.add(roleArr[0]);
-        // Node ID
-        scmInfo.add(roleArr[3]);
-        // Ratis Port
-        scmInfo.add(roleArr[1]);
-        // Role
-        scmInfo.add(roleArr[2]);
-        result.add(scmInfo);
-      }
-      return result;
-    } catch (Exception e) {
-      LOG.error("Failed to getRatisRoles.", e);
-      return getRatisRolesException("Exception Occurred, " + e.getMessage());
-    }
-  }
-
-  private static List<List<String>> getRatisRolesException(String exceptionString) {
-    return Collections.singletonList(Collections.singletonList(exceptionString));
+    return server != null ?
+        HddsUtils.format(server.getRatisRoles()) : "STANDALONE";
   }
 
   /**

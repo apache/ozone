@@ -101,7 +101,9 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
     // Disable bucket selection dropdown if more than one volume is selected
     // If there is only one volume, bucket selection dropdown should not be disabled.
     const isBucketSelectionDisabled = !selectedVolumes ||
-      (selectedVolumes?.length > 1 && volumeBucketMap.size !== 1);
+      (selectedVolumes &&
+        (selectedVolumes.length > 1 &&
+          (volumeBucketMap.size !== 1)));
     let bucketOptions: IOption[] = [];
     // When volume is changed and more than one volume is selected,
     // selected buckets value should be reset to all buckets
@@ -453,7 +455,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
             <Tabs.TabPane tab='File Size' key='1'>
               <div className='content-div'>
                 {isLoading ? <span><LoadingOutlined /> Loading...</span> :
-                  ((fileCountsResponse?.length > 0) ?
+                  ((fileCountsResponse && fileCountsResponse.length > 0) ?
                     <div>
                       <Row>
                         <Col xs={24} xl={18}>
@@ -504,7 +506,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
             <Tabs.TabPane tab='Container Size' key='2'>
               <div className='content-div'>
                 {isLoading ? <span><LoadingOutlined /> Loading...</span> :
-                  ((containerCountResponse?.length > 0) ?
+                  ((containerCountResponse && containerCountResponse.length > 0) ?
                     <div>
                       <Row>
                         <Col style={{ margin: 'auto', marginTop: '2%' }}>

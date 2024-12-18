@@ -137,7 +137,6 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
 
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import static org.apache.hadoop.ozone.ClientVersion.EC_REPLICA_INDEX_REQUIRED_IN_BLOCK_REQUEST;
-import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
@@ -596,13 +595,9 @@ public class KeyValueHandler extends Handler {
 
       boolean endOfBlock = false;
       if (!request.getPutBlock().hasEof() || request.getPutBlock().getEof()) {
-        // There are two cases where client sends empty put block with eof.
-        // (1) An EC empty file. In this case, the block/chunk file does not exist,
-        //     so no need to flush/close the file.
-        // (2) Ratis output stream in incremental chunk list mode may send empty put block
-        //     to close the block, in which case we need to flush/close the file.
-        if (!request.getPutBlock().getBlockData().getChunksList().isEmpty() ||
-            blockData.getMetadata().containsKey(INCREMENTAL_CHUNK_LIST)) {
+        // in EC, we will be doing empty put block.
+        // So, let's flush only when there are any chunks
+        if (!request.getPutBlock().getBlockData().getChunksList().isEmpty()) {
           chunkManager.finishWriteChunks(kvContainer, blockData);
         }
         endOfBlock = true;
@@ -997,9 +992,6 @@ public class KeyValueHandler extends Handler {
         // of order.
         blockData.setBlockCommitSequenceId(dispatcherContext.getLogIndex());
         boolean eob = writeChunk.getBlock().getEof();
-        if (eob) {
-          chunkManager.finishWriteChunks(kvContainer, blockData);
-        }
         blockManager.putBlock(kvContainer, blockData, eob);
         blockDataProto = blockData.getProtoBufMessage();
         final long numBytes = blockDataProto.getSerializedSize();

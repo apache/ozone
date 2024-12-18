@@ -82,7 +82,6 @@ import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -164,7 +163,6 @@ public class TestOzoneShellHA {
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
     conf.setBoolean(OZONE_FS_HSYNC_ENABLED, true);
     startKMS();
     startCluster(conf);
@@ -592,7 +590,6 @@ public class TestOzoneShellHA {
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
 
     OzoneConfiguration clientConf = getClientConfForOFS(hostPrefix, conf);
-    clientConf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     clientConf.setBoolean(OZONE_FS_HSYNC_ENABLED, true);
     FileSystem fs = FileSystem.get(clientConf);
 
@@ -712,7 +709,6 @@ public class TestOzoneShellHA {
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
 
     OzoneConfiguration clientConf = getClientConfForOFS(hostPrefix, conf);
-    clientConf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     clientConf.setBoolean(OZONE_FS_HSYNC_ENABLED, true);
     FileSystem fs = FileSystem.get(clientConf);
 
@@ -829,7 +825,6 @@ public class TestOzoneShellHA {
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
 
     OzoneConfiguration clientConf = getClientConfForOFS(hostPrefix, conf);
-    clientConf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     clientConf.setBoolean(OZONE_FS_HSYNC_ENABLED, true);
     FileSystem fs = FileSystem.get(clientConf);
 

@@ -38,7 +38,7 @@ public class CancelPrepareSubCommand implements Callable<Void> {
   @CommandLine.Option(
       names = {"-id", "--service-id"},
       description = "Ozone Manager Service ID",
-      required = false
+      required = true
   )
   private String omServiceId;
 

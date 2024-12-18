@@ -75,6 +75,7 @@ public interface ContainerDispatcher {
   /**
    * Returns the handler for the specified containerType.
    * @param containerType
+   * @return
    */
   Handler getHandler(ContainerProtos.ContainerType containerType);
 

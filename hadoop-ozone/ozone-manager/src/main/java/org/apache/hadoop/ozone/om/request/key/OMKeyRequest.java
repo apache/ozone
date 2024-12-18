@@ -611,7 +611,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   /**
    * Get FileEncryptionInfoProto from KeyArgs.
    * @param keyArgs
-   * @return FileEncryptionInfo
+   * @return
    */
   protected FileEncryptionInfo getFileEncryptionInfo(KeyArgs keyArgs) {
     FileEncryptionInfo encryptionInfo = null;
@@ -623,7 +623,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   /**
    * Check bucket quota in bytes.
-   * @param metadataManager
+   * @paran metadataManager
    * @param omBucketInfo
    * @param allocateSize
    * @throws IOException
@@ -911,7 +911,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * @param keyName           - key name.
    * @param uploadID          - Multi part upload ID for this key.
    * @param omMetadataManager
-   * @return {@code String}
+   * @return
    * @throws IOException
    */
   protected String getDBMultipartOpenKey(String volumeName, String bucketName,

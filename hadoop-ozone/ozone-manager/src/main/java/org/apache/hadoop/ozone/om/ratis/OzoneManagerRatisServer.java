@@ -301,23 +301,15 @@ public final class OzoneManagerRatisServer {
   }
 
   /**
-   * API used internally from OzoneManager Server when requests need to be submitted.
+   * API used internally from OzoneManager Server when requests needs to be
+   * submitted to ratis, where the crafted RaftClientRequest is passed along.
    * @param omRequest
-   * @param cliId
-   * @param callId
+   * @param raftClientRequest
    * @return OMResponse
    * @throws ServiceException
    */
-  public OMResponse submitRequest(OMRequest omRequest, ClientId cliId, long callId) throws ServiceException {
-    RaftClientRequest raftClientRequest = RaftClientRequest.newBuilder()
-        .setClientId(cliId)
-        .setServerId(getRaftPeerId())
-        .setGroupId(getRaftGroupId())
-        .setCallId(callId)
-        .setMessage(Message.valueOf(
-            OMRatisHelper.convertRequestToByteString(omRequest)))
-        .setType(RaftClientRequest.writeRequestType())
-        .build();
+  public OMResponse submitRequest(OMRequest omRequest,
+      RaftClientRequest raftClientRequest) throws ServiceException {
     RaftClientReply raftClientReply =
         submitRequestToRatis(raftClientRequest);
     return createOmResponse(omRequest, raftClientReply);

@@ -22,8 +22,7 @@ import {
   Props as ReactSelectProps,
   components,
   OptionProps,
-  ValueType,
-  ValueContainerProps
+  ValueType
 } from 'react-select';
 
 import { selectStyles } from "@/v2/constants/select.constants";
@@ -46,27 +45,6 @@ interface MultiSelectProps extends ReactSelectProps<Option, true> {
 }
 
 // ------------- Component -------------- //
-
-const Option: React.FC<OptionProps<Option, true>> = (props) => {
-  return (
-    <div>
-      <components.Option
-        {...props}>
-        <input
-          type='checkbox'
-          checked={props.isSelected}
-          style={{
-            marginRight: '8px',
-            accentColor: '#1AA57A'
-          }}
-          onChange={() => null} />
-        <label>{props.label}</label>
-      </components.Option>
-    </div>
-  )
-}
-
-
 const MultiSelect: React.FC<MultiSelectProps> = ({
   options = [],
   selected = [],
@@ -80,20 +58,24 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
   ...props
 }) => {
 
-  const ValueContainer = ({ children, ...props }: ValueContainerProps<Option, true>) => {
+  const Option: React.FC<OptionProps<Option, true>> = (props) => {
     return (
-      <components.ValueContainer {...props}>
-        {React.Children.map(children, (child) => (
-          ((child as React.ReactElement<any, string
-            | React.JSXElementConstructor<any>>
-            | React.ReactPortal)?.type as React.JSXElementConstructor<any>)).name === "DummyInput"
-          ? child
-          : null
-        )}
-        {placeholder}: {selected.length} selected
-      </components.ValueContainer>
-    );
-  };
+      <div>
+        <components.Option
+          {...props}>
+          <input
+            type='checkbox'
+            checked={props.isSelected}
+            style={{
+              marginRight: '8px',
+              accentColor: '#1AA57A'
+            }}
+            onChange={() => null} />
+          <label>{props.label}</label>
+        </components.Option>
+      </div>
+    )
+  }
 
   return (
     <ReactSelect
@@ -107,12 +89,10 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
     classNamePrefix='multi-select'
     options={options}
     components={{
-      ValueContainer,
       Option
     }}
     placeholder={placeholder}
     value={selected}
-    isOptionDisabled={(option) => option.value === fixedColumn}
     onChange={(selected: ValueType<Option, true>) => {
       if (selected?.length === options.length) return onChange!(options);
       return onChange!(selected);

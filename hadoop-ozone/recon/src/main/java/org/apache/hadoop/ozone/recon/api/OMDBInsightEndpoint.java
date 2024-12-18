@@ -734,7 +734,7 @@ public class OMDBInsightEndpoint {
    * /volume1/fso-bucket/dir1/dir2/dir3/file1
    * Input Request for OBS bucket:
    *
-   *    {@literal `api/v1/keys/listKeys?startPrefix=/volume1/obs-bucket&limit=2&replicationType=RATIS`}
+   *    `api/v1/keys/listKeys?startPrefix=/volume1/obs-bucket&limit=2&replicationType=RATIS`
    * Output Response:
    *
    * {
@@ -832,7 +832,7 @@ public class OMDBInsightEndpoint {
    * }
    * Input Request for FSO bucket:
    *
-   *        {@literal `api/v1/keys/listKeys?startPrefix=/volume1/fso-bucket&limit=2&replicationType=RATIS`}
+   *        `api/v1/keys/listKeys?startPrefix=/volume1/fso-bucket&limit=2&replicationType=RATIS`
    * Output Response:
    *
    * {
@@ -930,6 +930,7 @@ public class OMDBInsightEndpoint {
    * }
    *
    * ********************************************************
+   * @throws IOException
    */
   @GET
   @Path("/listKeys")

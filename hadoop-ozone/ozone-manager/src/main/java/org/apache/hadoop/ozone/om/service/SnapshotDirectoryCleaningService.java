@@ -34,12 +34,13 @@ import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
+import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -47,6 +48,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnap
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotSize;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.protocol.Message;
+import org.apache.ratis.protocol.RaftClientRequest;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -61,7 +64,6 @@ import java.util.stream.Collectors;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getDirectoryInfo;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getOzonePathKeyForFso;
-import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getPreviousSnapshot;
 
 /**
  * Snapshot BG Service for deleted directory deep clean and exclusive size
@@ -144,11 +146,11 @@ public class SnapshotDirectoryCleaningService
           <String, SnapshotInfo>> iterator = snapshotInfoTable.iterator()) {
 
         while (iterator.hasNext()) {
-          SnapshotInfo currSnapInfo = snapshotInfoTable.get(iterator.next().getKey());
+          SnapshotInfo currSnapInfo = iterator.next().getValue();
 
           // Expand deleted dirs only on active snapshot. Deleted Snapshots
           // will be cleaned up by SnapshotDeletingService.
-          if (currSnapInfo == null || currSnapInfo.getSnapshotStatus() != SNAPSHOT_ACTIVE ||
+          if (currSnapInfo.getSnapshotStatus() != SNAPSHOT_ACTIVE ||
               currSnapInfo.getDeepCleanedDeletedDir()) {
             continue;
           }
@@ -174,7 +176,8 @@ public class SnapshotDirectoryCleaningService
                   "unexpected state.");
             }
 
-            SnapshotInfo previousSnapshot = getPreviousSnapshot(getOzoneManager(), snapChainManager, currSnapInfo);
+            SnapshotInfo previousSnapshot = getPreviousActiveSnapshot(
+                currSnapInfo, snapChainManager, omSnapshotManager);
             SnapshotInfo previousToPrevSnapshot = null;
 
             Table<String, OmKeyInfo> previousKeyTable = null;
@@ -191,7 +194,8 @@ public class SnapshotDirectoryCleaningService
                   .getKeyTable(bucketInfo.getBucketLayout());
               prevRenamedTable = omPreviousSnapshot
                   .getMetadataManager().getSnapshotRenamedTable();
-              previousToPrevSnapshot = getPreviousSnapshot(getOzoneManager(), snapChainManager, previousSnapshot);
+              previousToPrevSnapshot = getPreviousActiveSnapshot(
+                  previousSnapshot, snapChainManager, omSnapshotManager);
             }
 
             Table<String, OmKeyInfo> previousToPrevKeyTable = null;
@@ -434,7 +438,25 @@ public class SnapshotDirectoryCleaningService
 
   public void submitRequest(OMRequest omRequest, ClientId clientId) {
     try {
-      OzoneManagerRatisUtils.submitRequest(getOzoneManager(), omRequest, clientId, getRunCount().get());
+      if (isRatisEnabled()) {
+        OzoneManagerRatisServer server =
+            getOzoneManager().getOmRatisServer();
+
+        RaftClientRequest raftClientRequest = RaftClientRequest.newBuilder()
+            .setClientId(clientId)
+            .setServerId(server.getRaftPeerId())
+            .setGroupId(server.getRaftGroupId())
+            .setCallId(getRunCount().get())
+            .setMessage(Message.valueOf(
+                OMRatisHelper.convertRequestToByteString(omRequest)))
+            .setType(RaftClientRequest.writeRequestType())
+            .build();
+
+        server.submitRequest(omRequest, raftClientRequest);
+      } else {
+        getOzoneManager().getOmServerProtocol()
+            .submitRequest(null, omRequest);
+      }
     } catch (ServiceException e) {
       LOG.error("Snapshot deep cleaning request failed. " +
           "Will retry at next run.", e);

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import moment from 'moment';
 import filesize from 'filesize';
 import axios, { CanceledError } from 'axios';
@@ -105,8 +105,8 @@ const getSummaryTableValue = (
 
 const Overview: React.FC<{}> = () => {
 
-  const cancelOverviewSignal = useRef<AbortController>();
-  const cancelOMDBSyncSignal = useRef<AbortController>();
+  let cancelOverviewSignal: AbortController;
+  let cancelOMDBSyncSignal: AbortController;
 
   const [state, setState] = useState<OverviewState>({
     loading: false,
@@ -147,8 +147,8 @@ const Overview: React.FC<{}> = () => {
       // Component will Un-mount
       autoReloadHelper.stopPolling();
       cancelRequests([
-        cancelOMDBSyncSignal.current!,
-        cancelOverviewSignal.current!
+        cancelOMDBSyncSignal,
+        cancelOverviewSignal
       ]);
     })
   }, [])
@@ -161,8 +161,8 @@ const Overview: React.FC<{}> = () => {
 
     // Cancel any previous pending requests
     cancelRequests([
-      cancelOMDBSyncSignal.current!,
-      cancelOverviewSignal.current!
+      cancelOMDBSyncSignal,
+      cancelOverviewSignal
     ]);
 
     const { requests, controller } = PromiseAllSettledGetHelper([
@@ -170,8 +170,8 @@ const Overview: React.FC<{}> = () => {
       '/api/v1/task/status',
       '/api/v1/keys/open/summary',
       '/api/v1/keys/deletePending/summary'
-    ], cancelOverviewSignal.current);
-    cancelOverviewSignal.current = controller;
+    ], cancelOverviewSignal);
+    cancelOverviewSignal = controller;
 
     requests.then(axios.spread((
       clusterStateResponse: Awaited<Promise<any>>,
@@ -264,10 +264,10 @@ const Overview: React.FC<{}> = () => {
 
     const { request, controller } = AxiosGetHelper(
       '/api/v1/triggerdbsync/om',
-      cancelOMDBSyncSignal.current,
+      cancelOMDBSyncSignal,
       'OM-DB Sync request cancelled because data was updated'
     );
-    cancelOMDBSyncSignal.current = controller;
+    cancelOMDBSyncSignal = controller;
 
     request.then(omStatusResponse => {
       const omStatus = omStatusResponse.data;

@@ -104,7 +104,7 @@ public class DefaultApprover implements CertificateApprover {
    * @param certSerialId - the new certificate id.
    * @return Signed Certificate.
    * @throws IOException - On Error
-   * @throws CertificateException - on Error.
+   * @throws OperatorCreationException - on Error.
    */
   @SuppressWarnings("ParameterNumber")
   @Override

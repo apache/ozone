@@ -71,7 +71,7 @@ public class PutKeyHandler extends KeyHandler {
 
   @Option(names = "--expectedGeneration",
       description = "Store key only if it already exists and its generation matches the value provided")
-  private Long expectedGeneration;
+  private long expectedGeneration;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
@@ -131,14 +131,9 @@ public class PutKeyHandler extends KeyHandler {
   private OzoneOutputStream createOrReplaceKey(OzoneBucket bucket, String keyName,
       long size, Map<String, String> keyMetadata, ReplicationConfig replicationConfig
   ) throws IOException {
-    if (expectedGeneration != null) {
-      final long existingGeneration = expectedGeneration;
-      Preconditions.checkArgument(existingGeneration > 0,
-          "expectedGeneration must be positive, but was %s", existingGeneration);
-      return bucket.rewriteKey(keyName, size, existingGeneration, replicationConfig, keyMetadata);
-    }
-
-    return bucket.createKey(keyName, size, replicationConfig, keyMetadata);
+    return expectedGeneration > 0
+        ? bucket.rewriteKey(keyName, size, expectedGeneration, replicationConfig, keyMetadata)
+        : bucket.createKey(keyName, size, replicationConfig, keyMetadata);
   }
 
   private void stream(

@@ -355,7 +355,11 @@ public final class RandomKeyGenerator implements Callable<Void> {
     // wait until all keys are added or exception occurred.
     while ((numberOfKeysAdded.get() != totalKeyCount)
            && exception == null) {
-      Thread.sleep(CHECK_INTERVAL_MILLIS);
+      try {
+        Thread.sleep(CHECK_INTERVAL_MILLIS);
+      } catch (InterruptedException e) {
+        throw e;
+      }
     }
     executor.shutdown();
     executor.awaitTermination(Integer.MAX_VALUE, TimeUnit.MILLISECONDS);
@@ -369,7 +373,11 @@ public final class RandomKeyGenerator implements Callable<Void> {
 
     if (validateExecutor != null) {
       while (!validationQueue.isEmpty()) {
-        Thread.sleep(CHECK_INTERVAL_MILLIS);
+        try {
+          Thread.sleep(CHECK_INTERVAL_MILLIS);
+        } catch (InterruptedException e) {
+          throw e;
+        }
       }
       validateExecutor.shutdown();
       validateExecutor.awaitTermination(Integer.MAX_VALUE,
@@ -413,7 +421,11 @@ public final class RandomKeyGenerator implements Callable<Void> {
       // wait until all Buckets are cleaned or exception occurred.
       while ((numberOfBucketsCleaned.get() != totalBucketCount)
           && exception == null) {
-        Thread.sleep(CHECK_INTERVAL_MILLIS);
+        try {
+          Thread.sleep(CHECK_INTERVAL_MILLIS);
+        } catch (InterruptedException e) {
+          throw e;
+        }
       }
     } catch (InterruptedException e) {
       LOG.error("Failed to wait until all Buckets are cleaned", e);

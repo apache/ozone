@@ -17,7 +17,6 @@
  */
 
 import { Acl } from "@/v2/types/acl.types";
-import { Option as MultiOption } from "@/v2/components/select/multiSelect";
 
 // Corresponds to OzoneManagerProtocolProtos.StorageTypeProto
 export const BucketStorageTypeList = [
@@ -39,8 +38,8 @@ export type BucketLayout = typeof BucketLayoutTypeList[number];
 
 export type Bucket = {
   volumeName: string;
-  name: string;
-  versioning: boolean;
+  bucketName: string;
+  isVersionEnabled: boolean;
   storageType: BucketStorage;
   creationTime: number;
   modificationTime: number;
@@ -53,27 +52,4 @@ export type Bucket = {
   owner: string;
   acls?: Acl[];
   bucketLayout: BucketLayout;
-}
-
-export type BucketResponse = {
-  totalCount: number;
-  buckets: Bucket[];
-}
-
-export type BucketsState = {
-  totalCount: number;
-  lastUpdated: number;
-  columnOptions: MultiOption[];
-  volumeBucketMap: Map<string, Set<Bucket>>;
-  bucketsUnderVolume: Bucket[];
-  volumeOptions: MultiOption[];
-}
-
-export type BucketsTableProps = {
-  loading: boolean;
-  data: Bucket[];
-  handleAclClick: (arg0: Bucket) => void;
-  selectedColumns: MultiOption[];
-  searchColumn: 'name' | 'volumeName';
-  searchTerm: string;
 }

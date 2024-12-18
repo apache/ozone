@@ -289,12 +289,12 @@ public final class SCMDatanodeHeartbeatDispatcher {
   public enum ContainerReportType {
     /**
      * Incremental container report type
-     * {@link IncrementalContainerReportFromDatanode}.
+     * {@liks IncrementalContainerReportFromDatanode}.
      */
     ICR,
     /**
      * Full container report type
-     * {@link ContainerReportFromDatanode}.
+     * {@liks ContainerReportFromDatanode}.
      */
     FCR
   }

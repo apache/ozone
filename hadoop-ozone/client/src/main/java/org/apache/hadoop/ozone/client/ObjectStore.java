@@ -217,7 +217,7 @@ public class ObjectStore {
    * Set secretKey for accessId.
    * @param accessId
    * @param secretKey
-   * @return {@code S3SecretValue <accessId, secretKey>} pair
+   * @return S3SecretValue <accessId, secretKey> pair
    * @throws IOException
    */
   public S3SecretValue setS3Secret(String accessId, String secretKey)
