@@ -126,6 +126,8 @@ import org.slf4j.event.Level;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -176,6 +178,7 @@ public class TestHSync {
   private static final int WAL_HEADER_LEN = 83;
 
   private static OpenKeyCleanupService openKeyCleanupService;
+  private static final int AUTO_THRESHOLD = 0;
 
   @BeforeAll
   public static void init() throws Exception {
@@ -1059,6 +1062,31 @@ public class TestHSync {
     }
 
     testEncryptedStreamCapabilities(false);
+  }
+
+  @Test
+  public void testOzoneStreamCapabilityForHsyncHflush() throws Exception {
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    CONF.set(OZONE_FS_DATASTREAM_AUTO_THRESHOLD, AUTO_THRESHOLD + "B");
+    CONF.setBoolean(OZONE_FS_DATASTREAM_ENABLED, true);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+    final Path file = new Path(dir, "file");
+
+    try (FileSystem fs = FileSystem.get(CONF);
+         FSDataOutputStream os = fs.create(file, true)) {
+      os.write(100);
+      // Verify output stream supports hsync() and hflush().
+      assertTrue(os.hasCapability(StreamCapabilities.HFLUSH),
+          "KeyOutputStream should support hflush()!");
+      assertTrue(os.hasCapability(StreamCapabilities.HSYNC),
+          "KeyOutputStream should support hsync()!");
+    }
+
+    CONF.setBoolean(OZONE_FS_DATASTREAM_ENABLED, false);
   }
 
   @Test
