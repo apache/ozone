@@ -514,6 +514,54 @@ public class TestReplicationSupervisor {
   }
 
   @ContainerLayoutTestInfo.ContainerTest
+  public void testTransferredBytes(ContainerLayoutVersion layout) throws IOException {
+    this.layoutVersion = layout;
+    ReplicationSupervisor replicationSupervisor = supervisorWithReplicator(FakeReplicator::new);
+    ReplicationSupervisor ecReconstructionSupervisor = supervisorWithECReconstruction();
+    try {
+      //WHEN
+      ReplicationTask task1 = createTask(1L);
+      replicationSupervisor.addTask(task1);
+      ECReconstructionCoordinatorTask task2 = createECTaskWithCoordinator(2L);
+      ecReconstructionSupervisor.addTask(task2);
+      //THEN
+      assertTrue(replicationSupervisor.getTransferredBytes() > 0);
+      assertTrue(replicationSupervisor.getTransferredBytes(task1.getMetricName()) > 0);
+      assertEquals(100, task1.getTransferredBytes());
+      assertTrue(ecReconstructionSupervisor.getTransferredBytes() > 0);
+      assertTrue(ecReconstructionSupervisor.getTransferredBytes(task2.getMetricName()) > 0);
+      assertEquals(100, task2.getTransferredBytes());
+    } finally {
+      replicationSupervisor.stop();
+      ecReconstructionSupervisor.stop();
+    }
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testQueuedTime(ContainerLayoutVersion layout) throws IOException {
+    this.layoutVersion = layout;
+    ReplicationSupervisor replicationSupervisor = supervisorWithReplicator(FakeReplicator::new);
+    ReplicationSupervisor ecReconstructionSupervisor = supervisorWithECReconstruction();
+    try {
+      //WHEN
+      ReplicationTask task1 = createTask(1L);
+      replicationSupervisor.addTask(task1);
+      ECReconstructionCoordinatorTask task2 = createECTaskWithCoordinator(2L);
+      ecReconstructionSupervisor.addTask(task2);
+      //THEN
+      assertTrue(replicationSupervisor.getQueuedTime() > 0);
+      assertTrue(replicationSupervisor.getQueuedTime(task1.getMetricName()) > 0);
+      assertTrue(task1.getQueuedTime() > 0);
+      assertTrue(ecReconstructionSupervisor.getQueuedTime() > 0);
+      assertTrue(ecReconstructionSupervisor.getQueuedTime(task2.getMetricName()) > 0);
+      assertTrue(task2.getQueuedTime() > 0);
+    } finally {
+      replicationSupervisor.stop();
+      ecReconstructionSupervisor.stop();
+    }
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
   public void testPriorityOrdering(ContainerLayoutVersion layout)
       throws InterruptedException {
     this.layoutVersion = layout;
@@ -768,6 +816,22 @@ public class TestReplicationSupervisor {
         set.addContainer(kvc);
       });
     }
+
+    @Override
+    public void reconstructECContainerGroup(long containerID,
+        ECReplicationConfig repConfig, SortedMap<Integer, DatanodeDetails> sourceNodeMap,
+        SortedMap<Integer, DatanodeDetails> targetNodeMap, AbstractReplicationTask task)
+        throws IOException {
+      // Simulate QueueTime generation
+      try {
+        Thread.sleep(10);
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+      task.exitQueue();
+      reconstructECContainerGroup(containerID, repConfig, sourceNodeMap, targetNodeMap);
+      task.setTransferredBytes(100);
+    }
   }
 
   /**
@@ -784,6 +848,13 @@ public class TestReplicationSupervisor {
 
     @Override
     public void replicate(ReplicationTask task) {
+      // Simulate QueueTime generation
+      try {
+        Thread.sleep(10);
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+      task.exitQueue();
       if (set.getContainer(task.getContainerId()) != null) {
         task.setStatus(AbstractReplicationTask.Status.SKIPPED);
         return;
@@ -802,6 +873,7 @@ public class TestReplicationSupervisor {
         set.addContainer(kvc);
         task.setStatus(DONE);
       });
+      task.setTransferredBytes(100);
     }
   }
 
