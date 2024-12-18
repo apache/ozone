@@ -21,7 +21,7 @@ import React, { useState } from 'react';
 import { DUSubpath } from '@/v2/types/diskUsage.types';
 import { Breadcrumb, Menu, Input } from 'antd';
 import { MenuProps } from 'antd/es/menu';
-import { CaretDownOutlined, CaretRightOutlined, HomeFilled } from '@ant-design/icons';
+import { CaretDownOutlined, HomeFilled } from '@ant-design/icons';
 
 
 type File = {
