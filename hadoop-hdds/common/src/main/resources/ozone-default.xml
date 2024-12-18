@@ -4564,4 +4564,30 @@
       Configuration property to configure the max server side response size for list calls on om.
     </description>
   </property>
+  <property>
+    <name>ozone.om.prefetch.max.blocks</name>
+    <value>10000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Maximum number of prefetched blocks to maintain in the OM.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.prefetch.blocks.factor</name>
+    <value>2</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      The factor by which the number of blocks requested by the client is multiplied to determine the number of blocks
+      to prefetch and cache asynchronously.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.prefetched.blocks.periodic.expiry.interval</name>
+    <value>30s</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Interval for periodically expiring prefetched blocks in the OM.
+    </description>
+  </property>
+
 </configuration>
