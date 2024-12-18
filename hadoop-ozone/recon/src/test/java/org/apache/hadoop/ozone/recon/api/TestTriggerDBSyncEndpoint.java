@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.common.CommonUtils;
+import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -102,6 +103,8 @@ public class TestTriggerDBSyncEndpoint {
 
 
     ReconUtils reconUtilsMock = mock(ReconUtils.class);
+    ReconTaskStatusDao reconTaskStatusDaoMock = mock(ReconTaskStatusDao.class);
+    ReconTaskStatusCounter reconTaskStatusCounterMock = mock(ReconTaskStatusCounter.class);
     DBCheckpoint checkpoint = omMetadataManager.getStore()
         .getCheckpoint(true);
     File tarFile = createTarFile(checkpoint.getCheckpointLocation());
@@ -116,13 +119,10 @@ public class TestTriggerDBSyncEndpoint {
         commonUtils.getReconNodeDetails());
 
     ReconTaskController reconTaskController = mock(ReconTaskController.class);
-    when(reconTaskController.getReconTaskStatusDao())
-        .thenReturn(mock(ReconTaskStatusDao.class));
-
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         new OzoneManagerServiceProviderImpl(configuration,
-            reconOMMetadataManager, reconTaskController, reconUtilsMock,
-            ozoneManagerProtocol, new ReconContext(configuration, reconUtilsMock));
+            reconOMMetadataManager, reconTaskController, reconTaskStatusDaoMock, reconTaskStatusCounterMock,
+            reconUtilsMock, ozoneManagerProtocol, new ReconContext(configuration, reconUtilsMock));
     ozoneManagerServiceProvider.start();
 
     reconTestInjector =

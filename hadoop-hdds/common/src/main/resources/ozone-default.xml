@@ -3305,6 +3305,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.task.status.counter.duration</name>
+    <value>5</value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      Number of OM DB sync cycles for which the various Recon task run statistics will be stored
+    </description>
+  </property>
+  <property>
     <name>ozone.recon.om.socket.timeout</name>
     <value>5s</value>
     <tag>OZONE, RECON, OM</tag>

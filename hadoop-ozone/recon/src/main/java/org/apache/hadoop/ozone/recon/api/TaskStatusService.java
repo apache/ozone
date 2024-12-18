@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import org.apache.hadoop.ozone.recon.api.types.ReconTaskStatusResponse;
+import org.apache.hadoop.ozone.recon.api.types.ReconTaskStatusStat;
+import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 
@@ -28,6 +31,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.MediaType;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Endpoint for displaying the last successful run of each Recon Task.
@@ -38,16 +42,28 @@ public class TaskStatusService {
 
   @Inject
   private ReconTaskStatusDao reconTaskStatusDao;
+  @Inject
+  private ReconTaskStatusCounter taskStatusCounter;
+
+  // Internal function to combine counter value with DerbyDB values
+  private ReconTaskStatusResponse convertToTaskStatusResponse(ReconTaskStatus task) {
+    ReconTaskStatusStat counter = taskStatusCounter.getTaskCountFor(task.getTaskName());
+    return new ReconTaskStatusResponse(
+        task.getTaskName(), task.getLastUpdatedSeqNumber(), task.getLastUpdatedTimestamp(),
+        task.getIsCurrentTaskRunning(), task.getLastTaskRunStatus(),
+        counter.getSuccessCount(), counter.getFailureCount(), counter.getInitializationTime());
+  }
 
   /**
-   * Return the list of Recon Tasks and the last successful timestamp and
-   * sequence number.
+   * Return the list of Recon Tasks and associated metrics.
    * @return {@link Response}
    */
   @GET
   @Path("status")
-  public Response getTaskTimes() {
+  public Response getTaskMetrics() {
     List<ReconTaskStatus> resultSet = reconTaskStatusDao.findAll();
-    return Response.ok(resultSet).build();
+    List<ReconTaskStatusResponse> taskMetricsList = resultSet.stream().map(
+        this::convertToTaskStatusResponse).collect(Collectors.toList());
+    return Response.ok(taskMetricsList).build();
   }
 }
