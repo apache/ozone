@@ -200,12 +200,10 @@ public class OmRequestFeatureValidatorProcessor extends AbstractProcessor {
     boolean isPreprocessor = false;
     for (Entry<? extends ExecutableElement, ? extends AnnotationValue>
         entry : methodAnnotation.getElementValues().entrySet()) {
-
       if (isProcessingPhaseValue(entry)) {
         isPreprocessor = evaluateProcessingPhase(entry);
       }
     }
-
     return isPreprocessor;
   }
 
