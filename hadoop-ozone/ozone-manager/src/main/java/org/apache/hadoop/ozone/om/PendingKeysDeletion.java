@@ -31,11 +31,18 @@ public class PendingKeysDeletion {
 
   private HashMap<String, RepeatedOmKeyInfo> keysToModify;
   private List<BlockGroup> keyBlocksList;
+  private String lastKey;
 
   public PendingKeysDeletion(List<BlockGroup> keyBlocksList,
-       HashMap<String, RepeatedOmKeyInfo> keysToModify) {
+       HashMap<String, RepeatedOmKeyInfo> keysToModify,
+       String lastKey) {
     this.keysToModify = keysToModify;
     this.keyBlocksList = keyBlocksList;
+    this.lastKey = lastKey;
+  }
+
+  public String getLastKey() {
+    return lastKey;
   }
 
   public HashMap<String, RepeatedOmKeyInfo> getKeysToModify() {
