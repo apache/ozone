@@ -1,6 +1,13 @@
-# Problem Statement
+# Background
 
-Execution at leader node needs deal with below cases:
+Here is the summary of the challenges:
+
+- The current implementation depends on consensus on the order of requests received and not on consensus on the processing of the requests.
+- The double buffer implementation currently is meant to optimize the rate at which writes get flushed to RocksDB but the effective batching achieved is 1.2 at best. It is also a source of continuous bugs and added complexity for new features.
+- The number of transactions that can be pushed through Ratis currently caps out around 25k.
+- The Current performance envelope for OM is around 12k transactions per second. The early testing pushes this to 40k transactions per second.
+
+## Execution at leader node needs deal with below cases
 1. Parallel execution: ratis serialize all the execution in order. With control, it is possible to execute the request in parallel which are independent.
 2. Optimized locking: Locks are taken at bucket level for both read and write flow. Here, focus to remove lock between read and write flow, and have more granular locking.
 3. Cache Optimization: Cache are maintained for write operation and read also make use of same for consistency. This creates complexity for read to provide accurate result with parallel operation.
@@ -8,7 +15,17 @@ Execution at leader node needs deal with below cases:
 5. Request execution flow optimization: Optimize request execution flow, removing un-necessary operation and improve testability.
 6. Performance and resource Optimization: Currently, same execution is repeated at all nodes, and have more failure points. With leader side execution and parallelism, need improve performance and resource utilization.
 
-# Leader execution flow
+### Object ID generation
+Currently, the Object ID is tied to Ratis transaction metadata. This has multiple challenges in the long run.
+
+- If OM adopts multi Ratis to scale writes further, Object IDs will not longer be unique.
+- If we shard OM, then across OMs the object ID will not be unique.
+- When batching multiple requests, we cannot utilize Ratis metadata to generate object IDs.
+
+Longer term, we should move to a UUID based object ID generation. This will allow us to generate object IDs that are globally unique. In the mean time, we are moving to a persistent counter based object ID generation. The counter is persisted during apply transaction and is incremented for each new object created.
+
+
+# Leader execution
 
 ![high-level-flow.png](high-level-flow.png)
 
@@ -162,7 +179,7 @@ This will have the following advantages:
 TODO: With echo, define test utils and sample test cases
 - Capture test cases based on behavior.
 
-## Step-by-step integration of existing request
+## Step-by-step integration of existing request (interoperability)
 
 Leader side execution have changes for all flows. This needs to be done incrementally to help better quality, testability.
 This needs below integration points in current code:
@@ -171,6 +188,9 @@ This needs below integration points in current code:
 3. Granular locking for old flow, this ensures `no cache` for new flow do not have impact
 4. OmStateMachine integration for new flow, so that both old and new flow can work together
 5. Request segregation for new flow which is incrementally added.
+
+With above, Enable for old and new flow execution will be done with Feature flag, to switch between them seamlessly.
+And old flow can be removed with achieving quality and compatibility for new flow execution.
 
 ## Impacted areas
 1. With Leader side execution, metrics and its capturing information can change.
