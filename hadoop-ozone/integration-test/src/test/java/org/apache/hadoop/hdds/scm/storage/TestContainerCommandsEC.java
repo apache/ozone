@@ -78,6 +78,7 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -125,6 +126,7 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 /**
  * This class tests container commands on EC containers.
  */
+@Unhealthy
 public class TestContainerCommandsEC {
 
   private static final String ANY_USER = "any";

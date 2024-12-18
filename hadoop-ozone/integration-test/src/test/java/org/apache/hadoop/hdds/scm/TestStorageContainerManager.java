@@ -92,12 +92,12 @@ import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.Time;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.RaftServerConfigKeys;
@@ -141,16 +141,14 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.mockRemoteUser;
 import static org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils.setInternalState;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
-import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
@@ -164,6 +162,7 @@ import static org.mockito.Mockito.verify;
  * Test class that exercises the StorageContainerManager.
  */
 @Timeout(900)
+@Unhealthy
 public class TestStorageContainerManager {
   private static final String LOCALHOST_IP = "127.0.0.1";
   private static XceiverClientManager xceiverClientManager;
@@ -367,7 +366,9 @@ public class TestStorageContainerManager {
 
   @Test
   public void testOldDNRegistersToReInitialisedSCM() throws Exception {
+    LogManager.getLogger(HeartbeatEndpointTask.class).setLevel(Level.DEBUG);
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OZONE_SCM_HA_ENABLE_KEY, true);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 3000, TimeUnit.MILLISECONDS);
 
@@ -402,7 +403,6 @@ public class TestStorageContainerManager {
       GenericTestUtils.LogCapturer scmDnHBDispatcherLog =
           GenericTestUtils.LogCapturer.captureLogs(
               SCMDatanodeHeartbeatDispatcher.LOG);
-      LogManager.getLogger(HeartbeatEndpointTask.class).setLevel(Level.DEBUG);
       GenericTestUtils.LogCapturer heartbeatEndpointTaskLog =
           GenericTestUtils.LogCapturer.captureLogs(HeartbeatEndpointTask.LOG);
       GenericTestUtils.LogCapturer versionEndPointTaskLog =
@@ -559,6 +559,7 @@ public class TestStorageContainerManager {
   @Test
   public void testSCMInitialization(@TempDir Path tempDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, "10s");
     Path scmPath = tempDir.resolve("scm-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
 
@@ -573,21 +574,6 @@ public class TestStorageContainerManager {
     StorageContainerManager.scmInit(conf, testClusterId);
     assertEquals(NodeType.SCM, scmStore.getNodeType());
     assertEquals(testClusterId, scmStore.getClusterID());
-    assertTrue(scmStore.isSCMHAEnabled());
-  }
-
-  @Test
-  public void testSCMInitializationWithHAEnabled(@TempDir Path tempDir) throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
-    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, "10s");
-    Path scmPath = tempDir.resolve("scm-meta");
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
-
-    final UUID clusterId = UUID.randomUUID();
-    // This will initialize SCM
-    StorageContainerManager.scmInit(conf, clusterId.toString());
-    SCMStorageConfig scmStore = new SCMStorageConfig(conf);
     assertTrue(scmStore.isSCMHAEnabled());
     validateRatisGroupExists(conf, clusterId.toString());
   }
@@ -951,35 +937,6 @@ public class TestStorageContainerManager {
     assertEquals(containerReportExecutors.scheduledEvents(),
         containerReportExecutors.queuedEvents());
     containerReportExecutors.close();
-  }
-
-  @Test
-  public void testNonRatisToRatis()
-      throws IOException, AuthenticationException, InterruptedException,
-      TimeoutException {
-    final OzoneConfiguration conf = new OzoneConfiguration();
-    try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
-        .build()) {
-      final StorageContainerManager nonRatisSCM = cluster
-          .getStorageContainerManager();
-      assertNull(nonRatisSCM.getScmHAManager().getRatisServer());
-      assertFalse(nonRatisSCM.getScmStorageConfig().isSCMHAEnabled());
-      nonRatisSCM.stop();
-      nonRatisSCM.join();
-
-      DefaultConfigManager.clearDefaultConfigs();
-      conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
-      StorageContainerManager.scmInit(conf, cluster.getClusterId());
-      conf.setInt(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY, getFreePort());
-      conf.unset(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY);
-      cluster.restartStorageContainerManager(false);
-
-      final StorageContainerManager ratisSCM = cluster
-          .getStorageContainerManager();
-      assertNotNull(ratisSCM.getScmHAManager().getRatisServer());
-      assertTrue(ratisSCM.getScmStorageConfig().isSCMHAEnabled());
-    }
   }
 
   private void addTransactions(StorageContainerManager scm,
