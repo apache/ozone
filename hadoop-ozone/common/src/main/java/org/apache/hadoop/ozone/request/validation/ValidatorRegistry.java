@@ -101,7 +101,7 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
     Class<RequestType[]> requestArrayClass = (Class<RequestType[]>) Array.newInstance(requestType, 0)
         .getClass();
     Set<Class<? extends Annotation>> validatorsToBeRegistered =
-        new Reflections(new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage(""))
+        new Reflections(new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache"))
             .setScanners(Scanners.TypesAnnotated)
             .setParallel(true)).getTypesAnnotatedWith(RegisterValidator.class).stream()
             .filter(annotationClass -> getReturnTypeOfAnnotationMethod((Class<? extends Annotation>) annotationClass,
