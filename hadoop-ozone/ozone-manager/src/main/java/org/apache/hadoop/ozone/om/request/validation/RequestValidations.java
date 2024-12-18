@@ -77,7 +77,7 @@ public class RequestValidations {
 
     List<Method> validations = registry.validationsFor(request.getCmdType(), PRE_PROCESS,
         this.getVersions(request));
-    OMRequest validatedRequest = request.toBuilder().build();
+    OMRequest validatedRequest = request;
     try {
       for (Method m : validations) {
         LOG.debug("Running the {} request pre-process validation from {}.{}",

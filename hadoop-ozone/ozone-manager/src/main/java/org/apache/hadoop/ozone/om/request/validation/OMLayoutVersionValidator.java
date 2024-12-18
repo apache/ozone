@@ -92,7 +92,7 @@ public @interface OMLayoutVersionValidator {
 
   /**
    * The type of the request handled by this validator method.
-   * @return the requestType to whihc the validator shoudl be applied
+   * @return the requestType to whihc the validator should be applied
    */
   Type[] requestType();
 
