@@ -215,11 +215,11 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
   }
 
   public void setAdminCheck(Predicate<UserGroupInformation> check) {
-    adminCheck = Objects.requireNonNull(check, "admin check");
+    adminCheck = Objects.requireNonNull(check, "admin check == null");
   }
 
   public void setReadOnlyAdminCheck(Predicate<UserGroupInformation> check) {
-    readOnlyAdminCheck = Objects.requireNonNull(check, "read-only admin check");
+    readOnlyAdminCheck = Objects.requireNonNull(check, "read-only admin check == null");
   }
 
   public void setAllowListAllVolumes(boolean allowListAllVolumes) {
