@@ -134,10 +134,8 @@ public class BlockDeletingService extends BackgroundService {
       // We must ensure there is no empty container in this result.
       // The chosen result depends on what container deletion policy is
       // configured.
-      long startTime = Time.monotonicNow();
-      int blocksLimitPerInterval = getBlockLimitPerInterval();
       List<ContainerBlockInfo> containers =
-          chooseContainerForBlockDeletion(blocksLimitPerInterval,
+          chooseContainerForBlockDeletion(getBlockLimitPerInterval(),
               containerDeletionPolicy);
 
       BackgroundTask containerBlockInfos = null;
