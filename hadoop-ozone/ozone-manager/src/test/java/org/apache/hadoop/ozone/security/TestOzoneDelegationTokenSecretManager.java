@@ -257,10 +257,7 @@ public class TestOzoneDelegationTokenSecretManager {
     Token<OzoneTokenIdentifier> token = secretManager.createToken(TEST_USER,
         TEST_USER,
         TEST_USER);
-    OzoneTokenIdentifier ozoneTokenIdentifier = OzoneTokenIdentifier.
-        readProtoBuf(token.getIdentifier());
-    long renewDate = secretManager.updateToken(token, ozoneTokenIdentifier, expiryTime);
-    om.getMetadataManager().getDelegationTokenTable().put(ozoneTokenIdentifier, renewDate);
+    addToTokenStore(token);
     Thread.sleep(10 * 5);
 
     if (restartSecretManager) {
@@ -293,10 +290,7 @@ public class TestOzoneDelegationTokenSecretManager {
     secretManager.start(certificateClient);
     Token<OzoneTokenIdentifier> token = secretManager.createToken(TEST_USER,
         TEST_USER, TEST_USER);
-    OzoneTokenIdentifier ozoneTokenIdentifier = OzoneTokenIdentifier.
-        readProtoBuf(token.getIdentifier());
-    long renewDate = secretManager.updateToken(token, ozoneTokenIdentifier, expiryTime);
-    om.getMetadataManager().getDelegationTokenTable().put(ozoneTokenIdentifier, renewDate);
+    addToTokenStore(token);
     AccessControlException exception =
         assertThrows(AccessControlException.class,
             () -> secretManager.renewToken(token, "rougeUser"));
@@ -364,10 +358,7 @@ public class TestOzoneDelegationTokenSecretManager {
     secretManager.start(certificateClient);
     Token<OzoneTokenIdentifier> token = secretManager.createToken(TEST_USER,
         TEST_USER, TEST_USER);
-    OzoneTokenIdentifier ozoneTokenIdentifier = OzoneTokenIdentifier.
-        readProtoBuf(token.getIdentifier());
-    long renewDate = secretManager.updateToken(token, ozoneTokenIdentifier, expiryTime);
-    om.getMetadataManager().getDelegationTokenTable().put(ozoneTokenIdentifier, renewDate);
+    addToTokenStore(token);
     secretManager.cancelToken(token, TEST_USER.toString());
   }
 
@@ -525,5 +516,12 @@ public class TestOzoneDelegationTokenSecretManager {
         .setOmServiceId(OzoneConsts.OM_SERVICE_ID_DEFAULT)
         .setSecretKeyClient(secretKeyClient)
         .build();
+  }
+
+  private void addToTokenStore(Token<OzoneTokenIdentifier> token) throws IOException {
+    OzoneTokenIdentifier ozoneTokenIdentifier = OzoneTokenIdentifier.
+        readProtoBuf(token.getIdentifier());
+    long renewDate = secretManager.updateToken(token, ozoneTokenIdentifier, expiryTime);
+    om.getMetadataManager().getDelegationTokenTable().put(ozoneTokenIdentifier, renewDate);
   }
 }
