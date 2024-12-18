@@ -265,8 +265,7 @@ public class TestOzoneDelegationTokenSecretManager {
     }
 
     long renewalTime = secretManager.renewToken(token, TEST_USER.toString());
-    secretManager.updateToken(token, OzoneTokenIdentifier.
-        readProtoBuf(token.getIdentifier()), expiryTime);
+    addToTokenStore(token);
     assertThat(renewalTime).isGreaterThan(0);
   }
 
