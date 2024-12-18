@@ -171,9 +171,9 @@ public class TestOzoneFileSystemWithStreaming {
     assertNotNull(underlying);
     LOG.info("underlying after close: {}", underlying.getClass());
     if (belowThreshold) {
-      assertInstanceOf(OzoneFSOutputStream.class, underlying);
+      assertInstanceOf(CapableOzoneFSOutputStream.class, underlying);
     } else {
-      assertEquals(OzoneFSDataStreamOutput.class, underlying.getClass());
+      assertEquals(CapableOzoneFSDataStreamOutput.class, underlying.getClass());
     }
   }
 
@@ -186,7 +186,7 @@ public class TestOzoneFileSystemWithStreaming {
       assertNull(underlying);
     } else {
       assertNotNull(underlying);
-      assertEquals(OzoneFSDataStreamOutput.class,
+      assertEquals(CapableOzoneFSDataStreamOutput.class,
           underlying.getClass());
     }
   }

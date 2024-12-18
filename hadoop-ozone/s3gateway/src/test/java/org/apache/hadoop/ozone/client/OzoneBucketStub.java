@@ -743,6 +743,16 @@ public final class OzoneBucketStub extends OzoneBucket {
     }
 
     @Override
+    public void hflush() {
+
+    }
+
+    @Override
+    public void hsync() throws IOException {
+
+    }
+
+    @Override
     public Map<String, String> getMetadata() {
       return metadata;
     }
