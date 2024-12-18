@@ -77,8 +77,10 @@ public class QuotaTrigger extends RepairTool {
           bucketList.isEmpty()
               ? "all buckets"
               : ("buckets " + buckets));
-      omClient.startQuotaRepair(bucketList);
-      info(omClient.getQuotaRepairStatus());
+      if (!isDryRun()) {
+        omClient.startQuotaRepair(bucketList);
+        info(omClient.getQuotaRepairStatus());
+      }
     }
   }
 }

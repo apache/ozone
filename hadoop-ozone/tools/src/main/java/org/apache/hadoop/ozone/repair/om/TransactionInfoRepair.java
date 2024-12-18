@@ -89,12 +89,17 @@ public class TransactionInfoRepair extends RepairTool {
       TransactionInfo transactionInfo = TransactionInfo.valueOf(highestTransactionTerm, highestTransactionIndex);
 
       byte[] transactionInfoBytes = TransactionInfo.getCodec().toPersistedFormat(transactionInfo);
-      db.get()
-          .put(transactionInfoCfh, StringCodec.get().toPersistedFormat(TRANSACTION_INFO_KEY), transactionInfoBytes);
+      byte[] key = StringCodec.get().toPersistedFormat(TRANSACTION_INFO_KEY);
 
-      info("The highest transaction info has been updated to: %s",
-          RocksDBUtils.getValue(db, transactionInfoCfh, TRANSACTION_INFO_KEY,
-              TransactionInfo.getCodec()).getTermIndex());
+      info("Updating transaction info to %s", transactionInfo.getTermIndex());
+
+      if (!isDryRun()) {
+        db.get().put(transactionInfoCfh, key, transactionInfoBytes);
+
+        info("The highest transaction info has been updated to: %s",
+            RocksDBUtils.getValue(db, transactionInfoCfh, TRANSACTION_INFO_KEY,
+                TransactionInfo.getCodec()).getTermIndex());
+      }
     } catch (RocksDBException exception) {
       error("Failed to update the RocksDB for the given path: %s", dbPath);
       error(

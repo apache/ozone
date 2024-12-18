@@ -85,11 +85,6 @@ public class FSORepairTool extends RepairTool {
       description = "Path to OM RocksDB")
   private String omDBPath;
 
-  @CommandLine.Option(names = {"-r", "--repair"},
-      defaultValue = "false",
-      description = "Run in repair mode to move unreferenced files and directories to deleted tables.")
-  private boolean repair;
-
   @CommandLine.Option(names = {"-v", "--volume"},
       description = "Filter by volume name. Add '/' before the volume name.")
   private String volumeFilter;
@@ -107,7 +102,7 @@ public class FSORepairTool extends RepairTool {
     if (checkIfServiceIsRunning("OM")) {
       return;
     }
-    if (repair) {
+    if (!isDryRun()) {
       info("FSO Repair Tool is running in repair mode");
     } else {
       info("FSO Repair Tool is running in debug mode");
@@ -276,7 +271,7 @@ public class FSORepairTool extends RepairTool {
     private void processBucket(OmVolumeArgs volume, OmBucketInfo bucketInfo) throws IOException {
       info("Processing bucket: " + volume.getVolume() + "/" + bucketInfo.getBucketName());
       if (checkIfSnapshotExistsForBucket(volume.getVolume(), bucketInfo.getBucketName())) {
-        if (!repair) {
+        if (isDryRun()) {
           info(
               "Snapshot detected in bucket '" + volume.getVolume() + "/" + bucketInfo.getBucketName() + "'. ");
         } else {
@@ -362,7 +357,7 @@ public class FSORepairTool extends RepairTool {
               info("Found unreferenced directory: " + dirKey);
               unreferencedStats.addDir();
 
-              if (!repair) {
+              if (isDryRun()) {
                 if (verbose) {
                   info("Marking unreferenced directory " + dirKey + " for deletion.");
                 }
@@ -396,7 +391,7 @@ public class FSORepairTool extends RepairTool {
               info("Found unreferenced file: " + fileKey);
               unreferencedStats.addFile(fileInfo.getDataSize());
 
-              if (!repair) {
+              if (isDryRun()) {
                 if (verbose) {
                   info("Marking unreferenced file " + fileKey + " for deletion." + fileKey);
                 }

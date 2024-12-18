@@ -28,6 +28,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.util.List;
+import java.util.Map;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
@@ -66,6 +67,33 @@ public class TestOzoneRepair {
     System.setOut(OLD_OUT);
     System.setErr(OLD_ERR);
     System.setProperty("user.name", OLD_USER);
+  }
+
+  /** All leaf subcommands should support {@code --dry-run},
+   * except if marked as {@link ReadOnlyCommand}. */
+  @Test
+  void subcommandsSupportDryRun() {
+    assertSubcommandOptionRecursively(new OzoneRepair().getCmd());
+  }
+
+  private static void assertSubcommandOptionRecursively(CommandLine cmd) {
+    Map<String, CommandLine> subcommands = cmd.getSubcommands();
+    if (subcommands.isEmpty()) {
+      // leaf command
+      CommandLine.Model.CommandSpec spec = cmd.getCommandSpec();
+      Object userObject = spec.userObject();
+      if (!(userObject instanceof ReadOnlyCommand)) {
+        assertThat(spec.optionsMap().keySet())
+            .as(() -> "'" + spec.qualifiedName() + "' defined by " + userObject.getClass()
+                + " should support --dry-run or implement " + ReadOnlyCommand.class)
+            .contains("--dry-run");
+      }
+    } else {
+      // parent command
+      for (CommandLine sub : subcommands.values()) {
+        assertSubcommandOptionRecursively(sub);
+      }
+    }
   }
 
   @Test
