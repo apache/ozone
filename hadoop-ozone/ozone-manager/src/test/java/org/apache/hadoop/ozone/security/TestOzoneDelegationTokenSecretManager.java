@@ -257,6 +257,10 @@ public class TestOzoneDelegationTokenSecretManager {
     Token<OzoneTokenIdentifier> token = secretManager.createToken(TEST_USER,
         TEST_USER,
         TEST_USER);
+    OzoneTokenIdentifier ozoneTokenIdentifier = OzoneTokenIdentifier.
+        readProtoBuf(token.getIdentifier());
+    long renewDate = secretManager.updateToken(token, ozoneTokenIdentifier, expiryTime);
+    om.getMetadataManager().getDelegationTokenTable().put(ozoneTokenIdentifier, renewDate);
     Thread.sleep(10 * 5);
 
     if (restartSecretManager) {
@@ -264,6 +268,8 @@ public class TestOzoneDelegationTokenSecretManager {
     }
 
     long renewalTime = secretManager.renewToken(token, TEST_USER.toString());
+    secretManager.updateToken(token, OzoneTokenIdentifier.
+        readProtoBuf(token.getIdentifier()), expiryTime);
     assertThat(renewalTime).isGreaterThan(0);
   }
 
@@ -354,6 +360,10 @@ public class TestOzoneDelegationTokenSecretManager {
     secretManager.start(certificateClient);
     Token<OzoneTokenIdentifier> token = secretManager.createToken(TEST_USER,
         TEST_USER, TEST_USER);
+    OzoneTokenIdentifier ozoneTokenIdentifier = OzoneTokenIdentifier.
+        readProtoBuf(token.getIdentifier());
+    long renewDate = secretManager.updateToken(token, ozoneTokenIdentifier, expiryTime);
+    om.getMetadataManager().getDelegationTokenTable().put(ozoneTokenIdentifier, renewDate);
     secretManager.cancelToken(token, TEST_USER.toString());
   }
 
