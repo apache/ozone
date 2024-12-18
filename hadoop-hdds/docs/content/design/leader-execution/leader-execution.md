@@ -116,8 +116,12 @@ Stripped locking ordering:
 - And then need take lock in sequence order
 
 #### FSO Locking
-
 TODO
+
+Challenges compared to OBS,
+1. Implicit directory creation
+2. file Id depends on parent directory /<volId>/<bucketId>/<parent ObjectId>/<file name>
+So due to hierarchy in nature and parallel operation at various level, FSO locking is more complicated.
 
 #### Legacy Locking:
 Not-in-scope
@@ -190,7 +194,7 @@ This needs below integration points in current code:
 5. Request segregation for new flow which is incrementally added.
 
 With above, Enable for old and new flow execution will be done with Feature flag, to switch between them seamlessly.
-And old flow can be removed with achieving quality and compatibility for new flow execution.
+And old flow can be removed with achieving quality, performance and compatibility for new flow execution.
 
 ## Impacted areas
 1. With Leader side execution, metrics and its capturing information can change.
