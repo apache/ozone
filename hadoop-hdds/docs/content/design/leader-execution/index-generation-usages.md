@@ -52,6 +52,6 @@ This case is no more required as the request is executed at leader node. It can 
 
 ## Step-by-step incremental changes for existing flow
 
-for increment changes, need remove dependency with ratis index. For this, need to use leader index in both old and new flow.
-
+1. for increment changes, need remove dependency with ratis index. For this, need to use leader index in both old and new flow.
+2. objectId generation: need follow old logic of index to objectId conversion.
 
