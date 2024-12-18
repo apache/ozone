@@ -49,6 +49,16 @@ import java.util.stream.Collectors;
  */
 public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
 
+  /**
+   * A validator registered should have the following parameters:
+   * applyBeforeVersion: Enum extending Version
+   * RequestType: Enum signifying the type of request.
+   * RequestProcessingPhase: Signifying if the validator is supposed to run pre or post submitting the request.
+   * Based on the afforementioned parameters a complete map is built which stores the validators in a sorted order of
+   * the applyBeforeVersion value of the validator method.
+   * Thus when a request comes with a certain version value, all validators containing `applyBeforeVersion` parameter
+   * greater than the request versions get triggered. {@link #validationsFor(Enum, RequestProcessingPhase, Version)}
+   */
   private final Map<Class<? extends Version>, EnumMap<RequestType,
       EnumMap<RequestProcessingPhase, IndexedItems<Method, Integer>>>> indexedValidatorMap;
 
@@ -58,31 +68,32 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
    * A validation method is recognized by all the annotations classes which
    * are annotated by {@link RegisterValidator} annotation that contains
    * important information about how and when to use the validator.
+   * @param requestType class of request type enum.
    * @param validatorPackage the main package inside which validatiors should
    *                         be discovered.
+   * @param allowedVersionTypes a set containing the various types of version allowed to be registered.
+   * @param allowedProcessingPhases set of request processing phases which would be allowed to be registered to
+   *                                registry.
+   *
    */
   public ValidatorRegistry(Class<RequestType> requestType,
-                    String validatorPackage,
-                    Set<Class<? extends Version>> allowedVersionTypes,
-                    Set<RequestProcessingPhase> allowedProcessingPhases) {
+                           String validatorPackage,
+                           Set<Class<? extends Version>> allowedVersionTypes,
+                           Set<RequestProcessingPhase> allowedProcessingPhases) {
     this(requestType, ClasspathHelper.forPackage(validatorPackage), allowedVersionTypes, allowedProcessingPhases);
-  }
-
-  private Class<?> getReturnTypeOfAnnotationMethod(Class<? extends Annotation> clzz, String methodName) {
-    try {
-      return clzz.getMethod(methodName).getReturnType();
-    } catch (NoSuchMethodException e) {
-      throw new IllegalArgumentException("Method " + methodName + " not found in class:" + clzz.getCanonicalName());
-    }
   }
 
   /**
    * Creates a {@link ValidatorRegistry} instance that discovers validation
    * methods under the provided URL.
-   * A validation method is recognized by all annotations having the annotated by {@link RegisterValidator}
+   * A validation method is recognized by all annotations annotated by the {@link RegisterValidator}
    * annotation that contains important information about how and when to use
    * the validator.
+   * @param requestType class of request type enum.
    * @param searchUrls the path in which the annotated methods are searched.
+   * @param allowedVersionTypes a set containing the various types of version allowed to be registered.
+   * @param allowedProcessingPhases set of request processing phases which would be allowed to be registered to
+   *                                registry.
    */
   public ValidatorRegistry(Class<RequestType> requestType,
                     Collection<URL> searchUrls,
@@ -170,6 +181,14 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
     }
   }
 
+  private Class<?> getReturnTypeOfAnnotationMethod(Class<? extends Annotation> clzz, String methodName) {
+    try {
+      return clzz.getMethod(methodName).getReturnType();
+    } catch (NoSuchMethodException e) {
+      throw new IllegalArgumentException("Method " + methodName + " not found in class:" + clzz.getCanonicalName());
+    }
+  }
+
   private <Validator extends Annotation> Version getApplyBeforeVersion(Validator validator) {
     return callAnnotationMethod(validator, RegisterValidator.APPLY_BEFORE_METHOD_NAME, Version.class);
   }
@@ -242,7 +261,6 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
       }
 
     }
-
   }
 
   private <K, V> V getAndInitialize(K key, Supplier<V> defaultSupplier, Map<K, V> from) {

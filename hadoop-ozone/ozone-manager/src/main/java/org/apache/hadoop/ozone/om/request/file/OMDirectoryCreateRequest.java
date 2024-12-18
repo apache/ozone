@@ -26,9 +26,6 @@ import java.util.List;
 import java.util.Map;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.request.validation.OMLayoutVersionValidator;
 import org.apache.ratis.server.protocol.TermIndex;
