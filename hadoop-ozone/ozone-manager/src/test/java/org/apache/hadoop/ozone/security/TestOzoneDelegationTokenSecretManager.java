@@ -139,7 +139,7 @@ public class TestOzoneDelegationTokenSecretManager {
     // TODO: Once HA and non-HA code paths are merged in
     //  OzoneDelegationTokenSecretManager, this test should be updated to
     //  test both ratis enabled and disabled case.
-    config.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
+    config.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, true);
     File newFolder = folder.toFile();
     if (!newFolder.exists()) {
       assertTrue(newFolder.mkdirs());
@@ -293,6 +293,10 @@ public class TestOzoneDelegationTokenSecretManager {
     secretManager.start(certificateClient);
     Token<OzoneTokenIdentifier> token = secretManager.createToken(TEST_USER,
         TEST_USER, TEST_USER);
+    OzoneTokenIdentifier ozoneTokenIdentifier = OzoneTokenIdentifier.
+        readProtoBuf(token.getIdentifier());
+    long renewDate = secretManager.updateToken(token, ozoneTokenIdentifier, expiryTime);
+    om.getMetadataManager().getDelegationTokenTable().put(ozoneTokenIdentifier, renewDate);
     AccessControlException exception =
         assertThrows(AccessControlException.class,
             () -> secretManager.renewToken(token, "rougeUser"));
