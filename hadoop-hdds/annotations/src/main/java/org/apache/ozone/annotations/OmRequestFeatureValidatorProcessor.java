@@ -91,17 +91,13 @@ public class OmRequestFeatureValidatorProcessor extends AbstractProcessor {
 
   private static final List<String> ANNOTATION_SIMPLE_NAMES = Arrays.asList("OMClientVersionValidator",
       "OMLayoutVersionValidator");
-  public static final String ANNOTATION_CONDITIONS_PROPERTY_NAME = "conditions";
   public static final String ANNOTATION_PROCESSING_PHASE_PROPERTY_NAME =
       "processingPhase";
-  public static final String ANNOTATION_MAX_CLIENT_VERSION_PROPERTY_NAME = "maxClientVersion";
 
   public static final String PROCESSING_PHASE_PRE_PROCESS = "PRE_PROCESS";
   public static final String PROCESSING_PHASE_POST_PROCESS = "POST_PROCESS";
   public static final String ERROR_NO_PROCESSING_PHASE_DEFINED =
       "RequestFeatureValidator has an invalid ProcessingPhase defined.";
-
-  public static final String MAX_CLIENT_VERSION_FUTURE_VERSION = "FUTURE_VERSION";
 
   @Override
   public boolean process(Set<? extends TypeElement> annotations,
@@ -224,30 +220,11 @@ public class OmRequestFeatureValidatorProcessor extends AbstractProcessor {
     return false;
   }
 
-  private boolean hasValidMaxClientVersion(
-      Entry<? extends ExecutableElement, ? extends AnnotationValue> entry) {
-    if (isPropertyNamedAs(entry, ANNOTATION_MAX_CLIENT_VERSION_PROPERTY_NAME)) {
-      Name maxClientVersion = visit(entry, new MaxClientVersionVisitor());
-      return !maxClientVersion.contentEquals(MAX_CLIENT_VERSION_FUTURE_VERSION);
-    }
-    return false;
-  }
-
   private boolean isProcessingPhaseValue(
       Entry<? extends ExecutableElement, ? extends AnnotationValue> entry) {
     return isPropertyNamedAs(entry, ANNOTATION_PROCESSING_PHASE_PROPERTY_NAME);
   }
 
-  private boolean isMaxClientVersionValue(
-      Entry<? extends ExecutableElement, ? extends AnnotationValue> entry) {
-    return isPropertyNamedAs(entry, ANNOTATION_MAX_CLIENT_VERSION_PROPERTY_NAME);
-  }
-
-  private boolean hasValidValidationCondition(
-      Entry<? extends ExecutableElement, ? extends AnnotationValue> entry) {
-    return isPropertyNamedAs(entry, ANNOTATION_CONDITIONS_PROPERTY_NAME)
-        && visit(entry, new ConditionValidator());
-  }
 
   private boolean isPropertyNamedAs(
       Entry<? extends ExecutableElement, ? extends AnnotationValue> entry,
@@ -259,36 +236,6 @@ public class OmRequestFeatureValidatorProcessor extends AbstractProcessor {
       Entry<? extends ExecutableElement, ? extends AnnotationValue> entry,
       AnnotationValueVisitor<T, Void> visitor) {
     return entry.getValue().accept(visitor, null);
-  }
-
-  private static class ConditionValidator
-      extends SimpleAnnotationValueVisitor8<Boolean, Void> {
-
-    ConditionValidator() {
-      super(Boolean.FALSE);
-    }
-
-    @Override
-    public Boolean visitArray(List<? extends AnnotationValue> vals,
-        Void unused) {
-      if (vals.isEmpty()) {
-        return Boolean.FALSE;
-      }
-      return Boolean.TRUE;
-    }
-
-  }
-
-  private static class MaxClientVersionVisitor
-      extends SimpleAnnotationValueVisitor8<Name, Void> {
-
-    MaxClientVersionVisitor() {
-    }
-
-    @Override
-    public Name visitEnumConstant(VariableElement c, Void unused) {
-      return c.getSimpleName();
-    }
   }
 
   private static class ProcessingPhaseVisitor

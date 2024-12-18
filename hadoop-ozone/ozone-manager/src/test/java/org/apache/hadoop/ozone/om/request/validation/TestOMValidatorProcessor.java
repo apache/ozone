@@ -489,16 +489,8 @@ public class TestOMValidatorProcessor {
     lines.add("  }");
     lines.add("}");
     lines.add("");
-    lines.stream()
-//        .filter(s -> !s.startsWith("import"))
-        .forEach(System.out::println);
+    lines.stream().forEach(System.out::println);
     return lines;
-  }
-
-  private <V extends Enum<V> & Version> String annotationOf(RequestProcessingPhase phase,
-                                                  Type reqType, Class<?> annotationClass) {
-    return annotationOf(phase.name(), reqType, annotationClass,
-        (V)ANNOTATION_VERSION_CLASS_MAP.get(annotationClass).getEnumConstants()[0]);
   }
 
   private <V extends Enum<V> & Version> String annotationOf(
