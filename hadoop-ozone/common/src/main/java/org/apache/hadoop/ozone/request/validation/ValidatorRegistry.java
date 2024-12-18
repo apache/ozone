@@ -156,7 +156,8 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
                                                          V requestVersion) {
 
     return Optional.ofNullable(this.indexedValidatorMap.get(requestVersion.getClass()))
-        .map(requestTypeMap -> requestTypeMap.get(requestType)).map(phaseMap -> phaseMap.get(phase))
+        .map(requestTypeMap -> requestTypeMap.get(requestType))
+        .map(phaseMap -> phaseMap.get(phase))
         .map(indexedMethods -> requestVersion.version() < 0 ?
             indexedMethods.getItemsEqualToIdx(requestVersion.version()) :
             indexedMethods.getItemsGreaterThanIdx(requestVersion.version()))
@@ -256,18 +257,20 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
         EnumMap<RequestType, EnumMap<RequestProcessingPhase, IndexedItems<Method, Integer>>> requestMap =
             this.indexedValidatorMap.get(versionClass);
         EnumMap<RequestProcessingPhase, IndexedItems<Method, Integer>> phaseMap =
-            this.getAndInitialize(type, () -> new EnumMap<>(RequestProcessingPhase.class), requestMap);
-        this.getAndInitialize(phase, IndexedItems::new, phaseMap).add(method, applyBeforeVersion.version());
+            requestMap.computeIfAbsent(type, k -> new EnumMap<>(RequestProcessingPhase.class));
+        phaseMap.computeIfAbsent(phase, k -> new IndexedItems<>()).add(method, applyBeforeVersion.version());
       }
-
     }
   }
 
-  private <K, V> V getAndInitialize(K key, Supplier<V> defaultSupplier, Map<K, V> from) {
-    return from.computeIfAbsent(key, k -> defaultSupplier.get());
-  }
-
-  static final class IndexedItems<T, IDX extends Comparable<IDX>> {
+  /**
+   * Class responsible for maintaining indexs of items. Here each item should have an index corresponding to it.
+   * The class implements functions for efficiently fetching range gets on the items added to the data structure.
+   * @param <T> Refers to the Type of the item in the data structure
+   * @param <IDX> Type of the index of an item added in the data structure. It is important that the index is
+   *             comparable to each other.
+   */
+  private static final class IndexedItems<T, IDX extends Comparable<IDX>> {
     private final List<T> items;
     private final TreeMap<IDX, Integer> indexMap;
 
@@ -288,7 +291,6 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
     }
 
     /**
-     *
      * @param indexValue Given index value.
      * @return All the items which has an index value greater than given index value.
      */
@@ -299,7 +301,6 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
     }
 
     /**
-     *
      * @param indexValue Given index value.
      * @return All the items which has an index value greater than given index value.
      */
