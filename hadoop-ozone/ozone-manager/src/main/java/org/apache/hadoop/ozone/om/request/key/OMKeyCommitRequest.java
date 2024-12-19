@@ -526,7 +526,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
   @OMClientVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.CommitKey,
-      applyBefore = ClientVersion.ERASURE_CODING_SUPPORT
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT
   )
   public static OMRequest blockCommitKeyWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
@@ -545,7 +545,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
   @OMLayoutVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.CommitKey,
-      applyBefore = OMLayoutFeature.HSYNC
+      applyBefore = OMLayoutFeature.HBASE_SUPPORT
   )
   public static OMRequest disallowHsync(
       OMRequest req, ValidationContext ctx) throws OMException {

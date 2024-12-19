@@ -168,7 +168,7 @@ public class OMKeyRemoveAclRequest extends OMKeyAclRequest {
   @OMClientVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.RemoveAcl,
-      applyBefore = ClientVersion.ERASURE_CODING_SUPPORT
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT
   )
   public static OMRequest blockRemoveAclWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
