@@ -526,7 +526,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     when(ozoneManager.getOmSnapshotManager()).thenAnswer(i -> omSnapshotManager);
     DirectoryDeletingService service = Mockito.spy(new DirectoryDeletingService(1000, TimeUnit.MILLISECONDS, 1000,
         ozoneManager,
-        cluster.getConf()));
+        cluster.getConf(), 1));
     service.shutdown();
     final int initialSnapshotCount =
         (int) cluster.getOzoneManager().getMetadataManager().countRowsInTable(snapshotInfoTable);
@@ -560,7 +560,7 @@ public class TestDirectoryDeletingServiceWithFSO {
       }
       return i.callRealMethod();
     }).when(service).optimizeDirDeletesAndSubmitRequest(anyLong(), anyLong(), anyLong(),
-        anyLong(), anyList(), anyList(), eq(null), anyLong(), anyInt(), Mockito.any(), any());
+        anyLong(), anyList(), anyList(), eq(null), anyLong(), anyInt(), Mockito.any(), any(), anyLong());
 
     Mockito.doAnswer(i -> {
       store.createSnapshot(testVolumeName, testBucketName, snap2);

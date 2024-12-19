@@ -93,6 +93,7 @@ public class DeletedBlockLogImpl
   private long scmCommandTimeoutMs = Duration.ofSeconds(300).toMillis();
 
   private static final int LIST_ALL_FAILED_TRANSACTIONS = -1;
+  private long lastProcessedTransactionId = -1;
 
   public DeletedBlockLogImpl(ConfigurationSource conf,
       StorageContainerManager scm,
@@ -344,6 +345,34 @@ public class DeletedBlockLogImpl
       try (TableIterator<Long,
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
                deletedBlockLogStateManager.getReadOnlyIterator()) {
+        if (lastProcessedTransactionId != -1) {
+          iter.seek(lastProcessedTransactionId);
+          /*
+           * We should start from (lastProcessedTransactionId + 1) transaction.
+           * Now the iterator (iter.next call) is pointing at
+           * lastProcessedTransactionId, read the current value to move
+           * the cursor.
+           */
+          if (iter.hasNext()) {
+            /*
+             * There is a possibility that the lastProcessedTransactionId got
+             * deleted from the table, in that case we have to set
+             * lastProcessedTransactionId to next available transaction in the table.
+             *
+             * By doing this there is a chance that we will skip processing the new
+             * lastProcessedTransactionId, that should be ok. We can get to it in the
+             * next run.
+             */
+            lastProcessedTransactionId = iter.next().getKey();
+          }
+
+          // If we have reached the end, go to beginning.
+          if (!iter.hasNext()) {
+            iter.seekToFirst();
+            lastProcessedTransactionId = -1;
+          }
+        }
+
         // Get the CmdStatus status of the aggregation, so that the current
         // status of the specified transaction can be found faster
         Map<UUID, Map<Long, CmdStatus>> commandStatus =
@@ -352,13 +381,14 @@ public class DeletedBlockLogImpl
                 map(DatanodeDetails::getUuid).collect(Collectors.toSet()));
         ArrayList<Long> txIDs = new ArrayList<>();
         metrics.setNumBlockDeletionTransactionDataNodes(dnList.size());
+        Table.KeyValue<Long, DeletedBlocksTransaction> keyValue = null;
         // Here takes block replica count as the threshold to avoid the case
         // that part of replicas committed the TXN and recorded in the
         // SCMDeletedBlockTransactionStatusManager, while they are counted
         // in the threshold.
         while (iter.hasNext() &&
             transactions.getBlocksDeleted() < blockDeletionLimit) {
-          Table.KeyValue<Long, DeletedBlocksTransaction> keyValue = iter.next();
+          keyValue = iter.next();
           DeletedBlocksTransaction txn = keyValue.getValue();
           final ContainerID id = ContainerID.valueOf(txn.getContainerID());
           try {
@@ -386,7 +416,24 @@ public class DeletedBlockLogImpl
             LOG.warn("Container: {} was not found for the transaction: {}.", id, txn);
             txIDs.add(txn.getTxID());
           }
+
+          if (lastProcessedTransactionId == keyValue.getKey()) {
+            // We have circled back to the last transaction.
+            break;
+          }
+
+          if (!iter.hasNext() && lastProcessedTransactionId != -1) {
+            /*
+             * We started from in-between and reached end of the table,
+             * now we should go to the start of the table and process
+             * the transactions.
+             */
+            iter.seekToFirst();
+          }
         }
+
+        lastProcessedTransactionId = keyValue != null ? keyValue.getKey() : -1;
+
         if (!txIDs.isEmpty()) {
           deletedBlockLogStateManager.removeTransactionsFromDB(txIDs);
           metrics.incrBlockDeletionTransactionCompleted(txIDs.size());
@@ -445,8 +492,10 @@ public class DeletedBlockLogImpl
           getSCMDeletedBlockTransactionStatusManager()
               .commitTransactions(ackProto.getResultsList(), dnId);
           metrics.incrBlockDeletionCommandSuccess();
+          metrics.incrDNCommandsSuccess(dnId, 1);
         } else if (status == CommandStatus.Status.FAILED) {
           metrics.incrBlockDeletionCommandFailure();
+          metrics.incrDNCommandsFailure(dnId, 1);
         } else {
           LOG.debug("Delete Block Command {} is not executed on the Datanode" +
               " {}.", commandStatus.getCmdId(), dnId);
