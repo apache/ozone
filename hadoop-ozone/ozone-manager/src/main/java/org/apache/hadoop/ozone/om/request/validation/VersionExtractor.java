@@ -17,7 +17,7 @@
 package org.apache.hadoop.ozone.om.request.validation;
 
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.Version;
+import org.apache.hadoop.ozone.Versioned;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
@@ -31,7 +31,7 @@ public enum VersionExtractor {
    */
   LAYOUT_VERSION_EXTRACTOR {
     @Override
-    public Version extractVersion(OMRequest req, ValidationContext ctx) {
+    public Versioned extractVersion(OMRequest req, ValidationContext ctx) {
       LayoutVersionManager layoutVersionManager = ctx.versionManager();
       return ctx.versionManager().getFeature(layoutVersionManager.getMetadataLayoutVersion());
     }
@@ -47,7 +47,7 @@ public enum VersionExtractor {
    */
   CLIENT_VERSION_EXTRACTOR {
     @Override
-    public Version extractVersion(OMRequest req, ValidationContext ctx) {
+    public Versioned extractVersion(OMRequest req, ValidationContext ctx) {
       return req.getVersion() > ClientVersion.CURRENT_VERSION ?
           ClientVersion.FUTURE_VERSION : ClientVersion.fromProtoValue(req.getVersion());
     }
@@ -58,6 +58,6 @@ public enum VersionExtractor {
     }
   };
 
-  public abstract Version extractVersion(OMRequest req, ValidationContext ctx);
-  public abstract Class<? extends Version> getVersionClass();
+  public abstract Versioned extractVersion(OMRequest req, ValidationContext ctx);
+  public abstract Class<? extends Versioned> getVersionClass();
 }

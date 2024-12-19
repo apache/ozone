@@ -21,6 +21,6 @@ package org.apache.hadoop.ozone;
 /**
  * Base class defining the version in the entire system.
  */
-public interface Version {
+public interface Versioned {
   int version();
 }
