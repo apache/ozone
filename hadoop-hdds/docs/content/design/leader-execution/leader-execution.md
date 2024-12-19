@@ -93,20 +93,7 @@ Gateway: Perform lock as per below strategy for OBS/FSO
 On lock success, trigger execution of request to respective executor queue
 
 #### OBS Locking
-
-Just need to take a write lock over key, and Stripped locks to be used.
-
-```
-Volume and Bucket: Read lock
-Key: Write lock
-```
-
-**Note**: Multiple keys locking (like delete multiple keys or rename operation), lock needs to be taken in order, i.e. using StrippedLocking order to avoid dead lock.
-
-Stripped locking ordering:
-- Strip lock is obtained over a hash bucket.
-- All keys needs to be ordered with hash bucket
-- And then need take lock in sequence order
+refer [OBS locking](obs-locking.md)
 
 #### FSO Locking
 TODO
