@@ -66,10 +66,6 @@ public class NSSummaryAdmin implements AdminSubcommand {
   @CommandLine.ParentCommand
   private OzoneAdmin parent;
 
-  public OzoneAdmin getParent() {
-    return parent;
-  }
-
   private boolean isObjectStoreBucket(OzoneBucket bucket, ObjectStore objectStore) {
     boolean enableFileSystemPaths = getOzoneConfig()
         .getBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,

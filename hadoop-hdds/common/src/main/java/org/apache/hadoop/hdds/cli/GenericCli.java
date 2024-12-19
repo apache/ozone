@@ -119,6 +119,7 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
     return ozoneConf;
   }
 
+  @Override
   public OzoneConfiguration getOzoneConf() {
     if (conf == null) {
       conf = createOzoneConfiguration();
