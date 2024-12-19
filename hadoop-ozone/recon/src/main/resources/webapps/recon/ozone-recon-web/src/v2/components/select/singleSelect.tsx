@@ -50,7 +50,7 @@ const SingleSelect: React.FC<SingleSelectProps> = ({
 
 
   const ValueContainer = ({ children, ...props }: ValueContainerProps<Option, false>) => {
-    const selectedLimit = props.getValue() as Option[];
+    const selectedValue = props.getValue() as Option[];
     return (
       <components.ValueContainer {...props}>
         {React.Children.map(children, (child) => (
@@ -60,7 +60,7 @@ const SingleSelect: React.FC<SingleSelectProps> = ({
           ? child
           : null
         )}
-        Limit: {selectedLimit[0]?.label ?? ''}
+        {placeholder}: {selectedValue[0]?.label ?? ''}
       </components.ValueContainer>
     );
   };

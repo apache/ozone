@@ -123,7 +123,7 @@ public class OzoneAddress {
   }
 
   public OzoneClient createClient(MutableConfigurationSource conf)
-      throws IOException, OzoneClientException {
+      throws IOException {
     OzoneClient client;
     String scheme = ozoneURI.getScheme();
     if (ozoneURI.getScheme() == null || scheme.isEmpty()) {
@@ -185,13 +185,12 @@ public class OzoneAddress {
    * @param omServiceID
    * @return OzoneClient
    * @throws IOException
-   * @throws OzoneClientException
    */
   public OzoneClient createClientForS3Commands(
       OzoneConfiguration conf,
       String omServiceID
   )
-      throws IOException, OzoneClientException {
+      throws IOException {
     Collection<String> serviceIds = conf.
         getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY);
     if (omServiceID != null) {
@@ -227,8 +226,7 @@ public class OzoneAddress {
    * @param uri - UriString
    * @return URI
    */
-  protected URI parseURI(String uri)
-      throws OzoneClientException {
+  protected URI parseURI(String uri) throws OzoneClientException {
     if ((uri == null) || uri.isEmpty()) {
       throw new OzoneClientException(
           "Ozone URI is needed to execute this command.");
@@ -422,7 +420,7 @@ public class OzoneAddress {
     }
   }
 
-  public void ensureRootAddress() throws OzoneClientException {
+  public void ensureRootAddress() throws  OzoneClientException {
     if (keyName.length() != 0 || bucketName.length() != 0
         || volumeName.length() != 0) {
       throw new OzoneClientException(

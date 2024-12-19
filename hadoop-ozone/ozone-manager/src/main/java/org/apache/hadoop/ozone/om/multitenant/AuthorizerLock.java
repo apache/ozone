@@ -43,7 +43,7 @@ public interface AuthorizerLock {
 
   /**
    * @return stamp that can be passed to
-   *    {@link this#validateOptimisticRead(long)} to check if a write lock was
+   *    {@link #validateOptimisticRead(long)} to check if a write lock was
    *    acquired since the stamp was issued.
    * @throws IOException If an ongoing write prevents the lock from moving to
    *    the read state for longer than the timeout.

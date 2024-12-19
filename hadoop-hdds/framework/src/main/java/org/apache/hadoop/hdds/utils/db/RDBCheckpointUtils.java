@@ -49,7 +49,7 @@ public final class RDBCheckpointUtils {
     final boolean success = RatisHelper.attemptUntilTrue(file::exists, POLL_INTERVAL_DURATION, maxWaitTimeout);
     if (!success) {
       LOG.info("Checkpoint directory: {} didn't get created in {} secs.",
-          maxWaitTimeout.getSeconds(), file.getAbsolutePath());
+          file.getAbsolutePath(), maxWaitTimeout.getSeconds());
     }
     return success;
   }

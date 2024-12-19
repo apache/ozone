@@ -35,6 +35,11 @@ public final class ByteStringCodec implements Codec<ByteString> {
   private ByteStringCodec() { }
 
   @Override
+  public Class<ByteString> getTypeClass() {
+    return ByteString.class;
+  }
+
+  @Override
   public boolean supportCodecBuffer() {
     return true;
   }

@@ -94,6 +94,7 @@ public class TestUsageInfoSubcommand {
     assertEquals(80.00, json.get(0).get("remainingPercent").doubleValue(), 0.001);
 
     assertEquals(5, json.get(0).get("containerCount").longValue());
+    assertEquals(10, json.get(0).get("pipelineCount").longValue());
   }
 
   @Test
@@ -122,6 +123,7 @@ public class TestUsageInfoSubcommand {
     assertThat(output).contains("Remaining    :");
     assertThat(output).contains("Remaining %  :");
     assertThat(output).contains("Container(s) :");
+    assertThat(output).contains("Pipeline(s)  :");
     assertThat(output).contains("Container Pre-allocated :");
     assertThat(output).contains("Remaining Allocatable   :");
     assertThat(output).contains("Free Space To Spare     :");
@@ -135,6 +137,7 @@ public class TestUsageInfoSubcommand {
         .setRemaining(80)
         .setUsed(10)
         .setContainerCount(5)
+        .setPipelineCount(10)
         .build());
     return result;
   }

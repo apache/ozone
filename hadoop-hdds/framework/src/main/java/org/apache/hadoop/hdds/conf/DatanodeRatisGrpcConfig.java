@@ -31,23 +31,6 @@ import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFI
 @ConfigGroup(prefix = HDDS_DATANODE_RATIS_PREFIX_KEY + "."
     + GrpcConfigKeys.PREFIX)
 public class DatanodeRatisGrpcConfig {
-  @Config(key = "message.size.max",
-      defaultValue = "32MB",
-      type = ConfigType.SIZE,
-      tags = {OZONE, CLIENT, PERFORMANCE},
-      description = "Maximum message size allowed to be received by Grpc " +
-          "Channel (Server)."
-  )
-  private int maximumMessageSize = 32 * 1024 * 1024;
-
-  public int getMaximumMessageSize() {
-    return maximumMessageSize;
-  }
-
-  public void setMaximumMessageSize(int maximumMessageSize) {
-    this.maximumMessageSize = maximumMessageSize;
-  }
-
   @Config(key = "flow.control.window",
       defaultValue = "5MB",
       type = ConfigType.SIZE,

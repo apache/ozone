@@ -35,7 +35,7 @@ import java.util.function.Function;
 /**
  * Map: containerId {@literal ->} (localId {@literal ->} {@link BlockData}).
  * The outer container map does not entail locking for a better performance.
- * The inner {@link BlockDataMap} is synchronized.
+ * The inner {@code BlockDataMap} is synchronized.
  *
  * This class will maintain list of open keys per container when closeContainer
  * command comes, it should autocommit all open keys of a open container before

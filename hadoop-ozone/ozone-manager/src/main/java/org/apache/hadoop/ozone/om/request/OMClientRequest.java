@@ -381,7 +381,6 @@ public abstract class OMClientRequest implements RequestAuditor {
    */
   @VisibleForTesting
   public UserGroupInformation createUGI() throws AuthenticationException {
-
     if (userGroupInformation != null) {
       return userGroupInformation;
     }
@@ -413,6 +412,11 @@ public abstract class OMClientRequest implements RequestAuditor {
     return ugi;
   }
 
+  @VisibleForTesting
+  public void setUGI(UserGroupInformation ugi) {
+    this.userGroupInformation = ugi;
+  }
+
   /**
    * Return InetAddress created from OMRequest userInfo. If userInfo is not
    * set, returns null.
@@ -438,7 +442,6 @@ public abstract class OMClientRequest implements RequestAuditor {
    * Return String created from OMRequest userInfo. If userInfo is not
    * set, returns null.
    * @return String
-   * @throws IOException
    */
   @VisibleForTesting
   public String getHostName() {

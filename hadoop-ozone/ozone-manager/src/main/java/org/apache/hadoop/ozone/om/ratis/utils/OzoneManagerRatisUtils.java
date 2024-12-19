@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.ratis.utils;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.File;
 import java.nio.file.InvalidPathException;
@@ -77,6 +78,7 @@ import org.apache.hadoop.ozone.om.request.security.OMRenewDelegationTokenRequest
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotDeleteRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotMoveDeletedKeysRequest;
+import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotMoveTableKeysRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotPurgeRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotRenameRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotSetPropertyRequest;
@@ -98,6 +100,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneOb
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ratis.grpc.GrpcTlsConfig;
+import org.apache.ratis.protocol.ClientId;
 import org.rocksdb.RocksDBException;
 
 import java.io.IOException;
@@ -107,7 +110,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
 
@@ -117,6 +120,7 @@ import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
 public final class OzoneManagerRatisUtils {
   private static final Logger LOG = LoggerFactory
       .getLogger(OzoneManagerRatisUtils.class);
+  private static final RpcController NULL_RPC_CONTROLLER = null;
 
   private OzoneManagerRatisUtils() {
   }
@@ -229,6 +233,8 @@ public final class OzoneManagerRatisUtils {
       return new OMSnapshotRenameRequest(omRequest);
     case SnapshotMoveDeletedKeys:
       return new OMSnapshotMoveDeletedKeysRequest(omRequest);
+    case SnapshotMoveTableKeys:
+      return new OMSnapshotMoveTableKeysRequest(omRequest);
     case SnapshotPurge:
       return new OMSnapshotPurgeRequest(omRequest);
     case SetSnapshotProperty:
@@ -334,6 +340,16 @@ public final class OzoneManagerRatisUtils {
       return new S3ExpiredMultipartUploadsAbortRequest(omRequest);
     case QuotaRepair:
       return new OMQuotaRepairRequest(omRequest);
+    case PutObjectTagging:
+      keyArgs = omRequest.getPutObjectTaggingRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
+    case DeleteObjectTagging:
+      keyArgs = omRequest.getDeleteObjectTaggingRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     default:
       throw new OMException("Unrecognized write command type request "
           + cmdType, OMException.ResultCodes.INVALID_REQUEST);
@@ -401,9 +417,9 @@ public final class OzoneManagerRatisUtils {
   }
 
   /**
-   * Convert exception result to {@link OzoneManagerProtocolProtos.Status}.
+   * Convert exception result to {@link org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status}.
    * @param exception
-   * @return OzoneManagerProtocolProtos.Status
+   * @return Status
    */
   public static Status exceptionToResponseStatus(Exception exception) {
     if (exception instanceof OMException) {
@@ -433,8 +449,7 @@ public final class OzoneManagerRatisUtils {
    */
   public static TransactionInfo getTrxnInfoFromCheckpoint(
       OzoneConfiguration conf, Path dbPath) throws Exception {
-    return HAUtils
-        .getTrxnInfoFromCheckpoint(conf, dbPath, new OMDBDefinition());
+    return HAUtils.getTrxnInfoFromCheckpoint(conf, dbPath, OMDBDefinition.get());
   }
 
   /**
@@ -479,7 +494,7 @@ public final class OzoneManagerRatisUtils {
           OZONE_OM_RATIS_SNAPSHOT_DIR, OZONE_METADATA_DIRS);
       File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
       snapshotDir = Paths.get(metaDirPath.getPath(),
-          OM_RATIS_SNAPSHOT_DIR).toString();
+          OZONE_RATIS_SNAPSHOT_DIR).toString();
     }
     return snapshotDir;
   }
@@ -501,5 +516,14 @@ public final class OzoneManagerRatisUtils {
     }
 
     return null;
+  }
+
+  public static OzoneManagerProtocolProtos.OMResponse submitRequest(
+      OzoneManager om, OMRequest omRequest, ClientId clientId, long callId) throws ServiceException {
+    if (om.isRatisEnabled()) {
+      return om.getOmRatisServer().submitRequest(omRequest, clientId, callId);
+    } else {
+      return om.getOmServerProtocol().submitRequest(NULL_RPC_CONTROLLER, omRequest);
+    }
   }
 }

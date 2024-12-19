@@ -21,7 +21,6 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.shell.MandatoryReplicationOptions;
@@ -45,7 +44,7 @@ public class RewriteKeyHandler extends KeyHandler {
   private MandatoryReplicationOptions replication;
 
   @Override
-  protected void execute(OzoneClient client, OzoneAddress address) throws IOException, OzoneClientException {
+  protected void execute(OzoneClient client, OzoneAddress address) throws IOException {
     String volumeName = address.getVolumeName();
     String bucketName = address.getBucketName();
     String keyName = address.getKeyName();

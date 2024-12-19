@@ -20,9 +20,11 @@
 package org.apache.hadoop.ozone.om.request.snapshot;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -60,7 +62,6 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
   @Override
   @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    OmSnapshotManager omSnapshotManager = ozoneManager.getOmSnapshotManager();
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
         ozoneManager.getMetadataManager();
     SnapshotChainManager snapshotChainManager =
@@ -78,19 +79,26 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
     try {
-      nextSnapshot = SnapshotUtils.getNextActiveSnapshot(fromSnapshot,
-          snapshotChainManager, omSnapshotManager);
+      // Check the snapshot exists.
+      SnapshotInfo snapshotInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, fromSnapshot.getTableKey());
+
+      nextSnapshot = SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager, snapshotInfo);
 
       // Get next non-deleted snapshot.
-      List<SnapshotMoveKeyInfos> nextDBKeysList =
-          moveDeletedKeysRequest.getNextDBKeysList();
-      List<SnapshotMoveKeyInfos> reclaimKeysList =
-          moveDeletedKeysRequest.getReclaimKeysList();
-      List<HddsProtos.KeyValue> renamedKeysList =
-          moveDeletedKeysRequest.getRenamedKeysList();
-      List<String> movedDirs =
-          moveDeletedKeysRequest.getDeletedDirsToMoveList();
+      List<SnapshotMoveKeyInfos> nextDBKeysList = moveDeletedKeysRequest.getNextDBKeysList();
+      List<SnapshotMoveKeyInfos> reclaimKeysList = moveDeletedKeysRequest.getReclaimKeysList();
+      List<HddsProtos.KeyValue> renamedKeysList = moveDeletedKeysRequest.getRenamedKeysList();
+      List<String> movedDirs = moveDeletedKeysRequest.getDeletedDirsToMoveList();
 
+      // Update lastTransactionInfo for fromSnapshot and the nextSnapshot.
+      fromSnapshot.setLastTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());
+      omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(fromSnapshot.getTableKey()),
+          CacheValue.get(termIndex.getIndex(), fromSnapshot));
+      if (nextSnapshot != null) {
+        nextSnapshot.setLastTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());
+        omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(nextSnapshot.getTableKey()),
+            CacheValue.get(termIndex.getIndex(), nextSnapshot));
+      }
       omClientResponse = new OMSnapshotMoveDeletedKeysResponse(
           omResponse.build(), fromSnapshot, nextSnapshot,
           nextDBKeysList, reclaimKeysList, renamedKeysList, movedDirs);

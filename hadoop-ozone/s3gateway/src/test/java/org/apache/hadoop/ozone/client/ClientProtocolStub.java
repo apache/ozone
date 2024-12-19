@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
@@ -299,21 +298,6 @@ public class ClientProtocolStub implements ClientProtocol {
                                  String keyPrefix, String prevKey,
                                  int maxListResult) throws IOException {
     return null;
-  }
-
-  @Override
-  public List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
-                                           String startKeyName,
-                                           String keyPrefix, int maxKeys)
-      throws IOException {
-    return null;
-  }
-
-  @Override
-  public boolean recoverTrash(String volumeName, String bucketName,
-                              String keyName, String destinationBucket)
-      throws IOException {
-    return false;
   }
 
   @Override
@@ -785,6 +769,22 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public void recoverKey(OmKeyArgs args, long clientID) throws IOException {
 
+  }
+
+  @Override
+  public Map<String, String> getObjectTagging(String volumeName, String bucketName, String keyName) throws IOException {
+    return getBucket(volumeName, bucketName).getObjectTagging(keyName);
+  }
+
+  @Override
+  public void putObjectTagging(String volumeName, String bucketName, String keyName, Map<String, String> tags)
+      throws IOException {
+    getBucket(volumeName, bucketName).putObjectTagging(keyName, tags);
+  }
+
+  @Override
+  public void deleteObjectTagging(String volumeName, String bucketName, String keyName) throws IOException {
+    getBucket(volumeName, bucketName).deleteObjectTagging(keyName);
   }
 
 }

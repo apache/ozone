@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
+import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -83,6 +84,7 @@ public class ContainerOperationClient implements ScmClient {
   private final boolean containerTokenEnabled;
   private final OzoneConfiguration configuration;
   private XceiverClientManager xceiverClientManager;
+  private int maxCountOfContainerList;
 
   public synchronized XceiverClientManager getXceiverClientManager()
       throws IOException {
@@ -110,13 +112,16 @@ public class ContainerOperationClient implements ScmClient {
     }
     containerTokenEnabled = conf.getBoolean(HDDS_CONTAINER_TOKEN_ENABLED,
         HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT);
+    maxCountOfContainerList = conf
+        .getInt(ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT,
+            ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT_DEFAULT);
   }
 
   private XceiverClientManager newXCeiverClientManager(ConfigurationSource conf)
       throws IOException {
     XceiverClientManager manager;
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-      CACertificateProvider caCerts = () -> HAUtils.buildCAX509List(null, conf);
+      CACertificateProvider caCerts = () -> HAUtils.buildCAX509List(conf);
       manager = new XceiverClientManager(conf,
           conf.getObject(XceiverClientManager.ScmClientConfig.class),
           new ClientTrustManager(caCerts, null));
@@ -339,17 +344,29 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public List<ContainerInfo> listContainer(long startContainerID,
+  public ContainerListResult listContainer(long startContainerID,
       int count) throws IOException {
+    if (count > maxCountOfContainerList) {
+      LOG.warn("Attempting to list {} containers. However, this exceeds" +
+          " the cluster's current limit of {}. The results will be capped at the" +
+          " maximum allowed count.", count, maxCountOfContainerList);
+      count = maxCountOfContainerList;
+    }
     return storageContainerLocationClient.listContainer(
         startContainerID, count);
   }
 
   @Override
-  public List<ContainerInfo> listContainer(long startContainerID,
+  public ContainerListResult listContainer(long startContainerID,
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType repType,
       ReplicationConfig replicationConfig) throws IOException {
+    if (count > maxCountOfContainerList) {
+      LOG.warn("Attempting to list {} containers. However, this exceeds" +
+          " the cluster's current limit of {}. The results will be capped at the" +
+          " maximum allowed count.", count, maxCountOfContainerList);
+      count = maxCountOfContainerList;
+    }
     return storageContainerLocationClient.listContainer(
         startContainerID, count, state, repType, replicationConfig);
   }
@@ -517,6 +534,11 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public List<String> getScmRatisRoles() throws IOException {
     return storageContainerLocationClient.getScmInfo().getRatisPeerRoles();
+  }
+
+  @Override
+  public boolean isScmRatisEnable() throws IOException {
+    return storageContainerLocationClient.getScmInfo().getScmRatisEnabled();
   }
 
   @Override

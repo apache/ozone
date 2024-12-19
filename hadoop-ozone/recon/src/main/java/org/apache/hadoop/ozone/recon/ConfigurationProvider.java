@@ -53,6 +53,8 @@ public class ConfigurationProvider implements
 
   @VisibleForTesting
   public static void setConfiguration(OzoneConfiguration conf) {
+    // Nullity check is used in case the configuration was already set
+    // in the MiniOzoneCluster
     if (configuration == null) {
       ConfigurationProvider.configuration = conf;
     }

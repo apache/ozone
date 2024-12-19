@@ -253,7 +253,7 @@ public class SCMDatanodeProtocolServer implements
         == SCMRegisteredResponseProto.ErrorCode.success) {
       eventPublisher.fireEvent(CONTAINER_REPORT,
           new SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode(
-              datanodeDetails, containerReportsProto));
+              datanodeDetails, containerReportsProto, true));
       eventPublisher.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
           new NodeRegistrationContainerReport(datanodeDetails,
               containerReportsProto));
@@ -491,7 +491,6 @@ public class SCMDatanodeProtocolServer implements
 
   /**
    * Get Key associated with Datanode address for this server.
-   * @return
    */
   protected String getDatanodeAddressKey() {
     return this.scm.getScmNodeDetails().getDatanodeAddressKey();

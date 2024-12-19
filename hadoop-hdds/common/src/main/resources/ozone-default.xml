@@ -161,6 +161,13 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.container.list.max.count</name>
+    <value>4096</value>
+    <tag>OZONE, SCM, CONTAINER</tag>
+    <description>The max number of containers info could be included in
+      response of ListContainer request.</description>
+  </property>
+  <property>
     <name>hdds.datanode.dir</name>
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
@@ -272,16 +279,16 @@
   </property>
   <property>
     <name>hdds.ratis.snapshot.threshold</name>
-    <value>10000</value>
-    <tag>OZONE, RATIS</tag>
+    <value>100000</value>
+    <tag>OZONE, CONTAINER, RATIS</tag>
     <description>Number of transactions after which a ratis snapshot should be
       taken.
     </description>
   </property>
   <property>
     <name>hdds.container.ratis.statemachine.max.pending.apply-transactions</name>
-    <value>10000</value>
-    <tag>OZONE, RATIS</tag>
+    <value>100000</value>
+    <tag>OZONE, CONTAINER, RATIS</tag>
     <description>Maximum number of pending apply transactions in a data
       pipeline. The default value is kept same as default snapshot threshold
       hdds.ratis.snapshot.threshold.
@@ -858,6 +865,15 @@
     <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
     <description>
       The default read threshold to use memory mapped buffers.
+    </description>
+  </property>
+  <property>
+    <name>ozone.chunk.read.mapped.buffer.max.count</name>
+    <value>0</value>
+    <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
+    <description>
+      The default max count of memory mapped buffers allowed for a DN.
+      Default 0 means no mapped buffers allowed for data read.
     </description>
   </property>
   <property>
@@ -1561,7 +1577,7 @@
 
   <property>
     <name>hdds.datanode.metadata.rocksdb.cache.size</name>
-    <value>64MB</value>
+    <value>1GB</value>
     <tag>OZONE, DATANODE, MANAGEMENT</tag>
     <description>
         Size of the block metadata cache shared among RocksDB instances on each
@@ -3407,14 +3423,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.client.list.trash.keys.max</name>
-    <value>1000</value>
-    <tag>OZONE, CLIENT</tag>
-    <description>
-      The maximum number of keys to return for a list trash request.
-    </description>
-  </property>
-  <property>
     <name>ozone.http.basedir</name>
     <value/>
     <tag>OZONE, OM, SCM, MANAGEMENT</tag>
@@ -3468,9 +3476,9 @@
   <property>
     <name>ozone.s3g.client.buffer.size</name>
     <tag>OZONE, S3GATEWAY</tag>
-    <value>4KB</value>
+    <value>4MB</value>
     <description>
-      The size of the buffer which is for read block. (4KB by default).
+      The size of the buffer which is for read block. (4MB by default).
     </description>
   </property>
   <property>
@@ -3739,6 +3747,15 @@
     <description>
       The time interval between successive SnapshotDirectoryCleaningService
       thread run.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.snapshot.deep.cleaning.enabled</name>
+    <value>false</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>
+      Flag to enable/disable snapshot deep cleaning.
     </description>
   </property>
 
@@ -4225,11 +4242,26 @@
   </property>
 
   <property>
+    <name>ozone.hbase.enhancements.allowed</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      When set to false, server-side HBase enhancement-related Ozone (experimental) features
+      are disabled (not allowed to be enabled) regardless of whether those configs are set.
+
+      Here is the list of configs and values overridden when this config is set to false:
+      1. ozone.fs.hsync.enabled = false
+
+      A warning message will be printed if any of the above configs are overridden by this.
+    </description>
+  </property>
+  <property>
     <name>ozone.fs.hsync.enabled</name>
     <value>false</value>
-    <tag>OZONE, CLIENT</tag>
+    <tag>OZONE, CLIENT, OM</tag>
     <description>
-      Enable hsync/hflush. By default they are disabled.
+      Enable hsync/hflush on the Ozone Manager and/or client side. Disabled by default.
+      Can be enabled only when ozone.hbase.enhancements.allowed = true
     </description>
   </property>
   <property>
@@ -4505,19 +4537,31 @@
     </description>
   </property>
   <property>
-    <name>ozone.ec.grpc.zerocopy.enabled</name>
-    <value>true</value>
-    <tag>OZONE, DATANODE</tag>
-    <description>
-      Specify if zero-copy should be enabled for EC GRPC protocol.
-    </description>
-  </property>
-  <property>
     <name>ozone.om.max.buckets</name>
     <value>100000</value>
     <tag>OZONE, OM</tag>
     <description>
       maximum number of buckets across all volumes.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.volume.io.percentiles.intervals.seconds</name>
+    <value>60</value>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      This setting specifies the interval (in seconds) for monitoring percentile performance metrics.
+      It helps in tracking the read and write performance of DataNodes in real-time,
+      allowing for better identification and analysis of performance issues.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.server.list.max.size</name>
+    <value>1000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Configuration property to configure the max server side response size for list calls on om.
     </description>
   </property>
 </configuration>

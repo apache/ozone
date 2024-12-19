@@ -22,7 +22,9 @@ import {
   Props as ReactSelectProps,
   components,
   OptionProps,
-  ValueType
+  ValueType,
+  ValueContainerProps,
+  StylesConfig
 } from 'react-select';
 
 import { selectStyles } from "@/v2/constants/select.constants";
@@ -40,64 +42,92 @@ interface MultiSelectProps extends ReactSelectProps<Option, true> {
   placeholder: string;
   fixedColumn: string;
   columnLength: number;
+  style?: StylesConfig<Option, true>;
   onChange: (arg0: ValueType<Option, true>) => void;
   onTagClose: (arg0: string) => void;
 }
 
 // ------------- Component -------------- //
+
+const Option: React.FC<OptionProps<Option, true>> = (props) => {
+  return (
+    <div>
+      <components.Option
+        {...props}>
+        <input
+          type='checkbox'
+          checked={props.isSelected}
+          style={{
+            marginRight: '8px',
+            accentColor: '#1AA57A'
+          }}
+          onChange={() => null} />
+        <label>{props.label}</label>
+      </components.Option>
+    </div>
+  )
+}
+
+
 const MultiSelect: React.FC<MultiSelectProps> = ({
   options = [],
   selected = [],
   maxSelected = 5,
   placeholder = 'Columns',
+  isDisabled = false,
   fixedColumn,
   columnLength,
   tagRef,
+  style,
   onTagClose = () => { },  // Assign default value as a void function
   onChange = () => { },  // Assign default value as a void function
   ...props
 }) => {
 
-  const Option: React.FC<OptionProps<Option, true>> = (props) => {
+  const ValueContainer = ({ children, ...props }: ValueContainerProps<Option, true>) => {
     return (
-      <div>
-        <components.Option
-          {...props}>
-          <input
-            type='checkbox'
-            checked={props.isSelected}
-            style={{
-              marginRight: '8px',
-              accentColor: '#1AA57A'
-            }}
-            onChange={() => null} />
-          <label>{props.label}</label>
-        </components.Option>
-      </div>
-    )
-  }
+      <components.ValueContainer {...props}>
+        {React.Children.map(children, (child) => (
+          ((child as React.ReactElement<any, string
+            | React.JSXElementConstructor<any>>
+            | React.ReactPortal)?.type as React.JSXElementConstructor<any>)).name === "DummyInput"
+          ? child
+          : null
+        )}
+        {isDisabled
+          ? placeholder
+          : `${placeholder}: ${selected.length} selected`
+}
+      </components.ValueContainer>
+    );
+  };
+
+  const finalStyles = {...selectStyles, ...style ?? {}}
 
   return (
     <ReactSelect
-    {...props}
-    isMulti={true}
-    closeMenuOnSelect={false}
-    hideSelectedOptions={false}
-    isClearable={false}
-    isSearchable={false}
-    controlShouldRenderValue={false}
-    classNamePrefix='multi-select'
-    options={options}
-    components={{
-      Option
-    }}
-    placeholder={placeholder}
-    value={selected}
-    onChange={(selected: ValueType<Option, true>) => {
-      if (selected?.length === options.length) return onChange!(options);
-      return onChange!(selected);
-    }}
-    styles={selectStyles} />
+      {...props}
+      isMulti={true}
+      closeMenuOnSelect={false}
+      hideSelectedOptions={false}
+      isClearable={false}
+      isSearchable={false}
+      controlShouldRenderValue={false}
+      classNamePrefix='multi-select'
+      options={options}
+      components={{
+        ValueContainer,
+        Option
+      }}
+      placeholder={placeholder}
+      value={selected}
+      isOptionDisabled={(option) => option.value === fixedColumn}
+      isDisabled={isDisabled}
+      onChange={(selected: ValueType<Option, true>) => {
+        if (selected?.length === options.length) return onChange!(options);
+        return onChange!(selected);
+      }}
+      styles={finalStyles} />
   )
 }
 

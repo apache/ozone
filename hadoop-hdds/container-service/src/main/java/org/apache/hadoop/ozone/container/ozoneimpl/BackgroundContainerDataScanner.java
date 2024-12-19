@@ -62,6 +62,7 @@ public class BackgroundContainerDataScanner extends
     throttler = new HddsDataTransferThrottler(conf.getBandwidthPerVolume());
     canceler = new Canceler();
     this.metrics = ContainerDataScannerMetrics.create(volume.toString());
+    this.metrics.setStorageDirectory(volume.toString());
     this.minScanGap = conf.getContainerScanMinGap();
     this.checksumManager = checksumManager;
   }

@@ -62,7 +62,9 @@ import static org.apache.hadoop.hdds.DatanodeVersion.COMBINED_PUTBLOCK_WRITECHUN
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.writeChunkAsync;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
+import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -198,9 +200,7 @@ public class BlockOutputStream extends OutputStream {
         blkIDBuilder.build()).addMetadata(keyValue);
     this.pipeline = pipeline;
     // tell DataNode I will send incremental chunk list
-    // EC does not support incremental chunk list.
-    this.supportIncrementalChunkList = config.getIncrementalChunkList() &&
-        this instanceof RatisBlockOutputStream && allDataNodesSupportPiggybacking();
+    this.supportIncrementalChunkList = canEnableIncrementalChunkList();
     LOG.debug("incrementalChunkList is {}", supportIncrementalChunkList);
     if (supportIncrementalChunkList) {
       this.containerBlockData.addMetadata(INCREMENTAL_CHUNK_LIST_KV);
@@ -233,13 +233,52 @@ public class BlockOutputStream extends OutputStream {
     writtenDataLength = 0;
     failedServers = new ArrayList<>(0);
     ioException = new AtomicReference<>(null);
-    checksum = new Checksum(config.getChecksumType(),
-        config.getBytesPerChecksum());
+    this.checksum = new Checksum(config.getChecksumType(), config.getBytesPerChecksum(), true);
     this.clientMetrics = clientMetrics;
     this.streamBufferArgs = streamBufferArgs;
-    this.allowPutBlockPiggybacking = config.getEnablePutblockPiggybacking() &&
-            allDataNodesSupportPiggybacking();
+    this.allowPutBlockPiggybacking = canEnablePutblockPiggybacking();
     LOG.debug("PutBlock piggybacking is {}", allowPutBlockPiggybacking);
+  }
+
+  /**
+   * Helper method to check if incremental chunk list can be enabled.
+   * Prints debug messages if it cannot be enabled.
+   */
+  private boolean canEnableIncrementalChunkList() {
+    boolean confEnableIncrementalChunkList = config.getIncrementalChunkList();
+    if (!confEnableIncrementalChunkList) {
+      return false;
+    }
+
+    if (!(this instanceof RatisBlockOutputStream)) {
+      // Note: EC does not support incremental chunk list
+      LOG.debug("Unable to enable incrementalChunkList because BlockOutputStream is not a RatisBlockOutputStream");
+      return false;
+    }
+    if (!allDataNodesSupportPiggybacking()) {
+      // Not all datanodes support piggybacking and incremental chunk list.
+      LOG.debug("Unable to enable incrementalChunkList because not all datanodes support piggybacking");
+      return false;
+    }
+    return confEnableIncrementalChunkList;
+  }
+
+  /**
+   * Helper method to check if PutBlock piggybacking can be enabled.
+   * Prints debug message if it cannot be enabled.
+   */
+  private boolean canEnablePutblockPiggybacking() {
+    boolean confEnablePutblockPiggybacking = config.getEnablePutblockPiggybacking();
+    if (!confEnablePutblockPiggybacking) {
+      return false;
+    }
+
+    if (!allDataNodesSupportPiggybacking()) {
+      // Not all datanodes support piggybacking and incremental chunk list.
+      LOG.debug("Unable to enable PutBlock piggybacking because not all datanodes support piggybacking");
+      return false;
+    }
+    return confEnablePutblockPiggybacking;
   }
 
   private boolean allDataNodesSupportPiggybacking() {
@@ -322,6 +361,7 @@ public class BlockOutputStream extends OutputStream {
   private void writeChunkIfNeeded() throws IOException {
     if (currentBufferRemaining == 0) {
       LOG.debug("WriteChunk from write(), buffer = {}", currentBuffer);
+      clientMetrics.getWriteChunksDuringWrite().incr();
       writeChunk(currentBuffer);
       updateWriteChunkLength();
     }
@@ -366,6 +406,7 @@ public class BlockOutputStream extends OutputStream {
         updatePutBlockLength();
         CompletableFuture<PutBlockResult> putBlockFuture = executePutBlock(false, false);
         recordWatchForCommitAsync(putBlockFuture);
+        clientMetrics.getFlushesDuringWrite().incr();
       }
 
       if (bufferPool.isAtCapacity()) {
@@ -375,10 +416,8 @@ public class BlockOutputStream extends OutputStream {
   }
 
   private void recordWatchForCommitAsync(CompletableFuture<PutBlockResult> putBlockResultFuture) {
-    recordFlushFuture(watchForCommitAsync(putBlockResultFuture));
-  }
+    final CompletableFuture<Void> flushFuture = putBlockResultFuture.thenCompose(x -> watchForCommit(x.commitIndex));
 
-  private void recordFlushFuture(CompletableFuture<Void> flushFuture) {
     Preconditions.checkState(Thread.holdsLock(this));
     this.lastFlushFuture = flushFuture;
     this.allPendingFlushFutures = allPendingFlushFutures.thenCombine(flushFuture, (last, curr) -> null);
@@ -444,7 +483,8 @@ public class BlockOutputStream extends OutputStream {
         writeChunk(buffer);
         putBlockFuture = executePutBlock(false, false);
       }
-      CompletableFuture<Void> watchForCommitAsync = watchForCommitAsync(putBlockFuture);
+      CompletableFuture<Void> watchForCommitAsync =
+          putBlockFuture.thenCompose(x -> watchForCommit(x.commitIndex));
       try {
         watchForCommitAsync.get();
       } catch (InterruptedException e) {
@@ -477,33 +517,48 @@ public class BlockOutputStream extends OutputStream {
   }
 
   /**
-   * Watch for a specific commit index.
+   * Send a watch request to wait until the given index became committed.
+   * When watch is not needed (e.g. EC), this is a NOOP.
+   *
+   * @param index the log index to wait for.
+   * @return the future of the reply.
    */
-  XceiverClientReply sendWatchForCommit(long commitIndex)
-      throws IOException {
-    return null;
+  CompletableFuture<XceiverClientReply> sendWatchForCommit(long index) {
+    return CompletableFuture.completedFuture(null);
   }
 
-  private void watchForCommit(long commitIndex) throws IOException {
-    checkOpen();
+  private CompletableFuture<Void> watchForCommit(long commitIndex) {
     try {
-      LOG.debug("Entering watchForCommit commitIndex = {}", commitIndex);
-      final XceiverClientReply reply = sendWatchForCommit(commitIndex);
-      if (reply != null) {
-        List<DatanodeDetails> dnList = reply.getDatanodes();
-        if (!dnList.isEmpty()) {
-          Pipeline pipe = xceiverClient.getPipeline();
-
-          LOG.warn("Failed to commit BlockId {} on {}. Failed nodes: {}",
-              blockID, pipe, dnList);
-          failedServers.addAll(dnList);
-        }
-      }
-    } catch (IOException ioe) {
-      setIoException(ioe);
-      throw getIoException();
+      checkOpen();
+    } catch (IOException e) {
+      throw new FlushRuntimeException(e);
     }
-    LOG.debug("Leaving watchForCommit commitIndex = {}", commitIndex);
+
+    LOG.debug("Entering watchForCommit commitIndex = {}", commitIndex);
+    final long start = Time.monotonicNowNanos();
+    return sendWatchForCommit(commitIndex)
+        .thenAccept(this::checkReply)
+        .exceptionally(e -> {
+          throw new FlushRuntimeException(setIoException(e));
+        })
+        .whenComplete((r, e) -> {
+          LOG.debug("Leaving watchForCommit commitIndex = {}", commitIndex);
+          clientMetrics.getHsyncWatchForCommitNs().add(Time.monotonicNowNanos() - start);
+        });
+  }
+
+  private void checkReply(XceiverClientReply reply) {
+    if (reply == null) {
+      return;
+    }
+    final List<DatanodeDetails> dnList = reply.getDatanodes();
+    if (dnList.isEmpty()) {
+      return;
+    }
+
+    LOG.warn("Failed to commit BlockId {} on {}. Failed nodes: {}",
+        blockID, xceiverClient.getPipeline(), dnList);
+    failedServers.addAll(dnList);
   }
 
   void updateCommitInfo(XceiverClientReply reply, List<ChunkBuffer> buffers) {
@@ -531,6 +586,7 @@ public class BlockOutputStream extends OutputStream {
     final CompletableFuture<ContainerCommandResponseProto> flushFuture;
     final XceiverClientReply asyncReply;
     try {
+      // Note: checksum was previously appended to containerBlockData by WriteChunk
       BlockData blockData = containerBlockData.build();
       LOG.debug("sending PutBlock {} flushPos {}", blockData, flushPos);
 
@@ -645,12 +701,15 @@ public class BlockOutputStream extends OutputStream {
       throws IOException, InterruptedException, ExecutionException {
     checkOpen();
     LOG.debug("Start handleFlushInternal close={}", close);
-    CompletableFuture<Void> toWaitFor = handleFlushInternalSynchronized(close);
+    CompletableFuture<Void> toWaitFor = captureLatencyNs(clientMetrics.getHsyncSynchronizedWorkNs(),
+        () -> handleFlushInternalSynchronized(close));
 
     if (toWaitFor != null) {
       LOG.debug("Waiting for flush");
       try {
+        long startWaiting = Time.monotonicNowNanos();
         toWaitFor.get();
+        clientMetrics.getHsyncWaitForFlushNs().add(Time.monotonicNowNanos() - startWaiting);
       } catch (ExecutionException ex) {
         if (ex.getCause() instanceof FlushRuntimeException) {
           throw ((FlushRuntimeException) ex.getCause()).cause;
@@ -679,6 +738,7 @@ public class BlockOutputStream extends OutputStream {
   }
 
   private synchronized CompletableFuture<Void> handleFlushInternalSynchronized(boolean close) throws IOException {
+    long start = Time.monotonicNowNanos();
     CompletableFuture<PutBlockResult> putBlockResultFuture = null;
     // flush the last chunk data residing on the currentBuffer
     if (totalWriteChunkLength < writtenDataLength) {
@@ -720,17 +780,8 @@ public class BlockOutputStream extends OutputStream {
     if (putBlockResultFuture != null) {
       recordWatchForCommitAsync(putBlockResultFuture);
     }
+    clientMetrics.getHsyncSendWriteChunkNs().add(Time.monotonicNowNanos() - start);
     return lastFlushFuture;
-  }
-
-  private CompletableFuture<Void> watchForCommitAsync(CompletableFuture<PutBlockResult> putBlockResultFuture) {
-    return putBlockResultFuture.thenAccept(x -> {
-      try {
-        watchForCommit(x.commitIndex);
-      } catch (IOException e) {
-        throw new FlushRuntimeException(e);
-      }
-    });
   }
 
   @Override
@@ -771,7 +822,7 @@ public class BlockOutputStream extends OutputStream {
   }
 
 
-  public void setIoException(Exception e) {
+  public IOException setIoException(Throwable e) {
     IOException ioe = getIoException();
     if (ioe == null) {
       IOException exception =  new IOException(EXCEPTION_MSG + e.toString(), e);
@@ -782,6 +833,7 @@ public class BlockOutputStream extends OutputStream {
               "so subsequent request also encounters " +
               "Storage Container Exception {}", ioe, e);
     }
+    return getIoException();
   }
 
   void cleanup() {
@@ -802,6 +854,8 @@ public class BlockOutputStream extends OutputStream {
     if (lastChunkBuffer != null) {
       DIRECT_BUFFER_POOL.returnBuffer(lastChunkBuffer);
       lastChunkBuffer = null;
+      // Clear checksum cache
+      checksum.clearChecksumCache();
     }
   }
 
@@ -851,7 +905,10 @@ public class BlockOutputStream extends OutputStream {
     final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
     final ByteString data = chunk.toByteString(
         bufferPool.byteStringConversion());
-    ChecksumData checksumData = checksum.computeChecksum(chunk);
+    // chunk is incremental, don't cache its checksum
+    ChecksumData checksumData = checksum.computeChecksum(chunk, false);
+    // side note: checksum object is shared with PutBlock's (blockData) checksum calc,
+    // current impl does not support caching both
     ChunkInfo chunkInfo = ChunkInfo.newBuilder()
         .setChunkName(blockID.get().getLocalID() + "_chunk_" + ++chunkIndex)
         .setOffset(offset)
@@ -1001,6 +1058,7 @@ public class BlockOutputStream extends OutputStream {
           lastChunkBuffer.capacity() - lastChunkBuffer.position();
       appendLastChunkBuffer(chunk, 0, remainingBufferSize);
       updateBlockDataWithLastChunkBuffer();
+      // TODO: Optional refactoring: Can attach ChecksumCache to lastChunkBuffer rather than Checksum
       appendLastChunkBuffer(chunk, remainingBufferSize,
           chunk.remaining() - remainingBufferSize);
     }
@@ -1017,10 +1075,13 @@ public class BlockOutputStream extends OutputStream {
     LOG.debug("lastChunkInfo = {}", lastChunkInfo);
     long lastChunkSize = lastChunkInfo.getLen();
     addToBlockData(lastChunkInfo);
-
+    // Set ByteBuffer limit to capacity, pos to 0. Does not erase data
     lastChunkBuffer.clear();
+
     if (lastChunkSize == config.getStreamBufferSize()) {
       lastChunkOffset += config.getStreamBufferSize();
+      // Reached stream buffer size (chunk size), starting new chunk, need to clear checksum cache
+      checksum.clearChecksumCache();
     } else {
       lastChunkBuffer.position((int) lastChunkSize);
     }
@@ -1084,8 +1145,9 @@ public class BlockOutputStream extends OutputStream {
     lastChunkBuffer.flip();
     int revisedChunkSize = lastChunkBuffer.remaining();
     // create the chunk info to be sent in PutBlock.
-    ChecksumData revisedChecksumData =
-        checksum.computeChecksum(lastChunkBuffer);
+    // checksum cache is utilized for this computation
+    // this checksum is stored in blockData and later transferred in PutBlock
+    ChecksumData revisedChecksumData = checksum.computeChecksum(lastChunkBuffer, true);
 
     long chunkID = lastPartialChunkOffset / config.getStreamBufferSize();
     ChunkInfo.Builder revisedChunkInfo = ChunkInfo.newBuilder()

@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Set;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -96,7 +97,8 @@ public abstract class Handler {
    *
    * @return datanode Id
    */
-  protected String getDatanodeId() {
+  @VisibleForTesting
+  public String getDatanodeId() {
     return datanodeId;
   }
 

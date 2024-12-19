@@ -27,7 +27,6 @@ import org.junit.jupiter.api.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.any;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.apache.ozone.test.MetricsAsserts.getLongGauge;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
@@ -57,16 +56,11 @@ public class TestReplicationManagerMetrics {
         report.increment(s);
       }
     }
-    final LegacyReplicationManager lrm = mock(
-        LegacyReplicationManager.class);
-    when(lrm.getInflightCount(any(InflightType.class)))
-        .thenReturn(0);
     ConfigurationSource conf = new OzoneConfiguration();
     ReplicationManager.ReplicationManagerConfiguration rmConf = conf
         .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
     ReplicationManager replicationManager = mock(ReplicationManager.class);
     when(replicationManager.getConfig()).thenReturn(rmConf);
-    when(replicationManager.getLegacyReplicationManager()).thenReturn(lrm);
     when(replicationManager.getContainerReport()).thenReturn(report);
     when(replicationManager.getContainerReplicaPendingOps())
         .thenReturn(mock(ContainerReplicaPendingOps.class));
