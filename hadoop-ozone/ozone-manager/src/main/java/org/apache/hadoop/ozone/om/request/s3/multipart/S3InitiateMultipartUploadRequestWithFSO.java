@@ -109,6 +109,8 @@ public class S3InitiateMultipartUploadRequestWithFSO
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
+      missingParentInfos = addOrGetMissingDirectories(ozoneManager, keyArgs, transactionLogIndex);
+
       OMFileRequest.OMPathInfoWithFSO pathInfoFSO = OMFileRequest
           .verifyDirectoryKeysInPath(omMetadataManager, volumeName, bucketName,
               keyName, Paths.get(keyName));
@@ -118,10 +120,6 @@ public class S3InitiateMultipartUploadRequestWithFSO
 
       final OmBucketInfo bucketInfo = getBucketInfo(omMetadataManager,
           volumeName, bucketName);
-
-      // add all missing parents to dir table
-      missingParentInfos = getAllMissingParentDirInfo(ozoneManager, keyArgs, bucketInfo,
-              pathInfoFSO, transactionLogIndex);
 
       // We are adding uploadId to key, because if multiple users try to
       // perform multipart upload on the same key, each will try to upload, who
@@ -192,18 +190,6 @@ public class S3InitiateMultipartUploadRequestWithFSO
           .addAllMetadata(KeyValueUtil.getFromProtobuf(keyArgs.getMetadataList()))
           .addAllTags(KeyValueUtil.getFromProtobuf(keyArgs.getTagsList()))
           .build();
-      
-      // validate and update namespace for missing parent directory
-      if (null != missingParentInfos) {
-        checkBucketQuotaInNamespace(bucketInfo, missingParentInfos.size());
-        bucketInfo.incrUsedNamespace(missingParentInfos.size());
-      }
-
-      // Add cache entries for the prefix directories.
-      // Skip adding for the file key itself, until Key Commit.
-      OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
-              volumeId, bucketId, transactionLogIndex,
-              missingParentInfos, null);
 
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
           multipartOpenKey, omKeyInfo, pathInfoFSO.getLeafNodeName(), keyName,
@@ -213,6 +199,9 @@ public class S3InitiateMultipartUploadRequestWithFSO
       omMetadataManager.getMultipartInfoTable().addCacheEntry(
           multipartKey, multipartKeyInfo, transactionLogIndex);
 
+      if (bucketInfo == null) {
+        throw new IOException("bucketInfo is null");
+      }
       omClientResponse =
           new S3InitiateMultipartUploadResponseWithFSO(
               omResponse.setInitiateMultiPartUploadResponse(
@@ -244,6 +233,11 @@ public class S3InitiateMultipartUploadRequestWithFSO
             bucketName, keyName, exception, result);
 
     return omClientResponse;
+  }
+
+  @Override
+  protected boolean addMissingDirectoriesToCacheEnabled() {
+    return true;
   }
 
   /**

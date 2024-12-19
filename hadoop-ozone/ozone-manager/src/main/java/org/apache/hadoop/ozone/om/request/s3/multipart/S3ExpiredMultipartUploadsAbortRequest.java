@@ -21,6 +21,10 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -49,6 +53,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -190,6 +195,30 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
 
   }
 
+  private KeyArgs buildKeyArgs(final OmMultipartUpload multipartUpload) throws OMException {
+    final long now = Instant.now().toEpochMilli();
+    final ReplicationConfig replicationConfig =
+            multipartUpload.getReplicationConfig();
+    KeyArgs.Builder builder =
+            KeyArgs.newBuilder()
+                    .setVolumeName(multipartUpload.getVolumeName())
+                    .setBucketName(multipartUpload.getBucketName())
+                    .setKeyName(multipartUpload.getKeyName())
+                    .setType(replicationConfig.getReplicationType())
+                    .setModificationTime(now);
+
+    if (replicationConfig instanceof ECReplicationConfig) {
+      builder.setEcReplicationConfig(((ECReplicationConfig) replicationConfig).toProto());
+    } else if (replicationConfig instanceof RatisReplicationConfig) {
+      builder.setFactor(((RatisReplicationConfig) replicationConfig).getReplicationFactor());
+    } else if (replicationConfig instanceof StandaloneReplicationConfig) {
+      builder.setFactor(((StandaloneReplicationConfig) replicationConfig).getReplicationFactor());
+    } else {
+      throw new OMException(OMException.ResultCodes.INVALID_REQUEST);
+    }
+    return builder.build();
+  }
+
   private void updateTableCache(OzoneManager ozoneManager,
         long trxnLogIndex, ExpiredMultipartUploadsBucket mpusPerBucket,
         Map<OmBucketInfo, List<OmMultipartAbortInfo>> abortedMultipartUploads)
@@ -250,6 +279,7 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
           try {
             multipartUpload =
                 OmMultipartUpload.from(expiredMPUKeyName);
+            multipartUpload.setReplicationConfig(omMultipartKeyInfo.getReplicationConfig());
           } catch (IllegalArgumentException e) {
             LOG.warn("Aborting expired MPU failed: MPU key: " +
                 expiredMPUKeyName + " has invalid structure, " +
@@ -259,6 +289,8 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
 
           String multipartOpenKey;
           try {
+            KeyArgs keyArgs = buildKeyArgs(multipartUpload);
+            addOrGetMissingDirectories(ozoneManager, keyArgs, trxnLogIndex);
             multipartOpenKey =
                 OMMultipartUploadUtils
                     .getMultipartOpenKey(multipartUpload.getVolumeName(),
@@ -271,7 +303,7 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
                 multipartUpload.getVolumeName() + ", bucket: " +
                 multipartUpload.getBucketName() + ", key: " +
                 multipartUpload.getKeyName() + ". Cannot parse the open key" +
-                "for this MPU, skipping this MPU.");
+                "for this MPU, skipping this MPU.", ome);
             continue;
           }
 
@@ -336,6 +368,10 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
             .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
       }
     }
+  }
 
+  @Override
+  protected boolean addMissingDirectoriesToCacheEnabled() {
+    return true;
   }
 }
