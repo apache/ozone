@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.request.validation;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.ozone.Version;
+import org.apache.hadoop.ozone.Versioned;
 import org.reflections.Reflections;
 import org.reflections.scanners.Scanners;
 import org.reflections.util.ClasspathHelper;
@@ -56,9 +56,9 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
    * Based on the afforementioned parameters a complete map is built which stores the validators in a sorted order of
    * the applyBeforeVersion value of the validator method.
    * Thus when a request comes with a certain version value, all validators containing `applyBeforeVersion` parameter
-   * greater than the request versions get triggered. {@link #validationsFor(Enum, RequestProcessingPhase, Version)}
+   * greater than the request versions get triggered. {@link #validationsFor(Enum, RequestProcessingPhase, Versioned)}
    */
-  private final Map<Class<? extends Version>, EnumMap<RequestType,
+  private final Map<Class<? extends Versioned>, EnumMap<RequestType,
       EnumMap<RequestProcessingPhase, IndexedItems<Method, Integer>>>> indexedValidatorMap;
 
   /**
@@ -77,7 +77,7 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
    */
   public ValidatorRegistry(Class<RequestType> requestType,
                            String validatorPackage,
-                           Set<Class<? extends Version>> allowedVersionTypes,
+                           Set<Class<? extends Versioned>> allowedVersionTypes,
                            Set<RequestProcessingPhase> allowedProcessingPhases) {
     this(requestType, ClasspathHelper.forPackage(validatorPackage), allowedVersionTypes, allowedProcessingPhases);
   }
@@ -96,7 +96,7 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
    */
   public ValidatorRegistry(Class<RequestType> requestType,
                     Collection<URL> searchUrls,
-                    Set<Class<? extends Version>> allowedVersionTypes,
+                    Set<Class<? extends Versioned>> allowedVersionTypes,
                     Set<RequestProcessingPhase> allowedProcessingPhases) {
     Class<RequestType[]> requestArrayClass = (Class<RequestType[]>) Array.newInstance(requestType, 0)
         .getClass();
@@ -134,7 +134,7 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
    */
   public List<Method> validationsFor(RequestType requestType,
                                      RequestProcessingPhase phase,
-                                     List<? extends Version> requestVersions) {
+                                     List<? extends Versioned> requestVersions) {
     return requestVersions.stream()
         .flatMap(requestVersion -> this.validationsFor(requestType, phase, requestVersion).stream())
         .distinct().collect(Collectors.toList());
@@ -150,7 +150,7 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
    * @param requestVersion version extracted corresponding to the request.
    * @return the list of validation methods that has to run.
    */
-  public <V extends Version> List<Method> validationsFor(RequestType requestType,
+  public <V extends Versioned> List<Method> validationsFor(RequestType requestType,
                                                          RequestProcessingPhase phase,
                                                          V requestVersion) {
 
@@ -189,8 +189,8 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
     }
   }
 
-  private <Validator extends Annotation> Version getApplyBeforeVersion(Validator validator) {
-    return callAnnotationMethod(validator, RegisterValidator.APPLY_BEFORE_METHOD_NAME, Version.class);
+  private <Validator extends Annotation> Versioned getApplyBeforeVersion(Validator validator) {
+    return callAnnotationMethod(validator, RegisterValidator.APPLY_BEFORE_METHOD_NAME, Versioned.class);
   }
 
   private <Validator extends Annotation> RequestProcessingPhase getRequestPhase(Validator validator) {
@@ -234,7 +234,7 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
                                  Class<? extends Annotation> validatorToBeRegistered,
                                  Reflections reflections) {
     Collection<Method> methods =  reflections.getMethodsAnnotatedWith(validatorToBeRegistered);
-    Class<? extends Version> versionClass = (Class<? extends Version>)
+    Class<? extends Versioned> versionClass = (Class<? extends Versioned>)
         this.getReturnTypeOfAnnotationMethod(validatorToBeRegistered, RegisterValidator.APPLY_BEFORE_METHOD_NAME);
     List<Pair<? extends Annotation, Method>> sortedMethodsByApplyBeforeVersion = methods.stream()
         .map(method -> Pair.of(method.getAnnotation(validatorToBeRegistered), method))
@@ -246,7 +246,7 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
     for (Pair<? extends Annotation, Method> validatorMethodPair : sortedMethodsByApplyBeforeVersion) {
       Annotation validator = validatorMethodPair.getKey();
       Method method = validatorMethodPair.getValue();
-      Version applyBeforeVersion = this.getApplyBeforeVersion(validator);
+      Versioned applyBeforeVersion = this.getApplyBeforeVersion(validator);
       RequestProcessingPhase phase = this.getRequestPhase(validator);
       checkAllowedAnnotationValues(allowedPhases, phase, RegisterValidator.PROCESSING_PHASE_METHOD_NAME,
           method.getName());

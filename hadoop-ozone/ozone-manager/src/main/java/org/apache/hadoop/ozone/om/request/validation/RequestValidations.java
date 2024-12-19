@@ -18,7 +18,7 @@ package org.apache.hadoop.ozone.om.request.validation;
 
 import com.google.common.collect.Sets;
 import com.google.protobuf.ServiceException;
-import org.apache.hadoop.ozone.Version;
+import org.apache.hadoop.ozone.Versioned;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -117,7 +117,7 @@ public class RequestValidations {
     return validatedResponse;
   }
 
-  private List<Version> getVersions(OMRequest request) {
+  private List<Versioned> getVersions(OMRequest request) {
     return Arrays.stream(VersionExtractor.values())
         .map(versionExtractor -> versionExtractor.extractVersion(request, context))
         .filter(Objects::nonNull)

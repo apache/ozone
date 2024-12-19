@@ -18,7 +18,7 @@ package org.apache.hadoop.ozone.om.request.validation;
 
 import com.google.testing.compile.Compilation;
 import com.google.testing.compile.JavaFileObjects;
-import org.apache.hadoop.ozone.Version;
+import org.apache.hadoop.ozone.Versioned;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.request.validation.RegisterValidator;
 import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
@@ -89,7 +89,7 @@ public class TestOMValidatorProcessor {
 
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & Version> void testAnnotationCanOnlyBeAppliedOnMethods(Class<?> annotationClass,
+  public <V extends Enum<V> & Versioned> void testAnnotationCanOnlyBeAppliedOnMethods(Class<?> annotationClass,
                                                                                     V version) {
     for (Annotation a : annotationClass.getAnnotations()) {
       if (a instanceof Target) {
@@ -101,7 +101,7 @@ public class TestOMValidatorProcessor {
 
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & Version> void testACorrectAnnotationSetupForPreProcessCompiles(Class<?> annotationClass,
+  public <V extends Enum<V> & Versioned> void testACorrectAnnotationSetupForPreProcessCompiles(Class<?> annotationClass,
                                                                                              V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(preProcess(), aReqType(), annotationClass, version),
@@ -115,7 +115,7 @@ public class TestOMValidatorProcessor {
 
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & Version> void testACorrectAnnotationSetupForPostProcessCompiles(Class<?> annotationClass,
+  public <V extends Enum<V> & Versioned> void testACorrectAnnotationSetupForPostProcessCompiles(Class<?> annotationClass,
                                                                                               V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(postProcess(), aReqType(), annotationClass, version),
@@ -129,7 +129,7 @@ public class TestOMValidatorProcessor {
 
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & Version> void testValidatorDoesNotNecessarilyThrowsExceptions(Class<?> annotationClass,
+  public <V extends Enum<V> & Versioned> void testValidatorDoesNotNecessarilyThrowsExceptions(Class<?> annotationClass,
                                                                                             V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(preProcess(), aReqType(), annotationClass, version),
@@ -143,7 +143,7 @@ public class TestOMValidatorProcessor {
 
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & Version> void testNonStaticValidatorDoesNotCompile(Class<?> annotationClass,
+  public <V extends Enum<V> & Versioned> void testNonStaticValidatorDoesNotCompile(Class<?> annotationClass,
                                                                                  V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(preProcess(), aReqType(), annotationClass, version),
@@ -158,7 +158,7 @@ public class TestOMValidatorProcessor {
 
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & Version> void testValidatorMethodCanBeFinal(Class<?> annotationClass,
+  public <V extends Enum<V> & Versioned> void testValidatorMethodCanBeFinal(Class<?> annotationClass,
                                                                           V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(preProcess(), aReqType(), annotationClass, version),
@@ -172,7 +172,7 @@ public class TestOMValidatorProcessor {
 
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & Version> void testValidatorMethodCanBePrivate(Class<?> annotationClass,
+  public <V extends Enum<V> & Versioned> void testValidatorMethodCanBePrivate(Class<?> annotationClass,
                                                                             V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(preProcess(), aReqType(), annotationClass, version),
@@ -186,7 +186,7 @@ public class TestOMValidatorProcessor {
 
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & Version> void testValidatorMethodCanBeDefaultVisible(Class<?> annotationClass,
+  public <V extends Enum<V> & Versioned> void testValidatorMethodCanBeDefaultVisible(Class<?> annotationClass,
                                                                                    V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(preProcess(), aReqType(), annotationClass, version),
@@ -200,7 +200,7 @@ public class TestOMValidatorProcessor {
 
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & Version> void testValidatorMethodCanBeProtected(Class<?> annotationClass,
+  public <V extends Enum<V> & Versioned> void testValidatorMethodCanBeProtected(Class<?> annotationClass,
                                                                               V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(preProcess(), aReqType(), annotationClass, version),
@@ -214,7 +214,7 @@ public class TestOMValidatorProcessor {
 
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & Version> void testNotEnoughParametersForPreProcess(Class<?> annotationClass,
+  public <V extends Enum<V> & Versioned> void testNotEnoughParametersForPreProcess(Class<?> annotationClass,
                                                                                  V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(preProcess(), aReqType(), annotationClass, version),
@@ -230,7 +230,7 @@ public class TestOMValidatorProcessor {
 
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & Version> void testTooManyParametersForPreProcess(Class<?> annotationClass,
+  public <V extends Enum<V> & Versioned> void testTooManyParametersForPreProcess(Class<?> annotationClass,
                                                                                V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(preProcess(), aReqType(), annotationClass, version),
@@ -246,7 +246,7 @@ public class TestOMValidatorProcessor {
 
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & Version> void testNotEnoughParametersForPostProcess(Class<?> annotationClass,
+  public <V extends Enum<V> & Versioned> void testNotEnoughParametersForPostProcess(Class<?> annotationClass,
                                                                                   V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(postProcess(), aReqType(), annotationClass, version),
@@ -262,7 +262,7 @@ public class TestOMValidatorProcessor {
 
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & Version> void testTooManyParametersForPostProcess(Class<?> annotationClass,
+  public <V extends Enum<V> & Versioned> void testTooManyParametersForPostProcess(Class<?> annotationClass,
                                                                                 V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(postProcess(), aReqType(), annotationClass, version),
@@ -279,7 +279,7 @@ public class TestOMValidatorProcessor {
 
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & Version> void testWrongReturnValueForPreProcess(Class<?> annotationClass,
+  public <V extends Enum<V> & Versioned> void testWrongReturnValueForPreProcess(Class<?> annotationClass,
                                                                               V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(preProcess(), aReqType(), annotationClass, version),
@@ -294,7 +294,7 @@ public class TestOMValidatorProcessor {
 
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & Version> void testWrongReturnValueForPostProcess(Class<?> annotationClass,
+  public <V extends Enum<V> & Versioned> void testWrongReturnValueForPostProcess(Class<?> annotationClass,
                                                                                V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(postProcess(), aReqType(), annotationClass, version),
@@ -309,7 +309,7 @@ public class TestOMValidatorProcessor {
 
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & Version> void testWrongFirstArgumentForPreProcess(Class<?> annotationClass,
+  public <V extends Enum<V> & Versioned> void testWrongFirstArgumentForPreProcess(Class<?> annotationClass,
                                                                                 V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(preProcess(), aReqType(), annotationClass, version),
@@ -324,7 +324,7 @@ public class TestOMValidatorProcessor {
 
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & Version> void testWrongFirstArgumentForPostProcess(Class<?> annotationClass,
+  public <V extends Enum<V> & Versioned> void testWrongFirstArgumentForPostProcess(Class<?> annotationClass,
                                                                                  V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(postProcess(), aReqType(), annotationClass, version),
@@ -339,7 +339,7 @@ public class TestOMValidatorProcessor {
 
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & Version> void testWrongSecondArgumentForPreProcess(Class<?> annotationClass,
+  public <V extends Enum<V> & Versioned> void testWrongSecondArgumentForPreProcess(Class<?> annotationClass,
                                                                                  V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(preProcess(), aReqType(), annotationClass, version),
@@ -354,7 +354,7 @@ public class TestOMValidatorProcessor {
 
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & Version> void testWrongSecondArgumentForPostProcess(Class<?> annotationClass,
+  public <V extends Enum<V> & Versioned> void testWrongSecondArgumentForPostProcess(Class<?> annotationClass,
                                                                                   V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(postProcess(), aReqType(), annotationClass, version),
@@ -369,7 +369,7 @@ public class TestOMValidatorProcessor {
 
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & Version> void testWrongThirdArgumentForPostProcess(Class<?> annotationClass,
+  public <V extends Enum<V> & Versioned> void testWrongThirdArgumentForPostProcess(Class<?> annotationClass,
                                                                                  V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(postProcess(), aReqType(), annotationClass, version),
@@ -384,7 +384,7 @@ public class TestOMValidatorProcessor {
   
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & Version> void testInvalidProcessingPhase(Class<?> annotationClass,
+  public <V extends Enum<V> & Versioned> void testInvalidProcessingPhase(Class<?> annotationClass,
                                                                        V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf("INVALID", aReqType(), annotationClass, version),
@@ -398,7 +398,7 @@ public class TestOMValidatorProcessor {
 
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & Version> void testInvalidClientVersion(Class<?> annotationClass,
+  public <V extends Enum<V> & Versioned> void testInvalidClientVersion(Class<?> annotationClass,
                                                                      V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(RequestProcessingPhase.PRE_PROCESS, aReqType(), annotationClass, null),
@@ -412,7 +412,7 @@ public class TestOMValidatorProcessor {
 
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & Version> void testMultipleErrorMessages(Class<?> annotationClass,
+  public <V extends Enum<V> & Versioned> void testMultipleErrorMessages(Class<?> annotationClass,
                                                                       V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(postProcess(), aReqType(), annotationClass, version),
@@ -493,12 +493,12 @@ public class TestOMValidatorProcessor {
     return lines;
   }
 
-  private <V extends Enum<V> & Version> String annotationOf(
+  private <V extends Enum<V> & Versioned> String annotationOf(
       RequestProcessingPhase phase, Type reqType, Class<?> annotationClass, V applyBeforeVersion) {
     return annotationOf(phase.name(), reqType, annotationClass, applyBeforeVersion);
   }
 
-  private <V extends Enum<V> & Version> String annotationOf(
+  private <V extends Enum<V> & Versioned> String annotationOf(
       String phase,
       Type reqType,
       Class<?> annotationClass,

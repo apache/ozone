@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.ozone.request.validation;
 
-import org.apache.hadoop.ozone.Version;
+import org.apache.hadoop.ozone.Versioned;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -28,7 +28,7 @@ import java.lang.annotation.Target;
 /**
  * Annotations to register a validator. {@link org.apache.ozone.annotations.RegisterValidatorProcessor}
  * enforces other annotation to have the following methods:
- * applyBefore : Returns an enum which implement {@link Version}
+ * applyBefore : Returns an enum which implement {@link Versioned}
  * requestType: Returns an Enum value.
  * processingPhase: Returns {@link RequestProcessingPhase}
  */
