@@ -113,6 +113,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ResetDeletedBlockRetryCountRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ResetDeletedBlockRetryCountResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetVolumeInfosRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetVolumeInfosResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerListResult;
@@ -731,6 +733,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setGetMetricsResponse(getMetrics(request.getGetMetricsRequest()))
             .build();
+      case GetVolumeFailureInfos:
+        GetVolumeInfosRequestProto getVolumeInfosRequest = request.getGetVolumeInfosRequest();
+        GetVolumeInfosResponseProto getVolumeInfosResponse = getVolumeInfos(getVolumeInfosRequest);
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetVolumeInfosResponse(getVolumeInfosResponse)
+            .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -882,6 +892,26 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     impl.deleteContainer(request.getContainerID());
     return SCMDeleteContainerResponseProto.newBuilder().build();
 
+  }
+
+  /**
+   *
+   * @param request
+   * @return
+   * @throws IOException
+   */
+  public GetVolumeInfosResponseProto getVolumeInfos(
+      GetVolumeInfosRequestProto request) throws IOException {
+
+    // Prepare parameters
+    String uuid = request.getUuid();
+    String hostName = request.getHostName();
+    String displayMode = request.getDisplayMode();
+    int currentPage = request.getCurrentPage();
+    int pageSize = request.getPageSize();
+
+    // Invoke method and return result
+    return impl.getVolumeInfos(displayMode, uuid, hostName, pageSize, currentPage);
   }
 
   public NodeQueryResponseProto queryNode(
