@@ -33,9 +33,8 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import org.apache.hadoop.hdds.cli.AdminSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.OzoneAdmin;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
@@ -56,9 +55,9 @@ import picocli.CommandLine;
     description = "Print a tree of the network topology as reported by SCM",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-@MetaInfServices(SubcommandWithParent.class)
+@MetaInfServices(AdminSubcommand.class)
 public class TopologySubcommand extends ScmSubcommand
-    implements SubcommandWithParent {
+    implements AdminSubcommand {
 
   private static final List<HddsProtos.NodeState> STATES = new ArrayList<>();
 
@@ -135,11 +134,6 @@ public class TopologySubcommand extends ScmSubcommand
         }
       }
     }
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return OzoneAdmin.class;
   }
 
   // Format

@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import jakarta.annotation.Nonnull;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -481,7 +482,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
 
         System.out.println(
             "  subdir acls : " + omDirInfo + " ==> " + omDirAcls);
-        assertEquals(expectedInheritAcls, omDirAcls,
+        assertTrue(omDirAcls.containsAll(expectedInheritAcls),
             "Failed to inherit parent DEFAULT acls!");
 
         parentID = omDirInfo.getObjectID();
@@ -513,9 +514,9 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
 
       // Should inherit parent DEFAULT acls
       // [user:newUser:rw[ACCESS], group:newGroup:rwl[ACCESS]]
-      assertEquals(parentDefaultAcl.stream()
+      assertTrue(keyAcls.containsAll(parentDefaultAcl.stream()
               .map(acl -> acl.withScope(OzoneAcl.AclScope.ACCESS))
-              .collect(Collectors.toList()), keyAcls,
+              .collect(Collectors.toList())),
           "Failed to inherit bucket DEFAULT acls!");
       // Should not inherit parent ACCESS acls
       assertThat(keyAcls).doesNotContain(parentAccessAcl);
@@ -529,7 +530,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
       ".snapshot/a/b/keyName,Cannot create key under path reserved for snapshot: .snapshot/",
       ".snapshot,Cannot create key with reserved name: .snapshot"})
   public void testPreExecuteWithInvalidKeyPrefix(String invalidKeyName,
-                                                 String expectedErrorMessage) {
+                                                 String expectedErrorMessage) throws IOException {
 
     OMRequest omRequest = createFileRequest(volumeName, bucketName,
         invalidKeyName, HddsProtos.ReplicationFactor.ONE,
@@ -644,8 +645,10 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
    * @return OMFileCreateRequest reference
    */
   @Nonnull
-  protected OMFileCreateRequest getOMFileCreateRequest(OMRequest omRequest) {
-    return new OMFileCreateRequest(omRequest, getBucketLayout());
+  protected OMFileCreateRequest getOMFileCreateRequest(OMRequest omRequest) throws IOException {
+    OMFileCreateRequest request = new OMFileCreateRequest(omRequest, getBucketLayout());
+    request.setUGI(UserGroupInformation.getCurrentUser());
+    return request;
   }
 
 }

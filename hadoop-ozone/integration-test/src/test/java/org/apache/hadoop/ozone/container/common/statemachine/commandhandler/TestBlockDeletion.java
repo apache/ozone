@@ -50,7 +50,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
-import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -132,7 +131,6 @@ public class TestBlockDeletion {
     conf = new OzoneConfiguration();
     GenericTestUtils.setLogLevel(DeletedBlockLogImpl.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(SCMBlockDeletingService.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(LegacyReplicationManager.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(ReplicationManager.LOG, Level.DEBUG);
 
     conf.set("ozone.replication.allowed-configs",
@@ -317,6 +315,9 @@ public class TestBlockDeletion {
 
     assertEquals(metrics.getNumBlockDeletionTransactionCreated(),
         metrics.getNumBlockDeletionTransactionCompleted());
+    assertEquals(metrics.getNumBlockDeletionCommandSent(), metrics.getNumCommandsDatanodeSent());
+    assertEquals(metrics.getNumBlockDeletionCommandSuccess(), metrics.getNumCommandsDatanodeSuccess());
+    assertEquals(metrics.getBNumBlockDeletionCommandFailure(), metrics.getNumCommandsDatanodeFailed());
     assertThat(metrics.getNumBlockDeletionCommandSent())
         .isGreaterThanOrEqualTo(metrics.getNumBlockDeletionCommandSuccess() +
             metrics.getBNumBlockDeletionCommandFailure());
@@ -340,7 +341,6 @@ public class TestBlockDeletion {
   @Test
   public void testContainerStatisticsAfterDelete() throws Exception {
     ReplicationManager replicationManager = scm.getReplicationManager();
-    boolean legacyEnabled = replicationManager.getConfig().isLegacyEnabled();
 
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -403,16 +403,13 @@ public class TestBlockDeletion {
     containerInfos.stream().forEach(container ->
         assertEquals(HddsProtos.LifeCycleState.DELETING,
             container.getState()));
-    LogCapturer logCapturer = LogCapturer.captureLogs(
-        legacyEnabled ? LegacyReplicationManager.LOG  : ReplicationManager.LOG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(ReplicationManager.LOG);
     logCapturer.clearOutput();
 
     Thread.sleep(5000);
     replicationManager.processAll();
     ((EventQueue) scm.getEventQueue()).processAll(1000);
-    String expectedOutput = legacyEnabled
-        ? "Resend delete Container"
-        : "Sending delete command for container";
+    String expectedOutput = "Sending delete command for container";
     GenericTestUtils.waitFor(() -> logCapturer.getOutput()
         .contains(expectedOutput), 500, 5000);
 
