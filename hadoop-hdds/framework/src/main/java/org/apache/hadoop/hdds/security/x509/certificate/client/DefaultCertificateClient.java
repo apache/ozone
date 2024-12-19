@@ -739,7 +739,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * Default handling of each {@link InitCase}.
    */
   protected InitResponse handleCase(InitCase init)
-      throws CertificateException {
+      throws IOException {
     switch (init) {
     case NONE:
       getLogger().info("Creating keypair for client as keypair and " +
@@ -926,8 +926,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   /**
    * Bootstrap the client by creating keypair and storing it in configured
    * location.
-   * */
-  protected void bootstrapClientKeys() throws CertificateException {
+   */
+  protected void bootstrapClientKeys() throws IOException {
     Path keyPath = securityConfig.getKeyLocation(component);
     if (Files.notExists(keyPath)) {
       try {
@@ -937,7 +937,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
             "for certificate storage.", BOOTSTRAP_ERROR);
       }
     }
-    KeyPair keyPair = createKeyPair(null);
+    KeyPair keyPair = createKeyPair(keyStorage());
     privateKey = keyPair.getPrivate();
     publicKey = keyPair.getPublic();
   }

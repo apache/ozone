@@ -78,10 +78,6 @@ public class OzoneSecretKey {
     return publicKey.getEncoded();
   }
 
-  public void setExpiryDate(long expiryDate) {
-    this.expiryDate = expiryDate;
-  }
-
   @Override
   public int hashCode() {
     HashCodeBuilder hashCodeBuilder = new HashCodeBuilder(537, 963);
