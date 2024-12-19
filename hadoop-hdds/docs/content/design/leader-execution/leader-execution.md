@@ -24,6 +24,16 @@ Currently, the Object ID is tied to Ratis transaction metadata. This has multipl
 
 Longer term, we should move to a UUID based object ID generation. This will allow us to generate object IDs that are globally unique. In the mean time, we are moving to a persistent counter based object ID generation. The counter is persisted during apply transaction and is incremented for each new object created.
 
+## Prototype Performance Result:
+
+| sno | item                                     | old flow result               | leader execution result |
+|-----|------------------------------------------|-------------------------------|------------------------|
+| 1   | Operation / Second (key create / commit) | 12k+                          | 40k+                   |
+| 2   | Key Commit / Second                      | 5.9k+                         | 20k+ (3.3 times)       |
+| 3   | CPU Utilization Leader | 16% (unable to increase load) | 33%                    |
+| 4   | CPU Utilization Follower | 6% above                      | 4% below               |
+
+Refer [performance prototype result](performance-prototype-result.pdf)
 
 # Leader execution
 
@@ -37,10 +47,10 @@ Gatekeeper act as entry point for request execution. Its function is:
 1. orchestrate the execution flow
 2. granular locking
 3. execution of request
-4. validate om state
+4. validate om state like upgrade
 5. update metrics and return response
 6. handle client replay of request
-7. leader side index generation
+7. managed index generation (remove dependency with ratis index for objectId)
 
 ### Executor
 This prepares context for execution, process the request, communicate to all nodes for db changes via ratis and clearing up any cache.
@@ -49,24 +59,26 @@ This prepares context for execution, process the request, communicate to all nod
 All request as executed parallel are batched and send as single request to other nodes. This helps improve performance over network with batching.
 
 ### Apply Transaction (via ratis at all nodes)
-With new flow, all nodes during ratis apply transaction will just only update the DB for changes. There will be few specific action like snapshot creation of db, upgrade handling which will be done at node.
-As change, there will not be any double buffer and all changes will be flushed to db immediately.
+With new flow as change,
+- all nodes during ratis apply transaction will just only update the DB for changes.
+- there will not be any double buffer and all changes will be flushed to db immediately.
+- there will be few specific action like snapshot creation of db, upgrade handling which will be done at node. 
 
-## Design consideration
+## Description
 
 ### Index generation
 refer [index generation and usages](index-generation-usages.md)
 
-### Keep No-Cache for write operation
+### No-Cache for write operation
 
 In old flow, a key creation / updation is added to PartialTableCache, and cleanup happens when DoubleBuffer flushes DB changes.
 Since DB changes is done in batches, so a cache is maintained till flush of DB is completed. Cache is maintained so that OM can serve further request till flush is completed.
 
-This adds complexity during read for the keys, as it needs ensure to have latest data from cache or DB.
+This adds complexity during read for the keys, as it needs ensure to have the latest data from cache or DB.
 Since there can be parallel operation of adding keys to cache, removal from cache and flush to db, this induces bug to the code if this is not handled properly.
 
 For new flow, partial table cache is removed, and changes are visible as soon as changes are flushed to db.
-For this,
+For this to achieve,
 - granular locking for key operation to avoid parallel update till the existing operation completes. This avoids need of cache as data is available only after changes are persisted.
 - Double buffer operation removal for the flow, flush is done immediately before response is returned. This is no more needed as no need to serve next request as current reply is not done.
 - Bucket resource is handled in such a way that its visible only after db changes are flushed. This is required as quota is shared between different keys operating parallel.
@@ -74,26 +86,7 @@ Note: For incremental changes, quota count will be available immediately for rea
 
 ### Quota handling
 
-Earlier, bucket level lock is taken, quota validation is performed and updated with-in lock in cache in all nodes.
-During startup before persistence to db, request is re-executed from ratis log and bucket quota cache is prepared again.
-So once bucket quota is updated in cache, it will remain same (As recovered during startup with same re-execution).
-
-Now request is getting executed at leader node, so bucket case will not be able to recover if crash happens. So it can be updated in BucketTable cache only after its persisted.
-
-For bucket quota in new flow,
-- When processing key commit, the quota will be `reserved` at leader.
-- Bucket quota changes will be distributed to all other nodes via ratis
-- At all nodes, key changes is flushed to DB, during that time, quota change will be updated to BucketTable, and quota reserve will be reset.
-- On failure, reserve quota for the request will be reset.
-
-
-### Execution persist and distribution
-
-refer [request-process-distribution](request-persist-distribution.md)
-
-### Replay of client request handling
-
-refer [request-replay-handling](request-replay.md)
+refer [bucket quota](bucket-reserve-quota.md)
 
 ### Granular locking
 Gateway: Perform lock as per below strategy for OBS/FSO
@@ -153,6 +146,13 @@ OBS:
 - [Create key](request/obs-create-key.md)
 - [Commit key](request/obs-commit-key.md)
 
+### Execution persist and distribution
+
+refer [request-process-distribution](request-persist-distribution.md)
+
+### Replay of client request handling
+
+refer [request-replay-handling](request-replay.md)
 
 ### Testability framework
 
@@ -201,14 +201,3 @@ And old flow can be removed with achieving quality, performance and compatibilit
    - Certain metrics may not be valid
    - New metrics needs to be added
    - Metrics will be updated at leader side now like for key create. At follower node, its just db update, so value will not be udpated.
-
-## Prototype Performance Result:
-
-| sno | item                                     | old flow result               | leader execution result |
-|-----|------------------------------------------|-------------------------------|------------------------|
-| 1   | Operation / Second (key create / commit) | 12k+                          | 40k+                   |
-| 2   | Key Commit / Second                      | 5.9k+                         | 20k+ (3.3 times)       |
-| 3   | CPU Utilization Leader | 16% (unable to increase load) | 33%                    |
-| 4   | CPU Utilization Follower | 6% above                      | 4% below               |
-
-Refer [performance prototype result](performance-prototype-result.pdf)
