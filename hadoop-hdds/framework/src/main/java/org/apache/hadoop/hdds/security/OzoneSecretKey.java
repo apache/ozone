@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.security;
 
 import com.google.common.base.Preconditions;
+
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -24,8 +25,6 @@ import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.security.x509.keys.SecurityUtil;
 
 /**
  * Wrapper class for Ozone/Hdds secret keys. Used in delegation tokens and block
@@ -39,7 +38,6 @@ public class OzoneSecretKey {
   private long expiryDate;
   private PrivateKey privateKey;
   private PublicKey publicKey;
-  private SecurityConfig securityConfig;
   private String certSerialId;
 
   public OzoneSecretKey(int keyId, long expiryDate, KeyPair keyPair,
@@ -50,21 +48,6 @@ public class OzoneSecretKey {
     this.privateKey = keyPair.getPrivate();
     this.publicKey = keyPair.getPublic();
     this.certSerialId = certificateSerialId;
-  }
-
-  /*
-   * Create new instance using default signature algorithm and provider.
-   * */
-  public OzoneSecretKey(int keyId, long expiryDate, byte[] pvtKey,
-      byte[] publicKey) {
-    Preconditions.checkNotNull(pvtKey);
-    Preconditions.checkNotNull(publicKey);
-
-    this.securityConfig = new SecurityConfig(new OzoneConfiguration());
-    this.keyId = keyId;
-    this.expiryDate = expiryDate;
-    this.privateKey = SecurityUtil.getPrivateKey(pvtKey, securityConfig);
-    this.publicKey = SecurityUtil.getPublicKey(publicKey, securityConfig);
   }
 
   public int getKeyId() {
