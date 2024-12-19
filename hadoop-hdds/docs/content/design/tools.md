@@ -1,4 +1,24 @@
-# Improved Usability of Ozone Tools
+---
+title: Improved Layout of Ozone Tools
+summary: Proposal for an improved layout of Ozone tools CLI
+date: 2024-12-18
+author: Ethan Rose
+---
+<!--
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License. See accompanying LICENSE file.
+-->
+
+# Improved Layout of Ozone Tools
 
 The `ozone-tools` module currently contains utilites that can be used to troubleshoot and fix low level issues in an Ozone cluster through the `ozone debug` and `ozone repair` subcommands. These tools have traditionally been updated in an ad-hoc fashion and not well documented. As we continue to add more tools and their complexity increases, we should standardize the layout and function of these tools to make sure they are safe and easy to use.
 
