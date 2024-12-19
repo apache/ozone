@@ -51,7 +51,7 @@ public class InterSCMGrpcService extends
   private final Table<String, TransactionInfo> transactionInfoTable;
 
   InterSCMGrpcService(final StorageContainerManager scm) throws IOException {
-    Objects.requireNonNull(scm, "scm");
+    Objects.requireNonNull(scm, "scm == null");
     this.scm = scm;
     this.transactionInfoTable = HAUtils.getTransactionInfoTable(
         scm.getScmMetadataStore().getStore(), SCMDBDefinition.get());
@@ -65,7 +65,7 @@ public class InterSCMGrpcService extends
       scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
       TransactionInfo transactionInfo =
           transactionInfoTable.get(TRANSACTION_INFO_KEY);
-      Objects.requireNonNull(transactionInfo, "transactionInfo");
+      Objects.requireNonNull(transactionInfo, "transactionInfo == null");
       SCMGrpcOutputStream outputStream =
           new SCMGrpcOutputStream(responseObserver, scm.getClusterId(),
               BUFFER_SIZE);

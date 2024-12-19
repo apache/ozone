@@ -115,7 +115,7 @@ public final class MetricsAsserts {
     private final String expected;
 
     InfoWithSameName(MetricsInfo info) {
-      expected = Objects.requireNonNull(info.name(), "info name");
+      expected = Objects.requireNonNull(info.name(), "info#name == null");
     }
 
     @Override
