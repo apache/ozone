@@ -54,8 +54,16 @@ public class FSORepairCLI implements Callable<Void> {
       description = "Verbose output. Show all intermediate steps and deleted keys info.")
   private boolean verbose;
 
+  @CommandLine.Option(names = {"--force"},
+      description = "Use --force flag only in false-positive cases."
+  )
+  private boolean force;
+
   @Override
   public Void call() throws Exception {
+    if (checkIfOMIsRunning()) {
+      return null;
+    }
     if (repair) {
       System.out.println("FSO Repair Tool is running in repair mode");
     } else {
@@ -74,5 +82,21 @@ public class FSORepairCLI implements Callable<Void> {
     }
 
     return null;
+  }
+
+  private boolean checkIfOMIsRunning() {
+    String runningServices = System.getenv("OZONE_RUNNING_SERVICES");
+    if (runningServices != null && runningServices.contains("om")) {
+      if (!force) {
+        System.err.println("Error: OM is currently running on this host. " +
+                "Stop the OM service before running the repair tool.");
+        return true;
+      } else {
+        System.out.println("Warning: --force flag used. Proceeding despite OM being detected as running.");
+      }
+    } else {
+      System.out.println("No running OM service detected. Proceeding with repair.");
+    }
+    return false;
   }
 }
