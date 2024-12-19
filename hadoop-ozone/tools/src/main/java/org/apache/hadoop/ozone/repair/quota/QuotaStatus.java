@@ -64,8 +64,4 @@ public class QuotaStatus implements Callable<Void>  {
     System.out.println(ozoneManagerClient.getQuotaRepairStatus());
     return null;
   }
-
-  protected QuotaRepair getParent() {
-    return parent;
-  }
 }

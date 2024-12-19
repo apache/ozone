@@ -26,4 +26,6 @@ public interface GenericParentCommand {
   boolean isVerbose();
 
   OzoneConfiguration createOzoneConfiguration();
+
+  OzoneConfiguration getOzoneConf();
 }
