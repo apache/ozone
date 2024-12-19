@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -144,18 +143,6 @@ public class ContainerBalancerSelectionCriteria {
   }
 
   /**
-   * Checks whether a Container has the ReplicationType
-   * {@link HddsProtos.ReplicationType#EC} and the Legacy Replication Manger is enabled.
-   * @param container container to check
-   * @return true if the ReplicationType is EC and "hdds.scm.replication
-   * .enable.legacy" is true, else false
-   */
-  private boolean isECContainerAndLegacyRMEnabled(ContainerInfo container) {
-    return container.getReplicationType().equals(HddsProtos.ReplicationType.EC)
-        && replicationManager.getConfig().isLegacyEnabled();
-  }
-
-  /**
    * Gets containers that are suitable for moving based on the following
    * required criteria:
    * 1. Container must not be undergoing replication.
@@ -163,7 +150,6 @@ public class ContainerBalancerSelectionCriteria {
    * 3. Container size should be closer to 5GB.
    * 4. Container must not be in the configured exclude containers list.
    * 5. Container should be closed.
-   * 6. If the {@link LegacyReplicationManager} is enabled, then the container should not be an EC container.
    * @param node DatanodeDetails for which to find candidate containers.
    * @return true if the container should be excluded, else false
    */
@@ -179,7 +165,7 @@ public class ContainerBalancerSelectionCriteria {
     }
     return excludeContainers.contains(containerID) || excludeContainersDueToFailure.contains(containerID) ||
         containerToSourceMap.containsKey(containerID) ||
-        !isContainerClosed(container, node) || isECContainerAndLegacyRMEnabled(container) ||
+        !isContainerClosed(container, node) ||
         isContainerReplicatingOrDeleting(containerID) ||
         !findSourceStrategy.canSizeLeaveSource(node, container.getUsedBytes())
         || breaksMaxSizeToMoveLimit(container.containerID(),

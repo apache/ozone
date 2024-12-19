@@ -223,7 +223,7 @@ public class TestOzoneShellHA {
   @BeforeEach
   public void setup() throws UnsupportedEncodingException {
     ozoneShell = new OzoneShell();
-    ozoneAdminShell = new OzoneAdmin(ozoneConfiguration);
+    ozoneAdminShell = new OzoneAdmin();
     System.setOut(new PrintStream(out, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(err, false, DEFAULT_ENCODING));
   }

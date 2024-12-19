@@ -15,8 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:compat
-
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 basename=$(basename ${COMPOSE_DIR})
@@ -98,6 +96,14 @@ test_cross_compatibility() {
 
   for client_version in "$@"; do
     for data_version in $(echo "$client_version" "$cluster_version" "$current_version" | xargs -n1 | sort -u); do
+
+      # do not test old-only scenario
+      if [[ "${cluster_version}" != "${current_version}" ]] \
+        && [[ "${client_version}" != "${current_version}" ]] \
+        && [[ "${data_version}" != "${current_version}" ]]; then
+        continue
+      fi
+
       client _read ${data_version}
     done
   done
@@ -106,12 +112,3 @@ test_cross_compatibility() {
 }
 
 create_results_dir
-
-# current cluster with various clients
-COMPOSE_FILE=new-cluster.yaml:clients.yaml cluster_version=${current_version} test_cross_compatibility ${old_versions} ${current_version}
-
-# old cluster with clients: same version and current version
-for cluster_version in ${old_versions}; do
-  export OZONE_VERSION=${cluster_version}
-  COMPOSE_FILE=old-cluster.yaml:clients.yaml test_cross_compatibility ${cluster_version} ${current_version}
-done

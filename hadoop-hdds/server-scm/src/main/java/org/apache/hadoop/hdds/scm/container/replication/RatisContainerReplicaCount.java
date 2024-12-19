@@ -223,11 +223,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
 
   /**
    * The new replication manager now does not consider replicas with
-   * UNHEALTHY state when counting sufficient replication. This method is
-   * overridden to ensure LegacyReplicationManager works as intended in
-   * HDDS-6447.
-   * See {@link LegacyRatisContainerReplicaCount}, which overrides this
-   * method, for details.
+   * UNHEALTHY state when counting sufficient replication.
    */
   protected int healthyReplicaCountAdapter() {
     return 0;

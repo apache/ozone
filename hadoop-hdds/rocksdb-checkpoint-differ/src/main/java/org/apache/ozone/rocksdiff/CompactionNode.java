@@ -17,6 +17,8 @@
  */
 package org.apache.ozone.rocksdiff;
 
+import org.apache.ozone.compaction.log.CompactionFileInfo;
+
 /**
  * Node in the compaction DAG that represents an SST file.
  */
@@ -46,6 +48,11 @@ public class CompactionNode {
     this.startKey = startKey;
     this.endKey = endKey;
     this.columnFamily = columnFamily;
+  }
+
+  public CompactionNode(CompactionFileInfo compactionFileInfo) {
+    this(compactionFileInfo.getFileName(), -1, -1, compactionFileInfo.getStartKey(),
+        compactionFileInfo.getEndKey(), compactionFileInfo.getColumnFamily());
   }
 
   @Override

@@ -69,6 +69,7 @@ import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.TimeDuration;
 import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -82,6 +83,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -92,7 +94,6 @@ import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -411,7 +412,7 @@ public class TestSnapshotDiffManager {
   }
 
   @ParameterizedTest
-  @ValueSource(ints = {1, 2, 5, 10, 100, 1000, 10000})
+  @ValueSource(ints = {0, 1, 2, 5, 10, 100, 1000, 10000})
   public void testGetDeltaFilesWithDag(int numberOfFiles) throws IOException {
     UUID snap1 = UUID.randomUUID();
     UUID snap2 = UUID.randomUUID();
@@ -429,7 +430,7 @@ public class TestSnapshotDiffManager {
         any(DifferSnapshotInfo.class),
         any(DifferSnapshotInfo.class),
         eq(diffDir))
-    ).thenReturn(Lists.newArrayList(randomStrings));
+    ).thenReturn(Optional.of(Lists.newArrayList(randomStrings)));
 
     ReferenceCounted<OmSnapshot> rcFromSnapshot =
         omSnapshotManager.getActiveSnapshot(VOLUME_NAME, BUCKET_NAME, snap1.toString());
@@ -441,14 +442,20 @@ public class TestSnapshotDiffManager {
     SnapshotInfo fromSnapshotInfo = getMockedSnapshotInfo(snap1);
     SnapshotInfo toSnapshotInfo = getMockedSnapshotInfo(snap2);
     when(jobTableIterator.isValid()).thenReturn(false);
-    Set<String> deltaFiles = snapshotDiffManager.getDeltaFiles(
-        fromSnapshot,
-        toSnapshot,
-        Arrays.asList("cf1", "cf2"), fromSnapshotInfo,
-        toSnapshotInfo, false,
-        Collections.emptyMap(), diffDir);
-    assertEquals(randomStrings, deltaFiles);
-
+    try (MockedStatic<RdbUtil> mockedRdbUtil = Mockito.mockStatic(RdbUtil.class, Mockito.CALLS_REAL_METHODS);
+         MockedStatic<RocksDiffUtils> mockedRocksDiffUtils = Mockito.mockStatic(RocksDiffUtils.class,
+             Mockito.CALLS_REAL_METHODS)) {
+      mockedRdbUtil.when(() -> RdbUtil.getSSTFilesForComparison(any(), any()))
+          .thenReturn(Collections.singleton(RandomStringUtils.randomAlphabetic(10)));
+      mockedRocksDiffUtils.when(() -> RocksDiffUtils.filterRelevantSstFiles(any(), any())).thenAnswer(i -> null);
+      Set<String> deltaFiles = snapshotDiffManager.getDeltaFiles(
+          fromSnapshot,
+          toSnapshot,
+          Arrays.asList("cf1", "cf2"), fromSnapshotInfo,
+          toSnapshotInfo, false,
+          Collections.emptyMap(), diffDir);
+      assertEquals(randomStrings, deltaFiles);
+    }
     rcFromSnapshot.close();
     rcToSnapshot.close();
   }
@@ -476,7 +483,8 @@ public class TestSnapshotDiffManager {
           });
 
       mockedRocksDiffUtils.when(() ->
-              RocksDiffUtils.filterRelevantSstFiles(anySet(), anyMap()))
+              RocksDiffUtils.filterRelevantSstFiles(anySet(), anyMap(), anyMap(), any(ManagedRocksDB.class),
+                  any(ManagedRocksDB.class)))
           .thenAnswer((Answer<Void>) invocationOnMock -> {
             invocationOnMock.getArgument(0, Set.class).stream()
                 .findAny().ifPresent(val -> {
@@ -497,7 +505,7 @@ public class TestSnapshotDiffManager {
             any(DifferSnapshotInfo.class),
             any(DifferSnapshotInfo.class),
             anyString()))
-            .thenReturn(Collections.emptyList());
+            .thenReturn(Optional.ofNullable(Collections.emptyList()));
       }
 
       ReferenceCounted<OmSnapshot> rcFromSnapshot =
@@ -543,7 +551,8 @@ public class TestSnapshotDiffManager {
           });
 
       mockedRocksDiffUtils.when(() ->
-              RocksDiffUtils.filterRelevantSstFiles(anySet(), anyMap()))
+              RocksDiffUtils.filterRelevantSstFiles(anySet(), anyMap(), anyMap(), any(ManagedRocksDB.class),
+                  any(ManagedRocksDB.class)))
           .thenAnswer((Answer<Void>) invocationOnMock -> {
             invocationOnMock.getArgument(0, Set.class).stream()
                 .findAny().ifPresent(val -> {
@@ -560,7 +569,7 @@ public class TestSnapshotDiffManager {
       when(snapshotInfoTable.get(SnapshotInfo.getTableKey(VOLUME_NAME, BUCKET_NAME, snap2.toString())))
           .thenReturn(getSnapshotInfoInstance(VOLUME_NAME, BUCKET_NAME, snap2.toString(), snap2));
 
-      doThrow(new FileNotFoundException("File not found exception."))
+      doThrow(new RuntimeException("File not found exception."))
           .when(differ)
           .getSSTDiffListWithFullPath(
               any(DifferSnapshotInfo.class),
@@ -1509,6 +1518,27 @@ public class TestSnapshotDiffManager {
 
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     when(bucketInfoTable.get(bucketKey)).thenReturn(bucketInfo);
+  }
+
+  @Test
+  public void testGetDeltaFilesWithFullDiff() throws IOException {
+    SnapshotDiffManager spy = spy(snapshotDiffManager);
+    OmSnapshot fromSnapshot = getMockedOmSnapshot(UUID.randomUUID());
+    OmSnapshot toSnapshot = getMockedOmSnapshot(UUID.randomUUID());
+    Mockito.doAnswer(invocation -> {
+      OmSnapshot snapshot = invocation.getArgument(0);
+      if (snapshot == fromSnapshot) {
+        return Sets.newHashSet("1", "2", "3");
+      }
+      if (snapshot == toSnapshot) {
+        return Sets.newHashSet("3", "4", "5");
+      }
+      return Sets.newHashSet("6", "7", "8");
+    }).when(spy).getSSTFileListForSnapshot(Mockito.any(OmSnapshot.class),
+        Mockito.anyList());
+    Set<String> deltaFiles = spy.getDeltaFiles(fromSnapshot, toSnapshot, Collections.emptyList(), snapshotInfo,
+        snapshotInfo, true, Collections.emptyMap(), null);
+    Assertions.assertEquals(Sets.newHashSet("1", "2", "3", "4", "5"), deltaFiles);
   }
 
   @Test

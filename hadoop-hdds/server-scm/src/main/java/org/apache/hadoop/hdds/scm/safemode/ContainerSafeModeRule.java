@@ -69,6 +69,12 @@ public class ContainerSafeModeRule extends
   private final ContainerManager containerManager;
 
   public ContainerSafeModeRule(String ruleName, EventQueue eventQueue,
+                               ConfigurationSource conf,
+                               ContainerManager containerManager, SCMSafeModeManager manager) {
+    this(ruleName, eventQueue, conf, containerManager.getContainers(), containerManager, manager);
+  }
+
+  public ContainerSafeModeRule(String ruleName, EventQueue eventQueue,
              ConfigurationSource conf,
              List<ContainerInfo> containers,
              ContainerManager containerManager, SCMSafeModeManager manager) {

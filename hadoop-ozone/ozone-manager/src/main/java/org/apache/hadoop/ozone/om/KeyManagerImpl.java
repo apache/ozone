@@ -153,6 +153,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DIRECTORY_S
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION_DEFAULT;
 import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
@@ -257,8 +259,16 @@ public class KeyManagerImpl implements KeyManager {
           OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
           OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT,
           TimeUnit.MILLISECONDS);
-      dirDeletingService = new DirectoryDeletingService(dirDeleteInterval,
-          TimeUnit.MILLISECONDS, serviceTimeout, ozoneManager, configuration);
+      int dirDeletingServiceCorePoolSize =
+          configuration.getInt(OZONE_THREAD_NUMBER_DIR_DELETION,
+              OZONE_THREAD_NUMBER_DIR_DELETION_DEFAULT);
+      if (dirDeletingServiceCorePoolSize <= 0) {
+        dirDeletingServiceCorePoolSize = 1;
+      }
+      dirDeletingService =
+          new DirectoryDeletingService(dirDeleteInterval, TimeUnit.MILLISECONDS,
+              serviceTimeout, ozoneManager, configuration,
+              dirDeletingServiceCorePoolSize);
       dirDeletingService.start();
     }
 
@@ -2052,7 +2062,7 @@ public class KeyManagerImpl implements KeyManager {
         parentInfo.getObjectID(), "");
     long countEntries = 0;
 
-    Table dirTable = metadataManager.getDirectoryTable();
+    Table<String, OmDirectoryInfo> dirTable = metadataManager.getDirectoryTable();
     try (TableIterator<String,
         ? extends Table.KeyValue<String, OmDirectoryInfo>>
         iterator = dirTable.iterator()) {

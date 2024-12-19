@@ -68,7 +68,7 @@ public interface ContainerReplicaCount {
         || containerState == HddsProtos.LifeCycleState.QUASI_CLOSED)
         && getReplicas().stream()
         .filter(r -> r.getDatanodeDetails().getPersistedOpState() == IN_SERVICE)
-        .allMatch(r -> LegacyReplicationManager.compareState(
+        .allMatch(r -> ReplicationManager.compareState(
             containerState, r.getState()));
 
   }

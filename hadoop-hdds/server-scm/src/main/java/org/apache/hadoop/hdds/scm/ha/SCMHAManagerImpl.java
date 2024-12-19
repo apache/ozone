@@ -463,8 +463,6 @@ public class SCMHAManagerImpl implements SCMHAManager {
     scm.getContainerManager().reinitialize(metadataStore.getContainerTable());
     scm.getScmBlockManager().getDeletedBlockLog().reinitialize(
         metadataStore.getDeletedBlocksTXTable());
-    scm.getReplicationManager().getMoveScheduler()
-        .reinitialize(metadataStore.getMoveTable());
     scm.getStatefulServiceStateManager().reinitialize(
         metadataStore.getStatefulServiceConfigTable());
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {

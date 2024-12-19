@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -72,6 +73,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
@@ -314,6 +316,29 @@ class TestOmSnapshotManager {
         getINode(f1FileLink.toPath()), "link matches original file");
   }
 
+
+  @Test
+  public void testGetSnapshotInfo() throws IOException {
+    SnapshotInfo s1 = createSnapshotInfo("vol", "buck");
+    UUID latestGlobalSnapId =
+        ((OmMetadataManagerImpl) om.getMetadataManager()).getSnapshotChainManager()
+            .getLatestGlobalSnapshotId();
+    UUID latestPathSnapId =
+        ((OmMetadataManagerImpl) om.getMetadataManager()).getSnapshotChainManager()
+            .getLatestPathSnapshotId(String.join("/", "vol", "buck"));
+    s1.setPathPreviousSnapshotId(latestPathSnapId);
+    s1.setGlobalPreviousSnapshotId(latestGlobalSnapId);
+    ((OmMetadataManagerImpl) om.getMetadataManager()).getSnapshotChainManager()
+        .addSnapshot(s1);
+    OMException ome = assertThrows(OMException.class,
+        () -> om.getOmSnapshotManager().getSnapshot(s1.getSnapshotId()));
+    assertEquals(OMException.ResultCodes.FILE_NOT_FOUND, ome.getResult());
+    // not present in snapshot chain too
+    SnapshotInfo s2 = createSnapshotInfo("vol", "buck");
+    ome = assertThrows(OMException.class,
+        () -> om.getOmSnapshotManager().getSnapshot(s2.getSnapshotId()));
+    assertEquals(OMException.ResultCodes.FILE_NOT_FOUND, ome.getResult());
+  }
   /*
    * Test that exclude list is generated correctly.
    */

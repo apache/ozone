@@ -17,11 +17,7 @@
  */
 package org.apache.hadoop.hdds.cli;
 
-import com.google.common.annotations.VisibleForTesting;
-import java.io.IOException;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.security.UserGroupInformation;
 
 import picocli.CommandLine;
 
@@ -35,38 +31,6 @@ import picocli.CommandLine;
     mixinStandardHelpOptions = true)
 public class OzoneAdmin extends GenericCli implements ExtensibleParentCommand {
 
-  private OzoneConfiguration ozoneConf;
-
-  private UserGroupInformation user;
-
-  public OzoneAdmin() {
-    super();
-  }
-
-  @VisibleForTesting
-  public OzoneAdmin(OzoneConfiguration conf) {
-    ozoneConf = conf;
-  }
-
-  public OzoneConfiguration getOzoneConf() {
-    if (ozoneConf == null) {
-      ozoneConf = createOzoneConfiguration();
-    }
-    return ozoneConf;
-  }
-
-  public UserGroupInformation getUser() throws IOException {
-    if (user == null) {
-      user = UserGroupInformation.getCurrentUser();
-    }
-    return user;
-  }
-
-  /**
-   * Main for the Ozone Admin shell Command handling.
-   *
-   * @param argv - System Args Strings[]
-   */
   public static void main(String[] argv) {
     new OzoneAdmin().run(argv);
   }

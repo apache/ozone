@@ -53,7 +53,7 @@ public class InfoBucketHandler extends BucketHandler {
    */
   public static class LinkBucket {
     private String volumeName;
-    private String bucketName;
+    private String name;
     private String sourceVolume;
     private String sourceBucket;
     private Instant creationTime;
@@ -63,7 +63,7 @@ public class InfoBucketHandler extends BucketHandler {
 
     LinkBucket(OzoneBucket ozoneBucket) {
       this.volumeName = ozoneBucket.getVolumeName();
-      this.bucketName = ozoneBucket.getName();
+      this.name = ozoneBucket.getName();
       this.sourceVolume = ozoneBucket.getSourceVolume();
       this.sourceBucket = ozoneBucket.getSourceBucket();
       this.creationTime = ozoneBucket.getCreationTime();
@@ -76,8 +76,8 @@ public class InfoBucketHandler extends BucketHandler {
       return volumeName;
     }
 
-    public String getBucketName() {
-      return bucketName;
+    public String getName() {
+      return name;
     }
 
     public String getSourceVolume() {

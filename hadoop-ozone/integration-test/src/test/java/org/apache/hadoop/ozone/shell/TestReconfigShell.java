@@ -67,7 +67,8 @@ public class TestReconfigShell {
    */
   @BeforeAll
   public static void setup() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
+    ozoneAdmin = new OzoneAdmin();
+    OzoneConfiguration conf = ozoneAdmin.getOzoneConf();
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     String omServiceId = UUID.randomUUID().toString();
     cluster = MiniOzoneCluster.newHABuilder(conf)
@@ -77,7 +78,6 @@ public class TestReconfigShell {
         .setNumDatanodes(DATANODE_COUNT)
         .build();
     cluster.waitForClusterToBeReady();
-    ozoneAdmin = new OzoneAdmin(cluster.getConf());
     ozoneManager = cluster.getOzoneManager();
     storageContainerManager = cluster.getStorageContainerManager();
     datanodeServices = cluster.getHddsDatanodes();

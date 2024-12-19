@@ -441,20 +441,10 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
           continue;
         }
 
-        // If we get here, the container is closed or quasi-closed and all the replicas match that
-        // state, except for any which are unhealthy. As the container is closed, we can check
-        // if it is sufficiently replicated using replicationManager, but this only works if the
-        // legacy RM is not enabled.
-        boolean legacyEnabled = conf.getBoolean("hdds.scm.replication.enable" +
-            ".legacy", false);
-        boolean replicatedOK;
-        if (legacyEnabled) {
-          replicatedOK = replicaSet.isSufficientlyReplicatedForOffline(dn.getDatanodeDetails(), nodeManager);
-        } else {
-          ReplicationManagerReport report = new ReplicationManagerReport();
-          replicationManager.checkContainerStatus(replicaSet.getContainer(), report);
-          replicatedOK = report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED) == 0;
-        }
+        ReplicationManagerReport report = new ReplicationManagerReport();
+        replicationManager.checkContainerStatus(replicaSet.getContainer(), report);
+        boolean replicatedOK = report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED) == 0;
+
         if (replicatedOK) {
           sufficientlyReplicated++;
         } else {
