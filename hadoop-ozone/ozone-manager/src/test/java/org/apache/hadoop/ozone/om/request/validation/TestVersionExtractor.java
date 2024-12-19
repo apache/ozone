@@ -24,22 +24,14 @@ import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.junit.jupiter.params.provider.MethodSource;
-
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class TestVersionExtractor {
-
-  private static Stream<Arguments> futureClientVersionValues() {
-    return IntStream.range(1, 10).mapToObj(delta -> Arguments.of(ClientVersion.CURRENT_VERSION + delta));
-  }
 
   @ParameterizedTest
   @EnumSource(OMLayoutFeature.class)
@@ -63,10 +55,10 @@ class TestVersionExtractor {
   }
 
   @ParameterizedTest
-  @MethodSource("futureClientVersionValues")
-  void testClientVersionExtractorForFutureValues(int clientVersion) {
+  @ValueSource(ints = {1, 2, 5, 10, 1000, 10000})
+  void testClientVersionExtractorForFutureValues(int futureVersion) {
     OMRequest request = mock(OMRequest.class);
-    when(request.getVersion()).thenReturn(clientVersion);
+    when(request.getVersion()).thenReturn(ClientVersion.CURRENT_VERSION + futureVersion);
     Versioned version = VersionExtractor.CLIENT_VERSION_EXTRACTOR.extractVersion(request, null);
     assertEquals(ClientVersion.FUTURE_VERSION, version);
     assertEquals(ClientVersion.class, VersionExtractor.CLIENT_VERSION_EXTRACTOR.getVersionClass());
