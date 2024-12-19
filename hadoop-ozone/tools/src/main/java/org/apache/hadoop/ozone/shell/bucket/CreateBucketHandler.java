@@ -59,31 +59,32 @@ public class CreateBucketHandler extends BucketHandler {
               " user if not specified")
   private String ownerName;
 
-  enum AllowedBucketLayouts {
-    FILE_SYSTEM_OPTIMIZED,
-    fso,
-    OBJECT_STORE,
-    obs,
-    LEGACY;
-
-    public static AllowedBucketLayouts fromString(String value) {
-      if (value.equals("FILE_SYSTEM_OPTIMIZED") || value.equalsIgnoreCase("fso")) {
-        return FILE_SYSTEM_OPTIMIZED;
+  private static class LayoutConverter implements CommandLine.ITypeConverter<BucketLayout> {
+    @Override
+    public BucketLayout convert(String value) {
+      if (value == null) {
+        return null;
       }
-      if (value.equals("OBJECT_STORE") || value.equalsIgnoreCase("obs")) {
-        return OBJECT_STORE;
+      switch (value) {
+        case "fso":
+          return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+        case "obs":
+          return BucketLayout.OBJECT_STORE;
+        default:
+          for (BucketLayout candidate : BucketLayout.values()) {
+            if (candidate.name().equalsIgnoreCase(value)) {
+              return candidate;
+            }
+          }
+          throw new IllegalArgumentException("Unknown bucket layout: " + value);
       }
-      if (value.equals("LEGACY") || value.equalsIgnoreCase("legacy")) {
-        return LEGACY;
-      }
-      return valueOf(value); // throws IllegalArgumentException if not mapped to an enum, better than returning null
     }
   }
 
-  @Option(names = { "--layout", "-l" },
+  @Option(names = { "--layout", "-l" }, converter = LayoutConverter.class,
       description = "Allowed Bucket Layouts: fso (for file system optimized buckets FILE_SYSTEM_OPTIMIZED), " +
           "obs (for object store optimized OBJECT_STORE) and legacy (LEGACY is Deprecated)")
-  private String allowedBucketLayout;
+  private BucketLayout allowedBucketLayout;
 
   @CommandLine.Mixin
   private ShellReplicationOptions replication;
@@ -106,9 +107,7 @@ public class CreateBucketHandler extends BucketHandler {
         new BucketArgs.Builder().setStorageType(StorageType.DEFAULT)
             .setVersioning(false).setOwner(ownerName);
     if (allowedBucketLayout != null) {
-      BucketLayout bucketLayout =
-          BucketLayout.fromString(AllowedBucketLayouts.fromString(allowedBucketLayout).toString());
-      bb.setBucketLayout(bucketLayout);
+      bb.setBucketLayout(allowedBucketLayout);
     }
     // TODO: New Client talking to old server, will it create a LEGACY bucket?
 
