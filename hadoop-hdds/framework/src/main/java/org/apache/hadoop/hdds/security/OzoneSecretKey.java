@@ -17,12 +17,7 @@
 package org.apache.hadoop.hdds.security;
 
 import com.google.common.base.Preconditions;
-import com.google.protobuf.ByteString;
-import java.io.ByteArrayInputStream;
-import java.io.DataInput;
-import java.io.DataInputStream;
-import java.io.DataOutput;
-import java.io.IOException;
+
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -30,9 +25,6 @@ import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.SecretKeyProto;
 
 /**
  * Wrapper class for Ozone/Hdds secret keys. Used in delegation tokens and block
@@ -40,13 +32,12 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.SecretKeyProto;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
-public class OzoneSecretKey implements Writable {
+public class OzoneSecretKey {
 
   private int keyId;
   private long expiryDate;
   private PrivateKey privateKey;
   private PublicKey publicKey;
-  private SecurityConfig securityConfig;
   private String certSerialId;
 
   public OzoneSecretKey(int keyId, long expiryDate, KeyPair keyPair,
@@ -57,29 +48,6 @@ public class OzoneSecretKey implements Writable {
     this.privateKey = keyPair.getPrivate();
     this.publicKey = keyPair.getPublic();
     this.certSerialId = certificateSerialId;
-  }
-
-  /*
-   * Create new instance using default signature algorithm and provider.
-   * */
-  public OzoneSecretKey(int keyId, long expiryDate, byte[] pvtKey,
-      byte[] publicKey) {
-    Preconditions.checkNotNull(pvtKey);
-    Preconditions.checkNotNull(publicKey);
-
-    this.securityConfig = new SecurityConfig(new OzoneConfiguration());
-    this.keyId = keyId;
-    this.expiryDate = expiryDate;
-    try {
-      this.privateKey = securityConfig.keyCodec().decodePrivateKey(pvtKey);
-    } catch (IOException | RuntimeException e) {
-      this.privateKey = null;
-    }
-    try {
-      this.publicKey = securityConfig.keyCodec().decodePublicKey(publicKey);
-    } catch (IOException | RuntimeException e) {
-      this.publicKey = null;
-    }
   }
 
   public int getKeyId() {
@@ -115,30 +83,6 @@ public class OzoneSecretKey implements Writable {
   }
 
   @Override
-  public void write(DataOutput out) throws IOException {
-    SecretKeyProto token = SecretKeyProto.newBuilder()
-        .setKeyId(getKeyId())
-        .setExpiryDate(getExpiryDate())
-        .setPrivateKeyBytes(ByteString.copyFrom(getEncodedPrivateKey()))
-        .setPublicKeyBytes(ByteString.copyFrom(getEncodedPubliceKey()))
-        .build();
-    out.write(token.toByteArray());
-  }
-
-  @Override
-  public void readFields(DataInput in) throws IOException {
-    SecretKeyProto secretKey = SecretKeyProto.parseFrom((DataInputStream) in);
-    expiryDate = secretKey.getExpiryDate();
-    keyId = secretKey.getKeyId();
-    try {
-      privateKey = securityConfig.keyCodec().decodePrivateKey(secretKey.getPrivateKeyBytes().toByteArray());
-      publicKey = securityConfig.keyCodec().decodePublicKey(secretKey.getPublicKeyBytes().toByteArray());
-    } catch (RuntimeException e) {
-      throw new IOException(e);
-    }
-  }
-
-  @Override
   public int hashCode() {
     HashCodeBuilder hashCodeBuilder = new HashCodeBuilder(537, 963);
     hashCodeBuilder.append(getExpiryDate())
@@ -165,27 +109,6 @@ public class OzoneSecretKey implements Writable {
           .build();
     }
     return false;
-  }
-
-  /**
-   * Reads protobuf encoded input stream to construct {@link OzoneSecretKey}.
-   */
-  static OzoneSecretKey readProtoBuf(DataInput in) throws IOException {
-    Preconditions.checkNotNull(in);
-    SecretKeyProto key = SecretKeyProto.parseFrom((DataInputStream) in);
-    return new OzoneSecretKey(key.getKeyId(), key.getExpiryDate(),
-        key.getPrivateKeyBytes().toByteArray(),
-        key.getPublicKeyBytes().toByteArray());
-  }
-
-  /**
-   * Reads protobuf encoded input stream to construct {@link OzoneSecretKey}.
-   */
-  static OzoneSecretKey readProtoBuf(byte[] identifier) throws IOException {
-    Preconditions.checkNotNull(identifier);
-    DataInputStream in = new DataInputStream(new ByteArrayInputStream(
-        identifier));
-    return readProtoBuf(in);
   }
 
 }

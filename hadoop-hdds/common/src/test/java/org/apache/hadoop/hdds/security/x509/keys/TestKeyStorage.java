@@ -138,7 +138,7 @@ public class TestKeyStorage {
     @Test
     @DisplayName("attempt to store a key, fails during I/O operations and throws an IOException.")
     public void testStoreKeyFailToWrite() throws Exception {
-      FileSystemProvider fsp = mock(FileSystemProvider.class);
+      FileSystemProvider fsp = spy(FileSystemProvider.class);
       // this is needed for the file create to throw an exception
       when(fsp.newByteChannel(any(), any(), any())).thenThrow(new IOException(ERROR_MSG));
       // this is needed to avoid that the storage implementation sees the path as existing.
@@ -183,7 +183,7 @@ public class TestKeyStorage {
     @Test
     @DisplayName("attempt to read a key, fails during I/O operations and throws an IOException.")
     public void testReadKeyFailToWrite() throws Exception {
-      FileSystemProvider fsp = mock(FileSystemProvider.class);
+      FileSystemProvider fsp = spy(FileSystemProvider.class);
       // this is needed for the file create to throw an exception
       when(fsp.newByteChannel(any(), any(), any())).thenThrow(new IOException(ERROR_MSG));
       // this is needed to avoid that the storage implementation sees the path as existing.
@@ -213,7 +213,7 @@ public class TestKeyStorage {
     @MockitoSettings(strictness = Strictness.LENIENT)
     public void testInitFailsOnPermissions() {
       // the mock will not return posix file attributes, so setting posix permissions fails.
-      FileSystemProvider fsp = mock(FileSystemProvider.class);
+      FileSystemProvider fsp = spy(FileSystemProvider.class);
 
       FileSystem fs = mock(FileSystem.class);
       when(fs.provider()).thenReturn(fsp);
@@ -232,7 +232,7 @@ public class TestKeyStorage {
     @MockitoSettings(strictness = Strictness.LENIENT)
     public void testInitFailsOnDirCreation() throws Exception {
       // the mock will not return posix file attributes, so setting them fails.
-      FileSystemProvider fsp = mock(FileSystemProvider.class);
+      FileSystemProvider fsp = spy(FileSystemProvider.class);
       // first exception is to make path non-existent, second do nothing to get to the createDirectory call.
       doThrow(IOException.class).doNothing().when(fsp).checkAccess(any(Path.class));
       doThrow(new IOException(ERROR_MSG)).when(fsp).createDirectory(any(), any());
