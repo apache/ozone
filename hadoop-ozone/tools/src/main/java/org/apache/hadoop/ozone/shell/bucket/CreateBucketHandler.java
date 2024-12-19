@@ -82,8 +82,8 @@ public class CreateBucketHandler extends BucketHandler {
   }
 
   @Option(names = { "--layout", "-l" }, converter = LayoutConverter.class,
-      description = "Allowed Bucket Layouts: fso (for file system optimized buckets FILE_SYSTEM_OPTIMIZED), " +
-          "obs (for object store optimized OBJECT_STORE) and legacy (LEGACY is Deprecated)")
+          description = "Allowed Bucket Layouts: fso (for file system optimized buckets FILE_SYSTEM_OPTIMIZED), " +
+                  "obs (for object store optimized OBJECT_STORE) and legacy (LEGACY is Deprecated)")
   private BucketLayout allowedBucketLayout;
 
   @CommandLine.Mixin
