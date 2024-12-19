@@ -180,24 +180,6 @@ public class TestFSORepairTool {
     assertEquals(expectedOutput, reportOutput);
   }
 
-  private int repair(String... args) {
-    return execute(false, args);
-  }
-
-  private int dryRun(String... args) {
-    return execute(true, args);
-  }
-
-  private int execute(boolean dryRun, String... args) {
-    List<String> argList = new ArrayList<>(Arrays.asList("om", "fso-tree", "--db", dbPath));
-    if (!dryRun) {
-      argList.add("--repair");
-    }
-    argList.addAll(Arrays.asList(args));
-
-    return cmd.execute(argList.toArray(new String[0]));
-  }
-
   /**
    * Test to verify the file size of the tree.
    */
@@ -356,6 +338,24 @@ public class TestFSORepairTool {
     assertEquals(1, countTableEntries(cluster.getOzoneManager().getMetadataManager().getDeletedDirTable()));
     // 3 files are unreferenced and moved to the deletedTable during repair mode.
     assertEquals(3, countTableEntries(cluster.getOzoneManager().getMetadataManager().getDeletedTable()));
+  }
+
+  private int repair(String... args) {
+    return execute(false, args);
+  }
+
+  private int dryRun(String... args) {
+    return execute(true, args);
+  }
+
+  private int execute(boolean dryRun, String... args) {
+    List<String> argList = new ArrayList<>(Arrays.asList("om", "fso-tree", "--db", dbPath));
+    if (!dryRun) {
+      argList.add("--repair");
+    }
+    argList.addAll(Arrays.asList(args));
+
+    return cmd.execute(argList.toArray(new String[0]));
   }
 
   private <K, V> int countTableEntries(Table<K, V> table) throws Exception {
