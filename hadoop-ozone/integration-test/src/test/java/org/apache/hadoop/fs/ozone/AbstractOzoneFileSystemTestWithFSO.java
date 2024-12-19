@@ -65,8 +65,8 @@ abstract class AbstractOzoneFileSystemTestWithFSO extends AbstractOzoneFileSyste
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractOzoneFileSystemTestWithFSO.class);
 
-  AbstractOzoneFileSystemTestWithFSO(boolean enableOMRatis) {
-    super(true, enableOMRatis, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+  AbstractOzoneFileSystemTestWithFSO() {
+    super(true, BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   @Test
