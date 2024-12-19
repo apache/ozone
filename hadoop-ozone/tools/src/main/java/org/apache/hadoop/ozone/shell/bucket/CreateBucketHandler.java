@@ -59,11 +59,31 @@ public class CreateBucketHandler extends BucketHandler {
               " user if not specified")
   private String ownerName;
 
-  enum AllowedBucketLayouts { FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, LEGACY }
+  enum AllowedBucketLayouts {
+    FILE_SYSTEM_OPTIMIZED,
+    fso,
+    OBJECT_STORE,
+    obs,
+    LEGACY;
+
+    public static AllowedBucketLayouts fromString(String value) {
+      if (value.equals("FILE_SYSTEM_OPTIMIZED") || value.equalsIgnoreCase("fso")) {
+        return FILE_SYSTEM_OPTIMIZED;
+      }
+      if (value.equals("OBJECT_STORE") || value.equalsIgnoreCase("obs")) {
+        return OBJECT_STORE;
+      }
+      if (value.equals("LEGACY") || value.equalsIgnoreCase("legacy")) {
+        return LEGACY;
+      }
+      return valueOf(value); // throws IllegalArgumentException if not mapped to an enum, better than returning null
+    }
+  }
 
   @Option(names = { "--layout", "-l" },
-      description = "Allowed Bucket Layouts: ${COMPLETION-CANDIDATES}")
-  private AllowedBucketLayouts allowedBucketLayout;
+      description = "Allowed Bucket Layouts: fso (for file system optimized buckets FILE_SYSTEM_OPTIMIZED), " +
+          "obs (for object store optimized OBJECT_STORE) and legacy (LEGACY is Deprecated)")
+  private String allowedBucketLayout;
 
   @CommandLine.Mixin
   private ShellReplicationOptions replication;
@@ -87,7 +107,7 @@ public class CreateBucketHandler extends BucketHandler {
             .setVersioning(false).setOwner(ownerName);
     if (allowedBucketLayout != null) {
       BucketLayout bucketLayout =
-          BucketLayout.fromString(allowedBucketLayout.toString());
+          BucketLayout.fromString(AllowedBucketLayouts.fromString(allowedBucketLayout).toString());
       bb.setBucketLayout(bucketLayout);
     }
     // TODO: New Client talking to old server, will it create a LEGACY bucket?

@@ -31,7 +31,7 @@ ${TESTFILE}         testfile
 Write keys
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
     Execute             ozone sh volume create ${VOLUME}
-    Execute             ozone sh bucket create ${VOLUME}/${BUCKET} -l OBJECT_STORE
+    Execute             ozone sh bucket create ${VOLUME}/${BUCKET} -l obs
     Execute             dd if=/dev/urandom of=${TEMP_DIR}/${TESTFILE}1 bs=100 count=10
     Execute             ozone sh key put ${VOLUME}/${BUCKET}/${TESTFILE}1 ${TEMP_DIR}/${TESTFILE}1
     Execute             dd if=/dev/urandom of=${TEMP_DIR}/${TESTFILE}2 bs=100 count=15
