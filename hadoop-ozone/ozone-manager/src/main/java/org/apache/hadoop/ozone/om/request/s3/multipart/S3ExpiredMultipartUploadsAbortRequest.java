@@ -290,7 +290,7 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
           String multipartOpenKey;
           try {
             KeyArgs keyArgs = buildKeyArgs(multipartUpload);
-            addMissingDirectories(ozoneManager, keyArgs, trxnLogIndex);
+            addOrGetMissingDirectories(ozoneManager, keyArgs, trxnLogIndex);
             multipartOpenKey =
                 OMMultipartUploadUtils
                     .getMultipartOpenKey(multipartUpload.getVolumeName(),
@@ -368,6 +368,10 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
             .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
       }
     }
+  }
 
+  @Override
+  protected boolean addMissingDirectoriesToCacheEnabled() {
+    return true;
   }
 }

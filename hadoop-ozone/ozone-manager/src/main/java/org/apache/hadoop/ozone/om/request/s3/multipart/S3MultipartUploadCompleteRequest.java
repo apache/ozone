@@ -18,9 +18,18 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
-import jakarta.annotation.Nullable;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
+
+import java.io.IOException;
+import java.nio.file.InvalidPathException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
+
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -61,14 +70,7 @@ import org.apache.ratis.server.protocol.TermIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.nio.file.InvalidPathException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiFunction;
+import jakarta.annotation.Nullable;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
@@ -174,7 +176,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       List<OmDirectoryInfo> missingParentInfos =
-              addMissingDirectories(ozoneManager, keyArgs, trxnLogIndex);
+              addOrGetMissingDirectories(ozoneManager, keyArgs, trxnLogIndex);
 
       String dbMultipartOpenKey =
           getDBMultipartOpenKey(volumeName, bucketName, keyName, uploadID,

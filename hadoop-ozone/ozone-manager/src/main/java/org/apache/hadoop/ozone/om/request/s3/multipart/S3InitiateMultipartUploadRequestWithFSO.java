@@ -109,7 +109,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
-      missingParentInfos = addMissingDirectories(ozoneManager, keyArgs, transactionLogIndex);
+      missingParentInfos = addOrGetMissingDirectories(ozoneManager, keyArgs, transactionLogIndex);
 
       OMFileRequest.OMPathInfoWithFSO pathInfoFSO = OMFileRequest
           .verifyDirectoryKeysInPath(omMetadataManager, volumeName, bucketName,
@@ -233,6 +233,11 @@ public class S3InitiateMultipartUploadRequestWithFSO
             bucketName, keyName, exception, result);
 
     return omClientResponse;
+  }
+
+  @Override
+  protected boolean addMissingDirectoriesToCacheEnabled() {
+    return true;
   }
 
   /**

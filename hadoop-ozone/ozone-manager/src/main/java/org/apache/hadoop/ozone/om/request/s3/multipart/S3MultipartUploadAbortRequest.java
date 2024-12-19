@@ -139,7 +139,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
 
       String multipartOpenKey;
       try {
-        addMissingDirectories(ozoneManager, keyArgs, trxnLogIndex);
+        addOrGetMissingDirectories(ozoneManager, keyArgs, trxnLogIndex);
         multipartOpenKey =
             getMultipartOpenKey(keyArgs.getMultipartUploadID(), volumeName,
                 bucketName, keyName, omMetadataManager);

@@ -162,5 +162,10 @@ public class S3MultipartUploadCompleteRequestWithFSO
   public BucketLayout getBucketLayout() {
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
+
+  @Override
+  protected boolean addMissingDirectoriesToCacheEnabled() {
+    return true;
+  }
 }
 

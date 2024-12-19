@@ -1378,11 +1378,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   protected void addMissingParentsToCache(OmBucketInfo omBucketInfo,
-                                          List<OmDirectoryInfo> missingParentInfos,
-                                          OMMetadataManager omMetadataManager,
-                                          long volumeId,
-                                          long bucketId,
-                                          long transactionLogIndex) throws IOException {
+      List<OmDirectoryInfo> missingParentInfos,
+      OMMetadataManager omMetadataManager,
+      long volumeId,
+      long bucketId,
+      long transactionLogIndex) throws IOException {
 
     // validate and update namespace for missing parent directory.
     checkBucketQuotaInNamespace(omBucketInfo, missingParentInfos.size());
@@ -1390,93 +1390,100 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     // Add cache entries for the missing parent directories.
     OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
-            volumeId, bucketId, transactionLogIndex,
-            missingParentInfos, null);
+        volumeId, bucketId, transactionLogIndex,
+        missingParentInfos, null);
   }
 
   protected OmKeyInfo getOmKeyInfoFromOpenKeyTable(String dbMultipartKey,
-                                                   String keyName,
-                                                   OMMetadataManager omMetadataManager) throws IOException {
+      String keyName,
+      OMMetadataManager omMetadataManager) throws IOException {
     return omMetadataManager.getOpenKeyTable(getBucketLayout())
-            .get(dbMultipartKey);
+        .get(dbMultipartKey);
   }
 
   protected void addMultiPartToCache(
-          OMMetadataManager omMetadataManager, String multipartOpenKey,
-          OMFileRequest.OMPathInfoWithFSO pathInfoFSO, OmKeyInfo omKeyInfo,
-          String keyName, long transactionLogIndex
+      OMMetadataManager omMetadataManager, String multipartOpenKey,
+      OMFileRequest.OMPathInfoWithFSO pathInfoFSO, OmKeyInfo omKeyInfo,
+      String keyName, long transactionLogIndex
   ) {
 
     // Add multi part to cache
     OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-            multipartOpenKey, omKeyInfo, pathInfoFSO.getLeafNodeName(),
-            keyName, transactionLogIndex);
+        multipartOpenKey, omKeyInfo, pathInfoFSO.getLeafNodeName(),
+        keyName, transactionLogIndex);
 
   }
 
-  protected List<OmDirectoryInfo> addMissingDirectories(OzoneManager ozoneManager,
-                                                        OzoneManagerProtocolProtos.KeyArgs keyArgs,
-                                                        long trxnLogIndex) throws
-          IOException {
+  protected boolean addMissingDirectoriesToCacheEnabled() {
+    return false;
+  }
+
+  protected List<OmDirectoryInfo> addOrGetMissingDirectories(OzoneManager ozoneManager,
+      OzoneManagerProtocolProtos.KeyArgs keyArgs,
+      long trxnLogIndex) throws
+      IOException {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     final String volumeName = keyArgs.getVolumeName();
     final String bucketName = keyArgs.getBucketName();
     final String keyName = keyArgs.getKeyName();
     OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
-            volumeName, bucketName);
-    List<OmDirectoryInfo> missingParentInfos;
+        volumeName, bucketName);
     OMFileRequest.OMPathInfoWithFSO pathInfoFSO = OMFileRequest
-            .verifyDirectoryKeysInPath(omMetadataManager, volumeName, bucketName,
-                    keyName, Paths.get(keyName));
-    missingParentInfos = getAllMissingParentDirInfo(ozoneManager, keyArgs, omBucketInfo,
-                    pathInfoFSO, trxnLogIndex);
+        .verifyDirectoryKeysInPath(omMetadataManager, volumeName, bucketName,
+            keyName, Paths.get(keyName));
+    List<OmDirectoryInfo> missingParentInfos =
+        getAllMissingParentDirInfo(ozoneManager, keyArgs, omBucketInfo,
+            pathInfoFSO, trxnLogIndex);
+    if (!addMissingDirectoriesToCacheEnabled()) {
+      return missingParentInfos;
+    }
 
     if (missingParentInfos != null && !missingParentInfos.isEmpty()) {
       final long volumeId = omMetadataManager.getVolumeId(volumeName);
       final long bucketId = omMetadataManager.getBucketId(volumeName,
-              bucketName);
+          bucketName);
 
       // add all missing parents to directory table
       addMissingParentsToCache(omBucketInfo, missingParentInfos,
-              omMetadataManager, volumeId, bucketId, trxnLogIndex);
+          omMetadataManager, volumeId, bucketId, trxnLogIndex);
 
       String multipartOpenKey = omMetadataManager
-              .getMultipartKey(volumeId, bucketId,
-                      pathInfoFSO.getLastKnownParentId(),
-                      pathInfoFSO.getLeafNodeName(),
-                      keyArgs.getMultipartUploadID());
+          .getMultipartKey(volumeId, bucketId,
+              pathInfoFSO.getLastKnownParentId(),
+              pathInfoFSO.getLeafNodeName(),
+              keyArgs.getMultipartUploadID());
 
       if (getOmKeyInfoFromOpenKeyTable(multipartOpenKey,
-              keyName, omMetadataManager) == null) {
+          keyName, omMetadataManager) == null) {
 
         final ReplicationConfig replicationConfig = OzoneConfigUtil
-                .resolveReplicationConfigPreference(keyArgs.getType(),
-                        keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
-                        omBucketInfo != null ?
-                                omBucketInfo.getDefaultReplicationConfig() :
-                                null, ozoneManager);
+            .resolveReplicationConfigPreference(keyArgs.getType(),
+                keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
+                omBucketInfo != null ?
+                    omBucketInfo.getDefaultReplicationConfig() :
+                    null, ozoneManager);
 
         OmKeyInfo keyInfoFromArgs = new OmKeyInfo.Builder()
-                .setVolumeName(volumeName)
-                .setBucketName(bucketName)
-                .setKeyName(keyName)
-                .setCreationTime(keyArgs.getModificationTime())
-                .setModificationTime(keyArgs.getModificationTime())
-                .setReplicationConfig(replicationConfig)
-                .setOmKeyLocationInfos(Collections.singletonList(
-                        new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
-                .setAcls(getAclsForKey(keyArgs, omBucketInfo, pathInfoFSO,
-                        ozoneManager.getPrefixManager(), ozoneManager.getConfiguration()))
-                .setObjectID(pathInfoFSO.getLeafNodeObjectId())
-                .setUpdateID(trxnLogIndex)
-                .setFileEncryptionInfo(keyArgs.hasFileEncryptionInfo() ?
-                        OMPBHelper.convert(keyArgs.getFileEncryptionInfo()) : null)
-                .setParentObjectID(pathInfoFSO.getLastKnownParentId())
-                .build();
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(keyName)
+            .setCreationTime(keyArgs.getModificationTime())
+            .setModificationTime(keyArgs.getModificationTime())
+            .setReplicationConfig(replicationConfig)
+            .setOmKeyLocationInfos(Collections.singletonList(
+                new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
+            .setAcls(getAclsForKey(keyArgs, omBucketInfo, pathInfoFSO,
+                ozoneManager.getPrefixManager(), ozoneManager.getConfiguration()))
+            .setObjectID(pathInfoFSO.getLeafNodeObjectId())
+            .setUpdateID(trxnLogIndex)
+            .setFileEncryptionInfo(keyArgs.hasFileEncryptionInfo() ?
+                OMPBHelper.convert(keyArgs.getFileEncryptionInfo()) : null)
+            .setParentObjectID(pathInfoFSO.getLastKnownParentId())
+            .build();
 
         // Add missing multi part info to open key table
         addMultiPartToCache(omMetadataManager, multipartOpenKey,
-                pathInfoFSO, keyInfoFromArgs, keyName, trxnLogIndex);
+            pathInfoFSO, keyInfoFromArgs, keyName, trxnLogIndex);
       }
     }
     return missingParentInfos;
