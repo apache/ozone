@@ -33,6 +33,8 @@ message ClientRequestInfo {
 }
 ```
 
+Refer [Execution Control Message](request-persist-distribution.md#control-request) for format.
+
 DB Persistence:
 ```
 New rocksDB table: ClientRequestReplyTable
