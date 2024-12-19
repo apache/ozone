@@ -80,7 +80,9 @@ public class TestKeyValueContainerIntegrityChecks {
         .equals(ContainerLayoutVersion.FILE_PER_BLOCK)) {
       containerLayoutTestInfo = ContainerLayoutTestInfo.FILE_PER_BLOCK;
     } else {
-      containerLayoutTestInfo = ContainerLayoutTestInfo.FILE_PER_CHUNK;
+      // abort
+      throw new IllegalArgumentException("Unsupported layout: " +
+          versionInfo.getLayout());
     }
     setup();
   }

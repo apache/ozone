@@ -38,7 +38,7 @@ import java.nio.charset.Charset;
 import java.time.Instant;
 import java.util.UUID;
 
-import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -231,7 +231,7 @@ public class TestContainerDataYaml {
         .getChunksPath());
     assertEquals("/hdds/current/aed-fg4-hji-jkl/containerDir0/1", kvData
         .getMetadataPath());
-    assertEquals(FILE_PER_CHUNK, kvData.getLayoutVersion());
+    assertEquals(FILE_PER_BLOCK, kvData.getLayoutVersion());
     assertEquals(2, kvData.getMetadata().size());
   }
 
