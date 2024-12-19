@@ -74,7 +74,6 @@ import static org.mockito.Mockito.when;
 
 import org.slf4j.event.Level;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -262,13 +261,11 @@ public class TestOzoneDelegationTokenSecretManager {
   }
 
   @Test
-  @Unhealthy("HDDS-11869")
   public void testReloadAndRenewToken() throws Exception {
     testRenewTokenSuccessHelper(true);
   }
 
   @Test
-  @Unhealthy("HDDS-11869")
   public void testRenewTokenSuccess() throws Exception {
     testRenewTokenSuccessHelper(false);
   }
@@ -277,7 +274,6 @@ public class TestOzoneDelegationTokenSecretManager {
    * Tests failure for mismatch in renewer.
    */
   @Test
-  @Unhealthy("HDDS-11869")
   public void testRenewTokenFailure() throws Exception {
     secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
         expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
@@ -346,7 +342,6 @@ public class TestOzoneDelegationTokenSecretManager {
   }
 
   @Test
-  @Unhealthy("HDDS-11869")
   public void testCancelTokenSuccess() throws Exception {
     secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
         expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
