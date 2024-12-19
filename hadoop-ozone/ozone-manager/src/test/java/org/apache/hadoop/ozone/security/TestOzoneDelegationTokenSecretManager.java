@@ -59,7 +59,6 @@ import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -132,14 +131,6 @@ public class TestOzoneDelegationTokenSecretManager {
 
   private OzoneConfiguration createNewTestPath() throws IOException {
     OzoneConfiguration config = new OzoneConfiguration();
-    // When ratis is enabled, tokens are not updated to the store directly by
-    // OzoneDelegationTokenSecretManager. Tokens are updated via Ratis
-    // through the DoubleBuffer. Hence, to test
-    // OzoneDelegationTokenSecretManager, we should disable OM Ratis.
-    // TODO: Once HA and non-HA code paths are merged in
-    //  OzoneDelegationTokenSecretManager, this test should be updated to
-    //  test both ratis enabled and disabled case.
-    config.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, true);
     File newFolder = folder.toFile();
     if (!newFolder.exists()) {
       assertTrue(newFolder.mkdirs());
