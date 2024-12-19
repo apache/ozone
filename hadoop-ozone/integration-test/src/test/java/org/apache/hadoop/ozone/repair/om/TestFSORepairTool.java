@@ -172,7 +172,6 @@ public class TestFSORepairTool {
   void testConnectedTreeOneBucket(boolean dryRun) {
     String expectedOutput = serializeReport(vol1Report);
 
-    // Test the connected tree in debug mode.
     int exitCode = execute(dryRun, "-v", "/vol1", "-b", "bucket1");
     assertEquals(0, exitCode, err.getOutput());
 
