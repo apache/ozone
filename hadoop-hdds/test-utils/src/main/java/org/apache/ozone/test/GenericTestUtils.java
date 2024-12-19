@@ -45,6 +45,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -353,44 +355,71 @@ public abstract class GenericTestUtils {
     return System.nanoTime() / NANOSECONDS_PER_MILLISECOND;
   }
 
-  /**
-   * Capture output printed to {@link System#err}.
-   * <p>
-   * Usage:
-   * <pre>
-   *   try (SystemErrCapturer capture = new SystemErrCapturer()) {
-   *     ...
-   *     // Call capture.getOutput() to get the output string
-   *   }
-   * </pre>
-   * <p>
-   * TODO: Add lambda support once Java 8 is common.
-   * {@code
-   *   SystemErrCapturer.withCapture(capture -> {
-   *     ...
-   *   })
-   * }
-   */
-  public static class SystemErrCapturer implements AutoCloseable {
+  public static PrintStreamCapturer captureOut() {
+    return new SystemOutCapturer();
+  }
+
+  public static PrintStreamCapturer captureErr() {
+    return new SystemErrCapturer();
+  }
+
+  /** Capture contents of a {@code PrintStream}, until {@code close()}d. */
+  public abstract static class PrintStreamCapturer implements AutoCloseable, Supplier<String> {
     private final ByteArrayOutputStream bytes;
     private final PrintStream bytesPrintStream;
-    private final PrintStream oldErr;
+    private final PrintStream old;
+    private final Consumer<PrintStream> restore;
 
-    public SystemErrCapturer() throws UnsupportedEncodingException {
+    protected PrintStreamCapturer(PrintStream out, Consumer<PrintStream> install) {
+      old = out;
       bytes = new ByteArrayOutputStream();
-      bytesPrintStream = new PrintStream(bytes, false, UTF_8.name());
-      oldErr = System.err;
-      System.setErr(new TeePrintStream(oldErr, bytesPrintStream));
+      try {
+        bytesPrintStream = new PrintStream(bytes, false, UTF_8.name());
+        install.accept(new TeePrintStream(out, bytesPrintStream));
+        restore = install;
+      } catch (UnsupportedEncodingException e) {
+        throw new IllegalStateException(e);
+      }
     }
 
-    public String getOutput() throws UnsupportedEncodingException {
-      return bytes.toString(UTF_8.name());
+    @Override
+    public String get() {
+      return getOutput();
+    }
+
+    public String getOutput() {
+      try {
+        return bytes.toString(UTF_8.name());
+      } catch (UnsupportedEncodingException e) {
+        throw new IllegalStateException(e);
+      }
+    }
+
+    public void reset() {
+      bytes.reset();
     }
 
     @Override
     public void close() throws Exception {
       IOUtils.closeQuietly(bytesPrintStream);
-      System.setErr(oldErr);
+      restore.accept(old);
+    }
+  }
+
+  /**
+   * Capture output printed to {@link System#err}.
+   * <p>
+   * Usage:
+   * <pre>
+   *   try (PrintStreamCapturer capture = captureErr()) {
+   *     ...
+   *     // Call capture.getOutput() to get the output string
+   *   }
+   * </pre>
+   */
+  public static class SystemErrCapturer extends PrintStreamCapturer {
+    public SystemErrCapturer() {
+      super(System.err, System::setErr);
     }
   }
 
@@ -399,40 +428,15 @@ public abstract class GenericTestUtils {
    * <p>
    * Usage:
    * <pre>
-   *   try (SystemOutCapturer capture = new SystemOutCapturer()) {
+   *   try (PrintStreamCapturer capture = captureOut()) {
    *     ...
    *     // Call capture.getOutput() to get the output string
    *   }
    * </pre>
-   * <p>
-   * TODO: Add lambda support once Java 8 is common.
-   * {@code
-   *   SystemOutCapturer.withCapture(capture -> {
-   *     ...
-   *   })
-   * }
    */
-  public static class SystemOutCapturer implements AutoCloseable {
-    private final ByteArrayOutputStream bytes;
-    private final PrintStream bytesPrintStream;
-    private final PrintStream oldOut;
-
-    public SystemOutCapturer() throws
-        UnsupportedEncodingException {
-      bytes = new ByteArrayOutputStream();
-      bytesPrintStream = new PrintStream(bytes, false, UTF_8.name());
-      oldOut = System.out;
-      System.setOut(new TeePrintStream(oldOut, bytesPrintStream));
-    }
-
-    public String getOutput() throws UnsupportedEncodingException {
-      return bytes.toString(UTF_8.name());
-    }
-
-    @Override
-    public void close() throws Exception {
-      IOUtils.closeQuietly(bytesPrintStream);
-      System.setOut(oldOut);
+  public static class SystemOutCapturer extends PrintStreamCapturer {
+    public SystemOutCapturer() {
+      super(System.out, System::setOut);
     }
   }
 
