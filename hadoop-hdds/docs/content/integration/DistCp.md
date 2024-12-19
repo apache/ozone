@@ -3,7 +3,7 @@ title: DistCp
 weight: 4
 menu:
    main:
-      parent: "Application integrations"
+      parent: "Application Integrations"
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
@@ -24,7 +24,7 @@ menu:
 
 # Hadoop DistCp
 
-The Hadoop DistCP is a command line, MapReduce-based tool for bulk data copying.
+[Hadoop DistCP](https://hadoop.apache.org/docs/current/hadoop-distcp/DistCp.html) is a command line, MapReduce-based tool for bulk data copying.
 
 The `hadoop distcp` command can be used to copy data to and from Ozone and any Hadoop compatible file systems, such as HDFS or S3A.
 
@@ -44,9 +44,9 @@ You must define the service IDs for both `ozone1` and `ozone2` clusters in the `
 </property>
 ```
 
-Next, define their logical mappings. For more details, refer to the [OM High Availability]({{< ref "OM-HA.md" >}}).
+Next, define their logical mappings. For more details, refer to [OM High Availability]({{< ref "OM-HA.md" >}}).
 
-## Copy between Ozone and HDFS
+## Copy from HDFS to Ozone
 
 DistCp performs a file checksum check to ensure file integrity. However, since the default checksum type of HDFS (`CRC32C`) differs from that of Ozone (`CRC32`), the file checksum check will cause the DistCp job to fail.
 
@@ -68,6 +68,21 @@ hadoop distcp \
   -skipcrccheck \
   hdfs://ns1/tmp ofs://ozone1/vol1/bucket1/dst
 ```
+
+## Copy from Ozone to HDFS
+
+When copying files from Ozone to HDFS, similar issues can occur due to differences in checksum types. In this case, you must configure the checksum type for HDFS, as it is the destination system.
+
+Example:
+
+```bash
+hadoop distcp \
+  -Ddfs.checksum.combine.mode=COMPOSITE_CRC \
+  -Ddfs.checksum.type=CRC32 \
+  hdfs://ns1/tmp ofs://ozone1/vol1/bucket1/dst
+```
+
+By specifying the appropriate checksum configuration or skipping the validation, you can ensure that DistCp jobs complete successfully when transferring data between HDFS and Ozone.
 
 ## Encrypted data
 

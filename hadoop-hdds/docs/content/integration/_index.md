@@ -1,5 +1,5 @@
 ---
-title: "Application integrations"
+title: "Application Integrations"
 menu:
    main:
       weight: 5
