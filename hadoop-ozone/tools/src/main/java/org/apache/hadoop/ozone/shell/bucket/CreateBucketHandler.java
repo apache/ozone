@@ -66,17 +66,17 @@ public class CreateBucketHandler extends BucketHandler {
         return null;
       }
       switch (value) {
-        case "fso":
-          return BucketLayout.FILE_SYSTEM_OPTIMIZED;
-        case "obs":
-          return BucketLayout.OBJECT_STORE;
-        default:
-          for (BucketLayout candidate : BucketLayout.values()) {
-            if (candidate.name().equalsIgnoreCase(value)) {
-              return candidate;
-            }
+      case "fso":
+        return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+      case "obs":
+        return BucketLayout.OBJECT_STORE;
+      default:
+        for (BucketLayout candidate : BucketLayout.values()) {
+          if (candidate.name().equalsIgnoreCase(value)) {
+            return candidate;
           }
-          throw new IllegalArgumentException("Unknown bucket layout: " + value);
+        }
+        throw new IllegalArgumentException("Unknown bucket layout: " + value);
       }
     }
   }
