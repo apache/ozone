@@ -18,7 +18,10 @@
 package org.apache.hadoop.hdds.cli;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.ratis.util.MemoizedSupplier;
 import picocli.CommandLine;
+
+import java.util.function.Supplier;
 
 /** Base functionality for all Ozone subcommands. */
 @CommandLine.Command(
@@ -30,11 +33,18 @@ public abstract class AbstractSubcommand {
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
 
+  private final Supplier<GenericParentCommand> rootSupplier =
+      MemoizedSupplier.valueOf(this::findRootCommand);
+
   protected CommandLine.Model.CommandSpec spec() {
     return spec;
   }
 
   protected GenericParentCommand rootCommand() {
+    return rootSupplier.get();
+  }
+
+  private GenericParentCommand findRootCommand() {
     Object root = spec.root().userObject();
     return root instanceof GenericParentCommand
         ? (GenericParentCommand) root
