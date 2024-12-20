@@ -4,7 +4,7 @@ chunksPath: /hdds/current/aed-fg4-hji-jkl/containerDir0/1
 containerID: 9223372036854775807
 containerType: KeyValueContainer
 metadataPath: /hdds/current/aed-fg4-hji-jkl/containerDir0/1
-layOutVersion: 1
+layOutVersion: 2
 maxSize: 5368709120
 originPipelineId: b2c96aa4-b757-4f97-b286-6fb80a1baf8e
 originNodeId: 6dcfb385-caea-4efb-9ef3-f87fadca0f51

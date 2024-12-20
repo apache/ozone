@@ -21,7 +21,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerDummyImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerBlockStrategy;
-import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerChunkStrategy;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -63,23 +62,6 @@ public enum ContainerLayoutTestInfo {
     @Override
     public void updateConfig(OzoneConfiguration config) {
       config.setBoolean(HDDS_CONTAINER_PERSISTDATA, false);
-    }
-  },
-
-  FILE_PER_CHUNK {
-    @Override
-    public ChunkManager createChunkManager(boolean sync, BlockManager manager) {
-      return new FilePerChunkStrategy(sync, manager, null);
-    }
-
-    @Override
-    public void validateFileCount(File dir, long blockCount, long chunkCount) {
-      assertFileCount(dir, chunkCount);
-    }
-
-    @Override
-    public ContainerLayoutVersion getLayout() {
-      return ContainerLayoutVersion.FILE_PER_CHUNK;
     }
   },
 

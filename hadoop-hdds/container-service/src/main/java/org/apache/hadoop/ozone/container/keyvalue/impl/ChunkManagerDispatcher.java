@@ -45,7 +45,6 @@ import java.util.Map;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
-import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
 
 /**
  * Selects ChunkManager implementation to use for each chunk operation.
@@ -60,8 +59,6 @@ public class ChunkManagerDispatcher implements ChunkManager {
 
   ChunkManagerDispatcher(boolean sync, BlockManager manager,
                          VolumeSet volSet) {
-    handlers.put(FILE_PER_CHUNK,
-        new FilePerChunkStrategy(sync, manager, volSet));
     handlers.put(FILE_PER_BLOCK,
         new FilePerBlockStrategy(sync, manager, volSet));
   }
