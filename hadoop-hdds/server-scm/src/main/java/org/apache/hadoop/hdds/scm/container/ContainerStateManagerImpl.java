@@ -34,6 +34,7 @@ import com.google.common.util.concurrent.Striped;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -284,6 +285,13 @@ public final class ContainerStateManagerImpl
   public Set<ContainerID> getContainerIDs(final LifeCycleState state) {
     try (AutoCloseableLock ignored = readLock()) {
       return containers.getContainerIDsByState(state);
+    }
+  }
+
+  @Override
+  public Set<ContainerID> getContainerIDs(final ReplicationType type) {
+    try (AutoCloseableLock ignored = readLock()) {
+      return containers.getContainerIDsByType(type);
     }
   }
 

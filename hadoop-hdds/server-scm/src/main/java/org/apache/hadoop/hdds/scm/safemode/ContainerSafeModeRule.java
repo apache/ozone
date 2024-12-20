@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -81,7 +82,6 @@ public class ContainerSafeModeRule extends
     this.ratisContainers = new HashSet<>();
     this.ecContainers = new HashSet<>();
     this.ecContainerDNsMap = new ConcurrentHashMap<>();
-
     initializeRule();
   }
 
@@ -102,8 +102,42 @@ public class ContainerSafeModeRule extends
 
   @Override
   protected synchronized boolean validate() {
-    return (getCurrentContainerThreshold() >= safeModeCutoff) &&
-        (getCurrentECContainerThreshold() >= safeModeCutoff);
+    if (validateBasedOnReportProcessing()) {
+      return (getCurrentContainerThreshold() >= safeModeCutoff) &&
+          (getCurrentECContainerThreshold() >= safeModeCutoff);
+    }
+
+    // TODO: Split ContainerSafeModeRule into RatisContainerSafeModeRule and
+    //   ECContainerSafeModeRule
+    final List<ContainerInfo> containers = containerManager.getContainers(
+        ReplicationType.RATIS);
+
+    final Set<ContainerID> containerIDs = containers.parallelStream()
+        .filter(this::isClosed).map(ContainerInfo::containerID)
+        .collect(Collectors.toSet());
+
+    final long missingContainerCount = containerIDs.parallelStream()
+        .filter(this::isMissing).count();
+
+    return missingContainerCount == 0;
+  }
+
+  /**
+   * Checks if the container has any replica.
+   */
+  private boolean isMissing(ContainerID id) {
+    try {
+      return containerManager.getContainerReplicas(id).isEmpty();
+    } catch (ContainerNotFoundException ex) {
+      /*
+       * This should never happen, in case this happens the container
+       * somehow got removed from SCM.
+       * Safemode rule doesn't have to log/fix this. We will just exclude this
+       * from the rule validation.
+       */
+      return false;
+
+    }
   }
 
   @VisibleForTesting
@@ -118,6 +152,8 @@ public class ContainerSafeModeRule extends
         (ecContainerWithMinReplicas.doubleValue() / ecMaxContainer);
   }
 
+
+  // TODO: Report processing logic will be removed in future. HDDS-11958.
   @Override
   protected synchronized void process(
       final NodeRegistrationContainerReport reportsProto) {
@@ -278,11 +314,10 @@ public class ContainerSafeModeRule extends
     }
   }
 
-  private boolean checkContainerState(LifeCycleState state) {
-    if (state == LifeCycleState.QUASI_CLOSED || state == LifeCycleState.CLOSED) {
-      return true;
-    }
-    return false;
+  private boolean isClosed(ContainerInfo container) {
+    final LifeCycleState state = container.getState();
+    return state == LifeCycleState.QUASI_CLOSED ||
+        state == LifeCycleState.CLOSED;
   }
 
   private void initializeRule() {
@@ -298,10 +333,9 @@ public class ContainerSafeModeRule extends
       // created by the client. We are not considering these containers for
       // now. These containers can be handled by tracking pipelines.
 
-      LifeCycleState containerState = container.getState();
       HddsProtos.ReplicationType replicationType = container.getReplicationType();
 
-      if (checkContainerState(containerState) && container.getNumberOfKeys() > 0) {
+      if (isClosed(container) && container.getNumberOfKeys() > 0) {
         // If it's of type Ratis
         if (replicationType.equals(HddsProtos.ReplicationType.RATIS)) {
           ratisContainers.add(container.getContainerID());
