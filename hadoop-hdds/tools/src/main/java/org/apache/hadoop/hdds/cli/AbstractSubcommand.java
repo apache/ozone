@@ -46,13 +46,6 @@ public abstract class AbstractSubcommand {
     return rootSupplier.get();
   }
 
-  static GenericParentCommand findRootCommand(CommandLine.Model.CommandSpec spec) {
-    Object root = spec.root().userObject();
-    return root instanceof GenericParentCommand
-        ? (GenericParentCommand) root
-        : new NoParentCommand();
-  }
-
   protected boolean isVerbose() {
     return rootCommand().isVerbose();
   }
@@ -60,6 +53,13 @@ public abstract class AbstractSubcommand {
   /** @see GenericParentCommand#getOzoneConf() */
   protected OzoneConfiguration getOzoneConf() {
     return rootCommand().getOzoneConf();
+  }
+
+  static GenericParentCommand findRootCommand(CommandLine.Model.CommandSpec spec) {
+    Object root = spec.root().userObject();
+    return root instanceof GenericParentCommand
+        ? (GenericParentCommand) root
+        : new NoParentCommand();
   }
 
   /** No-op implementation for unit tests, which may bypass creation of GenericCli object. */
