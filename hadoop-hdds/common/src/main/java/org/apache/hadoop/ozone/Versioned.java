@@ -15,30 +15,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds;
+package org.apache.hadoop.ozone;
 
-import org.apache.hadoop.ozone.Versioned;
 
 /**
- * Base type for component version enums.
+ * Base class defining the version in the entire system.
  */
-public interface ComponentVersion extends Versioned {
-
-  /**
-   * Returns the description of the version enum value.
-   * @return the description of the version enum value.
-   */
-  String description();
-
-  /**
-   * Returns the value that represents the enum in a protocol message
-   * transferred over the wire.
-   * @return the version associated with the enum value.
-   */
-  int toProtoValue();
-
-  @Override
-  default int version() {
-    return toProtoValue();
-  }
+public interface Versioned {
+  int version();
 }

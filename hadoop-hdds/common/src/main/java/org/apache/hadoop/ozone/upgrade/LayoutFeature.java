@@ -18,12 +18,14 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
+import org.apache.hadoop.ozone.Versioned;
+
 import java.util.Optional;
 
 /**
  * Generic Layout feature interface for Ozone.
  */
-public interface LayoutFeature {
+public interface LayoutFeature extends Versioned {
   String name();
 
   int layoutVersion();
@@ -46,6 +48,11 @@ public interface LayoutFeature {
     }
 
     void execute(T arg) throws Exception;
+  }
+
+  @Override
+  default int version() {
+    return this.layoutVersion();
   }
 
   /**
