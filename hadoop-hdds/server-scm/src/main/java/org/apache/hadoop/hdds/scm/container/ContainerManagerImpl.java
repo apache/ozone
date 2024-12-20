@@ -37,6 +37,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
@@ -145,6 +146,12 @@ public class ContainerManagerImpl implements ContainerManager {
         .getContainer(id))
         .orElseThrow(() -> new ContainerNotFoundException("Container with id " +
             id + " not found."));
+  }
+
+
+  @Override
+  public List<ContainerInfo> getContainers(ReplicationType type) {
+    return toContainers(containerStateManager.getContainerIDs(type));
   }
 
   @Override
