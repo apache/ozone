@@ -57,6 +57,7 @@ public abstract class AbstractSubcommand {
     return rootCommand().isVerbose();
   }
 
+  /** @see GenericParentCommand#getOzoneConf() */
   protected OzoneConfiguration getOzoneConf() {
     return rootCommand().getOzoneConf();
   }
