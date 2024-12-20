@@ -1,5 +1,5 @@
 ---
-title: "Application integrations"
+title: "Application Integrations"
 menu:
    main:
       weight: 5
@@ -21,6 +21,6 @@ menu:
   limitations under the License.
 -->
 
-{{<jumbotron title="Application integration">}}
+{{<jumbotron>}}
 Many applications can be integrated with Ozone through the the Hadoop compatible ofs interface or the S3 interface.
 {{</jumbotron>}}
