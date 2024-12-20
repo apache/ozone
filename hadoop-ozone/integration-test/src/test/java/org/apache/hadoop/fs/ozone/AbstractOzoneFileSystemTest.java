@@ -150,9 +150,8 @@ abstract class AbstractOzoneFileSystemTest {
       p -> !p.toUri().getPath().startsWith(TRASH_ROOT.toString());
   private String fsRoot;
 
-  AbstractOzoneFileSystemTest(boolean setDefaultFs, boolean enableOMRatis, BucketLayout layout) {
+  AbstractOzoneFileSystemTest(boolean setDefaultFs, BucketLayout layout) {
     enabledFileSystemPaths = setDefaultFs;
-    omRatisEnabled = enableOMRatis;
     bucketLayout = layout;
   }
 
@@ -161,7 +160,6 @@ abstract class AbstractOzoneFileSystemTest {
 
   private final BucketLayout bucketLayout;
   private final boolean enabledFileSystemPaths;
-  private final boolean omRatisEnabled;
 
   private MiniOzoneCluster cluster;
   private OzoneClient client;
@@ -186,7 +184,6 @@ abstract class AbstractOzoneFileSystemTest {
     conf.setFloat(FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
     conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, TRASH_INTERVAL / 2);
     conf.setInt(OZONE_OM_SERVER_LIST_MAX_SIZE, 2);
-    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
     conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
