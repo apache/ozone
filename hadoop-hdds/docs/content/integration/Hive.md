@@ -3,7 +3,7 @@ title: Hive
 weight: 4
 menu:
    main:
-      parent: "Application integrations"
+      parent: "Application Integrations"
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
@@ -22,40 +22,34 @@ menu:
   limitations under the License.
 -->
 
-Hive has supported Ozone since Apache Hive 4.0 through [HIVE-26360](https://issues.apache.org/jira/browse/HIVE-26360).
+# Overview
+Apache Hive has supported Apache Ozone since Hive 4.0. To enable Hive to work with Ozone paths, ensure that the `ozone-filesystem-hadoop3` JAR is added to the Hive classpath.
 
-To enable Hive to work with Ozone paths, ensure that the Ozone `ozone-filesystem-hadoop3` JAR file is added to the Hive classpath.
+# Supported Access Protocols
+
+Hive supports the following protocols for accessing Ozone data:
+
+* ofs
+* o3fs
+* s3a
+
+# Supported Replication Types
+
+Hive is compatible with Ozone buckets configured with either:
+
+* RATIS (Replication)
+* Erasure Coding
 
 # Accessing Ozone Data in Hive
 
-Hive provides two approaches to interact with Ozone:
+Hive provides two methods to interact with data in Ozone:
 
-* External Tables
 * Managed Tables
-
-## External Tables
-
-You can create an external table in Hive using data stored in Ozone. For example:
-
-```sql
-CREATE EXTERNAL TABLE external_table (
-    id INT,
-    name STRING
-)
-LOCATION 'ofs://ozone1/vol1/bucket1/table1';
-```
-
-You can verify that Hive correctly references the Ozone path by running:
-
-```sql
-SHOW CREATE EXTERNAL TABLE external_table;
-```
+* External Tables
 
 ## Managed Tables
-
-Hive allows you to configure the Warehouse Directory to store managed tables in Ozone.
-
-To do this, set the following properties in the `hive-site.xml` configuration file:
+### Configuring the Hive Warehouse Directory in Ozone
+To store managed tables in Ozone, update the following properties in the `hive-site.xml` configuration file:
 
 ```xml
 <property>
@@ -68,19 +62,100 @@ To do this, set the following properties in the `hive-site.xml` configuration fi
 </property>
 ```
 
-To create a managed table:
+### Creating a Managed Table
+You can create a managed table with a standard `CREATE TABLE` statement:
+
 ```sql
 CREATE TABLE myTable (
     id INT,
     name STRING
-)
+);
 ```
 
-You can also load data from an Ozone location into a Hive table. For example:
+### Loading Data into a Managed Table
+Data can be loaded into a Hive table from an Ozone location:
 
 ```sql
 LOAD DATA INPATH 'ofs://ozone1/vol1/bucket1/table.csv' INTO TABLE myTable;
 ```
 
-## Using the S3A Protocol
-In addition to ofs, Hive can access Ozone via the S3 Gateway using the S3A file system. For more details, refer to the [S3 Protocol]({{< ref "interface/S3.md">}}) documentation.
+### Specifying a Custom Ozone Path
+You can define a custom Ozone path for a database using the `MANAGEDLOCATION` clause:
+
+```sql
+CREATE DATABASE d1 MANAGEDLOCATION 'ofs://ozone1/vol1/bucket1/data';
+```
+
+Tables created in the database d1 will be stored under the specified path:
+`ofs://ozone1/vol1/bucket1/data`
+
+### Verifying the Ozone Path
+You can confirm that Hive references the correct Ozone path using:
+
+```sql
+SHOW CREATE DATABASE d1;
+```
+
+Output Example:
+
+```text
++----------------------------------------------------+
+|                   createdb_stmt                    |
++----------------------------------------------------+
+| CREATE DATABASE `d1`                               |
+| LOCATION                                           |
+|   'ofs://ozone1/vol1/bucket1/external/d1.db'       |
+| MANAGEDLOCATION                                    |
+|   'ofs://ozone1/vol1/bucket1/data'                 |
++----------------------------------------------------+
+```
+
+## External Tables
+
+Hive allows the creation of external tables to query existing data stored in Ozone.
+
+### Creating an External Table
+```sql
+CREATE EXTERNAL TABLE external_table (
+    id INT,
+    name STRING
+)
+LOCATION 'ofs://ozone1/vol1/bucket1/table1';
+```
+
+### Verifying the External Table Path
+To confirm the table's metadata and location, use:
+
+```sql
+SHOW CREATE EXTERNAL TABLE external_table;
+```
+Output Example:
+
+```text
++----------------------------------------------------+
+|                   createtab_stmt                   |
++----------------------------------------------------+
+| CREATE EXTERNAL TABLE `external_table`(            |
+|   `id` int,                                        |
+|   `name` string)                                   |
+| ROW FORMAT SERDE                                   |
+|   'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe'  |
+| STORED AS INPUTFORMAT                              |
+|   'org.apache.hadoop.mapred.TextInputFormat'       |
+| OUTPUTFORMAT                                       |
+|   'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat' |
+| LOCATION                                           |
+|   'ofs://ozone1/vol1/bucket1/table1'               |
+| TBLPROPERTIES (                                    |
+|   'bucketing_version'='2',                         |
+|   'transient_lastDdlTime'='1734725573')            |
++----------------------------------------------------+
+```
+
+# Using the S3A Protocol
+In addition to ofs, Hive can access Ozone using the S3 Gateway via the S3A file system.
+
+For more information, consult:
+
+* The [S3 Protocol]({{< ref "interface/S3.md">}})
+* The [Hadoop S3A](https://hadoop.apache.org/docs/current/hadoop-aws/tools/hadoop-aws/index.html) documentation.
