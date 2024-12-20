@@ -77,37 +77,6 @@ public class S3MultipartUploadCompleteRequestWithFSO
   }
 
   @Override
-  protected void addMissingParentsToCache(OmBucketInfo omBucketInfo,
-      List<OmDirectoryInfo> missingParentInfos,
-      OMMetadataManager omMetadataManager, long volumeId, long bucketId,
-      long transactionLogIndex) throws IOException {
-
-    // validate and update namespace for missing parent directory.
-    checkBucketQuotaInNamespace(omBucketInfo, missingParentInfos.size());
-    omBucketInfo.incrUsedNamespace(missingParentInfos.size());
-
-    // Add cache entries for the missing parent directories.
-    OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
-        volumeId, bucketId, transactionLogIndex,
-        missingParentInfos, null);
-  }
-
-  @Override
-  protected void addMultiPartToCache(
-      OMMetadataManager omMetadataManager, String multipartOpenKey,
-      OMFileRequest.OMPathInfoWithFSO pathInfoFSO, OmKeyInfo omKeyInfo,
-      String keyName, long transactionLogIndex
-  ) throws IOException {
-
-    // Add multi part to cache
-    OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-        multipartOpenKey, omKeyInfo, pathInfoFSO.getLeafNodeName(),
-        keyName, transactionLogIndex);
-
-  }
-
-
-  @Override
   protected OmKeyInfo getOmKeyInfoFromKeyTable(String dbOzoneFileKey,
       String keyName, OMMetadataManager omMetadataManager) throws IOException {
     return OMFileRequest.getOmKeyInfoFromFileTable(false,
@@ -192,6 +161,11 @@ public class S3MultipartUploadCompleteRequestWithFSO
   @Override
   public BucketLayout getBucketLayout() {
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+  }
+
+  @Override
+  protected boolean addMissingDirectoriesToCacheEnabled() {
+    return true;
   }
 }
 

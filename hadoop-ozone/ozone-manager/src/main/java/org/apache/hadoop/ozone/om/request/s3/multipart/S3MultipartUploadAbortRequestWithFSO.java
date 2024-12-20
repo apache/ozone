@@ -60,4 +60,9 @@ public class S3MultipartUploadAbortRequestWithFSO
         omBucketInfo.copyObject(), getBucketLayout());
     return omClientResp;
   }
+
+  @Override
+  protected boolean addMissingDirectoriesToCacheEnabled() {
+    return true;
+  }
 }

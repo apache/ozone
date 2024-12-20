@@ -24,6 +24,8 @@ import java.util.Map;
 
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
@@ -47,8 +49,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.s3.multipart
-    .S3MultipartUploadAbortResponse;
+import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadAbortResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadAbortRequest;
@@ -57,8 +58,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.util.Time;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
@@ -140,6 +139,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
 
       String multipartOpenKey;
       try {
+        addOrGetMissingDirectories(ozoneManager, keyArgs, trxnLogIndex);
         multipartOpenKey =
             getMultipartOpenKey(keyArgs.getMultipartUploadID(), volumeName,
                 bucketName, keyName, omMetadataManager);
@@ -157,13 +157,18 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       // If there is no entry in openKeyTable, then there is no multipart
       // upload initiated for this key.
       if (omKeyInfo == null) {
-        throw new OMException("Abort Multipart Upload Failed: volume: " +
+        throw new OMException("Abort Multipart Upload Failed (omKeyInfo not found): volume: " +
             requestedVolume + "bucket: " + requestedBucket + "key: " + keyName,
             OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
       }
 
       multipartKeyInfo = omMetadataManager.getMultipartInfoTable()
           .get(multipartKey);
+      if (multipartKeyInfo == null) {
+        throw new OMException("Abort Multipart Upload Failed (multipartKeyInfo not found): volume: " +
+                requestedVolume + "bucket: " + requestedBucket + "key: " + keyName,
+                OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
+      }
       multipartKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       // When abort uploaded key, we need to subtract the PartKey length from
