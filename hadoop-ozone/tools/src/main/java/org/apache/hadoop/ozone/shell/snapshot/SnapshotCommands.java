@@ -20,10 +20,8 @@ package org.apache.hadoop.ozone.shell.snapshot;
 
 import java.util.concurrent.Callable;
 
-import org.apache.hadoop.hdds.cli.GenericParentCommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.MissingSubcommandException;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.shell.Shell;
 
 import picocli.CommandLine.Command;
@@ -45,7 +43,7 @@ import picocli.CommandLine.ParentCommand;
     },
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class SnapshotCommands implements GenericParentCommand, Callable<Void> {
+public class SnapshotCommands implements Callable<Void> {
 
   @ParentCommand
   private Shell shell;
@@ -54,15 +52,5 @@ public class SnapshotCommands implements GenericParentCommand, Callable<Void> {
   public Void call() throws Exception {
     throw new MissingSubcommandException(
         this.shell.getCmd().getSubcommands().get("snapshot"));
-  }
-
-  @Override
-  public boolean isVerbose() {
-    return shell.isVerbose();
-  }
-
-  @Override
-  public OzoneConfiguration createOzoneConfiguration() {
-    return shell.createOzoneConfiguration();
   }
 }

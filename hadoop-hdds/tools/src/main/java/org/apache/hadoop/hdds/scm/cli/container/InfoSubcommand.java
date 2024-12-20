@@ -27,7 +27,6 @@ import java.time.Instant;
 import java.util.Scanner;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.hdds.cli.GenericParentCommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -47,9 +46,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Parameters;
-import picocli.CommandLine.Spec;
 
 /**
  * This is the handler that process container info command.
@@ -60,9 +57,6 @@ import picocli.CommandLine.Spec;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class InfoSubcommand extends ScmSubcommand {
-
-  @Spec
-  private CommandSpec spec;
 
   @CommandLine.Option(names = { "--json" },
       defaultValue = "false",
@@ -181,10 +175,7 @@ public class InfoSubcommand extends ScmSubcommand {
     } else {
       // Print container report info.
       System.out.printf("Container id: %s%n", containerID);
-      boolean verbose = spec != null
-          && spec.root().userObject() instanceof GenericParentCommand
-          && ((GenericParentCommand) spec.root().userObject()).isVerbose();
-      if (verbose) {
+      if (isVerbose()) {
         System.out.printf("Pipeline Info: %s%n", container.getPipeline());
       } else {
         System.out.printf("Pipeline id: %s%n", container.getPipeline().getId().getId());
