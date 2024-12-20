@@ -60,7 +60,7 @@ public class TestTaskStatusService extends AbstractReconSqlDBTest {
     ReconTaskStatusDao reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
 
     ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
-        "Dummy_Task", System.currentTimeMillis(), 0L);
+        "Dummy_Task", System.currentTimeMillis(), 0L, null);
     reconTaskStatusDao.insert(reconTaskStatusRecord);
 
     List<ReconTaskStatus> resultList = new ArrayList<>();
