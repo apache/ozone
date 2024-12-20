@@ -555,8 +555,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   private OMResponse runCommand(OMRequest request, TermIndex termIndex) {
     try {
+      ExecutionContext context = new ExecutionContext();
+      context.setTermIndex(termIndex);
+      context.setIndex(termIndex.getIndex());
       final OMClientResponse omClientResponse = handler.handleWriteRequest(
-          request, termIndex, ozoneManagerDoubleBuffer);
+          request, context, ozoneManagerDoubleBuffer);
       OMLockDetails omLockDetails = omClientResponse.getOmLockDetails();
       OMResponse omResponse = omClientResponse.getOMResponse();
       if (omLockDetails != null) {
