@@ -49,7 +49,7 @@ public class ScmOption extends AbstractMixin {
   private String scmServiceId;
 
   public ScmClient createScmClient() throws IOException {
-    OzoneConfiguration conf = createOzoneConfiguration();
+    OzoneConfiguration conf = getOzoneConf();
     checkAndSetSCMAddressArg(conf);
 
     return new ContainerOperationClient(conf);
@@ -85,7 +85,7 @@ public class ScmOption extends AbstractMixin {
 
   public SCMSecurityProtocol createScmSecurityClient() {
     try {
-      return getScmSecurityClient(createOzoneConfiguration());
+      return getScmSecurityClient(getOzoneConf());
     } catch (IOException ex) {
       throw new IllegalArgumentException(
           "Can't create SCM Security client", ex);

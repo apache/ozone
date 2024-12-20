@@ -64,7 +64,7 @@ public abstract class Handler extends AbstractSubcommand implements Callable<Voi
 
   @Override
   public Void call() throws Exception {
-    conf = createOzoneConfiguration();
+    conf = getOzoneConf();
 
     if (!isApplicable()) {
       return null;

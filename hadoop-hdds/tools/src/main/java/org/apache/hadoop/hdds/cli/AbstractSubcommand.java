@@ -45,10 +45,6 @@ public abstract class AbstractSubcommand {
     return rootCommand().isVerbose();
   }
 
-  public OzoneConfiguration createOzoneConfiguration() {
-    return rootCommand().createOzoneConfiguration();
-  }
-
   protected OzoneConfiguration getOzoneConf() {
     return rootCommand().getOzoneConf();
   }
@@ -61,11 +57,6 @@ public abstract class AbstractSubcommand {
     @Override
     public boolean isVerbose() {
       return false;
-    }
-
-    @Override
-    public OzoneConfiguration createOzoneConfiguration() {
-      return new OzoneConfiguration();
     }
 
     @Override

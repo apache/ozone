@@ -37,10 +37,6 @@ public abstract class AbstractMixin {
     return (GenericParentCommand) spec.root().userObject();
   }
 
-  protected OzoneConfiguration createOzoneConfiguration() {
-    return rootCommand().createOzoneConfiguration();
-  }
-
   protected OzoneConfiguration getOzoneConf() {
     return rootCommand().getOzoneConf();
   }

@@ -105,7 +105,6 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
     throw new MissingSubcommandException(cmd);
   }
 
-  @Override
   public OzoneConfiguration createOzoneConfiguration() {
     OzoneConfiguration ozoneConf = new OzoneConfiguration();
     if (configurationPath != null) {
