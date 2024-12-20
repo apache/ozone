@@ -34,17 +34,19 @@ public abstract class AbstractSubcommand {
   private CommandLine.Model.CommandSpec spec;
 
   private final Supplier<GenericParentCommand> rootSupplier =
-      MemoizedSupplier.valueOf(this::findRootCommand);
+      MemoizedSupplier.valueOf(() -> findRootCommand(spec));
 
   protected CommandLine.Model.CommandSpec spec() {
     return spec;
   }
 
+  /** Get the Ozone object annotated with {@link CommandLine.Command}) that was used to run this command.
+   * Usually this is some subclass of {@link GenericCli}, but in unit tests it could be any subcommand. */
   protected GenericParentCommand rootCommand() {
     return rootSupplier.get();
   }
 
-  private GenericParentCommand findRootCommand() {
+  static GenericParentCommand findRootCommand(CommandLine.Model.CommandSpec spec) {
     Object root = spec.root().userObject();
     return root instanceof GenericParentCommand
         ? (GenericParentCommand) root

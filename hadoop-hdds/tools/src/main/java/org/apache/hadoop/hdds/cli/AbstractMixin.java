@@ -34,7 +34,7 @@ public abstract class AbstractMixin {
   }
 
   protected GenericParentCommand rootCommand() {
-    return (GenericParentCommand) spec.root().userObject();
+    return AbstractSubcommand.findRootCommand(spec);
   }
 
   protected OzoneConfiguration getOzoneConf() {
