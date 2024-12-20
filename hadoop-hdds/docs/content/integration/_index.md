@@ -22,5 +22,5 @@ menu:
 -->
 
 {{<jumbotron>}}
-Many applications can be integrated with Ozone through the the Hadoop compatible ofs interface or the S3 interface.
+Many applications can be integrated with Ozone through the Hadoop-compatible ofs interface or the S3 interface.
 {{</jumbotron>}}
