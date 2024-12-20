@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om.request.validation;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
@@ -37,7 +38,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static java.util.Arrays.asList;
+import static org.apache.hadoop.ozone.om.request.validation.VersionExtractor.CLIENT_VERSION_EXTRACTOR;
+import static org.apache.hadoop.ozone.om.request.validation.VersionExtractor.LAYOUT_VERSION_EXTRACTOR;
 import static org.apache.hadoop.ozone.request.validation.RequestProcessingPhase.POST_PROCESS;
 import static org.apache.hadoop.ozone.request.validation.RequestProcessingPhase.PRE_PROCESS;
 import static org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.GeneralValidatorsForTesting.startValidatorTest;
@@ -81,9 +83,10 @@ public class TestValidatorRegistry {
   public void testNoValidatorsReturnedForEmptyConditionList() {
     ValidatorRegistry<OzoneManagerProtocolProtos.Type> registry =
         new ValidatorRegistry<>(OzoneManagerProtocolProtos.Type.class, PACKAGE,
-            Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getVersionClass).collect(Collectors.toSet()),
-            REQUEST_PROCESSING_PHASES);
-    List<Method> validators = registry.validationsFor(CreateKey, PRE_PROCESS, ClientVersion.CURRENT);
+            Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getValidatorClass)
+                .collect(Collectors.toSet()), REQUEST_PROCESSING_PHASES);
+    List<Method> validators = registry.validationsFor(CreateKey, PRE_PROCESS,
+        CLIENT_VERSION_EXTRACTOR.getValidatorClass(), ClientVersion.CURRENT);
 
     assertTrue(validators.isEmpty());
   }
@@ -92,11 +95,12 @@ public class TestValidatorRegistry {
   public void testRegistryHasThePreFinalizePreProcessCreateKeyValidator() {
     ValidatorRegistry<OzoneManagerProtocolProtos.Type> registry = new ValidatorRegistry<>(
         OzoneManagerProtocolProtos.Type.class, PACKAGE,
-        Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getVersionClass).collect(Collectors.toSet()),
+        Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getValidatorClass).collect(Collectors.toSet()),
         REQUEST_PROCESSING_PHASES);
     List<Method> validators =
-        registry.validationsFor(CreateKey, PRE_PROCESS, asList(ClientVersion.CURRENT,
-            OMLayoutFeature.FILESYSTEM_SNAPSHOT));
+        registry.validationsFor(CreateKey, PRE_PROCESS,
+            ImmutableMap.of(CLIENT_VERSION_EXTRACTOR.getValidatorClass(), ClientVersion.CURRENT,
+                LAYOUT_VERSION_EXTRACTOR.getValidatorClass(), OMLayoutFeature.FILESYSTEM_SNAPSHOT));
 
     assertEquals(1, validators.size());
     String expectedMethodName = "preProcessCreateKeyQuotaLayoutValidator";
@@ -107,10 +111,11 @@ public class TestValidatorRegistry {
   public void testRegistryHasThePreFinalizePostProcessCreateKeyValidator() {
     ValidatorRegistry<OzoneManagerProtocolProtos.Type> registry =
         new ValidatorRegistry<>(OzoneManagerProtocolProtos.Type.class, PACKAGE,
-        Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getVersionClass).collect(Collectors.toSet()),
+        Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getValidatorClass).collect(Collectors.toSet()),
         REQUEST_PROCESSING_PHASES);
     List<Method> validators = registry.validationsFor(CreateKey, POST_PROCESS,
-        asList(ClientVersion.CURRENT, OMLayoutFeature.BUCKET_LAYOUT_SUPPORT));
+        ImmutableMap.of(CLIENT_VERSION_EXTRACTOR.getValidatorClass(), ClientVersion.CURRENT,
+            LAYOUT_VERSION_EXTRACTOR.getValidatorClass(), OMLayoutFeature.BUCKET_LAYOUT_SUPPORT));
 
     assertEquals(1, validators.size());
     String expectedMethodName = "postProcessCreateKeyQuotaLayoutValidator";
@@ -121,10 +126,11 @@ public class TestValidatorRegistry {
   public void testRegistryHasTheOldClientPreProcessCreateKeyValidator() {
     ValidatorRegistry<OzoneManagerProtocolProtos.Type> registry =
         new ValidatorRegistry<>(OzoneManagerProtocolProtos.Type.class, PACKAGE,
-        Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getVersionClass).collect(Collectors.toSet()),
+        Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getValidatorClass).collect(Collectors.toSet()),
         REQUEST_PROCESSING_PHASES);
     List<Method> validators =
-        registry.validationsFor(CreateKey, PRE_PROCESS, ClientVersion.ERASURE_CODING_SUPPORT);
+        registry.validationsFor(CreateKey, PRE_PROCESS, CLIENT_VERSION_EXTRACTOR.getValidatorClass(),
+            ClientVersion.ERASURE_CODING_SUPPORT);
 
     assertEquals(2, validators.size());
     List<String> methodNames =
@@ -137,10 +143,10 @@ public class TestValidatorRegistry {
   public void testRegistryHasTheOldClientPostProcessCreateKeyValidator() {
     ValidatorRegistry<OzoneManagerProtocolProtos.Type> registry =
         new ValidatorRegistry<>(OzoneManagerProtocolProtos.Type.class, PACKAGE,
-        Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getVersionClass).collect(Collectors.toSet()),
+        Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getValidatorClass).collect(Collectors.toSet()),
         REQUEST_PROCESSING_PHASES);
     List<Method> validators = registry.validationsFor(CreateKey, POST_PROCESS,
-        ClientVersion.ERASURE_CODING_SUPPORT);
+        CLIENT_VERSION_EXTRACTOR.getValidatorClass(), ClientVersion.ERASURE_CODING_SUPPORT);
 
     assertEquals(2, validators.size());
     List<String> methodNames =
@@ -153,12 +159,14 @@ public class TestValidatorRegistry {
   public void testRegistryHasTheMultiPurposePreProcessCreateVolumeValidator() {
     ValidatorRegistry<OzoneManagerProtocolProtos.Type> registry =
         new ValidatorRegistry<>(OzoneManagerProtocolProtos.Type.class, PACKAGE,
-        Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getVersionClass).collect(Collectors.toSet()),
+        Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getValidatorClass).collect(Collectors.toSet()),
         REQUEST_PROCESSING_PHASES);
     List<Method> preFinalizeValidators =
-        registry.validationsFor(CreateVolume, PRE_PROCESS, OMLayoutFeature.HSYNC);
+        registry.validationsFor(CreateVolume, PRE_PROCESS, LAYOUT_VERSION_EXTRACTOR.getValidatorClass(),
+            OMLayoutFeature.HSYNC);
     List<Method> newClientValidators =
-        registry.validationsFor(CreateVolume, PRE_PROCESS, ClientVersion.ERASURE_CODING_SUPPORT);
+        registry.validationsFor(CreateVolume, PRE_PROCESS, CLIENT_VERSION_EXTRACTOR.getValidatorClass(),
+            ClientVersion.ERASURE_CODING_SUPPORT);
 
     assertEquals(1, preFinalizeValidators.size());
     assertEquals(1, newClientValidators.size());
@@ -171,12 +179,14 @@ public class TestValidatorRegistry {
   public void testRegistryHasTheMultiPurposePostProcessCreateVolumeValidator() {
     ValidatorRegistry<OzoneManagerProtocolProtos.Type> registry = new ValidatorRegistry<>(
         OzoneManagerProtocolProtos.Type.class, PACKAGE,
-        Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getVersionClass).collect(Collectors.toSet()),
+        Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getValidatorClass).collect(Collectors.toSet()),
         REQUEST_PROCESSING_PHASES);
     List<Method> preFinalizeValidators =
-        registry.validationsFor(CreateVolume, POST_PROCESS, OMLayoutFeature.HSYNC);
+        registry.validationsFor(CreateVolume, POST_PROCESS, LAYOUT_VERSION_EXTRACTOR.getValidatorClass(),
+            OMLayoutFeature.HSYNC);
     List<Method> oldClientValidators =
-        registry.validationsFor(CreateVolume, POST_PROCESS, ClientVersion.ERASURE_CODING_SUPPORT);
+        registry.validationsFor(CreateVolume, POST_PROCESS, CLIENT_VERSION_EXTRACTOR.getValidatorClass(),
+            ClientVersion.ERASURE_CODING_SUPPORT);
 
     assertEquals(1, preFinalizeValidators.size());
     assertEquals(1, oldClientValidators.size());
@@ -189,10 +199,11 @@ public class TestValidatorRegistry {
   public void testValidatorsAreReturnedForMultiCondition() {
     ValidatorRegistry<OzoneManagerProtocolProtos.Type> registry = new ValidatorRegistry<>(
         OzoneManagerProtocolProtos.Type.class, PACKAGE,
-        Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getVersionClass).collect(Collectors.toSet()),
+        Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getValidatorClass).collect(Collectors.toSet()),
         REQUEST_PROCESSING_PHASES);
     List<Method> validators = registry.validationsFor(CreateKey, POST_PROCESS,
-            Arrays.asList(ClientVersion.ERASURE_CODING_SUPPORT, OMLayoutFeature.HSYNC));
+            ImmutableMap.of(CLIENT_VERSION_EXTRACTOR.getValidatorClass(), ClientVersion.ERASURE_CODING_SUPPORT,
+                LAYOUT_VERSION_EXTRACTOR.getValidatorClass(), OMLayoutFeature.HSYNC));
 
     assertEquals(3, validators.size());
     List<String> methodNames =
@@ -207,10 +218,11 @@ public class TestValidatorRegistry {
 
     ValidatorRegistry<OzoneManagerProtocolProtos.Type> registry = new ValidatorRegistry<>(
         OzoneManagerProtocolProtos.Type.class, PACKAGE_WO_VALIDATORS,
-        Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getVersionClass).collect(Collectors.toSet()),
+        Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getValidatorClass).collect(Collectors.toSet()),
         REQUEST_PROCESSING_PHASES);
     assertTrue(registry.validationsFor(CreateKey, PRE_PROCESS,
-        asList(ClientVersion.ERASURE_CODING_SUPPORT, OMLayoutFeature.HSYNC)).isEmpty());
+        ImmutableMap.of(CLIENT_VERSION_EXTRACTOR.getValidatorClass(), ClientVersion.ERASURE_CODING_SUPPORT,
+            LAYOUT_VERSION_EXTRACTOR.getValidatorClass(), OMLayoutFeature.HSYNC)).isEmpty());
   }
 
   @Test
@@ -223,31 +235,34 @@ public class TestValidatorRegistry {
     }
     ValidatorRegistry<OzoneManagerProtocolProtos.Type> registry = new ValidatorRegistry<>(
         OzoneManagerProtocolProtos.Type.class, urlsToUse,
-        Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getVersionClass).collect(Collectors.toSet()),
+        Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getValidatorClass).collect(Collectors.toSet()),
         REQUEST_PROCESSING_PHASES);
 
-    assertTrue(registry.validationsFor(CreateKey, PRE_PROCESS, asList(ClientVersion.CURRENT,
-        OMLayoutFeature.BUCKET_LAYOUT_SUPPORT)).isEmpty());
+    assertTrue(registry.validationsFor(CreateKey, PRE_PROCESS,
+        ImmutableMap.of(CLIENT_VERSION_EXTRACTOR.getValidatorClass(), ClientVersion.CURRENT,
+            LAYOUT_VERSION_EXTRACTOR.getValidatorClass(), OMLayoutFeature.BUCKET_LAYOUT_SUPPORT)).isEmpty());
   }
 
   @Test
   public void testNoDefinedValidationForRequestReturnsEmptyList() {
     ValidatorRegistry<OzoneManagerProtocolProtos.Type> registry = new ValidatorRegistry<>(
         OzoneManagerProtocolProtos.Type.class, PACKAGE,
-        Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getVersionClass).collect(Collectors.toSet()),
+        Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getValidatorClass).collect(Collectors.toSet()),
         REQUEST_PROCESSING_PHASES);
 
-    assertTrue(registry.validationsFor(CreateDirectory, null, ClientVersion.ERASURE_CODING_SUPPORT).isEmpty());
+    assertTrue(registry.validationsFor(CreateDirectory, null, CLIENT_VERSION_EXTRACTOR.getValidatorClass(),
+        ClientVersion.ERASURE_CODING_SUPPORT).isEmpty());
   }
 
   @Test
   public void testFutureVersionForRequestReturnsOnlyFutureVersionValidators() {
     ValidatorRegistry<OzoneManagerProtocolProtos.Type> registry = new ValidatorRegistry<>(
         OzoneManagerProtocolProtos.Type.class, PACKAGE,
-        Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getVersionClass).collect(Collectors.toSet()),
+        Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getValidatorClass).collect(Collectors.toSet()),
         REQUEST_PROCESSING_PHASES);
 
-    List<Method> validators = registry.validationsFor(CreateKey, PRE_PROCESS, ClientVersion.FUTURE_VERSION);
+    List<Method> validators = registry.validationsFor(CreateKey, PRE_PROCESS,
+        CLIENT_VERSION_EXTRACTOR.getValidatorClass(), ClientVersion.FUTURE_VERSION);
 
     assertEquals(1, validators.size());
     List<String> methodNames =

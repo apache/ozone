@@ -41,7 +41,7 @@ class TestVersionExtractor {
     when(context.versionManager()).thenReturn(layoutVersionManager);
     Versioned version = VersionExtractor.LAYOUT_VERSION_EXTRACTOR.extractVersion(null, context);
     assertEquals(layoutVersionValue, version);
-    assertEquals(OMLayoutFeature.class, VersionExtractor.LAYOUT_VERSION_EXTRACTOR.getVersionClass());
+    assertEquals(OMLayoutFeature.class, VersionExtractor.LAYOUT_VERSION_EXTRACTOR.getValidatorClass());
   }
 
   @ParameterizedTest
@@ -51,7 +51,7 @@ class TestVersionExtractor {
     when(request.getVersion()).thenReturn(expectedClientVersion.version());
     Versioned version = VersionExtractor.CLIENT_VERSION_EXTRACTOR.extractVersion(request, null);
     assertEquals(expectedClientVersion, version);
-    assertEquals(ClientVersion.class, VersionExtractor.CLIENT_VERSION_EXTRACTOR.getVersionClass());
+    assertEquals(ClientVersion.class, VersionExtractor.CLIENT_VERSION_EXTRACTOR.getValidatorClass());
   }
 
   @ParameterizedTest
@@ -61,6 +61,6 @@ class TestVersionExtractor {
     when(request.getVersion()).thenReturn(ClientVersion.CURRENT_VERSION + futureVersion);
     Versioned version = VersionExtractor.CLIENT_VERSION_EXTRACTOR.extractVersion(request, null);
     assertEquals(ClientVersion.FUTURE_VERSION, version);
-    assertEquals(ClientVersion.class, VersionExtractor.CLIENT_VERSION_EXTRACTOR.getVersionClass());
+    assertEquals(ClientVersion.class, VersionExtractor.CLIENT_VERSION_EXTRACTOR.getValidatorClass());
   }
 }

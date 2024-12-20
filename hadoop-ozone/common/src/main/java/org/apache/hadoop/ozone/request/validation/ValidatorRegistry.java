@@ -56,9 +56,10 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
    * Based on the afforementioned parameters a complete map is built which stores the validators in a sorted order of
    * the applyBeforeVersion value of the validator method.
    * Thus when a request comes with a certain version value, all validators containing `applyBeforeVersion` parameter
-   * greater than the request versions get triggered. {@link #validationsFor(Enum, RequestProcessingPhase, Versioned)}
+   * greater than the request versions get triggered.
+   * {@link #validationsFor(Enum, RequestProcessingPhase, Class, Versioned)}
    */
-  private final Map<Class<? extends Versioned>, EnumMap<RequestType,
+  private final Map<Class<? extends Annotation>, EnumMap<RequestType,
       EnumMap<RequestProcessingPhase, IndexedItems<Method, Integer>>>> indexedValidatorMap;
 
   /**
@@ -70,16 +71,16 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
    * @param requestType class of request type enum.
    * @param validatorPackage the main package inside which validatiors should
    *                         be discovered.
-   * @param allowedVersionTypes a set containing the various types of version allowed to be registered.
+   * @param allowedValidators a set containing the various types of version allowed to be registered.
    * @param allowedProcessingPhases set of request processing phases which would be allowed to be registered to
    *                                registry.
    *
    */
   public ValidatorRegistry(Class<RequestType> requestType,
                            String validatorPackage,
-                           Set<Class<? extends Versioned>> allowedVersionTypes,
+                           Set<Class<? extends Annotation>> allowedValidators,
                            Set<RequestProcessingPhase> allowedProcessingPhases) {
-    this(requestType, ClasspathHelper.forPackage(validatorPackage), allowedVersionTypes, allowedProcessingPhases);
+    this(requestType, ClasspathHelper.forPackage(validatorPackage), allowedValidators, allowedProcessingPhases);
   }
 
   /**
@@ -90,13 +91,13 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
    * the validator.
    * @param requestType class of request type enum.
    * @param searchUrls the path in which the annotated methods are searched.
-   * @param allowedVersionTypes a set containing the various types of version allowed to be registered.
+   * @param allowedValidators a set containing the various types of validator annotation allowed to be registered.
    * @param allowedProcessingPhases set of request processing phases which would be allowed to be registered to
    *                                registry.
    */
   public ValidatorRegistry(Class<RequestType> requestType,
                     Collection<URL> searchUrls,
-                    Set<Class<? extends Versioned>> allowedVersionTypes,
+                    Set<Class<? extends Annotation>> allowedValidators,
                     Set<RequestProcessingPhase> allowedProcessingPhases) {
     Class<RequestType[]> requestArrayClass = (Class<RequestType[]>) Array.newInstance(requestType, 0)
         .getClass();
@@ -104,16 +105,14 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
         new Reflections(new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.hadoop"))
             .setScanners(Scanners.TypesAnnotated)
             .setParallel(true)).getTypesAnnotatedWith(RegisterValidator.class).stream()
+            .filter(allowedValidators::contains)
             .filter(annotationClass -> getReturnTypeOfAnnotationMethod((Class<? extends Annotation>) annotationClass,
                 RegisterValidator.REQUEST_TYPE_METHOD_NAME)
                 .equals(requestArrayClass))
-            .filter(annotationClass -> allowedVersionTypes.contains(getReturnTypeOfAnnotationMethod(
-                (Class<? extends Annotation>) annotationClass,
-                    RegisterValidator.APPLY_BEFORE_METHOD_NAME)))
             .map(annotationClass -> (Class<? extends Annotation>) annotationClass)
             .collect(Collectors.toSet());
-    this.indexedValidatorMap = allowedVersionTypes.stream().collect(ImmutableMap.toImmutableMap(Function.identity(),
-        versionClass -> new EnumMap<>(requestType)));
+    this.indexedValidatorMap = allowedValidators.stream().collect(ImmutableMap.toImmutableMap(Function.identity(),
+        validatorClass -> new EnumMap<>(requestType)));
     Reflections reflections = new Reflections(new ConfigurationBuilder()
         .setUrls(searchUrls)
         .setScanners(Scanners.MethodsAnnotated)
@@ -134,9 +133,10 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
    */
   public List<Method> validationsFor(RequestType requestType,
                                      RequestProcessingPhase phase,
-                                     List<? extends Versioned> requestVersions) {
-    return requestVersions.stream()
-        .flatMap(requestVersion -> this.validationsFor(requestType, phase, requestVersion).stream())
+                                     Map<Class<? extends Annotation>, ? extends Versioned> requestVersions) {
+    return requestVersions.entrySet().stream()
+        .flatMap(requestVersion -> this.validationsFor(requestType, phase, requestVersion.getKey(),
+            requestVersion.getValue()).stream())
         .distinct().collect(Collectors.toList());
   }
 
@@ -152,6 +152,7 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
    */
   public <V extends Versioned> List<Method> validationsFor(RequestType requestType,
                                                          RequestProcessingPhase phase,
+                                                         Class<? extends Annotation> validatorClass,
                                                          V requestVersion) {
 
     return Optional.ofNullable(this.indexedValidatorMap.get(requestVersion.getClass()))
@@ -234,8 +235,6 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
                                  Class<? extends Annotation> validatorToBeRegistered,
                                  Reflections reflections) {
     Collection<Method> methods =  reflections.getMethodsAnnotatedWith(validatorToBeRegistered);
-    Class<? extends Versioned> versionClass = (Class<? extends Versioned>)
-        this.getReturnTypeOfAnnotationMethod(validatorToBeRegistered, RegisterValidator.APPLY_BEFORE_METHOD_NAME);
     List<Pair<? extends Annotation, Method>> sortedMethodsByApplyBeforeVersion = methods.stream()
         .map(method -> Pair.of(method.getAnnotation(validatorToBeRegistered), method))
         .sorted((validatorMethodPair1, validatorMethodPair2) ->
@@ -254,7 +253,7 @@ public class ValidatorRegistry<RequestType extends Enum<RequestType>> {
       method.setAccessible(true);
       for (RequestType type : types) {
         EnumMap<RequestType, EnumMap<RequestProcessingPhase, IndexedItems<Method, Integer>>> requestMap =
-            this.indexedValidatorMap.get(versionClass);
+            this.indexedValidatorMap.get(validatorToBeRegistered);
         EnumMap<RequestProcessingPhase, IndexedItems<Method, Integer>> phaseMap =
             requestMap.computeIfAbsent(type, k -> new EnumMap<>(RequestProcessingPhase.class));
         phaseMap.computeIfAbsent(phase, k -> new IndexedItems<>()).add(method, applyBeforeVersion.version());

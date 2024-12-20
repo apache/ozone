@@ -115,8 +115,8 @@ public class TestOMValidatorProcessor {
 
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & Versioned> void testACorrectAnnotationSetupForPostProcessCompiles(Class<?> annotationClass,
-                                                                                              V version) {
+  public <V extends Enum<V> & Versioned> void testACorrectAnnotationSetupForPostProcessCompiles(
+      Class<?> annotationClass, V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(postProcess(), aReqType(), annotationClass, version),
         modifiers("public", "static"),

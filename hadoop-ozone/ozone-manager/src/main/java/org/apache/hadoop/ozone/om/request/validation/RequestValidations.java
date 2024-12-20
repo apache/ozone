@@ -25,13 +25,16 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.request.validation.ValidatorRegistry;
+import org.jgrapht.alg.util.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -67,7 +70,7 @@ public class RequestValidations {
 
   public synchronized RequestValidations load() {
     registry = new ValidatorRegistry<>(Type.class, validationsPackageName,
-        Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getVersionClass).collect(Collectors.toSet()),
+        Arrays.stream(VersionExtractor.values()).map(VersionExtractor::getValidatorClass).collect(Collectors.toSet()),
         ALLOWED_REQUEST_PROCESSING_PHASES);
     return this;
   }
@@ -117,10 +120,11 @@ public class RequestValidations {
     return validatedResponse;
   }
 
-  private List<Versioned> getVersions(OMRequest request) {
+  private Map<Class<? extends Annotation>, Versioned> getVersions(OMRequest request) {
     return Arrays.stream(VersionExtractor.values())
-        .map(versionExtractor -> versionExtractor.extractVersion(request, context))
-        .filter(Objects::nonNull)
-        .collect(Collectors.toList());
+        .map(versionExtractor -> Pair.of(versionExtractor.getValidatorClass(),
+            versionExtractor.extractVersion(request, context)))
+        .filter(pair -> Objects.nonNull(pair.getSecond()))
+        .collect(Collectors.toMap(pair -> pair.getFirst(), pair -> pair.getSecond()));
   }
 }
