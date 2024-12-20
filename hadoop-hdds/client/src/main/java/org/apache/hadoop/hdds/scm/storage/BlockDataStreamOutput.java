@@ -507,6 +507,22 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     }
   }
 
+  @Override
+  public void hflush() throws IOException {
+    hsync();
+  }
+
+  @Override
+  public void hsync() throws IOException {
+    try {
+      if (!isClosed()) {
+        handleFlush(false);
+      }
+    } catch (Exception e) {
+
+    }
+  }
+
   public void waitFuturesComplete() throws IOException {
     try {
       CompletableFuture.allOf(futures.toArray(EMPTY_FUTURE_ARRAY)).get();
