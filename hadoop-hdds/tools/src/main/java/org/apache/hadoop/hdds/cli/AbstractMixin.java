@@ -24,7 +24,7 @@ import static picocli.CommandLine.Spec.Target.MIXEE;
 
 /** Base functionality for all Ozone CLI mixins. */
 @CommandLine.Command
-public abstract class AbstractMixin implements GenericParentCommand {
+public abstract class AbstractMixin {
 
   @CommandLine.Spec(MIXEE)
   private CommandLine.Model.CommandSpec spec;
@@ -37,18 +37,11 @@ public abstract class AbstractMixin implements GenericParentCommand {
     return (GenericParentCommand) spec.root().userObject();
   }
 
-  @Override
-  public boolean isVerbose() {
-    return rootCommand().isVerbose();
-  }
-
-  @Override
-  public OzoneConfiguration createOzoneConfiguration() {
+  protected OzoneConfiguration createOzoneConfiguration() {
     return rootCommand().createOzoneConfiguration();
   }
 
-  @Override
-  public OzoneConfiguration getOzoneConf() {
+  protected OzoneConfiguration getOzoneConf() {
     return rootCommand().getOzoneConf();
   }
 

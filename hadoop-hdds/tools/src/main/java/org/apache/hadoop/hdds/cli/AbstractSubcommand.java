@@ -25,7 +25,7 @@ import picocli.CommandLine;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
-public abstract class AbstractSubcommand implements GenericParentCommand {
+public abstract class AbstractSubcommand {
 
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
@@ -35,27 +35,42 @@ public abstract class AbstractSubcommand implements GenericParentCommand {
   }
 
   protected GenericParentCommand rootCommand() {
-    return (GenericParentCommand) spec.root().userObject();
+    Object root = spec.root().userObject();
+    return root instanceof GenericParentCommand
+        ? (GenericParentCommand) root
+        : new NoParentCommand();
   }
 
-  @Override
-  public boolean isVerbose() {
-    final GenericParentCommand root = rootCommand();
-    // 'this' could be root in unit test, where subcommand is created without parents
-    return root != this && root.isVerbose();
+  protected boolean isVerbose() {
+    return rootCommand().isVerbose();
   }
 
-  @Override
   public OzoneConfiguration createOzoneConfiguration() {
-    final GenericParentCommand root = rootCommand();
-    // 'this' could be root in unit test, where subcommand is created without parents
-    return root != this ? root.createOzoneConfiguration() : new OzoneConfiguration();
+    return rootCommand().createOzoneConfiguration();
   }
 
-  @Override
-  public OzoneConfiguration getOzoneConf() {
-    final GenericParentCommand root = rootCommand();
-    // 'this' could be root in unit test, where subcommand is created without parents
-    return root != this ? root.getOzoneConf() : new OzoneConfiguration();
+  protected OzoneConfiguration getOzoneConf() {
+    return rootCommand().getOzoneConf();
+  }
+
+  /** No-op implementation for unit tests, which may bypass creation of GenericCli object. */
+  private static class NoParentCommand implements GenericParentCommand {
+
+    private final OzoneConfiguration conf = new OzoneConfiguration();
+
+    @Override
+    public boolean isVerbose() {
+      return false;
+    }
+
+    @Override
+    public OzoneConfiguration createOzoneConfiguration() {
+      return new OzoneConfiguration();
+    }
+
+    @Override
+    public OzoneConfiguration getOzoneConf() {
+      return conf;
+    }
   }
 }
