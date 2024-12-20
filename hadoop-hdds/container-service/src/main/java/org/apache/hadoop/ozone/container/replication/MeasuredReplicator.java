@@ -97,31 +97,31 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
     DefaultMetricsSystem.instance().unregisterSource(metricsName());
   }
 
-  MutableCounterLong getSuccess() {
+  public MutableCounterLong getSuccess() {
     return success;
   }
 
-  MutableGaugeLong getSuccessTime() {
+  public MutableGaugeLong getSuccessTime() {
     return successTime;
   }
 
-  MutableGaugeLong getFailureTime() {
+  public MutableGaugeLong getFailureTime() {
     return failureTime;
   }
 
-  MutableCounterLong getFailure() {
+  public MutableCounterLong getFailure() {
     return failure;
   }
 
-  MutableGaugeLong getQueueTime() {
+  public MutableGaugeLong getQueueTime() {
     return queueTime;
   }
 
-  MutableGaugeLong getTransferredBytes() {
+  public MutableGaugeLong getTransferredBytes() {
     return transferredBytes;
   }
 
-  MutableGaugeLong getFailureBytes() {
+  public MutableGaugeLong getFailureBytes() {
     return failureBytes;
   }
 

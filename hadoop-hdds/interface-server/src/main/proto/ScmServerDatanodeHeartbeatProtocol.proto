@@ -169,6 +169,7 @@ message NodeReportProto {
   repeated StorageReportProto storageReport = 1;
   repeated MetadataStorageReportProto metadataStorageReport = 2;
   repeated StorageReportProto dbStorageReport = 3;
+  repeated KeyValue replicationMetrics = 4;
 }
 
 message StorageReportProto {

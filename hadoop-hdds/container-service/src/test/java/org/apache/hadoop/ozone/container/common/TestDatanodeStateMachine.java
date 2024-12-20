@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
@@ -204,6 +205,9 @@ public class TestDatanodeStateMachine {
     ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, idPath, conf);
     try (DatanodeStateMachine stateMachine =
              new DatanodeStateMachine(datanodeDetails, conf)) {
+      HddsDatanodeService hddsDatanodeService = new HddsDatanodeService();
+      hddsDatanodeService.setDatanodeStateMachine(stateMachine);
+      stateMachine.getContainer().setHddsDatanodeService(hddsDatanodeService);
       DatanodeStateMachine.DatanodeStates currentState =
           stateMachine.getContext().getState();
       assertEquals(DatanodeStateMachine.DatanodeStates.INIT,
