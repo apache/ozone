@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.ratis.ExecutionContext;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
@@ -127,7 +127,7 @@ public class S3GetSecretRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
@@ -157,7 +157,7 @@ public class S3GetSecretRequest extends OMClientRequest {
               // Not found in S3SecretTable.
               if (createIfNotExist) {
                 // Add new entry in this case
-                assignS3SecretValue = S3SecretValue.of(accessId, awsSecret.get(), termIndex.getIndex());
+                assignS3SecretValue = S3SecretValue.of(accessId, awsSecret.get(), context.getIndex());
                 // Add cache entry first.
                 s3SecretManager.updateCache(accessId, assignS3SecretValue);
               } else {
