@@ -34,7 +34,7 @@
     <apache-rat-plugin.version>0.16.1</apache-rat-plugin.version>
     <aspectj-plugin.version>1.14</aspectj-plugin.version>
     <aspectj.version>1.9.7</aspectj.version>
-    <assertj.version>3.26.3</assertj.version>
+    <assertj.version>3.27.0</assertj.version>
     <aws-java-sdk.version>1.12.661</aws-java-sdk.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.79</bouncycastle.version>
