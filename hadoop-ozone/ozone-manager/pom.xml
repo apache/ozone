@@ -419,7 +419,8 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           </annotationProcessorPaths>
           <annotationProcessors>
             <annotationProcessor>org.apache.hadoop.hdds.conf.ConfigFileGenerator</annotationProcessor>
-            <annotationProcessor>org.apache.ozone.annotations.RequestFeatureValidatorProcessor</annotationProcessor>
+            <annotationProcessor>org.apache.ozone.annotations.OmRequestFeatureValidatorProcessor</annotationProcessor>
+            <annotationProcessor>org.apache.ozone.annotations.RegisterValidatorProcessor</annotationProcessor>
           </annotationProcessors>
         </configuration>
       </plugin>
