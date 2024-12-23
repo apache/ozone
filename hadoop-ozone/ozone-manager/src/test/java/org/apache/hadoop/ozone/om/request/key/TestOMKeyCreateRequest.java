@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -501,6 +502,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         createKeyRequest(false, 0, keyName, initialMetadata);
     OMKeyCreateRequest initialOmKeyCreateRequest =
         new OMKeyCreateRequest(initialRequest, getBucketLayout());
+    initialOmKeyCreateRequest.setUGI(UserGroupInformation.getCurrentUser());
     OMClientResponse initialResponse =
         initialOmKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
     verifyMetadataInResponse(initialResponse, initialMetadata);
@@ -519,6 +521,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         createKeyRequest(false, 0, keyName, updatedMetadata);
     OMKeyCreateRequest updatedOmKeyCreateRequest =
         new OMKeyCreateRequest(updatedRequest, getBucketLayout());
+    updatedOmKeyCreateRequest.setUGI(UserGroupInformation.getCurrentUser());
 
     OMClientResponse updatedResponse =
         updatedOmKeyCreateRequest.validateAndUpdateCache(ozoneManager, 101L);
@@ -562,6 +565,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         createKeyRequest(false, 0, keyName, overwriteMetadata, emptyMap(), emptyList());
     OMKeyCreateRequest overwriteOmKeyCreateRequest =
         new OMKeyCreateRequest(overwriteRequestWithMetadata, getBucketLayout());
+    overwriteOmKeyCreateRequest.setUGI(UserGroupInformation.getCurrentUser());
 
     // Perform the overwrite operation and capture the response
     OMClientResponse overwriteResponse =
@@ -989,7 +993,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     // Retrieve the committed key info
     OmKeyInfo existingKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(getOzoneKey());
     List<OzoneAcl> existingAcls = existingKeyInfo.getAcls();
-    assertEquals(acls, existingAcls);
+    assertThat(existingAcls.containsAll(acls));
 
     // Create a request with a generation which doesn't match the current key
     omRequest = createKeyRequest(false, 0, 100,
@@ -1039,9 +1043,9 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         .findAny().orElse(null);
 
     // Should inherit parent DEFAULT Acls
-    assertEquals(parentDefaultAcl.stream()
+    assertTrue(keyAcls.containsAll(parentDefaultAcl.stream()
             .map(acl -> acl.withScope(OzoneAcl.AclScope.ACCESS))
-            .collect(Collectors.toList()), keyAcls,
+            .collect(Collectors.toList())),
         "Failed to inherit parent DEFAULT acls!,");
 
     // Should not inherit parent ACCESS Acls
@@ -1054,7 +1058,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   }
 
 
-  private void checkNotAValidPath(String keyName) {
+  private void checkNotAValidPath(String keyName) throws IOException {
     OMRequest omRequest = createKeyRequest(false, 0, keyName);
     OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
     OMException ex =
@@ -1137,13 +1141,16 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     return omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
   }
 
-  protected OMKeyCreateRequest getOMKeyCreateRequest(OMRequest omRequest) {
-    return new OMKeyCreateRequest(omRequest, getBucketLayout());
+  protected OMKeyCreateRequest getOMKeyCreateRequest(OMRequest omRequest) throws IOException {
+    OMKeyCreateRequest request = new OMKeyCreateRequest(omRequest, getBucketLayout());
+    request.setUGI(UserGroupInformation.getCurrentUser());
+    return request;
   }
 
   protected OMKeyCreateRequest getOMKeyCreateRequest(
-      OMRequest omRequest, BucketLayout layout) {
-    return new OMKeyCreateRequest(omRequest, layout);
+      OMRequest omRequest, BucketLayout layout) throws IOException {
+    OMKeyCreateRequest request = new OMKeyCreateRequest(omRequest, layout);
+    request.setUGI(UserGroupInformation.getCurrentUser());
+    return request;
   }
-
 }

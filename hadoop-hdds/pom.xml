@@ -29,6 +29,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <name>Apache Ozone HDDS</name>
   <packaging>pom</packaging>
 
+  <properties>
+    <sort.skip>true</sort.skip>
+  </properties>
+
   <modules>
     <module>annotations</module>
     <module>hadoop-dependency-client</module>
@@ -54,18 +58,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <module>rocks-native</module>
   </modules>
 
-  <repositories>
-    <repository>
-      <id>apache.snapshots.https</id>
-      <url>https://repository.apache.org/content/repositories/snapshots</url>
-    </repository>
-  </repositories>
-  <pluginRepositories>
-    <pluginRepository>
-      <id>apache.snapshots.https</id>
-      <url>https://repository.apache.org/content/repositories/snapshots</url>
-    </pluginRepository>
-  </pluginRepositories>
   <dependencyManagement>
     <dependencies>
 

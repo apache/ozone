@@ -20,7 +20,8 @@ set -eux -o pipefail
 # This script exports keytabs and starts KDC server.
 
 export_keytab() {
-   kadmin.local -q "ktadd -norandkey -k /etc/security/keytabs/$2.keytab $1@EXAMPLE.COM"
+  kadmin.local -q "addprinc -randkey $1@EXAMPLE.COM"
+  kadmin.local -q "ktadd -norandkey -k /etc/security/keytabs/$2.keytab $1@EXAMPLE.COM"
 }
 
 rm -f /etc/security/keytabs/*.keytab

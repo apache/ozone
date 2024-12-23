@@ -1032,8 +1032,10 @@ public class SnapshotDiffManager implements AutoCloseable {
     // tombstone is not loaded.
     // TODO: [SNAPSHOT] Update Rocksdb SSTFileIterator to read tombstone
     if (skipNativeDiff || !isNativeLibsLoaded) {
-      deltaFiles.addAll(getSSTFileListForSnapshot(fromSnapshot,
-          tablesToLookUp));
+      Set<String> inputFiles = getSSTFileListForSnapshot(fromSnapshot, tablesToLookUp);
+      ManagedRocksDB fromDB = ((RDBStore)fromSnapshot.getMetadataManager().getStore()).getDb().getManagedRocksDb();
+      RocksDiffUtils.filterRelevantSstFiles(inputFiles, tablePrefixes, fromDB);
+      deltaFiles.addAll(inputFiles);
     }
     addToObjectIdMap(fsTable, tsTable, deltaFiles,
         !skipNativeDiff && isNativeLibsLoaded,
@@ -1125,7 +1127,7 @@ public class SnapshotDiffManager implements AutoCloseable {
                             String diffDir)
       throws IOException {
     // TODO: [SNAPSHOT] Refactor the parameter list
-    final Set<String> deltaFiles = new HashSet<>();
+    Optional<Set<String>> deltaFiles = Optional.empty();
 
     // Check if compaction DAG is available, use that if so
     if (differ != null && fsInfo != null && tsInfo != null && !useFullDiff) {
@@ -1139,40 +1141,36 @@ public class SnapshotDiffManager implements AutoCloseable {
 
       LOG.debug("Calling RocksDBCheckpointDiffer");
       try {
-        List<String> sstDiffList = differ.getSSTDiffListWithFullPath(toDSI,
-            fromDSI, diffDir);
-        deltaFiles.addAll(sstDiffList);
+        deltaFiles = differ.getSSTDiffListWithFullPath(toDSI, fromDSI, diffDir).map(HashSet::new);
       } catch (Exception exception) {
         LOG.warn("Failed to get SST diff file using RocksDBCheckpointDiffer. " +
             "It will fallback to full diff now.", exception);
       }
     }
 
-    if (useFullDiff || deltaFiles.isEmpty()) {
+    if (useFullDiff || !deltaFiles.isPresent()) {
       // If compaction DAG is not available (already cleaned up), fall back to
       //  the slower approach.
       if (!useFullDiff) {
         LOG.warn("RocksDBCheckpointDiffer is not available, falling back to" +
                 " slow path");
       }
-
-      Set<String> fromSnapshotFiles =
-          RdbUtil.getSSTFilesForComparison(
-              ((RDBStore)fromSnapshot.getMetadataManager().getStore())
-                  .getDb().getManagedRocksDb(),
-              tablesToLookUp);
-      Set<String> toSnapshotFiles =
-          RdbUtil.getSSTFilesForComparison(
-              ((RDBStore)toSnapshot.getMetadataManager().getStore()).getDb()
-                  .getManagedRocksDb(),
-              tablesToLookUp);
-
-      deltaFiles.addAll(fromSnapshotFiles);
-      deltaFiles.addAll(toSnapshotFiles);
-      RocksDiffUtils.filterRelevantSstFiles(deltaFiles, tablePrefixes);
+      ManagedRocksDB fromDB = ((RDBStore)fromSnapshot.getMetadataManager().getStore())
+          .getDb().getManagedRocksDb();
+      ManagedRocksDB toDB = ((RDBStore)toSnapshot.getMetadataManager().getStore())
+          .getDb().getManagedRocksDb();
+      Set<String> fromSnapshotFiles = getSSTFileListForSnapshot(fromSnapshot, tablesToLookUp);
+      Set<String> toSnapshotFiles = getSSTFileListForSnapshot(toSnapshot, tablesToLookUp);
+      Set<String> diffFiles = new HashSet<>();
+      diffFiles.addAll(fromSnapshotFiles);
+      diffFiles.addAll(toSnapshotFiles);
+      RocksDiffUtils.filterRelevantSstFiles(diffFiles, tablePrefixes, fromDB, toDB);
+      deltaFiles = Optional.of(diffFiles);
     }
 
-    return deltaFiles;
+    return deltaFiles.orElseThrow(() ->
+        new IOException("Error getting diff files b/w " + fromSnapshot.getSnapshotTableKey() + " and " +
+            toSnapshot.getSnapshotTableKey()));
   }
 
   private void validateEstimatedKeyChangesAreInLimits(

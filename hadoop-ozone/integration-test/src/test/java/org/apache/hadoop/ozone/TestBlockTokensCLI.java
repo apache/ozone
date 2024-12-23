@@ -103,7 +103,8 @@ public final class TestBlockTokensCLI {
 
   @BeforeAll
   public static void init() throws Exception {
-    conf = new OzoneConfiguration();
+    ozoneAdmin = new OzoneAdmin();
+    conf = ozoneAdmin.getOzoneConf();
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
 
     ExitUtils.disableSystemExit();
@@ -117,7 +118,6 @@ public final class TestBlockTokensCLI {
     setSecretKeysConfig();
     startCluster();
     client = cluster.newClient();
-    ozoneAdmin = new OzoneAdmin(conf);
   }
 
   @AfterAll

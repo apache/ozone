@@ -29,7 +29,8 @@ on:
 env:
   FAIL_FAST: ${{ github.event_name == 'pull_request' }}
   # Minimum required Java version for running Ozone is defined in pom.xml (javac.version).
-  TEST_JAVA_VERSION: 17 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
+  TEST_JAVA_VERSION: 21 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
+  MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml --show-version
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
   HADOOP_IMAGE: ghcr.io/apache/hadoop
   OZONE_IMAGE: ghcr.io/apache/ozone
@@ -257,7 +258,7 @@ jobs:
           key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             maven-repo-
-        if: ${{ !contains('author,bats,docs', matrix.check) }}
+        if: ${{ !contains('author,bats', matrix.check) }}
       - name: Download Ratis repo
         if: ${{ inputs.ratis_args != '' }}
         uses: actions/download-artifact@v4
@@ -343,6 +344,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.build-info.outputs.sha }}
+      - name: Cache for maven dependencies
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.m2/repository/*/*/*
+            !~/.m2/repository/org/apache/ozone
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-repo-
       - name: Download compiled Ozone binaries
         uses: actions/download-artifact@v4
         with:
@@ -486,6 +496,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.build-info.outputs.sha }}
+      - name: Cache for maven dependencies
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.m2/repository/*/*/*
+            !~/.m2/repository/org/apache/ozone
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-repo-
       - name: Download compiled Ozone binaries
         uses: actions/download-artifact@v4
         with:
@@ -530,6 +549,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.build-info.outputs.sha }}
+      - name: Cache for maven dependencies
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.m2/repository/*/*/*
+            !~/.m2/repository/org/apache/ozone
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-repo-
       - name: Download compiled Ozone binaries
         uses: actions/download-artifact@v4
         with:
