@@ -140,7 +140,7 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
       }*/
       byte[] crcBytes = checksumData.array();
       if (LOG.isDebugEnabled()) {
-        blockChecksumForDebug = CrcUtil.toSingleCrcString(crcBytes);
+        blockChecksumForDebug = CrcUtil.toMultiCrcString(crcBytes);
       }
       getBlockChecksumBuf().write(crcBytes);
       break;
