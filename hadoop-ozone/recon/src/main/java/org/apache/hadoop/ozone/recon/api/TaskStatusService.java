@@ -47,7 +47,7 @@ public class TaskStatusService {
 
   // Internal function to combine counter value with DerbyDB values
   private ReconTaskStatusResponse convertToTaskStatusResponse(ReconTaskStatus task) {
-    ReconTaskStatusStat counter = taskStatusCounter.getTaskCountFor(task.getTaskName());
+    ReconTaskStatusStat counter = taskStatusCounter.getTaskStatsFor(task.getTaskName());
     return new ReconTaskStatusResponse(
         task.getTaskName(), task.getLastUpdatedSeqNumber(), task.getLastUpdatedTimestamp(),
         task.getIsCurrentTaskRunning(), task.getLastTaskRunStatus(),
@@ -55,15 +55,15 @@ public class TaskStatusService {
   }
 
   /**
-   * Return the list of Recon Tasks and associated metrics.
+   * Return the list of Recon Tasks and associated stats.
    * @return {@link Response}
    */
   @GET
   @Path("status")
-  public Response getTaskMetrics() {
+  public Response getTaskStats() {
     List<ReconTaskStatus> resultSet = reconTaskStatusDao.findAll();
-    List<ReconTaskStatusResponse> taskMetricsList = resultSet.stream().map(
+    List<ReconTaskStatusResponse> taskStatsList = resultSet.stream().map(
         this::convertToTaskStatusResponse).collect(Collectors.toList());
-    return Response.ok(taskMetricsList).build();
+    return Response.ok(taskStatsList).build();
   }
 }

@@ -72,10 +72,10 @@ public class ContainerSizeCountTask extends ReconScmTask {
       ContainerManager containerManager,
       StorageContainerServiceProvider scmClient,
       ReconTaskStatusDao reconTaskStatusDao,
-      ReconTaskStatusCounter reconTaskStatusCounter,
       ReconTaskConfig reconTaskConfig,
       ContainerCountBySizeDao containerCountBySizeDao,
-      UtilizationSchemaDefinition utilizationSchemaDefinition) {
+      UtilizationSchemaDefinition utilizationSchemaDefinition,
+      ReconTaskStatusCounter reconTaskStatusCounter) {
     super(reconTaskStatusDao, reconTaskStatusCounter);
     this.scmClient = scmClient;
     this.containerManager = containerManager;
@@ -175,9 +175,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
   public void process(List<ContainerInfo> containers) {
     lock.writeLock().lock();
     try {
-      taskStatusUpdater.setIsCurrentTaskRunning(1);
-      taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-      taskStatusUpdater.updateDetails();
+      recordRunStart();
       final Map<ContainerSizeCountKey, Long> containerSizeCountMap
           = new HashMap<>();
       final Map<ContainerID, Long> deletedContainers

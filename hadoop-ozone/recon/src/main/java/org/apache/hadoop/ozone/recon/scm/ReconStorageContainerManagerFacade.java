@@ -273,15 +273,15 @@ public class ReconStorageContainerManagerFacade
 
     ReconTaskConfig reconTaskConfig = conf.getObject(ReconTaskConfig.class);
     PipelineSyncTask pipelineSyncTask = new PipelineSyncTask(pipelineManager, nodeManager,
-        reconTaskStatusDao, reconTaskStatusCounter, scmServiceProvider, reconTaskConfig);
+        scmServiceProvider, reconTaskStatusDao, reconTaskConfig, reconTaskStatusCounter);
 
     containerHealthTask = new ContainerHealthTask(containerManager, scmServiceProvider,
-        containerHealthSchemaManager, containerPlacementPolicy, reconTaskStatusDao, reconTaskStatusCounter,
-        reconTaskConfig, reconContainerMetadataManager, conf);
+        reconTaskStatusDao, containerHealthSchemaManager, containerPlacementPolicy,
+        reconTaskConfig, reconContainerMetadataManager, conf, reconTaskStatusCounter);
 
     this.containerSizeCountTask = new ContainerSizeCountTask(containerManager, scmServiceProvider,
-        reconTaskStatusDao, reconTaskStatusCounter, reconTaskConfig,
-        containerCountBySizeDao, utilizationSchemaDefinition);
+        reconTaskStatusDao, reconTaskConfig, containerCountBySizeDao,
+        utilizationSchemaDefinition, reconTaskStatusCounter);
 
     this.dataSource = dataSource;
 

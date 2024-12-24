@@ -94,13 +94,12 @@ public class ContainerHealthTask extends ReconScmTask {
   public ContainerHealthTask(
       ContainerManager containerManager,
       StorageContainerServiceProvider scmClient,
+      ReconTaskStatusDao reconTaskStatusDao,
       ContainerHealthSchemaManager containerHealthSchemaManager,
       PlacementPolicy placementPolicy,
-      ReconTaskStatusDao reconTaskStatusDao,
-      ReconTaskStatusCounter reconTaskStatusCounter,
       ReconTaskConfig reconTaskConfig,
       ReconContainerMetadataManager reconContainerMetadataManager,
-      OzoneConfiguration conf) {
+      OzoneConfiguration conf, ReconTaskStatusCounter reconTaskStatusCounter) {
     super(reconTaskStatusDao, reconTaskStatusCounter);
     this.scmClient = scmClient;
     this.containerHealthSchemaManager = containerHealthSchemaManager;
@@ -144,19 +143,21 @@ public class ContainerHealthTask extends ReconScmTask {
           unhealthyContainerStateStatsMap);
       long start = Time.monotonicNow();
       long currentTime = System.currentTimeMillis();
-      taskStatusUpdater.setIsCurrentTaskRunning(1);
-      taskStatusUpdater.setLastUpdatedTimestamp(currentTime);
-      taskStatusUpdater.updateDetails();
+      recordRunStart();
       long existingCount = processExistingDBRecords(currentTime,
           unhealthyContainerStateStatsMap);
       LOG.debug("Container Health task thread took {} milliseconds to" +
               " process {} existing database records.",
           Time.monotonicNow() - start, existingCount);
 
+      start = Time.monotonicNow();
       checkAndProcessContainers(unhealthyContainerStateStatsMap, currentTime);
+      LOG.debug("Container Health Task thread took {} milliseconds to process containers",
+          Time.monotonicNow() - start);
       taskStatusUpdater.setLastTaskRunStatus(0);
       processedContainers.clear();
     } catch (Exception e) {
+      LOG.error("ContainerHealthTask encountered exception", e);
       // For any exception that is thrown we know the container health check has failed,
       // increment the failure count for the task
       taskStatusUpdater.setLastTaskRunStatus(-1);

@@ -81,10 +81,10 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
         containerManager,
         scmClient,
         reconTaskStatusDao,
-        reconTaskStatusCounter,
         reconTaskConfig,
         containerCountBySizeDao,
-        utilizationSchemaDefinition);
+        utilizationSchemaDefinition,
+        reconTaskStatusCounter);
     // Truncate table before running each test
     dslContext.truncate(CONTAINER_COUNT_BY_SIZE);
   }

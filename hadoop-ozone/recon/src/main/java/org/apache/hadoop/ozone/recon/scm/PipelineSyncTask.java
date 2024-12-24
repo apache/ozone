@@ -60,10 +60,10 @@ public class PipelineSyncTask extends ReconScmTask {
 
   public PipelineSyncTask(ReconPipelineManager pipelineManager,
       ReconNodeManager nodeManager,
-      ReconTaskStatusDao reconTaskStatusDao,
-      ReconTaskStatusCounter reconTaskStatusCounter,
       StorageContainerServiceProvider scmClient,
-      ReconTaskConfig reconTaskConfig) {
+      ReconTaskStatusDao reconTaskStatusDao,
+      ReconTaskConfig reconTaskConfig,
+      ReconTaskStatusCounter reconTaskStatusCounter) {
     super(reconTaskStatusDao, reconTaskStatusCounter);
     this.scmClient = scmClient;
     this.reconPipelineManager = pipelineManager;
@@ -87,24 +87,21 @@ public class PipelineSyncTask extends ReconScmTask {
     }
   }
 
-  public void triggerPipelineSyncTask()
-      throws IOException, NodeNotFoundException {
+  public void triggerPipelineSyncTask() {
     lock.writeLock().lock();
     try {
       long start = Time.monotonicNow();
       List<Pipeline> pipelinesFromScm = scmClient.getPipelines();
-      taskStatusUpdater.setIsCurrentTaskRunning(1);
-      taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-      taskStatusUpdater.updateDetails();
+      recordRunStart();
       reconPipelineManager.initializePipelines(pipelinesFromScm);
       syncOperationalStateOnDeadNodes();
       LOG.debug("Pipeline sync Thread took {} milliseconds.",
           Time.monotonicNow() - start);
       taskStatusUpdater.setLastTaskRunStatus(0);
     } catch (IOException | NodeNotFoundException e) {
+      LOG.error("PipelineSyncTask thread encountered exception", e);
       // If we encounter an exception, increment failure count for task and bubble forward the exception
       taskStatusUpdater.setLastTaskRunStatus(-1);
-      throw e;
     } finally {
       recordSingleRunCompletion();
       lock.writeLock().unlock();

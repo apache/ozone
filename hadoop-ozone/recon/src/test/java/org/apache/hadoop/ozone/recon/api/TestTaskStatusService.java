@@ -96,10 +96,10 @@ public class TestTaskStatusService extends AbstractReconSqlDBTest {
   public void testTaskStatistics() {
 
     ReconTaskStatusCounter taskStatusCounter = mock(ReconTaskStatusCounter.class);
-    ReconTaskStatusStat mockedTaskCounts = new ReconTaskStatusStat(10, 2);
+    ReconTaskStatusStat mockedTaskStats = new ReconTaskStatusStat(10, 2);
     String taskName = "DummyTask_" + System.currentTimeMillis();
 
-    when(taskStatusCounter.getTaskCountFor(anyString())).thenReturn(mockedTaskCounts);
+    when(taskStatusCounter.getTaskStatsFor(anyString())).thenReturn(mockedTaskStats);
 
     Response response = taskStatusService.getTaskMetrics();
     List<ReconTaskStatusResponse> tasks = (List<ReconTaskStatusResponse>) response.getEntity();

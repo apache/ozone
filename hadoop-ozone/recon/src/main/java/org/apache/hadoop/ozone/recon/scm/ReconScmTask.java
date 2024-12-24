@@ -43,26 +43,26 @@ public abstract class ReconScmTask {
     this.taskStatusUpdater = new ReconTaskStatusUpdater(reconTaskStatusDao, taskStatusCounter, getTaskName());
   }
 
-  private void register() {
-    String taskName = getTaskName();
-    taskStatusUpdater.setTaskName(taskName);
-    taskStatusUpdater.updateDetails();
-  }
-
   /**
    * Start underlying start thread.
    */
   public synchronized void start() {
-    register();
-    if (!isRunning()) {
-      LOG.info("Starting {} Thread.", getTaskName());
-      running = true;
-      taskThread = new Thread(this::run, "Recon-" + getTaskName());
-      taskThread.setName(getTaskName());
-      taskThread.setDaemon(true);
-      taskThread.start();
-    } else {
-      LOG.info("{} Thread is already running.", getTaskName());
+    try {
+      if (!isRunning()) {
+        LOG.info("Starting {} Thread.", getTaskName());
+        running = true;
+        taskThread = new Thread(this::run, "Recon-" + getTaskName());
+        taskThread.setName(getTaskName());
+        taskThread.setDaemon(true);
+        taskThread.start();
+
+        // Insert initial values to DB as thread has started
+        taskStatusUpdater.updateDetails();
+      } else {
+        LOG.info("{} Thread is already running.", getTaskName());
+      }
+    } catch (Exception e) {
+      LOG.error("Failed to start {} thread due to exception", getTaskName(), e);
     }
   }
 
@@ -96,6 +96,16 @@ public abstract class ReconScmTask {
       taskStatusUpdater.updateDetails();
     } catch (DataAccessException e) {
       LOG.error("Failed to update table for task: {}", getTaskName());
+    }
+  }
+
+  protected void recordRunStart() {
+    try {
+      taskStatusUpdater.setIsCurrentTaskRunning(1);
+      taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
+      taskStatusUpdater.updateDetails();
+    } catch (DataAccessException e) {
+      LOG.error("Failed to update table for start of task: {}", getTaskName());
     }
   }
 

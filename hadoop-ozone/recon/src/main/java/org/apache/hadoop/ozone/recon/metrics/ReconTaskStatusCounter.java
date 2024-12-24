@@ -21,10 +21,12 @@ package org.apache.hadoop.ozone.recon.metrics;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.api.types.ReconTaskStatusStat;
 
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_STATUS_COUNTER_DURATION;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_STATUS_COUNTER_DURATION_DEFAULT;
+import javax.inject.Inject;
+
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_STATUS_COUNTER_CYCLES_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_STATUS_COUNTER_CYCLES_LIMIT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFUALT;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,7 +36,7 @@ import java.util.concurrent.TimeUnit;
  * This class contains definitions and implementation of Recon Task Status counters
  * For each task we maintain a count of the successes and the failures.
  * This count is stored for a configurable
- * {@link org.apache.hadoop.ozone.recon.ReconServerConfigKeys#OZONE_RECON_TASK_STATUS_COUNTER_DURATION} which defaults
+ * {@link org.apache.hadoop.ozone.recon.ReconServerConfigKeys#OZONE_RECON_TASK_STATUS_COUNTER_CYCLES_LIMIT} which defaults
  * to '5' times {@link org.apache.hadoop.ozone.recon.ReconServerConfigKeys#OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY}
  * Each task is mapped to a {@link ReconTaskStatusStat} instance to store the counts.
  */
@@ -45,25 +47,26 @@ public class ReconTaskStatusCounter {
   // Task name is mapped from the enum to a Pair of <count of successful runs, count of failed runs>
   private final Map<String, ReconTaskStatusStat> taskStatusCounter = new ConcurrentHashMap<>();
 
-  public ReconTaskStatusCounter() {
-    OzoneConfiguration conf = new OzoneConfiguration();
+  @Inject
+  public ReconTaskStatusCounter(OzoneConfiguration conf) {
     int countCycles = conf.getInt(
-        OZONE_RECON_TASK_STATUS_COUNTER_DURATION,
-        OZONE_RECON_TASK_STATUS_COUNTER_DURATION_DEFAULT
+        OZONE_RECON_TASK_STATUS_COUNTER_CYCLES_LIMIT,
+        OZONE_RECON_TASK_STATUS_COUNTER_CYCLES_LIMIT_DEFAULT
     );
     long taskSyncInterval = conf.getTimeDuration(
-        OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY,
-        OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT,
+        RECON_OM_DELTA_UPDATE_LOOP_LIMIT,
+        RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFUALT,
         TimeUnit.MILLISECONDS
     );
     timeoutDuration = taskSyncInterval * countCycles;
   }
 
   /**
-   * Checks if the duration of the counters exceeded
-   * the configured {@link org.apache.hadoop.ozone.recon.ReconServerConfigKeys
-   *  OZONE_RECON_TASK_STATUS_STORAGE_DURATION} duration.
-   * Default duration/TTL of the counter is 30 minutes
+   * Checks if the counter has exceeded the number of OM DB sync cycles for which it is configured
+   * to store the count. <br>
+   * The configuration is: {@link org.apache.hadoop.ozone.recon.ReconServerConfigKeys
+   * #OZONE_RECON_TASK_STATUS_COUNTER_CYCLES_LIMIT} <br>
+   * Default duration/TTL of the counter is 5 OM DB sync cycles.<br>
    * In case the count data TTL is reached, reinitialize the instance to reset the data, else do nothing
    */
   private void checkCountDataExpiry(String taskName) {
@@ -94,7 +97,12 @@ public class ReconTaskStatusCounter {
     }
   }
 
-  public ReconTaskStatusStat getTaskCountFor(String taskName) {
+  /**
+   * Get the statistics like number of success/failure count for the task name provided
+   * @param taskName The task for which stats should be fetched
+   * @return {@link ReconTaskStatusStat} instance of the statistics for the task
+   */
+  public ReconTaskStatusStat getTaskStatsFor(String taskName) {
     return taskStatusCounter.getOrDefault(taskName, new ReconTaskStatusStat());
   }
 }

@@ -3305,7 +3305,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.recon.task.status.counter.duration</name>
+    <name>ozone.recon.task.status.counter.cycles.limit</name>
     <value>5</value>
     <tag>OZONE, RECON</tag>
     <description>
