@@ -96,20 +96,4 @@ public final class SqlDbUtils {
         LOG.info("{} table already exists, skipping creation.", tableName);
         return true;
       };
-
-  /**
-   * Helper function to check if a column exists through JOOQ.
-   */
-  public static final TriFunction<Connection, String, String, Boolean> COLUMN_EXISTS_CHECK =
-      (conn, tableName, columnName) -> {
-        try {
-          DSL.using(conn).select(DSL.field(DSL.name(columnName)))
-              .from(tableName).execute();
-        } catch (DataAccessException ex) {
-          LOG.debug(ex.getMessage());
-          return false;
-        }
-        LOG.info("Found column: {} in table: {}", columnName, tableName);
-        return true;
-      };
 }

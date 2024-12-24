@@ -31,7 +31,6 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 
-import static org.hadoop.ozone.recon.codegen.SqlDbUtils.COLUMN_EXISTS_CHECK;
 import static org.hadoop.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
 import static org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition.RECON_TASK_STATUS_TABLE_NAME;
 
@@ -54,20 +53,13 @@ public class ReconTaskStatusTableUpgradeAction implements ReconUpgradeAction {
       if (!TABLE_EXISTS_CHECK.test(conn, RECON_TASK_STATUS_TABLE_NAME)) {
         return;
       }
-      DSLContext dslContext = DSL.using(conn);
 
-      // This is a workaround as currently the upgrade action runs even for a fresh install
-      // TODO: Remove the check once HDDS-11846 is fixed
-      if (!COLUMN_EXISTS_CHECK.apply(conn, RECON_TASK_STATUS_TABLE_NAME, "last_task_run_status")
-          && !COLUMN_EXISTS_CHECK.apply(conn, RECON_TASK_STATUS_TABLE_NAME, "current_task_run_status")) {
-        // Add the new columns if it is not already present in the table
-        dslContext.alterTable(RECON_TASK_STATUS_TABLE_NAME)
-            .add(
-                DSL.field(DSL.name("last_task_run_status"), SQLDataType.INTEGER),
-                DSL.field(DSL.name("current_task_run_status"), SQLDataType.INTEGER)
-            )
-            .execute();
-      }
+      DSLContext dslContext = DSL.using(conn);
+      dslContext.alterTable(RECON_TASK_STATUS_TABLE_NAME).add(
+          DSL.field(DSL.name("last_task_run_status"), SQLDataType.INTEGER),
+          DSL.field(DSL.name("current_task_run_status"), SQLDataType.INTEGER)
+      ).execute();
+
     } catch (SQLException se) {
       LOG.error("Error while upgrading Recon Task Status table. Message: {}", se.getMessage());
     }
