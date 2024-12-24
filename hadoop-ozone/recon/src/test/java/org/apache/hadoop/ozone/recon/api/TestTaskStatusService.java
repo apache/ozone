@@ -76,7 +76,7 @@ public class TestTaskStatusService extends AbstractReconSqlDBTest {
     List<ReconTaskStatus> resultList = new ArrayList<>();
     resultList.add(reconTaskStatusRecord);
 
-    Response response = taskStatusService.getTaskMetrics();
+    Response response = taskStatusService.getTaskStats();
 
     List<ReconTaskStatusResponse> responseList = (List<ReconTaskStatusResponse>)
         response.getEntity();
@@ -101,7 +101,7 @@ public class TestTaskStatusService extends AbstractReconSqlDBTest {
 
     when(taskStatusCounter.getTaskStatsFor(anyString())).thenReturn(mockedTaskStats);
 
-    Response response = taskStatusService.getTaskMetrics();
+    Response response = taskStatusService.getTaskStats();
     List<ReconTaskStatusResponse> tasks = (List<ReconTaskStatusResponse>) response.getEntity();
     assertEquals(tasks.size(), 1);
     assertEquals(tasks.get(0).getTaskName(), taskName);
