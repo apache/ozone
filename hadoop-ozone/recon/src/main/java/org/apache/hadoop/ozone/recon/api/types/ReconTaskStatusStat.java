@@ -20,34 +20,36 @@ package org.apache.hadoop.ozone.recon.api.types;
 
 import com.google.common.annotations.VisibleForTesting;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 /**
  * This class provides the model for storing the statistics for the
  * various tasks that are run by Recon.
  */
 public class ReconTaskStatusStat {
   // Store the initialization time for the task stats for a specific task
+  private final AtomicInteger successCount;
+  private final AtomicInteger failureCount;
   private long initializationTime;
-  private int successCount;
-  private int failureCount;
 
   public ReconTaskStatusStat() {
     this.initializationTime = System.currentTimeMillis();
-    this.successCount = 0;
-    this.failureCount = 0;
+    this.successCount = new AtomicInteger(0);
+    this.failureCount = new AtomicInteger(0);
   }
 
   @VisibleForTesting
-  public ReconTaskStatusStat(int successCount, int failureCount) {
+  public ReconTaskStatusStat(AtomicInteger successCount, AtomicInteger failureCount) {
     this.successCount = successCount;
     this.failureCount = failureCount;
   }
 
   public void incrementSuccess() {
-    successCount += 1;
+    successCount.incrementAndGet();
   }
 
   public void incrementFailure() {
-    failureCount += 1;
+    failureCount.incrementAndGet();
   }
 
   public void setInitializationTime(long time) {
@@ -59,16 +61,16 @@ public class ReconTaskStatusStat {
   }
 
   public int getSuccessCount() {
-    return successCount;
+    return successCount.get();
   }
 
   public int getFailureCount() {
-    return failureCount;
+    return failureCount.get();
   }
 
   public void reset() {
-    this.successCount = 0;
-    this.failureCount = 0;
+    this.successCount.set(0);
+    this.failureCount.set(0);
     this.initializationTime = System.currentTimeMillis();
   }
 }

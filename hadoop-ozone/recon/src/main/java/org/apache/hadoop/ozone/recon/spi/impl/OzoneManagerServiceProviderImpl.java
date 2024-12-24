@@ -232,13 +232,12 @@ public class OzoneManagerServiceProviderImpl
   }
 
   public void registerOMDBTasks() {
+    registerTask(OmSnapshotTaskName.OmSnapshotRequest.name());
+    registerTask(OmSnapshotTaskName.OmDeltaRequest.name());
+  }
 
-    reconTaskUpdater.setTaskName(OmSnapshotTaskName.OmDeltaRequest.name());
-    reconTaskUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
-    reconTaskUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-    reconTaskUpdater.updateDetails();
-
-    reconTaskUpdater.setTaskName(OmSnapshotTaskName.OmSnapshotRequest.name());
+  private void registerTask(String taskName) {
+    reconTaskUpdater.setTaskName(taskName);
     reconTaskUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
     reconTaskUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
     reconTaskUpdater.updateDetails();
@@ -566,9 +565,9 @@ public class OzoneManagerServiceProviderImpl
         if (currentSequenceNumber <= 0) {
           fullSnapshot = true;
         } else {
-          reconTaskUpdater = reconTaskUpdater.getInstanceWithTask(OmSnapshotTaskName.OmDeltaRequest.name());
+          reconTaskUpdater.setTaskName(OmSnapshotTaskName.OmDeltaRequest.name());
           reconTaskUpdater.setLastUpdatedSeqNumber(currentSequenceNumber);
-          reconTaskUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
+
           try (OMDBUpdatesHandler omdbUpdatesHandler =
               new OMDBUpdatesHandler(omMetadataManager)) {
             LOG.info("Obtaining delta updates from Ozone Manager");
@@ -576,8 +575,10 @@ public class OzoneManagerServiceProviderImpl
             reconTaskUpdater.setIsCurrentTaskRunning(1);
             reconTaskUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
             reconTaskUpdater.updateDetails();
+
             getAndApplyDeltaUpdatesFromOM(currentSequenceNumber,
                 omdbUpdatesHandler);
+
             // Update timestamp of successful delta updates query.
             reconTaskUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
             reconTaskUpdater.setLastTaskRunStatus(0);
@@ -601,7 +602,8 @@ public class OzoneManagerServiceProviderImpl
         }
 
         if (fullSnapshot) {
-          reconTaskUpdater = reconTaskUpdater.getInstanceWithTask(OmSnapshotTaskName.OmSnapshotRequest.name());
+          reconTaskUpdater.setTaskName(OmSnapshotTaskName.OmSnapshotRequest.name());
+          reconTaskUpdater.setLastUpdatedSeqNumber(currentSequenceNumber);
           try {
             metrics.incrNumSnapshotRequests();
             LOG.info("Obtaining full snapshot from Ozone Manager");
@@ -609,10 +611,11 @@ public class OzoneManagerServiceProviderImpl
             reconTaskUpdater.setIsCurrentTaskRunning(1);
             reconTaskUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
             reconTaskUpdater.updateDetails();
+
             boolean success = updateReconOmDBWithNewSnapshot();
             // Update timestamp of successful delta updates query.
             if (success) {
-              reconTaskUpdater.setLastUpdatedTimestamp(getCurrentOMDBSequenceNumber());
+              reconTaskUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
               reconTaskUpdater.setLastTaskRunStatus(0);
 
               // Reinitialize tasks that are listening.

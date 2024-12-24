@@ -70,15 +70,19 @@ public class ReconTaskStatusCounter {
    * In case the count data TTL is reached, reinitialize the instance to reset the data, else do nothing
    */
   private void checkCountDataExpiry(String taskName) {
-    ReconTaskStatusStat taskStat = taskStatusCounter.getOrDefault(taskName, new ReconTaskStatusStat());
-    //Since initially the task list is empty, each task will get initialized at different times
-    if ((System.currentTimeMillis() - taskStat.getInitializationTime()) > timeoutDuration) {
-      // If the task stat TTL is expired, we want to reset the associated counters
-      taskStat.reset();
-    }
-    // Update the map with the for the task stats - this adds the value if not already present
-    // else update the stat with initial values if TTL is over
-    taskStatusCounter.put(taskName, taskStat);
+    taskStatusCounter.compute(taskName, (key, taskStat) -> {
+      if (null == taskStat) {
+        return new ReconTaskStatusStat();
+      }
+
+      //Since initially the task list is empty, each task will get initialized at different times
+      if ((System.currentTimeMillis() - taskStat.getInitializationTime()) > timeoutDuration) {
+        // If TTL has expired we need to reset the stats
+        taskStat.reset();
+      }
+
+      return taskStat;
+    });
   }
 
   /**
@@ -88,13 +92,14 @@ public class ReconTaskStatusCounter {
    */
   public void updateCounter(String taskName, boolean successful) {
     checkCountDataExpiry(taskName);
-    taskStatusCounter.putIfAbsent(taskName, new ReconTaskStatusStat());
-
-    if (successful) {
-      taskStatusCounter.get(taskName).incrementSuccess();
-    } else {
-      taskStatusCounter.get(taskName).incrementFailure();
-    }
+    taskStatusCounter.computeIfPresent(taskName, (key, taskStat) -> {
+      if (successful) {
+        taskStat.incrementSuccess();
+      } else {
+        taskStat.incrementFailure();
+      }
+      return taskStat;
+    });
   }
 
   /**
