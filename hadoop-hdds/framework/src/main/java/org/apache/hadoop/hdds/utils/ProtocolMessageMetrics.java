@@ -33,6 +33,7 @@ import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /**
@@ -125,6 +126,7 @@ public final class ProtocolMessageMetrics<KEY> implements MetricsSource {
 
   public void unregister() {
     DefaultMetricsSystem.instance().unregisterSource(name);
+    quantiles.values().forEach(q -> MetricUtil.stop(q));
   }
 
   @Override
