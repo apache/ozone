@@ -22,6 +22,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -38,6 +39,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -65,6 +67,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_I
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
@@ -73,6 +76,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
@@ -103,6 +108,7 @@ public class TestDeleteWithInAdequateDN {
 
     conf = new OzoneConfiguration();
 
+    conf.setBoolean(OZONE_SCM_HA_ENABLE_KEY, true);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 100,
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
@@ -281,6 +287,8 @@ public class TestDeleteWithInAdequateDN {
     //cluster.getOzoneManager().deleteKey(keyArgs);
     client.getObjectStore().getVolume(volumeName).getBucket(bucketName).
         deleteKey("ratis");
+    // flush deletedBlockLog
+    waitForDeletedBlockLog();
     // make sure the chunk was never deleted on the leader even though
     // deleteBlock handler is invoked
 
@@ -319,5 +327,20 @@ public class TestDeleteWithInAdequateDN {
       });
       assertSame(ContainerProtos.Result.UNABLE_TO_FIND_CHUNK, e.getResult());
     }
+  }
+
+  private void waitForDeletedBlockLog() throws InterruptedException, TimeoutException {
+    GenericTestUtils.waitFor(() -> {
+      StorageContainerManager scm = cluster.getStorageContainerManager();
+      try {
+        scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
+        if (scm.getScmBlockManager().getDeletedBlockLog().getNumOfValidTransactions() > 0) {
+          return true;
+        }
+        return false;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 100, 3000);
   }
 }
