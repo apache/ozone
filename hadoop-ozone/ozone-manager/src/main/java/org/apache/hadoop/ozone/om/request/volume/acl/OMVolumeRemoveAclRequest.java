@@ -53,16 +53,17 @@ public class OMVolumeRemoveAclRequest extends OMVolumeAclRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    OMRequest omRequest = super.preExecute(ozoneManager);
     long modificationTime = Time.now();
     OzoneManagerProtocolProtos.RemoveAclRequest.Builder removeAclRequestBuilder
-        = omRequest.getRemoveAclRequest().toBuilder()
-            .setModificationTime(modificationTime);
+        = getOmRequest().getRemoveAclRequest().toBuilder()
+        .setModificationTime(modificationTime);
 
-    return omRequest.toBuilder()
+    OMRequest omRequest = getOmRequest().toBuilder()
         .setRemoveAclRequest(removeAclRequestBuilder)
         .setUserInfo(getUserInfo())
         .build();
+    setOmRequest(omRequest);
+    return super.preExecute(ozoneManager);
   }
 
   private final List<OzoneAcl> ozoneAcls;

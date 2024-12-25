@@ -60,6 +60,7 @@ import static org.apache.hadoop.ozone.OmUtils.normalizeKey;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.RENAME_OPEN_FILE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.validateKeyName;
 
 /**
  * Handles rename key request - prefix layout.
@@ -72,6 +73,14 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
   public OMKeyRenameRequestWithFSO(OMRequest omRequest,
                                    BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
+  }
+
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    OMRequest omRequest = commonKeyRenamePreExecute(ozoneManager);
+    KeyArgs keyArgs = omRequest.getRenameKeyRequest().getKeyArgs();
+    validateKeyName(keyArgs.getKeyName());
+    return omRequest;
   }
 
   @Override
@@ -103,11 +112,6 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     OmKeyInfo fromKeyValue;
     Result result;
     try {
-      if (fromKeyName.length() == 0) {
-        throw new OMException("Source key name is empty",
-                OMException.ResultCodes.INVALID_KEY_NAME);
-      }
-
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
       acquiredLock = getOmLockDetails().isLockAcquired();

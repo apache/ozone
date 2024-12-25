@@ -53,16 +53,17 @@ public class OMVolumeSetAclRequest extends OMVolumeAclRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    OMRequest omRequest = super.preExecute(ozoneManager);
     long modificationTime = Time.now();
     OzoneManagerProtocolProtos.SetAclRequest.Builder setAclRequestBuilder =
-        omRequest.getSetAclRequest().toBuilder()
+        getOmRequest().getSetAclRequest().toBuilder()
             .setModificationTime(modificationTime);
 
-    return omRequest.toBuilder()
+    OMRequest omRequest = getOmRequest().toBuilder()
         .setSetAclRequest(setAclRequestBuilder)
         .setUserInfo(getUserInfo())
         .build();
+    setOmRequest(omRequest);
+    return super.preExecute(ozoneManager);
   }
 
   private final List<OzoneAcl> ozoneAcls;

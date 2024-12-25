@@ -59,6 +59,7 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    OMRequest request = super.preExecute(ozoneManager);
     if (getModificationTime() < -1) {
       throw new OMException(OMException.ResultCodes.INVALID_REQUEST);
     }
@@ -68,8 +69,6 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
           OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
           getVolumeName(), getBucketName(), getKeyName());
     }
-
-    OMRequest request = super.preExecute(ozoneManager);
 
     SetTimesRequest setTimesRequest = request.getSetTimesRequest();
     String keyPath = setTimesRequest.getKeyArgs().getKeyName();

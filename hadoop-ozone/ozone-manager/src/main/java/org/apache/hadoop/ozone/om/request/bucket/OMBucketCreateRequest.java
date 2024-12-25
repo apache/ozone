@@ -92,14 +92,6 @@ public class OMBucketCreateRequest extends OMClientRequest {
         getOmRequest().getCreateBucketRequest();
     BucketInfo bucketInfo = createBucketRequest.getBucketInfo();
 
-    String volumeName = bucketInfo.getVolumeName();
-    String bucketName = bucketInfo.getBucketName();
-    if (ozoneManager.getAclsEnabled()) {
-      checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
-          OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,
-          volumeName, bucketName, null);
-    }
-
     // Verify resource name
     OmUtils.validateBucketName(bucketInfo.getBucketName(),
         ozoneManager.isStrictS3());
@@ -148,8 +140,18 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
     newCreateBucketRequest.setBucketInfo(newBucketInfo.build());
 
-    return getOmRequest().toBuilder().setUserInfo(getUserInfo())
+    OMRequest omRequest = getOmRequest().toBuilder().setUserInfo(getUserInfo())
         .setCreateBucketRequest(newCreateBucketRequest.build()).build();
+    setOmRequest(omRequest);
+
+    String volumeName = newCreateBucketRequest.getBucketInfo().getVolumeName();
+    String bucketName = newCreateBucketRequest.getBucketInfo().getBucketName();
+    if (ozoneManager.getAclsEnabled()) {
+      checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
+          OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,
+          volumeName, bucketName, null);
+    }
+    return getOmRequest();
   }
 
   private static void validateMaxBucket(OzoneManager ozoneManager)

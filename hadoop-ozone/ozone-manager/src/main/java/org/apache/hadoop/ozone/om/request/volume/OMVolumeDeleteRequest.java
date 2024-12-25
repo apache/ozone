@@ -66,14 +66,14 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    // check Acl
-    String volume = getOmRequest().getDeleteVolumeRequest().getVolumeName();
+    OMRequest omRequest = super.preExecute(ozoneManager);
+    String volume = omRequest.getDeleteVolumeRequest().getVolumeName();
     if (ozoneManager.getAclsEnabled()) {
       checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
           OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.DELETE, volume,
           null, null);
     }
-    return super.preExecute(ozoneManager);
+    return omRequest;
   }
 
   @Override

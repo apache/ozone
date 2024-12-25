@@ -87,13 +87,6 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     BucketArgs bucketArgs =
         getOmRequest().getSetBucketPropertyRequest().getBucketArgs();
 
-    // check Acl
-    final String volumeName = bucketArgs.getVolumeName();
-    final String bucketName = bucketArgs.getBucketName();
-    if (ozoneManager.getAclsEnabled()) {
-      checkAclPermission(ozoneManager, volumeName, bucketName);
-    }
-
     long modificationTime = Time.now();
     OzoneManagerProtocolProtos.SetBucketPropertyRequest.Builder
         setBucketPropertyRequestBuilder = getOmRequest()

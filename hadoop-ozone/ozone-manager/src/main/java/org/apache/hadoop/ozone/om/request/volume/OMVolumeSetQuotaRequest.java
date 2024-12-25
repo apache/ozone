@@ -72,13 +72,6 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     SetVolumePropertyRequest setVolumePropertyRequest =
         getOmRequest().getSetVolumePropertyRequest();
-    String volume = setVolumePropertyRequest.getVolumeName();
-    // check Acl
-    if (ozoneManager.getAclsEnabled()) {
-      checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
-          OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE, volume,
-          null, null);
-    }
     // In production this will never happen, this request will be called only
     // when we have quota in bytes is set in setVolumePropertyRequest.
     if (!setVolumePropertyRequest.hasQuotaInBytes() &&
@@ -96,10 +89,19 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
         .getSetVolumePropertyRequest().toBuilder()
         .setModificationTime(modificationTime);
 
-    return getOmRequest().toBuilder()
+    OMRequest omRequest = getOmRequest().toBuilder()
         .setSetVolumePropertyRequest(setPropertyRequestBuilde)
         .setUserInfo(getUserInfo())
         .build();
+    setOmRequest(omRequest);
+    String volume = omRequest.getSetVolumePropertyRequest().getVolumeName();
+    // check Acl
+    if (ozoneManager.getAclsEnabled()) {
+      checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+          OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE, volume,
+          null, null);
+    }
+    return getOmRequest();
   }
 
   @Override

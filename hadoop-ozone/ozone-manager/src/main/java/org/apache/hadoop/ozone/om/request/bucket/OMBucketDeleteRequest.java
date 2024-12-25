@@ -82,9 +82,11 @@ public class OMBucketDeleteRequest extends OMClientRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    OMRequest omRequest = super.preExecute(ozoneManager);
+
     // check Acl
     DeleteBucketRequest deleteBucketRequest =
-        getOmRequest().getDeleteBucketRequest();
+        omRequest.getDeleteBucketRequest();
     String volumeName = deleteBucketRequest.getVolumeName();
     String bucketName = deleteBucketRequest.getBucketName();
     if (ozoneManager.getAclsEnabled()) {
@@ -92,8 +94,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
           OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.DELETE,
           volumeName, bucketName, null);
     }
-
-    return super.preExecute(ozoneManager);
+    return getOmRequest();
   }
 
   @Override

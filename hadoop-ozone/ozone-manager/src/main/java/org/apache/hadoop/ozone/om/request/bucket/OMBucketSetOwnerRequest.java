@@ -64,20 +64,11 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager)
       throws IOException {
-
-    // check Acl
     final BucketArgs bucketArgs = getOmRequest()
         .getSetBucketPropertyRequest().getBucketArgs();
     if (!bucketArgs.hasOwnerName()) {
       throw new OMException("Bucket args must contain ownerName",
           OMException.ResultCodes.INVALID_REQUEST);
-    }
-    final String volumeName = bucketArgs.getVolumeName();
-    final String bucketName = bucketArgs.getBucketName();
-    if (ozoneManager.getAclsEnabled()) {
-      checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
-          OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
-          volumeName, bucketName, null);
     }
 
     long modificationTime = Time.now();
@@ -86,10 +77,21 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
         .getSetBucketPropertyRequest().toBuilder()
         .setModificationTime(modificationTime);
 
-    return getOmRequest().toBuilder()
+    OMRequest omRequest = getOmRequest().toBuilder()
         .setSetBucketPropertyRequest(setBucketPropertyRequestBuilder)
         .setUserInfo(getUserInfo())
         .build();
+    setOmRequest(omRequest);
+
+    final String volumeName = bucketArgs.getVolumeName();
+    final String bucketName = bucketArgs.getBucketName();
+    // check Acl
+    if (ozoneManager.getAclsEnabled()) {
+      checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
+          OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
+          volumeName, bucketName, null);
+    }
+    return getOmRequest();
   }
 
   @Override

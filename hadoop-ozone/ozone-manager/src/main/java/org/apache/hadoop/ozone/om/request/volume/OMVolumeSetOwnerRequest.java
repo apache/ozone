@@ -78,22 +78,23 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
           OMException.ResultCodes.INVALID_REQUEST);
     }
 
+    long modificationTime = Time.now();
+    SetVolumePropertyRequest.Builder setPropertyRequestBuilder = getOmRequest()
+        .getSetVolumePropertyRequest().toBuilder()
+        .setModificationTime(modificationTime);
+
+    OMRequest omRequest = getOmRequest().toBuilder()
+        .setSetVolumePropertyRequest(setPropertyRequestBuilder)
+        .setUserInfo(getUserInfo())
+        .build();
+    setOmRequest(omRequest);
     // check Acl
     if (ozoneManager.getAclsEnabled()) {
       checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
           OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
           volume, null, null);
     }
-
-    long modificationTime = Time.now();
-    SetVolumePropertyRequest.Builder setPropertyRequestBuilder = getOmRequest()
-        .getSetVolumePropertyRequest().toBuilder()
-        .setModificationTime(modificationTime);
-
-    return getOmRequest().toBuilder()
-        .setSetVolumePropertyRequest(setPropertyRequestBuilder)
-        .setUserInfo(getUserInfo())
-        .build();
+    return getOmRequest();
   }
 
   @Override
