@@ -84,7 +84,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager)
       throws IOException {
-        long modificationTime = Time.now();
+    long modificationTime = Time.now();
     final OzoneManagerProtocolProtos.SetBucketPropertyRequest.Builder
         setBucketPropertyRequestBuilder = getOmRequest()
         .getSetBucketPropertyRequest().toBuilder()
