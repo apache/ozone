@@ -270,3 +270,36 @@ Create key twice with different content and expect different ETags
                                 Execute AWSS3Cli           rm s3://${BUCKET}/test_key_to_check_etag_differences
                                 Execute                    rm -rf /tmp/file1
                                 Execute                    rm -rf /tmp/file2
+
+Create&Download big file by multipart upload and get file via part numbers
+                                Execute                            head -c 10000000 </dev/urandom > /tmp/big_file
+    ${result}                   Execute AWSS3CliDebug              cp /tmp/big_file s3://${BUCKET}/
+    ${get_part_1_response}      Execute AWSS3APICli                get-object --bucket ${BUCKET} --key big_file /tmp/big_file_1 --part-number 1
+    ${part_1_size} =            Execute and checkrc                echo '${get_part_1_response}' | jq -r '.ContentLength'  0
+                                Should contain                     ${get_part_1_response}    \"PartsCount\": 2
+    ${get_part_2_response}      Execute AWSS3APICli                get-object --bucket ${BUCKET} --key big_file /tmp/big_file_2 --part-number 2
+    ${part_2_size} =            Execute and checkrc                echo '${get_part_2_response}' | jq -r '.ContentLength'  0
+                                Should contain                     ${get_part_2_response}    \"PartsCount\": 2
+
+                                Should Be Equal As Integers        10000000    ${${part_1_size} + ${part_2_size}}
+
+    ${get_part_3_response}      Execute AWSS3APICli                get-object --bucket ${BUCKET} --key big_file /tmp/big_file_3 --part-number 3
+                                Should contain                     ${get_part_3_response}    \"ContentLength\": 0
+                                Should contain                     ${get_part_3_response}    \"PartsCount\": 2
+                                # clean up
+                                Execute AWSS3Cli                   rm s3://${BUCKET}/big_file
+                                Execute                            rm -rf /tmp/big_file
+                                Execute                            rm -rf /tmp/big_file_1
+                                Execute                            rm -rf /tmp/big_file_2
+                                Execute                            rm -rf /tmp/big_file_3
+
+Create&Download big file by multipart upload and get file not existed part number
+                                Execute                    head -c 10000000 </dev/urandom > /tmp/big_file
+    ${result}                   Execute AWSS3CliDebug      cp /tmp/big_file s3://${BUCKET}/
+    ${get_part_99_response}     Execute AWSS3APICli        get-object --bucket ${BUCKET} --key big_file /tmp/big_file_1 --part-number 99
+                                Should contain             ${get_part_99_response}    \"ContentLength\": 0
+                                Should contain             ${get_part_99_response}    \"PartsCount\": 2
+                                # clean up
+                                Execute AWSS3Cli           rm s3://${BUCKET}/big_file
+                                Execute                    rm -rf /tmp/big_file
+                                Execute                    rm -rf /tmp/big_file_1
