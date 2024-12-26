@@ -24,9 +24,7 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Scanner;
 
 /**
  * Place one or more datanodes into Maintenance Mode.
@@ -38,12 +36,8 @@ import java.util.Scanner;
     versionProvider = HddsVersionProvider.class)
 public class MaintenanceSubCommand extends ScmSubcommand {
 
-  @CommandLine.Parameters(description = "One or more host names separated by spaces. " +
-          "To read from stdin, specify '-' and supply the host names " +
-          "separated by newlines.",
-          arity = "1..*",
-          paramLabel = "<host name>")
-  private List<String> parameters = new ArrayList<>();
+  @CommandLine.Mixin
+  private HostNameParameters hostNameParams;
 
   @CommandLine.Option(names = {"--end"},
       description = "Automatically end maintenance after the given hours. " +
@@ -58,17 +52,7 @@ public class MaintenanceSubCommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    List<String> hosts;
-    // Whether to read from stdin
-    if (parameters.get(0).equals("-")) {
-      hosts = new ArrayList<>();
-      Scanner scanner = new Scanner(System.in, "UTF-8");
-      while (scanner.hasNextLine()) {
-        hosts.add(scanner.nextLine().trim());
-      }
-    } else {
-      hosts = parameters;
-    }
+    List<String> hosts = hostNameParams.getHostNames();
     List<DatanodeAdminError> errors =
         scmClient.startMaintenanceNodes(hosts, endInHours, force);
     System.out.println("Entering maintenance mode on datanode(s):\n" +

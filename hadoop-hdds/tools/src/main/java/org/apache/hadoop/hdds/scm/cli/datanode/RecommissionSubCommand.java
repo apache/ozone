@@ -24,9 +24,7 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Scanner;
 
 /**
  * Recommission one or more datanodes.
@@ -39,26 +37,12 @@ import java.util.Scanner;
     versionProvider = HddsVersionProvider.class)
 public class RecommissionSubCommand extends ScmSubcommand {
 
-  @CommandLine.Parameters(description = "One or more host names separated by spaces. " +
-          "To read from stdin, specify '-' and supply the host names " +
-          "separated by newlines.",
-          arity = "1..*",
-          paramLabel = "<host name>")
-  private List<String> parameters = new ArrayList<>();
+  @CommandLine.Mixin
+  private HostNameParameters hostNameParams;
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    List<String> hosts;
-    // Whether to read from stdin
-    if (parameters.get(0).equals("-")) {
-      hosts = new ArrayList<>();
-      Scanner scanner = new Scanner(System.in, "UTF-8");
-      while (scanner.hasNextLine()) {
-        hosts.add(scanner.nextLine().trim());
-      }
-    } else {
-      hosts = parameters;
-    }
+    List<String> hosts = hostNameParams.getHostNames();
     List<DatanodeAdminError> errors = scmClient.recommissionNodes(hosts);
     System.out.println("Started recommissioning datanode(s):\n" +
         String.join("\n", hosts));
