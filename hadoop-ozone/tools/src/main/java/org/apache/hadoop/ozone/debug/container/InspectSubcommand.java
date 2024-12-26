@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.debug.container;
 
+import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -39,14 +40,14 @@ import java.util.concurrent.Callable;
     name = "inspect",
     description
         = "Check the metadata of all container replicas on this datanode.")
-public class InspectSubcommand implements Callable<Void> {
+public class InspectSubcommand extends AbstractSubcommand implements Callable<Void> {
 
   @CommandLine.ParentCommand
   private ContainerCommands parent;
 
   @Override
   public Void call() throws IOException {
-    final OzoneConfiguration conf = parent.getOzoneConf();
+    final OzoneConfiguration conf = getOzoneConf();
     parent.loadContainersFromVolumes();
 
     final KeyValueContainerMetadataInspector inspector

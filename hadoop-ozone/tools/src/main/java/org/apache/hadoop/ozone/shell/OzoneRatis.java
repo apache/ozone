@@ -33,15 +33,6 @@ import picocli.CommandLine;
         mixinStandardHelpOptions = true)
 public class OzoneRatis extends GenericCli {
 
-  public OzoneRatis() {
-    super(OzoneRatis.class);
-  }
-
-  /**
-   * Main for the OzoneRatis Command handling.
-   *
-   * @param argv - System Args Strings[]
-   */
   public static void main(String[] argv) throws Exception {
     new OzoneRatis().run(argv);
   }
