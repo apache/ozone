@@ -1426,9 +1426,12 @@ public class TestHSync {
       outputStream2.hsync();
       outputStream2.close();
       assertEquals(data1.length() + data2.length(), metrics.getDataCommittedBytes());
+      // wait until double buffer flush
+      cluster.getOzoneManager().awaitDoubleBufferFlush();
 
       Map<String, OmKeyInfo> openKeys = getAllOpenKeys(openKeyTable);
       Map<String, RepeatedOmKeyInfo> deletedKeys = getAllDeletedKeys(deletedTable);
+
       // There should be no key in openKeyTable
       assertEquals(0, openKeys.size());
       // There should be one key in delete table
@@ -1504,6 +1507,8 @@ public class TestHSync {
       // hsync/close second hsync key should success
       outputStream2.hsync();
       outputStream2.close();
+      // wait until double buffer flush
+      cluster.getOzoneManager().awaitDoubleBufferFlush();
 
       Map<String, OmKeyInfo> openKeys = getAllOpenKeys(openKeyTable);
       Map<String, RepeatedOmKeyInfo> deletedKeys = getAllDeletedKeys(deletedTable);
