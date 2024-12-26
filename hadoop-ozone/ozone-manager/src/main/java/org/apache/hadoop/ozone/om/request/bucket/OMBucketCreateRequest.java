@@ -139,17 +139,23 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
     newCreateBucketRequest.setBucketInfo(newBucketInfo.build());
 
-    OMRequest omRequest = getOmRequest().toBuilder().setUserInfo(getUserInfo())
-        .setCreateBucketRequest(newCreateBucketRequest.build()).build();
+    final OMRequest omRequest = getOmRequest()
+        .toBuilder()
+        .setUserInfo(getUserInfo())
+        .setCreateBucketRequest(newCreateBucketRequest.build())
+        .build();
     setOmRequest(omRequest);
 
-    String volumeName = newCreateBucketRequest.getBucketInfo().getVolumeName();
-    String bucketName = newCreateBucketRequest.getBucketInfo().getBucketName();
+    final String volumeName =
+        newCreateBucketRequest.getBucketInfo().getVolumeName();
+    final String bucketName =
+        newCreateBucketRequest.getBucketInfo().getBucketName();
     if (ozoneManager.getAclsEnabled()) {
       checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
           OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,
           volumeName, bucketName, null);
     }
+
     return getOmRequest();
   }
 

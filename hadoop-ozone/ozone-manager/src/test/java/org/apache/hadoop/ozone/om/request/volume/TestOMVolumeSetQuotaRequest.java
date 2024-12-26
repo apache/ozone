@@ -157,7 +157,6 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
             "user1");
 
     // Creating OMVolumeSetQuotaRequest with SetProperty request set with owner.
-
     OMVolumeSetQuotaRequest omVolumeSetQuotaRequest =
         new OMVolumeSetQuotaRequest(originalRequest);
     OMException exception = assertThrows(OMException.class,

@@ -59,6 +59,7 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
         ozoneManager);
     assertNotEquals(modifiedRequest, originalRequest);
   }
+
   @Test
   public void testPreExecute2() throws Exception {
     String volumeName = UUID.randomUUID().toString();
@@ -72,8 +73,6 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
         () -> omVolumeSetOwnerRequest.preExecute(ozoneManager));
     assertEquals(OMException.ResultCodes.INVALID_REQUEST, e.getResult());
   }
-
-
 
   @Test
   public void testValidateAndUpdateCacheSuccess() throws Exception {
