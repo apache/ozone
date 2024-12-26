@@ -26,6 +26,8 @@ import picocli.CommandLine.Command;
 import java.io.IOException;
 import java.util.List;
 
+import static org.apache.hadoop.hdds.scm.cli.datanode.DecommissionSubCommand.showErrors;
+
 /**
  * Recommission one or more datanodes.
  * Place decommissioned or maintenance nodes back into service.
@@ -46,15 +48,6 @@ public class RecommissionSubCommand extends ScmSubcommand {
     List<DatanodeAdminError> errors = scmClient.recommissionNodes(hosts);
     System.out.println("Started recommissioning datanode(s):\n" +
         String.join("\n", hosts));
-    if (errors.size() > 0) {
-      for (DatanodeAdminError error : errors) {
-        System.err.println("Error: " + error.getHostname() + ": "
-            + error.getError());
-      }
-      // Throwing the exception will cause a non-zero exit status for the
-      // command.
-      throw new IOException(
-          "Some nodes could be recommissioned");
-    }
+    showErrors(errors, "Some nodes could be recommissioned");
   }
 }

@@ -26,6 +26,8 @@ import picocli.CommandLine.Command;
 import java.io.IOException;
 import java.util.List;
 
+import static org.apache.hadoop.hdds.scm.cli.datanode.DecommissionSubCommand.showErrors;
+
 /**
  * Place one or more datanodes into Maintenance Mode.
  */
@@ -57,15 +59,6 @@ public class MaintenanceSubCommand extends ScmSubcommand {
         scmClient.startMaintenanceNodes(hosts, endInHours, force);
     System.out.println("Entering maintenance mode on datanode(s):\n" +
         String.join("\n", hosts));
-    if (errors.size() > 0) {
-      for (DatanodeAdminError error : errors) {
-        System.err.println("Error: " + error.getHostname() + ": "
-            + error.getError());
-      }
-      // Throwing the exception will cause a non-zero exit status for the
-      // command.
-      throw new IOException(
-          "Some nodes could not start the maintenance workflow");
-    }
+    showErrors(errors, "Some nodes could not start the maintenance workflow");
   }
 }

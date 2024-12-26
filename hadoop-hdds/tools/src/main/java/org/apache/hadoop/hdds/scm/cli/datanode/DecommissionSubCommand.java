@@ -50,15 +50,18 @@ public class DecommissionSubCommand extends ScmSubcommand {
     List<DatanodeAdminError> errors = scmClient.decommissionNodes(hosts, force);
     System.out.println("Started decommissioning datanode(s):\n" +
         String.join("\n", hosts));
-    if (errors.size() > 0) {
+    showErrors(errors, "Some nodes could not enter the decommission workflow");
+  }
+
+  static void showErrors(List<DatanodeAdminError> errors, String message) throws IOException {
+    if (!errors.isEmpty()) {
       for (DatanodeAdminError error : errors) {
         System.err.println("Error: " + error.getHostname() + ": "
             + error.getError());
       }
       // Throwing the exception will cause a non-zero exit status for the
       // command.
-      throw new IOException(
-          "Some nodes could not enter the decommission workflow");
+      throw new IOException(message);
     }
   }
 }
