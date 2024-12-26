@@ -84,15 +84,14 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager)
       throws IOException {
-    BucketArgs bucketArgs =
-        getOmRequest().getSetBucketPropertyRequest().getBucketArgs();
-
-    long modificationTime = Time.now();
-    OzoneManagerProtocolProtos.SetBucketPropertyRequest.Builder
+        long modificationTime = Time.now();
+    final OzoneManagerProtocolProtos.SetBucketPropertyRequest.Builder
         setBucketPropertyRequestBuilder = getOmRequest()
         .getSetBucketPropertyRequest().toBuilder()
         .setModificationTime(modificationTime);
 
+    final BucketArgs bucketArgs =
+        getOmRequest().getSetBucketPropertyRequest().getBucketArgs();
     if (bucketArgs.hasBekInfo()) {
       KeyProviderCryptoExtension kmsProvider = ozoneManager.getKmsProvider();
       BucketArgs.Builder bucketArgsBuilder =
@@ -102,10 +101,20 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       setBucketPropertyRequestBuilder.setBucketArgs(bucketArgsBuilder.build());
     }
 
-    return getOmRequest().toBuilder()
+    final OMRequest omRequest = getOmRequest().toBuilder()
         .setSetBucketPropertyRequest(setBucketPropertyRequestBuilder)
         .setUserInfo(getUserInfo())
         .build();
+    setOmRequest(omRequest);
+
+    final String volumeName = bucketArgs.getVolumeName();
+    final String bucketName = bucketArgs.getBucketName();
+    // check Acl
+    if (ozoneManager.getAclsEnabled()) {
+      checkAclPermission(ozoneManager, volumeName, bucketName);
+    }
+
+    return getOmRequest();
   }
 
   @Override

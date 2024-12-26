@@ -91,7 +91,6 @@ public class OMBucketCreateRequest extends OMClientRequest {
     CreateBucketRequest createBucketRequest =
         getOmRequest().getCreateBucketRequest();
     BucketInfo bucketInfo = createBucketRequest.getBucketInfo();
-
     // Verify resource name
     OmUtils.validateBucketName(bucketInfo.getBucketName(),
         ozoneManager.isStrictS3());
@@ -217,7 +216,6 @@ public class OMBucketCreateRequest extends OMClientRequest {
     OMClientResponse omClientResponse = null;
 
     try {
-      // check Acl
       mergeOmLockDetails(
           metadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName));
       acquiredVolumeLock = getOmLockDetails().isLockAcquired();

@@ -312,11 +312,11 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
   )
   public static OMRequest blockCreateDirectoryWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
-    KeyArgs keyArgs = req.getCreateDirectoryRequest().getKeyArgs();
+    final KeyArgs keyArgs = req.getCreateDirectoryRequest().getKeyArgs();
     OMClientRequestUtils.validateVolumeName(keyArgs.getVolumeName());
     OMClientRequestUtils.validateBucketName(keyArgs.getBucketName());
 
-    BucketLayout bucketLayout = ctx.getBucketLayout(
+    final BucketLayout bucketLayout = ctx.getBucketLayout(
         keyArgs.getVolumeName(), keyArgs.getBucketName());
     bucketLayout.validateSupportedOperation();
 
