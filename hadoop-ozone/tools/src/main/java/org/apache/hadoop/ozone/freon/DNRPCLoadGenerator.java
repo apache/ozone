@@ -127,7 +127,7 @@ public class DNRPCLoadGenerator extends BaseFreonGenerator
             "OM echo response payload size should be positive value or zero.");
 
     if (configuration == null) {
-      configuration = freon.createOzoneConfiguration();
+      configuration = freon.getOzoneConf();
     }
     ContainerOperationClient scmClient = new ContainerOperationClient(configuration);
     ContainerInfo containerInfo = scmClient.getContainer(containerID);

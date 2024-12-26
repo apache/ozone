@@ -304,7 +304,7 @@ public final class TestBlockTokensCLI {
    * format.
    */
   private String[] createArgsForCommand(String[] additionalArgs) {
-    OzoneConfiguration defaultConf = ozoneAdmin.createOzoneConfiguration();
+    OzoneConfiguration defaultConf = ozoneAdmin.getOzoneConf();
     Map<String, String> diff = Maps.difference(defaultConf.getOzoneProperties(),
         conf.getOzoneProperties()).entriesOnlyOnRight();
     String[] args = new String[diff.size() + additionalArgs.length];

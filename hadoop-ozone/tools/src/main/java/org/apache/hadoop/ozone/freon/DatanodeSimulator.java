@@ -422,7 +422,7 @@ public class DatanodeSimulator implements Callable<Void> {
   }
 
   private void init() throws IOException {
-    conf = freonCommand.createOzoneConfiguration();
+    conf = freonCommand.getOzoneConf();
     Collection<InetSocketAddress> addresses = getSCMAddressForDatanodes(conf);
     scmClients = new HashMap<>(addresses.size());
     for (InetSocketAddress address : addresses) {

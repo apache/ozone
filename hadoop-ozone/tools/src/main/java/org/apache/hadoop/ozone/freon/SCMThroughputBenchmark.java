@@ -190,7 +190,7 @@ public final class SCMThroughputBenchmark implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    conf = freon.createOzoneConfiguration();
+    conf = freon.getOzoneConf();
 
     ThroughputBenchmark benchmark = createBenchmark();
     initCluster(benchmark);

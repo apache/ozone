@@ -17,16 +17,17 @@
 package org.apache.hadoop.hdds.cli;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.concurrent.Callable;
+import java.util.function.Supplier;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ratis.util.MemoizedSupplier;
 import picocli.CommandLine;
 import picocli.CommandLine.ExitCode;
 import picocli.CommandLine.Model.CommandSpec;
@@ -44,13 +45,18 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
   private boolean verbose;
 
   @Option(names = {"-D", "--set"})
-  private Map<String, String> configurationOverrides = new HashMap<>();
+  public void setConfigurationOverrides(Map<String, String> configOverrides) {
+    configOverrides.forEach(getOzoneConf()::set);
+  }
 
   @Option(names = {"-conf"})
-  private String configurationPath;
+  public void setConfigurationPath(String configPath) {
+    getOzoneConf().addResource(new Path(configPath));
+  }
 
+  private final Supplier<OzoneConfiguration> configSupplier =
+      MemoizedSupplier.valueOf(OzoneConfiguration::new);
   private final CommandLine cmd;
-  private OzoneConfiguration conf;
   private UserGroupInformation user;
 
   public GenericCli() {
@@ -92,8 +98,7 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
   protected void printError(Throwable error) {
     //message could be null in case of NPE. This is unexpected so we can
     //print out the stack trace.
-    if (verbose || error.getMessage() == null
-        || error.getMessage().length() == 0) {
+    if (verbose || Strings.isNullOrEmpty(error.getMessage())) {
       error.printStackTrace(System.err);
     } else {
       System.err.println(error.getMessage().split("\n")[0]);
@@ -105,25 +110,9 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
     throw new MissingSubcommandException(cmd);
   }
 
-  public OzoneConfiguration createOzoneConfiguration() {
-    OzoneConfiguration ozoneConf = new OzoneConfiguration();
-    if (configurationPath != null) {
-      ozoneConf.addResource(new Path(configurationPath));
-    }
-    if (configurationOverrides != null) {
-      for (Entry<String, String> entry : configurationOverrides.entrySet()) {
-        ozoneConf.set(entry.getKey(), entry.getValue());
-      }
-    }
-    return ozoneConf;
-  }
-
   @Override
   public OzoneConfiguration getOzoneConf() {
-    if (conf == null) {
-      conf = createOzoneConfiguration();
-    }
-    return conf;
+    return configSupplier.get();
   }
 
   public UserGroupInformation getUser() throws IOException {
