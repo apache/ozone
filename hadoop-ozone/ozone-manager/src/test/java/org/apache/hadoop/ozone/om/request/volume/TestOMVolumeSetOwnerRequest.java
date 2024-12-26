@@ -61,20 +61,6 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
   }
 
   @Test
-  public void testPreExecute2() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    OMRequest originalRequest =
-        OMRequestTestUtils.createSetVolumePropertyRequest(volumeName);
-
-    OMVolumeSetOwnerRequest omVolumeSetOwnerRequest =
-        new OMVolumeSetOwnerRequest(originalRequest);
-
-    OMException e = assertThrows(OMException.class,
-        () -> omVolumeSetOwnerRequest.preExecute(ozoneManager));
-    assertEquals(OMException.ResultCodes.INVALID_REQUEST, e.getResult());
-  }
-
-  @Test
   public void testValidateAndUpdateCacheSuccess() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String ownerName = "user1";
@@ -170,11 +156,8 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
   @Test
   public void testInvalidRequest() throws Exception {
     String volumeName = UUID.randomUUID().toString();
-
-    // create request with quota set.
     OMRequest originalRequest =
-        OMRequestTestUtils.createSetVolumePropertyRequest(volumeName,
-            100L, 100L);
+        OMRequestTestUtils.createSetVolumePropertyRequest(volumeName);
 
     OMVolumeSetOwnerRequest omVolumeSetOwnerRequest =
         new OMVolumeSetOwnerRequest(originalRequest);
