@@ -393,7 +393,7 @@ public class TestBlockDeletion {
       return scm.getContainerManager().getContainers().stream()
           .allMatch(c -> c.getUsedBytes() == 0 &&
               c.getNumberOfKeys() == 0);
-      }, 500, 20000);
+    }, 500, 20000);
     Thread.sleep(5000);
     // Verify that pending block delete num are as expected with resent cmds
     cluster.getHddsDatanodes().forEach(dn -> {
