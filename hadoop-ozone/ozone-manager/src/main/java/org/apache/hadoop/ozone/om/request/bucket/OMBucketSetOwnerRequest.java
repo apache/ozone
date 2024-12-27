@@ -77,7 +77,8 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
         .getSetBucketPropertyRequest().toBuilder()
         .setModificationTime(modificationTime);
 
-    OMRequest omRequest = getOmRequest().toBuilder()
+    final OMRequest omRequest = getOmRequest()
+        .toBuilder()
         .setSetBucketPropertyRequest(setBucketPropertyRequestBuilder)
         .setUserInfo(getUserInfo())
         .build();

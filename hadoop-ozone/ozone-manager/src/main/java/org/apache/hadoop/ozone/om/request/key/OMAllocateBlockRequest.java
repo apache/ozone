@@ -315,12 +315,12 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
   )
   public static OMRequest blockAllocateBlockWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
-    KeyArgs keyArgs = req.getAllocateBlockRequest().getKeyArgs();
+    final KeyArgs keyArgs = req.getAllocateBlockRequest().getKeyArgs();
 
     OMClientRequestUtils.validateVolumeName(keyArgs.getVolumeName());
     OMClientRequestUtils.validateBucketName(keyArgs.getBucketName());
 
-    BucketLayout bucketLayout = ctx.getBucketLayout(
+    final BucketLayout bucketLayout = ctx.getBucketLayout(
         keyArgs.getVolumeName(), keyArgs.getBucketName());
     bucketLayout.validateSupportedOperation();
 

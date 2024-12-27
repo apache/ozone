@@ -271,12 +271,12 @@ public class OMKeyRenameRequest extends OMKeyRequest {
   )
   public static OMRequest blockRenameKeyWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
-    KeyArgs keyArgs = req.getRenameKeyRequest().getKeyArgs();
+    final KeyArgs keyArgs = req.getRenameKeyRequest().getKeyArgs();
 
     OMClientRequestUtils.validateVolumeName(keyArgs.getVolumeName());
     OMClientRequestUtils.validateBucketName(keyArgs.getBucketName());
 
-    BucketLayout bucketLayout = ctx.getBucketLayout(
+    final BucketLayout bucketLayout = ctx.getBucketLayout(
         keyArgs.getVolumeName(), keyArgs.getBucketName());
     bucketLayout.validateSupportedOperation();
     return req;

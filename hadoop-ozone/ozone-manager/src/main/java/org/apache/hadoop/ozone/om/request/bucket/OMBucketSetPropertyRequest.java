@@ -85,13 +85,14 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
   public OMRequest preExecute(OzoneManager ozoneManager)
       throws IOException {
     long modificationTime = Time.now();
-    final OzoneManagerProtocolProtos.SetBucketPropertyRequest.Builder
+    OzoneManagerProtocolProtos.SetBucketPropertyRequest.Builder
         setBucketPropertyRequestBuilder = getOmRequest()
         .getSetBucketPropertyRequest().toBuilder()
         .setModificationTime(modificationTime);
 
-    final BucketArgs bucketArgs =
+    BucketArgs bucketArgs =
         getOmRequest().getSetBucketPropertyRequest().getBucketArgs();
+
     if (bucketArgs.hasBekInfo()) {
       KeyProviderCryptoExtension kmsProvider = ozoneManager.getKmsProvider();
       BucketArgs.Builder bucketArgsBuilder =
@@ -101,7 +102,8 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       setBucketPropertyRequestBuilder.setBucketArgs(bucketArgsBuilder.build());
     }
 
-    final OMRequest omRequest = getOmRequest().toBuilder()
+    final OMRequest omRequest = getOmRequest()
+        .toBuilder()
         .setSetBucketPropertyRequest(setBucketPropertyRequestBuilder)
         .setUserInfo(getUserInfo())
         .build();
