@@ -107,48 +107,4 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
 
     return chunks;
   }
-
-  /**
-   * Parses out the raw blockChecksum bytes from {@code checksumData} byte
-   * buffer according to the blockChecksumType and populates the cumulative
-   * blockChecksumBuf with it.
-   *
-   * @return a debug-string representation of the parsed checksum if
-   *     debug is enabled, otherwise null.
-   */
-  @Override
-  protected String populateBlockChecksumBuf(ByteBuffer checksumData)
-      throws IOException {
-    String blockChecksumForDebug = null;
-    switch (getCombineMode()) {
-    case MD5MD5CRC:
-      //read md5
-      final MD5Hash md5 = new MD5Hash(checksumData.array());
-      md5.write(getBlockChecksumBuf());
-      if (LOG.isDebugEnabled()) {
-        blockChecksumForDebug = md5.toString();
-      }
-      break;
-    case COMPOSITE_CRC:
-      // TODO: abort if chunk checksum type is not CRC32/CRC32C
-      //BlockChecksumType returnedType = PBHelperClient.convert(
-      //    checksumData.getBlockChecksumOptions().getBlockChecksumType());
-      /*if (returnedType != BlockChecksumType.COMPOSITE_CRC) {
-        throw new IOException(String.format(
-            "Unexpected blockChecksumType '%s', expecting COMPOSITE_CRC",
-            returnedType));
-      }*/
-      byte[] crcBytes = checksumData.array();
-      if (LOG.isDebugEnabled()) {
-        blockChecksumForDebug = CrcUtil.toMultiCrcString(crcBytes);
-      }
-      getBlockChecksumBuf().write(crcBytes);
-      break;
-    default:
-      throw new IOException(
-          "Unknown combine mode: " + getCombineMode());
-    }
-
-    return blockChecksumForDebug;
-  }
 }

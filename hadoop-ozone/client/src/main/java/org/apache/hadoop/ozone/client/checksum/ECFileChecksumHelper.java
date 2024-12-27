@@ -61,33 +61,6 @@ public class ECFileChecksumHelper extends BaseFileChecksumHelper {
   }
 
   @Override
-  protected String populateBlockChecksumBuf(
-      ByteBuffer blockChecksumByteBuffer) throws IOException {
-    String blockChecksumForDebug = null;
-    switch (getCombineMode()) {
-    case MD5MD5CRC:
-      final MD5Hash md5 = new MD5Hash(blockChecksumByteBuffer.array());
-      md5.write(getBlockChecksumBuf());
-      if (LOG.isDebugEnabled()) {
-        blockChecksumForDebug = md5.toString();
-      }
-      break;
-    case COMPOSITE_CRC:
-      byte[] crcBytes = blockChecksumByteBuffer.array();
-      if (LOG.isDebugEnabled()) {
-        blockChecksumForDebug = CrcUtil.toSingleCrcString(crcBytes);
-      }
-      getBlockChecksumBuf().write(crcBytes);
-      break;
-    default:
-      throw new IOException(
-          "Unknown combine mode: " + getCombineMode());
-    }
-
-    return blockChecksumForDebug;
-  }
-
-  @Override
   protected List<ContainerProtos.ChunkInfo> getChunkInfos(OmKeyLocationInfo
                                                               keyLocationInfo) throws IOException {
     // To read an EC block, we create a STANDALONE pipeline that contains the
