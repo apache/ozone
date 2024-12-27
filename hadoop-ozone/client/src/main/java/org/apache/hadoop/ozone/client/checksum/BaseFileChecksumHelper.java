@@ -174,7 +174,7 @@ public abstract class BaseFileChecksumHelper {
    *     debug is enabled, otherwise null.
    */
 
-  protected String populateBlockChecksumBuf(ByteBuffer blockChecksumByteBuffer) throws IOException{
+  protected String populateBlockChecksumBuf(ByteBuffer blockChecksumByteBuffer) throws IOException {
     String blockChecksumForDebug = null;
     switch (getCombineMode()) {
     case MD5MD5CRC:
