@@ -89,7 +89,8 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
         .getSetVolumePropertyRequest().toBuilder()
         .setModificationTime(modificationTime);
 
-    OMRequest omRequest = getOmRequest().toBuilder()
+    final OMRequest omRequest = getOmRequest()
+        .toBuilder()
         .setSetVolumePropertyRequest(setPropertyRequestBuilde)
         .setUserInfo(getUserInfo())
         .build();

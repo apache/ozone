@@ -46,7 +46,7 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
 
   @Test
-  public void testPreExecute1() throws Exception {
+  public void testPreExecute() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String newOwner = "user1";
     OMRequest originalRequest =

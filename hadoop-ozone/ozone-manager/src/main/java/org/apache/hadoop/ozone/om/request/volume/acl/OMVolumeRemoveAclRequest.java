@@ -56,7 +56,7 @@ public class OMVolumeRemoveAclRequest extends OMVolumeAclRequest {
     long modificationTime = Time.now();
     OzoneManagerProtocolProtos.RemoveAclRequest.Builder removeAclRequestBuilder
         = getOmRequest().getRemoveAclRequest().toBuilder()
-        .setModificationTime(modificationTime);
+            .setModificationTime(modificationTime);
 
     OMRequest omRequest = getOmRequest().toBuilder()
         .setRemoveAclRequest(removeAclRequestBuilder)
