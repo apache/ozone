@@ -40,6 +40,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import javax.ws.rs.core.Response;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 /**
@@ -96,7 +97,7 @@ public class TestTaskStatusService extends AbstractReconSqlDBTest {
   public void testTaskStatistics() {
 
     ReconTaskStatusCounter taskStatusCounter = mock(ReconTaskStatusCounter.class);
-    ReconTaskStatusStat mockedTaskStats = new ReconTaskStatusStat(10, 2);
+    ReconTaskStatusStat mockedTaskStats = new ReconTaskStatusStat(new AtomicInteger(10), new AtomicInteger(2));
     String taskName = "DummyTask_" + System.currentTimeMillis();
 
     when(taskStatusCounter.getTaskStatsFor(anyString())).thenReturn(mockedTaskStats);

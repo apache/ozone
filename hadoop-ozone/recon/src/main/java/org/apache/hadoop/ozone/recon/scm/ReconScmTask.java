@@ -18,14 +18,11 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
-import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
-import org.apache.hadoop.ozone.recon.tasks.ReconTaskStatusUpdater;
-import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.jooq.exception.DataAccessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.sql.SQLException;
 
 /**
  * Any background task that keeps SCM's metadata up to date.
@@ -38,9 +35,10 @@ public abstract class ReconScmTask {
   private final ReconTaskStatusUpdater taskStatusUpdater;
 
   protected ReconScmTask(
-      ReconTaskStatusDao reconTaskStatusDao, ReconTaskStatusCounter taskStatusCounter
+      ReconTaskStatusUpdaterManager taskStatusUpdaterManager
   ) {
-    this.taskStatusUpdater = new ReconTaskStatusUpdater(reconTaskStatusDao, taskStatusCounter, getTaskName());
+    // In case the task is not already present in the DB, table is updated with initial values for task
+    this.taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(getTaskName());
   }
 
   /**
@@ -55,9 +53,6 @@ public abstract class ReconScmTask {
         taskThread.setName(getTaskName());
         taskThread.setDaemon(true);
         taskThread.start();
-
-        // Insert initial values to DB as thread has started
-        taskStatusUpdater.updateDetails();
       } else {
         LOG.info("{} Thread is already running.", getTaskName());
       }
@@ -89,6 +84,11 @@ public abstract class ReconScmTask {
     return true;
   }
 
+  /**
+   * Helper function to update TASK_STATUS table with task end values.
+   * Set isCurrentTaskRunning as false, update the timestamp.
+   * Call this function after the actual task processing ends to update table in DB.
+   */
   protected void recordSingleRunCompletion() {
     try {
       taskStatusUpdater.setIsCurrentTaskRunning(0);
@@ -99,6 +99,11 @@ public abstract class ReconScmTask {
     }
   }
 
+  /**
+   * Helper function to update TASK_STATUS table with task start values.
+   * Set the isCurrentTaskRunning as true, update the timestamp.
+   * Call this function before the actual task processing starts to update table in DB.
+   */
   protected void recordRunStart() {
     try {
       taskStatusUpdater.setIsCurrentTaskRunning(1);

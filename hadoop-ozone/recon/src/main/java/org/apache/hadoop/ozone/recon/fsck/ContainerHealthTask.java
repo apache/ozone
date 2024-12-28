@@ -46,7 +46,8 @@ import org.apache.hadoop.ozone.recon.scm.ReconScmTask;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
-import org.apache.hadoop.ozone.recon.tasks.ReconTaskStatusUpdater;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.hadoop.util.Time;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
@@ -94,13 +95,12 @@ public class ContainerHealthTask extends ReconScmTask {
   public ContainerHealthTask(
       ContainerManager containerManager,
       StorageContainerServiceProvider scmClient,
-      ReconTaskStatusDao reconTaskStatusDao,
       ContainerHealthSchemaManager containerHealthSchemaManager,
       PlacementPolicy placementPolicy,
       ReconTaskConfig reconTaskConfig,
       ReconContainerMetadataManager reconContainerMetadataManager,
-      OzoneConfiguration conf, ReconTaskStatusCounter reconTaskStatusCounter) {
-    super(reconTaskStatusDao, reconTaskStatusCounter);
+      OzoneConfiguration conf, ReconTaskStatusUpdaterManager taskStatusUpdaterManager) {
+    super(taskStatusUpdaterManager);
     this.scmClient = scmClient;
     this.containerHealthSchemaManager = containerHealthSchemaManager;
     this.reconContainerMetadataManager = reconContainerMetadataManager;

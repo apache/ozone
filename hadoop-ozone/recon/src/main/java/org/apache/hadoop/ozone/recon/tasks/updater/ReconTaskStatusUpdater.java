@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.recon.tasks;
+package org.apache.hadoop.ozone.recon.tasks.updater;
 
 import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
@@ -40,19 +40,23 @@ public class ReconTaskStatusUpdater {
   private String taskName;
 
   public ReconTaskStatusUpdater(ReconTaskStatusDao reconTaskStatusDao,
-                                ReconTaskStatusCounter reconTaskStatusCounter) {
-    this.reconTaskStatusDao = reconTaskStatusDao;
-    this.taskStatusCounter = reconTaskStatusCounter;
-    this.reconTaskStatus = new ReconTaskStatus(null, 0L, 0L, 0, 0);
-  }
-
-  public ReconTaskStatusUpdater(ReconTaskStatusDao reconTaskStatusDao,
                                 ReconTaskStatusCounter taskStatusCounter,
                                 String taskName) {
     this.taskName = taskName;
     this.reconTaskStatusDao = reconTaskStatusDao;
     this.taskStatusCounter = taskStatusCounter;
     this.reconTaskStatus = new ReconTaskStatus(taskName, 0L, 0L, 0, 0);
+  }
+
+  public ReconTaskStatusUpdater(ReconTaskStatusDao reconTaskStatusDao,
+                                ReconTaskStatusCounter reconTaskStatusCounter,
+                                String taskName, Long lastUpdatedTimestamp, Long lastUpdatedSeqNum,
+                                Integer lastTaskRunStatus, Integer isCurrentTaskRunning) {
+    this.taskName = taskName;
+    this.reconTaskStatusDao = reconTaskStatusDao;
+    this.taskStatusCounter = reconTaskStatusCounter;
+    this.reconTaskStatus = new ReconTaskStatus(taskName, lastUpdatedTimestamp, lastUpdatedSeqNum,
+        lastTaskRunStatus, isCurrentTaskRunning);
   }
 
   public void setTaskName(String taskName) {
@@ -74,10 +78,6 @@ public class ReconTaskStatusUpdater {
 
   public void setIsCurrentTaskRunning(int isCurrentTaskRunning) {
     this.reconTaskStatus.setIsCurrentTaskRunning(isCurrentTaskRunning);
-  }
-
-  public ReconTaskStatusUpdater getInstanceWithTask(String name) {
-    return new ReconTaskStatusUpdater(reconTaskStatusDao, taskStatusCounter, name);
   }
 
   public void updateDetails() {

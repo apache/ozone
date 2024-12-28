@@ -25,8 +25,10 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QU
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
 import static org.hadoop.ozone.recon.schema.tables.ContainerCountBySizeTable.CONTAINER_COUNT_BY_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -38,6 +40,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
@@ -54,8 +58,7 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
   private ContainerManager containerManager;
   private StorageContainerServiceProvider scmClient;
   private ReconTaskConfig reconTaskConfig;
-  private ReconTaskStatusDao reconTaskStatusDao;
-  private ReconTaskStatusCounter reconTaskStatusCounter;
+  private ReconTaskStatusUpdaterManager reconTaskStatusUpdaterManager;
   private ContainerCountBySizeDao containerCountBySizeDao;
   private UtilizationSchemaDefinition utilizationSchemaDefinition;
   private ContainerSizeCountTask task;
@@ -73,18 +76,19 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
     containerCountBySizeDao = getDao(ContainerCountBySizeDao.class);
     reconTaskConfig = new ReconTaskConfig();
     reconTaskConfig.setContainerSizeCountTaskInterval(Duration.ofSeconds(1));
-    reconTaskStatusDao = mock(ReconTaskStatusDao.class);
-    reconTaskStatusCounter = mock(ReconTaskStatusCounter.class);
+    reconTaskStatusUpdaterManager = mock(ReconTaskStatusUpdaterManager.class);
+    when(reconTaskStatusUpdaterManager.getTaskStatusUpdater(anyString())).thenReturn(new ReconTaskStatusUpdater(
+        getDao(ReconTaskStatusDao.class), mock(ReconTaskStatusCounter.class),
+        "mockedTask-" + System.currentTimeMillis()));
     containerManager = mock(ContainerManager.class);
     scmClient = mock(StorageContainerServiceProvider.class);
     task = new ContainerSizeCountTask(
         containerManager,
         scmClient,
-        reconTaskStatusDao,
         reconTaskConfig,
         containerCountBySizeDao,
         utilizationSchemaDefinition,
-        reconTaskStatusCounter);
+        reconTaskStatusUpdaterManager);
     // Truncate table before running each test
     dslContext.truncate(CONTAINER_COUNT_BY_SIZE);
   }

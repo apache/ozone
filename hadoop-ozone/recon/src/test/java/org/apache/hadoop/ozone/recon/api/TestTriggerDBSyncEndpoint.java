@@ -39,6 +39,8 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.junit.jupiter.api.BeforeEach;
@@ -103,8 +105,13 @@ public class TestTriggerDBSyncEndpoint {
 
 
     ReconUtils reconUtilsMock = mock(ReconUtils.class);
+
     ReconTaskStatusDao reconTaskStatusDaoMock = mock(ReconTaskStatusDao.class);
     ReconTaskStatusCounter reconTaskStatusCounterMock = mock(ReconTaskStatusCounter.class);
+    ReconTaskStatusUpdaterManager taskStatusUpdaterManagerMock = mock(ReconTaskStatusUpdaterManager.class);
+    when(taskStatusUpdaterManagerMock.getTaskStatusUpdater(anyString())).thenReturn(new ReconTaskStatusUpdater(
+        reconTaskStatusDaoMock, reconTaskStatusCounterMock, "dummyTaskManager"));
+
     DBCheckpoint checkpoint = omMetadataManager.getStore()
         .getCheckpoint(true);
     File tarFile = createTarFile(checkpoint.getCheckpointLocation());
@@ -121,8 +128,9 @@ public class TestTriggerDBSyncEndpoint {
     ReconTaskController reconTaskController = mock(ReconTaskController.class);
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         new OzoneManagerServiceProviderImpl(configuration,
-            reconOMMetadataManager, reconTaskController, reconTaskStatusDaoMock, reconTaskStatusCounterMock,
-            reconUtilsMock, ozoneManagerProtocol, new ReconContext(configuration, reconUtilsMock));
+            reconOMMetadataManager, reconTaskController,
+            reconUtilsMock, ozoneManagerProtocol, new ReconContext(configuration, reconUtilsMock),
+            taskStatusUpdaterManagerMock);
     ozoneManagerServiceProvider.start();
 
     reconTestInjector =

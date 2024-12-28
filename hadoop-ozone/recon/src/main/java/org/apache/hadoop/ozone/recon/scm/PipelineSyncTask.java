@@ -34,7 +34,8 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
-import org.apache.hadoop.ozone.recon.tasks.ReconTaskStatusUpdater;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.hadoop.util.Time;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.slf4j.Logger;
@@ -59,12 +60,11 @@ public class PipelineSyncTask extends ReconScmTask {
   private final ReconTaskStatusUpdater taskStatusUpdater;
 
   public PipelineSyncTask(ReconPipelineManager pipelineManager,
-      ReconNodeManager nodeManager,
-      StorageContainerServiceProvider scmClient,
-      ReconTaskStatusDao reconTaskStatusDao,
-      ReconTaskConfig reconTaskConfig,
-      ReconTaskStatusCounter reconTaskStatusCounter) {
-    super(reconTaskStatusDao, reconTaskStatusCounter);
+                          ReconNodeManager nodeManager,
+                          StorageContainerServiceProvider scmClient,
+                          ReconTaskConfig reconTaskConfig,
+                          ReconTaskStatusUpdaterManager taskStatusUpdaterManager) {
+    super(taskStatusUpdaterManager);
     this.scmClient = scmClient;
     this.reconPipelineManager = pipelineManager;
     this.nodeManager = nodeManager;
@@ -87,7 +87,7 @@ public class PipelineSyncTask extends ReconScmTask {
     }
   }
 
-  public void triggerPipelineSyncTask() {
+  public void triggerPipelineSyncTask() throws IOException, NodeNotFoundException{
     lock.writeLock().lock();
     try {
       long start = Time.monotonicNow();
@@ -102,6 +102,7 @@ public class PipelineSyncTask extends ReconScmTask {
       LOG.error("PipelineSyncTask thread encountered exception", e);
       // If we encounter an exception, increment failure count for task and bubble forward the exception
       taskStatusUpdater.setLastTaskRunStatus(-1);
+      throw e;
     } finally {
       recordSingleRunCompletion();
       lock.writeLock().unlock();

@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
@@ -35,6 +36,8 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,9 +59,12 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
   public void setUp() {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
-    ReconTaskStatusCounter reconTaskStatusCounter = mock(ReconTaskStatusCounter.class);
+    ReconTaskStatusCounter reconTaskStatusCounterMock = mock(ReconTaskStatusCounter.class);
+    ReconTaskStatusUpdaterManager reconTaskStatusUpdaterManagerMock = mock(ReconTaskStatusUpdaterManager.class);
+    when(reconTaskStatusUpdaterManagerMock.getTaskStatusUpdater(anyString()))
+        .thenReturn(new ReconTaskStatusUpdater(reconTaskStatusDao, reconTaskStatusCounterMock, "dummyTask"));
     reconTaskController = new ReconTaskControllerImpl(ozoneConfiguration, new HashSet<>(),
-        reconTaskStatusDao, reconTaskStatusCounter);
+        reconTaskStatusUpdaterManagerMock);
     reconTaskController.start();
   }
 

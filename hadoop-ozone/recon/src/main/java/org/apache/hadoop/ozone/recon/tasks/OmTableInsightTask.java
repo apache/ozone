@@ -164,6 +164,7 @@ public class OmTableInsightTask implements ReconOmTask {
     final Collection<String> taskTables = getTaskTables();
 
     // Process each update event
+    long startTime = System.currentTimeMillis();
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, Object> omdbUpdateEvent = eventIterator.next();
       String tableName = omdbUpdateEvent.getTable();
@@ -208,7 +209,8 @@ public class OmTableInsightTask implements ReconOmTask {
     if (!replicatedSizeMap.isEmpty()) {
       writeDataToDB(replicatedSizeMap);
     }
-    LOG.debug("Completed a 'process' run of OmTableInsightTask.");
+    LOG.debug("{} successfully processed in {} milliseconds",
+        getTaskName(), (System.currentTimeMillis() - startTime));
     return new ImmutablePair<>(getTaskName(), true);
   }
 

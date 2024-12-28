@@ -26,6 +26,8 @@ import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.apache.hadoop.ozone.recon.scm.ReconScmTask;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
@@ -71,12 +73,11 @@ public class ContainerSizeCountTask extends ReconScmTask {
   public ContainerSizeCountTask(
       ContainerManager containerManager,
       StorageContainerServiceProvider scmClient,
-      ReconTaskStatusDao reconTaskStatusDao,
       ReconTaskConfig reconTaskConfig,
       ContainerCountBySizeDao containerCountBySizeDao,
       UtilizationSchemaDefinition utilizationSchemaDefinition,
-      ReconTaskStatusCounter reconTaskStatusCounter) {
-    super(reconTaskStatusDao, reconTaskStatusCounter);
+      ReconTaskStatusUpdaterManager taskStatusUpdaterManager) {
+    super(taskStatusUpdaterManager);
     this.scmClient = scmClient;
     this.containerManager = containerManager;
     this.containerCountBySizeDao = containerCountBySizeDao;
@@ -174,13 +175,13 @@ public class ContainerSizeCountTask extends ReconScmTask {
    */
   public void process(List<ContainerInfo> containers) {
     lock.writeLock().lock();
+    boolean processingFailed = false;
     try {
       recordRunStart();
       final Map<ContainerSizeCountKey, Long> containerSizeCountMap
           = new HashMap<>();
       final Map<ContainerID, Long> deletedContainers
           = new HashMap<>(processedContainers);
-
       // Loop to handle container create and size-update operations
       for (ContainerInfo container : containers) {
         if (container.getState().equals(DELETED)) {
@@ -190,14 +191,12 @@ public class ContainerSizeCountTask extends ReconScmTask {
         // For New Container being created
         try {
           process(container, containerSizeCountMap);
-          taskStatusUpdater.setLastTaskRunStatus(0);
         } catch (Exception e) {
-          taskStatusUpdater.setLastTaskRunStatus(-1);
+          processingFailed = true;
           // FIXME: it is a bug if there is an exception.
           LOG.error("FIXME: Failed to process " + container, e);
         }
       }
-
       // Method to handle Container delete operations
       handleContainerDeleteOperations(deletedContainers, containerSizeCountMap);
 
@@ -206,6 +205,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
       containerSizeCountMap.clear();
       LOG.debug("Completed a 'process' run of ContainerSizeCountTask.");
     } finally {
+      taskStatusUpdater.setLastTaskRunStatus(processingFailed ? -1 : 0);
       recordSingleRunCompletion();
       lock.writeLock().unlock();
     }

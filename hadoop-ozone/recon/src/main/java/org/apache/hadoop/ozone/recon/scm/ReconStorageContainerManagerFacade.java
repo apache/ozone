@@ -125,6 +125,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Containe
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
 
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.ratis.util.ExitUtils;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
@@ -189,12 +190,12 @@ public class ReconStorageContainerManagerFacade
                                             UtilizationSchemaDefinition utilizationSchemaDefinition,
                                             ContainerHealthSchemaManager containerHealthSchemaManager,
                                             ReconContainerMetadataManager reconContainerMetadataManager,
-                                            ReconTaskStatusDao reconTaskStatusDao,
-                                            ReconTaskStatusCounter reconTaskStatusCounter,
                                             ReconUtils reconUtils,
                                             ReconSafeModeManager safeModeManager,
                                             ReconContext reconContext,
-                                            DataSource dataSource) throws IOException {
+                                            DataSource dataSource,
+                                            ReconTaskStatusUpdaterManager taskStatusUpdaterManager)
+      throws IOException {
     reconNodeDetails = reconUtils.getReconNodeDetails(conf);
     this.threadNamePrefix = reconNodeDetails.threadNamePrefix();
     this.eventQueue = new EventQueue(threadNamePrefix);
@@ -273,15 +274,14 @@ public class ReconStorageContainerManagerFacade
 
     ReconTaskConfig reconTaskConfig = conf.getObject(ReconTaskConfig.class);
     PipelineSyncTask pipelineSyncTask = new PipelineSyncTask(pipelineManager, nodeManager,
-        scmServiceProvider, reconTaskStatusDao, reconTaskConfig, reconTaskStatusCounter);
+        scmServiceProvider, reconTaskConfig, taskStatusUpdaterManager);
 
     containerHealthTask = new ContainerHealthTask(containerManager, scmServiceProvider,
-        reconTaskStatusDao, containerHealthSchemaManager, containerPlacementPolicy,
-        reconTaskConfig, reconContainerMetadataManager, conf, reconTaskStatusCounter);
+        containerHealthSchemaManager, containerPlacementPolicy,
+        reconTaskConfig, reconContainerMetadataManager, conf, taskStatusUpdaterManager);
 
     this.containerSizeCountTask = new ContainerSizeCountTask(containerManager, scmServiceProvider,
-        reconTaskStatusDao, reconTaskConfig, containerCountBySizeDao,
-        utilizationSchemaDefinition, reconTaskStatusCounter);
+        reconTaskConfig, containerCountBySizeDao, utilizationSchemaDefinition, taskStatusUpdaterManager);
 
     this.dataSource = dataSource;
 

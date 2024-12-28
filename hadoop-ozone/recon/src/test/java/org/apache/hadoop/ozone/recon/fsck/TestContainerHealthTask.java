@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.any;
@@ -66,6 +67,8 @@ import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
@@ -190,9 +193,9 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     // Start container health task
     ContainerHealthTask containerHealthTask =
         new ContainerHealthTask(scmMock.getContainerManager(),
-            scmMock.getScmServiceProvider(), getTaskStatusDao(), containerHealthSchemaManager,
+            scmMock.getScmServiceProvider(), containerHealthSchemaManager,
             placementMock, reconTaskConfig, reconContainerMetadataManager,
-            new OzoneConfiguration(), getMockTaskStatusCounter());
+            new OzoneConfiguration(), getMockTaskStatusUpdaterManager());
     containerHealthTask.start();
 
     // Ensure unhealthy container count in DB matches expected
@@ -362,9 +365,9 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
         1L)).thenReturn(5L);
     ContainerHealthTask containerHealthTask =
         new ContainerHealthTask(scmMock.getContainerManager(),
-            scmMock.getScmServiceProvider(), getTaskStatusDao(), containerHealthSchemaManager,
+            scmMock.getScmServiceProvider(), containerHealthSchemaManager,
             placementMock, reconTaskConfig, reconContainerMetadataManager,
-            new OzoneConfiguration(), getMockTaskStatusCounter());
+            new OzoneConfiguration(), getMockTaskStatusUpdaterManager());
     containerHealthTask.start();
     LambdaTestUtils.await(6000, 1000, () ->
         (unHealthyContainersTableHandle.count() == 1));
@@ -547,9 +550,9 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     reconTaskConfig.setMissingContainerTaskInterval(Duration.ofSeconds(2));
     ContainerHealthTask containerHealthTask =
         new ContainerHealthTask(scmMock.getContainerManager(),
-            scmMock.getScmServiceProvider(), getTaskStatusDao(), containerHealthSchemaManager,
+            scmMock.getScmServiceProvider(), containerHealthSchemaManager,
             placementMock, reconTaskConfig, reconContainerMetadataManager,
-            new OzoneConfiguration(), getMockTaskStatusCounter());
+            new OzoneConfiguration(), getMockTaskStatusUpdaterManager());
 
     containerHealthTask.start();
 
@@ -570,6 +573,14 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
   private ReconTaskStatusCounter getMockTaskStatusCounter() {
     return mock(ReconTaskStatusCounter.class);
+  }
+
+  private ReconTaskStatusUpdaterManager getMockTaskStatusUpdaterManager() {
+    ReconTaskStatusUpdaterManager reconTaskStatusUpdaterManager = mock(ReconTaskStatusUpdaterManager.class);
+    when(reconTaskStatusUpdaterManager.getTaskStatusUpdater(anyString())).thenReturn(new ReconTaskStatusUpdater(
+        getDao(ReconTaskStatusDao.class), mock(ReconTaskStatusCounter.class),
+        "mockedTask-" + System.currentTimeMillis()));
+    return reconTaskStatusUpdaterManager;
   }
 
   private Set<ContainerReplica> getMockReplicas(

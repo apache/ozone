@@ -55,11 +55,13 @@ public class ReconTaskStatusTableUpgradeAction implements ReconUpgradeAction {
       }
 
       DSLContext dslContext = DSL.using(conn);
-      dslContext.alterTable(RECON_TASK_STATUS_TABLE_NAME).add(
-          DSL.field(DSL.name("last_task_run_status"), SQLDataType.INTEGER),
-          DSL.field(DSL.name("current_task_run_status"), SQLDataType.INTEGER)
-      ).execute();
-
+      // JOOQ doesn't support Derby DB officially, there is no way to run 'ADD COLUMN' command in single call
+      // for multiple columns. Hence, we run it as two separate steps.
+      // This command runs irrespective of fresh install, so only create column if it doesn't exist
+      LOG.info("Adding 'last_task_run_status' column to task status table");
+      dslContext.alterTable(RECON_TASK_STATUS_TABLE_NAME).addColumn("last_task_run_status", SQLDataType.INTEGER).execute();
+      LOG.info("Adding 'current_task_run_status' column to task status table");
+      dslContext.alterTable(RECON_TASK_STATUS_TABLE_NAME).addColumn("current_task_run_status", SQLDataType.INTEGER).execute();
     } catch (SQLException se) {
       LOG.error("Error while upgrading Recon Task Status table. Message: {}", se.getMessage());
     }
