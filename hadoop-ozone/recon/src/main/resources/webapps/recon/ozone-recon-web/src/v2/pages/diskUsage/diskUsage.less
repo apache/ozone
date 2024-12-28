@@ -28,15 +28,24 @@
 .content-div {
   min-height: unset;
 
-  .breadcrumb-nav {
-    font-size: 0.9vw;
-    margin: 0px 0px 8px 8px;
-    .breadcrumb-nav-item {
-      background: transparent;
-      border: none !important;
-      cursor: pointer;
-      color: @primary-color;
-      
+  #breadcrumb-container {
+    overflow-y: hidden;
+    overflow-x: auto;
+    padding: 0px 8px 16px 8px;
+    margin-bottom: 10px;
+    width: 83vw;
+    height: 20%;
+
+    .breadcrumb-nav {
+      font-size: 0.9vw;
+      width: max-content;
+      .breadcrumb-nav-item {
+        background: transparent;
+        border: none !important;
+        cursor: pointer;
+        color: @primary-color;
+        
+      }
     }
   }
 

@@ -22,7 +22,9 @@ import java.sql.SQLException;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.apache.hadoop.ozone.recon.upgrade.ReconLayoutFeature;
 import org.hadoop.ozone.recon.schema.ReconSchemaDefinition;
+import org.hadoop.ozone.recon.schema.SchemaVersionTableDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,13 +47,46 @@ public class ReconSchemaManager {
 
   @VisibleForTesting
   public void createReconSchema() {
-    reconSchemaDefinitions.forEach(reconSchemaDefinition -> {
-      try {
-        reconSchemaDefinition.initializeSchema();
-      } catch (SQLException e) {
-        LOG.error("Error creating Recon schema {}.",
-            reconSchemaDefinition.getClass().getSimpleName(), e);
-      }
-    });
+    // Calculate the latest SLV from ReconLayoutFeature
+    int latestSLV = calculateLatestSLV();
+
+    try {
+      // Initialize the schema version table first
+      reconSchemaDefinitions.stream()
+          .filter(SchemaVersionTableDefinition.class::isInstance)
+          .findFirst()
+          .ifPresent(schemaDefinition -> {
+            SchemaVersionTableDefinition schemaVersionTable = (SchemaVersionTableDefinition) schemaDefinition;
+            schemaVersionTable.setLatestSLV(latestSLV);
+            try {
+              schemaVersionTable.initializeSchema();
+            } catch (SQLException e) {
+              LOG.error("Error initializing SchemaVersionTableDefinition.", e);
+            }
+          });
+
+      // Initialize all other tables
+      reconSchemaDefinitions.stream()
+          .filter(definition -> !(definition instanceof SchemaVersionTableDefinition))
+          .forEach(definition -> {
+            try {
+              definition.initializeSchema();
+            } catch (SQLException e) {
+              LOG.error("Error initializing schema: {}.", definition.getClass().getSimpleName(), e);
+            }
+          });
+
+    } catch (Exception e) {
+      LOG.error("Error creating Recon schema.", e);
+    }
+  }
+
+  /**
+   * Calculate the latest SLV by iterating over ReconLayoutFeature.
+   *
+   * @return The latest SLV.
+   */
+  private int calculateLatestSLV() {
+    return ReconLayoutFeature.determineSLV();
   }
 }
