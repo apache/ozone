@@ -42,6 +42,7 @@ public class ReconTaskStatusStat {
   public ReconTaskStatusStat(AtomicInteger successCount, AtomicInteger failureCount) {
     this.successCount = successCount;
     this.failureCount = failureCount;
+    this.initializationTime = System.currentTimeMillis();
   }
 
   public void incrementSuccess() {
@@ -50,10 +51,6 @@ public class ReconTaskStatusStat {
 
   public void incrementFailure() {
     failureCount.incrementAndGet();
-  }
-
-  public void setInitializationTime(long time) {
-    this.initializationTime = time;
   }
 
   public long getInitializationTime() {

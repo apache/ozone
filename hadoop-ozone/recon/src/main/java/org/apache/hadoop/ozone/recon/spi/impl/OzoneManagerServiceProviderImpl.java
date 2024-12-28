@@ -240,7 +240,7 @@ public class OzoneManagerServiceProviderImpl
     reconTaskUpdater.setTaskName(taskName);
     reconTaskUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
     reconTaskUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-    reconTaskUpdater.updateDetails();
+    reconTaskUpdater.updateDetails(false);
   }
 
   @Override
@@ -578,7 +578,7 @@ public class OzoneManagerServiceProviderImpl
               // Get updates from OM and apply to local Recon OM DB.
               reconTaskUpdater.setIsCurrentTaskRunning(1);
               reconTaskUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-              reconTaskUpdater.updateDetails();
+              reconTaskUpdater.updateDetails(false);
 
               getAndApplyDeltaUpdatesFromOM(currentSequenceNumber,
                   omdbUpdatesHandler);
@@ -588,11 +588,12 @@ public class OzoneManagerServiceProviderImpl
             } catch (IOException | RocksDBException e) {
               LOG.error("Failed to get and apply delta updates with exception", e);
               reconTaskUpdater.setLastTaskRunStatus(-1);
+              fullSnapshot = true;
             } finally {
               // Update timestamp of successful delta updates query.
               reconTaskUpdater.setIsCurrentTaskRunning(0);
               reconTaskUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-              reconTaskUpdater.updateDetails();
+              reconTaskUpdater.updateDetails(true);
             }
 
             // Pass on DB update events to tasks that are listening.
@@ -618,7 +619,7 @@ public class OzoneManagerServiceProviderImpl
             // Update local Recon OM DB to new snapshot.
             reconTaskUpdater.setIsCurrentTaskRunning(1);
             reconTaskUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-            reconTaskUpdater.updateDetails();
+            reconTaskUpdater.updateDetails(false);
 
             boolean success = updateReconOmDBWithNewSnapshot();
             // Update timestamp of successful delta updates query.
@@ -652,7 +653,7 @@ public class OzoneManagerServiceProviderImpl
           } finally {
             reconTaskUpdater.setIsCurrentTaskRunning(0);
             reconTaskUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-            reconTaskUpdater.updateDetails();
+            reconTaskUpdater.updateDetails(true);
           }
         }
         printOMDBMetaInfo();
@@ -724,7 +725,8 @@ public class OzoneManagerServiceProviderImpl
    * Get OM RocksDB's latest sequence number.
    * @return latest sequence number.
    */
-  private long getCurrentOMDBSequenceNumber() {
+  @VisibleForTesting
+  public long getCurrentOMDBSequenceNumber() {
     return omMetadataManager.getLastSequenceNumberFromDB();
   }
 

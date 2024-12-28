@@ -23,9 +23,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.google.inject.AbstractModule;
-import com.google.inject.Injector;
-
 import org.apache.hadoop.ozone.recon.api.types.ReconTaskStatusResponse;
 import org.apache.hadoop.ozone.recon.api.types.ReconTaskStatusStat;
 import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
@@ -34,10 +31,12 @@ import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import javax.ws.rs.core.Response;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -47,6 +46,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Test for Task Status Service.
  */
 public class TestTaskStatusService extends AbstractReconSqlDBTest {
+
+  @TempDir
+  private Path temporaryFolder;
   private TaskStatusService taskStatusService;
 
   public TestTaskStatusService() {
@@ -54,20 +56,17 @@ public class TestTaskStatusService extends AbstractReconSqlDBTest {
   }
 
   @BeforeEach
-  public void setUp() {
-    Injector parentInjector = getInjector();
-    parentInjector.createChildInjector(new AbstractModule() {
-      @Override
-      protected void configure() {
-        taskStatusService = new TaskStatusService();
-        bind(TaskStatusService.class).toInstance(taskStatusService);
-      }
-    });
+  public void setUp() throws Exception {
+    ReconTaskStatusCounter reconTaskStatusCounterMock = mock(ReconTaskStatusCounter.class);
+    when(reconTaskStatusCounterMock.getTaskStatsFor(anyString())).thenReturn(new ReconTaskStatusStat(
+        new AtomicInteger(10), new AtomicInteger(2)
+    ));
+    taskStatusService = new TaskStatusService(getDao(ReconTaskStatusDao.class), reconTaskStatusCounterMock);
   }
 
   @ParameterizedTest
   @ValueSource(ints = {0, 1, -1})
-  public void testGetTaskTimes(int lastTaskRunStatus) {
+  public void testTaskTableValues(int lastTaskRunStatus) {
     ReconTaskStatusDao reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
 
     ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
@@ -94,19 +93,19 @@ public class TestTaskStatusService extends AbstractReconSqlDBTest {
 
   @Test
   @SuppressWarnings("unchecked")
-  public void testTaskStatistics() {
-
-    ReconTaskStatusCounter taskStatusCounter = mock(ReconTaskStatusCounter.class);
-    ReconTaskStatusStat mockedTaskStats = new ReconTaskStatusStat(new AtomicInteger(10), new AtomicInteger(2));
+  public void testTaskCounts() {
+    ReconTaskStatusDao reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
     String taskName = "DummyTask_" + System.currentTimeMillis();
-
-    when(taskStatusCounter.getTaskStatsFor(anyString())).thenReturn(mockedTaskStats);
+    ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
+        taskName, System.currentTimeMillis(), 0L, 0, 0);
+    reconTaskStatusDao.insert(reconTaskStatusRecord);
 
     Response response = taskStatusService.getTaskStats();
+
     List<ReconTaskStatusResponse> tasks = (List<ReconTaskStatusResponse>) response.getEntity();
-    assertEquals(tasks.size(), 1);
-    assertEquals(tasks.get(0).getTaskName(), taskName);
-    assertEquals(tasks.get(0).getSuccessCount(), 10);
-    assertEquals(tasks.get(0).getFailureCount(), 2);
+    assertEquals(1, tasks.size());
+    assertEquals(taskName, tasks.get(0).getTaskName());
+    assertEquals(10, tasks.get(0).getSuccessCount());
+    assertEquals(2, tasks.get(0).getFailureCount());
   }
 }

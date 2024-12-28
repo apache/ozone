@@ -31,13 +31,11 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.Node;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.hadoop.util.Time;
-import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,7 +85,7 @@ public class PipelineSyncTask extends ReconScmTask {
     }
   }
 
-  public void triggerPipelineSyncTask() throws IOException, NodeNotFoundException{
+  public void triggerPipelineSyncTask() {
     lock.writeLock().lock();
     try {
       long start = Time.monotonicNow();
@@ -99,13 +97,17 @@ public class PipelineSyncTask extends ReconScmTask {
           Time.monotonicNow() - start);
       taskStatusUpdater.setLastTaskRunStatus(0);
     } catch (IOException | NodeNotFoundException e) {
-      LOG.error("PipelineSyncTask thread encountered exception", e);
+      LOG.error("PipelineSyncTask encountered exception", e);
       // If we encounter an exception, increment failure count for task and bubble forward the exception
       taskStatusUpdater.setLastTaskRunStatus(-1);
-      throw e;
     } finally {
-      recordSingleRunCompletion();
-      lock.writeLock().unlock();
+      try {
+        recordSingleRunCompletion();
+      } catch (Exception e) {
+        LOG.error("Exception occurred while trying to record PipelineSyncTask completion", e);
+      } finally {
+        lock.writeLock().unlock();
+      }
     }
   }
 

@@ -30,7 +30,6 @@ import java.util.function.BiPredicate;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.lang3.function.TriFunction;
 import org.jooq.exception.DataAccessException;
 import org.jooq.impl.DSL;
 import org.slf4j.Logger;

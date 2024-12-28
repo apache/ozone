@@ -62,7 +62,10 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     ReconTaskStatusCounter reconTaskStatusCounterMock = mock(ReconTaskStatusCounter.class);
     ReconTaskStatusUpdaterManager reconTaskStatusUpdaterManagerMock = mock(ReconTaskStatusUpdaterManager.class);
     when(reconTaskStatusUpdaterManagerMock.getTaskStatusUpdater(anyString()))
-        .thenReturn(new ReconTaskStatusUpdater(reconTaskStatusDao, reconTaskStatusCounterMock, "dummyTask"));
+        .thenAnswer(i -> {
+          String taskName = i.getArgument(0);
+          return new ReconTaskStatusUpdater(reconTaskStatusDao, reconTaskStatusCounterMock, taskName);
+        });
     reconTaskController = new ReconTaskControllerImpl(ozoneConfiguration, new HashSet<>(),
         reconTaskStatusUpdaterManagerMock);
     reconTaskController.start();
@@ -98,7 +101,6 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
         .process(any());
     long endTime = System.currentTimeMillis();
 
-    reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
     ReconTaskStatus reconTaskStatus = reconTaskStatusDao.findById("MockTask");
     long taskTimeStamp = reconTaskStatus.getLastUpdatedTimestamp();
     long seqNumber = reconTaskStatus.getLastUpdatedSeqNumber();
@@ -157,6 +159,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     }
 
     //Should be ignored now.
+    Long startTime = System.currentTimeMillis();
     reconTaskController.consumeOMEvents(omUpdateEventBatchMock,
         omMetadataManagerMock);
     assertThat(reconTaskController.getRegisteredTasks()).isEmpty();
@@ -165,7 +168,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     ReconTaskStatus dbRecord = reconTaskStatusDao.findById(taskName);
 
     assertEquals(taskName, dbRecord.getTaskName());
-    assertEquals(Long.valueOf(0L), dbRecord.getLastUpdatedTimestamp());
+    assertThat(dbRecord.getLastUpdatedTimestamp()).isGreaterThanOrEqualTo(startTime);
     assertEquals(Long.valueOf(0L), dbRecord.getLastUpdatedSeqNumber());
   }
 

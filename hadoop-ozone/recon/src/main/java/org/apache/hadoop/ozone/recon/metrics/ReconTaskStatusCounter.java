@@ -18,15 +18,16 @@
 
 package org.apache.hadoop.ozone.recon.metrics;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.api.types.ReconTaskStatusStat;
 
-import javax.inject.Inject;
-
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_STATUS_COUNTER_CYCLES_LIMIT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_STATUS_COUNTER_CYCLES_LIMIT_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFUALT;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,11 +36,12 @@ import java.util.concurrent.TimeUnit;
 /**
  * This class contains definitions and implementation of Recon Task Status counters
  * For each task we maintain a count of the successes and the failures.
- * This count is stored for a configurable
- * {@link org.apache.hadoop.ozone.recon.ReconServerConfigKeys#OZONE_RECON_TASK_STATUS_COUNTER_CYCLES_LIMIT} which defaults
+ * This count is stored for a configurable {@link org.apache.hadoop.ozone.recon.ReconServerConfigKeys
+ * #OZONE_RECON_TASK_STATUS_COUNTER_CYCLES_LIMIT} which defaults
  * to '5' times {@link org.apache.hadoop.ozone.recon.ReconServerConfigKeys#OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY}
  * Each task is mapped to a {@link ReconTaskStatusStat} instance to store the counts.
  */
+@Singleton
 public class ReconTaskStatusCounter {
   // Stores the configurable timeout duration i.e. the TTL of the counts
   private final long timeoutDuration;
@@ -49,16 +51,23 @@ public class ReconTaskStatusCounter {
 
   @Inject
   public ReconTaskStatusCounter(OzoneConfiguration conf) {
+    // Get the number of cycles of OM sync task for which we want to store the count
     int countCycles = conf.getInt(
         OZONE_RECON_TASK_STATUS_COUNTER_CYCLES_LIMIT,
         OZONE_RECON_TASK_STATUS_COUNTER_CYCLES_LIMIT_DEFAULT
     );
+    // Get the interval between which the OM sync task is being run
     long taskSyncInterval = conf.getTimeDuration(
-        RECON_OM_DELTA_UPDATE_LOOP_LIMIT,
-        RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFUALT,
+        OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY,
+        OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS
     );
     timeoutDuration = taskSyncInterval * countCycles;
+  }
+
+  @VisibleForTesting
+  public long getTimeoutDuration() {
+    return this.timeoutDuration;
   }
 
   /**
@@ -66,7 +75,7 @@ public class ReconTaskStatusCounter {
    * to store the count. <br>
    * The configuration is: {@link org.apache.hadoop.ozone.recon.ReconServerConfigKeys
    * #OZONE_RECON_TASK_STATUS_COUNTER_CYCLES_LIMIT} <br>
-   * Default duration/TTL of the counter is 5 OM DB sync cycles.<br>
+   * Default duration/TTL of the counter is 5 OM DB sync cycles i.e (5 * 10min interval between sync) = 50min.<br>
    * In case the count data TTL is reached, reinitialize the instance to reset the data, else do nothing
    */
   private void checkCountDataExpiry(String taskName) {
@@ -103,7 +112,7 @@ public class ReconTaskStatusCounter {
   }
 
   /**
-   * Get the statistics like number of success/failure count for the task name provided
+   * Get the statistics like number of success/failure count for the task name provided.
    * @param taskName The task for which stats should be fetched
    * @return {@link ReconTaskStatusStat} instance of the statistics for the task
    */

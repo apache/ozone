@@ -187,7 +187,7 @@ public final class  ReconServerConfigKeys {
       OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_DEFAULT = 3;
 
   public static final String OZONE_RECON_TASK_STATUS_COUNTER_CYCLES_LIMIT =
-      "ozone.recon.task.status.counter.duration";
+      "ozone.recon.task.status.counter.cycles.limit";
 
   public static final int OZONE_RECON_TASK_STATUS_COUNTER_CYCLES_LIMIT_DEFAULT = 5;
 

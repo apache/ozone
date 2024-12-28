@@ -545,7 +545,6 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     when(reconContainerMetadataManager.getKeyCountForContainer(2L)).thenReturn(0L);
 
     // Start the container health task
-    ReconTaskStatusDao reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
     ReconTaskConfig reconTaskConfig = new ReconTaskConfig();
     reconTaskConfig.setMissingContainerTaskInterval(Duration.ofSeconds(2));
     ContainerHealthTask containerHealthTask =
@@ -567,19 +566,14 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     });
   }
 
-  private ReconTaskStatusDao getTaskStatusDao() {
-    return getDao(ReconTaskStatusDao.class);
-  }
-
-  private ReconTaskStatusCounter getMockTaskStatusCounter() {
-    return mock(ReconTaskStatusCounter.class);
-  }
-
   private ReconTaskStatusUpdaterManager getMockTaskStatusUpdaterManager() {
     ReconTaskStatusUpdaterManager reconTaskStatusUpdaterManager = mock(ReconTaskStatusUpdaterManager.class);
-    when(reconTaskStatusUpdaterManager.getTaskStatusUpdater(anyString())).thenReturn(new ReconTaskStatusUpdater(
-        getDao(ReconTaskStatusDao.class), mock(ReconTaskStatusCounter.class),
-        "mockedTask-" + System.currentTimeMillis()));
+    when(reconTaskStatusUpdaterManager.getTaskStatusUpdater(anyString())).thenAnswer(inv -> {
+      String taskName = inv.getArgument(0);
+      return new ReconTaskStatusUpdater(
+          getDao(ReconTaskStatusDao.class), mock(ReconTaskStatusCounter.class),
+          taskName);
+    });
     return reconTaskStatusUpdaterManager;
   }
 

@@ -31,11 +31,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -43,12 +40,9 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
-import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -111,7 +105,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         ReconTaskStatusUpdater taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(task.getTaskName());
         taskStatusUpdater.setIsCurrentTaskRunning(1);
         taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-        taskStatusUpdater.updateDetails();
+        taskStatusUpdater.updateDetails(false);
         // events passed to process method is no longer filtered
         tasks.add(() -> task.process(events));
       }
@@ -168,7 +162,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       ReconTaskStatusUpdater taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(task.getTaskName());
       taskStatusUpdater.setIsCurrentTaskRunning(1);
       taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-      taskStatusUpdater.updateDetails();
+      taskStatusUpdater.updateDetails(false);
       tasks.add(() -> task.reprocess(omMetadataManager));
     }
 
@@ -192,7 +186,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
             }
             taskStatusUpdater.setIsCurrentTaskRunning(0);
             taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-            taskStatusUpdater.updateDetails();
+            taskStatusUpdater.updateDetails(true);
           })).toArray(CompletableFuture[]::new)).join();
     } catch (CompletionException ce) {
       LOG.error("Completing all tasks failed with exception ", ce);
@@ -253,7 +247,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
           }
           taskStatusUpdater.setIsCurrentTaskRunning(0);
           taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-          taskStatusUpdater.updateDetails();
+          taskStatusUpdater.updateDetails(true);
         })).collect(Collectors.toList());
 
     try {

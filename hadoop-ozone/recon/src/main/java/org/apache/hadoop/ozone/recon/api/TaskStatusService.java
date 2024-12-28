@@ -40,10 +40,14 @@ import java.util.stream.Collectors;
 @Produces(MediaType.APPLICATION_JSON)
 public class TaskStatusService {
 
-  @Inject
   private ReconTaskStatusDao reconTaskStatusDao;
-  @Inject
   private ReconTaskStatusCounter taskStatusCounter;
+
+  @Inject
+  TaskStatusService(ReconTaskStatusDao reconTaskStatusDao, ReconTaskStatusCounter reconTaskStatusCounter) {
+    this.reconTaskStatusDao = reconTaskStatusDao;
+    this.taskStatusCounter = reconTaskStatusCounter;
+  }
 
   // Internal function to combine counter value with DerbyDB values
   private ReconTaskStatusResponse convertToTaskStatusResponse(ReconTaskStatus task) {
