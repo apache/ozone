@@ -43,7 +43,7 @@ an older release of Ozone and a later release (which may be the local build).
 
 ## Supported Versions
 
-Non-rolling upgrades and downgrades are supported from 1.1.0 to any later version. Note that 1.1.0 did not have the non-rolling upgrade framework, so things like preparing the OMs for upgrade and checking finalization status are not present in that version. Manual upgrade is the only supported upgrade option from 1.0.0 to 1.1.0.
+Non-rolling upgrades and downgrades are supported from 1.1.0 to any later version. Note that 1.1.0 did not have the non-rolling upgrade framework, so things like preparing the OMs for upgrade and checking finalization status are not present in that version.
 
 ## Directory Layout
 
@@ -74,7 +74,7 @@ Each type of upgrade has a subdirectory under the *upgrades* directory.
 
 ### compose
 
-Docker compose cluster definitions to be used in upgrade testing are defined in the *compose* directory. A compose cluster can be selected by specifying the name of its subdirectory as the first argument to `run_test`. `run_test` will then source the `load.sh` script in the cluster's directory so it is used during the test. For manual testing, docker compose can be used normally from the compose cluster directory. Note that some clusters may not work with older versions. Ozone 1.1.0, for example, does not support SCM HA.
+Docker compose cluster definitions to be used in upgrade testing are defined in the *compose* directory. A compose cluster can be selected by specifying the name of its subdirectory as the first argument to `run_test`. `run_test` will then source the `load.sh` script in the cluster's directory so it is used during the test.
 
 ## Persisting Data
 
