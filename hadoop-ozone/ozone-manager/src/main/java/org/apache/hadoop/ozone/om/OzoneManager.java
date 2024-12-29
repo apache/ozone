@@ -3091,6 +3091,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public List<List<String>> getRatisRoles() {
+    String leaderReadiness = omRatisServer.checkLeaderStatus().name();
     int port = omNodeDetails.getRatisPort();
     if (!isRatisEnabled) {
       return getRatisRolesException("Ratis is disabled");
@@ -3111,7 +3112,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("Failed to getServiceList", e);
       return getRatisRolesException("IO-Exception Occurred, " + e.getMessage());
     }
-    return OmUtils.format(serviceList, port, leaderId.toString());
+    return OmUtils.format(serviceList, port, leaderId.toString(), leaderReadiness);
   }
 
   /**
