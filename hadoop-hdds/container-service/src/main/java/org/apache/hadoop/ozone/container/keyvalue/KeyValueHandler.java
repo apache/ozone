@@ -92,6 +92,8 @@ import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CLOSED_CONTAINER_IO;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_ALREADY_EXISTS;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
@@ -99,6 +101,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DELETE_ON_NON_EMPTY_CONTAINER;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DELETE_ON_OPEN_CONTAINER;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.GET_SMALL_FILE_ERROR;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_ARGUMENT;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_CONTAINER_STATE;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IO_EXCEPTION;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.PUT_SMALL_FILE_ERROR;
@@ -119,9 +122,6 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.putBlockResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerDataProto.State.RECOVERING;
-import static org.apache.hadoop.ozone.ClientVersion.EC_REPLICA_INDEX_REQUIRED_IN_BLOCK_REQUEST;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 
@@ -243,6 +243,15 @@ public class KeyValueHandler extends Handler {
       ContainerCommandRequestProto request, KeyValueContainer kvContainer,
       DispatcherContext dispatcherContext) {
     Type cmdType = request.getCmdType();
+    // Validate the request has been made to the correct datanode with the node id matching.
+    if (kvContainer != null) {
+      try {
+        handler.validateRequestDatanodeId(kvContainer.getContainerData().getReplicaIndex(),
+            request.getDatanodeUuid());
+      } catch (StorageContainerException e) {
+        return ContainerUtils.logAndReturnError(LOG, e, request);
+      }
+    }
 
     switch (cmdType) {
     case CreateContainer:
@@ -354,7 +363,23 @@ public class KeyValueHandler extends Handler {
                   " already exists", null, CONTAINER_ALREADY_EXISTS), request);
     }
 
+    try {
+      this.validateRequestDatanodeId(request.getCreateContainer().hasReplicaIndex() ?
+          request.getCreateContainer().getReplicaIndex() : null, request.getDatanodeUuid());
+    } catch (StorageContainerException e) {
+      return ContainerUtils.logAndReturnError(LOG, e, request);
+    }
+
     long containerID = request.getContainerID();
+    State containerState = request.getCreateContainer().getState();
+
+    if (containerState != RECOVERING) {
+      try {
+        containerSet.ensureContainerNotMissing(containerID, containerState);
+      } catch (StorageContainerException ex) {
+        return ContainerUtils.logAndReturnError(LOG, ex, request);
+      }
+    }
 
     ContainerLayoutVersion layoutVersion =
         ContainerLayoutVersion.getConfiguredVersion(conf);
@@ -379,7 +404,11 @@ public class KeyValueHandler extends Handler {
     try {
       if (containerSet.getContainer(containerID) == null) {
         newContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
-        created = containerSet.addContainer(newContainer);
+        if (RECOVERING == newContainer.getContainerState()) {
+          created = containerSet.addContainerByOverwriteMissingContainer(newContainer);
+        } else {
+          created = containerSet.addContainer(newContainer);
+        }
       } else {
         // The create container request for an already existing container can
         // arrive in case the ContainerStateMachine reapplies the transaction
@@ -560,6 +589,8 @@ public class KeyValueHandler extends Handler {
         endOfBlock = true;
       }
 
+      // Note: checksum held inside blockData. But no extra checksum validation here with handlePutBlock.
+
       long bcsId =
           dispatcherContext == null ? 0 : dispatcherContext.getLogIndex();
       blockData.setBlockCommitSequenceId(bcsId);
@@ -635,15 +666,6 @@ public class KeyValueHandler extends Handler {
   }
 
   /**
-   * Checks if a replicaIndex needs to be checked based on the client version for a request.
-   * @param request ContainerCommandRequest object.
-   * @return true if the validation is required for the client version else false.
-   */
-  private boolean replicaIndexCheckRequired(ContainerCommandRequestProto request) {
-    return request.hasVersion() && request.getVersion() >= EC_REPLICA_INDEX_REQUIRED_IN_BLOCK_REQUEST.toProtoValue();
-  }
-
-  /**
    * Handle Get Block operation. Calls BlockManager to process the request.
    */
   ContainerCommandResponseProto handleGetBlock(
@@ -661,9 +683,7 @@ public class KeyValueHandler extends Handler {
     try {
       BlockID blockID = BlockID.getFromProtobuf(
           request.getGetBlock().getBlockID());
-      if (replicaIndexCheckRequired(request)) {
-        BlockUtils.verifyReplicaIdx(kvContainer, blockID);
-      }
+      BlockUtils.verifyReplicaIdx(kvContainer, blockID);
       responseData = blockManager.getBlock(kvContainer, blockID).getProtoBufMessage();
       final long numBytes = responseData.getSerializedSize();
       metrics.incContainerBytesStats(Type.GetBlock, numBytes);
@@ -786,9 +806,7 @@ public class KeyValueHandler extends Handler {
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(request.getReadChunk()
           .getChunkData());
       Preconditions.checkNotNull(chunkInfo);
-      if (replicaIndexCheckRequired(request)) {
-        BlockUtils.verifyReplicaIdx(kvContainer, blockID);
-      }
+      BlockUtils.verifyReplicaIdx(kvContainer, blockID);
       BlockUtils.verifyBCSId(kvContainer, blockID);
 
       if (dispatcherContext == null) {
@@ -888,6 +906,7 @@ public class KeyValueHandler extends Handler {
       if (isWrite) {
         data =
             ChunkBuffer.wrap(writeChunk.getData().asReadOnlyByteBufferList());
+        // TODO: Can improve checksum validation here. Make this one-shot after protocol change.
         validateChunkChecksumData(data, chunkInfo);
       }
       chunkManager
@@ -1084,7 +1103,7 @@ public class KeyValueHandler extends Handler {
      * might already be in closing state here.
      */
     if (containerState == State.OPEN || containerState == State.CLOSING
-        || containerState == State.RECOVERING) {
+        || containerState == RECOVERING) {
       return;
     }
 
@@ -1532,5 +1551,23 @@ public class KeyValueHandler extends Handler {
   @VisibleForTesting
   public static void setInjector(FaultInjector instance) {
     injector = instance;
+  }
+
+  /**
+   * Verify if request's replicaIndex matches with containerData. This validates only for EC containers i.e.
+   * containerReplicaIdx should be > 0.
+   *
+   * @param containerReplicaIdx  replicaIndex for the container command.
+   * @param requestDatanodeUUID requested block info
+   * @throws StorageContainerException if replicaIndex mismatches.
+   */
+  private boolean validateRequestDatanodeId(Integer containerReplicaIdx, String requestDatanodeUUID)
+      throws StorageContainerException {
+    if (containerReplicaIdx != null && containerReplicaIdx > 0 && !requestDatanodeUUID.equals(this.getDatanodeId())) {
+      throw new StorageContainerException(
+          String.format("Request is trying to write to node with uuid : %s but the current nodeId is: %s .",
+              requestDatanodeUUID, this.getDatanodeId()), INVALID_ARGUMENT);
+    }
+    return true;
   }
 }

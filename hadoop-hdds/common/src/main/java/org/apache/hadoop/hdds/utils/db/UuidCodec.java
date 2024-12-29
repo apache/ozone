@@ -41,6 +41,11 @@ public final class UuidCodec implements Codec<UUID> {
   private UuidCodec() { }
 
   @Override
+  public Class<UUID> getTypeClass() {
+    return UUID.class;
+  }
+
+  @Override
   public boolean supportCodecBuffer() {
     return true;
   }

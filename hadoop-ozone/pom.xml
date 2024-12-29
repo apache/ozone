@@ -26,6 +26,7 @@
 
   <properties>
     <docker.image>apache/ozone:${project.version}</docker.image>
+    <sort.skip>true</sort.skip>
   </properties>
   <modules>
     <module>interface-client</module>
@@ -38,6 +39,8 @@
     <module>ozonefs-common</module>
     <module>ozonefs</module>
     <module>datanode</module>
+    <module>recon</module>
+    <module>recon-codegen</module>
     <module>s3gateway</module>
     <module>dist</module>
     <module>csi</module>
@@ -46,13 +49,6 @@
     <module>httpfsgateway</module>
     <module>s3-secret-store</module>
   </modules>
-
-  <repositories>
-    <repository>
-      <id>apache.snapshots.https</id>
-      <url>https://repository.apache.org/content/repositories/snapshots</url>
-    </repository>
-  </repositories>
 
   <dependencyManagement>
 
@@ -397,18 +393,6 @@
       </modules>
     </profile>
     <profile>
-      <id>build-with-recon</id>
-      <activation>
-        <property>
-          <name>!skipRecon</name>
-        </property>
-      </activation>
-      <modules>
-        <module>recon</module>
-        <module>recon-codegen</module>
-      </modules>
-    </profile>
-    <profile>
       <id>parallel-tests</id>
       <build>
         <plugins>
@@ -451,37 +435,6 @@
                 <test.unique.fork.id>fork-${surefire.forkNumber}</test.unique.fork.id>
               </systemPropertyVariables>
             </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>add-classpath-descriptor</id>
-      <activation>
-        <file>
-          <exists>src/main/java</exists>
-        </file>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-dependency-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>add-classpath-descriptor</id>
-                <phase>prepare-package</phase>
-                <goals>
-                  <goal>build-classpath</goal>
-                </goals>
-                <configuration>
-                  <outputFile>${project.build.outputDirectory}/${project.artifactId}.classpath</outputFile>
-                  <prefix>$HDDS_LIB_JARS_DIR</prefix>
-                  <outputFilterFile>true</outputFilterFile>
-                  <includeScope>runtime</includeScope>
-                </configuration>
-              </execution>
-            </executions>
           </plugin>
         </plugins>
       </build>

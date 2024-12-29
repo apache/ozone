@@ -26,9 +26,10 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.ratis.protocol.RaftPeer;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -43,6 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 /**
  * Test transferLeadership with SCM HA setup.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestTransferLeadershipShell {
   private MiniOzoneHAClusterImpl cluster = null;
   private OzoneConfiguration conf;
@@ -50,6 +52,7 @@ public class TestTransferLeadershipShell {
   private String scmServiceId;
   private int numOfOMs = 3;
   private int numOfSCMs = 3;
+  private OzoneAdmin ozoneAdmin;
 
   private static final long SNAPSHOT_THRESHOLD = 5;
 
@@ -58,9 +61,10 @@ public class TestTransferLeadershipShell {
    *
    * @throws IOException Exception
    */
-  @BeforeEach
+  @BeforeAll
   public void init() throws Exception {
-    conf = new OzoneConfiguration();
+    ozoneAdmin = new OzoneAdmin();
+    conf = ozoneAdmin.getOzoneConf();
     omServiceId = "om-service-test1";
     scmServiceId = "scm-service-test1";
     conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
@@ -78,7 +82,7 @@ public class TestTransferLeadershipShell {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterEach
+  @AfterAll
   public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -93,7 +97,6 @@ public class TestTransferLeadershipShell {
     omList.remove(oldLeader);
     OzoneManager newLeader = omList.get(0);
     cluster.waitForClusterToBeReady();
-    OzoneAdmin ozoneAdmin = new OzoneAdmin(conf);
     String[] args1 = {"om", "transfer", "-n", newLeader.getOMNodeId()};
     ozoneAdmin.execute(args1);
     Thread.sleep(3000);
@@ -117,7 +120,6 @@ public class TestTransferLeadershipShell {
     scmList.remove(oldLeader);
     StorageContainerManager newLeader = scmList.get(0);
 
-    OzoneAdmin ozoneAdmin = new OzoneAdmin(conf);
     String[] args1 = {"scm", "transfer", "-n", newLeader.getScmId()};
     ozoneAdmin.execute(args1);
     cluster.waitForClusterToBeReady();

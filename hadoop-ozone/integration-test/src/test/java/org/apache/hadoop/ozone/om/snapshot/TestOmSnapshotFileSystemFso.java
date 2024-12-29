@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Timeout;
  */
 @Timeout(120)
 public class TestOmSnapshotFileSystemFso extends TestOmSnapshotFileSystem {
-  TestOmSnapshotFileSystemFso() {
-    super(BUCKET_NAME_FSO);
+  TestOmSnapshotFileSystemFso() throws Exception {
+    super(BUCKET_NAME_FSO, false);
   }
 }

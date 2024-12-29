@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
@@ -49,7 +50,6 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -65,50 +65,48 @@ import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneFsServerDefaults;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
-import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
-
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
-    .BUCKET_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
-    .VOLUME_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 
@@ -221,7 +219,15 @@ public class BasicRootedOzoneClientAdapterImpl
           OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
 
       // Fetches the bucket layout to be used by OFS.
-      initDefaultFsBucketLayout(conf);
+      try {
+        initDefaultFsBucketLayout(conf);
+      } catch (IOException | RuntimeException exception) {
+        // in case of exception, the adapter object will not be
+        // initialised making the client object unreachable, close the client
+        // to release resources in this case and rethrow.
+        ozoneClient.close();
+        throw exception;
+      }
 
       config = conf;
     } finally {
@@ -780,7 +786,7 @@ public class BasicRootedOzoneClientAdapterImpl
    */
   private List<FileStatusAdapter> listStatusRoot(
       boolean recursive, String startPath, long numEntries,
-      URI uri, Path workingDir, String username) throws IOException {
+      URI uri, Path workingDir, String username, boolean lite) throws IOException {
 
     OFSPath ofsStartPath = new OFSPath(startPath, config);
     // list volumes
@@ -793,7 +799,7 @@ public class BasicRootedOzoneClientAdapterImpl
       if (recursive) {
         String pathStrNextVolume = volume.getName();
         res.addAll(listStatus(pathStrNextVolume, recursive, startPath,
-            numEntries - res.size(), uri, workingDir, username));
+            numEntries - res.size(), uri, workingDir, username, lite));
       }
     }
     return res;
@@ -802,9 +808,10 @@ public class BasicRootedOzoneClientAdapterImpl
   /**
    * Helper for OFS listStatus on a volume.
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   private List<FileStatusAdapter> listStatusVolume(String volumeStr,
       boolean recursive, String startPath, long numEntries,
-      URI uri, Path workingDir, String username) throws IOException {
+      URI uri, Path workingDir, String username, boolean lite) throws IOException {
 
     OFSPath ofsStartPath = new OFSPath(startPath, config);
     // list buckets in the volume
@@ -818,7 +825,7 @@ public class BasicRootedOzoneClientAdapterImpl
       if (recursive) {
         String pathStrNext = volumeStr + OZONE_URI_DELIMITER + bucket.getName();
         res.addAll(listStatus(pathStrNext, recursive, startPath,
-            numEntries - res.size(), uri, workingDir, username));
+            numEntries - res.size(), uri, workingDir, username, lite));
       }
     }
     return res;
@@ -828,7 +835,7 @@ public class BasicRootedOzoneClientAdapterImpl
    * Helper for OFS listStatus on a bucket to get all snapshots.
    */
   private List<FileStatusAdapter> listStatusBucketSnapshot(
-      String volumeName, String bucketName, URI uri) throws IOException {
+      String volumeName, String bucketName, URI uri, String prevSnapshot, long numberOfEntries) throws IOException {
 
     OzoneBucket ozoneBucket = getBucket(volumeName, bucketName, false);
     UserGroupInformation ugi =
@@ -837,9 +844,9 @@ public class BasicRootedOzoneClientAdapterImpl
     String group = getGroupName(ugi);
     List<FileStatusAdapter> res = new ArrayList<>();
 
-    Iterator<OzoneSnapshot> snapshotIter = objectStore.listSnapshot(volumeName, bucketName, null, null);
+    Iterator<OzoneSnapshot> snapshotIter = objectStore.listSnapshot(volumeName, bucketName, null, prevSnapshot);
 
-    while (snapshotIter.hasNext()) {
+    while (snapshotIter.hasNext() && res.size() < numberOfEntries) {
       OzoneSnapshot ozoneSnapshot = snapshotIter.next();
       if (SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE.name().equals(ozoneSnapshot.getSnapshotStatus())) {
         res.add(getFileStatusAdapterForBucketSnapshot(
@@ -870,13 +877,15 @@ public class BasicRootedOzoneClientAdapterImpl
    *                   Used in making the return path qualified.
    * @param username User name.
    *                 Used in making the return path qualified.
+   * @param lite true if lightweight response needs to be returned otherwise false.
    * @return A list of FileStatusAdapter.
    * @throws IOException Bucket exception or FileNotFoundException.
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   @Override
   public List<FileStatusAdapter> listStatus(String pathStr, boolean recursive,
       String startPath, long numEntries, URI uri,
-      Path workingDir, String username) throws IOException {
+      Path workingDir, String username, boolean lite) throws IOException {
 
     incrementCounter(Statistic.OBJECTS_LIST, 1);
     // Remove authority from startPath if it exists
@@ -895,44 +904,53 @@ public class BasicRootedOzoneClientAdapterImpl
     OFSPath ofsPath = new OFSPath(pathStr, config);
     if (ofsPath.isRoot()) {
       return listStatusRoot(
-          recursive, startPath, numEntries, uri, workingDir, username);
+          recursive, startPath, numEntries, uri, workingDir, username, lite);
     }
     OFSPath ofsStartPath = new OFSPath(startPath, config);
     if (ofsPath.isVolume()) {
       String startBucketPath = ofsStartPath.getNonKeyPath();
       return listStatusVolume(ofsPath.getVolumeName(),
-          recursive, startBucketPath, numEntries, uri, workingDir, username);
+          recursive, startBucketPath, numEntries, uri, workingDir, username, lite);
     }
 
     if (ofsPath.isSnapshotPath()) {
       return listStatusBucketSnapshot(ofsPath.getVolumeName(),
-          ofsPath.getBucketName(), uri);
+          ofsPath.getBucketName(), uri, ofsStartPath.getSnapshotName(), numEntries);
     }
-
+    List<FileStatusAdapter> result = new ArrayList<>();
     String keyName = ofsPath.getKeyName();
     // Internally we need startKey to be passed into bucket.listStatus
     String startKey = ofsStartPath.getKeyName();
     try {
       OzoneBucket bucket = getBucket(ofsPath, false);
-      List<OzoneFileStatus> statuses;
+      List<OzoneFileStatus> statuses = Collections.emptyList();
+      List<OzoneFileStatusLight> lightStatuses = Collections.emptyList();
       if (bucket.isSourcePathExist()) {
-        statuses = bucket
-            .listStatus(keyName, recursive, startKey, numEntries);
+        if (lite) {
+          lightStatuses = bucket.listStatusLight(keyName, recursive, startKey, numEntries);
+        } else {
+          statuses = bucket.listStatus(keyName, recursive, startKey, numEntries);
+        }
+
       } else {
         LOG.warn("Source Bucket does not exist, link bucket {} is orphan " +
             "and returning empty list of files inside it", bucket.getName());
-        statuses = Collections.emptyList();
       }
       
       // Note: result in statuses above doesn't have volume/bucket path since
       //  they are from the server.
       String ofsPathPrefix = ofsPath.getNonKeyPath();
 
-      List<FileStatusAdapter> result = new ArrayList<>();
-      for (OzoneFileStatus status : statuses) {
-        result.add(toFileStatusAdapter(status, username, uri, workingDir,
-            ofsPathPrefix));
+      if (lite) {
+        for (OzoneFileStatusLight status : lightStatuses) {
+          result.add(toFileStatusAdapter(status, username, uri, workingDir, ofsPathPrefix));
+        }
+      } else {
+        for (OzoneFileStatus status : statuses) {
+          result.add(toFileStatusAdapter(status, username, uri, workingDir, ofsPathPrefix));
+        }
       }
+
       return result;
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
@@ -1035,6 +1053,31 @@ public class BasicRootedOzoneClientAdapterImpl
     );
   }
 
+  private FileStatusAdapter toFileStatusAdapter(OzoneFileStatusLight status,
+      String owner, URI defaultUri, Path workingDir, String ofsPathPrefix) {
+    BasicOmKeyInfo keyInfo = status.getKeyInfo();
+    short replication = (short) keyInfo.getReplicationConfig()
+        .getRequiredNodes();
+    return new FileStatusAdapter(
+        keyInfo.getDataSize(),
+        keyInfo.getReplicatedSize(),
+        new Path(ofsPathPrefix + OZONE_URI_DELIMITER + keyInfo.getKeyName())
+            .makeQualified(defaultUri, workingDir),
+        status.isDirectory(),
+        replication,
+        status.getBlockSize(),
+        keyInfo.getModificationTime(),
+        keyInfo.getModificationTime(),
+        status.isDirectory() ? (short) 00777 : (short) 00666,
+        StringUtils.defaultIfEmpty(keyInfo.getOwnerName(), owner),
+        owner,
+        null,
+        getBlockLocations(null),
+        false,
+        OzoneClientUtils.isKeyErasureCode(keyInfo)
+    );
+  }
+
   /**
    * Helper method to get List of BlockLocation from OM Key info.
    * @param fileStatus Ozone key file status.
@@ -1071,16 +1114,15 @@ public class BasicRootedOzoneClientAdapterImpl
       omKeyLocationInfo.getPipeline().getNodes()
           .forEach(dn -> {
             hostList.add(dn.getHostName());
-            int port = dn.getPort(
-                DatanodeDetails.Port.Name.STANDALONE).getValue();
+            int port = dn.getStandalonePort().getValue();
             if (port == 0) {
               port = configuredDnPort;
             }
             nameList.add(dn.getHostName() + ":" + port);
           });
 
-      String[] hosts = hostList.toArray(new String[hostList.size()]);
-      String[] names = nameList.toArray(new String[nameList.size()]);
+      String[] hosts = hostList.toArray(new String[0]);
+      String[] names = nameList.toArray(new String[0]);
       BlockLocation blockLocation = new BlockLocation(
           names, hosts, offsetOfBlockInFile,
           omKeyLocationInfo.getLength());

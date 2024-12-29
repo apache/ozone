@@ -23,11 +23,8 @@ package org.apache.hadoop.ozone.repair.quota;
 
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
-
 
 /**
  * Tool to get status of last triggered quota repair.
@@ -38,8 +35,7 @@ import picocli.CommandLine;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
-@MetaInfServices(SubcommandWithParent.class)
-public class QuotaStatus implements Callable<Void>, SubcommandWithParent  {
+public class QuotaStatus implements Callable<Void>  {
   @CommandLine.Spec
   private static CommandLine.Model.CommandSpec spec;
 
@@ -67,14 +63,5 @@ public class QuotaStatus implements Callable<Void>, SubcommandWithParent  {
         parent.createOmClient(omServiceId, omHost, false);
     System.out.println(ozoneManagerClient.getQuotaRepairStatus());
     return null;
-  }
-
-  protected QuotaRepair getParent() {
-    return parent;
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return QuotaRepair.class;
   }
 }

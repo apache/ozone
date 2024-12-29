@@ -29,6 +29,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <packaging>jar</packaging>
 
   <properties>
+    <classpath.skip>false</classpath.skip>
   </properties>
 
   <dependencies>

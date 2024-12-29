@@ -359,10 +359,11 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       DeletedContainerBlocksSummary summary =
           DeletedContainerBlocksSummary.getFrom(containerBlocks);
       LOG.info("Summary of deleting container blocks, numOfTransactions={}, "
-              + "numOfContainers={}, numOfBlocks={}",
+              + "numOfContainers={}, numOfBlocks={}, commandId={}.",
           summary.getNumOfTxs(),
           summary.getNumOfContainers(),
-          summary.getNumOfBlocks());
+          summary.getNumOfBlocks(),
+          cmd.getCmd().getId());
       if (LOG.isDebugEnabled()) {
         LOG.debug("Start to delete container blocks, TXIDs={}",
             summary.getTxIDSummary());
@@ -389,7 +390,14 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           LOG.debug("Sending following block deletion ACK to SCM");
           for (DeleteBlockTransactionResult result : blockDeletionACK
               .getResultsList()) {
-            LOG.debug("{} : {}", result.getTxID(), result.getSuccess());
+            boolean success = result.getSuccess();
+            LOG.debug("TxId = {} : ContainerId = {} : {}",
+                result.getTxID(), result.getContainerID(), success);
+            if (success) {
+              blockDeleteMetrics.incrProcessedTransactionSuccessCount(1);
+            } else {
+              blockDeleteMetrics.incrProcessedTransactionFailCount(1);
+            }
           }
         }
       }

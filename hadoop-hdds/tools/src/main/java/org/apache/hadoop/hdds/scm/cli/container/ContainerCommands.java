@@ -19,10 +19,9 @@ package org.apache.hadoop.hdds.scm.cli.container;
 
 import java.util.concurrent.Callable;
 
+import org.apache.hadoop.hdds.cli.AdminSubcommand;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.OzoneAdmin;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
@@ -45,8 +44,8 @@ import picocli.CommandLine.Spec;
         ReportSubcommand.class,
         UpgradeSubcommand.class
     })
-@MetaInfServices(SubcommandWithParent.class)
-public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
+@MetaInfServices(AdminSubcommand.class)
+public class ContainerCommands implements Callable<Void>, AdminSubcommand {
 
   @Spec
   private CommandSpec spec;
@@ -55,10 +54,5 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
   public Void call() throws Exception {
     GenericCli.missingSubcommand(spec);
     return null;
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return OzoneAdmin.class;
   }
 }
