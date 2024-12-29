@@ -19,8 +19,7 @@ import React from 'react';
 import {
   render,
   screen,
-  fireEvent,
-  waitFor,
+  waitFor
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { rest } from "msw";
@@ -29,7 +28,7 @@ import { vi } from 'vitest';
 import Datanodes from '@/v2/pages/datanodes/datanodes';
 import * as commonUtils from '@/utils/common';
 import { datanodeServer } from '@/__tests__/mocks/datanodeMocks/datanodeServer';
-import DatanodesTable from '@/v2/components/tables/datanodesTable';
+import { datanodeLocators } from '@/__tests__/locators/locators';
 
 // Mock utility functions
 vi.spyOn(commonUtils, 'showDataFetchError');
@@ -98,7 +97,7 @@ describe('Datanodes Component', () => {
     // Click the "Remove" button to open the modal
     await waitFor(() => {
       // Wait for the button to appear in screen
-      screen.getByText(/Remove/);
+      screen.getByTestId(datanodeLocators.datanodeRemoveButton);
     }).then(() => {
       userEvent.click(screen.getByText(/Remove/));
     })
@@ -106,7 +105,7 @@ describe('Datanodes Component', () => {
     // Confirm removal in the modal
     await waitFor(() => {
       // Wait for the button to appear in screen
-      screen.getByText(/OK/);
+      screen.getByTestId(datanodeLocators.datanodeRemoveModal);
     }).then(() => {
       userEvent.click(screen.getByText(/OK/));
     })
