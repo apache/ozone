@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.cli;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.Callable;
-import java.util.function.Supplier;
 
 import com.google.common.base.Strings;
 import org.apache.hadoop.fs.Path;
@@ -27,7 +26,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ratis.util.MemoizedSupplier;
 import picocli.CommandLine;
 import picocli.CommandLine.ExitCode;
 import picocli.CommandLine.Model.CommandSpec;
@@ -40,24 +38,24 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
 
   public static final int EXECUTION_ERROR_EXIT_CODE = -1;
 
+  private final OzoneConfiguration config = new OzoneConfiguration();
+  private final CommandLine cmd;
+
+  private UserGroupInformation user;
+
   @Option(names = {"--verbose"},
       description = "More verbose output. Show the stack trace of the errors.")
   private boolean verbose;
 
   @Option(names = {"-D", "--set"})
   public void setConfigurationOverrides(Map<String, String> configOverrides) {
-    configOverrides.forEach(getOzoneConf()::set);
+    configOverrides.forEach(config::set);
   }
 
   @Option(names = {"-conf"})
   public void setConfigurationPath(String configPath) {
-    getOzoneConf().addResource(new Path(configPath));
+    config.addResource(new Path(configPath));
   }
-
-  private final Supplier<OzoneConfiguration> configSupplier =
-      MemoizedSupplier.valueOf(OzoneConfiguration::new);
-  private final CommandLine cmd;
-  private UserGroupInformation user;
 
   public GenericCli() {
     this(CommandLine.defaultFactory());
@@ -112,7 +110,7 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
 
   @Override
   public OzoneConfiguration getOzoneConf() {
-    return configSupplier.get();
+    return config;
   }
 
   public UserGroupInformation getUser() throws IOException {
