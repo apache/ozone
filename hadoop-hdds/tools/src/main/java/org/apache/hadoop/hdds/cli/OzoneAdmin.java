@@ -37,7 +37,7 @@ public class OzoneAdmin extends GenericCli implements ExtensibleParentCommand {
 
   @Override
   public int execute(String[] argv) {
-    TracingUtil.initTracing("shell", createOzoneConfiguration());
+    TracingUtil.initTracing("shell", getOzoneConf());
     String spanName = "ozone admin " + String.join(" ", argv);
     return TracingUtil.executeInNewSpan(spanName,
         () -> super.execute(argv));

@@ -17,11 +17,10 @@
 package org.apache.hadoop.hdds.cli;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.concurrent.Callable;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
@@ -39,19 +38,24 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
 
   public static final int EXECUTION_ERROR_EXIT_CODE = -1;
 
+  private final OzoneConfiguration config = new OzoneConfiguration();
+  private final CommandLine cmd;
+
+  private UserGroupInformation user;
+
   @Option(names = {"--verbose"},
       description = "More verbose output. Show the stack trace of the errors.")
   private boolean verbose;
 
   @Option(names = {"-D", "--set"})
-  private Map<String, String> configurationOverrides = new HashMap<>();
+  public void setConfigurationOverrides(Map<String, String> configOverrides) {
+    configOverrides.forEach(config::set);
+  }
 
   @Option(names = {"-conf"})
-  private String configurationPath;
-
-  private final CommandLine cmd;
-  private OzoneConfiguration conf;
-  private UserGroupInformation user;
+  public void setConfigurationPath(String configPath) {
+    config.addResource(new Path(configPath));
+  }
 
   public GenericCli() {
     this(CommandLine.defaultFactory());
@@ -92,8 +96,7 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
   protected void printError(Throwable error) {
     //message could be null in case of NPE. This is unexpected so we can
     //print out the stack trace.
-    if (verbose || error.getMessage() == null
-        || error.getMessage().length() == 0) {
+    if (verbose || Strings.isNullOrEmpty(error.getMessage())) {
       error.printStackTrace(System.err);
     } else {
       System.err.println(error.getMessage().split("\n")[0]);
@@ -105,25 +108,9 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
     throw new MissingSubcommandException(cmd);
   }
 
-  public OzoneConfiguration createOzoneConfiguration() {
-    OzoneConfiguration ozoneConf = new OzoneConfiguration();
-    if (configurationPath != null) {
-      ozoneConf.addResource(new Path(configurationPath));
-    }
-    if (configurationOverrides != null) {
-      for (Entry<String, String> entry : configurationOverrides.entrySet()) {
-        ozoneConf.set(entry.getKey(), entry.getValue());
-      }
-    }
-    return ozoneConf;
-  }
-
   @Override
   public OzoneConfiguration getOzoneConf() {
-    if (conf == null) {
-      conf = createOzoneConfiguration();
-    }
-    return conf;
+    return config;
   }
 
   public UserGroupInformation getUser() throws IOException {

@@ -572,7 +572,7 @@ public class BaseFreonGenerator {
   }
 
   public OzoneConfiguration createOzoneConfiguration() {
-    return freonCommand.createOzoneConfiguration();
+    return freonCommand.getOzoneConf();
   }
 
   /**

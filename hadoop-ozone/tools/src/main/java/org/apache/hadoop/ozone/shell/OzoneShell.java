@@ -58,7 +58,7 @@ public class OzoneShell extends Shell {
 
   @Override
   public int execute(String[] argv) {
-    TracingUtil.initTracing("shell", createOzoneConfiguration());
+    TracingUtil.initTracing("shell", getOzoneConf());
     String spanName = "ozone sh " + String.join(" ", argv);
     return TracingUtil.executeInNewSpan(spanName,
         () -> super.execute(argv));

@@ -100,7 +100,7 @@ public class HsyncGenerator extends BaseFreonGenerator implements Callable<Void>
     init();
 
     if (configuration == null) {
-      configuration = freon.createOzoneConfiguration();
+      configuration = freon.getOzoneConf();
     }
     URI uri = URI.create(rootPath);
 
