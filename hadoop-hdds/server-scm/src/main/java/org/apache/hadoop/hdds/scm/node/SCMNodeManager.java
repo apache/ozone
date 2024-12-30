@@ -23,6 +23,7 @@ import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -674,6 +675,8 @@ public class SCMNodeManager implements NodeManager {
         datanodeInfo.updateStorageReports(nodeReport.getStorageReportList());
         datanodeInfo.updateMetaDataStorageReports(nodeReport.
             getMetadataStorageReportList());
+        datanodeInfo.setContainersReplicationMetrics(nodeReport.getReplicationMetricsList()
+            .stream().collect(Collectors.toMap(HddsProtos.KeyValue::getKey, HddsProtos.KeyValue::getValue)));
         metrics.incNumNodeReportProcessed();
       }
     } catch (NodeNotFoundException e) {
@@ -1715,6 +1718,19 @@ public class SCMNodeManager implements NodeManager {
       LOG.warn("Cannot find node for uuid {}", uuid);
       return null;
     }
+  }
+
+  /**
+   * Given datanode details, return a list of
+   * Container replication metrics.
+   *
+   * @param datanodeDetails {@link DatanodeDetails} datanode details
+   * @return node containers replication metrics {@link Map}
+   */
+  @Override
+  public Map<String, String> getNodeContainersReplicationMetrics(DatanodeDetails datanodeDetails)
+      throws NodeNotFoundException {
+    return nodeStateManager.getNode(datanodeDetails.getUuid()).getContainersReplicationMetrics();
   }
 
   /**
