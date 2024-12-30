@@ -285,7 +285,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
   @Override
   public Void call() throws Exception {
     if (ozoneConfiguration == null) {
-      ozoneConfiguration = freon.createOzoneConfiguration();
+      ozoneConfiguration = freon.getOzoneConf();
     }
     if (!ozoneConfiguration.getBoolean(
         HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA,

@@ -20,10 +20,8 @@ package org.apache.hadoop.ozone.shell.keys;
 
 import java.util.concurrent.Callable;
 
-import org.apache.hadoop.hdds.cli.GenericParentCommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.MissingSubcommandException;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.shell.Shell;
 
 import picocli.CommandLine.Command;
@@ -52,8 +50,7 @@ import picocli.CommandLine.ParentCommand;
     },
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class KeyCommands
-    implements GenericParentCommand, Callable<Void> {
+public class KeyCommands implements Callable<Void> {
 
   @ParentCommand
   private Shell shell;
@@ -62,15 +59,5 @@ public class KeyCommands
   public Void call() throws Exception {
     throw new MissingSubcommandException(
         this.shell.getCmd().getSubcommands().get("key"));
-  }
-
-  @Override
-  public boolean isVerbose() {
-    return shell.isVerbose();
-  }
-
-  @Override
-  public OzoneConfiguration createOzoneConfiguration() {
-    return shell.createOzoneConfiguration();
   }
 }

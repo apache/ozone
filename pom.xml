@@ -34,7 +34,7 @@
     <apache-rat-plugin.version>0.16.1</apache-rat-plugin.version>
     <aspectj-plugin.version>1.14</aspectj-plugin.version>
     <aspectj.version>1.9.7</aspectj.version>
-    <assertj.version>3.26.3</assertj.version>
+    <assertj.version>3.27.0</assertj.version>
     <aws-java-sdk.version>1.12.661</aws-java-sdk.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.79</bouncycastle.version>
@@ -125,7 +125,7 @@
     <jaxb-runtime.version>2.3.9</jaxb-runtime.version>
     <jcip-annotations.version>1.0-1</jcip-annotations.version>
     <jersey.version>1.19.4</jersey.version>
-    <jersey2.version>2.45</jersey2.version>
+    <jersey2.version>2.46</jersey2.version>
     <jetty.version>9.4.56.v20240826</jetty.version>
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
@@ -137,7 +137,7 @@
     <jsch.version>0.1.55</jsch.version>
     <jsp-api.version>2.1</jsp-api.version>
     <jsr311-api.version>1.1.1</jsr311-api.version>
-    <junit5.version>5.11.3</junit5.version>
+    <junit5.version>5.11.4</junit5.version>
     <kerby.version>1.0.1</kerby.version>
     <kotlin.version>1.9.25</kotlin.version>
     <license-maven-plugin.version>2.5.0</license-maven-plugin.version>
@@ -203,7 +203,7 @@
     <ratis.version>3.1.2</ratis.version>
     <re2j.version>1.7</re2j.version>
     <reflections.version>0.10.2</reflections.version>
-    <reload4j.version>1.2.25</reload4j.version>
+    <reload4j.version>1.2.26</reload4j.version>
     <restrict-imports.enforcer.version>2.6.0</restrict-imports.enforcer.version>
     <rocksdb.version>7.7.3</rocksdb.version>
     <servlet-api.version>3.1.0</servlet-api.version>

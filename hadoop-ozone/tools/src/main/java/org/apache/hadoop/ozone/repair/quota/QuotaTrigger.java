@@ -84,9 +84,4 @@ public class QuotaTrigger implements Callable<Void>  {
     }
     return null;
   }
-
-  protected QuotaRepair getParent() {
-    return parent;
-  }
-
 }

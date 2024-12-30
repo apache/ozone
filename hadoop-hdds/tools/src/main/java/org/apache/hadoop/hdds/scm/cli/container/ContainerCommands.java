@@ -22,11 +22,9 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.AdminSubcommand;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.OzoneAdmin;
 
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.ParentCommand;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
 
@@ -52,16 +50,9 @@ public class ContainerCommands implements Callable<Void>, AdminSubcommand {
   @Spec
   private CommandSpec spec;
 
-  @ParentCommand
-  private OzoneAdmin parent;
-
   @Override
   public Void call() throws Exception {
     GenericCli.missingSubcommand(spec);
     return null;
-  }
-
-  public OzoneAdmin getParent() {
-    return parent;
   }
 }
