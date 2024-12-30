@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -287,8 +288,7 @@ public class TestDeleteWithInAdequateDN {
     //cluster.getOzoneManager().deleteKey(keyArgs);
     client.getObjectStore().getVolume(volumeName).getBucket(bucketName).
         deleteKey("ratis");
-    // flush deletedBlockLog
-    waitForDeletedBlockLog();
+    OzoneTestUtils.waitForDeletedBlockLog(cluster.getStorageContainerManager());
     // make sure the chunk was never deleted on the leader even though
     // deleteBlock handler is invoked
 
@@ -327,20 +327,5 @@ public class TestDeleteWithInAdequateDN {
       });
       assertSame(ContainerProtos.Result.UNABLE_TO_FIND_CHUNK, e.getResult());
     }
-  }
-
-  private void waitForDeletedBlockLog() throws InterruptedException, TimeoutException {
-    GenericTestUtils.waitFor(() -> {
-      StorageContainerManager scm = cluster.getStorageContainerManager();
-      try {
-        scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
-        if (scm.getScmBlockManager().getDeletedBlockLog().getNumOfValidTransactions() > 0) {
-          return true;
-        }
-        return false;
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }, 100, 3000);
   }
 }

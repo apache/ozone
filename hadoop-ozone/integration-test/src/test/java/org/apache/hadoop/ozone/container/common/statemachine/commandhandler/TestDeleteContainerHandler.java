@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -68,6 +69,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.slf4j.LoggerFactory;
 
@@ -75,6 +77,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -97,6 +100,7 @@ public class TestDeleteContainerHandler {
   @BeforeAll
   public static void setup() throws Exception {
     conf = new OzoneConfiguration();
+    conf.setBoolean(OZONE_SCM_HA_ENABLE_KEY, true);
     conf.set(OZONE_SCM_CONTAINER_SIZE, "1GB");
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         0, StorageUnit.MB);
@@ -196,6 +200,8 @@ public class TestDeleteContainerHandler {
     // Delete key, which will make isEmpty flag to true in containerData
     objectStore.getVolume(volumeName)
         .getBucket(bucketName).deleteKey(keyName);
+    OzoneTestUtils.waitForDeletedBlockLog(cluster.getStorageContainerManager());
+    OzoneTestUtils.waitBlockDeleted(cluster.getStorageContainerManager());
 
     // Ensure isEmpty flag is true when key is deleted and container is empty
     GenericTestUtils.waitFor(() -> getContainerfromDN(
@@ -313,6 +319,8 @@ public class TestDeleteContainerHandler {
     // Delete key, which will make isEmpty flag to true in containerData
     objectStore.getVolume(volumeName)
         .getBucket(bucketName).deleteKey(keyName);
+    OzoneTestUtils.waitForDeletedBlockLog(cluster.getStorageContainerManager());
+    OzoneTestUtils.waitBlockDeleted(cluster.getStorageContainerManager());
 
     // Ensure isEmpty flag is true when key is deleted and container is empty
     GenericTestUtils.waitFor(() -> getContainerfromDN(
@@ -652,6 +660,8 @@ public class TestDeleteContainerHandler {
     // Delete key, which will make isEmpty flag to true in containerData
     objectStore.getVolume(volumeName)
         .getBucket(bucketName).deleteKey(keyName);
+    OzoneTestUtils.waitForDeletedBlockLog(cluster.getStorageContainerManager());
+    OzoneTestUtils.waitBlockDeleted(cluster.getStorageContainerManager());
 
     // Ensure isEmpty flag is true when key is deleted
     GenericTestUtils.waitFor(() -> getContainerfromDN(
