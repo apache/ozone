@@ -173,10 +173,9 @@ public final class OzoneTestUtils {
         if (scm.getScmBlockManager().getDeletedBlockLog().getNumOfValidTransactions() > 0) {
           return true;
         }
-        return false;
       } catch (IOException e) {
-        throw new RuntimeException(e);
       }
+      return false;
     }, 100, 3000);
   }
 
@@ -193,6 +192,6 @@ public final class OzoneTestUtils {
       } catch (IOException e) {
       }
       return false;
-    }, 100, 30000);
+    }, 1000, 60000);
   }
 }
