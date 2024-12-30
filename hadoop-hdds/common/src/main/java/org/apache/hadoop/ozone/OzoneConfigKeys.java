@@ -697,6 +697,18 @@ public final class OzoneConfigKeys {
       "ozone.security.crypto.compliance.mode";
   public static final String OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED = "unrestricted";
 
+  public static final String OZONE_OM_PREFETCH_MAX_BLOCKS = "ozone.om.prefetch.max.blocks";
+  public static final int OZONE_OM_PREFETCH_MAX_BLOCKS_DEFAULT = 10000;
+
+  public static final String OZONE_OM_PREFETCH_BLOCKS_FACTOR = "ozone.om.prefetch.blocks.factor";
+  public static final int OZONE_OM_PREFETCH_BLOCKS_FACTOR_DEFAULT = 2;
+
+  public static final String
+      OZONE_OM_PREFETCHED_BLOCKS_EXPIRY_INTERVAL =
+      "ozone.om.prefetched.blocks.periodic.expiry.interval";
+  public static final String
+      OZONE_OM_PREFETCHED_BLOCKS_EXPIRY_INTERVAL_DEFAULT = "30s";
+
 
   /**
    * There is no need to instantiate this class.
