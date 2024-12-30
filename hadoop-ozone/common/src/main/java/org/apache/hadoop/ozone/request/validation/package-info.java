@@ -23,7 +23,7 @@
  * code for any server.
  * {@link org.apache.hadoop.ozone.request.validation.RegisterValidator}
  * is used to register any validator which has the following methods:
- * - applyBefore : Returns an enum which implement {@link org.apache.hadoop.ozone.Version}
+ * - applyBefore : Returns an enum which implement {@link org.apache.hadoop.ozone.Versioned}
  * - requestType: Returns an Enum value.
  * - processingPhase: Returns {@link org.apache.hadoop.ozone.request.validation.RequestProcessingPhase}
  *
