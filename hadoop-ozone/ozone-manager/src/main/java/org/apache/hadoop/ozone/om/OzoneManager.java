@@ -3091,7 +3091,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public List<List<String>> getRatisRoles() {
-    String leaderReadiness = omRatisServer.checkLeaderStatus().name();
     int port = omNodeDetails.getRatisPort();
     if (!isRatisEnabled) {
       return getRatisRolesException("Ratis is disabled");
@@ -3099,6 +3098,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (null == omRatisServer) {
       return getRatisRolesException("Server is shutting down");
     }
+    String leaderReadiness = omRatisServer.checkLeaderStatus().name();
     final RaftPeerId leaderId = omRatisServer.getLeaderId();
     if (leaderId == null) {
       LOG.error("No leader found");
