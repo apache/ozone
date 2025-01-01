@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
-import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
