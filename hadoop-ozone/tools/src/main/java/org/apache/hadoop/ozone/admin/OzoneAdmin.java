@@ -15,8 +15,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.cli;
+package org.apache.hadoop.ozone.admin;
 
+import org.apache.hadoop.hdds.cli.AdminSubcommand;
+import org.apache.hadoop.hdds.cli.ExtensibleParentCommand;
+import org.apache.hadoop.hdds.cli.GenericCli;
+import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 
 import picocli.CommandLine;
