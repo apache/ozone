@@ -60,6 +60,14 @@ describe('Datanodes Component', () => {
     expect(screen.getByTestId('search-input')).toBeInTheDocument();
   });
 
+  test('renders table with correct number of rows', async () => {
+    render(<Datanodes />);
+
+    // Wait for the data to load
+    const rows = await waitFor(() => screen.getAllByTestId(/dntable-/));
+    expect(rows).toHaveLength(5); // Based on the mocked DatanodeResponse
+  });
+
   test('loads data on mount', async () => {
     render(<Datanodes />);
     // Wait for the data to be loaded into the table
@@ -70,6 +78,19 @@ describe('Datanodes Component', () => {
     expect(dnTable).toHaveTextContent('HEALTHY');
   });
 
+  test('displays no data message if the datanodes API returns an empty array', async () => {
+    datanodeServer.use(
+      rest.get('api/v1/datanodes', (req, res, ctx) => {
+        return res(ctx.status(200), ctx.json({ totalCount: 0, datanodes: [] }));
+      })
+    );
+
+    render(<Datanodes />);
+
+    // Wait for the no data message
+    await waitFor(() => expect(screen.getByText('No Data')).toBeInTheDocument());
+  });
+
   test('handles search input change', async () => {
     render(<Datanodes />);
     await waitFor(() => screen.getByTestId('dn-table'));
@@ -77,6 +98,17 @@ describe('Datanodes Component', () => {
     const searchInput = screen.getByTestId('search-input');
     userEvent.type(searchInput, 'ozone-datanode-1');
     await waitFor(() => expect(searchInput).toHaveValue('ozone-datanode-1'));
+  });
+
+  test('displays a message when no results match the search term', async () => {
+    render(<Datanodes />);
+    const searchInput = screen.getByTestId('search-input');
+
+    // Type a term that doesn't match any datanode
+    userEvent.type(searchInput, 'nonexistent-datanode');
+
+    // Verify that no results message is displayed
+    await waitFor(() => expect(screen.getByText('No Data')).toBeInTheDocument());
   });
 
   // Since this is a static response, even if we remove we will not get the truncated response from backend
