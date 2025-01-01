@@ -187,7 +187,7 @@ public abstract class BaseFileChecksumHelper {
     case COMPOSITE_CRC:
       byte[] crcBytes = blockChecksumByteBuffer.array();
       if (LOG.isDebugEnabled()) {
-        blockChecksumForDebug = CrcUtil.toSingleCrcString(crcBytes);
+        blockChecksumForDebug = CrcUtil.toMultiCrcString(crcBytes);
       }
       getBlockChecksumBuf().write(crcBytes);
       break;
