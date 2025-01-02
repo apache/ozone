@@ -16,38 +16,29 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.repair.ldb;
+package org.apache.hadoop.ozone.repair.om;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
-import org.apache.hadoop.hdds.cli.RepairSubcommand;
-import org.kohsuke.MetaInfServices;
+
 import picocli.CommandLine;
+import picocli.CommandLine.Model.CommandSpec;
 
 import java.util.concurrent.Callable;
 
 /**
- * Ozone Repair CLI for RocksDB.
+ * Tool to repair snapshotInfoTable in case it has corrupted entries.
  */
-@CommandLine.Command(name = "ldb",
+@CommandLine.Command(
+    name = "snapshot",
+    description = "Subcommand for all snapshot related repairs.",
     subcommands = {
-        SnapshotRepair.class,
-        TransactionInfoRepair.class,
-    },
-    description = "Operational tool to repair RocksDB table.")
-@MetaInfServices(RepairSubcommand.class)
-public class RDBRepair implements Callable<Void>, RepairSubcommand {
+        SnapshotChainRepair.class
+    }
+)
+public class SnapshotRepair implements Callable<Void> {
 
   @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
-
-  @CommandLine.Option(names = {"--db"},
-      required = true,
-      description = "Database File Path")
-  private String dbPath;
-
-  public String getDbPath() {
-    return dbPath;
-  }
+  private static CommandSpec spec;
 
   @Override
   public Void call() {

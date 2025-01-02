@@ -19,7 +19,7 @@
  * permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.repair.ldb;
+package org.apache.hadoop.ozone.repair.om;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -54,8 +54,10 @@ public class TransactionInfoRepair implements Callable<Void>  {
   @CommandLine.Spec
   private static CommandLine.Model.CommandSpec spec;
 
-  @CommandLine.ParentCommand
-  private RDBRepair parent;
+  @CommandLine.Option(names = {"--db"},
+          required = true,
+          description = "Database File Path")
+  private String dbPath;
 
   @CommandLine.Option(names = {"--term"},
       required = true,
@@ -66,7 +68,6 @@ public class TransactionInfoRepair implements Callable<Void>  {
       required = true,
       description = "Highest index of transactionInfoTable. The input should be non-zero long integer.")
   private long highestTransactionIndex;
-
 
   protected void setHighestTransactionTerm(
       long highestTransactionTerm) {
@@ -82,7 +83,6 @@ public class TransactionInfoRepair implements Callable<Void>  {
   @Override
   public Void call() throws Exception {
     List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
-    String dbPath = getParent().getDbPath();
     List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(
         dbPath);
 
@@ -117,9 +117,4 @@ public class TransactionInfoRepair implements Callable<Void>  {
 
     return null;
   }
-
-  protected RDBRepair getParent() {
-    return parent;
-  }
-
 }

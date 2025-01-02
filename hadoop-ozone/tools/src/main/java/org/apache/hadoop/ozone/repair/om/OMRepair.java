@@ -31,6 +31,8 @@ import java.util.concurrent.Callable;
 @CommandLine.Command(name = "om",
     subcommands = {
         FSORepairCLI.class,
+        SnapshotRepair.class,
+        TransactionInfoRepair.class
     },
     description = "Operational tool to repair OM.")
 @MetaInfServices(RepairSubcommand.class)
