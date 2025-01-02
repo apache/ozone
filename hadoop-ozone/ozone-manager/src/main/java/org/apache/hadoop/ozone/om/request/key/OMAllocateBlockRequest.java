@@ -26,14 +26,15 @@ import java.util.Map;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.om.request.validation.OMLayoutVersionValidator;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
-import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
-import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
-import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.OMClientVersionValidator;
+import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -277,10 +278,10 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+  @OMLayoutVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.AllocateBlock
+      requestType = Type.AllocateBlock,
+      applyBefore = OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT
   )
   public static OMRequest disallowAllocateBlockWithECReplicationConfig(
       OMRequest req, ValidationContext ctx) throws OMException {
@@ -307,10 +308,10 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
    * @return the validated request
    * @throws OMException if the request is invalid
    */
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+  @OMClientVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.AllocateBlock
+      requestType = Type.AllocateBlock,
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT
   )
   public static OMRequest blockAllocateBlockWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {

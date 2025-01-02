@@ -16,12 +16,12 @@
  */
 package org.apache.hadoop.ozone.om.request.validation.testvalidatorset2;
 
-import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
+import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.om.request.validation.OMClientVersionValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 
-import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.PRE_PROCESS;
-import static org.apache.hadoop.ozone.om.request.validation.ValidationCondition.OLDER_CLIENT_REQUESTS;
+import static org.apache.hadoop.ozone.request.validation.RequestProcessingPhase.PRE_PROCESS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateKey;
 
 /**
@@ -32,11 +32,11 @@ public final class ValidatorsForOnlyOldClientValidations {
 
   private ValidatorsForOnlyOldClientValidations() { }
 
-  @RequestFeatureValidator(
-      conditions = { OLDER_CLIENT_REQUESTS },
+  @OMClientVersionValidator(
       processingPhase = PRE_PROCESS,
-      requestType = CreateKey)
-  public static OMRequest oldClientPreProcessCreateKeyValidator2(
+      requestType = CreateKey,
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT)
+  public static OMRequest preProcessCreateKeyBucketLayoutClientValidator(
       OMRequest req, ValidationContext ctx) {
     return req;
   }

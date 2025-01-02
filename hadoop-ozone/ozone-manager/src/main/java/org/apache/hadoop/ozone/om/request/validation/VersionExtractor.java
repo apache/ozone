@@ -22,6 +22,8 @@ import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 
+import java.lang.annotation.Annotation;
+
 /**
  * Class to extract version out of OM request.
  */
@@ -37,8 +39,8 @@ public enum VersionExtractor {
     }
 
     @Override
-    public Class<OMLayoutFeature> getVersionClass() {
-      return OMLayoutFeature.class;
+    public Class<? extends Annotation> getValidatorClass() {
+      return OMLayoutVersionValidator.class;
     }
   },
 
@@ -53,11 +55,11 @@ public enum VersionExtractor {
     }
 
     @Override
-    public Class<ClientVersion> getVersionClass() {
-      return ClientVersion.class;
+    public Class<? extends Annotation> getValidatorClass() {
+      return OMClientVersionValidator.class;
     }
   };
 
   public abstract Versioned extractVersion(OMRequest req, ValidationContext ctx);
-  public abstract Class<? extends Versioned> getVersionClass();
+  public abstract Class<? extends Annotation> getValidatorClass();
 }
