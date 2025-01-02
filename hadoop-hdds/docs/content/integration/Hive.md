@@ -56,10 +56,6 @@ To store managed tables in Ozone, update the following properties in the `hive-s
   <name>hive.metastore.warehouse.dir</name>
   <value>ofs://ozone1/vol1/bucket1/warehouse/</value>
 </property>
-<property>
-  <name>hive.metastore.warehouse.external.dir</name>
-  <value>ofs://ozone1/vol1/bucket1/external/</value>
-</property>
 ```
 
 ### Creating a Managed Table
@@ -123,11 +119,24 @@ CREATE EXTERNAL TABLE external_table (
 LOCATION 'ofs://ozone1/vol1/bucket1/table1';
 ```
 
+* With external tables, the data is expected to be created and managed by another tool.
+* Hive queries the data as-is.
+* The metadata is stored under the external warehouse directory.
+* Note: Dropping an external table in Hive does not delete the associated data.
+
+You can also have the metadata for the external tables stored in Ozone too by applying the following configuration in the `hive-site.xml` file:
+```xml
+<property>
+  <name>hive.metastore.warehouse.external.dir</name>
+  <value>ofs://ozone1/vol1/bucket1/external/</value>
+</property>
+```
+
 ### Verifying the External Table Path
 To confirm the table's metadata and location, use:
 
 ```sql
-SHOW CREATE EXTERNAL TABLE external_table;
+SHOW CREATE TABLE external_table;
 ```
 Output Example:
 
