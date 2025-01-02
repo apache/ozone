@@ -37,8 +37,15 @@ export const overviewLocators = {
 }
 
 export const datanodeLocators = {
-  'datanodeContainer': 'datanodes-container',
-  'datanodeMultiSelect': 'datanodes-multiselect'
+  'datanodeMultiSelect': 'dn-multi-select',
+  'datanodeSearchcDropdown': 'search-dropdown',
+  'datanodeSearchInput': 'search-input',
+  'datanodeRemoveButton': 'dn-remove-btn',
+  'datanodeRemoveModal': 'dn-remove-modal',
+  'datanodeTable': 'dn-table',
+  'datanodeRowRegex': /dntable-/,
+  datanodeSearchOption: (label: string) => `search-opt-${label}`,
+  datanodeTableRow: (uuid: string) =>  `dntable-${uuid}`
 }
 
 export const autoReloadPanelLocators = {
@@ -46,3 +53,5 @@ export const autoReloadPanelLocators = {
   'refreshButton': 'autoreload-panel-refresh',
   'toggleSwitch': 'autoreload-panel-switch'
 }
+
+export const searchInputLocator = 'search-input';
