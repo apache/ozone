@@ -54,7 +54,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -86,7 +85,6 @@ public class TestOzoneFileSystemWithStreaming {
     CONF.setBoolean(HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
     CONF.setBoolean(OZONE_FS_DATASTREAM_ENABLED, true);
     CONF.set(OZONE_FS_DATASTREAM_AUTO_THRESHOLD, AUTO_THRESHOLD + "B");
-    CONF.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, true);
     CONF.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
     CONF.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
 

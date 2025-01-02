@@ -15,14 +15,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.fs.ozone;
 
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.junit.jupiter.api.TestInstance;
+package org.apache.hadoop.hdds.scm.container.balancer;
 
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class TestOFSWithFSPathsAndOMRatisAndCacheOnly extends AbstractRootedOzoneFileSystemTest {
-  TestOFSWithFSPathsAndOMRatisAndCacheOnly() {
-    super(BucketLayout.LEGACY, true, true, false, true);
+/**
+ * Information about the iteration.
+ */
+public class IterationInfo {
+
+  private final Integer iterationNumber;
+  private final String iterationResult;
+  private final Long iterationDuration;
+
+  public IterationInfo(Integer iterationNumber, String iterationResult, long iterationDuration) {
+    this.iterationNumber = iterationNumber;
+    this.iterationResult = iterationResult;
+    this.iterationDuration = iterationDuration;
+  }
+
+  public Integer getIterationNumber() {
+    return iterationNumber;
+  }
+
+  public String getIterationResult() {
+    return iterationResult;
+  }
+
+  public Long getIterationDuration() {
+    return iterationDuration;
   }
 }

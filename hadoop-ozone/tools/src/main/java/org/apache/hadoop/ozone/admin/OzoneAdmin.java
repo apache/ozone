@@ -15,13 +15,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.cli;
+package org.apache.hadoop.ozone.admin;
 
-import com.google.common.annotations.VisibleForTesting;
-import java.io.IOException;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.cli.AdminSubcommand;
+import org.apache.hadoop.hdds.cli.ExtensibleParentCommand;
+import org.apache.hadoop.hdds.cli.GenericCli;
+import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.security.UserGroupInformation;
 
 import picocli.CommandLine;
 
@@ -35,45 +35,13 @@ import picocli.CommandLine;
     mixinStandardHelpOptions = true)
 public class OzoneAdmin extends GenericCli implements ExtensibleParentCommand {
 
-  private OzoneConfiguration ozoneConf;
-
-  private UserGroupInformation user;
-
-  public OzoneAdmin() {
-    super();
-  }
-
-  @VisibleForTesting
-  public OzoneAdmin(OzoneConfiguration conf) {
-    ozoneConf = conf;
-  }
-
-  public OzoneConfiguration getOzoneConf() {
-    if (ozoneConf == null) {
-      ozoneConf = createOzoneConfiguration();
-    }
-    return ozoneConf;
-  }
-
-  public UserGroupInformation getUser() throws IOException {
-    if (user == null) {
-      user = UserGroupInformation.getCurrentUser();
-    }
-    return user;
-  }
-
-  /**
-   * Main for the Ozone Admin shell Command handling.
-   *
-   * @param argv - System Args Strings[]
-   */
   public static void main(String[] argv) {
     new OzoneAdmin().run(argv);
   }
 
   @Override
   public int execute(String[] argv) {
-    TracingUtil.initTracing("shell", createOzoneConfiguration());
+    TracingUtil.initTracing("shell", getOzoneConf());
     String spanName = "ozone admin " + String.join(" ", argv);
     return TracingUtil.executeInNewSpan(spanName,
         () -> super.execute(argv));

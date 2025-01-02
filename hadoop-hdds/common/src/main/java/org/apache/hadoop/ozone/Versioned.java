@@ -15,14 +15,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.fs.ozone;
+package org.apache.hadoop.ozone;
 
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.junit.jupiter.api.TestInstance;
 
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class TestO3FSWithFSPathsAndOMRatis extends AbstractOzoneFileSystemTest {
-  TestO3FSWithFSPathsAndOMRatis() {
-    super(true, true, BucketLayout.LEGACY);
-  }
+/**
+ * Base class defining the version in the entire system.
+ */
+public interface Versioned {
+  int version();
 }

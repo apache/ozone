@@ -16,15 +16,16 @@
  */
 package org.apache.hadoop.hdds.cli;
 
-import java.util.HashMap;
+import java.io.IOException;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.concurrent.Callable;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.security.UserGroupInformation;
 import picocli.CommandLine;
 import picocli.CommandLine.ExitCode;
 import picocli.CommandLine.Model.CommandSpec;
@@ -37,36 +38,36 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
 
   public static final int EXECUTION_ERROR_EXIT_CODE = -1;
 
+  private final OzoneConfiguration config = new OzoneConfiguration();
+  private final CommandLine cmd;
+
+  private UserGroupInformation user;
+
   @Option(names = {"--verbose"},
       description = "More verbose output. Show the stack trace of the errors.")
   private boolean verbose;
 
   @Option(names = {"-D", "--set"})
-  private Map<String, String> configurationOverrides = new HashMap<>();
+  public void setConfigurationOverrides(Map<String, String> configOverrides) {
+    configOverrides.forEach(config::set);
+  }
 
   @Option(names = {"-conf"})
-  private String configurationPath;
-
-  private final CommandLine cmd;
+  public void setConfigurationPath(String configPath) {
+    config.addResource(new Path(configPath));
+  }
 
   public GenericCli() {
-    this(null);
+    this(CommandLine.defaultFactory());
   }
 
-  public GenericCli(Class<?> type) {
-    this(type, CommandLine.defaultFactory());
-  }
-
-  public GenericCli(Class<?> type, CommandLine.IFactory factory) {
+  public GenericCli(CommandLine.IFactory factory) {
     cmd = new CommandLine(this, factory);
     cmd.setExecutionExceptionHandler((ex, commandLine, parseResult) -> {
       printError(ex);
       return EXECUTION_ERROR_EXIT_CODE;
     });
 
-    if (type != null) {
-      SubcommandWithParent.addSubcommands(getCmd(), type);
-    }
     ExtensibleParentCommand.addSubcommands(cmd);
   }
 
@@ -95,8 +96,7 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
   protected void printError(Throwable error) {
     //message could be null in case of NPE. This is unexpected so we can
     //print out the stack trace.
-    if (verbose || error.getMessage() == null
-        || error.getMessage().length() == 0) {
+    if (verbose || Strings.isNullOrEmpty(error.getMessage())) {
       error.printStackTrace(System.err);
     } else {
       System.err.println(error.getMessage().split("\n")[0]);
@@ -109,17 +109,15 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
   }
 
   @Override
-  public OzoneConfiguration createOzoneConfiguration() {
-    OzoneConfiguration ozoneConf = new OzoneConfiguration();
-    if (configurationPath != null) {
-      ozoneConf.addResource(new Path(configurationPath));
+  public OzoneConfiguration getOzoneConf() {
+    return config;
+  }
+
+  public UserGroupInformation getUser() throws IOException {
+    if (user == null) {
+      user = UserGroupInformation.getCurrentUser();
     }
-    if (configurationOverrides != null) {
-      for (Entry<String, String> entry : configurationOverrides.entrySet()) {
-        ozoneConf.set(entry.getKey(), entry.getValue());
-      }
-    }
-    return ozoneConf;
+    return user;
   }
 
   @VisibleForTesting

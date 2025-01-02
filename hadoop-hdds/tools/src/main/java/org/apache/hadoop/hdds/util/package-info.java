@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -14,14 +14,9 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * <p>
  */
-package org.apache.hadoop.fs.ozone;
-
-import org.junit.jupiter.api.TestInstance;
-
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class TestOFSWithFSOAndOMRatisAndCacheOnly extends AbstractRootedOzoneFileSystemTestWithFSO {
-  TestOFSWithFSOAndOMRatisAndCacheOnly() {
-    super(true, false, true);
-  }
-}
+/**
+ * SCM related cli utils.
+ */
+package org.apache.hadoop.hdds.util;

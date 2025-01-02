@@ -19,9 +19,9 @@ package org.apache.hadoop.hdds.scm.cli;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfo;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.ozone.OzoneConsts;
 import picocli.CommandLine;
@@ -31,9 +31,13 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static org.apache.hadoop.hdds.util.DurationUtil.getPrettyDuration;
+import static org.apache.hadoop.util.StringUtils.byteDesc;
 
 /**
  * Handler to query status of container balancer.
@@ -58,27 +62,42 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
   public void execute(ScmClient scmClient) throws IOException {
     ContainerBalancerStatusInfoResponseProto response = scmClient.getContainerBalancerStatusInfo();
     boolean isRunning = response.getIsRunning();
-    ContainerBalancerStatusInfo balancerStatusInfo = response.getContainerBalancerStatusInfo();
+    ContainerBalancerStatusInfoProto balancerStatusInfo = response.getContainerBalancerStatusInfo();
     if (isRunning) {
+      Instant startedAtInstant = Instant.ofEpochSecond(balancerStatusInfo.getStartedAt());
       LocalDateTime dateTime =
-          LocalDateTime.ofInstant(Instant.ofEpochSecond(balancerStatusInfo.getStartedAt()), ZoneId.systemDefault());
+          LocalDateTime.ofInstant(startedAtInstant, ZoneId.systemDefault());
       System.out.println("ContainerBalancer is Running.");
 
       if (verbose) {
-        System.out.printf("Started at: %s %s%n%n", dateTime.toLocalDate(), dateTime.toLocalTime());
+        System.out.printf("Started at: %s %s%n", dateTime.toLocalDate(), dateTime.toLocalTime());
+        Duration balancingDuration = Duration.between(startedAtInstant, OffsetDateTime.now());
+        System.out.printf("Balancing duration: %s%n%n", getPrettyDuration(balancingDuration));
         System.out.println(getConfigurationPrettyString(balancerStatusInfo.getConfiguration()));
-        List<ContainerBalancerTaskIterationStatusInfo> iterationsStatusInfoList
+        List<ContainerBalancerTaskIterationStatusInfoProto> iterationsStatusInfoList
             = balancerStatusInfo.getIterationsStatusInfoList();
 
         System.out.println("Current iteration info:");
-        System.out.println(
-            getPrettyIterationStatusInfo(iterationsStatusInfoList.get(iterationsStatusInfoList.size() - 1))
-        );
+        ContainerBalancerTaskIterationStatusInfoProto currentIterationStatistic = iterationsStatusInfoList.stream()
+            .filter(it -> it.getIterationResult().isEmpty())
+            .findFirst()
+            .orElse(null);
+        if (currentIterationStatistic == null) {
+          System.out.println("-\n");
+        } else {
+          System.out.println(
+              getPrettyIterationStatusInfo(currentIterationStatistic)
+          );
+        }
+
 
         if (verboseWithHistory) {
           System.out.println("Iteration history list:");
           System.out.println(
-              iterationsStatusInfoList.stream().map(this::getPrettyIterationStatusInfo)
+              iterationsStatusInfoList
+                  .stream()
+                  .filter(it -> !it.getIterationResult().isEmpty())
+                  .map(this::getPrettyIterationStatusInfo)
                   .collect(Collectors.joining("\n"))
           );
         }
@@ -134,23 +153,31 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
             configuration.getExcludeDatanodes().isEmpty() ? "None" : configuration.getExcludeDatanodes());
   }
 
-  private String getPrettyIterationStatusInfo(ContainerBalancerTaskIterationStatusInfo iterationStatusInfo) {
+  private String getPrettyIterationStatusInfo(ContainerBalancerTaskIterationStatusInfoProto iterationStatusInfo) {
     int iterationNumber = iterationStatusInfo.getIterationNumber();
     String iterationResult = iterationStatusInfo.getIterationResult();
-    long sizeScheduledForMove = iterationStatusInfo.getSizeScheduledForMoveGB();
-    long dataSizeMovedGB = iterationStatusInfo.getDataSizeMovedGB();
+    long iterationDuration = iterationStatusInfo.getIterationDuration();
+    long sizeScheduledForMove = iterationStatusInfo.getSizeScheduledForMove();
+    long dataSizeMoved = iterationStatusInfo.getDataSizeMoved();
     long containerMovesScheduled = iterationStatusInfo.getContainerMovesScheduled();
     long containerMovesCompleted = iterationStatusInfo.getContainerMovesCompleted();
     long containerMovesFailed = iterationStatusInfo.getContainerMovesFailed();
     long containerMovesTimeout = iterationStatusInfo.getContainerMovesTimeout();
-    String enteringDataNodeList = iterationStatusInfo.getSizeEnteringNodesGBList()
-            .stream().map(nodeInfo -> nodeInfo.getUuid() + " <- " + nodeInfo.getDataVolumeGB() + "\n")
+    String enteringDataNodeList = iterationStatusInfo.getSizeEnteringNodesList()
+            .stream().map(nodeInfo -> nodeInfo.getUuid() + " <- " + byteDesc(nodeInfo.getDataVolume()) + "\n")
             .collect(Collectors.joining());
-    String leavingDataNodeList = iterationStatusInfo.getSizeLeavingNodesGBList()
-            .stream().map(nodeInfo -> nodeInfo.getUuid() + " -> " + nodeInfo.getDataVolumeGB() + "\n")
+    if (enteringDataNodeList.isEmpty()) {
+      enteringDataNodeList = " -\n";
+    }
+    String leavingDataNodeList = iterationStatusInfo.getSizeLeavingNodesList()
+            .stream().map(nodeInfo -> nodeInfo.getUuid() + " -> " + byteDesc(nodeInfo.getDataVolume()) + "\n")
             .collect(Collectors.joining());
+    if (leavingDataNodeList.isEmpty()) {
+      leavingDataNodeList = " -\n";
+    }
     return String.format(
             "%-50s %s%n" +
+                    "%-50s %s%n" +
                     "%-50s %s%n" +
                     "%-50s %s%n" +
                     "%-50s %s%n" +
@@ -162,11 +189,12 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
                     "%-50s %n%s" +
                     "%-50s %n%s",
             "Key", "Value",
-            "Iteration number", iterationNumber,
+            "Iteration number", iterationNumber == 0 ? "-" : iterationNumber,
+            "Iteration duration", getPrettyDuration(Duration.ofSeconds(iterationDuration)),
             "Iteration result",
-            iterationResult.isEmpty() ? "IN_PROGRESS" : iterationResult,
-            "Size scheduled to move", sizeScheduledForMove,
-            "Moved data size", dataSizeMovedGB,
+            iterationResult.isEmpty() ? "-" : iterationResult,
+            "Size scheduled to move", byteDesc(sizeScheduledForMove),
+            "Moved data size", byteDesc(dataSizeMoved),
             "Scheduled to move containers", containerMovesScheduled,
             "Already moved containers", containerMovesCompleted,
             "Failed to move containers", containerMovesFailed,
@@ -174,5 +202,6 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
             "Entered data to nodes", enteringDataNodeList,
             "Exited data from nodes", leavingDataNodeList);
   }
+
 }
 

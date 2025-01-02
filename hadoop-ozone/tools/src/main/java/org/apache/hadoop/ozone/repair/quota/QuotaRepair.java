@@ -113,8 +113,4 @@ public class QuotaRepair implements Callable<Void>, RepairSubcommand {
   public UserGroupInformation getUser() throws IOException {
     return UserGroupInformation.getCurrentUser();
   }
-
-  protected OzoneRepair getParent() {
-    return parent;
-  }
 }

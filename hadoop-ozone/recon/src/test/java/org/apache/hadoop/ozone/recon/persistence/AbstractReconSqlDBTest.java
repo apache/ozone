@@ -126,6 +126,10 @@ public class AbstractReconSqlDBTest {
     return injector.getInstance(DataSource.class).getConnection();
   }
 
+  protected DataSource getDataSource() {
+    return injector.getInstance(DataSource.class);
+  }
+
   protected DSLContext getDslContext() {
     return dslContext;
   }

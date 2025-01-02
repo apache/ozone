@@ -169,7 +169,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   @Override
   public Void call() throws Exception {
-    OzoneConfiguration configuration = createOzoneConfiguration();
+    OzoneConfiguration configuration = getOzoneConf();
     if (printBanner) {
       HddsServerUtil.startupShutdownMessage(HddsVersionInfo.HDDS_VERSION_INFO,
           HddsDatanodeService.class, args, LOG, configuration);
