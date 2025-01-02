@@ -188,7 +188,7 @@ public class MutableVolumeSet implements VolumeSet {
 
         volume = volumeFactory.createFailedVolume(locationString);
         failedVolumeMap.put(locationString, volume);
-        LOG.error("Failed to parse the storage location: " + locationString, e);
+        LOG.error("Failed to parse the storage location: {}.", locationString, e);
       }
     }
 
@@ -390,6 +390,8 @@ public class MutableVolumeSet implements VolumeSet {
 
         LOG.info("Removed Volume : {} from VolumeSet", volumeRoot);
       } else if (failedVolumeMap.containsKey(volumeRoot)) {
+        StorageVolume storageVolume = failedVolumeMap.get(volumeRoot);
+        storageVolume.resetFailureTime();
         failedVolumeMap.remove(volumeRoot);
         LOG.info("Removed Volume : {} from failed VolumeSet", volumeRoot);
       } else {
@@ -516,7 +518,7 @@ public class MutableVolumeSet implements VolumeSet {
         builder.setStorageLocation(volume.getStorageDir()
             .getAbsolutePath()).setId(volume.getStorageID()).setFailed(true)
             .setCapacity(0).setRemaining(0).setScmUsed(0).setStorageType(
-            volume.getStorageType());
+            volume.getStorageType()).setFailureTime(volume.getFailureTime().toEpochMilli());
         StorageLocationReport r = builder.build();
         reports[counter++] = r;
       }
