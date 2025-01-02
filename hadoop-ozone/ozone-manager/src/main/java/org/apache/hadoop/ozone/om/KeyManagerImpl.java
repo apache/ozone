@@ -2082,7 +2082,7 @@ public class KeyManagerImpl implements KeyManager {
     iterator.seek(seekDirInDB);
     long consumedSize = 0;
 
-    while (iterator.hasNext() && numEntries - countEntries > 0 && remainingBufLimit > 0) {
+    while (iterator.hasNext() && remainingBufLimit > 0) {
       Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
       OmDirectoryInfo dirInfo = entry.getValue();
       long objectSerializedSize = entry.getRawValue().length;
@@ -2123,7 +2123,7 @@ public class KeyManagerImpl implements KeyManager {
 
       iterator.seek(seekFileInDB);
 
-      while (iterator.hasNext() && numEntries - countEntries > 0) {
+      while (iterator.hasNext() && remainingBufLimit > 0) {
         Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
         OmKeyInfo fileInfo = entry.getValue();
         long objectSerializedSize = entry.getRawValue().length;

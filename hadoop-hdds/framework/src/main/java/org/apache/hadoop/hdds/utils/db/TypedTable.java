@@ -581,9 +581,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     public byte[] getRawValue() throws IOException {
       return rawKeyValue.getValue();
     }
-
   }
-
 
   RawIterator<CodecBuffer> newCodecBufferTableIterator(
       TableIterator<CodecBuffer, KeyValue<CodecBuffer, CodecBuffer>> i) {

@@ -430,6 +430,7 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
     };
   }
 
+
   /** A {@link TableIterator} to iterate {@link KeyValue}s. */
   interface KeyValueIterator<KEY, VALUE>
       extends TableIterator<KEY, KeyValue<KEY, VALUE>> {
