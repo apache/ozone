@@ -80,7 +80,7 @@ public class ReconTaskStatusTableUpgradeAction implements ReconUpgradeAction {
       // for multiple columns. Hence, we run it as two separate steps.
       LOG.info("Adding 'last_task_run_status' column to task status table");
       addColumnToTable(dslContext, "last_task_run_status");
-      LOG.info("Adding 'current_task_run_status' column to task status table");
+      LOG.info("Adding 'is_current_task_running' column to task status table");
       addColumnToTable(dslContext, "is_current_task_running");
 
       //Handle previous table values with new columns default values

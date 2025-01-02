@@ -24,6 +24,7 @@ import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -37,7 +38,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ReconTaskStatusUpdaterManager {
   private final ReconTaskStatusDao reconTaskStatusDao;
   // Act as a cache for the task updater instancesF
-  private final ConcurrentHashMap<String, ReconTaskStatusUpdater> updaterCache;
+  private final Map<String, ReconTaskStatusUpdater> updaterCache;
 
   @Inject
   public ReconTaskStatusUpdaterManager(
@@ -68,6 +69,27 @@ public class ReconTaskStatusUpdaterManager {
     return updaterCache.computeIfAbsent(taskName, (name) -> {
       ReconTaskStatusUpdater taskStatusUpdater = new ReconTaskStatusUpdater(
           reconTaskStatusDao, name);
+      taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
+      // Insert initial values into DB
+      taskStatusUpdater.updateDetails();
+      return taskStatusUpdater;
+    });
+  }
+
+  /**
+   * Gets the updater for the provided task name and updates DB with initial values
+   * if the task is not already present in DB.
+   * @param taskName The name of the task for which we want to get instance of the updater
+   * @param sequenceNumber  The sequence of OM DB for which the task was processed.
+   * @return An instance of {@link ReconTaskStatusUpdater} for the provided task name.
+   */
+  public ReconTaskStatusUpdater getTaskStatusUpdater(String taskName, long sequenceNumber) {
+    // If the task is not already present in the DB then we can initialize using initial values
+    return updaterCache.computeIfAbsent(taskName, (name) -> {
+      ReconTaskStatusUpdater taskStatusUpdater = new ReconTaskStatusUpdater(
+          reconTaskStatusDao, name);
+      taskStatusUpdater.setLastUpdatedSeqNumber(sequenceNumber);
+      taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
       // Insert initial values into DB
       taskStatusUpdater.updateDetails();
       return taskStatusUpdater;

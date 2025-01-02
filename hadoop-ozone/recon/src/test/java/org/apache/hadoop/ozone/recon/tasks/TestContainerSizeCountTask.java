@@ -117,7 +117,7 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
     containers.add(omContainerInfo1);
     containers.add(omContainerInfo2);
 
-    task.process(containers);
+    task.processContainers(containers);
 
     // Verify 3 containers are in correct bins.
     assertEquals(3, containerCountBySizeDao.count());
@@ -149,7 +149,7 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
     given(omContainerInfo2.containerID()).willReturn(new ContainerID(2));
     given(omContainerInfo2.getUsedBytes()).willReturn(50000L); // 50KB
 
-    task.process(containers);
+    task.processContainers(containers);
 
     // Total size groups added to the database
     assertEquals(5, containerCountBySizeDao.count());
@@ -172,7 +172,7 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
 
     // Remove the container having size 1.5GB and upperbound 2147483648L
     containers.remove(omContainerInfo1);
-    task.process(containers);
+    task.processContainers(containers);
     recordToFind.value1(2147483648L);
     assertEquals(0, containerCountBySizeDao
         .findById(recordToFind.value1())
@@ -228,7 +228,7 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
     containers.add(negativeSizeDeletedContainer);
     containers.add(validSizeContainer);
 
-    task.process(containers);
+    task.processContainers(containers);
 
     // Verify that only the valid containers are counted
     assertEquals(3, containerCountBySizeDao.count());

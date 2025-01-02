@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -40,8 +41,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETED;
 import static org.hadoop.ozone.recon.schema.tables.ContainerCountBySizeTable.CONTAINER_COUNT_BY_SIZE;
@@ -65,7 +64,6 @@ public class ContainerSizeCountTask extends ReconScmTask {
   private HashMap<ContainerID, Long> processedContainers = new HashMap<>();
   private Map<ContainerSchemaDefinition.UnHealthyContainerStates, Map<String, Long>>
       unhealthyContainerStateStatsMap;
-  private ReadWriteLock lock = new ReentrantReadWriteLock(true);
   private final ReconTaskStatusUpdater taskStatusUpdater;
 
   public ContainerSizeCountTask(
@@ -96,21 +94,8 @@ public class ContainerSizeCountTask extends ReconScmTask {
       while (canRun()) {
         wait(interval);
         long startTime, endTime, duration, durationMilliseconds;
-        final List<ContainerInfo> containers = containerManager.getContainers();
-        if (processedContainers.isEmpty()) {
-          try {
-            int execute =
-                dslContext.truncate(CONTAINER_COUNT_BY_SIZE).execute();
-            LOG.debug("Deleted {} records from {}", execute,
-                CONTAINER_COUNT_BY_SIZE);
-          } catch (Exception e) {
-            LOG.error("An error occurred while truncating the table {}: {}",
-                CONTAINER_COUNT_BY_SIZE, e.getMessage(), e);
-            return;
-          }
-        }
         startTime = System.nanoTime();
-        process(containers);
+        initializeAndRunTask();
         endTime = System.nanoTime();
         duration = endTime - startTime;
         durationMilliseconds = duration / 1_000_000;
@@ -126,7 +111,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
   }
 
   private void process(ContainerInfo container,
-      Map<ContainerSizeCountKey, Long> map) {
+                       Map<ContainerSizeCountKey, Long> map) {
     final ContainerID id = container.containerID();
     final long usedBytes = container.getUsedBytes();
     final long currentSize;
@@ -171,44 +156,56 @@ public class ContainerSizeCountTask extends ReconScmTask {
    * size counts. Finally, the counts in the containerSizeCountMap are written
    * to the database using the writeCountsToDB() function.
    */
-  public void process(List<ContainerInfo> containers) {
-    lock.writeLock().lock();
-    boolean processingFailed = false;
-    try {
-      recordRunStart();
-      final Map<ContainerSizeCountKey, Long> containerSizeCountMap
-          = new HashMap<>();
-      final Map<ContainerID, Long> deletedContainers
-          = new HashMap<>(processedContainers);
-      // Loop to handle container create and size-update operations
-      for (ContainerInfo container : containers) {
-        if (container.getState().equals(DELETED)) {
-          continue; // Skip deleted containers
-        }
-        deletedContainers.remove(container.containerID());
-        // For New Container being created
-        try {
-          process(container, containerSizeCountMap);
-        } catch (Exception e) {
-          processingFailed = true;
-          // FIXME: it is a bug if there is an exception.
-          LOG.error("FIXME: Failed to process " + container, e);
-        }
+  @Override
+  protected void runTask() {
+    final List<ContainerInfo> containers = containerManager.getContainers();
+    if (processedContainers.isEmpty()) {
+      try {
+        int execute =
+            dslContext.truncate(CONTAINER_COUNT_BY_SIZE).execute();
+        LOG.debug("Deleted {} records from {}", execute,
+            CONTAINER_COUNT_BY_SIZE);
+      } catch (Exception e) {
+        LOG.error("An error occurred while truncating the table {}: {}",
+            CONTAINER_COUNT_BY_SIZE, e.getMessage(), e);
+        return;
       }
-      // Method to handle Container delete operations
-      handleContainerDeleteOperations(deletedContainers, containerSizeCountMap);
-
-      // Write to the database
-      writeCountsToDB(false, containerSizeCountMap);
-      containerSizeCountMap.clear();
-      LOG.debug("Completed a 'process' run of ContainerSizeCountTask.");
-    } finally {
-      taskStatusUpdater.setLastTaskRunStatus(processingFailed ? -1 : 0);
-      recordSingleRunCompletion();
-      lock.writeLock().unlock();
     }
+    processContainers(containers);
   }
 
+  @VisibleForTesting
+  public void processContainers(List<ContainerInfo> containers) {
+    boolean processingFailed = false;
+    final Map<ContainerSizeCountKey, Long> containerSizeCountMap
+        = new HashMap<>();
+    final Map<ContainerID, Long> deletedContainers
+        = new HashMap<>(processedContainers);
+    // Loop to handle container create and size-update operations
+    for (ContainerInfo container : containers) {
+      if (container.getState().equals(DELETED)) {
+        continue; // Skip deleted containers
+      }
+      deletedContainers.remove(container.containerID());
+      // For New Container being created
+      try {
+        process(container, containerSizeCountMap);
+      } catch (Exception e) {
+        processingFailed = true;
+        // FIXME: it is a bug if there is an exception.
+        LOG.error("FIXME: Failed to process " + container, e);
+      }
+    }
+
+    // Method to handle Container delete operations
+    handleContainerDeleteOperations(deletedContainers, containerSizeCountMap);
+    // Write to the database
+    writeCountsToDB(false, containerSizeCountMap);
+    containerSizeCountMap.clear();
+
+    LOG.debug("Completed a 'process' run of ContainerSizeCountTask.");
+    taskStatusUpdater.setLastTaskRunStatus(processingFailed ? -1 : 0);
+  }
 
   /**
    * Populate DB with the counts of container sizes calculated
@@ -306,7 +303,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
    * @param containerSize to calculate the upperSizeBound
    */
   private static void incrementContainerSizeCount(long containerSize,
-                   Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
+                                                  Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
     updateContainerSizeCount(containerSize, 1, containerSizeCountMap);
   }
 
@@ -327,12 +324,12 @@ public class ContainerSizeCountTask extends ReconScmTask {
    * @param containerSize to calculate the upperSizeBound
    */
   private static void decrementContainerSizeCount(long containerSize,
-                   Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
+                                                  Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
     updateContainerSizeCount(containerSize, -1, containerSizeCountMap);
   }
 
   private static void updateContainerSizeCount(long containerSize, int delta,
-      Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
+                                               Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
     ContainerSizeCountKey key = getContainerSizeCountKey(containerSize);
     containerSizeCountMap.compute(key,
         (k, previous) -> previous != null ? previous + delta : delta);

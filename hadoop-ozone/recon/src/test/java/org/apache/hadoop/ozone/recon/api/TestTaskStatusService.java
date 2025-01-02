@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import org.apache.hadoop.ozone.recon.api.types.ReconTaskStatusResponse;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
@@ -67,16 +66,16 @@ public class TestTaskStatusService extends AbstractReconSqlDBTest {
 
     Response response = taskStatusService.getTaskStats();
 
-    List<ReconTaskStatusResponse> responseList = (List<ReconTaskStatusResponse>)
+    List<ReconTaskStatus> responseList = (List<ReconTaskStatus>)
         response.getEntity();
 
     assertEquals(resultList.size(), responseList.size());
-    for (ReconTaskStatusResponse r : responseList) {
+    for (ReconTaskStatus r : responseList) {
       assertEquals(reconTaskStatusRecord.getTaskName(), r.getTaskName());
       assertEquals(reconTaskStatusRecord.getLastUpdatedTimestamp(),
           r.getLastUpdatedTimestamp());
       assertEquals(reconTaskStatusRecord.getLastTaskRunStatus(), r.getLastTaskRunStatus());
-      assertEquals(reconTaskStatusRecord.getIsCurrentTaskRunning(), r.getIsTaskCurrentlyRunning());
+      assertEquals(reconTaskStatusRecord.getIsCurrentTaskRunning(), r.getIsCurrentTaskRunning());
     }
   }
 }

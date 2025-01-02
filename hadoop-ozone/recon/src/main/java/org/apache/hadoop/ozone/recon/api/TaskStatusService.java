@@ -18,9 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import org.apache.hadoop.ozone.recon.api.types.ReconTaskStatusResponse;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -28,8 +26,6 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.MediaType;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Endpoint for displaying the last successful run of each Recon Task.
@@ -45,13 +41,6 @@ public class TaskStatusService {
     this.reconTaskStatusDao = reconTaskStatusDao;
   }
 
-  // Internal function to combine counter value with DerbyDB values
-  private ReconTaskStatusResponse convertToTaskStatusResponse(ReconTaskStatus task) {
-    return new ReconTaskStatusResponse(
-        task.getTaskName(), task.getLastUpdatedSeqNumber(), task.getLastUpdatedTimestamp(),
-        task.getIsCurrentTaskRunning(), task.getLastTaskRunStatus());
-  }
-
   /**
    * Return the list of Recon Tasks and associated stats.
    * @return {@link Response}
@@ -59,9 +48,6 @@ public class TaskStatusService {
   @GET
   @Path("status")
   public Response getTaskStats() {
-    List<ReconTaskStatus> resultSet = reconTaskStatusDao.findAll();
-    List<ReconTaskStatusResponse> taskStatsList = resultSet.stream().map(
-        this::convertToTaskStatusResponse).collect(Collectors.toList());
-    return Response.ok(taskStatsList).build();
+    return Response.ok(reconTaskStatusDao.findAll()).build();
   }
 }

@@ -942,7 +942,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     containers.add(omContainerInfo2);
 
     // Process the list of containers through the container size count task
-    containerSizeCountTask.process(containers);
+    containerSizeCountTask.processContainers(containers);
 
     // Test fetching all container counts
     Response response = utilizationEndpoint.getContainerCounts(0L);

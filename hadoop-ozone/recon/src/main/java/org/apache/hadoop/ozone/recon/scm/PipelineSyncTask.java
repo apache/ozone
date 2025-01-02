@@ -22,8 +22,6 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -53,7 +51,6 @@ public class PipelineSyncTask extends ReconScmTask {
   private ReconPipelineManager reconPipelineManager;
   private ReconNodeManager nodeManager;
 
-  private ReadWriteLock lock = new ReentrantReadWriteLock(true);
   private final long interval;
   private final ReconTaskStatusUpdater taskStatusUpdater;
 
@@ -74,7 +71,7 @@ public class PipelineSyncTask extends ReconScmTask {
   public void run() {
     try {
       while (canRun()) {
-        triggerPipelineSyncTask();
+        initializeAndRunTask();
         Thread.sleep(interval);
       }
     } catch (Throwable t) {
@@ -85,30 +82,16 @@ public class PipelineSyncTask extends ReconScmTask {
     }
   }
 
-  public void triggerPipelineSyncTask() {
-    lock.writeLock().lock();
-    try {
-      long start = Time.monotonicNow();
-      List<Pipeline> pipelinesFromScm = scmClient.getPipelines();
-      recordRunStart();
-      reconPipelineManager.initializePipelines(pipelinesFromScm);
-      syncOperationalStateOnDeadNodes();
-      LOG.debug("Pipeline sync Thread took {} milliseconds.",
-          Time.monotonicNow() - start);
-      taskStatusUpdater.setLastTaskRunStatus(0);
-    } catch (IOException | NodeNotFoundException e) {
-      LOG.error("PipelineSyncTask encountered exception", e);
-      // If we encounter an exception, increment failure count for task and bubble forward the exception
-      taskStatusUpdater.setLastTaskRunStatus(-1);
-    } finally {
-      try {
-        recordSingleRunCompletion();
-      } catch (Exception e) {
-        LOG.error("Exception occurred while trying to record PipelineSyncTask completion", e);
-      } finally {
-        lock.writeLock().unlock();
-      }
-    }
+  @Override
+  protected void runTask() throws IOException, NodeNotFoundException {
+    long start = Time.monotonicNow();
+    List<Pipeline> pipelinesFromScm = scmClient.getPipelines();
+    recordRunStart();
+    reconPipelineManager.initializePipelines(pipelinesFromScm);
+    syncOperationalStateOnDeadNodes();
+    LOG.debug("Pipeline sync Thread took {} milliseconds.",
+        Time.monotonicNow() - start);
+    taskStatusUpdater.setLastTaskRunStatus(0);
   }
 
   /**

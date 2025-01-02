@@ -24,6 +24,9 @@ import org.jooq.exception.DataAccessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
 /**
  * Any background task that keeps SCM's metadata up to date.
  */
@@ -33,6 +36,7 @@ public abstract class ReconScmTask {
   private Thread taskThread;
   private volatile boolean running;
   private final ReconTaskStatusUpdater taskStatusUpdater;
+  private ReadWriteLock lock = new ReentrantReadWriteLock(true);
 
   protected ReconScmTask(
       ReconTaskStatusUpdaterManager taskStatusUpdaterManager
@@ -127,4 +131,28 @@ public abstract class ReconScmTask {
   }
 
   protected abstract void run();
+
+  protected void initializeAndRunTask() {
+    lock.writeLock().lock();
+    try {
+      recordRunStart();
+      runTask();
+    } catch (Exception e) {
+      LOG.error("{} encountered exception. ", getTaskName(), e);
+      taskStatusUpdater.setLastTaskRunStatus(-1);
+    } finally {
+      try {
+        recordSingleRunCompletion();
+      } catch (Exception e) {
+        LOG.error("Exception occurred while trying to record {} completion", getTaskName(), e);
+      } finally {
+        lock.writeLock().unlock();
+      }
+    }
+  }
+
+  /**
+   * Override this method for the actual processing logic in child tasks.
+   */
+  protected abstract void runTask() throws Exception;
 }

@@ -69,7 +69,7 @@ Validate Task Status After Sync
         Dictionary Should Contain Key    ${task}    taskName
         Dictionary Should Contain Key    ${task}    lastUpdatedSeqNumber
         Dictionary Should Contain Key    ${task}    lastUpdatedTimestamp
-        Dictionary Should Contain Key    ${task}    isTaskCurrentlyRunning
+        Dictionary Should Contain Key    ${task}    isCurrentTaskRunning
         Dictionary Should Contain Key    ${task}    lastTaskRunStatus
     END
 
@@ -87,7 +87,7 @@ Validate Counters for Specific Task
     # Validate table fields
     Should Be True        ${task["lastUpdatedTimestamp"]}!=${None}
     Should Be True        ${task["lastUpdatedSeqNumber"]}!=${None}
-    Should Be True        ${task["isTaskCurrentlyRunning"]}!=${None}
+    Should Be True        ${task["isCurrentTaskRunning"]}!=${None}
     Should Be True        ${task["lastTaskRunStatus"]}!=${None}
 
 Validate All Tasks Updated After Sync

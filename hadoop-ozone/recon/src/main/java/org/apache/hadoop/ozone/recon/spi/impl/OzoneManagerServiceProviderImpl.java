@@ -134,7 +134,6 @@ public class OzoneManagerServiceProviderImpl
   private final String threadNamePrefix;
   private ThreadFactory threadFactory;
   private ReconContext reconContext;
-  private ReconTaskStatusUpdater reconTaskUpdater;
   private ReconTaskStatusUpdaterManager taskStatusUpdaterManager;
 
   /**
@@ -230,19 +229,6 @@ public class OzoneManagerServiceProviderImpl
     this.taskStatusUpdaterManager = taskStatusUpdaterManager;
   }
 
-  public void registerOMDBTasks() {
-    registerTask(OmSnapshotTaskName.OmSnapshotRequest.name());
-    registerTask(OmSnapshotTaskName.OmDeltaRequest.name());
-  }
-
-  private void registerTask(String taskName) {
-    reconTaskUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
-    reconTaskUpdater.setTaskName(taskName);
-    reconTaskUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
-    reconTaskUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-    reconTaskUpdater.updateDetails();
-  }
-
   @Override
   public OMMetadataManager getOMMetadataManagerInstance() {
     return omMetadataManager;
@@ -252,7 +238,6 @@ public class OzoneManagerServiceProviderImpl
   public void start() {
     LOG.info("Starting Ozone Manager Service Provider.");
     scheduler = Executors.newScheduledThreadPool(1, threadFactory);
-    registerOMDBTasks();
     try {
       omMetadataManager.start(configuration);
     } catch (IOException ioEx) {
@@ -555,6 +540,7 @@ public class OzoneManagerServiceProviderImpl
    */
   @VisibleForTesting
   public boolean syncDataFromOM() {
+    ReconTaskStatusUpdater reconTaskUpdater;
     if (isSyncDataFromOMRunning.compareAndSet(false, true)) {
       try {
         LOG.info("Syncing data from Ozone Manager.");
@@ -566,8 +552,7 @@ public class OzoneManagerServiceProviderImpl
           fullSnapshot = true;
         } else {
           reconTaskUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(
-              OmSnapshotTaskName.OmDeltaRequest.name());
-          reconTaskUpdater.setLastUpdatedSeqNumber(currentSequenceNumber);
+              OmSnapshotTaskName.OmDeltaRequest.name(), currentSequenceNumber);
 
           try (OMDBUpdatesHandler omdbUpdatesHandler =
               new OMDBUpdatesHandler(omMetadataManager)) {
@@ -611,8 +596,7 @@ public class OzoneManagerServiceProviderImpl
 
         if (fullSnapshot) {
           reconTaskUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(
-              OmSnapshotTaskName.OmSnapshotRequest.name());
-          reconTaskUpdater.setLastUpdatedSeqNumber(currentSequenceNumber);
+              OmSnapshotTaskName.OmSnapshotRequest.name(), currentSequenceNumber);
           try {
             metrics.incrNumSnapshotRequests();
             LOG.info("Obtaining full snapshot from Ozone Manager");
