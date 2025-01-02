@@ -70,7 +70,6 @@ import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.common.CommonUtils;
 import org.apache.hadoop.ozone.recon.metrics.OzoneManagerSyncMetrics;
-import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdatesHandler;
 import org.apache.hadoop.ozone.recon.tasks.OMUpdateEventBatch;
@@ -620,8 +619,7 @@ public class TestOzoneManagerServiceProviderImpl {
   private ReconTaskStatusUpdaterManager getMockTaskStatusUpdaterManager() {
     ReconTaskStatusUpdaterManager reconTaskStatusUpdaterManager = mock(ReconTaskStatusUpdaterManager.class);
     when(reconTaskStatusUpdaterManager.getTaskStatusUpdater(anyString())).thenAnswer(inv -> new ReconTaskStatusUpdater(
-        mock(ReconTaskStatusDao.class), mock(ReconTaskStatusCounter.class),
-        inv.getArgument(0)));
+        mock(ReconTaskStatusDao.class), inv.getArgument(0)));
     return reconTaskStatusUpdaterManager;
   }
 

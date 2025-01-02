@@ -93,7 +93,7 @@ public abstract class ReconScmTask {
     try {
       taskStatusUpdater.setIsCurrentTaskRunning(0);
       taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-      taskStatusUpdater.updateDetails(true);
+      taskStatusUpdater.updateDetails();
     } catch (DataAccessException e) {
       LOG.error("Failed to update table for task: {}", getTaskName());
     }
@@ -108,7 +108,7 @@ public abstract class ReconScmTask {
     try {
       taskStatusUpdater.setIsCurrentTaskRunning(1);
       taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-      taskStatusUpdater.updateDetails(false);
+      taskStatusUpdater.updateDetails();
     } catch (DataAccessException e) {
       LOG.error("Failed to update table for start of task: {}", getTaskName());
     }

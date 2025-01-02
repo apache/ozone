@@ -19,8 +19,6 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.hadoop.ozone.recon.api.types.ReconTaskStatusResponse;
-import org.apache.hadoop.ozone.recon.api.types.ReconTaskStatusStat;
-import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 
@@ -41,21 +39,17 @@ import java.util.stream.Collectors;
 public class TaskStatusService {
 
   private ReconTaskStatusDao reconTaskStatusDao;
-  private ReconTaskStatusCounter taskStatusCounter;
 
   @Inject
-  TaskStatusService(ReconTaskStatusDao reconTaskStatusDao, ReconTaskStatusCounter reconTaskStatusCounter) {
+  TaskStatusService(ReconTaskStatusDao reconTaskStatusDao) {
     this.reconTaskStatusDao = reconTaskStatusDao;
-    this.taskStatusCounter = reconTaskStatusCounter;
   }
 
   // Internal function to combine counter value with DerbyDB values
   private ReconTaskStatusResponse convertToTaskStatusResponse(ReconTaskStatus task) {
-    ReconTaskStatusStat counter = taskStatusCounter.getTaskStatsFor(task.getTaskName());
     return new ReconTaskStatusResponse(
         task.getTaskName(), task.getLastUpdatedSeqNumber(), task.getLastUpdatedTimestamp(),
-        task.getIsCurrentTaskRunning(), task.getLastTaskRunStatus(),
-        counter.getSuccessCount(), counter.getFailureCount(), counter.getInitializationTime());
+        task.getIsCurrentTaskRunning(), task.getLastTaskRunStatus());
   }
 
   /**

@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.recon.tasks.updater;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.slf4j.Logger;
@@ -36,36 +35,29 @@ public class ReconTaskStatusUpdater {
   private ReconTaskStatus reconTaskStatus;
 
   private ReconTaskStatusDao reconTaskStatusDao;
-  private ReconTaskStatusCounter taskStatusCounter;
 
   private String taskName;
 
   public ReconTaskStatusUpdater(ReconTaskStatusDao reconTaskStatusDao,
-                                ReconTaskStatusCounter taskStatusCounter,
                                 String taskName) {
     this.taskName = taskName;
     this.reconTaskStatusDao = reconTaskStatusDao;
-    this.taskStatusCounter = taskStatusCounter;
     this.reconTaskStatus = new ReconTaskStatus(taskName, 0L, 0L, 0, 0);
   }
 
   public ReconTaskStatusUpdater(ReconTaskStatusDao reconTaskStatusDao,
-                                ReconTaskStatusCounter reconTaskStatusCounter,
                                 String taskName, Long lastUpdatedTimestamp, Long lastUpdatedSeqNum,
                                 Integer lastTaskRunStatus, Integer isCurrentTaskRunning) {
     this.taskName = taskName;
     this.reconTaskStatusDao = reconTaskStatusDao;
-    this.taskStatusCounter = reconTaskStatusCounter;
     this.reconTaskStatus = new ReconTaskStatus(taskName, lastUpdatedTimestamp, lastUpdatedSeqNum,
         lastTaskRunStatus, isCurrentTaskRunning);
   }
 
   @VisibleForTesting
-  public ReconTaskStatusUpdater(String taskName, ReconTaskStatusDao reconTaskStatusDao,
-                                ReconTaskStatusCounter reconTaskStatusCounter) {
+  public ReconTaskStatusUpdater(String taskName, ReconTaskStatusDao reconTaskStatusDao) {
     this.taskName = taskName;
     this.reconTaskStatusDao = reconTaskStatusDao;
-    this.taskStatusCounter = reconTaskStatusCounter;
     this.reconTaskStatus = new ReconTaskStatus(taskName, 0L, 0L, 0, 0);
   }
 
@@ -92,9 +84,8 @@ public class ReconTaskStatusUpdater {
 
   /**
    * Utility function to update table with task details and update the counter if needed.
-   * @param modifyCounter Flag to determine whether to update counter or not
    */
-  public void updateDetails(boolean modifyCounter) {
+  public void updateDetails() {
     if (!reconTaskStatusDao.existsById(this.taskName)) {
       // First time getting the task, so insert value
       reconTaskStatusDao.insert(this.reconTaskStatus);
@@ -102,9 +93,6 @@ public class ReconTaskStatusUpdater {
     } else {
       // We already have row for the task in the table, update the row
       reconTaskStatusDao.update(this.reconTaskStatus);
-      if (null != this.reconTaskStatus.getLastTaskRunStatus() && modifyCounter) {
-        taskStatusCounter.updateCounter(taskName, this.reconTaskStatus.getLastTaskRunStatus() > -1);
-      }
     }
   }
 }

@@ -31,18 +31,6 @@ public class ReconTaskStatusResponse {
   @JsonProperty("taskName")
   private String taskName;
 
-  // The number of successes associated with the task
-  @JsonProperty("successes")
-  private int successCount;
-
-  // The number of failures associated with the task
-  @JsonProperty("failures")
-  private int failureCount;
-
-  // The timestamp at which the counters were last reset
-  @JsonProperty("counterStartedAt")
-  private long counterStartTime;
-
   @JsonProperty("lastUpdatedTimestamp")
   private long lastUpdatedTimestamp;
 
@@ -57,16 +45,12 @@ public class ReconTaskStatusResponse {
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public ReconTaskStatusResponse(String taskName, long lastUpdatedSeqNumber, long lastUpdatedTimestamp,
-                                 int isTaskCurrentlyRunning, int lastTaskRunStatus,
-                                 int successCount, int failureCount, long counterStartTime) {
+                                 int isTaskCurrentlyRunning, int lastTaskRunStatus) {
     this.taskName = taskName;
     this.lastUpdatedTimestamp = lastUpdatedTimestamp;
     this.lastUpdatedSeqNumber = lastUpdatedSeqNumber;
     this.lastTaskRunStatus = lastTaskRunStatus;
     this.isTaskCurrentlyRunning = isTaskCurrentlyRunning;
-    this.successCount = successCount;
-    this.failureCount = failureCount;
-    this.counterStartTime = counterStartTime;
   }
 
   public String getTaskName() {
@@ -87,17 +71,5 @@ public class ReconTaskStatusResponse {
 
   public int getLastTaskRunStatus() {
     return lastTaskRunStatus;
-  }
-
-  public long getSuccessCount() {
-    return successCount;
-  }
-
-  public long getFailureCount() {
-    return failureCount;
-  }
-
-  public long getCounterStartTime() {
-    return counterStartTime;
   }
 }

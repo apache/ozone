@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.common.CommonUtils;
-import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -107,10 +106,9 @@ public class TestTriggerDBSyncEndpoint {
     ReconUtils reconUtilsMock = mock(ReconUtils.class);
 
     ReconTaskStatusDao reconTaskStatusDaoMock = mock(ReconTaskStatusDao.class);
-    ReconTaskStatusCounter reconTaskStatusCounterMock = mock(ReconTaskStatusCounter.class);
     ReconTaskStatusUpdaterManager taskStatusUpdaterManagerMock = mock(ReconTaskStatusUpdaterManager.class);
     when(taskStatusUpdaterManagerMock.getTaskStatusUpdater(anyString())).thenReturn(new ReconTaskStatusUpdater(
-        reconTaskStatusDaoMock, reconTaskStatusCounterMock, "dummyTaskManager"));
+        reconTaskStatusDaoMock, "dummyTaskManager"));
 
     DBCheckpoint checkpoint = omMetadataManager.getStore()
         .getCheckpoint(true);

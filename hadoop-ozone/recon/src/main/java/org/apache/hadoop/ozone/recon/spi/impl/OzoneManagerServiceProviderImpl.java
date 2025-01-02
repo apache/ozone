@@ -240,7 +240,7 @@ public class OzoneManagerServiceProviderImpl
     reconTaskUpdater.setTaskName(taskName);
     reconTaskUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
     reconTaskUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-    reconTaskUpdater.updateDetails(false);
+    reconTaskUpdater.updateDetails();
   }
 
   @Override
@@ -578,7 +578,7 @@ public class OzoneManagerServiceProviderImpl
               // Get updates from OM and apply to local Recon OM DB.
               reconTaskUpdater.setIsCurrentTaskRunning(1);
               reconTaskUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-              reconTaskUpdater.updateDetails(false);
+              reconTaskUpdater.updateDetails();
 
               getAndApplyDeltaUpdatesFromOM(currentSequenceNumber,
                   omdbUpdatesHandler);
@@ -593,7 +593,7 @@ public class OzoneManagerServiceProviderImpl
               // Update timestamp of successful delta updates query.
               reconTaskUpdater.setIsCurrentTaskRunning(0);
               reconTaskUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-              reconTaskUpdater.updateDetails(true);
+              reconTaskUpdater.updateDetails();
             }
 
             // Pass on DB update events to tasks that are listening.
@@ -619,7 +619,7 @@ public class OzoneManagerServiceProviderImpl
             // Update local Recon OM DB to new snapshot.
             reconTaskUpdater.setIsCurrentTaskRunning(1);
             reconTaskUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-            reconTaskUpdater.updateDetails(false);
+            reconTaskUpdater.updateDetails();
 
             boolean success = updateReconOmDBWithNewSnapshot();
             // Update timestamp of successful delta updates query.
@@ -653,7 +653,7 @@ public class OzoneManagerServiceProviderImpl
           } finally {
             reconTaskUpdater.setIsCurrentTaskRunning(0);
             reconTaskUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-            reconTaskUpdater.updateDetails(true);
+            reconTaskUpdater.updateDetails();
           }
         }
         printOMDBMetaInfo();

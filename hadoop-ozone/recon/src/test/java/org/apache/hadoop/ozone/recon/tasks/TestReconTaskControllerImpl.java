@@ -33,7 +33,6 @@ import java.util.HashSet;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
@@ -59,12 +58,11 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
   public void setUp() {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
-    ReconTaskStatusCounter reconTaskStatusCounterMock = mock(ReconTaskStatusCounter.class);
     ReconTaskStatusUpdaterManager reconTaskStatusUpdaterManagerMock = mock(ReconTaskStatusUpdaterManager.class);
     when(reconTaskStatusUpdaterManagerMock.getTaskStatusUpdater(anyString()))
         .thenAnswer(i -> {
           String taskName = i.getArgument(0);
-          return new ReconTaskStatusUpdater(reconTaskStatusDao, reconTaskStatusCounterMock, taskName);
+          return new ReconTaskStatusUpdater(reconTaskStatusDao, taskName);
         });
     reconTaskController = new ReconTaskControllerImpl(ozoneConfiguration, new HashSet<>(),
         reconTaskStatusUpdaterManagerMock);

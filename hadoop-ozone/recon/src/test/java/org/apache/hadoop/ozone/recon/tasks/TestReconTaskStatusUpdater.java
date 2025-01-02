@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
@@ -44,13 +43,11 @@ import static org.mockito.Mockito.when;
  */
 public class TestReconTaskStatusUpdater extends AbstractReconSqlDBTest {
   private ReconTaskStatusDao reconTaskStatusDaoMock;
-  private ReconTaskStatusCounter reconTaskStatusCounterMock;
   private ReconTaskStatusUpdater updater;
 
   @BeforeEach
   void setup() {
     this.reconTaskStatusDaoMock = mock(ReconTaskStatusDao.class);
-    this.reconTaskStatusCounterMock = mock(ReconTaskStatusCounter.class);
     this.updater = mock(ReconTaskStatusUpdater.class);
 
     doAnswer(inv -> {
@@ -60,12 +57,9 @@ public class TestReconTaskStatusUpdater extends AbstractReconSqlDBTest {
       } else {
         // We already have row for the task in the table, update the row
         reconTaskStatusDaoMock.update(new ReconTaskStatus("task1", 0L, 0L, 0, 0));
-        if (inv.getArgument(0)) {
-          reconTaskStatusCounterMock.updateCounter("task1", true);
-        }
       }
       return  null;
-    }).when(updater).updateDetails(anyBoolean());
+    }).when(updater).updateDetails();
     doNothing().when(updater).setLastUpdatedSeqNumber(anyLong());
     doNothing().when(updater).setLastUpdatedTimestamp(anyLong());
     doNothing().when(updater).setLastTaskRunStatus(anyInt());
@@ -76,7 +70,7 @@ public class TestReconTaskStatusUpdater extends AbstractReconSqlDBTest {
   void testUpdateDetailsFirstTime() {
     when(reconTaskStatusDaoMock.existsById(anyString())).thenReturn(false);
 
-    updater.updateDetails(false);
+    updater.updateDetails();
 
     verify(reconTaskStatusDaoMock, times(1)).insert(any(ReconTaskStatus.class));
     verify(reconTaskStatusDaoMock, never()).update(any(ReconTaskStatus.class));
@@ -87,10 +81,9 @@ public class TestReconTaskStatusUpdater extends AbstractReconSqlDBTest {
     when(reconTaskStatusDaoMock.existsById(anyString())).thenReturn(true);
 
     updater.setLastTaskRunStatus(1); // Task success
-    updater.updateDetails(true);
+    updater.updateDetails();
 
     verify(reconTaskStatusDaoMock, times(1)).update(any(ReconTaskStatus.class));
-    verify(reconTaskStatusCounterMock, times(1)).updateCounter("task1", true);
   }
 
   @Test

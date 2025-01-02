@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.recon.upgrade;
 
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.jooq.DSLContext;
+import org.jooq.Record;
+import org.jooq.Result;
 import org.jooq.exception.DataAccessException;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
@@ -46,6 +48,27 @@ public class ReconTaskStatusTableUpgradeAction implements ReconUpgradeAction {
 
   public static final Logger LOG = LoggerFactory.getLogger(ReconTaskStatusTableUpgradeAction.class);
 
+  /**
+   * Utility function to add provided column to RECON_TASK_STATUS table as INTEGER type.
+   * @param dslContext  Stores {@link DSLContext} to perform alter operations
+   * @param columnName  Name of the column to be inserted to the table
+   */
+  private void addColumnToTable(DSLContext dslContext, String columnName) {
+    //Column is set as nullable to avoid any errors.
+    dslContext.alterTable(RECON_TASK_STATUS_TABLE_NAME)
+        .addColumn(columnName, SQLDataType.INTEGER.nullable(true)).execute();
+  }
+
+  /**
+   *  Utility function to set the provided column as Non-Null to enforce constraints in RECON_TASK_STATUS table.
+   * @param dslContext Stores {@link DSLContext} to perform alter operations
+   * @param columnName Name of the column to set as non-null
+   */
+  private void setColumnAsNonNullable(DSLContext dslContext, String columnName) {
+    dslContext.alterTable(RECON_TASK_STATUS_TABLE_NAME)
+        .alterColumn(columnName).setNotNull().execute();
+  }
+
   @Override
   public void execute(ReconStorageContainerManagerFacade scmFacade) throws DataAccessException {
     DataSource dataSource = scmFacade.getDataSource();
@@ -58,13 +81,22 @@ public class ReconTaskStatusTableUpgradeAction implements ReconUpgradeAction {
       // JOOQ doesn't support Derby DB officially, there is no way to run 'ADD COLUMN' command in single call
       // for multiple columns. Hence, we run it as two separate steps.
       LOG.info("Adding 'last_task_run_status' column to task status table");
-      dslContext.alterTable(RECON_TASK_STATUS_TABLE_NAME)
-          .addColumn("last_task_run_status", SQLDataType.INTEGER).execute();
+      addColumnToTable(dslContext, "last_task_run_status");
       LOG.info("Adding 'current_task_run_status' column to task status table");
-      dslContext.alterTable(RECON_TASK_STATUS_TABLE_NAME)
-          .addColumn("current_task_run_status", SQLDataType.INTEGER).execute();
-    } catch (SQLException se) {
-      LOG.error("Error while upgrading Recon Task Status table. Message: {}", se.getMessage());
+      addColumnToTable(dslContext, "is_current_task_running");
+
+      //Handle previous table values with new columns default values
+      int updatedRowCount = dslContext.update(DSL.table(RECON_TASK_STATUS_TABLE_NAME))
+          .set(DSL.field("last_task_run_status", SQLDataType.INTEGER), 0)
+          .set(DSL.field("is_current_task_running", SQLDataType.INTEGER), 0)
+          .execute();
+      LOG.info("Updated {} rows with default value for new columns", updatedRowCount);
+
+      // Now we will set the column as not-null to enforce constraints
+      setColumnAsNonNullable(dslContext, "last_task_run_status");
+      setColumnAsNonNullable(dslContext, "is_current_task_running");
+    } catch (SQLException | DataAccessException ex) {
+      LOG.error("Error while upgrading RECON_TASK_STATUS table.", ex);
     }
   }
 

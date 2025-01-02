@@ -67,9 +67,6 @@ Validate Task Status After Sync
 
     FOR    ${task}    IN    @{tasks}
         Dictionary Should Contain Key    ${task}    taskName
-        Dictionary Should Contain Key    ${task}    successes
-        Dictionary Should Contain Key    ${task}    failures
-        Dictionary Should Contain Key    ${task}    counterStartedAt
         Dictionary Should Contain Key    ${task}    lastUpdatedSeqNumber
         Dictionary Should Contain Key    ${task}    lastUpdatedTimestamp
         Dictionary Should Contain Key    ${task}    isTaskCurrentlyRunning
@@ -77,7 +74,7 @@ Validate Task Status After Sync
     END
 
 Validate Counters for Specific Task
-    [Documentation]  Validate success and failure counters for a specific task after OM DB sync.
+    [Documentation]  Validate response for a specific task after OM DB sync.
 
     ${tasks} =    Fetch Task Status
 
@@ -86,10 +83,6 @@ Validate Counters for Specific Task
     Should Be Equal As Integers    ${list_length}    1
 
     ${task} =    Get From List    ${task_list}    0
-
-    # Validate success and failure counters
-    Should Be True      ${task["successes"]}>=0
-    Should Be True      ${task["failures"]}>=0
 
     # Validate table fields
     Should Be True        ${task["lastUpdatedTimestamp"]}!=${None}
@@ -106,6 +99,4 @@ Validate All Tasks Updated After Sync
     FOR    ${task}    IN    @{tasks}
         Should Be True      ${task["lastUpdatedTimestamp"]}!=${None}
         Should Be True      ${task["lastUpdatedSeqNumber"]}!=${None}
-        Should Be True      ${task["successes"]}>=0
-        Should Be True      ${task["failures"]}>=0
     END

@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.recon.tasks.updater;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 
@@ -37,24 +36,21 @@ import java.util.concurrent.ConcurrentHashMap;
 @Singleton
 public class ReconTaskStatusUpdaterManager {
   private final ReconTaskStatusDao reconTaskStatusDao;
-  private final ReconTaskStatusCounter reconTaskStatusCounter;
   // Act as a cache for the task updater instancesF
   private final ConcurrentHashMap<String, ReconTaskStatusUpdater> updaterCache;
 
   @Inject
   public ReconTaskStatusUpdaterManager(
-      ReconTaskStatusDao reconTaskStatusDao,
-      ReconTaskStatusCounter reconTaskStatusCounter
+      ReconTaskStatusDao reconTaskStatusDao
   ) {
     this.reconTaskStatusDao = reconTaskStatusDao;
-    this.reconTaskStatusCounter = reconTaskStatusCounter;
     this.updaterCache = new ConcurrentHashMap<>();
 
     // Fetch the tasks present in the DB already
     List<ReconTaskStatus> tasks = reconTaskStatusDao.findAll();
     for (ReconTaskStatus task: tasks) {
       updaterCache.put(task.getTaskName(),
-          new ReconTaskStatusUpdater(reconTaskStatusDao, reconTaskStatusCounter, task.getTaskName(),
+          new ReconTaskStatusUpdater(reconTaskStatusDao, task.getTaskName(),
               task.getLastUpdatedTimestamp(), task.getLastUpdatedSeqNumber(),
               task.getLastTaskRunStatus(), task.getIsCurrentTaskRunning()
           ));
@@ -71,9 +67,9 @@ public class ReconTaskStatusUpdaterManager {
     // If the task is not already present in the DB then we can initialize using initial values
     return updaterCache.computeIfAbsent(taskName, (name) -> {
       ReconTaskStatusUpdater taskStatusUpdater = new ReconTaskStatusUpdater(
-          reconTaskStatusDao, reconTaskStatusCounter, name);
+          reconTaskStatusDao, name);
       // Insert initial values into DB
-      taskStatusUpdater.updateDetails(false);
+      taskStatusUpdater.updateDetails();
       return taskStatusUpdater;
     });
   }

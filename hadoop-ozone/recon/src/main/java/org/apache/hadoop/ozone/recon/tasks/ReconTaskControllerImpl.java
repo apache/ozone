@@ -105,7 +105,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         ReconTaskStatusUpdater taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(task.getTaskName());
         taskStatusUpdater.setIsCurrentTaskRunning(1);
         taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-        taskStatusUpdater.updateDetails(false);
+        taskStatusUpdater.updateDetails();
         // events passed to process method is no longer filtered
         tasks.add(() -> task.process(events));
       }
@@ -162,7 +162,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       ReconTaskStatusUpdater taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(task.getTaskName());
       taskStatusUpdater.setIsCurrentTaskRunning(1);
       taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-      taskStatusUpdater.updateDetails(false);
+      taskStatusUpdater.updateDetails();
       tasks.add(() -> task.reprocess(omMetadataManager));
     }
 
@@ -186,7 +186,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
             }
             taskStatusUpdater.setIsCurrentTaskRunning(0);
             taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-            taskStatusUpdater.updateDetails(true);
+            taskStatusUpdater.updateDetails();
           })).toArray(CompletableFuture[]::new)).join();
     } catch (CompletionException ce) {
       LOG.error("Completing all tasks failed with exception ", ce);
@@ -247,7 +247,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
           }
           taskStatusUpdater.setIsCurrentTaskRunning(0);
           taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-          taskStatusUpdater.updateDetails(true);
+          taskStatusUpdater.updateDetails();
         })).collect(Collectors.toList());
 
     try {

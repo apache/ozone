@@ -61,7 +61,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.TestContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
-import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusCounter;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
@@ -570,9 +569,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     ReconTaskStatusUpdaterManager reconTaskStatusUpdaterManager = mock(ReconTaskStatusUpdaterManager.class);
     when(reconTaskStatusUpdaterManager.getTaskStatusUpdater(anyString())).thenAnswer(inv -> {
       String taskName = inv.getArgument(0);
-      return new ReconTaskStatusUpdater(
-          getDao(ReconTaskStatusDao.class), mock(ReconTaskStatusCounter.class),
-          taskName);
+      return new ReconTaskStatusUpdater(getDao(ReconTaskStatusDao.class), taskName);
     });
     return reconTaskStatusUpdaterManager;
   }
