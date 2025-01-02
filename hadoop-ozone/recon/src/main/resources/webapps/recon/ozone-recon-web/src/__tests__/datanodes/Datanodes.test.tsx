@@ -17,6 +17,7 @@
  */
 import React from 'react';
 import {
+  fireEvent,
   render,
   screen,
   waitFor
@@ -28,7 +29,8 @@ import { vi } from 'vitest';
 import Datanodes from '@/v2/pages/datanodes/datanodes';
 import * as commonUtils from '@/utils/common';
 import { datanodeServer } from '@/__tests__/mocks/datanodeMocks/datanodeServer';
-import { datanodeLocators } from '@/__tests__/locators/locators';
+import { datanodeLocators, searchInputLocator } from '@/__tests__/locators/locators';
+import { waitForDNTable } from '@/__tests__/utils/datanodes.utils';
 
 // Mock utility functions
 vi.spyOn(commonUtils, 'showDataFetchError');
@@ -57,28 +59,28 @@ describe('Datanodes Component', () => {
     expect(screen.getByText(/Datanodes/)).toBeInTheDocument();
     expect(screen.getByTestId('auto-reload-panel')).toBeInTheDocument();
     expect(screen.getByTestId('multi-select')).toBeInTheDocument();
-    expect(screen.getByTestId('search-input')).toBeInTheDocument();
+    expect(screen.getByTestId(searchInputLocator)).toBeInTheDocument();
   });
 
-  test('renders table with correct number of rows', async () => {
+  test('Renders table with correct number of rows', async () => {
     render(<Datanodes />);
 
     // Wait for the data to load
-    const rows = await waitFor(() => screen.getAllByTestId(/dntable-/));
+    const rows = await waitFor(() => screen.getAllByTestId(datanodeLocators.datanodeRowRegex));
     expect(rows).toHaveLength(5); // Based on the mocked DatanodeResponse
   });
 
-  test('loads data on mount', async () => {
+  test('Loads data on mount', async () => {
     render(<Datanodes />);
     // Wait for the data to be loaded into the table
-    const dnTable = await waitFor(() => screen.getByTestId('dn-table'));
+    const dnTable = await waitForDNTable();
 
     // Ensure the correct data is displayed in the table
     expect(dnTable).toHaveTextContent('ozone-datanode-1.ozone_default');
     expect(dnTable).toHaveTextContent('HEALTHY');
   });
 
-  test('displays no data message if the datanodes API returns an empty array', async () => {
+  test('Displays no data message if the datanodes API returns an empty array', async () => {
     datanodeServer.use(
       rest.get('api/v1/datanodes', (req, res, ctx) => {
         return res(ctx.status(200), ctx.json({ totalCount: 0, datanodes: [] }));
@@ -91,21 +93,44 @@ describe('Datanodes Component', () => {
     await waitFor(() => expect(screen.getByText('No Data')).toBeInTheDocument());
   });
 
-  test('handles search input change', async () => {
+  test('Handles search input change', async () => {
     render(<Datanodes />);
-    await waitFor(() => screen.getByTestId('dn-table'));
+    await waitForDNTable();
 
-    const searchInput = screen.getByTestId('search-input');
-    userEvent.type(searchInput, 'ozone-datanode-1');
-    await waitFor(() => expect(searchInput).toHaveValue('ozone-datanode-1'));
+    const searchInput = screen.getByTestId(searchInputLocator);
+    fireEvent.change(searchInput, {
+      target: { value: 'ozone-datanode-1' }
+    });
+    // Sleep for 310ms to allow debounced search to take effect
+    await new Promise((r) => { setTimeout(r, 310) });
+    const rows = await waitFor(() => screen.getAllByTestId(datanodeLocators.datanodeRowRegex));
+    await waitFor(() => expect(rows).toHaveLength(1));
   });
 
-  test('displays a message when no results match the search term', async () => {
+  test('Handles case-sensitive search', async () => {
     render(<Datanodes />);
-    const searchInput = screen.getByTestId('search-input');
+    await waitForDNTable();
+
+    const searchInput = screen.getByTestId(searchInputLocator);
+    fireEvent.change(searchInput, {
+      target: { value: 'DataNode' }
+    });
+    await waitFor(() => expect(searchInput).toHaveValue('DataNode'));
+    // Sleep for 310ms to allow debounced search to take effect
+    await new Promise((r) => { setTimeout(r, 310) })
+
+    const rows = await waitFor(() => screen.getAllByTestId(datanodeLocators.datanodeRowRegex));
+    expect(rows).toHaveLength(1);
+  })
+
+  test('Displays a message when no results match the search term', async () => {
+    render(<Datanodes />);
+    const searchInput = screen.getByTestId(searchInputLocator);
 
     // Type a term that doesn't match any datanode
-    userEvent.type(searchInput, 'nonexistent-datanode');
+    fireEvent.change(searchInput, {
+      target: { value: 'nonexistent-datanode' }
+    });
 
     // Verify that no results message is displayed
     await waitFor(() => expect(screen.getByText('No Data')).toBeInTheDocument());
@@ -114,11 +139,11 @@ describe('Datanodes Component', () => {
   // Since this is a static response, even if we remove we will not get the truncated response from backend
   // i.e response with the removed DN. So the table will always have the value even if we remove it
   // causing this test to fail
-  test.skip('shows modal on row selection and confirms removal', async () => {
+  test.skip('Shows modal on row selection and confirms removal', async () => {
     render(<Datanodes />);
 
     // Wait for the data to be loaded into the table
-    await waitFor(() => screen.getByTestId('dn-table'));
+    await waitForDNTable();
 
     // Simulate selecting a row
     // The first checkbox is for the table header "Select All" checkbox -> idx 0
@@ -148,7 +173,7 @@ describe('Datanodes Component', () => {
     );
   });
 
-  test('handles API errors gracefully', async () => {
+  test('Handles API errors gracefully by showing error message', async () => {
     // Set up MSW to return an error for the datanode API
     datanodeServer.use(
       rest.get('api/v1/datanodes', (req, res, ctx) => {

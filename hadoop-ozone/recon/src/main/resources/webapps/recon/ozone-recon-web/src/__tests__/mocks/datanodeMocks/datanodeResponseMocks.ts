@@ -145,7 +145,7 @@ export const DatanodeResponse = {
       },
       {
           "uuid": "5",
-          "hostname": "ozone-datanode-5.ozone_default",
+          "hostname": "ozone-DataNode-5.ozone_default",
           "state": "DEAD",
           "opState": "DECOMMISSIONED",
           "lastHeartbeat": 1728280582055,

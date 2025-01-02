@@ -28,6 +28,7 @@ import {
 import { DatanodeTableProps } from '@/v2/types/datanode.types';
 import DatanodesTable from '@/v2/components/tables/datanodesTable';
 import { datanodeServer } from '@/__tests__/mocks/datanodeMocks/datanodeServer';
+import { waitForDNTable } from '@/__tests__/utils/datanodes.utils';
 
 const defaultProps: DatanodeTableProps = {
   loading: false,
@@ -89,7 +90,7 @@ describe('DatanodesTable Component', () => {
     render(<DatanodesTable {...defaultProps} data={[]} />);
 
     // Wait for the table to render
-    await waitFor(() => screen.getByTestId('dn-table'));
+    waitForDNTable();
 
     expect(screen.getByTestId('dn-table')).toBeInTheDocument();
   });
