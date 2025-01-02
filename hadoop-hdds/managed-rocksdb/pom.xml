@@ -29,6 +29,7 @@
 
   <properties>
     <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
+    <sort.skip>true</sort.skip>
   </properties>
 
   <dependencies>
