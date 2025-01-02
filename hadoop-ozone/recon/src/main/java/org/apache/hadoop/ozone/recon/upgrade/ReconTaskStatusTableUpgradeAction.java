@@ -20,8 +20,6 @@ package org.apache.hadoop.ozone.recon.upgrade;
 
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.jooq.DSLContext;
-import org.jooq.Record;
-import org.jooq.Result;
 import org.jooq.exception.DataAccessException;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
