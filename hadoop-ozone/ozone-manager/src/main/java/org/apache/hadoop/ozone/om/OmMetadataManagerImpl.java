@@ -351,12 +351,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     this.ozoneManager = ozoneManager;
     this.perfMetrics = perfMetrics;
     this.lock = new OzoneManagerLock(conf);
-    // TODO: This is a temporary check. Once fully implemented, all OM state
-    //  change should go through Ratis - be it standalone (for non-HA) or
-    //  replicated (for HA).
-    isRatisEnabled = conf.getBoolean(
-        OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
-        OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
+    isRatisEnabled = true;
     this.omEpoch = OmUtils.getOMEpoch(isRatisEnabled);
     // For test purpose only
     ignorePipelineinKey = conf.getBoolean(

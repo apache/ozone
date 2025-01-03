@@ -41,14 +41,6 @@ Client connects to the Leader Ozone Manager which process the request and schedu
 
 ## Configuration
 
-HA mode of Ozone Manager can be enabled with the following settings in `ozone-site.xml`:
-
-```XML
-<property>
-   <name>ozone.om.ratis.enable</name>
-   <value>true</value>
-</property>
-```
 One Ozone configuration (`ozone-site.xml`) can support multiple Ozone HA cluster. To select between the available HA clusters a logical name is required for each of the clusters which can be resolved to the IP addresses (and domain names) of the Ozone Managers.
 
 This logical name is called `serviceId` and can be configured in the `ozone-site.xml`

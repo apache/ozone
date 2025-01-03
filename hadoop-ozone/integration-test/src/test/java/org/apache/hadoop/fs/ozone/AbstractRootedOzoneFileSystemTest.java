@@ -157,12 +157,11 @@ abstract class AbstractRootedOzoneFileSystemTest {
   private OzoneClient client;
 
   AbstractRootedOzoneFileSystemTest(BucketLayout bucketLayout, boolean setDefaultFs,
-      boolean isAclEnabled, boolean noFlush) {
+      boolean isAclEnabled) {
     // Initialize the cluster before EACH set of parameters
     this.bucketLayout = bucketLayout;
     enabledFileSystemPaths = setDefaultFs;
     enableAcl = isAclEnabled;
-    useOnlyCache = noFlush;
     isBucketFSOptimized = bucketLayout.isFileSystemOptimized();
   }
 
@@ -203,8 +202,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
   private final boolean enabledFileSystemPaths;
   private final boolean isBucketFSOptimized;
   private final boolean enableAcl;
-
-  private final boolean useOnlyCache;
 
   private OzoneConfiguration conf;
   private MiniOzoneCluster cluster;
@@ -279,10 +276,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
     userOfs = UGI_USER1.doAs(
         (PrivilegedExceptionAction<RootedOzoneFileSystem>)()
             -> (RootedOzoneFileSystem) FileSystem.get(conf));
-
-    if (useOnlyCache) {
-      cluster.getOzoneManager().getOmServerProtocol().setShouldFlushCache(true);
-    }
   }
 
   protected OMMetrics getOMMetrics() {
@@ -2361,9 +2354,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
   @Test
   void testSnapshotRead() throws Exception {
-    if (useOnlyCache) {
-      return;
-    }
     // Init data
     OzoneBucket bucket1 =
         TestDataUtil.createVolumeAndBucket(client, bucketLayout);
@@ -2410,9 +2400,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
   @Test
   void testSnapshotDiff() throws Exception {
-    if (useOnlyCache) {
-      return;
-    }
     OzoneBucket bucket1 =
         TestDataUtil.createVolumeAndBucket(client, bucketLayout);
     Path volumePath1 = new Path(OZONE_URI_DELIMITER, bucket1.getVolumeName());
