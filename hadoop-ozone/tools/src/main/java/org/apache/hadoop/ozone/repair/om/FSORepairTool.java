@@ -93,19 +93,11 @@ public class FSORepairTool {
 
   public FSORepairTool(String dbPath, boolean repair, String volume, String bucket, boolean verbose)
       throws IOException {
-    this(getStoreFromPath(dbPath), dbPath, repair, volume, bucket, verbose);
-  }
-
-  /**
-   * Allows passing RocksDB instance from a MiniOzoneCluster directly to this class for testing.
-   */
-  public FSORepairTool(DBStore dbStore, String dbPath, boolean repair, String volume, String bucket, boolean verbose)
-      throws IOException {
     this.reachableStats = new ReportStatistics(0, 0, 0);
     this.unreachableStats = new ReportStatistics(0, 0, 0);
     this.unreferencedStats = new ReportStatistics(0, 0, 0);
 
-    this.store = dbStore;
+    this.store = getStoreFromPath(dbPath);
     this.omDBPath = dbPath;
     this.repair = repair;
     this.volumeFilter = volume;
