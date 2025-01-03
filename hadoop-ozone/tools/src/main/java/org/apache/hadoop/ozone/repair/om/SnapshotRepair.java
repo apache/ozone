@@ -17,16 +17,10 @@
  */
 
 package org.apache.hadoop.ozone.repair.om;
-
-import org.apache.hadoop.hdds.cli.GenericCli;
-
 import picocli.CommandLine;
-import picocli.CommandLine.Model.CommandSpec;
-
-import java.util.concurrent.Callable;
 
 /**
- * Tool to repair snapshotInfoTable in case it has corrupted entries.
+ * Tool for snapshot related repairs.
  */
 @CommandLine.Command(
     name = "snapshot",
@@ -35,14 +29,6 @@ import java.util.concurrent.Callable;
         SnapshotChainRepair.class
     }
 )
-public class SnapshotRepair implements Callable<Void> {
+public class SnapshotRepair {
 
-  @CommandLine.Spec
-  private static CommandSpec spec;
-
-  @Override
-  public Void call() {
-    GenericCli.missingSubcommand(spec);
-    return null;
-  }
 }

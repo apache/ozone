@@ -62,8 +62,8 @@ public class SnapshotChainRepair extends RepairTool {
   private String snapshotName;
 
   @CommandLine.Option(names = {"--db"},
-          required = true,
-          description = "Database File Path")
+      required = true,
+      description = "Database File Path")
   private String dbPath;
 
   @CommandLine.Option(names = {"--global-previous", "--gp"},

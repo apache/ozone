@@ -52,8 +52,8 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_
 public class TransactionInfoRepair extends RepairTool {
 
   @CommandLine.Option(names = {"--db"},
-          required = true,
-          description = "Database File Path")
+      required = true,
+      description = "Database File Path")
   private String dbPath;
 
   @CommandLine.Option(names = {"--term"},
