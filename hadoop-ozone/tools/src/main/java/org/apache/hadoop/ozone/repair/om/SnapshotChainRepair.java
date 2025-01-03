@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.repair.ldb;
+package org.apache.hadoop.ozone.repair.om;
 
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
@@ -48,21 +48,23 @@ import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_INFO_TABLE;
  * Tool to repair snapshotInfoTable in case it has corrupted entries.
  */
 @CommandLine.Command(
-    name = "snapshot",
+    name = "chain",
     description = "CLI to update global and path previous snapshot for a snapshot in case snapshot chain is corrupted."
 )
-public class SnapshotRepair extends RepairTool {
+public class SnapshotChainRepair extends RepairTool {
 
-  protected static final Logger LOG = LoggerFactory.getLogger(SnapshotRepair.class);
-
-  @CommandLine.ParentCommand
-  private RDBRepair parent;
+  protected static final Logger LOG = LoggerFactory.getLogger(SnapshotChainRepair.class);
 
   @CommandLine.Mixin
   private BucketUri bucketUri;
 
   @CommandLine.Parameters(description = "Snapshot name to update", index = "1")
   private String snapshotName;
+
+  @CommandLine.Option(names = {"--db"},
+      required = true,
+      description = "Database File Path")
+  private String dbPath;
 
   @CommandLine.Option(names = {"--global-previous", "--gp"},
       required = true,
@@ -82,9 +84,9 @@ public class SnapshotRepair extends RepairTool {
   @Override
   public void execute() throws Exception {
     List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
-    List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(parent.getDbPath());
+    List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(dbPath);
 
-    try (ManagedRocksDB db = ManagedRocksDB.open(parent.getDbPath(), cfDescList, cfHandleList)) {
+    try (ManagedRocksDB db = ManagedRocksDB.open(dbPath, cfDescList, cfHandleList)) {
       ColumnFamilyHandle snapshotInfoCfh = RocksDBUtils.getColumnFamilyHandle(SNAPSHOT_INFO_TABLE, cfHandleList);
       if (snapshotInfoCfh == null) {
         error("%s is not in a column family in DB for the given path.", SNAPSHOT_INFO_TABLE);
@@ -145,7 +147,7 @@ public class SnapshotRepair extends RepairTool {
             RocksDBUtils.getValue(db, snapshotInfoCfh, snapshotInfoTableKey, SnapshotInfo.getCodec()));
       }
     } catch (RocksDBException exception) {
-      error("Failed to update the RocksDB for the given path: %s", parent.getDbPath());
+      error("Failed to update the RocksDB for the given path: %s", dbPath);
       error(
           "Make sure that Ozone entity (OM, SCM or DN) is not running for the give dbPath and current host.");
       LOG.error(exception.toString());

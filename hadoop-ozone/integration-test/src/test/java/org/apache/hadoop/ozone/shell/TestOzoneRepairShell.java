@@ -89,7 +89,7 @@ public class TestOzoneRepairShell {
 
     String testTerm = "1111";
     String testIndex = "1111";
-    int exitCode = cmd.execute("ldb", "--db", dbPath, "update-transaction", "--term", testTerm, "--index", testIndex);
+    int exitCode = cmd.execute("om", "update-transaction", "--db", dbPath, "--term", testTerm, "--index", testIndex);
     assertEquals(0, exitCode, err);
     assertThat(out.get())
         .contains(
@@ -101,7 +101,7 @@ public class TestOzoneRepairShell {
     String cmdOut2 = scanTransactionInfoTable(dbPath);
     assertThat(cmdOut2).contains(testTerm + "#" + testIndex);
 
-    cmd.execute("ldb", "--db", dbPath, "update-transaction", "--term",
+    cmd.execute("om", "update-transaction", "--db", dbPath, "--term",
         originalHighestTermIndex[0], "--index", originalHighestTermIndex[1]);
     cluster.getOzoneManager().restart();
     try (OzoneClient ozoneClient = cluster.newClient()) {

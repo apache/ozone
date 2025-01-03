@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.repair.ldb;
+package org.apache.hadoop.ozone.repair.om;
 
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -126,9 +126,9 @@ public class TestTransactionInfoRepair {
 
       CommandLine cli = new OzoneRepair().getCmd();
       cli.execute(
-          "ldb",
-          "--db", DB_PATH,
+          "om",
           "update-transaction",
+          "--db", DB_PATH,
           "--term", String.valueOf(TEST_TERM),
           "--index", String.valueOf(TEST_INDEX));
     }

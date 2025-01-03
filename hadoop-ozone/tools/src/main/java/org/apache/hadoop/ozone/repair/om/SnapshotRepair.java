@@ -16,7 +16,19 @@
  *  limitations under the License.
  */
 
+package org.apache.hadoop.ozone.repair.om;
+import picocli.CommandLine;
+
 /**
- * RDB related repair tools.
+ * Tool for snapshot related repairs.
  */
-package org.apache.hadoop.ozone.repair.ldb;
+@CommandLine.Command(
+    name = "snapshot",
+    description = "Subcommand for all snapshot related repairs.",
+    subcommands = {
+        SnapshotChainRepair.class
+    }
+)
+public class SnapshotRepair {
+
+}
