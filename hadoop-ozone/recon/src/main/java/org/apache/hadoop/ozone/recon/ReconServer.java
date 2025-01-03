@@ -70,7 +70,7 @@ import static org.apache.hadoop.util.ExitUtil.terminate;
 /**
  * Recon server main class that stops and starts recon services.
  */
-public class ReconServer extends GenericCli {
+public class ReconServer extends GenericCli implements Runnable {
 
   private static final Logger LOG = LoggerFactory.getLogger(ReconServer.class);
   private Injector injector;
@@ -97,7 +97,7 @@ public class ReconServer extends GenericCli {
   }
 
   @Override
-  public Void call() throws Exception {
+  public void run() {
     String[] originalArgs = getCmd().getParseResult().originalArgs()
         .toArray(new String[0]);
 
@@ -194,7 +194,6 @@ public class ReconServer extends GenericCli {
         LOG.error("Error during stop Recon server", e);
       }
     }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
-    return null;
   }
 
   /**

@@ -97,7 +97,7 @@ import picocli.CommandLine.Command;
     hidden = true, description = "Start the datanode for ozone",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
-public class HddsDatanodeService extends GenericCli implements ServicePlugin {
+public class HddsDatanodeService extends GenericCli implements Runnable, ServicePlugin {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       HddsDatanodeService.class);
@@ -168,7 +168,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   @Override
-  public Void call() throws Exception {
+  public void run() {
     OzoneConfiguration configuration = getOzoneConf();
     if (printBanner) {
       HddsServerUtil.startupShutdownMessage(HddsVersionInfo.HDDS_VERSION_INFO,
@@ -183,7 +183,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         LOG.error("Error during stop Ozone Datanode.", e);
       }
     }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
-    return null;
   }
 
   public void setConfiguration(OzoneConfiguration configuration) {

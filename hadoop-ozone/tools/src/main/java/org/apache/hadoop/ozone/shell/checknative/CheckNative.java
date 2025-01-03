@@ -33,14 +33,14 @@ import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LI
  */
 @CommandLine.Command(name = "ozone checknative",
     description = "Checks if native libraries are loaded")
-public class CheckNative extends GenericCli {
+public class CheckNative extends GenericCli implements Runnable {
 
   public static void main(String[] argv) {
     new CheckNative().run(argv);
   }
 
   @Override
-  public Void call() throws Exception {
+  public void run() {
     boolean nativeHadoopLoaded = org.apache.hadoop.util.NativeCodeLoader.isNativeCodeLoaded();
     String hadoopLibraryName = "";
     String isalDetail = "";
@@ -70,6 +70,5 @@ public class CheckNative extends GenericCli {
       rocksToolsDetail = NativeLibraryLoader.getJniLibraryFileName();
     }
     System.out.printf("rocks-tools: %b %s%n", nativeRocksToolsLoaded, rocksToolsDetail);
-    return null;
   }
 }
