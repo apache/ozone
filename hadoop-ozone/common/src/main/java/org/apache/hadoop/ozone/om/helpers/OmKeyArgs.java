@@ -213,6 +213,7 @@ public final class OmKeyArgs implements Auditable {
     if (expectedDataGeneration != null) {
       builder.setExpectedDataGeneration(expectedDataGeneration);
     }
+
     return builder;
   }
 
@@ -227,7 +228,11 @@ public final class OmKeyArgs implements Auditable {
         .setLatestVersionLocation(getLatestVersionLocation())
         .setHeadOp(isHeadOp())
         .setForceUpdateContainerCacheFromSCM(
-            isForceUpdateContainerCacheFromSCM());
+            isForceUpdateContainerCacheFromSCM()
+        );
+    if (multipartUploadPartNumber != 0) {
+      builder.setMultipartNumber(multipartUploadPartNumber);
+    }
     if (expectedDataGeneration != null) {
       builder.setExpectedDataGeneration(expectedDataGeneration);
     }
@@ -308,8 +313,8 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
-    public Builder setMultipartUploadPartNumber(int partNumber) {
-      this.multipartUploadPartNumber = partNumber;
+    public Builder setMultipartUploadPartNumber(int multipartUploadPartNumber) {
+      this.multipartUploadPartNumber = multipartUploadPartNumber;
       return this;
     }
 
