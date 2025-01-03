@@ -383,6 +383,14 @@ public class KeyValueHandler extends Handler {
 
     ContainerLayoutVersion layoutVersion =
         ContainerLayoutVersion.getConfiguredVersion(conf);
+    if (layoutVersion == ContainerLayoutVersion.FILE_PER_CHUNK) {
+      try {
+        throw new StorageContainerException("FILE_PER_CHUNK layout is deprecated.",
+            UNSUPPORTED_REQUEST);
+      } catch (StorageContainerException ex) {
+        return ContainerUtils.logAndReturnError(LOG, ex, request);
+      }
+    }
     KeyValueContainerData newContainerData = new KeyValueContainerData(
         containerID, layoutVersion, maxContainerSize, request.getPipelineID(),
         getDatanodeId());
@@ -1317,9 +1325,6 @@ public class KeyValueHandler extends Handler {
     switch (layoutVersion) {
     case FILE_PER_BLOCK:
       prefixBuilder.append(localID).append(".block");
-      break;
-    case FILE_PER_CHUNK:
-      prefixBuilder.append(localID).append("_chunk_");
       break;
     default:
       throw new IOException("Unsupported container layout version " +

@@ -299,9 +299,6 @@ public class TestKeyValueContainerMetadataInspector
     case FILE_PER_BLOCK:
       createdFiles = createdBlocks;
       break;
-    case FILE_PER_CHUNK:
-      createdFiles = createdBlocks * CHUNKS_PER_BLOCK;
-      break;
     default:
       fail("Unrecognized chunk layout version.");
     }
