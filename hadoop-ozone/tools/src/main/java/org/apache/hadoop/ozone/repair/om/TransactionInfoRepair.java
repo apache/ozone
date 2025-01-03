@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
+import org.apache.hadoop.ozone.repair.RepairTool;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
@@ -35,7 +36,6 @@ import picocli.CommandLine;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Callable;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_TABLE;
@@ -49,10 +49,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
-public class TransactionInfoRepair implements Callable<Void>  {
-
-  @CommandLine.Spec
-  private static CommandLine.Model.CommandSpec spec;
+public class TransactionInfoRepair extends RepairTool {
 
   @CommandLine.Option(names = {"--db"},
           required = true,
@@ -69,19 +66,8 @@ public class TransactionInfoRepair implements Callable<Void>  {
       description = "Highest index of transactionInfoTable. The input should be non-zero long integer.")
   private long highestTransactionIndex;
 
-  protected void setHighestTransactionTerm(
-      long highestTransactionTerm) {
-    this.highestTransactionTerm = highestTransactionTerm;
-  }
-
-  protected void setHighestTransactionIndex(
-      long highestTransactionIndex) {
-    this.highestTransactionIndex = highestTransactionIndex;
-  }
-
-
   @Override
-  public Void call() throws Exception {
+  public void execute() throws Exception {
     List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
     List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(
         dbPath);
@@ -95,7 +81,7 @@ public class TransactionInfoRepair implements Callable<Void>  {
       TransactionInfo originalTransactionInfo =
           RocksDBUtils.getValue(db, transactionInfoCfh, TRANSACTION_INFO_KEY, TransactionInfo.getCodec());
 
-      System.out.println("The original highest transaction Info was " + originalTransactionInfo.getTermIndex());
+      info("The original highest transaction Info was %s", originalTransactionInfo.getTermIndex());
 
       TransactionInfo transactionInfo = TransactionInfo.valueOf(highestTransactionTerm, highestTransactionIndex);
 
@@ -103,18 +89,16 @@ public class TransactionInfoRepair implements Callable<Void>  {
       db.get()
           .put(transactionInfoCfh, StringCodec.get().toPersistedFormat(TRANSACTION_INFO_KEY), transactionInfoBytes);
 
-      System.out.println("The highest transaction info has been updated to: " +
+      info("The highest transaction info has been updated to: %s",
           RocksDBUtils.getValue(db, transactionInfoCfh, TRANSACTION_INFO_KEY,
               TransactionInfo.getCodec()).getTermIndex());
     } catch (RocksDBException exception) {
-      System.err.println("Failed to update the RocksDB for the given path: " + dbPath);
-      System.err.println(
+      error("Failed to update the RocksDB for the given path: %s", dbPath);
+      error(
           "Make sure that Ozone entity (OM) is not running for the give database path and current host.");
       throw new IOException("Failed to update RocksDB.", exception);
     } finally {
       IOUtils.closeQuietly(cfHandleList);
     }
-
-    return null;
   }
 }
