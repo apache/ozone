@@ -126,7 +126,7 @@ public class FSORepairTool {
         SnapshotInfo.class);
   }
 
-  public FSORepairTool.Report run() throws Exception {
+  public Report run() throws Exception {
     try {
       if (bucketFilter != null && volumeFilter == null) {
         System.out.println("--bucket flag cannot be used without specifying --volume.");
@@ -541,19 +541,19 @@ public class FSORepairTool {
     /**
      * Builds one report that is the aggregate of multiple others.
      */
-    public Report(FSORepairTool.Report... reports) {
+    public Report(Report... reports) {
       reachable = new ReportStatistics();
       unreachable = new ReportStatistics();
       unreferenced = new ReportStatistics();
 
-      for (FSORepairTool.Report report : reports) {
+      for (Report report : reports) {
         reachable.add(report.reachable);
         unreachable.add(report.unreachable);
         unreferenced.add(report.unreferenced);
       }
     }
 
-    private Report(FSORepairTool.Report.Builder builder) {
+    private Report(Report.Builder builder) {
       this.reachable = builder.reachable;
       this.unreachable = builder.unreachable;
       this.unreferenced = builder.unreferenced;
@@ -583,7 +583,7 @@ public class FSORepairTool {
       if (other == null || getClass() != other.getClass()) {
         return false;
       }
-      FSORepairTool.Report report = (FSORepairTool.Report) other;
+      Report report = (Report) other;
 
       // Useful for testing.
       System.out.println("Comparing reports\nExpect:\n" + this + "\nActual:\n" + report);
