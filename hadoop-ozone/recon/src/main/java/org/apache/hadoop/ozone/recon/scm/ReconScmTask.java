@@ -41,7 +41,7 @@ public abstract class ReconScmTask {
     String taskName = getTaskName();
     if (!reconTaskStatusDao.existsById(taskName)) {
       ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
-          taskName, 0L, 0L);
+          taskName, 0L, 0L, null);
       reconTaskStatusDao.insert(reconTaskStatusRecord);
       LOG.info("Registered {} task ", taskName);
     }
@@ -89,7 +89,7 @@ public abstract class ReconScmTask {
 
   protected void recordSingleRunCompletion() {
     reconTaskStatusDao.update(new ReconTaskStatus(getTaskName(),
-        System.currentTimeMillis(), 0L));
+        System.currentTimeMillis(), 0L, true));
   }
 
   protected boolean canRun() {
