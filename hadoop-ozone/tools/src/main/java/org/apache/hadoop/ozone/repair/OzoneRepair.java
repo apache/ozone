@@ -31,8 +31,8 @@ import java.util.Scanner;
  * Ozone Repair Command line tool.
  */
 @CommandLine.Command(name = "ozone repair",
-    description = "Repair is an advanced operation and the nodes being repaired " +
-        "should be stopped while it is running.",
+    description = "Advanced tool to repair Ozone. The nodes being repaired " +
+        "must be stopped before the tool is run.",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
 public class OzoneRepair extends GenericCli implements ExtensibleParentCommand {

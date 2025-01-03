@@ -94,4 +94,16 @@ public class TestOzoneRepair {
     assertThat(err.toString(DEFAULT_ENCODING)).doesNotContain("ATTENTION: Running as user " + OZONE_USER);
   }
 
+  @Test
+  void testOzoneRepairSkipsPromptWhenHelpFlagProvided() throws Exception {
+    OzoneRepair ozoneRepair = new OzoneRepair();
+
+    // when --help or -h flag is passed, prompt should not be displayed
+    ozoneRepair.execute(new String[]{"--help"});
+    assertThat(err.toString(DEFAULT_ENCODING)).doesNotContain("ATTENTION: Running as user " + OZONE_USER);
+
+    ozoneRepair.execute(new String[]{"-h"});
+    assertThat(err.toString(DEFAULT_ENCODING)).doesNotContain("ATTENTION: Running as user " + OZONE_USER);
+  }
+
 }
