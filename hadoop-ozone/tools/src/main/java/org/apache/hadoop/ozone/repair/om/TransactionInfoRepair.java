@@ -19,7 +19,7 @@
  * permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.repair.ldb;
+package org.apache.hadoop.ozone.repair.om;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -51,8 +51,10 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_
 )
 public class TransactionInfoRepair extends RepairTool {
 
-  @CommandLine.ParentCommand
-  private RDBRepair parent;
+  @CommandLine.Option(names = {"--db"},
+      required = true,
+      description = "Database File Path")
+  private String dbPath;
 
   @CommandLine.Option(names = {"--term"},
       required = true,
@@ -67,7 +69,6 @@ public class TransactionInfoRepair extends RepairTool {
   @Override
   public void execute() throws Exception {
     List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
-    String dbPath = getParent().getDbPath();
     List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(
         dbPath);
 
@@ -100,9 +101,4 @@ public class TransactionInfoRepair extends RepairTool {
       IOUtils.closeQuietly(cfHandleList);
     }
   }
-
-  protected RDBRepair getParent() {
-    return parent;
-  }
-
 }
