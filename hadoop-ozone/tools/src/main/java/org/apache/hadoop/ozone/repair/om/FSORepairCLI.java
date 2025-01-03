@@ -55,6 +55,9 @@ public class FSORepairCLI extends RepairTool {
 
   @Override
   public void execute() throws Exception {
+    if (checkIfServiceIsRunning("OM")) {
+      return;
+    }
     if (repair) {
       info("FSO Repair Tool is running in repair mode");
     } else {
