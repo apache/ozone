@@ -139,7 +139,7 @@ public class FSORepairTool extends RepairTool {
     private final ReportStatistics unreachableStats;
     private final ReportStatistics unreferencedStats;
 
-    public Impl() throws IOException {
+    Impl() throws IOException {
       this.reachableStats = new ReportStatistics(0, 0, 0);
       this.unreachableStats = new ReportStatistics(0, 0, 0);
       this.unreferencedStats = new ReportStatistics(0, 0, 0);
