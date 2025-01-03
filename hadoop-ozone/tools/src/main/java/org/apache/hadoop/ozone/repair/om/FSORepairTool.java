@@ -73,416 +73,429 @@ public class FSORepairTool {
   public static final Logger LOG = LoggerFactory.getLogger(FSORepairTool.class);
   private static final String REACHABLE_TABLE = "reachable";
 
-  private final String omDBPath;
-  private final DBStore store;
-  private final Table<String, OmVolumeArgs> volumeTable;
-  private final Table<String, OmBucketInfo> bucketTable;
-  private final Table<String, OmDirectoryInfo> directoryTable;
-  private final Table<String, OmKeyInfo> fileTable;
-  private final Table<String, OmKeyInfo> deletedDirectoryTable;
-  private final Table<String, RepeatedOmKeyInfo> deletedTable;
-  private final Table<String, SnapshotInfo> snapshotInfoTable;
-  private final String volumeFilter;
-  private final String bucketFilter;
-  private DBStore reachableDB;
-  private final ReportStatistics reachableStats;
-  private final ReportStatistics unreachableStats;
-  private final ReportStatistics unreferencedStats;
-  private final boolean repair;
-  private final boolean verbose;
+  private final Impl impl;
 
   public FSORepairTool(String dbPath, boolean repair, String volume, String bucket, boolean verbose)
       throws IOException {
-    this.reachableStats = new ReportStatistics(0, 0, 0);
-    this.unreachableStats = new ReportStatistics(0, 0, 0);
-    this.unreferencedStats = new ReportStatistics(0, 0, 0);
-
-    this.store = getStoreFromPath(dbPath);
-    this.omDBPath = dbPath;
-    this.repair = repair;
-    this.volumeFilter = volume;
-    this.bucketFilter = bucket;
-    this.verbose = verbose;
-    volumeTable = store.getTable(OmMetadataManagerImpl.VOLUME_TABLE,
-        String.class,
-        OmVolumeArgs.class);
-    bucketTable = store.getTable(OmMetadataManagerImpl.BUCKET_TABLE,
-        String.class,
-        OmBucketInfo.class);
-    directoryTable = store.getTable(OmMetadataManagerImpl.DIRECTORY_TABLE,
-        String.class,
-        OmDirectoryInfo.class);
-    fileTable = store.getTable(OmMetadataManagerImpl.FILE_TABLE,
-        String.class,
-        OmKeyInfo.class);
-    deletedDirectoryTable = store.getTable(OmMetadataManagerImpl.DELETED_DIR_TABLE,
-        String.class,
-        OmKeyInfo.class);
-    deletedTable = store.getTable(OmMetadataManagerImpl.DELETED_TABLE,
-        String.class,
-        RepeatedOmKeyInfo.class);
-    snapshotInfoTable = store.getTable(OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE,
-        String.class,
-        SnapshotInfo.class);
+    impl = new Impl(dbPath, repair, volume, bucket, verbose);
   }
 
-  public Report run() throws Exception {
-    try {
-      if (bucketFilter != null && volumeFilter == null) {
-        System.out.println("--bucket flag cannot be used without specifying --volume.");
-        return null;
-      }
+  void run() throws Exception {
+    impl.run();
+  }
 
-      if (volumeFilter != null) {
-        OmVolumeArgs volumeArgs = volumeTable.getIfExist(volumeFilter);
-        if (volumeArgs == null) {
-          System.out.println("Volume '" + volumeFilter + "' does not exist.");
+  private static class Impl {
+
+    private final String omDBPath;
+    private final DBStore store;
+    private final Table<String, OmVolumeArgs> volumeTable;
+    private final Table<String, OmBucketInfo> bucketTable;
+    private final Table<String, OmDirectoryInfo> directoryTable;
+    private final Table<String, OmKeyInfo> fileTable;
+    private final Table<String, OmKeyInfo> deletedDirectoryTable;
+    private final Table<String, RepeatedOmKeyInfo> deletedTable;
+    private final Table<String, SnapshotInfo> snapshotInfoTable;
+    private final String volumeFilter;
+    private final String bucketFilter;
+    private DBStore reachableDB;
+    private final ReportStatistics reachableStats;
+    private final ReportStatistics unreachableStats;
+    private final ReportStatistics unreferencedStats;
+    private final boolean repair;
+    private final boolean verbose;
+
+    public Impl(String dbPath, boolean repair, String volume, String bucket, boolean verbose)
+        throws IOException {
+      this.reachableStats = new ReportStatistics(0, 0, 0);
+      this.unreachableStats = new ReportStatistics(0, 0, 0);
+      this.unreferencedStats = new ReportStatistics(0, 0, 0);
+
+      this.store = getStoreFromPath(dbPath);
+      this.omDBPath = dbPath;
+      this.repair = repair;
+      this.volumeFilter = volume;
+      this.bucketFilter = bucket;
+      this.verbose = verbose;
+      volumeTable = store.getTable(OmMetadataManagerImpl.VOLUME_TABLE,
+          String.class,
+          OmVolumeArgs.class);
+      bucketTable = store.getTable(OmMetadataManagerImpl.BUCKET_TABLE,
+          String.class,
+          OmBucketInfo.class);
+      directoryTable = store.getTable(OmMetadataManagerImpl.DIRECTORY_TABLE,
+          String.class,
+          OmDirectoryInfo.class);
+      fileTable = store.getTable(OmMetadataManagerImpl.FILE_TABLE,
+          String.class,
+          OmKeyInfo.class);
+      deletedDirectoryTable = store.getTable(OmMetadataManagerImpl.DELETED_DIR_TABLE,
+          String.class,
+          OmKeyInfo.class);
+      deletedTable = store.getTable(OmMetadataManagerImpl.DELETED_TABLE,
+          String.class,
+          RepeatedOmKeyInfo.class);
+      snapshotInfoTable = store.getTable(OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE,
+          String.class,
+          SnapshotInfo.class);
+    }
+
+    public Report run() throws Exception {
+      try {
+        if (bucketFilter != null && volumeFilter == null) {
+          System.out.println("--bucket flag cannot be used without specifying --volume.");
           return null;
         }
-      }
 
-      // Iterate all volumes or a specific volume if specified
-      try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
-               volumeIterator = volumeTable.iterator()) {
-        try {
-          openReachableDB();
-        } catch (IOException e) {
-          System.out.println("Failed to open reachable database: " + e.getMessage());
-          throw e;
-        }
-        while (volumeIterator.hasNext()) {
-          Table.KeyValue<String, OmVolumeArgs> volumeEntry = volumeIterator.next();
-          String volumeKey = volumeEntry.getKey();
-
-          if (volumeFilter != null && !volumeFilter.equals(volumeKey)) {
-            continue;
+        if (volumeFilter != null) {
+          OmVolumeArgs volumeArgs = volumeTable.getIfExist(volumeFilter);
+          if (volumeArgs == null) {
+            System.out.println("Volume '" + volumeFilter + "' does not exist.");
+            return null;
           }
+        }
 
-          System.out.println("Processing volume: " + volumeKey);
+        // Iterate all volumes or a specific volume if specified
+        try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
+                 volumeIterator = volumeTable.iterator()) {
+          try {
+            openReachableDB();
+          } catch (IOException e) {
+            System.out.println("Failed to open reachable database: " + e.getMessage());
+            throw e;
+          }
+          while (volumeIterator.hasNext()) {
+            Table.KeyValue<String, OmVolumeArgs> volumeEntry = volumeIterator.next();
+            String volumeKey = volumeEntry.getKey();
 
-          if (bucketFilter != null) {
-            OmBucketInfo bucketInfo = bucketTable.getIfExist(volumeKey + "/" + bucketFilter);
-            if (bucketInfo == null) {
-              //Bucket does not exist in the volume
-              System.out.println("Bucket '" + bucketFilter + "' does not exist in volume '" + volumeKey + "'.");
-              return null;
-            }
-
-            if (bucketInfo.getBucketLayout() != BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-              System.out.println("Skipping non-FSO bucket " + bucketFilter);
+            if (volumeFilter != null && !volumeFilter.equals(volumeKey)) {
               continue;
             }
 
-            processBucket(volumeEntry.getValue(), bucketInfo);
-          } else {
+            System.out.println("Processing volume: " + volumeKey);
 
-            // Iterate all buckets in the volume.
-            try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
-                         bucketIterator = bucketTable.iterator()) {
-              bucketIterator.seek(volumeKey);
-              while (bucketIterator.hasNext()) {
-                Table.KeyValue<String, OmBucketInfo> bucketEntry = bucketIterator.next();
-                String bucketKey = bucketEntry.getKey();
-                OmBucketInfo bucketInfo = bucketEntry.getValue();
+            if (bucketFilter != null) {
+              OmBucketInfo bucketInfo = bucketTable.getIfExist(volumeKey + "/" + bucketFilter);
+              if (bucketInfo == null) {
+                //Bucket does not exist in the volume
+                System.out.println("Bucket '" + bucketFilter + "' does not exist in volume '" + volumeKey + "'.");
+                return null;
+              }
 
-                if (bucketInfo.getBucketLayout() != BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-                  System.out.println("Skipping non-FSO bucket " + bucketKey);
-                  continue;
+              if (bucketInfo.getBucketLayout() != BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+                System.out.println("Skipping non-FSO bucket " + bucketFilter);
+                continue;
+              }
+
+              processBucket(volumeEntry.getValue(), bucketInfo);
+            } else {
+
+              // Iterate all buckets in the volume.
+              try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
+                       bucketIterator = bucketTable.iterator()) {
+                bucketIterator.seek(volumeKey);
+                while (bucketIterator.hasNext()) {
+                  Table.KeyValue<String, OmBucketInfo> bucketEntry = bucketIterator.next();
+                  String bucketKey = bucketEntry.getKey();
+                  OmBucketInfo bucketInfo = bucketEntry.getValue();
+
+                  if (bucketInfo.getBucketLayout() != BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+                    System.out.println("Skipping non-FSO bucket " + bucketKey);
+                    continue;
+                  }
+
+                  // Stop this loop once we have seen all buckets in the current
+                  // volume.
+                  if (!bucketKey.startsWith(volumeKey)) {
+                    break;
+                  }
+
+                  processBucket(volumeEntry.getValue(), bucketInfo);
                 }
-
-                // Stop this loop once we have seen all buckets in the current
-                // volume.
-                if (!bucketKey.startsWith(volumeKey)) {
-                  break;
-                }
-
-                processBucket(volumeEntry.getValue(), bucketInfo);
               }
             }
           }
         }
+      } catch (IOException e) {
+        System.out.println("An error occurred while processing" + e.getMessage());
+        throw e;
+      } finally {
+        closeReachableDB();
+        store.close();
       }
-    } catch (IOException e) {
-      System.out.println("An error occurred while processing" + e.getMessage());
-      throw e;
-    } finally {
-      closeReachableDB();
-      store.close();
+
+      return buildReportAndLog();
     }
 
-    return buildReportAndLog();
-  }
+    private boolean checkIfSnapshotExistsForBucket(String volumeName, String bucketName) throws IOException {
+      if (snapshotInfoTable == null) {
+        return false;
+      }
 
-  private boolean checkIfSnapshotExistsForBucket(String volumeName, String bucketName) throws IOException {
-    if (snapshotInfoTable == null) {
+      try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>> iterator =
+               snapshotInfoTable.iterator()) {
+        while (iterator.hasNext()) {
+          SnapshotInfo snapshotInfo = iterator.next().getValue();
+          String snapshotPath = (volumeName + "/" + bucketName).replaceFirst("^/", "");
+          if (snapshotInfo.getSnapshotPath().equals(snapshotPath)) {
+            return true;
+          }
+        }
+      }
       return false;
     }
 
-    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>> iterator =
-            snapshotInfoTable.iterator()) {
-      while (iterator.hasNext()) {
-        SnapshotInfo snapshotInfo = iterator.next().getValue();
-        String snapshotPath = (volumeName + "/" + bucketName).replaceFirst("^/", "");
-        if (snapshotInfo.getSnapshotPath().equals(snapshotPath)) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  private void processBucket(OmVolumeArgs volume, OmBucketInfo bucketInfo) throws IOException {
-    System.out.println("Processing bucket: " + volume.getVolume() + "/" + bucketInfo.getBucketName());
-    if (checkIfSnapshotExistsForBucket(volume.getVolume(), bucketInfo.getBucketName())) {
-      if (!repair) {
-        System.out.println(
-            "Snapshot detected in bucket '" + volume.getVolume() + "/" + bucketInfo.getBucketName() + "'. ");
-      } else {
-        System.out.println(
-            "Skipping repair for bucket '" + volume.getVolume() + "/" + bucketInfo.getBucketName() + "' " +
-            "due to snapshot presence.");
-        return;
-      }
-    }
-    markReachableObjectsInBucket(volume, bucketInfo);
-    handleUnreachableAndUnreferencedObjects(volume, bucketInfo);
-  }
-
-  private Report buildReportAndLog() {
-    Report report = new Report.Builder()
-        .setReachable(reachableStats)
-        .setUnreachable(unreachableStats)
-        .setUnreferenced(unreferencedStats)
-        .build();
-
-    System.out.println("\n" + report);
-    return report;
-  }
-
-  private void markReachableObjectsInBucket(OmVolumeArgs volume, OmBucketInfo bucket) throws IOException {
-    // Only put directories in the stack.
-    // Directory keys should have the form /volumeID/bucketID/parentID/name.
-    Stack<String> dirKeyStack = new Stack<>();
-
-    // Since the tool uses parent directories to check for reachability, add
-    // a reachable entry for the bucket as well.
-    addReachableEntry(volume, bucket, bucket);
-    // Initialize the stack with all immediate child directories of the
-    // bucket, and mark them all as reachable.
-    Collection<String> childDirs = getChildDirectoriesAndMarkAsReachable(volume, bucket, bucket);
-    dirKeyStack.addAll(childDirs);
-
-    while (!dirKeyStack.isEmpty()) {
-      // Get one directory and process its immediate children.
-      String currentDirKey = dirKeyStack.pop();
-      OmDirectoryInfo currentDir = directoryTable.get(currentDirKey);
-      if (currentDir == null) {
-        System.out.println("Directory key" + currentDirKey + "to be processed was not found in the directory table.");
-        continue;
-      }
-
-      // TODO revisit this for a more memory efficient implementation,
-      //  possibly making better use of RocksDB iterators.
-      childDirs = getChildDirectoriesAndMarkAsReachable(volume, bucket, currentDir);
-      dirKeyStack.addAll(childDirs);
-    }
-  }
-
-  private boolean isDirectoryInDeletedDirTable(String dirKey) throws IOException {
-    return deletedDirectoryTable.isExist(dirKey);
-  }
-
-  private boolean isFileKeyInDeletedTable(String fileKey) throws IOException {
-    return deletedTable.isExist(fileKey);
-  }
-
-  private void handleUnreachableAndUnreferencedObjects(OmVolumeArgs volume, OmBucketInfo bucket) throws IOException {
-    // Check for unreachable and unreferenced directories in the bucket.
-    String bucketPrefix = OM_KEY_PREFIX +
-        volume.getObjectID() +
-        OM_KEY_PREFIX +
-        bucket.getObjectID();
-
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>> dirIterator =
-             directoryTable.iterator()) {
-      dirIterator.seek(bucketPrefix);
-      while (dirIterator.hasNext()) {
-        Table.KeyValue<String, OmDirectoryInfo> dirEntry = dirIterator.next();
-        String dirKey = dirEntry.getKey();
-
-        // Only search directories in this bucket.
-        if (!dirKey.startsWith(bucketPrefix)) {
-          break;
-        }
-
-        if (!isReachable(dirKey)) {
-          if (!isDirectoryInDeletedDirTable(dirKey)) {
-            System.out.println("Found unreferenced directory: " + dirKey);
-            unreferencedStats.addDir();
-
-            if (!repair) {
-              if (verbose) {
-                System.out.println("Marking unreferenced directory " + dirKey + " for deletion.");
-              }
-            } else {
-              System.out.println("Deleting unreferenced directory " + dirKey);
-              OmDirectoryInfo dirInfo = dirEntry.getValue();
-              markDirectoryForDeletion(volume.getVolume(), bucket.getBucketName(), dirKey, dirInfo);
-            }
-          } else {
-            unreachableStats.addDir();
-          }
-        }
-      }
-    }
-
-    // Check for unreachable and unreferenced files
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-             fileIterator = fileTable.iterator()) {
-      fileIterator.seek(bucketPrefix);
-      while (fileIterator.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> fileEntry = fileIterator.next();
-        String fileKey = fileEntry.getKey();
-        // Only search files in this bucket.
-        if (!fileKey.startsWith(bucketPrefix)) {
-          break;
-        }
-
-        OmKeyInfo fileInfo = fileEntry.getValue();
-        if (!isReachable(fileKey)) {
-          if (!isFileKeyInDeletedTable(fileKey)) {
-            System.out.println("Found unreferenced file: " + fileKey);
-            unreferencedStats.addFile(fileInfo.getDataSize());
-
-            if (!repair) {
-              if (verbose) {
-                System.out.println("Marking unreferenced file " + fileKey + " for deletion." + fileKey);
-              }
-            } else {
-              System.out.println("Deleting unreferenced file " + fileKey);
-              markFileForDeletion(fileKey, fileInfo);
-            }
-          } else {
-            unreachableStats.addFile(fileInfo.getDataSize());
-          }
+    private void processBucket(OmVolumeArgs volume, OmBucketInfo bucketInfo) throws IOException {
+      System.out.println("Processing bucket: " + volume.getVolume() + "/" + bucketInfo.getBucketName());
+      if (checkIfSnapshotExistsForBucket(volume.getVolume(), bucketInfo.getBucketName())) {
+        if (!repair) {
+          System.out.println(
+              "Snapshot detected in bucket '" + volume.getVolume() + "/" + bucketInfo.getBucketName() + "'. ");
         } else {
-          // NOTE: We are deserializing the proto of every reachable file
-          // just to log it's size. If we don't need this information we could
-          // save time by skipping this step.
-          reachableStats.addFile(fileInfo.getDataSize());
+          System.out.println(
+              "Skipping repair for bucket '" + volume.getVolume() + "/" + bucketInfo.getBucketName() + "' " +
+                  "due to snapshot presence.");
+          return;
+        }
+      }
+      markReachableObjectsInBucket(volume, bucketInfo);
+      handleUnreachableAndUnreferencedObjects(volume, bucketInfo);
+    }
+
+    private Report buildReportAndLog() {
+      Report report = new Report.Builder()
+          .setReachable(reachableStats)
+          .setUnreachable(unreachableStats)
+          .setUnreferenced(unreferencedStats)
+          .build();
+
+      System.out.println("\n" + report);
+      return report;
+    }
+
+    private void markReachableObjectsInBucket(OmVolumeArgs volume, OmBucketInfo bucket) throws IOException {
+      // Only put directories in the stack.
+      // Directory keys should have the form /volumeID/bucketID/parentID/name.
+      Stack<String> dirKeyStack = new Stack<>();
+
+      // Since the tool uses parent directories to check for reachability, add
+      // a reachable entry for the bucket as well.
+      addReachableEntry(volume, bucket, bucket);
+      // Initialize the stack with all immediate child directories of the
+      // bucket, and mark them all as reachable.
+      Collection<String> childDirs = getChildDirectoriesAndMarkAsReachable(volume, bucket, bucket);
+      dirKeyStack.addAll(childDirs);
+
+      while (!dirKeyStack.isEmpty()) {
+        // Get one directory and process its immediate children.
+        String currentDirKey = dirKeyStack.pop();
+        OmDirectoryInfo currentDir = directoryTable.get(currentDirKey);
+        if (currentDir == null) {
+          System.out.println("Directory key" + currentDirKey + "to be processed was not found in the directory table.");
+          continue;
+        }
+
+        // TODO revisit this for a more memory efficient implementation,
+        //  possibly making better use of RocksDB iterators.
+        childDirs = getChildDirectoriesAndMarkAsReachable(volume, bucket, currentDir);
+        dirKeyStack.addAll(childDirs);
+      }
+    }
+
+    private boolean isDirectoryInDeletedDirTable(String dirKey) throws IOException {
+      return deletedDirectoryTable.isExist(dirKey);
+    }
+
+    private boolean isFileKeyInDeletedTable(String fileKey) throws IOException {
+      return deletedTable.isExist(fileKey);
+    }
+
+    private void handleUnreachableAndUnreferencedObjects(OmVolumeArgs volume, OmBucketInfo bucket) throws IOException {
+      // Check for unreachable and unreferenced directories in the bucket.
+      String bucketPrefix = OM_KEY_PREFIX +
+          volume.getObjectID() +
+          OM_KEY_PREFIX +
+          bucket.getObjectID();
+
+      try (TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>> dirIterator =
+               directoryTable.iterator()) {
+        dirIterator.seek(bucketPrefix);
+        while (dirIterator.hasNext()) {
+          Table.KeyValue<String, OmDirectoryInfo> dirEntry = dirIterator.next();
+          String dirKey = dirEntry.getKey();
+
+          // Only search directories in this bucket.
+          if (!dirKey.startsWith(bucketPrefix)) {
+            break;
+          }
+
+          if (!isReachable(dirKey)) {
+            if (!isDirectoryInDeletedDirTable(dirKey)) {
+              System.out.println("Found unreferenced directory: " + dirKey);
+              unreferencedStats.addDir();
+
+              if (!repair) {
+                if (verbose) {
+                  System.out.println("Marking unreferenced directory " + dirKey + " for deletion.");
+                }
+              } else {
+                System.out.println("Deleting unreferenced directory " + dirKey);
+                OmDirectoryInfo dirInfo = dirEntry.getValue();
+                markDirectoryForDeletion(volume.getVolume(), bucket.getBucketName(), dirKey, dirInfo);
+              }
+            } else {
+              unreachableStats.addDir();
+            }
+          }
+        }
+      }
+
+      // Check for unreachable and unreferenced files
+      try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+               fileIterator = fileTable.iterator()) {
+        fileIterator.seek(bucketPrefix);
+        while (fileIterator.hasNext()) {
+          Table.KeyValue<String, OmKeyInfo> fileEntry = fileIterator.next();
+          String fileKey = fileEntry.getKey();
+          // Only search files in this bucket.
+          if (!fileKey.startsWith(bucketPrefix)) {
+            break;
+          }
+
+          OmKeyInfo fileInfo = fileEntry.getValue();
+          if (!isReachable(fileKey)) {
+            if (!isFileKeyInDeletedTable(fileKey)) {
+              System.out.println("Found unreferenced file: " + fileKey);
+              unreferencedStats.addFile(fileInfo.getDataSize());
+
+              if (!repair) {
+                if (verbose) {
+                  System.out.println("Marking unreferenced file " + fileKey + " for deletion." + fileKey);
+                }
+              } else {
+                System.out.println("Deleting unreferenced file " + fileKey);
+                markFileForDeletion(fileKey, fileInfo);
+              }
+            } else {
+              unreachableStats.addFile(fileInfo.getDataSize());
+            }
+          } else {
+            // NOTE: We are deserializing the proto of every reachable file
+            // just to log it's size. If we don't need this information we could
+            // save time by skipping this step.
+            reachableStats.addFile(fileInfo.getDataSize());
+          }
         }
       }
     }
-  }
 
-  protected void markFileForDeletion(String fileKey, OmKeyInfo fileInfo) throws IOException {
-    try (BatchOperation batch = store.initBatchOperation()) {
-      fileTable.deleteWithBatch(batch, fileKey);
+    protected void markFileForDeletion(String fileKey, OmKeyInfo fileInfo) throws IOException {
+      try (BatchOperation batch = store.initBatchOperation()) {
+        fileTable.deleteWithBatch(batch, fileKey);
 
-      RepeatedOmKeyInfo originalRepeatedKeyInfo = deletedTable.get(fileKey);
-      RepeatedOmKeyInfo updatedRepeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-          fileInfo, fileInfo.getUpdateID(), true);
-      // NOTE: The FSO code seems to write the open key entry with the whole
-      // path, using the object's names instead of their ID. This would only
-      // be possible when the file is deleted explicitly, and not part of a
-      // directory delete. It is also not possible here if the file's parent
-      // is gone. The name of the key does not matter so just use IDs.
-      deletedTable.putWithBatch(batch, fileKey, updatedRepeatedOmKeyInfo);
-      if (verbose) {
-        System.out.println("Added entry " + fileKey + " to open key table: " + updatedRepeatedOmKeyInfo);
-      }
-      store.commitBatchOperation(batch);
-    }
-  }
-
-  protected void markDirectoryForDeletion(String volumeName, String bucketName,
-                                        String dirKeyName, OmDirectoryInfo dirInfo) throws IOException {
-    try (BatchOperation batch = store.initBatchOperation()) {
-      directoryTable.deleteWithBatch(batch, dirKeyName);
-      // HDDS-7592: Make directory entries in deleted dir table unique.
-      String deleteDirKeyName = dirKeyName + OM_KEY_PREFIX + dirInfo.getObjectID();
-
-      // Convert the directory to OmKeyInfo for deletion.
-      OmKeyInfo dirAsKeyInfo = OMFileRequest.getOmKeyInfo(volumeName, bucketName, dirInfo, dirInfo.getName());
-      deletedDirectoryTable.putWithBatch(batch, deleteDirKeyName, dirAsKeyInfo);
-
-      store.commitBatchOperation(batch);
-    }
-  }
-
-  private Collection<String> getChildDirectoriesAndMarkAsReachable(OmVolumeArgs volume, OmBucketInfo bucket,
-                                                                   WithObjectID currentDir) throws IOException {
-
-    Collection<String> childDirs = new ArrayList<>();
-
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
-             dirIterator = directoryTable.iterator()) {
-      String dirPrefix = buildReachableKey(volume, bucket, currentDir);
-      // Start searching the directory table at the current directory's
-      // prefix to get its immediate children.
-      dirIterator.seek(dirPrefix);
-      while (dirIterator.hasNext()) {
-        Table.KeyValue<String, OmDirectoryInfo> childDirEntry = dirIterator.next();
-        String childDirKey = childDirEntry.getKey();
-        // Stop processing once we have seen all immediate children of this
-        // directory.
-        if (!childDirKey.startsWith(dirPrefix)) {
-          break;
+        RepeatedOmKeyInfo originalRepeatedKeyInfo = deletedTable.get(fileKey);
+        RepeatedOmKeyInfo updatedRepeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
+            fileInfo, fileInfo.getUpdateID(), true);
+        // NOTE: The FSO code seems to write the open key entry with the whole
+        // path, using the object's names instead of their ID. This would only
+        // be possible when the file is deleted explicitly, and not part of a
+        // directory delete. It is also not possible here if the file's parent
+        // is gone. The name of the key does not matter so just use IDs.
+        deletedTable.putWithBatch(batch, fileKey, updatedRepeatedOmKeyInfo);
+        if (verbose) {
+          System.out.println("Added entry " + fileKey + " to open key table: " + updatedRepeatedOmKeyInfo);
         }
-        // This directory was reached by search.
-        addReachableEntry(volume, bucket, childDirEntry.getValue());
-        childDirs.add(childDirKey);
-        reachableStats.addDir();
+        store.commitBatchOperation(batch);
       }
     }
 
-    return childDirs;
-  }
+    protected void markDirectoryForDeletion(String volumeName, String bucketName,
+        String dirKeyName, OmDirectoryInfo dirInfo) throws IOException {
+      try (BatchOperation batch = store.initBatchOperation()) {
+        directoryTable.deleteWithBatch(batch, dirKeyName);
+        // HDDS-7592: Make directory entries in deleted dir table unique.
+        String deleteDirKeyName = dirKeyName + OM_KEY_PREFIX + dirInfo.getObjectID();
 
-  /**
-   * Add the specified object to the reachable table, indicating it is part
-   * of the connected FSO tree.
-   */
-  private void addReachableEntry(OmVolumeArgs volume, OmBucketInfo bucket, WithObjectID object) throws IOException {
-    String reachableKey = buildReachableKey(volume, bucket, object);
-    // No value is needed for this table.
-    reachableDB.getTable(REACHABLE_TABLE, String.class, byte[].class).put(reachableKey, new byte[]{});
-  }
+        // Convert the directory to OmKeyInfo for deletion.
+        OmKeyInfo dirAsKeyInfo = OMFileRequest.getOmKeyInfo(volumeName, bucketName, dirInfo, dirInfo.getName());
+        deletedDirectoryTable.putWithBatch(batch, deleteDirKeyName, dirAsKeyInfo);
 
-  /**
-   *
-   * @param fileOrDirKey The key of a file or directory in RocksDB.
-   * @return true if the entry's parent is in the reachable table.
-   */
-  protected boolean isReachable(String fileOrDirKey) throws IOException {
-    String reachableParentKey = buildReachableParentKey(fileOrDirKey);
-
-    return reachableDB.getTable(REACHABLE_TABLE, String.class, byte[].class).get(reachableParentKey) != null;
-  }
-
-  private void openReachableDB() throws IOException {
-    File reachableDBFile = new File(new File(omDBPath).getParentFile(), "reachable.db");
-    System.out.println("Creating database of reachable directories at " + reachableDBFile);
-    // Delete the DB from the last run if it exists.
-    if (reachableDBFile.exists()) {
-      FileUtils.deleteDirectory(reachableDBFile);
+        store.commitBatchOperation(batch);
+      }
     }
 
-    ConfigurationSource conf = new OzoneConfiguration();
-    reachableDB = DBStoreBuilder.newBuilder(conf)
-        .setName("reachable.db")
-        .setPath(reachableDBFile.getParentFile().toPath())
-        .addTable(REACHABLE_TABLE)
-        .build();
-  }
+    private Collection<String> getChildDirectoriesAndMarkAsReachable(OmVolumeArgs volume, OmBucketInfo bucket,
+        WithObjectID currentDir) throws IOException {
 
-  private void closeReachableDB() throws IOException {
-    if (reachableDB != null) {
-      reachableDB.close();
+      Collection<String> childDirs = new ArrayList<>();
+
+      try (TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
+               dirIterator = directoryTable.iterator()) {
+        String dirPrefix = buildReachableKey(volume, bucket, currentDir);
+        // Start searching the directory table at the current directory's
+        // prefix to get its immediate children.
+        dirIterator.seek(dirPrefix);
+        while (dirIterator.hasNext()) {
+          Table.KeyValue<String, OmDirectoryInfo> childDirEntry = dirIterator.next();
+          String childDirKey = childDirEntry.getKey();
+          // Stop processing once we have seen all immediate children of this
+          // directory.
+          if (!childDirKey.startsWith(dirPrefix)) {
+            break;
+          }
+          // This directory was reached by search.
+          addReachableEntry(volume, bucket, childDirEntry.getValue());
+          childDirs.add(childDirKey);
+          reachableStats.addDir();
+        }
+      }
+
+      return childDirs;
     }
-    File reachableDBFile = new File(new File(omDBPath).getParentFile(), "reachable.db");
-    if (reachableDBFile.exists()) {
-      FileUtils.deleteDirectory(reachableDBFile);
+
+    /**
+     * Add the specified object to the reachable table, indicating it is part
+     * of the connected FSO tree.
+     */
+    private void addReachableEntry(OmVolumeArgs volume, OmBucketInfo bucket, WithObjectID object) throws IOException {
+      String reachableKey = buildReachableKey(volume, bucket, object);
+      // No value is needed for this table.
+      reachableDB.getTable(REACHABLE_TABLE, String.class, byte[].class).put(reachableKey, new byte[]{});
+    }
+
+    /**
+     * @param fileOrDirKey The key of a file or directory in RocksDB.
+     * @return true if the entry's parent is in the reachable table.
+     */
+    protected boolean isReachable(String fileOrDirKey) throws IOException {
+      String reachableParentKey = buildReachableParentKey(fileOrDirKey);
+
+      return reachableDB.getTable(REACHABLE_TABLE, String.class, byte[].class).get(reachableParentKey) != null;
+    }
+
+    private void openReachableDB() throws IOException {
+      File reachableDBFile = new File(new File(omDBPath).getParentFile(), "reachable.db");
+      System.out.println("Creating database of reachable directories at " + reachableDBFile);
+      // Delete the DB from the last run if it exists.
+      if (reachableDBFile.exists()) {
+        FileUtils.deleteDirectory(reachableDBFile);
+      }
+
+      ConfigurationSource conf = new OzoneConfiguration();
+      reachableDB = DBStoreBuilder.newBuilder(conf)
+          .setName("reachable.db")
+          .setPath(reachableDBFile.getParentFile().toPath())
+          .addTable(REACHABLE_TABLE)
+          .build();
+    }
+
+    private void closeReachableDB() throws IOException {
+      if (reachableDB != null) {
+        reachableDB.close();
+      }
+      File reachableDBFile = new File(new File(omDBPath).getParentFile(), "reachable.db");
+      if (reachableDBFile.exists()) {
+        FileUtils.deleteDirectory(reachableDBFile);
+      }
     }
   }
 
