@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -104,15 +105,15 @@ public class ChunkManagerDispatcher implements ChunkManager {
   }
 
   @Override
-  public ChunkBuffer readChunk(Container container, BlockID blockID,
+  public ChunkBufferToByteString readChunk(Container container, BlockID blockID,
       ChunkInfo info, DispatcherContext dispatcherContext)
       throws StorageContainerException {
 
-    ChunkBuffer data = selectHandler(container)
+    final ChunkBufferToByteString data = selectHandler(container)
         .readChunk(container, blockID, info, dispatcherContext);
 
     Preconditions.checkState(data != null);
-    container.getContainerData().updateReadStats(data.remaining());
+    container.getContainerData().updateReadStats(info.getLen());
 
     return data;
   }

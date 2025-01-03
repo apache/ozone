@@ -65,6 +65,7 @@ public class BlockManagerImpl implements BlockManager {
   private final int defaultReadBufferCapacity;
   private final int readMappedBufferThreshold;
   private final int readMappedBufferMaxCount;
+  private final boolean readNettyChunkedNioFile;
 
   /**
    * Constructs a Block Manager.
@@ -83,6 +84,9 @@ public class BlockManagerImpl implements BlockManager {
     this.readMappedBufferMaxCount = config.getInt(
         ScmConfigKeys.OZONE_CHUNK_READ_MAPPED_BUFFER_MAX_COUNT_KEY,
         ScmConfigKeys.OZONE_CHUNK_READ_MAPPED_BUFFER_MAX_COUNT_DEFAULT);
+    this.readNettyChunkedNioFile = config.getBoolean(
+        ScmConfigKeys.OZONE_CHUNK_READ_NETTY_CHUNKED_NIO_FILE_KEY,
+        ScmConfigKeys.OZONE_CHUNK_READ_NETTY_CHUNKED_NIO_FILE_DEFAULT);
   }
 
   @Override
@@ -304,13 +308,19 @@ public class BlockManagerImpl implements BlockManager {
     return defaultReadBufferCapacity;
   }
 
+  @Override
   public int getReadMappedBufferThreshold() {
     return readMappedBufferThreshold;
   }
 
-  /** @return the max count of memory mapped buffers for read. */
+  @Override
   public int getReadMappedBufferMaxCount() {
     return readMappedBufferMaxCount;
+  }
+
+  @Override
+  public boolean isReadNettyChunkedNioFile() {
+    return readNettyChunkedNioFile;
   }
 
   /**

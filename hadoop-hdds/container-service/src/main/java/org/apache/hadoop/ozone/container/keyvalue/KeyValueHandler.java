@@ -59,6 +59,7 @@ import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -799,7 +800,8 @@ public class KeyValueHandler extends Handler {
       }
       return malformedRequest(request);
     }
-    ChunkBuffer data;
+
+    final ChunkBufferToByteString data;
     try {
       BlockID blockID = BlockID.getFromProtobuf(
           request.getReadChunk().getBlockID());
@@ -861,11 +863,16 @@ public class KeyValueHandler extends Handler {
         "using BlockDeletingService");
   }
 
-  private void validateChunkChecksumData(ChunkBuffer data, ChunkInfo info)
+  private void validateChunkChecksumData(ChunkBufferToByteString data, ChunkInfo info)
       throws StorageContainerException {
     if (validateChunkChecksumData) {
       try {
-        Checksum.verifyChecksum(data.duplicate(data.position(), data.limit()), info.getChecksumData(), 0);
+        if (data instanceof ChunkBuffer) {
+          final ChunkBuffer b = (ChunkBuffer)data;
+          Checksum.verifyChecksum(b.duplicate(b.position(), b.limit()), info.getChecksumData(), 0);
+        } else {
+          Checksum.verifyChecksum(data.toByteString(byteBufferToByteString), info.getChecksumData(), 0);
+        }
       } catch (OzoneChecksumException ex) {
         throw ChunkUtils.wrapInStorageContainerException(ex);
       }
@@ -1058,8 +1065,8 @@ public class KeyValueHandler extends Handler {
           // of ByteStrings.
           chunkInfo.setReadDataIntoSingleBuffer(true);
         }
-        ChunkBuffer data = chunkManager.readChunk(kvContainer, blockID,
-            chunkInfo, dispatcherContext);
+        final ChunkBufferToByteString data = chunkManager.readChunk(
+            kvContainer, blockID, chunkInfo, dispatcherContext);
         dataBuffers.addAll(data.toByteStringList(byteBufferToByteString));
         chunkInfoProto = chunk;
       }

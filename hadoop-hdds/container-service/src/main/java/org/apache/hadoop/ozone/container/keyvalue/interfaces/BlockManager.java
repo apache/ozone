@@ -102,6 +102,9 @@ public interface BlockManager {
   /** @return the max count of memory mapped buffers to read. */
   int getReadMappedBufferMaxCount();
 
+  /** @return true iff Netty ChunkedNioFile read is enabled. */
+  boolean isReadNettyChunkedNioFile();
+
   /**
    * Shutdown ContainerManager.
    */
