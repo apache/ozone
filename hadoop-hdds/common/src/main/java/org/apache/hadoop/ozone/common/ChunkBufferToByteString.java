@@ -36,6 +36,10 @@ public interface ChunkBufferToByteString {
     return new ChunkBufferToByteStringByByteBufs(buffers);
   }
 
+  /** Release the underlying */
+  default void release() {
+  }
+
   /**
    * Convert this buffer to a {@link ByteString}.
    * The position and limit of this {@link ChunkBufferToByteString}

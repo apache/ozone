@@ -35,7 +35,7 @@ class ChunkBufferToByteStringByByteBufs implements ChunkBufferToByteString {
   private final List<ByteBuf> buffers;
 
   private volatile List<ByteString> byteStrings;
-  private volatile ByteString byteString;
+  private volatile ByteString concatenated;
 
   ChunkBufferToByteStringByByteBufs(List<ByteBuf> buffers) {
     this.buffers = buffers == null || buffers.isEmpty() ?
@@ -43,38 +43,55 @@ class ChunkBufferToByteStringByByteBufs implements ChunkBufferToByteString {
   }
 
   @Override
-  public ByteString toByteStringImpl(Function<ByteBuffer, ByteString> f) {
-    if (byteString != null) {
-      return byteString;
+  public void release() {
+    for (ByteBuf buf : buffers) {
+      buf.release();
     }
-    initByteStrings(f);
-    return Objects.requireNonNull(byteString, "byteString == null");
   }
 
   @Override
-  public List<ByteString> toByteStringListImpl(
-      Function<ByteBuffer, ByteString> f) {
+  public ByteString toByteStringImpl(Function<ByteBuffer, ByteString> f) {
+    if (concatenated != null) {
+      return concatenated;
+    }
+    initByteStrings(f);
+    return Objects.requireNonNull(concatenated, "concatenated == null");
+  }
+
+  @Override
+  public List<ByteString> toByteStringListImpl(Function<ByteBuffer, ByteString> f) {
     if (byteStrings != null) {
       return byteStrings;
     }
     return initByteStrings(f);
   }
 
-  private synchronized List<ByteString> initByteStrings(
-      Function<ByteBuffer, ByteString> f) {
+  private synchronized List<ByteString> initByteStrings(Function<ByteBuffer, ByteString> f) {
     if (byteStrings != null) {
       return byteStrings;
     }
-
-    byteStrings = new ArrayList<>();
-    byteString = ByteString.EMPTY;
-    for (ByteBuf buf : buffers) {
-      final ByteString s = f.apply(buf.nioBuffer());
-      buf.release();
-      byteStrings.add(s);
-      byteString = byteString.concat(s);
+    if (buffers.isEmpty()) {
+      byteStrings = Collections.emptyList();
+      concatenated = ByteString.EMPTY;
+      return byteStrings;
     }
+
+    final List<ByteString> array = new ArrayList<>();
+    concatenated = convert(buffers, array, f);
+    byteStrings = Collections.unmodifiableList(array);
     return byteStrings;
+  }
+
+  static ByteString convert(List<ByteBuf> bufs, List<ByteString> byteStrings, Function<ByteBuffer, ByteString> f) {
+    ByteString concatenated = ByteString.EMPTY;
+    for (ByteBuf buf : bufs) {
+      for(ByteBuffer b : buf.nioBuffers()) {
+        final ByteString s = f.apply(b);
+        byteStrings.add(s);
+        concatenated = concatenated.concat(s);
+      }
+    }
+    return concatenated;
   }
 
   @Override

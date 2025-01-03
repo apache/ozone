@@ -279,8 +279,8 @@ public class FilePerChunkStrategy implements ChunkManager {
         if (file.exists()) {
           long offset = info.getOffset() - chunkFileOffset;
           Preconditions.checkState(offset >= 0);
-          if (readNettyChunkedNioFile) {
-            return ChunkUtils.readData(file, bufferCapacity, offset, len, volume);
+          if (readNettyChunkedNioFile && dispatcherContext != null && dispatcherContext.isReleaseSupported()) {
+            return ChunkUtils.readData(file, bufferCapacity, offset, len, volume, dispatcherContext);
           }
           return ChunkUtils.readData(len, bufferCapacity, file, offset, volume,
               readMappedBufferThreshold, readMappedBufferMaxCount > 0, mappedBufferManager);

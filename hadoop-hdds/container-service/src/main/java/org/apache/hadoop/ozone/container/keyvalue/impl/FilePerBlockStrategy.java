@@ -210,8 +210,8 @@ public class FilePerBlockStrategy implements ChunkManager {
     int bufferCapacity = ChunkManager.getBufferCapacityForChunkRead(info,
         defaultReadBufferCapacity);
 
-    if (readNettyChunkedNioFile) {
-      return ChunkUtils.readData(chunkFile, bufferCapacity, offset, len, volume);
+    if (readNettyChunkedNioFile && dispatcherContext != null && dispatcherContext.isReleaseSupported()) {
+      return ChunkUtils.readData(chunkFile, bufferCapacity, offset, len, volume, dispatcherContext);
     }
     return ChunkUtils.readData(len, bufferCapacity, chunkFile, offset, volume,
         readMappedBufferThreshold, readMappedBufferMaxCount > 0, mappedBufferManager);

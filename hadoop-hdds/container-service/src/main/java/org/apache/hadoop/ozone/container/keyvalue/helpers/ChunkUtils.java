@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.impl.MappedBufferManager;
 import org.apache.hadoop.util.Time;
@@ -312,11 +313,13 @@ public final class ChunkUtils {
   }
 
   public static ChunkBufferToByteString readData(File file, long chunkSize,
-      long offset, long length, HddsVolume volume)
+      long offset, long length, HddsVolume volume, DispatcherContext context)
       throws StorageContainerException {
     final List<ByteBuf> buffers = readDataNettyChunkedNioFile(
         file, Math.toIntExact(chunkSize), offset, length, volume);
-    return ChunkBufferToByteString.wrap(buffers);
+    final ChunkBufferToByteString b = ChunkBufferToByteString.wrap(buffers);
+    context.setReleaseMethod(b::release);
+    return b;
   }
 
   /**
