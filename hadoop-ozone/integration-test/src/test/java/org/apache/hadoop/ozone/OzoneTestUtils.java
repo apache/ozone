@@ -165,7 +165,7 @@ public final class OzoneTestUtils {
   /**
    * Flush deleted block log & wait till something was flushed.
    */
-  public static void waitForDeletedBlockLog(StorageContainerManager scm)
+  public static void flushAndWaitForDeletedBlockLog(StorageContainerManager scm)
       throws InterruptedException, TimeoutException {
     GenericTestUtils.waitFor(() -> {
       try {

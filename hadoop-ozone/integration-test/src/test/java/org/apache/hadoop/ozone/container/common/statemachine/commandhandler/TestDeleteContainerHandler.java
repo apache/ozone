@@ -198,7 +198,7 @@ public class TestDeleteContainerHandler {
     // Delete key, which will make isEmpty flag to true in containerData
     objectStore.getVolume(volumeName)
         .getBucket(bucketName).deleteKey(keyName);
-    OzoneTestUtils.waitForDeletedBlockLog(cluster.getStorageContainerManager());
+    OzoneTestUtils.flushAndWaitForDeletedBlockLog(cluster.getStorageContainerManager());
     OzoneTestUtils.waitBlockDeleted(cluster.getStorageContainerManager());
 
     // Ensure isEmpty flag is true when key is deleted and container is empty
@@ -317,7 +317,7 @@ public class TestDeleteContainerHandler {
     // Delete key, which will make isEmpty flag to true in containerData
     objectStore.getVolume(volumeName)
         .getBucket(bucketName).deleteKey(keyName);
-    OzoneTestUtils.waitForDeletedBlockLog(cluster.getStorageContainerManager());
+    OzoneTestUtils.flushAndWaitForDeletedBlockLog(cluster.getStorageContainerManager());
     OzoneTestUtils.waitBlockDeleted(cluster.getStorageContainerManager());
 
     // Ensure isEmpty flag is true when key is deleted and container is empty
@@ -658,7 +658,7 @@ public class TestDeleteContainerHandler {
     // Delete key, which will make isEmpty flag to true in containerData
     objectStore.getVolume(volumeName)
         .getBucket(bucketName).deleteKey(keyName);
-    OzoneTestUtils.waitForDeletedBlockLog(cluster.getStorageContainerManager());
+    OzoneTestUtils.flushAndWaitForDeletedBlockLog(cluster.getStorageContainerManager());
     OzoneTestUtils.waitBlockDeleted(cluster.getStorageContainerManager());
 
     // Ensure isEmpty flag is true when key is deleted

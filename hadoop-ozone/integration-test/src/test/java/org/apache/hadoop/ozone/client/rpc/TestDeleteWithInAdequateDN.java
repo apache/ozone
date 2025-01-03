@@ -285,7 +285,7 @@ public class TestDeleteWithInAdequateDN {
     //cluster.getOzoneManager().deleteKey(keyArgs);
     client.getObjectStore().getVolume(volumeName).getBucket(bucketName).
         deleteKey("ratis");
-    OzoneTestUtils.waitForDeletedBlockLog(cluster.getStorageContainerManager());
+    OzoneTestUtils.flushAndWaitForDeletedBlockLog(cluster.getStorageContainerManager());
     // make sure the chunk was never deleted on the leader even though
     // deleteBlock handler is invoked
 

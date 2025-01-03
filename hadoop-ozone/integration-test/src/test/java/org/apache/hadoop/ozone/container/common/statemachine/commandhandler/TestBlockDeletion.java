@@ -827,18 +827,7 @@ public class TestBlockDeletion {
     }
 
     // Wait for block delete command sent from OM
-    GenericTestUtils.waitFor(() -> {
-      try {
-        scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
-        if (scm.getScmBlockManager().getDeletedBlockLog()
-            .getNumOfValidTransactions() > 0) {
-          return true;
-        }
-      } catch (IOException e) {
-      }
-      return false;
-    }, 100, 5000);
-
+    OzoneTestUtils.flushAndWaitForDeletedBlockLog(scm);
     long start = System.currentTimeMillis();
     // Wait for all blocks been deleted.
     GenericTestUtils.waitFor(() -> {
