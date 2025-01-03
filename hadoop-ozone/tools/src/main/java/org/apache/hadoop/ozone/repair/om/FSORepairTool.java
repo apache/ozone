@@ -71,6 +71,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
  */
 public class FSORepairTool {
   public static final Logger LOG = LoggerFactory.getLogger(FSORepairTool.class);
+  private static final String REACHABLE_TABLE = "reachable";
 
   private final String omDBPath;
   private final DBStore store;
@@ -83,7 +84,6 @@ public class FSORepairTool {
   private final Table<String, SnapshotInfo> snapshotInfoTable;
   private final String volumeFilter;
   private final String bucketFilter;
-  private static final String REACHABLE_TABLE = "reachable";
   private DBStore reachableDB;
   private final ReportStatistics reachableStats;
   private final ReportStatistics unreachableStats;
@@ -132,16 +132,6 @@ public class FSORepairTool {
     snapshotInfoTable = store.getTable(OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE,
         String.class,
         SnapshotInfo.class);
-  }
-
-  protected static DBStore getStoreFromPath(String dbPath) throws IOException {
-    File omDBFile = new File(dbPath);
-    if (!omDBFile.exists() || !omDBFile.isDirectory()) {
-      throw new IOException(String.format("Specified OM DB instance %s does " +
-          "not exist or is not a RocksDB directory.", dbPath));
-    }
-    // Load RocksDB and tables needed.
-    return OmMetadataManagerImpl.loadDB(new OzoneConfiguration(), new File(dbPath).getParentFile(), -1);
   }
 
   public FSORepairTool.Report run() throws Exception {
@@ -468,19 +458,6 @@ public class FSORepairTool {
   }
 
   /**
-   * Build an entry in the reachable table for the current object, which
-   * could be a bucket, file or directory.
-   */
-  private static String buildReachableKey(OmVolumeArgs volume, OmBucketInfo bucket, WithObjectID object) {
-    return OM_KEY_PREFIX +
-        volume.getObjectID() +
-        OM_KEY_PREFIX +
-        bucket.getObjectID() +
-        OM_KEY_PREFIX +
-        object.getObjectID();
-  }
-
-  /**
    *
    * @param fileOrDirKey The key of a file or directory in RocksDB.
    * @return true if the entry's parent is in the reachable table.
@@ -489,27 +466,6 @@ public class FSORepairTool {
     String reachableParentKey = buildReachableParentKey(fileOrDirKey);
 
     return reachableDB.getTable(REACHABLE_TABLE, String.class, byte[].class).get(reachableParentKey) != null;
-  }
-
-  /**
-   * Build an entry in the reachable table for the current object's parent
-   * object. The object could be a file or directory.
-   */
-  private static String buildReachableParentKey(String fileOrDirKey) {
-    String[] keyParts = fileOrDirKey.split(OM_KEY_PREFIX);
-    // Should be /volID/bucketID/parentID/name
-    // The first part will be blank since key begins with a slash.
-    Preconditions.assertTrue(keyParts.length >= 4);
-    String volumeID = keyParts[1];
-    String bucketID = keyParts[2];
-    String parentID = keyParts[3];
-
-    return OM_KEY_PREFIX +
-        volumeID +
-        OM_KEY_PREFIX +
-        bucketID +
-        OM_KEY_PREFIX +
-        parentID;
   }
 
   private void openReachableDB() throws IOException {
@@ -536,6 +492,50 @@ public class FSORepairTool {
     if (reachableDBFile.exists()) {
       FileUtils.deleteDirectory(reachableDBFile);
     }
+  }
+
+  protected static DBStore getStoreFromPath(String dbPath) throws IOException {
+    File omDBFile = new File(dbPath);
+    if (!omDBFile.exists() || !omDBFile.isDirectory()) {
+      throw new IOException(String.format("Specified OM DB instance %s does " +
+          "not exist or is not a RocksDB directory.", dbPath));
+    }
+    // Load RocksDB and tables needed.
+    return OmMetadataManagerImpl.loadDB(new OzoneConfiguration(), new File(dbPath).getParentFile(), -1);
+  }
+
+  /**
+   * Build an entry in the reachable table for the current object, which
+   * could be a bucket, file or directory.
+   */
+  private static String buildReachableKey(OmVolumeArgs volume, OmBucketInfo bucket, WithObjectID object) {
+    return OM_KEY_PREFIX +
+        volume.getObjectID() +
+        OM_KEY_PREFIX +
+        bucket.getObjectID() +
+        OM_KEY_PREFIX +
+        object.getObjectID();
+  }
+
+  /**
+   * Build an entry in the reachable table for the current object's parent
+   * object. The object could be a file or directory.
+   */
+  private static String buildReachableParentKey(String fileOrDirKey) {
+    String[] keyParts = fileOrDirKey.split(OM_KEY_PREFIX);
+    // Should be /volID/bucketID/parentID/name
+    // The first part will be blank since key begins with a slash.
+    Preconditions.assertTrue(keyParts.length >= 4);
+    String volumeID = keyParts[1];
+    String bucketID = keyParts[2];
+    String parentID = keyParts[3];
+
+    return OM_KEY_PREFIX +
+        volumeID +
+        OM_KEY_PREFIX +
+        bucketID +
+        OM_KEY_PREFIX +
+        parentID;
   }
 
   /**
