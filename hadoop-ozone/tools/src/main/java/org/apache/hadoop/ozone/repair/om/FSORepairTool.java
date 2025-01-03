@@ -83,7 +83,7 @@ public class FSORepairTool extends RepairTool {
   @CommandLine.Option(names = {"--db"},
       required = true,
       description = "Path to OM RocksDB")
-  private String dbPath;
+  private String omDBPath;
 
   @CommandLine.Option(names = {"-r", "--repair"},
       defaultValue = "false",
@@ -92,11 +92,11 @@ public class FSORepairTool extends RepairTool {
 
   @CommandLine.Option(names = {"-v", "--volume"},
       description = "Filter by volume name. Add '/' before the volume name.")
-  private String volume;
+  private String volumeFilter;
 
   @CommandLine.Option(names = {"-b", "--bucket"},
       description = "Filter by bucket name")
-  private String bucket;
+  private String bucketFilter;
 
   @CommandLine.Option(names = {"--verbose"},
       description = "Verbose output. Show all intermediate steps and deleted keys info.")
@@ -113,7 +113,7 @@ public class FSORepairTool extends RepairTool {
       info("FSO Repair Tool is running in debug mode");
     }
     try {
-      Impl repairTool = new Impl(dbPath, repair, volume, bucket, verbose);
+      Impl repairTool = new Impl();
       repairTool.run();
     } catch (Exception ex) {
       throw new IllegalArgumentException("FSO repair failed: " + ex.getMessage());
@@ -124,9 +124,8 @@ public class FSORepairTool extends RepairTool {
     }
   }
 
-  private static class Impl {
+  private class Impl {
 
-    private final String omDBPath;
     private final DBStore store;
     private final Table<String, OmVolumeArgs> volumeTable;
     private final Table<String, OmBucketInfo> bucketTable;
@@ -135,27 +134,17 @@ public class FSORepairTool extends RepairTool {
     private final Table<String, OmKeyInfo> deletedDirectoryTable;
     private final Table<String, RepeatedOmKeyInfo> deletedTable;
     private final Table<String, SnapshotInfo> snapshotInfoTable;
-    private final String volumeFilter;
-    private final String bucketFilter;
     private DBStore reachableDB;
     private final ReportStatistics reachableStats;
     private final ReportStatistics unreachableStats;
     private final ReportStatistics unreferencedStats;
-    private final boolean repair;
-    private final boolean verbose;
 
-    public Impl(String dbPath, boolean repair, String volume, String bucket, boolean verbose)
-        throws IOException {
+    public Impl() throws IOException {
       this.reachableStats = new ReportStatistics(0, 0, 0);
       this.unreachableStats = new ReportStatistics(0, 0, 0);
       this.unreferencedStats = new ReportStatistics(0, 0, 0);
 
-      this.store = getStoreFromPath(dbPath);
-      this.omDBPath = dbPath;
-      this.repair = repair;
-      this.volumeFilter = volume;
-      this.bucketFilter = bucket;
-      this.verbose = verbose;
+      this.store = getStoreFromPath(omDBPath);
       volumeTable = store.getTable(OmMetadataManagerImpl.VOLUME_TABLE,
           String.class,
           OmVolumeArgs.class);
