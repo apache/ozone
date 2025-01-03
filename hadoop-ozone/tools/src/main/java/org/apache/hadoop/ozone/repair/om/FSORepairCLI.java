@@ -18,9 +18,8 @@
 
 package org.apache.hadoop.ozone.repair.om;
 
+import org.apache.hadoop.ozone.repair.RepairTool;
 import picocli.CommandLine;
-
-import java.util.concurrent.Callable;
 
 /**
  * Parser for scm.db file.
@@ -30,7 +29,7 @@ import java.util.concurrent.Callable;
     description = "Identify and repair a disconnected FSO tree by marking unreferenced entries for deletion. " +
         "OM should be stopped while this tool is run."
 )
-public class FSORepairCLI implements Callable<Void> {
+public class FSORepairCLI extends RepairTool {
 
   @CommandLine.Option(names = {"--db"},
       required = true,
@@ -55,11 +54,11 @@ public class FSORepairCLI implements Callable<Void> {
   private boolean verbose;
 
   @Override
-  public Void call() throws Exception {
+  public void execute() throws Exception {
     if (repair) {
-      System.out.println("FSO Repair Tool is running in repair mode");
+      info("FSO Repair Tool is running in repair mode");
     } else {
-      System.out.println("FSO Repair Tool is running in debug mode");
+      info("FSO Repair Tool is running in debug mode");
     }
     try {
       FSORepairTool
@@ -70,9 +69,7 @@ public class FSORepairCLI implements Callable<Void> {
     }
 
     if (verbose) {
-      System.out.println("FSO repair finished.");
+      info("FSO repair finished.");
     }
-
-    return null;
   }
 }
