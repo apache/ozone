@@ -40,6 +40,14 @@ if [ ! -d "$DIST_DIR" ]; then
     "$DIR/build.sh" -Pcoverage
 fi
 
+if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+  pushd hadoop-ozone/dist/target/ozone-*
+  sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
+  popd
+
+  OZONE_ACCEPTANCE_SUITE="$1"
+fi
+
 mkdir -p "$REPORT_DIR"
 
 if [[ "${OZONE_ACCEPTANCE_SUITE}" == "s3a" ]]; then
