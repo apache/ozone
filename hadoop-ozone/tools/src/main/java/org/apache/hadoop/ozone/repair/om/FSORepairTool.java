@@ -171,14 +171,14 @@ public class FSORepairTool extends RepairTool {
     public Report run() throws Exception {
       try {
         if (bucketFilter != null && volumeFilter == null) {
-          System.out.println("--bucket flag cannot be used without specifying --volume.");
+          error("--bucket flag cannot be used without specifying --volume.");
           return null;
         }
 
         if (volumeFilter != null) {
           OmVolumeArgs volumeArgs = volumeTable.getIfExist(volumeFilter);
           if (volumeArgs == null) {
-            System.out.println("Volume '" + volumeFilter + "' does not exist.");
+            error("Volume '" + volumeFilter + "' does not exist.");
             return null;
           }
         }
@@ -189,7 +189,7 @@ public class FSORepairTool extends RepairTool {
           try {
             openReachableDB();
           } catch (IOException e) {
-            System.out.println("Failed to open reachable database: " + e.getMessage());
+            error("Failed to open reachable database: " + e.getMessage());
             throw e;
           }
           while (volumeIterator.hasNext()) {
@@ -200,18 +200,18 @@ public class FSORepairTool extends RepairTool {
               continue;
             }
 
-            System.out.println("Processing volume: " + volumeKey);
+            info("Processing volume: " + volumeKey);
 
             if (bucketFilter != null) {
               OmBucketInfo bucketInfo = bucketTable.getIfExist(volumeKey + "/" + bucketFilter);
               if (bucketInfo == null) {
                 //Bucket does not exist in the volume
-                System.out.println("Bucket '" + bucketFilter + "' does not exist in volume '" + volumeKey + "'.");
+                error("Bucket '" + bucketFilter + "' does not exist in volume '" + volumeKey + "'.");
                 return null;
               }
 
               if (bucketInfo.getBucketLayout() != BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-                System.out.println("Skipping non-FSO bucket " + bucketFilter);
+                info("Skipping non-FSO bucket " + bucketFilter);
                 continue;
               }
 
@@ -228,7 +228,7 @@ public class FSORepairTool extends RepairTool {
                   OmBucketInfo bucketInfo = bucketEntry.getValue();
 
                   if (bucketInfo.getBucketLayout() != BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-                    System.out.println("Skipping non-FSO bucket " + bucketKey);
+                    info("Skipping non-FSO bucket " + bucketKey);
                     continue;
                   }
 
@@ -245,7 +245,7 @@ public class FSORepairTool extends RepairTool {
           }
         }
       } catch (IOException e) {
-        System.out.println("An error occurred while processing" + e.getMessage());
+        error("An error occurred while processing" + e.getMessage());
         throw e;
       } finally {
         closeReachableDB();
@@ -274,13 +274,13 @@ public class FSORepairTool extends RepairTool {
     }
 
     private void processBucket(OmVolumeArgs volume, OmBucketInfo bucketInfo) throws IOException {
-      System.out.println("Processing bucket: " + volume.getVolume() + "/" + bucketInfo.getBucketName());
+      info("Processing bucket: " + volume.getVolume() + "/" + bucketInfo.getBucketName());
       if (checkIfSnapshotExistsForBucket(volume.getVolume(), bucketInfo.getBucketName())) {
         if (!repair) {
-          System.out.println(
+          info(
               "Snapshot detected in bucket '" + volume.getVolume() + "/" + bucketInfo.getBucketName() + "'. ");
         } else {
-          System.out.println(
+          info(
               "Skipping repair for bucket '" + volume.getVolume() + "/" + bucketInfo.getBucketName() + "' " +
                   "due to snapshot presence.");
           return;
@@ -297,7 +297,7 @@ public class FSORepairTool extends RepairTool {
           .setUnreferenced(unreferencedStats)
           .build();
 
-      System.out.println("\n" + report);
+      info("\n" + report);
       return report;
     }
 
@@ -319,7 +319,7 @@ public class FSORepairTool extends RepairTool {
         String currentDirKey = dirKeyStack.pop();
         OmDirectoryInfo currentDir = directoryTable.get(currentDirKey);
         if (currentDir == null) {
-          System.out.println("Directory key" + currentDirKey + "to be processed was not found in the directory table.");
+          info("Directory key" + currentDirKey + "to be processed was not found in the directory table.");
           continue;
         }
 
@@ -359,15 +359,15 @@ public class FSORepairTool extends RepairTool {
 
           if (!isReachable(dirKey)) {
             if (!isDirectoryInDeletedDirTable(dirKey)) {
-              System.out.println("Found unreferenced directory: " + dirKey);
+              info("Found unreferenced directory: " + dirKey);
               unreferencedStats.addDir();
 
               if (!repair) {
                 if (verbose) {
-                  System.out.println("Marking unreferenced directory " + dirKey + " for deletion.");
+                  info("Marking unreferenced directory " + dirKey + " for deletion.");
                 }
               } else {
-                System.out.println("Deleting unreferenced directory " + dirKey);
+                info("Deleting unreferenced directory " + dirKey);
                 OmDirectoryInfo dirInfo = dirEntry.getValue();
                 markDirectoryForDeletion(volume.getVolume(), bucket.getBucketName(), dirKey, dirInfo);
               }
@@ -393,15 +393,15 @@ public class FSORepairTool extends RepairTool {
           OmKeyInfo fileInfo = fileEntry.getValue();
           if (!isReachable(fileKey)) {
             if (!isFileKeyInDeletedTable(fileKey)) {
-              System.out.println("Found unreferenced file: " + fileKey);
+              info("Found unreferenced file: " + fileKey);
               unreferencedStats.addFile(fileInfo.getDataSize());
 
               if (!repair) {
                 if (verbose) {
-                  System.out.println("Marking unreferenced file " + fileKey + " for deletion." + fileKey);
+                  info("Marking unreferenced file " + fileKey + " for deletion." + fileKey);
                 }
               } else {
-                System.out.println("Deleting unreferenced file " + fileKey);
+                info("Deleting unreferenced file " + fileKey);
                 markFileForDeletion(fileKey, fileInfo);
               }
             } else {
@@ -431,7 +431,7 @@ public class FSORepairTool extends RepairTool {
         // is gone. The name of the key does not matter so just use IDs.
         deletedTable.putWithBatch(batch, fileKey, updatedRepeatedOmKeyInfo);
         if (verbose) {
-          System.out.println("Added entry " + fileKey + " to open key table: " + updatedRepeatedOmKeyInfo);
+          info("Added entry " + fileKey + " to open key table: " + updatedRepeatedOmKeyInfo);
         }
         store.commitBatchOperation(batch);
       }
@@ -503,7 +503,7 @@ public class FSORepairTool extends RepairTool {
 
     private void openReachableDB() throws IOException {
       File reachableDBFile = new File(new File(omDBPath).getParentFile(), "reachable.db");
-      System.out.println("Creating database of reachable directories at " + reachableDBFile);
+      info("Creating database of reachable directories at " + reachableDBFile);
       // Delete the DB from the last run if it exists.
       if (reachableDBFile.exists()) {
         FileUtils.deleteDirectory(reachableDBFile);
