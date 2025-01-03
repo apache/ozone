@@ -36,7 +36,7 @@ public interface ChunkBufferToByteString {
     return new ChunkBufferToByteStringByByteBufs(buffers);
   }
 
-  /** Release the underlying */
+  /** Release the underlying resource. */
   default void release() {
   }
 

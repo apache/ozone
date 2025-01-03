@@ -85,7 +85,7 @@ class ChunkBufferToByteStringByByteBufs implements ChunkBufferToByteString {
   static ByteString convert(List<ByteBuf> bufs, List<ByteString> byteStrings, Function<ByteBuffer, ByteString> f) {
     ByteString concatenated = ByteString.EMPTY;
     for (ByteBuf buf : bufs) {
-      for(ByteBuffer b : buf.nioBuffers()) {
+      for (ByteBuffer b : buf.nioBuffers()) {
         final ByteString s = f.apply(b);
         byteStrings.add(s);
         concatenated = concatenated.concat(s);
