@@ -18,12 +18,9 @@
 
 package org.apache.hadoop.ozone.repair.ldb;
 
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.RepairSubcommand;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
-
-import java.util.concurrent.Callable;
 
 /**
  * Ozone Repair CLI for RocksDB.
@@ -35,10 +32,7 @@ import java.util.concurrent.Callable;
     },
     description = "Operational tool to repair RocksDB table.")
 @MetaInfServices(RepairSubcommand.class)
-public class RDBRepair implements Callable<Void>, RepairSubcommand {
-
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
+public class RDBRepair implements RepairSubcommand {
 
   @CommandLine.Option(names = {"--db"},
       required = true,
@@ -47,11 +41,5 @@ public class RDBRepair implements Callable<Void>, RepairSubcommand {
 
   public String getDbPath() {
     return dbPath;
-  }
-
-  @Override
-  public Void call() {
-    GenericCli.missingSubcommand(spec);
-    return null;
   }
 }

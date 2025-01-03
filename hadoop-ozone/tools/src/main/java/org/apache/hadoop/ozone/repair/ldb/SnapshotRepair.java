@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.repair.RepairTool;
 import org.apache.hadoop.ozone.shell.bucket.BucketUri;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -31,7 +32,6 @@ import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
-import picocli.CommandLine.Model.CommandSpec;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -40,7 +40,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.Callable;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_INFO_TABLE;
@@ -52,12 +51,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_INFO_TABLE;
     name = "snapshot",
     description = "CLI to update global and path previous snapshot for a snapshot in case snapshot chain is corrupted."
 )
-public class SnapshotRepair implements Callable<Void> {
+public class SnapshotRepair extends RepairTool {
 
   protected static final Logger LOG = LoggerFactory.getLogger(SnapshotRepair.class);
-
-  @CommandLine.Spec
-  private static CommandSpec spec;
 
   @CommandLine.ParentCommand
   private RDBRepair parent;
@@ -84,15 +80,15 @@ public class SnapshotRepair implements Callable<Void> {
   private boolean dryRun;
 
   @Override
-  public Void call() throws Exception {
+  public void execute() throws Exception {
     List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
     List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(parent.getDbPath());
 
     try (ManagedRocksDB db = ManagedRocksDB.open(parent.getDbPath(), cfDescList, cfHandleList)) {
       ColumnFamilyHandle snapshotInfoCfh = RocksDBUtils.getColumnFamilyHandle(SNAPSHOT_INFO_TABLE, cfHandleList);
       if (snapshotInfoCfh == null) {
-        System.err.println(SNAPSHOT_INFO_TABLE + " is not in a column family in DB for the given path.");
-        return null;
+        error("%s is not in a column family in DB for the given path.", SNAPSHOT_INFO_TABLE);
+        return;
       }
 
       String snapshotInfoTableKey = SnapshotInfo.getTableKey(bucketUri.getValue().getVolumeName(),
@@ -102,9 +98,9 @@ public class SnapshotRepair implements Callable<Void> {
           SnapshotInfo.getCodec());
 
       if (snapshotInfo == null) {
-        System.err.println(snapshotName + " does not exist for given bucketUri: " + OM_KEY_PREFIX +
+        error("%s does not exist for given bucketUri: %s", snapshotName, OM_KEY_PREFIX +
             bucketUri.getValue().getVolumeName() + OM_KEY_PREFIX + bucketUri.getValue().getBucketName());
-        return null;
+        return;
       }
 
       // snapshotIdSet is the set of the all existed snapshots ID to make that the provided global previous and path
@@ -112,52 +108,50 @@ public class SnapshotRepair implements Callable<Void> {
       Set<UUID> snapshotIdSet = getSnapshotIdSet(db, snapshotInfoCfh);
 
       if (Objects.equals(snapshotInfo.getSnapshotId(), globalPreviousSnapshotId)) {
-        System.err.println("globalPreviousSnapshotId: '" + globalPreviousSnapshotId +
-            "' is equal to given snapshot's ID: '" + snapshotInfo.getSnapshotId() + "'.");
-        return null;
+        error("globalPreviousSnapshotId: '%s' is equal to given snapshot's ID: '%s'.",
+            globalPreviousSnapshotId, snapshotInfo.getSnapshotId());
+        return;
       }
 
       if (Objects.equals(snapshotInfo.getSnapshotId(), pathPreviousSnapshotId)) {
-        System.err.println("pathPreviousSnapshotId: '" + pathPreviousSnapshotId +
-            "' is equal to given snapshot's ID: '" + snapshotInfo.getSnapshotId() + "'.");
-        return null;
+        error("pathPreviousSnapshotId: '%s' is equal to given snapshot's ID: '%s'.",
+            pathPreviousSnapshotId, snapshotInfo.getSnapshotId());
+        return;
       }
 
       if (!snapshotIdSet.contains(globalPreviousSnapshotId)) {
-        System.err.println("globalPreviousSnapshotId: '" + globalPreviousSnapshotId +
-            "' does not exist in snapshotInfoTable.");
-        return null;
+        error("globalPreviousSnapshotId: '%s' does not exist in snapshotInfoTable.",
+            globalPreviousSnapshotId);
+        return;
       }
 
       if (!snapshotIdSet.contains(pathPreviousSnapshotId)) {
-        System.err.println("pathPreviousSnapshotId: '" + pathPreviousSnapshotId +
-            "' does not exist in snapshotInfoTable.");
-        return null;
+        error("pathPreviousSnapshotId: '%s' does not exist in snapshotInfoTable.",
+            pathPreviousSnapshotId);
+        return;
       }
 
       snapshotInfo.setGlobalPreviousSnapshotId(globalPreviousSnapshotId);
       snapshotInfo.setPathPreviousSnapshotId(pathPreviousSnapshotId);
 
       if (dryRun) {
-        System.out.println("SnapshotInfo would be updated to : " + snapshotInfo);
+        info("SnapshotInfo would be updated to : %s", snapshotInfo);
       } else {
         byte[] snapshotInfoBytes = SnapshotInfo.getCodec().toPersistedFormat(snapshotInfo);
         db.get()
             .put(snapshotInfoCfh, StringCodec.get().toPersistedFormat(snapshotInfoTableKey), snapshotInfoBytes);
 
-        System.out.println("Snapshot Info is updated to : " +
+        info("Snapshot Info is updated to : %s",
             RocksDBUtils.getValue(db, snapshotInfoCfh, snapshotInfoTableKey, SnapshotInfo.getCodec()));
       }
     } catch (RocksDBException exception) {
-      System.err.println("Failed to update the RocksDB for the given path: " + parent.getDbPath());
-      System.err.println(
+      error("Failed to update the RocksDB for the given path: %s", parent.getDbPath());
+      error(
           "Make sure that Ozone entity (OM, SCM or DN) is not running for the give dbPath and current host.");
       LOG.error(exception.toString());
     } finally {
       IOUtils.closeQuietly(cfHandleList);
     }
-
-    return null;
   }
 
   private Set<UUID> getSnapshotIdSet(ManagedRocksDB db, ColumnFamilyHandle snapshotInfoCfh)

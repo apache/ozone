@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 
 import com.codahale.metrics.Timer;
 import org.apache.commons.io.IOUtils;
+import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
@@ -38,6 +39,7 @@ import picocli.CommandLine.Command;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 public class HadoopFsValidator extends HadoopBaseFreonGenerator
     implements Callable<Void> {
 
