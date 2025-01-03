@@ -18,12 +18,17 @@
 package org.apache.hadoop.ozone.repair;
 
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
+import picocli.CommandLine;
 
 import java.io.PrintWriter;
 import java.util.concurrent.Callable;
 
 /** Parent class for all actionable repair commands. */
 public abstract class RepairTool extends AbstractSubcommand implements Callable<Void> {
+
+  @CommandLine.Option(names = {"--force"},
+      description = "Use this flag if you want to bypass the check in false-positive cases.")
+  private boolean force;
 
   /** Hook method for subclasses for performing actual repair task. */
   protected abstract void execute() throws Exception;
@@ -32,6 +37,23 @@ public abstract class RepairTool extends AbstractSubcommand implements Callable<
   public final Void call() throws Exception {
     execute();
     return null;
+  }
+
+  protected boolean checkIfServiceIsRunning(String serviceName) {
+    String envVariable = String.format("OZONE_%s_RUNNING", serviceName);
+    String runningServices = System.getenv(envVariable);
+    if ("true".equals(runningServices)) {
+      if (!force) {
+        error("Error: %s is currently running on this host. " +
+              "Stop the service before running the repair tool.", serviceName);
+        return true;
+      } else {
+        info("Warning: --force flag used. Proceeding despite %s being detected as running.", serviceName);
+      }
+    } else {
+      info("No running %s service detected. Proceeding with repair.", serviceName);
+    }
+    return false;
   }
 
   protected void info(String msg, Object... args) {

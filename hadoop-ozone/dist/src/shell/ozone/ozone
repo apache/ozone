@@ -253,19 +253,16 @@ function check_running_ozone_services
   OZONE_PID_DIR="/tmp"
 
   local services=("om" "scm" "datanode")
-  local running_services=()
 
   for service in "${services[@]}"; do
     for pid_file in ${OZONE_PID_DIR}/ozone-*-${service}.pid; do
       if [[ -f "${pid_file}" ]]; then
         if kill -0 "$(cat "${pid_file}")" 2>/dev/null; then
-          running_services+=("${service}")
+          export "OZONE_${service^^}_RUNNING=true"
         fi
       fi
     done
   done
-
-  export OZONE_RUNNING_SERVICES="${running_services[*]}"
 }
 
 ## @description  turn off logging for CLI by default
