@@ -208,7 +208,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
     Map<Long, Long> containerKeyCountMap = new HashMap<>();
     // List of the deleted (container, key) pair's
     List<ContainerKeyPrefix> deletedKeyCountList = new ArrayList<>();
-
+    long startTime = System.currentTimeMillis();
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, OmKeyInfo> omdbUpdateEvent = eventIterator.next();
       // Filter event inside process method to avoid duping
@@ -258,8 +258,8 @@ public class ContainerKeyMapperTask implements ReconOmTask {
       LOG.error("Unable to write Container Key Prefix data in Recon DB.", e);
       return new ImmutablePair<>(getTaskName(), false);
     }
-    LOG.debug("{} successfully processed {} OM DB update event(s).",
-        getTaskName(), eventCount);
+    LOG.debug("{} successfully processed {} OM DB update event(s) in {} milliseconds.",
+        getTaskName(), eventCount, (System.currentTimeMillis() - startTime));
     return new ImmutablePair<>(getTaskName(), true);
   }
 

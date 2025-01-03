@@ -49,7 +49,7 @@ public class ReconStaleNodeHandler extends StaleNodeHandler {
                           final EventPublisher publisher) {
     super.onMessage(datanodeDetails, publisher);
     try {
-      pipelineSyncTask.triggerPipelineSyncTask();
+      pipelineSyncTask.initializeAndRunTask();
     } catch (Exception exp) {
       LOG.error("Error trying to trigger pipeline sync task..",
           exp);

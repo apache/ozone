@@ -18,10 +18,14 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
-import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
+import org.jooq.exception.DataAccessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Any background task that keeps SCM's metadata up to date.
@@ -30,37 +34,34 @@ public abstract class ReconScmTask {
 
   private static final Logger LOG = LoggerFactory.getLogger(ReconScmTask.class);
   private Thread taskThread;
-  private ReconTaskStatusDao reconTaskStatusDao;
   private volatile boolean running;
+  private final ReconTaskStatusUpdater taskStatusUpdater;
+  private ReadWriteLock lock = new ReentrantReadWriteLock(true);
 
-  protected ReconScmTask(ReconTaskStatusDao reconTaskStatusDao) {
-    this.reconTaskStatusDao = reconTaskStatusDao;
-  }
-
-  private void register() {
-    String taskName = getTaskName();
-    if (!reconTaskStatusDao.existsById(taskName)) {
-      ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
-          taskName, 0L, 0L);
-      reconTaskStatusDao.insert(reconTaskStatusRecord);
-      LOG.info("Registered {} task ", taskName);
-    }
+  protected ReconScmTask(
+      ReconTaskStatusUpdaterManager taskStatusUpdaterManager
+  ) {
+    // In case the task is not already present in the DB, table is updated with initial values for task
+    this.taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(getTaskName());
   }
 
   /**
    * Start underlying start thread.
    */
   public synchronized void start() {
-    register();
-    if (!isRunning()) {
-      LOG.info("Starting {} Thread.", getTaskName());
-      running = true;
-      taskThread = new Thread(this::run, "Recon-" + getTaskName());
-      taskThread.setName(getTaskName());
-      taskThread.setDaemon(true);
-      taskThread.start();
-    } else {
-      LOG.info("{} Thread is already running.", getTaskName());
+    try {
+      if (!isRunning()) {
+        LOG.info("Starting {} Thread.", getTaskName());
+        running = true;
+        taskThread = new Thread(this::run, "Recon-" + getTaskName());
+        taskThread.setName(getTaskName());
+        taskThread.setDaemon(true);
+        taskThread.start();
+      } else {
+        LOG.info("{} Thread is already running.", getTaskName());
+      }
+    } catch (Exception e) {
+      LOG.error("Failed to start {} thread due to exception", getTaskName(), e);
     }
   }
 
@@ -87,9 +88,34 @@ public abstract class ReconScmTask {
     return true;
   }
 
+  /**
+   * Helper function to update TASK_STATUS table with task end values.
+   * Set isCurrentTaskRunning as false, update the timestamp.
+   * Call this function after the actual task processing ends to update table in DB.
+   */
   protected void recordSingleRunCompletion() {
-    reconTaskStatusDao.update(new ReconTaskStatus(getTaskName(),
-        System.currentTimeMillis(), 0L));
+    try {
+      taskStatusUpdater.setIsCurrentTaskRunning(0);
+      taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
+      taskStatusUpdater.updateDetails();
+    } catch (DataAccessException e) {
+      LOG.error("Failed to update table for task: {}", getTaskName());
+    }
+  }
+
+  /**
+   * Helper function to update TASK_STATUS table with task start values.
+   * Set the isCurrentTaskRunning as true, update the timestamp.
+   * Call this function before the actual task processing starts to update table in DB.
+   */
+  protected void recordRunStart() {
+    try {
+      taskStatusUpdater.setIsCurrentTaskRunning(1);
+      taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
+      taskStatusUpdater.updateDetails();
+    } catch (DataAccessException e) {
+      LOG.error("Failed to update table for start of task: {}", getTaskName());
+    }
   }
 
   protected boolean canRun() {
@@ -100,5 +126,33 @@ public abstract class ReconScmTask {
     return getClass().getSimpleName();
   }
 
+  public ReconTaskStatusUpdater getTaskStatusUpdater() {
+    return this.taskStatusUpdater;
+  }
+
   protected abstract void run();
+
+  protected void initializeAndRunTask() {
+    lock.writeLock().lock();
+    try {
+      recordRunStart();
+      runTask();
+    } catch (Exception e) {
+      LOG.error("{} encountered exception. ", getTaskName(), e);
+      taskStatusUpdater.setLastTaskRunStatus(-1);
+    } finally {
+      try {
+        recordSingleRunCompletion();
+      } catch (Exception e) {
+        LOG.error("Exception occurred while trying to record {} completion", getTaskName(), e);
+      } finally {
+        lock.writeLock().unlock();
+      }
+    }
+  }
+
+  /**
+   * Override this method for the actual processing logic in child tasks.
+   */
+  protected abstract void runTask() throws Exception;
 }

@@ -149,6 +149,7 @@ public class FileSizeCountTask implements ReconOmTask {
     Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
     final Collection<String> taskTables = getTaskTables();
 
+    long startTime = System.currentTimeMillis();
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, Object> omdbUpdateEvent = eventIterator.next();
       // Filter event inside process method to avoid duping
@@ -198,7 +199,8 @@ public class FileSizeCountTask implements ReconOmTask {
       }
     }
     writeCountsToDB(false, fileSizeCountMap);
-    LOG.debug("Completed a 'process' run of FileSizeCountTask.");
+    LOG.debug("{} successfully processed in {} milliseconds",
+        getTaskName(), (System.currentTimeMillis() - startTime));
     return new ImmutablePair<>(getTaskName(), true);
   }
 

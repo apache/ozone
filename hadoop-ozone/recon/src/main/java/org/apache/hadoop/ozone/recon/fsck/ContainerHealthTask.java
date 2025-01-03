@@ -26,8 +26,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -45,9 +43,10 @@ import org.apache.hadoop.ozone.recon.scm.ReconScmTask;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.hadoop.util.Time;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
-import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.hadoop.ozone.recon.schema.tables.records.UnhealthyContainersRecord;
 import org.jooq.Cursor;
@@ -71,8 +70,6 @@ public class ContainerHealthTask extends ReconScmTask {
       LoggerFactory.getLogger(ContainerHealthTask.class);
   public static final int FETCH_COUNT = Integer.parseInt(DEFAULT_FETCH_COUNT);
 
-  private final ReadWriteLock lock = new ReentrantReadWriteLock(true);
-
   private final StorageContainerServiceProvider scmClient;
   private final ContainerManager containerManager;
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
@@ -86,17 +83,18 @@ public class ContainerHealthTask extends ReconScmTask {
 
   private final OzoneConfiguration conf;
 
+  private final ReconTaskStatusUpdater taskStatusUpdater;
+
   @SuppressWarnings("checkstyle:ParameterNumber")
   public ContainerHealthTask(
       ContainerManager containerManager,
       StorageContainerServiceProvider scmClient,
-      ReconTaskStatusDao reconTaskStatusDao,
       ContainerHealthSchemaManager containerHealthSchemaManager,
       PlacementPolicy placementPolicy,
       ReconTaskConfig reconTaskConfig,
       ReconContainerMetadataManager reconContainerMetadataManager,
-      OzoneConfiguration conf) {
-    super(reconTaskStatusDao);
+      OzoneConfiguration conf, ReconTaskStatusUpdaterManager taskStatusUpdaterManager) {
+    super(taskStatusUpdaterManager);
     this.scmClient = scmClient;
     this.containerHealthSchemaManager = containerHealthSchemaManager;
     this.reconContainerMetadataManager = reconContainerMetadataManager;
@@ -104,13 +102,14 @@ public class ContainerHealthTask extends ReconScmTask {
     this.containerManager = containerManager;
     this.conf = conf;
     interval = reconTaskConfig.getMissingContainerTaskInterval().toMillis();
+    this.taskStatusUpdater = getTaskStatusUpdater();
   }
 
   @Override
   public void run() {
     try {
       while (canRun()) {
-        triggerContainerHealthCheck();
+        initializeAndRunTask();
         Thread.sleep(interval);
       }
     } catch (Throwable t) {
@@ -121,8 +120,8 @@ public class ContainerHealthTask extends ReconScmTask {
     }
   }
 
-  public void triggerContainerHealthCheck() {
-    lock.writeLock().lock();
+  @Override
+  protected void runTask() {
     // Map contains all UNHEALTHY STATES as keys and value is another map
     // with 3 keys (CONTAINER_COUNT, TOTAL_KEYS, TOTAL_USED_BYTES) and value
     // is count for each of these 3 stats.
@@ -132,23 +131,23 @@ public class ContainerHealthTask extends ReconScmTask {
     // <EMPTY_MISSING, <TOTAL_USED_BYTES, 2048>>
     Map<UnHealthyContainerStates, Map<String, Long>>
         unhealthyContainerStateStatsMap;
-    try {
-      unhealthyContainerStateStatsMap = new HashMap<>(Collections.emptyMap());
-      initializeUnhealthyContainerStateStatsMap(
-          unhealthyContainerStateStatsMap);
-      long start = Time.monotonicNow();
-      long currentTime = System.currentTimeMillis();
-      long existingCount = processExistingDBRecords(currentTime,
-          unhealthyContainerStateStatsMap);
-      LOG.debug("Container Health task thread took {} milliseconds to" +
-              " process {} existing database records.",
-          Time.monotonicNow() - start, existingCount);
+    unhealthyContainerStateStatsMap = new HashMap<>(Collections.emptyMap());
+    initializeUnhealthyContainerStateStatsMap(
+        unhealthyContainerStateStatsMap);
+    long start = Time.monotonicNow();
+    long currentTime = System.currentTimeMillis();
+    long existingCount = processExistingDBRecords(currentTime,
+        unhealthyContainerStateStatsMap);
+    LOG.debug("Container Health task thread took {} milliseconds to" +
+            " process {} existing database records.",
+        Time.monotonicNow() - start, existingCount);
 
-      checkAndProcessContainers(unhealthyContainerStateStatsMap, currentTime);
-      processedContainers.clear();
-    } finally {
-      lock.writeLock().unlock();
-    }
+    start = Time.monotonicNow();
+    checkAndProcessContainers(unhealthyContainerStateStatsMap, currentTime);
+    LOG.debug("Container Health Task thread took {} milliseconds to process containers",
+        Time.monotonicNow() - start);
+    taskStatusUpdater.setLastTaskRunStatus(0);
+    processedContainers.clear();
   }
 
   private void checkAndProcessContainers(
@@ -165,7 +164,6 @@ public class ContainerHealthTask extends ReconScmTask {
           .filter(c -> !processedContainers.contains(c))
           .forEach(c -> processContainer(c, currentTime,
               unhealthyContainerStateStatsMap));
-      recordSingleRunCompletion();
       LOG.debug("Container Health task thread took {} milliseconds for" +
               " processing {} containers.", Time.monotonicNow() - start,
           containers.size());
