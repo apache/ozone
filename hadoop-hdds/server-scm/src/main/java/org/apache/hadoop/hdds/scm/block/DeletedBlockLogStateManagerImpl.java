@@ -133,7 +133,8 @@ public class DeletedBlockLogStateManagerImpl
 
       @Override
       public void seekToFirst() {
-        throw new UnsupportedOperationException("seekToFirst");
+        iter.seekToFirst();
+        findNext();
       }
 
       @Override

@@ -167,7 +167,7 @@ public class OzoneManagerStarter extends GenericCli {
    * is set and print the startup banner message.
    */
   private void commonInit() {
-    conf = createOzoneConfiguration();
+    conf = getOzoneConf();
     TracingUtil.initTracing("OzoneManager", conf);
 
     String[] originalArgs = getCmd().getParseResult().originalArgs()

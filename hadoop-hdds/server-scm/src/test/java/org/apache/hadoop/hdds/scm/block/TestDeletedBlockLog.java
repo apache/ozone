@@ -441,6 +441,75 @@ public class TestDeletedBlockLog {
     assertEquals(30 * THREE, blocks.size());
   }
 
+
+  @Test
+  public void testSCMDelIteratorProgress() throws Exception {
+    int maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
+
+    // CASE1: When all transactions are valid and available
+    // Create 8 TXs in the log.
+    int noOfTransactions = 8;
+    addTransactions(generateData(noOfTransactions), true);
+    mockContainerHealthResult(true);
+    List<DeletedBlocksTransaction> blocks;
+
+    List<Long> txIDs = new ArrayList<>();
+    int i = 1;
+    while (i < noOfTransactions) {
+      // In each iteration read two transaction, API returns all the transactions in order.
+      // 1st iteration: {1, 2}
+      // 2nd iteration: {3, 4}
+      // 3rd iteration: {5, 6}
+      // 4th iteration: {7, 8}
+      blocks = getTransactions(2 * BLOCKS_PER_TXN * THREE);
+      assertEquals(blocks.get(0).getTxID(), i++);
+      assertEquals(blocks.get(1).getTxID(), i++);
+    }
+
+    // CASE2: When some transactions are not available for delete in the current iteration,
+    // either due to max retry reach or some other issue.
+    // New transactions Id is { 9, 10, 11, 12, 13, 14, 15, 16}
+    addTransactions(generateData(noOfTransactions), true);
+    mockContainerHealthResult(true);
+
+    // Mark transaction Id 11 as reached max retry count so that it will be ignored
+    // by scm deleting service while fetching transaction for delete
+    int ignoreTransactionId = 11;
+    txIDs.add((long) ignoreTransactionId);
+    for (i = 0; i < maxRetry; i++) {
+      incrementCount(txIDs);
+    }
+    incrementCount(txIDs);
+
+    i = 9;
+    while (true) {
+      // In each iteration read two transaction.
+      // If any transaction which is not available for delete in the current iteration,
+      // it will be ignored and will be re-checked again only after complete table is read.
+      // 1st iteration: {9, 10}
+      // 2nd iteration: {12, 13} Transaction 11 is ignored here
+      // 3rd iteration: {14, 15} Transaction 11 is available here,
+      // but it will be read only when all db records are read till the end.
+      // 4th iteration: {16, 11} Since iterator reached at the end of table after reading transaction 16,
+      // Iterator starts from beginning again, and it returns transaction 11 as well
+      blocks = getTransactions(2 * BLOCKS_PER_TXN * THREE);
+      if (i == ignoreTransactionId) {
+        i++;
+      }
+      assertEquals(blocks.get(0).getTxID(), i++);
+      if (i == 17) {
+        assertEquals(blocks.get(1).getTxID(), ignoreTransactionId);
+        break;
+      }
+      assertEquals(blocks.get(1).getTxID(), i++);
+
+      if (i == 14) {
+        // Reset transaction 11 so that it will be available in scm key deleting service in the subsequent iterations.
+        resetCount(txIDs);
+      }
+    }
+  }
+
   @Test
   public void testCommitTransactions() throws Exception {
     deletedBlockLog.setScmCommandTimeoutMs(Long.MAX_VALUE);
