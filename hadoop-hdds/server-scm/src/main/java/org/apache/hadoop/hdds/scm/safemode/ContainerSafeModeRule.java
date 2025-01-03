@@ -141,13 +141,13 @@ public class ContainerSafeModeRule extends
   }
 
   @VisibleForTesting
-  public synchronized double getCurrentContainerThreshold() {
+  public double getCurrentContainerThreshold() {
     return ratisMaxContainer == 0 ? 1 :
         (ratisContainerWithMinReplicas.doubleValue() / ratisMaxContainer);
   }
 
   @VisibleForTesting
-  public synchronized double getCurrentECContainerThreshold() {
+  public double getCurrentECContainerThreshold() {
     return ecMaxContainer == 0 ? 1 :
         (ecContainerWithMinReplicas.doubleValue() / ecMaxContainer);
   }
