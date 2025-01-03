@@ -321,17 +321,7 @@ public class TestStorageContainerManager {
       // after sometime, all the TX should be proceed and by then
       // the number of containerBlocks of all known containers will be
       // empty again.
-      GenericTestUtils.waitFor(() -> {
-        try {
-          if (SCMHAUtils.isSCMHAEnabled(cluster.getConf())) {
-            cluster.getStorageContainerManager().getScmHAManager()
-                .asSCMHADBTransactionBuffer().flush();
-          }
-          return delLog.getNumOfValidTransactions() == 0;
-        } catch (IOException e) {
-          return false;
-        }
-      }, 1000, 22000);
+      OzoneTestUtils.waitBlockDeleted(cluster.getStorageContainerManager());
       assertTrue(verifyBlocksWithTxnTable(cluster, conf, containerBlocks));
       // Continue the work, add some TXs that with known container names,
       // but unknown block IDs.
