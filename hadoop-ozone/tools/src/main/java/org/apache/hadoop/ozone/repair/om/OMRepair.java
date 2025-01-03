@@ -27,7 +27,7 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(name = "om",
     subcommands = {
-        FSORepairCLI.class,
+        FSORepairTool.class,
     },
     description = "Operational tool to repair OM.")
 @MetaInfServices(RepairSubcommand.class)

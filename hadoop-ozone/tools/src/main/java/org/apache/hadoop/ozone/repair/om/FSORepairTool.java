@@ -36,9 +36,11 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.repair.RepairTool;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 import java.io.File;
 import java.io.IOException;
@@ -69,19 +71,57 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
  * The tool is idempotent. reachable.db will not be deleted automatically when the tool finishes,
  * in case users want to manually inspect it. It can be safely deleted once the tool finishes.
  */
-public class FSORepairTool {
+@CommandLine.Command(
+    name = "fso-tree",
+    description = "Identify and repair a disconnected FSO tree by marking unreferenced entries for deletion. " +
+        "OM should be stopped while this tool is run."
+)
+public class FSORepairTool extends RepairTool {
   public static final Logger LOG = LoggerFactory.getLogger(FSORepairTool.class);
   private static final String REACHABLE_TABLE = "reachable";
 
-  private final Impl impl;
+  @CommandLine.Option(names = {"--db"},
+      required = true,
+      description = "Path to OM RocksDB")
+  private String dbPath;
 
-  public FSORepairTool(String dbPath, boolean repair, String volume, String bucket, boolean verbose)
-      throws IOException {
-    impl = new Impl(dbPath, repair, volume, bucket, verbose);
-  }
+  @CommandLine.Option(names = {"-r", "--repair"},
+      defaultValue = "false",
+      description = "Run in repair mode to move unreferenced files and directories to deleted tables.")
+  private boolean repair;
 
-  void run() throws Exception {
-    impl.run();
+  @CommandLine.Option(names = {"-v", "--volume"},
+      description = "Filter by volume name. Add '/' before the volume name.")
+  private String volume;
+
+  @CommandLine.Option(names = {"-b", "--bucket"},
+      description = "Filter by bucket name")
+  private String bucket;
+
+  @CommandLine.Option(names = {"--verbose"},
+      description = "Verbose output. Show all intermediate steps and deleted keys info.")
+  private boolean verbose;
+
+  @Override
+  public void execute() throws Exception {
+    if (checkIfServiceIsRunning("OM")) {
+      return;
+    }
+    if (repair) {
+      info("FSO Repair Tool is running in repair mode");
+    } else {
+      info("FSO Repair Tool is running in debug mode");
+    }
+    try {
+      Impl repairTool = new Impl(dbPath, repair, volume, bucket, verbose);
+      repairTool.run();
+    } catch (Exception ex) {
+      throw new IllegalArgumentException("FSO repair failed: " + ex.getMessage());
+    }
+
+    if (verbose) {
+      info("FSO repair finished.");
+    }
   }
 
   private static class Impl {
