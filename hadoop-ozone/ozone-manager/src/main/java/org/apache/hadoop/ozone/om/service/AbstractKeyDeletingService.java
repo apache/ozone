@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
+import org.apache.hadoop.ozone.om.DeleteKeysResult;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -347,7 +348,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   protected PurgePathRequest prepareDeleteDirRequest(
       long remainNum, OmKeyInfo pendingDeletedDirInfo, String delDirName,
       List<Pair<String, OmKeyInfo>> subDirList,
-      KeyManager keyManager) throws IOException {
+      KeyManager keyManager, long remainingBufLimit) throws IOException {
     // step-0: Get one pending deleted directory
     if (LOG.isDebugEnabled()) {
       LOG.debug("Pending deleted dir name: {}",
@@ -359,10 +360,12 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     final long bucketId = Long.parseLong(keys[2]);
 
     // step-1: get all sub directories under the deletedDir
-    List<OmKeyInfo> subDirs = keyManager
-        .getPendingDeletionSubDirs(volumeId, bucketId,
-            pendingDeletedDirInfo, remainNum);
+    DeleteKeysResult subDirDeleteResult =
+        keyManager.getPendingDeletionSubDirs(volumeId, bucketId,
+            pendingDeletedDirInfo, remainNum, remainingBufLimit);
+    List<OmKeyInfo> subDirs = subDirDeleteResult.getKeysToDelete();
     remainNum = remainNum - subDirs.size();
+    remainingBufLimit -= subDirDeleteResult.getConsumedSize();
 
     OMMetadataManager omMetadataManager = keyManager.getMetadataManager();
     for (OmKeyInfo dirInfo : subDirs) {
@@ -375,10 +378,12 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     }
 
     // step-2: get all sub files under the deletedDir
-    List<OmKeyInfo> subFiles = keyManager
-        .getPendingDeletionSubFiles(volumeId, bucketId,
-            pendingDeletedDirInfo, remainNum);
+    DeleteKeysResult subFileDeleteResult =
+        keyManager.getPendingDeletionSubFiles(volumeId, bucketId,
+            pendingDeletedDirInfo, remainNum, remainingBufLimit);
+    List<OmKeyInfo> subFiles = subFileDeleteResult.getKeysToDelete();
     remainNum = remainNum - subFiles.size();
+    remainingBufLimit -= subDirDeleteResult.getConsumedSize();
 
     if (LOG.isDebugEnabled()) {
       for (OmKeyInfo fileInfo : subFiles) {
@@ -391,7 +396,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     // limit. If count reached limit then there can be some more child
     // paths to be visited and will keep the parent deleted directory
     // for one more pass.
-    String purgeDeletedDir = remainNum > 0 ? delDirName : null;
+    String purgeDeletedDir = (remainNum > 0 && remainingBufLimit > 0) ? delDirName :  null;
     return wrapPurgeRequest(volumeId, bucketId,
         purgeDeletedDir, subFiles, subDirs);
   }
@@ -402,7 +407,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       List<Pair<String, OmKeyInfo>> allSubDirList,
       List<PurgePathRequest> purgePathRequestList,
       String snapTableKey, long startTime,
-      int remainingBufLimit, KeyManager keyManager,
+      long remainingBufLimit, KeyManager keyManager,
       UUID expectedPreviousSnapshotId, long rnCnt) {
 
     long limit = remainNum;
@@ -411,20 +416,19 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     int subdirDelNum = 0;
     int subDirRecursiveCnt = 0;
     int consumedSize = 0;
-    while (remainNum > 0 && subDirRecursiveCnt < allSubDirList.size()) {
+    while (subDirRecursiveCnt < allSubDirList.size() && remainingBufLimit > 0) {
       try {
         Pair<String, OmKeyInfo> stringOmKeyInfoPair
             = allSubDirList.get(subDirRecursiveCnt);
         PurgePathRequest request = prepareDeleteDirRequest(
             remainNum, stringOmKeyInfoPair.getValue(),
             stringOmKeyInfoPair.getKey(), allSubDirList,
-            keyManager);
-        if (isBufferLimitCrossed(remainingBufLimit, consumedSize,
-            request.getSerializedSize())) {
-          // ignore further add request
+            keyManager,remainingBufLimit);
+        if (request == null) {
           break;
         }
         consumedSize += request.getSerializedSize();
+        remainingBufLimit -= consumedSize;
         purgePathRequestList.add(request);
         // reduce remain count for self, sub-files, and sub-directories
         remainNum = remainNum - 1;
