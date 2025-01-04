@@ -28,8 +28,8 @@
     annotations at compile time.</description>
 
   <properties>
-    <maven.test.skip>true</maven.test.skip>
     <!-- no tests in this module so far -->
+    <maven.test.skip>true</maven.test.skip>
   </properties>
 
   <build>
