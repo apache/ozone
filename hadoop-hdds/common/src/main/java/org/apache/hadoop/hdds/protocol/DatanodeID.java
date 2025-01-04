@@ -41,6 +41,11 @@ public final class DatanodeID implements Comparable<DatanodeID> {
     this.uuid = uuid;
   }
 
+  // Mainly used for JSON conversion
+  public String getID() {
+    return toString();
+  }
+
   @Override
   public int compareTo(final DatanodeID that) {
     return this.uuid.compareTo(that.uuid);
