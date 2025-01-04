@@ -202,7 +202,6 @@
           <artifactId>snappy-java</artifactId>
         </exclusion>
       </exclusions>
-
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
