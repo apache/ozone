@@ -847,7 +847,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmSafeModeManager = configurator.getScmSafeModeManager();
     } else {
       scmSafeModeManager = new SCMSafeModeManager(conf,
-         containerManager, pipelineManager, eventQueue,
+          containerManager, pipelineManager, eventQueue,
           serviceManager, scmContext);
     }
 
