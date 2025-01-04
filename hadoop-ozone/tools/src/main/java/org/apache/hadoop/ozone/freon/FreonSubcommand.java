@@ -15,8 +15,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+package org.apache.hadoop.ozone.freon;
 
-/**
- * RDB related repair tools.
- */
-package org.apache.hadoop.ozone.repair.ldb;
+/** Marker interface for subcommands to be registered for {@code ozone freon}. */
+public interface FreonSubcommand {
+  // marker
+}

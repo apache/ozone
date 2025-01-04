@@ -18,14 +18,9 @@
 
 package org.apache.hadoop.ozone.shell.token;
 
-import java.util.concurrent.Callable;
-
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.MissingSubcommandException;
-import org.apache.hadoop.ozone.shell.Shell;
 
 import picocli.CommandLine.Command;
-import picocli.CommandLine.ParentCommand;
 
 /**
  * Sub-command to group token related operations.
@@ -40,14 +35,6 @@ import picocli.CommandLine.ParentCommand;
     },
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class TokenCommands implements Callable<Void> {
+public class TokenCommands {
 
-  @ParentCommand
-  private Shell shell;
-
-  @Override
-  public Void call() throws Exception {
-    throw new MissingSubcommandException(
-        this.shell.getCmd().getSubcommands().get("token"));
-  }
 }

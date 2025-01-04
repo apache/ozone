@@ -29,7 +29,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <packaging>jar</packaging>
 
   <properties>
-
+    <sort.skip>true</sort.skip>
   </properties>
 
   <dependencies>

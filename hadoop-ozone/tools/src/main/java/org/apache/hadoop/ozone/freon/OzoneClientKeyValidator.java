@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import com.codahale.metrics.Timer;
 import org.apache.commons.io.IOUtils;
 import org.apache.ratis.util.function.CheckedFunction;
+import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
@@ -42,6 +43,7 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 public class OzoneClientKeyValidator extends BaseFreonGenerator
     implements Callable<Void> {
 

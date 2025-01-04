@@ -48,7 +48,7 @@ abstract class AbstractRootedOzoneFileSystemTestWithFSO extends AbstractRootedOz
       LoggerFactory.getLogger(AbstractRootedOzoneFileSystemTestWithFSO.class);
 
   AbstractRootedOzoneFileSystemTestWithFSO(boolean enableOMRatis, boolean isAclEnabled, boolean noFlush) {
-    super(BucketLayout.FILE_SYSTEM_OPTIMIZED, true, enableOMRatis, isAclEnabled, noFlush);
+    super(BucketLayout.FILE_SYSTEM_OPTIMIZED, true, isAclEnabled, noFlush);
   }
 
   /**

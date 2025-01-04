@@ -23,6 +23,6 @@ import org.junit.jupiter.api.TestInstance;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TestOFSWithCacheOnly extends AbstractRootedOzoneFileSystemTest {
   TestOFSWithCacheOnly() {
-    super(BucketLayout.LEGACY, false, false, false, true);
+    super(BucketLayout.LEGACY, false, false, true);
   }
 }
