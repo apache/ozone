@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -61,9 +62,9 @@ public interface ContainerManager extends Closeable {
    * The max size of the searching range cannot exceed the
    * value of count.
    *
-   * @param startID start containerID, >=0,
+   * @param startID start containerID, &gt;=0,
    * start searching at the head if 0.
-   * @param count count must be >= 0
+   * @param count count must be &gt;= 0
    *              Usually the count will be replace with a very big
    *              value instead of being unlimited in case the db is very big.
    *
@@ -71,6 +72,8 @@ public interface ContainerManager extends Closeable {
    */
   List<ContainerInfo> getContainers(ContainerID startID, int count);
 
+
+  List<ContainerInfo> getContainers(ReplicationType type);
 
   /**
    * Returns all the containers which are in the specified state.
@@ -85,9 +88,9 @@ public interface ContainerManager extends Closeable {
    * The max size of the searching range cannot exceed the
    * value of count.
    *
-   * @param startID start containerID, >=0,
+   * @param startID start containerID, &gt;=0,
    * start searching at the head if 0.
-   * @param count count must be >= 0
+   * @param count count must be &gt;= 0
    *              Usually the count will be replace with a very big
    *              value instead of being unlimited in case the db is very big.
    * @param state container state
@@ -132,6 +135,16 @@ public interface ContainerManager extends Closeable {
       throws IOException, InvalidStateTransitionException;
 
   /**
+   * Bypasses the container state machine to change a container's state from DELETING to CLOSED. This API was
+   * introduced to fix a bug (HDDS-11136), and should be used with care otherwise.
+   *
+   * @see <a href="https://issues.apache.org/jira/browse/HDDS-11136">HDDS-11136</a>
+   * @param containerID id of the container to transition
+   * @throws IOException
+   */
+  void transitionDeletingToClosedState(ContainerID containerID) throws IOException;
+
+  /**
    * Returns the latest list of replicas for given containerId.
    *
    * @param containerID Container ID
@@ -154,7 +167,6 @@ public interface ContainerManager extends Closeable {
    *
    * @param containerID Container ID
    * @param replica ContainerReplica
-   * @return True of dataNode is removed successfully else false.
    */
   void removeContainerReplica(ContainerID containerID, ContainerReplica replica)
       throws ContainerNotFoundException, ContainerReplicaNotFoundException;

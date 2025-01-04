@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.SstFilteringService;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -50,6 +51,7 @@ import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ozone.rocksdiff.CompactionNode;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -376,6 +378,7 @@ public class TestSnapshotBackgroundServices {
 
   @Test
   @DisplayName("testCompactionLogBackgroundService")
+  @Flaky("HDDS-11672")
   public void testCompactionLogBackgroundService()
       throws IOException, InterruptedException, TimeoutException {
     OzoneManager leaderOM = getLeaderOM();
@@ -572,7 +575,7 @@ public class TestSnapshotBackgroundServices {
       } catch (IOException e) {
         fail();
       }
-      return snapshotInfo.isSstFiltered();
+      return SstFilteringService.isSstFiltered(ozoneManager.getConfiguration(), snapshotInfo);
     }, 1000, 10000);
   }
 

@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Map;
 
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.server.protocol.TermIndex;
@@ -58,8 +59,10 @@ import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
+import static org.apache.hadoop.ozone.OzoneConsts.DELETED_HSYNC_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 /**
  * Handles DeleteKey request.
@@ -98,8 +101,9 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
   protected KeyArgs resolveBucketAndCheckAcls(OzoneManager ozoneManager,
       KeyArgs.Builder newKeyArgs) throws IOException {
-    return resolveBucketAndCheckKeyAcls(newKeyArgs.build(), ozoneManager,
-        ACLType.DELETE);
+    return captureLatencyNs(
+          ozoneManager.getPerfMetrics().getDeleteKeyResolveBucketAndAclCheckLatencyNs(),
+          () -> resolveBucketAndCheckKeyAcls(newKeyArgs.build(), ozoneManager, ACLType.DELETE));
   }
 
   @Override
@@ -117,7 +121,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumKeyDeletes();
-
+    OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
 
@@ -128,7 +132,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     boolean acquiredLock = false;
     OMClientResponse omClientResponse = null;
     Result result = null;
-
+    long startNanos = Time.monotonicNowNanos();
     try {
       String objectKey =
           omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
@@ -161,6 +165,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       long quotaReleased = sumBlockLengths(omKeyInfo);
       omBucketInfo.incrUsedBytes(-quotaReleased);
       omBucketInfo.incrUsedNamespace(-1L);
+      OmKeyInfo deletedOpenKeyInfo = null;
 
       // If omKeyInfo has hsync metadata, delete its corresponding open key as well
       String dbOpenKey = null;
@@ -170,8 +175,9 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
         dbOpenKey = omMetadataManager.getOpenKey(volumeName, bucketName, keyName, hsyncClientId);
         OmKeyInfo openKeyInfo = openKeyTable.get(dbOpenKey);
         if (openKeyInfo != null) {
-          // Remove the open key by putting a tombstone entry
-          openKeyTable.addCacheEntry(dbOpenKey, trxnLogIndex);
+          openKeyInfo.getMetadata().put(DELETED_HSYNC_KEY, "true");
+          openKeyTable.addCacheEntry(dbOpenKey, openKeyInfo, trxnLogIndex);
+          deletedOpenKeyInfo = openKeyInfo;
         } else {
           LOG.warn("Potentially inconsistent DB state: open key not found with dbOpenKey '{}'", dbOpenKey);
         }
@@ -180,15 +186,19 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       omClientResponse = new OMKeyDeleteResponse(
           omResponse.setDeleteKeyResponse(DeleteKeyResponse.newBuilder())
               .build(), omKeyInfo, ozoneManager.isRatisEnabled(),
-          omBucketInfo.copyObject(), dbOpenKey);
+          omBucketInfo.copyObject(), deletedOpenKeyInfo);
 
       result = Result.SUCCESS;
+      long endNanosDeleteKeySuccessLatencyNs = Time.monotonicNowNanos();
+      perfMetrics.setDeleteKeySuccessLatencyNs(endNanosDeleteKeySuccessLatencyNs - startNanos);
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse =
           new OMKeyDeleteResponse(createErrorOMResponse(omResponse, exception),
               getBucketLayout());
+      long endNanosDeleteKeyFailureLatencyNs = Time.monotonicNowNanos();
+      perfMetrics.setDeleteKeyFailureLatencyNs(endNanosDeleteKeyFailureLatencyNs - startNanos);
     } finally {
       if (acquiredLock) {
         mergeOmLockDetails(omMetadataManager.getLock()
@@ -200,7 +210,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     }
 
     // Performing audit logging outside of the lock.
-    auditLog(auditLogger,
+    markForAudit(auditLogger,
         buildAuditMessage(OMAction.DELETE_KEY, auditMap, exception, userInfo));
 
     switch (result) {

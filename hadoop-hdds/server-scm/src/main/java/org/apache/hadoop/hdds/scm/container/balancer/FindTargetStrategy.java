@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import jakarta.annotation.Nonnull;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 /**
  * This interface can be used to implement strategies to find a target for a
@@ -68,4 +69,15 @@ public interface FindTargetStrategy {
    *               that containers can be moved to
    */
   void resetPotentialTargets(@Nonnull Collection<DatanodeDetails> targets);
+
+  /**
+   * Get a map of the node IDs and the corresponding data sizes moved to each node.
+   * @return nodeId to size entering from node map
+   */
+  Map<DatanodeDetails, Long> getSizeEnteringNodes();
+
+  /**
+   * Clear the map of node IDs and their corresponding data sizes that were moved to each node.
+   */
+  void clearSizeEnteringNodes();
 }

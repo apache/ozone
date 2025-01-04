@@ -33,6 +33,9 @@ import org.apache.hadoop.hdds.utils.db.Table;
 
 import com.codahale.metrics.Timer;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CONTAINERS;
+
+import org.apache.hadoop.ozone.freon.FreonSubcommand;
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
 
 
@@ -45,6 +48,7 @@ import picocli.CommandLine.Command;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 public class GeneratorScm extends BaseGenerator {
 
   private DBStore scmDb;
@@ -59,7 +63,7 @@ public class GeneratorScm extends BaseGenerator {
 
     ConfigurationSource config = createOzoneConfiguration();
 
-    scmDb = DBStoreBuilder.createDBStore(config, new SCMDBDefinition());
+    scmDb = DBStoreBuilder.createDBStore(config, SCMDBDefinition.get());
 
     containerStore = CONTAINERS.getTable(scmDb);
 

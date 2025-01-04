@@ -68,6 +68,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.time.DurationFormatUtils;
+import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
@@ -86,8 +87,9 @@ import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_H
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 @SuppressWarnings("java:S2245") // no need for secure random
-public final class RandomKeyGenerator implements Callable<Void> {
+public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand {
 
   @ParentCommand
   private Freon freon;
@@ -240,7 +242,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
   private OzoneConfiguration ozoneConfiguration;
   private ProgressBar progressbar;
 
-  RandomKeyGenerator() {
+  public RandomKeyGenerator() {
     // for picocli
   }
 
@@ -285,7 +287,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
   @Override
   public Void call() throws Exception {
     if (ozoneConfiguration == null) {
-      ozoneConfiguration = freon.createOzoneConfiguration();
+      ozoneConfiguration = freon.getOzoneConf();
     }
     if (!ozoneConfiguration.getBoolean(
         HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA,
@@ -355,11 +357,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
     // wait until all keys are added or exception occurred.
     while ((numberOfKeysAdded.get() != totalKeyCount)
            && exception == null) {
-      try {
-        Thread.sleep(CHECK_INTERVAL_MILLIS);
-      } catch (InterruptedException e) {
-        throw e;
-      }
+      Thread.sleep(CHECK_INTERVAL_MILLIS);
     }
     executor.shutdown();
     executor.awaitTermination(Integer.MAX_VALUE, TimeUnit.MILLISECONDS);
@@ -373,11 +371,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
 
     if (validateExecutor != null) {
       while (!validationQueue.isEmpty()) {
-        try {
-          Thread.sleep(CHECK_INTERVAL_MILLIS);
-        } catch (InterruptedException e) {
-          throw e;
-        }
+        Thread.sleep(CHECK_INTERVAL_MILLIS);
       }
       validateExecutor.shutdown();
       validateExecutor.awaitTermination(Integer.MAX_VALUE,
@@ -421,11 +415,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
       // wait until all Buckets are cleaned or exception occurred.
       while ((numberOfBucketsCleaned.get() != totalBucketCount)
           && exception == null) {
-        try {
-          Thread.sleep(CHECK_INTERVAL_MILLIS);
-        } catch (InterruptedException e) {
-          throw e;
-        }
+        Thread.sleep(CHECK_INTERVAL_MILLIS);
       }
     } catch (InterruptedException e) {
       LOG.error("Failed to wait until all Buckets are cleaned", e);

@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.DefaultSecretKeyClient;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
@@ -101,6 +102,9 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private static final Logger LOG = LoggerFactory.getLogger(
       HddsDatanodeService.class);
 
+  public static final String TESTING_DATANODE_VERSION_INITIAL = "testing.hdds.datanode.version.initial";
+  public static final String TESTING_DATANODE_VERSION_CURRENT = "testing.hdds.datanode.version.current";
+
   private OzoneConfiguration conf;
   private SecurityConfig secConf;
   private DatanodeDetails datanodeDetails;
@@ -116,8 +120,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
   private List<RatisDropwizardExports.MetricReporter> ratisReporterList = null;
-  private DNMXBeanImpl serviceRuntimeInfo =
-      new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) { };
+  private DNMXBeanImpl serviceRuntimeInfo;
   private ObjectName dnInfoBeanName;
   private HddsDatanodeClientProtocolServer clientProtocolServer;
   private OzoneAdmins admins;
@@ -169,7 +172,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   @Override
   public Void call() throws Exception {
-    OzoneConfiguration configuration = createOzoneConfiguration();
+    OzoneConfiguration configuration = getOzoneConf();
     if (printBanner) {
       HddsServerUtil.startupShutdownMessage(HddsVersionInfo.HDDS_VERSION_INFO,
           HddsDatanodeService.class, args, LOG, configuration);
@@ -210,6 +213,12 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   public void start() {
+    serviceRuntimeInfo = new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) {
+      @Override
+      public String getNamespace() {
+        return SCMHAUtils.getScmServiceId(conf);
+      }
+    };
     serviceRuntimeInfo.setStartTime();
 
     ratisReporterList = RatisDropwizardExports
@@ -222,14 +231,13 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       String ip = InetAddress.getByName(hostname).getHostAddress();
       datanodeDetails = initializeDatanodeDetails();
       datanodeDetails.setHostName(hostname);
+      serviceRuntimeInfo.setHostName(hostname);
       datanodeDetails.setIpAddress(ip);
       datanodeDetails.setVersion(
           HddsVersionInfo.HDDS_VERSION_INFO.getVersion());
       datanodeDetails.setSetupTime(Time.now());
       datanodeDetails.setRevision(
           HddsVersionInfo.HDDS_VERSION_INFO.getRevision());
-      datanodeDetails.setBuildDate(HddsVersionInfo.HDDS_VERSION_INFO.getDate());
-      datanodeDetails.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);
       TracingUtil.initTracing(
           "HddsDatanodeService." + datanodeDetails.getUuidString()
               .substring(0, 8), conf);
@@ -289,29 +297,36 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
               .register(REPLICATION_STREAMS_LIMIT_KEY,
                   this::reconfigReplicationStreamsLimit);
 
-      datanodeStateMachine = new DatanodeStateMachine(datanodeDetails, conf,
+      datanodeStateMachine = new DatanodeStateMachine(this, datanodeDetails, conf,
           dnCertClient, secretKeyClient, this::terminateDatanode,
           reconfigurationHandler);
       try {
         httpServer = new HddsDatanodeHttpServer(conf);
         httpServer.start();
         HttpConfig.Policy policy = HttpConfig.getHttpPolicy(conf);
+
         if (policy.isHttpEnabled()) {
-          datanodeDetails.setPort(DatanodeDetails.newPort(HTTP,
-                  httpServer.getHttpAddress().getPort()));
+          int httpPort = httpServer.getHttpAddress().getPort();
+          datanodeDetails.setPort(DatanodeDetails.newPort(HTTP, httpPort));
+          serviceRuntimeInfo.setHttpPort(String.valueOf(httpPort));
         }
+
         if (policy.isHttpsEnabled()) {
-          datanodeDetails.setPort(DatanodeDetails.newPort(HTTPS,
-                  httpServer.getHttpsAddress().getPort()));
+          int httpsPort = httpServer.getHttpAddress().getPort();
+          datanodeDetails.setPort(DatanodeDetails.newPort(HTTPS, httpsPort));
+          serviceRuntimeInfo.setHttpsPort(String.valueOf(httpsPort));
         }
+
       } catch (Exception ex) {
         LOG.error("HttpServer failed to start.", ex);
       }
 
-
       clientProtocolServer = new HddsDatanodeClientProtocolServer(
           datanodeDetails, conf, HddsVersionInfo.HDDS_VERSION_INFO,
           reconfigurationHandler);
+
+      int clientRpcport = clientProtocolServer.getClientRpcAddress().getPort();
+      serviceRuntimeInfo.setClientRpcPort(String.valueOf(clientRpcport));
 
       // Get admin list
       String starterUser =
@@ -417,17 +432,18 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
     Preconditions.checkNotNull(idFilePath);
     File idFile = new File(idFilePath);
+    DatanodeDetails details;
     if (idFile.exists()) {
-      return ContainerUtils.readDatanodeDetailsFrom(idFile);
+      details = ContainerUtils.readDatanodeDetailsFrom(idFile);
     } else {
       // There is no datanode.id file, this might be the first time datanode
       // is started.
-      DatanodeDetails details = DatanodeDetails.newBuilder()
-          .setUuid(UUID.randomUUID()).build();
-      details.setInitialVersion(DatanodeVersion.CURRENT_VERSION);
-      details.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);
-      return details;
+      details = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build();
+      details.setInitialVersion(getInitialVersion());
     }
+    // Current version is always overridden to the latest
+    details.setCurrentVersion(getCurrentVersion());
+    return details;
   }
 
   /**
@@ -619,6 +635,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     }
   }
 
+  public boolean isStopped() {
+    return isStopped.get();
+  }
+
   /**
    * Check ozone admin privilege, throws exception if not admin.
    */
@@ -657,5 +677,19 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     getDatanodeStateMachine().getContainer().getReplicationServer()
         .setPoolSize(Integer.parseInt(value));
     return value;
+  }
+
+  /**
+   * Returns the initial version of the datanode.
+   */
+  private int getInitialVersion() {
+    return conf.getInt(TESTING_DATANODE_VERSION_INITIAL, DatanodeVersion.CURRENT_VERSION);
+  }
+
+  /**
+   * Returns the current version of the datanode.
+   */
+  private int getCurrentVersion() {
+    return conf.getInt(TESTING_DATANODE_VERSION_CURRENT, DatanodeVersion.CURRENT_VERSION);
   }
 }

@@ -24,6 +24,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -49,10 +51,13 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVER_LIST_MAX_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -91,6 +96,8 @@ class TestOzoneFsSnapshot {
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
     conf.setInt(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, KeyManagerImpl.DISABLE_VALUE);
+    conf.setInt(OZONE_OM_SERVER_LIST_MAX_SIZE, 20);
+    conf.setInt(OZONE_FS_LISTING_PAGE_SIZE, 30);
 
     // Start the cluster
     cluster = MiniOzoneCluster.newHABuilder(conf)
@@ -289,6 +296,13 @@ class TestOzoneFsSnapshot {
       String snapshotPath2 = BUCKET_WITH_SNAPSHOT_INDICATOR_PATH +
           OM_KEY_PREFIX + snapshotName2;
       String snapshotKeyPath2 = snapshotPath2 + OM_KEY_PREFIX + key2;
+      List<String> snapshotNames = new ArrayList<>();
+      for (int i = 0; i < cluster.getConf().getInt(OZONE_FS_LISTING_PAGE_SIZE,
+          OZONE_FS_LISTING_PAGE_SIZE_DEFAULT) * 2; i++) {
+        snapshotNames.add(createSnapshot());
+      }
+      String snapshotName3 = createSnapshot();
+
 
       int res = ToolRunner.run(shell,
           new String[]{"-deleteSnapshot", BUCKET_PATH, snapshotName1});
@@ -313,6 +327,10 @@ class TestOzoneFsSnapshot {
 
       assertThat(listSnapOut).doesNotContain(snapshotName1);
       assertThat(listSnapOut).contains(snapshotName2);
+      assertThat(listSnapOut).contains(snapshotName3);
+      for (String snapshotName : snapshotNames) {
+        assertThat(listSnapOut).contains(snapshotName);
+      }
 
       // Check for snapshot keys with "ozone fs -ls"
       String listSnapKeyOut = execShellCommandAndGetOutput(1,

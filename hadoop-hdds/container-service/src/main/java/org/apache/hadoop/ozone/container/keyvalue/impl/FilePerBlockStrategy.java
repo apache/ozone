@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -75,6 +76,10 @@ public class FilePerBlockStrategy implements ChunkManager {
   private final OpenFiles files = new OpenFiles();
   private final int defaultReadBufferCapacity;
   private final int readMappedBufferThreshold;
+  private final int readMappedBufferMaxCount;
+  private final MappedBufferManager mappedBufferManager;
+
+  private final boolean readNettyChunkedNioFile;
   private final VolumeSet volumeSet;
 
   public FilePerBlockStrategy(boolean sync, BlockManager manager,
@@ -84,7 +89,17 @@ public class FilePerBlockStrategy implements ChunkManager {
         manager.getDefaultReadBufferCapacity();
     this.readMappedBufferThreshold = manager == null ? 0
         : manager.getReadMappedBufferThreshold();
+    this.readMappedBufferMaxCount = manager == null ? 0
+        : manager.getReadMappedBufferMaxCount();
+    LOG.info("ozone.chunk.read.mapped.buffer.max.count is load with {}", readMappedBufferMaxCount);
     this.volumeSet = volSet;
+    if (this.readMappedBufferMaxCount > 0) {
+      mappedBufferManager = new MappedBufferManager(this.readMappedBufferMaxCount);
+    } else {
+      mappedBufferManager = null;
+    }
+
+    this.readNettyChunkedNioFile = manager != null && manager.isReadNettyChunkedNioFile();
   }
 
   private static void checkLayoutVersion(Container container) {
@@ -170,7 +185,7 @@ public class FilePerBlockStrategy implements ChunkManager {
   }
 
   @Override
-  public ChunkBuffer readChunk(Container container, BlockID blockID,
+  public ChunkBufferToByteString readChunk(Container container, BlockID blockID,
       ChunkInfo info, DispatcherContext dispatcherContext)
       throws StorageContainerException {
 
@@ -192,10 +207,14 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     final long len = info.getLen();
     long offset = info.getOffset();
-    int bufferCapacity =  ChunkManager.getBufferCapacityForChunkRead(info,
+    int bufferCapacity = ChunkManager.getBufferCapacityForChunkRead(info,
         defaultReadBufferCapacity);
+
+    if (readNettyChunkedNioFile && dispatcherContext != null && dispatcherContext.isReleaseSupported()) {
+      return ChunkUtils.readData(chunkFile, bufferCapacity, offset, len, volume, dispatcherContext);
+    }
     return ChunkUtils.readData(len, bufferCapacity, chunkFile, offset, volume,
-        readMappedBufferThreshold);
+        readMappedBufferThreshold, readMappedBufferMaxCount > 0, mappedBufferManager);
   }
 
   @Override
@@ -220,6 +239,23 @@ public class FilePerBlockStrategy implements ChunkManager {
     } catch (IOException e) {
       onFailure(container.getContainerData().getVolume());
       throw e;
+    }
+  }
+
+  @Override
+  public void finalizeWriteChunk(KeyValueContainer container,
+      BlockID blockId) throws IOException {
+    synchronized (container) {
+      File chunkFile = getChunkFile(container, blockId);
+      try {
+        if (files.isOpen(chunkFile)) {
+          files.close(chunkFile);
+        }
+        verifyChunkFileExists(chunkFile);
+      } catch (IOException e) {
+        onFailure(container.getContainerData().getVolume());
+        throw e;
+      }
     }
   }
 
@@ -302,6 +338,11 @@ public class FilePerBlockStrategy implements ChunkManager {
       if (file != null) {
         files.invalidate(file.getPath());
       }
+    }
+
+    public boolean isOpen(File file) {
+      return file != null &&
+          files.getIfPresent(file.getPath()) != null;
     }
 
     private static void close(String filename, OpenFile openFile) {

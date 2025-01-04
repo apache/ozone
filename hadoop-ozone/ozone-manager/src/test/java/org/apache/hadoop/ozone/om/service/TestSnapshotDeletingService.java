@@ -20,7 +20,8 @@ package org.apache.hadoop.ozone.om.service;
 
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
@@ -56,43 +57,47 @@ public class TestSnapshotDeletingService {
   private SnapshotChainManager chainManager;
   @Mock
   private OmMetadataManagerImpl omMetadataManager;
-  @Mock
-  private ScmBlockLocationProtocol scmClient;
   private final OzoneConfiguration conf = new OzoneConfiguration();;
   private final long sdsRunInterval = Duration.ofMillis(1000).toMillis();
   private final  long sdsServiceTimeout = Duration.ofSeconds(10).toMillis();
 
 
-  private static Stream<Arguments> testCasesForIgnoreSnapshotGc() {
-    SnapshotInfo filteredSnapshot = SnapshotInfo.newBuilder().setSstFiltered(true).setName("snap1").build();
-    SnapshotInfo unFilteredSnapshot = SnapshotInfo.newBuilder().setSstFiltered(false).setName("snap1").build();
+  private static Stream<Arguments> testCasesForIgnoreSnapshotGc() throws IOException {
+    SnapshotInfo flushedSnapshot = SnapshotInfo.newBuilder().setSstFiltered(true)
+        .setLastTransactionInfo(TransactionInfo.valueOf(1, 1).toByteString())
+        .setName("snap1").build();
+    SnapshotInfo unFlushedSnapshot = SnapshotInfo.newBuilder().setSstFiltered(false).setName("snap1")
+        .setLastTransactionInfo(TransactionInfo.valueOf(0, 0).toByteString()).build();
     return Stream.of(
-        Arguments.of(filteredSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED, true, false),
-        Arguments.of(filteredSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, true, true),
-        Arguments.of(unFilteredSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED, true, true),
-        Arguments.of(unFilteredSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, true, true),
-        Arguments.of(filteredSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED, false, false),
-        Arguments.of(unFilteredSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED, false, false),
-        Arguments.of(unFilteredSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, false, true),
-        Arguments.of(filteredSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, false, true));
+        Arguments.of(flushedSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED, false),
+        Arguments.of(flushedSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, true),
+        Arguments.of(unFlushedSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED, false),
+        Arguments.of(unFlushedSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, true),
+        Arguments.of(flushedSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED, false),
+        Arguments.of(unFlushedSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED, false),
+        Arguments.of(unFlushedSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, true),
+        Arguments.of(flushedSnapshot, SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, true));
   }
 
   @ParameterizedTest
   @MethodSource("testCasesForIgnoreSnapshotGc")
   public void testProcessSnapshotLogicInSDS(SnapshotInfo snapshotInfo,
                                             SnapshotInfo.SnapshotStatus status,
-                                            boolean sstFilteringServiceEnabled,
                                             boolean expectedOutcome)
       throws IOException {
-    Mockito.when(keyManager.isSstFilteringSvcEnabled()).thenReturn(sstFilteringServiceEnabled);
     Mockito.when(omMetadataManager.getSnapshotChainManager()).thenReturn(chainManager);
-    Mockito.when(ozoneManager.getKeyManager()).thenReturn(keyManager);
     Mockito.when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
     Mockito.when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     Mockito.when(ozoneManager.getConfiguration()).thenReturn(conf);
+    if (status == SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED) {
+      Table<String, TransactionInfo> transactionInfoTable = Mockito.mock(Table.class);
+      Mockito.when(omMetadataManager.getTransactionInfoTable()).thenReturn(transactionInfoTable);
+      Mockito.when(transactionInfoTable.getSkipCache(Mockito.anyString()))
+          .thenReturn(TransactionInfo.valueOf(1, 1));
+    }
 
     SnapshotDeletingService snapshotDeletingService =
-        new SnapshotDeletingService(sdsRunInterval, sdsServiceTimeout, ozoneManager, scmClient);
+        new SnapshotDeletingService(sdsRunInterval, sdsServiceTimeout, ozoneManager);
 
     snapshotInfo.setSnapshotStatus(status);
     assertEquals(expectedOutcome, snapshotDeletingService.shouldIgnoreSnapshot(snapshotInfo));

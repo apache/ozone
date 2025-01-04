@@ -19,12 +19,12 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone</artifactId>
-    <version>1.5.0-SNAPSHOT</version>
+    <version>2.0.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone-filesystem-hadoop2</artifactId>
   <name>Apache Ozone FS Hadoop 2.x compatibility</name>
   <packaging>jar</packaging>
-  <version>1.5.0-SNAPSHOT</version>
+  <version>2.0.0-SNAPSHOT</version>
   <properties>
     <shaded.prefix>org.apache.hadoop.ozone.shaded</shaded.prefix>
   </properties>
@@ -116,6 +116,13 @@
   </dependencies>
   <build>
     <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <proc>none</proc>
+        </configuration>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>

@@ -29,6 +29,7 @@ import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeoutException;
 
 import com.google.common.base.Preconditions;
@@ -44,6 +45,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -92,7 +95,10 @@ public abstract class GenericTestUtils {
    * Get the (created) base directory for tests.
    *
    * @return the absolute directory
+   *
+   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
    */
+  @Deprecated
   public static File getTestDir() {
     String prop =
         System.getProperty(SYSPROP_TEST_DATA_DIR, DEFAULT_TEST_DATA_DIR);
@@ -109,7 +115,10 @@ public abstract class GenericTestUtils {
    * Get an uncreated directory for tests.
    *
    * @return the absolute directory for tests. Caller is expected to create it.
+   *
+   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
    */
+  @Deprecated
   public static File getTestDir(String subdir) {
     return new File(getTestDir(), subdir).getAbsoluteFile();
   }
@@ -119,7 +128,10 @@ public abstract class GenericTestUtils {
    * name. This is likely to provide a unique path for tests run in parallel
    *
    * @return the absolute directory for tests. Caller is expected to create it.
+   *
+   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
    */
+  @Deprecated
   public static File getRandomizedTestDir() {
     return new File(getRandomizedTempPath());
   }
@@ -131,7 +143,10 @@ public abstract class GenericTestUtils {
    *
    * @param subpath sub path, with no leading "/" character
    * @return a string to use in paths
+   *
+   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
    */
+  @Deprecated
   public static String getTempPath(String subpath) {
     String prop = WINDOWS ? DEFAULT_TEST_DATA_PATH
         : System.getProperty(SYSPROP_TEST_DATA_DIR, DEFAULT_TEST_DATA_PATH);
@@ -152,8 +167,11 @@ public abstract class GenericTestUtils {
    * under the relative path {@link #DEFAULT_TEST_DATA_PATH}
    *
    * @return a string to use in paths
+   *
+   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
    */
   @SuppressWarnings("java:S2245") // no need for secure random
+  @Deprecated
   public static String getRandomizedTempPath() {
     return getTempPath(getCallerClass(GenericTestUtils.class).getSimpleName()
         + "-" + randomAlphanumeric(10));
@@ -203,6 +221,20 @@ public abstract class GenericTestUtils {
           "Thread diagnostics:\n" +
           TimedOutTestsListener.buildThreadDiagnosticString());
     }
+  }
+
+  public static <T extends Throwable> T assertThrows(
+      Class<T> expectedType,
+      Callable<? extends AutoCloseable> func) {
+    return Assertions.assertThrows(expectedType, () -> {
+      final AutoCloseable closeable = func.call();
+      try {
+        if (closeable != null) {
+          closeable.close();
+        }
+      } catch (Exception ignored) {
+      }
+    });
   }
 
   /**
@@ -323,44 +355,71 @@ public abstract class GenericTestUtils {
     return System.nanoTime() / NANOSECONDS_PER_MILLISECOND;
   }
 
-  /**
-   * Capture output printed to {@link System#err}.
-   * <p>
-   * Usage:
-   * <pre>
-   *   try (SystemErrCapturer capture = new SystemErrCapturer()) {
-   *     ...
-   *     // Call capture.getOutput() to get the output string
-   *   }
-   * </pre>
-   * <p>
-   * TODO: Add lambda support once Java 8 is common.
-   * <pre>
-   *   SystemErrCapturer.withCapture(capture -> {
-   *     ...
-   *   })
-   * </pre>
-   */
-  public static class SystemErrCapturer implements AutoCloseable {
+  public static PrintStreamCapturer captureOut() {
+    return new SystemOutCapturer();
+  }
+
+  public static PrintStreamCapturer captureErr() {
+    return new SystemErrCapturer();
+  }
+
+  /** Capture contents of a {@code PrintStream}, until {@code close()}d. */
+  public abstract static class PrintStreamCapturer implements AutoCloseable, Supplier<String> {
     private final ByteArrayOutputStream bytes;
     private final PrintStream bytesPrintStream;
-    private final PrintStream oldErr;
+    private final PrintStream old;
+    private final Consumer<PrintStream> restore;
 
-    public SystemErrCapturer() throws UnsupportedEncodingException {
+    protected PrintStreamCapturer(PrintStream out, Consumer<PrintStream> install) {
+      old = out;
       bytes = new ByteArrayOutputStream();
-      bytesPrintStream = new PrintStream(bytes, false, UTF_8.name());
-      oldErr = System.err;
-      System.setErr(new TeePrintStream(oldErr, bytesPrintStream));
+      try {
+        bytesPrintStream = new PrintStream(bytes, false, UTF_8.name());
+        install.accept(new TeePrintStream(out, bytesPrintStream));
+        restore = install;
+      } catch (UnsupportedEncodingException e) {
+        throw new IllegalStateException(e);
+      }
     }
 
-    public String getOutput() throws UnsupportedEncodingException {
-      return bytes.toString(UTF_8.name());
+    @Override
+    public String get() {
+      return getOutput();
+    }
+
+    public String getOutput() {
+      try {
+        return bytes.toString(UTF_8.name());
+      } catch (UnsupportedEncodingException e) {
+        throw new IllegalStateException(e);
+      }
+    }
+
+    public void reset() {
+      bytes.reset();
     }
 
     @Override
     public void close() throws Exception {
       IOUtils.closeQuietly(bytesPrintStream);
-      System.setErr(oldErr);
+      restore.accept(old);
+    }
+  }
+
+  /**
+   * Capture output printed to {@link System#err}.
+   * <p>
+   * Usage:
+   * <pre>
+   *   try (PrintStreamCapturer capture = captureErr()) {
+   *     ...
+   *     // Call capture.getOutput() to get the output string
+   *   }
+   * </pre>
+   */
+  public static class SystemErrCapturer extends PrintStreamCapturer {
+    public SystemErrCapturer() {
+      super(System.err, System::setErr);
     }
   }
 
@@ -369,40 +428,15 @@ public abstract class GenericTestUtils {
    * <p>
    * Usage:
    * <pre>
-   *   try (SystemOutCapturer capture = new SystemOutCapturer()) {
+   *   try (PrintStreamCapturer capture = captureOut()) {
    *     ...
    *     // Call capture.getOutput() to get the output string
    *   }
    * </pre>
-   * <p>
-   * TODO: Add lambda support once Java 8 is common.
-   * <pre>
-   *   SystemOutCapturer.withCapture(capture -> {
-   *     ...
-   *   })
-   * </pre>
    */
-  public static class SystemOutCapturer implements AutoCloseable {
-    private final ByteArrayOutputStream bytes;
-    private final PrintStream bytesPrintStream;
-    private final PrintStream oldOut;
-
-    public SystemOutCapturer() throws
-        UnsupportedEncodingException {
-      bytes = new ByteArrayOutputStream();
-      bytesPrintStream = new PrintStream(bytes, false, UTF_8.name());
-      oldOut = System.out;
-      System.setOut(new TeePrintStream(oldOut, bytesPrintStream));
-    }
-
-    public String getOutput() throws UnsupportedEncodingException {
-      return bytes.toString(UTF_8.name());
-    }
-
-    @Override
-    public void close() throws Exception {
-      IOUtils.closeQuietly(bytesPrintStream);
-      System.setOut(oldOut);
+  public static class SystemOutCapturer extends PrintStreamCapturer {
+    public SystemOutCapturer() {
+      super(System.out, System::setOut);
     }
   }
 
@@ -475,8 +509,8 @@ public abstract class GenericTestUtils {
      * This method provides the modifiers field using reflection approach which is compatible
      * for both pre Java 9 and post java 9 versions.
      * @return modifiers field
-     * @throws IllegalAccessException
-     * @throws NoSuchFieldException
+     * @throws IllegalAccessException illegalAccessException,
+     * @throws NoSuchFieldException noSuchFieldException.
      */
     public static Field getModifiersField() throws IllegalAccessException, NoSuchFieldException {
       Field modifiersField = null;

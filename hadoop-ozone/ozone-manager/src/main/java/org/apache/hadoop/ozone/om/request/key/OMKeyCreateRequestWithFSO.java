@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -138,9 +137,8 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
               omMetadataManager.getBucketKey(volumeName, bucketName));
 
       // add all missing parents to dir table
-      missingParentInfos =
-          OMDirectoryCreateRequestWithFSO.getAllMissingParentDirInfo(
-              ozoneManager, keyArgs, bucketInfo, pathInfoFSO, trxnLogIndex);
+      missingParentInfos = getAllMissingParentDirInfo(
+          ozoneManager, keyArgs, bucketInfo, pathInfoFSO, trxnLogIndex);
 
       // total number of keys created.
       numKeysCreated = missingParentInfos.size();
@@ -156,7 +154,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
               getFileEncryptionInfo(keyArgs), ozoneManager.getPrefixManager(),
               bucketInfo, pathInfoFSO, trxnLogIndex,
               pathInfoFSO.getLeafNodeObjectId(),
-              ozoneManager.isRatisEnabled(), repConfig);
+              ozoneManager.isRatisEnabled(), repConfig, ozoneManager.getConfiguration());
 
       validateEncryptionKeyInfo(bucketInfo, keyArgs);
 
@@ -187,7 +185,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       // Even if bucket gets deleted, when commitKey we shall identify if
       // bucket gets deleted.
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-              dbOpenFileName, omFileInfo, pathInfoFSO.getLeafNodeName(),
+              dbOpenFileName, omFileInfo, pathInfoFSO.getLeafNodeName(), keyName,
               trxnLogIndex);
 
       // Add cache entries for the prefix directories.
@@ -228,7 +226,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
     }
 
     // Audit Log outside the lock
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
             OMAction.ALLOCATE_KEY, auditMap, exception,
             getOmRequest().getUserInfo()));
 
@@ -246,7 +244,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
    * @param keyName           - key name.
    * @param uploadID          - Multi part upload ID for this key.
    * @param omMetadataManager
-   * @return
+   * @return {@code String}
    * @throws IOException
    */
   @Override

@@ -72,6 +72,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
 
   private final SCMRatisServer ratisServer;
   private final ConfigurationSource conf;
+  private final OzoneConfiguration ozoneConf;
   private final SecurityConfig securityConfig;
   private final DBTransactionBuffer transactionBuffer;
   private final SCMSnapshotProvider scmSnapshotProvider;
@@ -89,6 +90,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
       final SecurityConfig securityConfig,
       final StorageContainerManager scm) throws IOException {
     this.conf = conf;
+    this.ozoneConf = OzoneConfiguration.of(conf);
     this.securityConfig = securityConfig;
     this.scm = scm;
     this.exitManager = new ExitManager();
@@ -128,7 +130,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
       // It will first try to add itself to existing ring
       final SCMNodeDetails nodeDetails =
           scm.getSCMHANodeDetails().getLocalNodeDetails();
-      final boolean success = HAUtils.addSCM(OzoneConfiguration.of(conf),
+      final boolean success = HAUtils.addSCM(ozoneConf,
           new AddSCMRequest.Builder().setClusterId(scm.getClusterId())
               .setScmId(scm.getScmId())
               .setRatisAddr(nodeDetails
@@ -221,17 +223,18 @@ public class SCMHAManagerImpl implements SCMHAManager {
     }
   }
 
+  private TransactionInfo getTransactionInfoFromCheckpoint(Path checkpointLocation) throws IOException {
+    return HAUtils.getTrxnInfoFromCheckpoint(
+        ozoneConf, checkpointLocation, SCMDBDefinition.get());
+  }
+
   @Override
   public TermIndex verifyCheckpointFromLeader(String leaderId,
                                               DBCheckpoint checkpoint) {
     try {
       Path checkpointLocation = checkpoint.getCheckpointLocation();
-      TransactionInfo checkpointTxnInfo = HAUtils
-          .getTrxnInfoFromCheckpoint(OzoneConfiguration.of(conf),
-              checkpointLocation, new SCMDBDefinition());
-
-      LOG.info("Installing checkpoint with SCMTransactionInfo {}",
-          checkpointTxnInfo);
+      final TransactionInfo checkpointTxnInfo = getTransactionInfoFromCheckpoint(checkpointLocation);
+      LOG.info("{}: Verify checkpoint {} from leader {}", scm.getScmId(), checkpointTxnInfo, leaderId);
 
       TermIndex termIndex =
           getRatisServer().getSCMStateMachine().getLastAppliedTermIndex();
@@ -281,12 +284,9 @@ public class SCMHAManagerImpl implements SCMHAManager {
       throws Exception {
 
     Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
-    TransactionInfo checkpointTrxnInfo = HAUtils
-        .getTrxnInfoFromCheckpoint(OzoneConfiguration.of(conf),
-            checkpointLocation, new SCMDBDefinition());
+    final TransactionInfo checkpointTrxnInfo = getTransactionInfoFromCheckpoint(checkpointLocation);
 
-    LOG.info("Installing checkpoint with SCMTransactionInfo {}",
-        checkpointTrxnInfo);
+    LOG.info("{}: Install checkpoint {}", scm.getScmId(), checkpointTrxnInfo);
 
     return installCheckpoint(checkpointLocation, checkpointTrxnInfo);
   }
@@ -457,14 +457,12 @@ public class SCMHAManagerImpl implements SCMHAManager {
 
    // TODO: Fix the metrics ??
     final SCMMetadataStore metadataStore = scm.getScmMetadataStore();
-    metadataStore.start(OzoneConfiguration.of(conf));
+    metadataStore.start(ozoneConf);
     scm.getSequenceIdGen().reinitialize(metadataStore.getSequenceIdTable());
     scm.getPipelineManager().reinitialize(metadataStore.getPipelineTable());
     scm.getContainerManager().reinitialize(metadataStore.getContainerTable());
     scm.getScmBlockManager().getDeletedBlockLog().reinitialize(
         metadataStore.getDeletedBlocksTXTable());
-    scm.getReplicationManager().getMoveScheduler()
-        .reinitialize(metadataStore.getMoveTable());
     scm.getStatefulServiceStateManager().reinitialize(
         metadataStore.getStatefulServiceConfigTable());
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {

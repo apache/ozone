@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone</artifactId>
-    <version>1.5.0-SNAPSHOT</version>
+    <version>2.0.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone-integration-test</artifactId>
-  <version>1.5.0-SNAPSHOT</version>
+  <version>2.0.0-SNAPSHOT</version>
   <description>Apache Ozone Integration Tests</description>
   <name>Apache Ozone Integration Tests</name>
   <packaging>jar</packaging>
@@ -141,6 +141,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <groupId>org.slf4j</groupId>
           <artifactId>*</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>com.sun.jersey</groupId>
+          <artifactId>jersey-servlet</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
@@ -160,6 +164,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <exclusion>
           <groupId>org.slf4j</groupId>
           <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.sun.jersey</groupId>
+          <artifactId>jersey-servlet</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -216,6 +224,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <groupId>org.slf4j</groupId>
           <artifactId>*</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>com.sun.jersey</groupId>
+          <artifactId>jersey-servlet</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
@@ -239,12 +251,22 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       </exclusions>
     </dependency>
     <dependency>
+      <groupId>org.apache.ratis</groupId>
+      <artifactId>ratis-server</artifactId>
+    </dependency>
+
+    <dependency>
       <groupId>org.hamcrest</groupId>
       <artifactId>hamcrest</artifactId>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>jul-to-slf4j</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <version>${assertj.version}</version>
     </dependency>
   </dependencies>
 
@@ -255,6 +277,13 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <artifactId>spotbugs-maven-plugin</artifactId>
         <configuration>
           <excludeFilterFile>${basedir}/dev-support/findbugsExcludeFile.xml</excludeFilterFile>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <proc>none</proc>
         </configuration>
       </plugin>
     </plugins>

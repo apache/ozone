@@ -218,7 +218,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       }
     }
 
-    auditLog(auditLogger, buildAuditMessage(OMAction.RENAME_KEY, auditMap,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.RENAME_KEY, auditMap,
             exception, getOmRequest().getUserInfo()));
 
     switch (result) {
@@ -395,7 +395,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
    * level, e.g. source is /vol1/buck1/dir1/key1 and dest is /vol1/buck1).
    *
    * @param request
-   * @return
+   * @return {@code String}
    * @throws OMException
    */
   @Override
@@ -410,7 +410,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
    * Returns the validated and normalized source key name.
    *
    * @param keyArgs
-   * @return
+   * @return {@code String}
    * @throws OMException
    */
   @Override

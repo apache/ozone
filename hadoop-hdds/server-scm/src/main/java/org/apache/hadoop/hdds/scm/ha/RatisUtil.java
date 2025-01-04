@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.RatisConfUtils;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
@@ -69,8 +70,9 @@ public final class RatisUtil {
     // TODO: Check the default values.
     final RaftProperties properties = new RaftProperties();
     setRaftStorageDir(properties, conf);
-    setRaftRpcProperties(properties, conf);
-    setRaftLogProperties(properties, conf);
+
+    final int logAppenderBufferByteLimit = setRaftLogProperties(properties, conf);
+    setRaftRpcProperties(properties, conf, logAppenderBufferByteLimit);
     setRaftRetryCacheProperties(properties, conf);
     setRaftSnapshotProperties(properties, conf);
     setRaftLeadElectionProperties(properties, conf);
@@ -100,15 +102,14 @@ public final class RatisUtil {
    * @param ozoneConf ConfigurationSource
    */
   private static void setRaftRpcProperties(final RaftProperties properties,
-      ConfigurationSource ozoneConf) {
+      ConfigurationSource ozoneConf, int logAppenderBufferByteLimit) {
     RatisHelper.setRpcType(properties,
         RpcType.valueOf(ozoneConf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_RPC_TYPE,
                 ScmConfigKeys.OZONE_SCM_HA_RATIS_RPC_TYPE_DEFAULT)));
     GrpcConfigKeys.Server.setPort(properties, ozoneConf
         .getInt(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY,
             ScmConfigKeys.OZONE_SCM_RATIS_PORT_DEFAULT));
-    GrpcConfigKeys.setMessageSizeMax(properties,
-        SizeInBytes.valueOf("32m"));
+    RatisConfUtils.Grpc.setMessageSizeMax(properties, logAppenderBufferByteLimit);
     long ratisRequestTimeout = ozoneConf.getTimeDuration(
             ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT,
             ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT_DEFAULT,
@@ -161,7 +162,7 @@ public final class RatisUtil {
    * @param properties RaftProperties instance which will be updated
    * @param ozoneConf ConfigurationSource
    */
-  private static void setRaftLogProperties(final RaftProperties properties,
+  private static int setRaftLogProperties(final RaftProperties properties,
       final ConfigurationSource ozoneConf) {
     Log.setSegmentSizeMax(properties, SizeInBytes.valueOf((long)
         ozoneConf.getStorageSize(
@@ -195,6 +196,7 @@ public final class RatisUtil {
             ozoneConf.getInt(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP,
                     ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP_DEFAULT));
     Log.setSegmentCacheNumMax(properties, 2);
+    return logAppenderQueueByteLimit;
   }
 
   /**

@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.scm.net;
 
 import  org.apache.hadoop.hdds.scm.net.NodeSchema.LayerType;
-import org.apache.hadoop.util.StringWithByteString;
+import org.apache.hadoop.ozone.util.StringWithByteString;
 
 /**
  * Class to hold network topology related constants and configurations.

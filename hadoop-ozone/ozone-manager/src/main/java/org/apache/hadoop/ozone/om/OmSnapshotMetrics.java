@@ -162,5 +162,22 @@ public final class OmSnapshotMetrics implements OmMetadataReaderMetrics {
       MutableCounterLong numKeyOps;
   private @Metric
       MutableCounterLong numFSOps;
+
+
+  private @Metric
+      MutableCounterLong numGetObjectTagging;
+  private @Metric
+      MutableCounterLong numGetObjectTaggingFails;
+
+  @Override
+  public void incNumGetObjectTagging() {
+    numGetObjectTagging.incr();
+    numKeyOps.incr();
+  }
+
+  @Override
+  public void incNumGetObjectTaggingFails() {
+    numGetObjectTaggingFails.incr();
+  }
 }
 

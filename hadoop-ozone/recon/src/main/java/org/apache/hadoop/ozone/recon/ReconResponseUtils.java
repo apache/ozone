@@ -44,7 +44,7 @@ public final class ReconResponseUtils {
     String jsonResponse = String.format(
         "{\"message\": \"No keys matched the search prefix: '%s'.\"}",
         startPrefix);
-    return Response.status(Response.Status.NOT_FOUND)
+    return Response.status(Response.Status.NO_CONTENT)
         .entity(jsonResponse)
         .type(MediaType.APPLICATION_JSON)
         .build();

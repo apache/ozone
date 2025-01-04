@@ -22,8 +22,8 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.hdds.HddsUtils;
@@ -110,8 +110,7 @@ public abstract class XceiverClientSpi implements Closeable {
   public ContainerCommandResponseProto sendCommand(
       ContainerCommandRequestProto request) throws IOException {
     try {
-      XceiverClientReply reply;
-      reply = sendCommandAsync(request);
+      XceiverClientReply reply = sendCommandAsync(request);
       return reply.getResponse().get();
     } catch (InterruptedException e) {
       // Re-interrupt the thread while catching InterruptedException
@@ -134,8 +133,7 @@ public abstract class XceiverClientSpi implements Closeable {
       List<Validator> validators)
       throws IOException {
     try {
-      XceiverClientReply reply;
-      reply = sendCommandAsync(request);
+      XceiverClientReply reply = sendCommandAsync(request);
       ContainerCommandResponseProto responseProto = reply.getResponse().get();
       for (Validator function : validators) {
         function.accept(request, responseProto);
@@ -178,9 +176,9 @@ public abstract class XceiverClientSpi implements Closeable {
    * @return reply containing the min commit index replicated to all or majority
    *         servers in case of a failure
    */
-  public abstract XceiverClientReply watchForCommit(long index)
-      throws InterruptedException, ExecutionException, TimeoutException,
-      IOException;
+  public CompletableFuture<XceiverClientReply> watchForCommit(long index) {
+    return CompletableFuture.completedFuture(null);
+  }
 
   /**
    * returns the min commit index replicated to all servers.

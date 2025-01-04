@@ -73,8 +73,9 @@ import picocli.CommandLine.ParentCommand;
 /**
  * Base class for simplified performance tests.
  */
+@CommandLine.Command
 @SuppressWarnings("java:S2245") // no need for secure random
-public class BaseFreonGenerator {
+public class BaseFreonGenerator implements FreonSubcommand {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(BaseFreonGenerator.class);
@@ -289,6 +290,10 @@ public class BaseFreonGenerator {
     } else {
       //replace environment variables to support multi-node execution
       prefix = resolvePrefix(prefix);
+    }
+    if (duration != null && !allowDuration()) {
+      LOG.warn("--duration is ignored");
+      duration = null;
     }
     if (duration != null) {
       durationInSecond = TimeDurationUtil.getTimeDurationHelper(
@@ -554,12 +559,21 @@ public class BaseFreonGenerator {
     return prefix;
   }
 
+  /**
+   * Whether to enable Duration.
+   * If enabled, the command will load the --duration option.
+   * If not enabled, the command will not load the --duration option.
+   */
+  public boolean allowDuration() {
+    return true;
+  }
+
   public MetricRegistry getMetrics() {
     return metrics;
   }
 
   public OzoneConfiguration createOzoneConfiguration() {
-    return freonCommand.createOzoneConfiguration();
+    return freonCommand.getOzoneConf();
   }
 
   /**

@@ -22,30 +22,25 @@ import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Function;
-import java.util.function.Supplier;
-
-import org.apache.hadoop.hdds.scm.ByteStringConversion;
 
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /** Buffer for a block chunk. */
-public interface ChunkBuffer extends UncheckedAutoCloseable {
+public interface ChunkBuffer extends ChunkBufferToByteString, UncheckedAutoCloseable {
 
   /** Similar to {@link ByteBuffer#allocate(int)}. */
   static ChunkBuffer allocate(int capacity) {
     return allocate(capacity, 0);
   }
 
-  /**
-   * Similar to {@link ByteBuffer#allocate(int)}
+  /** Similar to {@link ByteBuffer#allocate(int)}
    * except that it can specify the increment.
    *
    * @param increment
    *   the increment size so that this buffer is allocated incrementally.
-   *   When increment <= 0, entire buffer is allocated in the beginning.
+   *   When increment {@literal <= 0}, entire buffer is allocated in the beginning.
    */
   static ChunkBuffer allocate(int capacity, int increment) {
     if (increment > 0 && increment < capacity) {
@@ -60,7 +55,8 @@ public interface ChunkBuffer extends UncheckedAutoCloseable {
     return new ChunkBufferImplWithByteBuffer(buffer);
   }
 
-  /** Wrap the given list of {@link ByteBuffer}s as a {@link ChunkBuffer}. */
+  /** Wrap the given list of {@link ByteBuffer}s as a {@link ChunkBuffer},
+   * with a function called when buffers are released.*/
   static ChunkBuffer wrap(List<ByteBuffer> buffers) {
     Objects.requireNonNull(buffers, "buffers == null");
     if (buffers.size() == 1) {
@@ -142,53 +138,4 @@ public interface ChunkBuffer extends UncheckedAutoCloseable {
    * @return The number of bytes written, possibly zero
    */
   long writeTo(GatheringByteChannel channel) throws IOException;
-
-  /**
-   * Convert this buffer to a {@link ByteString}.
-   * The position and limit of this {@link ChunkBuffer} remains unchanged.
-   * The given function must preserve the position and limit
-   * of the input {@link ByteBuffer}.
-   */
-  default ByteString toByteString(Function<ByteBuffer, ByteString> function) {
-    return toByteStringImpl(b -> applyAndAssertFunction(b, function, this));
-  }
-
-  /**
-   * Convert this buffer(s) to a list of {@link ByteString}.
-   * The position and limit of this {@link ChunkBuffer} remains unchanged.
-   * The given function must preserve the position and limit
-   * of the input {@link ByteBuffer}.
-   */
-  default List<ByteString> toByteStringList(
-      Function<ByteBuffer, ByteString> function) {
-    return toByteStringListImpl(b -> applyAndAssertFunction(b, function, this));
-  }
-
-  // for testing
-  default ByteString toByteString() {
-    return toByteString(ByteStringConversion::safeWrap);
-  }
-
-  ByteString toByteStringImpl(Function<ByteBuffer, ByteString> function);
-
-  List<ByteString> toByteStringListImpl(
-      Function<ByteBuffer, ByteString> function);
-
-  static void assertInt(int expected, int computed, Supplier<String> prefix) {
-    if (expected != computed) {
-      throw new IllegalStateException(prefix.get()
-          + ": expected = " + expected + " but computed = " + computed);
-    }
-  }
-
-  /** Apply the function and assert if it preserves position and limit. */
-  static ByteString applyAndAssertFunction(ByteBuffer buffer,
-      Function<ByteBuffer, ByteString> function, Object name) {
-    final int pos = buffer.position();
-    final int lim = buffer.limit();
-    final ByteString bytes = function.apply(buffer);
-    assertInt(pos, buffer.position(), () -> name + ": Unexpected position");
-    assertInt(lim, buffer.limit(), () -> name + ": Unexpected limit");
-    return bytes;
-  }
 }

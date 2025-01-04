@@ -26,6 +26,8 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ratis.statemachine.SnapshotInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -41,6 +43,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
  * operation in DB.
  */
 public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
+
+  public static final Logger LOG = LoggerFactory.getLogger(SCMHADBTransactionBufferImpl.class);
   private final StorageContainerManager scm;
   private SCMMetadataStore metadataStore;
   private BatchOperation currentBatchOperation;
@@ -107,6 +111,8 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
 
   @Override
   public void setLatestSnapshot(SnapshotInfo latestSnapshot) {
+    LOG.info("{}: Set latest Snapshot to {}",
+        scm.getScmHAManager().getRatisServer().getDivision().getId(), latestSnapshot);
     this.latestSnapshot.set(latestSnapshot);
   }
 

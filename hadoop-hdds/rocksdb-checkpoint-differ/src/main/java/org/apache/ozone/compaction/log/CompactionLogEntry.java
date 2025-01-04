@@ -19,12 +19,12 @@
 package org.apache.ozone.compaction.log;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
-import org.apache.hadoop.util.Preconditions;
 
 import java.util.List;
 import java.util.Objects;
@@ -38,7 +38,8 @@ public final class CompactionLogEntry implements
   private static final Codec<CompactionLogEntry> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(CompactionLogEntryProto.getDefaultInstance()),
       CompactionLogEntry::getFromProtobuf,
-      CompactionLogEntry::getProtobuf);
+      CompactionLogEntry::getProtobuf,
+      CompactionLogEntry.class);
 
   public static Codec<CompactionLogEntry> getCodec() {
     return CODEC;

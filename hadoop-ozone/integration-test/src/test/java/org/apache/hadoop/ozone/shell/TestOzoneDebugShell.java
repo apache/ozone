@@ -21,6 +21,8 @@ package org.apache.hadoop.ozone.shell;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -34,9 +36,8 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
-import org.apache.hadoop.ozone.debug.DBScanner;
 import org.apache.hadoop.ozone.debug.OzoneDebug;
-import org.apache.hadoop.ozone.debug.RDBParser;
+import org.apache.hadoop.ozone.debug.ldb.RDBParser;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -46,6 +47,8 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import picocli.CommandLine;
 
 import java.io.File;
@@ -80,13 +83,14 @@ public class TestOzoneDebugShell {
 
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient client;
+  private static OzoneDebug ozoneDebugShell;
 
   private static OzoneConfiguration conf = null;
 
   protected static void startCluster() throws Exception {
     // Init HA cluster
     omServiceId = "om-service-test1";
-    final int numDNs = 3;
+    final int numDNs = 5;
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(numDNs)
         .build();
@@ -97,7 +101,8 @@ public class TestOzoneDebugShell {
 
   @BeforeAll
   public static void init() throws Exception {
-    conf = new OzoneConfiguration();
+    ozoneDebugShell = new OzoneDebug();
+    conf = ozoneDebugShell.getOzoneConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
         100, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1, SECONDS);
@@ -112,13 +117,14 @@ public class TestOzoneDebugShell {
     startCluster();
   }
 
-  @Test
-  public void testChunkInfoCmdBeforeAfterCloseContainer() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testChunkInfoCmdBeforeAfterCloseContainer(boolean isEcKey) throws Exception {
     final String volumeName = UUID.randomUUID().toString();
     final String bucketName = UUID.randomUUID().toString();
     final String keyName = UUID.randomUUID().toString();
 
-    writeKey(volumeName, bucketName, keyName);
+    writeKey(volumeName, bucketName, keyName, isEcKey);
 
     int exitCode = runChunkInfoCommand(volumeName, bucketName, keyName);
     assertEquals(0, exitCode);
@@ -134,7 +140,7 @@ public class TestOzoneDebugShell {
     final String volumeName = UUID.randomUUID().toString();
     final String bucketName = UUID.randomUUID().toString();
     final String keyName = UUID.randomUUID().toString();
-    writeKey(volumeName, bucketName, keyName);
+    writeKey(volumeName, bucketName, keyName, false);
     int exitCode = runChunkInfoAndVerifyPaths(volumeName, bucketName, keyName);
     assertEquals(0, exitCode);
   }
@@ -144,13 +150,12 @@ public class TestOzoneDebugShell {
     StringWriter stdout = new StringWriter();
     PrintWriter pstdout = new PrintWriter(stdout);
     CommandLine cmd = new CommandLine(new RDBParser())
-        .addSubcommand(new DBScanner())
         .setOut(pstdout);
     final String volumeName = UUID.randomUUID().toString();
     final String bucketName = UUID.randomUUID().toString();
     final String keyName = UUID.randomUUID().toString();
 
-    writeKey(volumeName, bucketName, keyName);
+    writeKey(volumeName, bucketName, keyName, false);
 
     String snapshotName =
         client.getObjectStore().createSnapshot(volumeName, bucketName, "snap1");
@@ -176,15 +181,22 @@ public class TestOzoneDebugShell {
         OM_DB_NAME + checkPointDir;
   }
 
-
   private static void writeKey(String volumeName, String bucketName,
-      String keyName) throws IOException {
+      String keyName, boolean isEcKey) throws IOException {
+    ReplicationConfig repConfig;
+    if (isEcKey) {
+      repConfig = new ECReplicationConfig(3, 2);
+    } else {
+      repConfig = ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+          ReplicationFactor.THREE);
+    }
     try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
       // see HDDS-10091 for making this work with FILE_SYSTEM_OPTIMIZED layout
-      TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName, BucketLayout.LEGACY);
+      TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName,
+          BucketLayout.LEGACY);
       TestDataUtil.createKey(
           client.getObjectStore().getVolume(volumeName).getBucket(bucketName),
-          keyName, ReplicationFactor.THREE, ReplicationType.RATIS, "test");
+          keyName, repConfig, "test");
     }
   }
 
@@ -196,7 +208,6 @@ public class TestOzoneDebugShell {
         getSetConfStringFromConf(OMConfigKeys.OZONE_OM_ADDRESS_KEY),
         "chunkinfo", bucketPath + Path.SEPARATOR + keyName };
 
-    OzoneDebug ozoneDebugShell = new OzoneDebug(conf);
     int exitCode = ozoneDebugShell.execute(args);
     return exitCode;
   }
@@ -208,7 +219,6 @@ public class TestOzoneDebugShell {
     String[] args = new String[] {
         getSetConfStringFromConf(OMConfigKeys.OZONE_OM_ADDRESS_KEY),
         "chunkinfo", bucketPath + Path.SEPARATOR + keyName };
-    OzoneDebug ozoneDebugShell = new OzoneDebug(conf);
     int exitCode = 1;
     try (GenericTestUtils.SystemOutCapturer capture = new GenericTestUtils
         .SystemOutCapturer()) {

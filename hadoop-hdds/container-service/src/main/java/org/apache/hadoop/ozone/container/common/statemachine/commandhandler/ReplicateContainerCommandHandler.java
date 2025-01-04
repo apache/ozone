@@ -43,27 +43,26 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
   static final Logger LOG =
       LoggerFactory.getLogger(ReplicateContainerCommandHandler.class);
 
-  private int invocationCount;
-
-  private long totalTime;
-
-  private ConfigurationSource conf;
-
   private ReplicationSupervisor supervisor;
 
   private ContainerReplicator downloadReplicator;
 
   private ContainerReplicator pushReplicator;
 
+  private String metricsName;
+
   public ReplicateContainerCommandHandler(
       ConfigurationSource conf,
       ReplicationSupervisor supervisor,
       ContainerReplicator downloadReplicator,
       ContainerReplicator pushReplicator) {
-    this.conf = conf;
     this.supervisor = supervisor;
     this.downloadReplicator = downloadReplicator;
     this.pushReplicator = pushReplicator;
+  }
+
+  public String getMetricsName() {
+    return this.metricsName;
   }
 
   @Override
@@ -86,12 +85,16 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
             downloadReplicator : pushReplicator;
 
     ReplicationTask task = new ReplicationTask(replicateCommand, replicator);
+    if (metricsName == null) {
+      metricsName = task.getMetricName();
+    }
     supervisor.addTask(task);
   }
 
   @Override
   public int getQueuedCount() {
-    return supervisor.getInFlightReplications(ReplicationTask.class);
+    return this.metricsName == null ? 0 : (int) this.supervisor
+        .getReplicationQueuedCount(metricsName);
   }
 
   @Override
@@ -101,19 +104,19 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
 
   @Override
   public int getInvocationCount() {
-    return this.invocationCount;
+    return this.metricsName == null ? 0 : (int) this.supervisor
+        .getReplicationRequestCount(metricsName);
   }
 
   @Override
   public long getAverageRunTime() {
-    if (invocationCount > 0) {
-      return totalTime / invocationCount;
-    }
-    return 0;
+    return this.metricsName == null ? 0 : (int) this.supervisor
+        .getReplicationRequestAvgTime(metricsName);
   }
 
   @Override
   public long getTotalRunTime() {
-    return totalTime;
+    return this.metricsName == null ? 0 : this.supervisor
+        .getReplicationRequestTotalTime(metricsName);
   }
 }

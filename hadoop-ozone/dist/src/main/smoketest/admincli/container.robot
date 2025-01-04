@@ -84,6 +84,18 @@ Report containers as JSON
                          Should contain   ${output}   stats
                          Should contain   ${output}   samples
 
+List all containers
+    ${output} =         Execute          ozone admin container list --all
+                        Should contain   ${output}   OPEN
+
+List all containers according to count (batchSize)
+    ${output} =         Execute          ozone admin container list --all --count 10
+                        Should contain   ${output}   OPEN
+
+List all containers from a particular container ID
+    ${output} =         Execute          ozone admin container list --all --start 1
+                        Should contain   ${output}   OPEN
+
 Close container
     ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
                         Execute          ozone admin container close "${container}"
@@ -93,7 +105,7 @@ Close container
 
 Incomplete command
     ${output} =         Execute And Ignore Error     ozone admin container
-                        Should contain   ${output}   Incomplete command
+                        Should contain   ${output}   Missing required subcommand
                         Should contain   ${output}   list
                         Should contain   ${output}   info
                         Should contain   ${output}   create

@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.client.checksum;
 
-import org.apache.hadoop.fs.PathIOException;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -28,7 +27,6 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
-import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -37,14 +35,12 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.security.token.Token;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.List;
 
 /**
  * The helper class to compute file checksum for replicated files.
  */
 public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
-  private int blockIdx;
 
   public ReplicatedFileChecksumHelper(
       OzoneVolume volume, OzoneBucket bucket, String keyName, long length,
@@ -61,65 +57,10 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
         keyInfo);
   }
 
-
   @Override
-  protected void checksumBlocks() throws IOException {
-    long currentLength = 0;
-    for (blockIdx = 0;
-         blockIdx < getKeyLocationInfoList().size() && getRemaining() >= 0;
-         blockIdx++) {
-      OmKeyLocationInfo keyLocationInfo =
-          getKeyLocationInfoList().get(blockIdx);
-      if (currentLength > getLength()) {
-        return;
-      }
-
-      if (!checksumBlock(keyLocationInfo)) {
-        throw new PathIOException(getSrc(),
-            "Fail to get block checksum for " + keyLocationInfo
-                + ", checksum combine mode: " + getCombineMode());
-      }
-
-      currentLength += keyLocationInfo.getLength();
-    }
-  }
-
-  /**
-   * Return true when sounds good to continue or retry, false when severe
-   * condition or totally failed.
-   */
-  private boolean checksumBlock(OmKeyLocationInfo keyLocationInfo)
-      throws IOException {
-    // for each block, send request
-    List<ContainerProtos.ChunkInfo> chunkInfos =
-        getChunkInfos(keyLocationInfo);
-    if (chunkInfos.size() == 0) {
-      return false;
-    }
-
-    long blockNumBytes = keyLocationInfo.getLength();
-
-    if (getRemaining() < blockNumBytes) {
-      blockNumBytes = getRemaining();
-    }
-    setRemaining(getRemaining() - blockNumBytes);
-
-    ContainerProtos.ChecksumData checksumData =
-        chunkInfos.get(0).getChecksumData();
-    setChecksumType(checksumData.getType());
-    int bytesPerChecksum = checksumData.getBytesPerChecksum();
-    setBytesPerCRC(bytesPerChecksum);
-
-    ByteBuffer blockChecksumByteBuffer = getBlockChecksumFromChunkChecksums(
-        keyLocationInfo, chunkInfos);
-    String blockChecksumForDebug =
-        populateBlockChecksumBuf(blockChecksumByteBuffer);
-
-    LOG.debug("got reply from pipeline {} for block {}: blockChecksum={}, " +
-            "blockChecksumType={}",
-        keyLocationInfo.getPipeline(), keyLocationInfo.getBlockID(),
-        blockChecksumForDebug, checksumData.getType());
-    return true;
+  protected AbstractBlockChecksumComputer getBlockChecksumComputer(List<ContainerProtos.ChunkInfo> chunkInfos,
+      long blockLength) {
+    return new ReplicatedBlockChecksumComputer(chunkInfos);
   }
 
   // copied from BlockInputStream
@@ -127,6 +68,7 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
    * Send RPC call to get the block info from the container.
    * @return List of chunks in this block.
    */
+  @Override
   protected List<ContainerProtos.ChunkInfo> getChunkInfos(
       OmKeyLocationInfo keyLocationInfo) throws IOException {
     // irrespective of the container state, we will always read via Standalone
@@ -162,60 +104,5 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
     }
 
     return chunks;
-  }
-
-  // TODO: copy BlockChecksumHelper here
-  ByteBuffer getBlockChecksumFromChunkChecksums(
-      OmKeyLocationInfo keyLocationInfo,
-      List<ContainerProtos.ChunkInfo> chunkInfoList)
-      throws IOException {
-    AbstractBlockChecksumComputer blockChecksumComputer =
-        new ReplicatedBlockChecksumComputer(chunkInfoList);
-    blockChecksumComputer.compute(getCombineMode());
-
-    return blockChecksumComputer.getOutByteBuffer();
-  }
-
-  /**
-   * Parses out the raw blockChecksum bytes from {@code checksumData} byte
-   * buffer according to the blockChecksumType and populates the cumulative
-   * blockChecksumBuf with it.
-   *
-   * @return a debug-string representation of the parsed checksum if
-   *     debug is enabled, otherwise null.
-   */
-  String populateBlockChecksumBuf(ByteBuffer checksumData)
-      throws IOException {
-    String blockChecksumForDebug = null;
-    switch (getCombineMode()) {
-    case MD5MD5CRC:
-      //read md5
-      final MD5Hash md5 = new MD5Hash(checksumData.array());
-      md5.write(getBlockChecksumBuf());
-      if (LOG.isDebugEnabled()) {
-        blockChecksumForDebug = md5.toString();
-      }
-      break;
-    case COMPOSITE_CRC:
-      // TODO: abort if chunk checksum type is not CRC32/CRC32C
-      //BlockChecksumType returnedType = PBHelperClient.convert(
-      //    checksumData.getBlockChecksumOptions().getBlockChecksumType());
-      /*if (returnedType != BlockChecksumType.COMPOSITE_CRC) {
-        throw new IOException(String.format(
-            "Unexpected blockChecksumType '%s', expecting COMPOSITE_CRC",
-            returnedType));
-      }*/
-      byte[] crcBytes = checksumData.array();
-      if (LOG.isDebugEnabled()) {
-        blockChecksumForDebug = CrcUtil.toSingleCrcString(crcBytes);
-      }
-      getBlockChecksumBuf().write(crcBytes);
-      break;
-    default:
-      throw new IOException(
-          "Unknown combine mode: " + getCombineMode());
-    }
-
-    return blockChecksumForDebug;
   }
 }

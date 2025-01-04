@@ -123,6 +123,7 @@ import static org.mockito.Mockito.eq;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
@@ -183,7 +184,7 @@ public class TestSCMNodeManager {
         TimeUnit.MILLISECONDS);
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
     conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     return conf;
   }
 
@@ -282,7 +283,7 @@ public class TestSCMNodeManager {
         1, TimeUnit.DAYS);
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
-      assertTrue(scm.checkLeader());
+      assertTrue(scm.getScmContext().isLeader());
       // Register 2 nodes correctly.
       // These will be used with a faulty node to test pipeline creation.
       DatanodeDetails goodNode1 = registerWithCapacity(nodeManager);
@@ -401,7 +402,7 @@ public class TestSCMNodeManager {
         1, TimeUnit.DAYS);
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
-      assertTrue(scm.checkLeader());
+      assertTrue(scm.getScmContext().isLeader());
       // Nodes with mismatched SLV cannot join the cluster.
       registerWithCapacity(nodeManager,
           LARGER_SLV_LAYOUT_PROTO, errorNodeNotPermitted);
@@ -850,15 +851,12 @@ public class TestSCMNodeManager {
     }
   }
 
-  @Test
-  public void testProcessLayoutVersion() throws IOException {
-    // TODO: Refactor this class to use org.junit.jupiter so test
-    //  parameterization can be used.
-    for (FinalizationCheckpoint checkpoint: FinalizationCheckpoint.values()) {
-      LOG.info("Testing with SCM finalization checkpoint {}", checkpoint);
-      testProcessLayoutVersionLowerMlv(checkpoint);
-      testProcessLayoutVersionReportHigherMlv(checkpoint);
-    }
+  @ParameterizedTest
+  @EnumSource(FinalizationCheckpoint.class)
+  public void testProcessLayoutVersion(FinalizationCheckpoint checkpoint) throws IOException {
+    LOG.info("Testing with SCM finalization checkpoint {}", checkpoint);
+    testProcessLayoutVersionLowerMlv(checkpoint);
+    testProcessLayoutVersionReportHigherMlv(checkpoint);
   }
 
   // Currently invoked by testProcessLayoutVersion.

@@ -46,7 +46,6 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.ozone.test.GenericTestUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
@@ -80,10 +79,6 @@ public class TestContainerStateMachineFailureOnRead {
   @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
-    String path = GenericTestUtils
-        .getTempPath(TestContainerStateMachineFailures.class.getSimpleName());
-    File baseDir = new File(path);
-    baseDir.mkdirs();
 
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);

@@ -23,6 +23,7 @@ import java.util.NavigableSet;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
@@ -114,6 +115,12 @@ public interface ContainerStateManager {
    */
   Set<ContainerID> getContainerIDs(LifeCycleState state);
 
+
+  /**
+   * Returns the IDs of the Containers whose ReplicationType matches the given type.
+   */
+  Set<ContainerID> getContainerIDs(ReplicationType type);
+
   /**
    *
    */
@@ -150,6 +157,18 @@ public interface ContainerStateManager {
   void updateContainerState(HddsProtos.ContainerID id,
                             HddsProtos.LifeCycleEvent event)
       throws IOException, InvalidStateTransitionException;
+
+
+  /**
+   * Bypasses the container state machine to change a container's state from DELETING to CLOSED. This API was
+   * introduced to fix a bug (HDDS-11136), and should be used with care otherwise.
+   *
+   * @see <a href="https://issues.apache.org/jira/browse/HDDS-11136">HDDS-11136</a>
+   * @param id id of the container to transition
+   * @throws IOException
+   */
+  @Replicate
+  void transitionDeletingToClosedState(HddsProtos.ContainerID id) throws IOException;
 
   /**
    *

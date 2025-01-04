@@ -237,21 +237,15 @@ public class TestNodeDecommissionManager {
     // same IP so we have 3 registered from the same host and 2 distinct ports.
     DatanodeDetails sourceDN = dns.get(9);
     int ratisPort = sourceDN
-        .getPort(DatanodeDetails.Port.Name.RATIS).getValue();
+        .getRatisPort().getValue();
     DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
     builder.setUuid(UUID.randomUUID())
         .setHostName(sourceDN.getHostName())
         .setIpAddress(sourceDN.getIpAddress())
-        .addPort(DatanodeDetails.newPort(
-            DatanodeDetails.Port.Name.STANDALONE,
-            sourceDN.getPort(DatanodeDetails.Port.Name.STANDALONE)
-                .getValue() + 1))
-        .addPort(DatanodeDetails.newPort(
-            DatanodeDetails.Port.Name.RATIS,
-            ratisPort + 1))
-        .addPort(DatanodeDetails.newPort(
-            DatanodeDetails.Port.Name.REST,
-            sourceDN.getPort(DatanodeDetails.Port.Name.REST).getValue() + 1))
+        .addPort(DatanodeDetails.newStandalonePort(sourceDN.getStandalonePort()
+            .getValue() + 1))
+        .addPort(DatanodeDetails.newRatisPort(ratisPort + 1))
+        .addPort(DatanodeDetails.newRestPort(sourceDN.getRestPort().getValue() + 1))
         .setNetworkLocation(sourceDN.getNetworkLocation());
     DatanodeDetails extraDN = builder.build();
     dns.add(extraDN);
@@ -440,6 +434,10 @@ public class TestNodeDecommissionManager {
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
         dns.get(2).getIpAddress(), dns.get(3).getIpAddress(), dns.get(4).getIpAddress()), false);
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
+    String errorMsg = String.format("%d IN-SERVICE HEALTHY and %d not IN-SERVICE or not HEALTHY nodes.", 5, 0);
+    assertTrue(error.get(0).getError().contains(errorMsg));
+    errorMsg = String.format("Cannot decommission as a minimum of %d IN-SERVICE HEALTHY nodes are required", 3);
+    assertTrue(error.get(0).getError().contains(errorMsg));
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
@@ -489,6 +487,10 @@ public class TestNodeDecommissionManager {
 
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()), false);
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
+    String errorMsg = String.format("%d IN-SERVICE HEALTHY and %d not IN-SERVICE or not HEALTHY nodes.", 5, 0);
+    assertTrue(error.get(0).getError().contains(errorMsg));
+    errorMsg = String.format("Cannot decommission as a minimum of %d IN-SERVICE HEALTHY nodes are required", 5);
+    assertTrue(error.get(0).getError().contains(errorMsg));
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()), true);
@@ -537,6 +539,10 @@ public class TestNodeDecommissionManager {
 
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()), false);
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
+    String errorMsg = String.format("%d IN-SERVICE HEALTHY and %d not IN-SERVICE or not HEALTHY nodes.", 5, 0);
+    assertTrue(error.get(0).getError().contains(errorMsg));
+    errorMsg = String.format("Cannot decommission as a minimum of %d IN-SERVICE HEALTHY nodes are required", 5);
+    assertTrue(error.get(0).getError().contains(errorMsg));
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
     error = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress()), true);
@@ -637,6 +643,7 @@ public class TestNodeDecommissionManager {
     error = decom.decommissionNodes(Arrays.asList(dns.get(0).getIpAddress(),
         dns.get(1).getIpAddress(), dns.get(2).getIpAddress()), false);
     assertFalse(error.get(0).getHostname().contains("AllHosts"));
+    assertTrue(error.get(0).getError().contains("The host was not found in SCM"));
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
@@ -673,6 +680,11 @@ public class TestNodeDecommissionManager {
     error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(),
         dns.get(2).getIpAddress(), dns.get(3).getIpAddress(), dns.get(4).getIpAddress()), 100, false);
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
+    String errorMsg = String.format("%d IN-SERVICE HEALTHY and %d not IN-SERVICE or not HEALTHY nodes.", 5, 0);
+    assertTrue(error.get(0).getError().contains(errorMsg));
+    errorMsg = String.format("Cannot enter maintenance mode as a minimum of %d IN-SERVICE HEALTHY nodes are required",
+        2);
+    assertTrue(error.get(0).getError().contains(errorMsg));
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
@@ -768,6 +780,11 @@ public class TestNodeDecommissionManager {
     error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress(), dns.get(2).getIpAddress()),
         100, false);
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
+    String errorMsg = String.format("%d IN-SERVICE HEALTHY and %d not IN-SERVICE or not HEALTHY nodes.", 5, 0);
+    assertTrue(error.get(0).getError().contains(errorMsg));
+    errorMsg = String.format("Cannot enter maintenance mode as a minimum of %d IN-SERVICE HEALTHY nodes are required",
+        4);
+    assertTrue(error.get(0).getError().contains(errorMsg));
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
@@ -869,6 +886,11 @@ public class TestNodeDecommissionManager {
     // it should not be allowed as for EC, maintenance.remaining.redundancy is 2 => 3+2=5 DNs are required
     error = decom.startMaintenanceNodes(Arrays.asList(dns.get(1).getIpAddress()), 100, false);
     assertTrue(error.get(0).getHostname().contains("AllHosts"));
+    String errorMsg = String.format("%d IN-SERVICE HEALTHY and %d not IN-SERVICE or not HEALTHY nodes.", 5, 0);
+    assertTrue(error.get(0).getError().contains(errorMsg));
+    errorMsg = String.format("Cannot enter maintenance mode as a minimum of %d IN-SERVICE HEALTHY nodes are required",
+        5);
+    assertTrue(error.get(0).getError().contains(errorMsg));
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
 
@@ -1053,12 +1075,9 @@ public class TestNodeDecommissionManager {
     builder.setUuid(UUID.randomUUID())
         .setHostName(multiDn.getHostName())
         .setIpAddress(multiDn.getIpAddress())
-        .addPort(DatanodeDetails.newPort(
-            DatanodeDetails.Port.Name.STANDALONE, 3456))
-        .addPort(DatanodeDetails.newPort(
-            DatanodeDetails.Port.Name.RATIS, 4567))
-        .addPort(DatanodeDetails.newPort(
-            DatanodeDetails.Port.Name.REST, 5678))
+        .addPort(DatanodeDetails.newStandalonePort(3456))
+        .addPort(DatanodeDetails.newRatisPort(4567))
+        .addPort(DatanodeDetails.newRestPort(5678))
         .setNetworkLocation(multiDn.getNetworkLocation());
 
     DatanodeDetails dn = builder.build();
@@ -1072,16 +1091,9 @@ public class TestNodeDecommissionManager {
     builder.setUuid(UUID.randomUUID())
         .setHostName(duplicatePorts.getHostName())
         .setIpAddress(duplicatePorts.getIpAddress())
-        .addPort(DatanodeDetails.newPort(
-            DatanodeDetails.Port.Name.STANDALONE,
-            duplicatePorts.getPort(DatanodeDetails.Port.Name.STANDALONE)
-                .getValue()))
-        .addPort(DatanodeDetails.newPort(
-            DatanodeDetails.Port.Name.RATIS,
-            duplicatePorts.getPort(DatanodeDetails.Port.Name.RATIS).getValue()))
-        .addPort(DatanodeDetails.newPort(
-            DatanodeDetails.Port.Name.REST,
-            duplicatePorts.getPort(DatanodeDetails.Port.Name.REST).getValue()))
+        .addPort(DatanodeDetails.newStandalonePort(duplicatePorts.getStandalonePort().getValue()))
+        .addPort(DatanodeDetails.newRatisPort(duplicatePorts.getRatisPort().getValue()))
+        .addPort(DatanodeDetails.newRestPort(duplicatePorts.getRestPort().getValue()))
         .setNetworkLocation(multiDn.getNetworkLocation());
     dn = builder.build();
     dns.add(dn);

@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>hdds</artifactId>
-    <version>1.5.0-SNAPSHOT</version>
+    <version>2.0.0-SNAPSHOT</version>
   </parent>
   <artifactId>hdds-interface-admin</artifactId>
-  <version>1.5.0-SNAPSHOT</version>
+  <version>2.0.0-SNAPSHOT</version>
   <description>Apache Ozone Distributed Data Store Admin interface
   </description>
   <name>Apache Ozone HDDS Admin Interface</name>
@@ -31,6 +31,8 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
   <properties>
     <maven.test.skip>true</maven.test.skip> <!-- no testable code in this module -->
+    <spotbugs.skip>true</spotbugs.skip> <!-- only generated code in this module -->
+    <sort.skip>true</sort.skip>
   </properties>
 
   <dependencies>
@@ -49,6 +51,13 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <plugin>
         <groupId>com.salesforce.servicelibs</groupId>
         <artifactId>proto-backwards-compatibility</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <proc>none</proc>
+        </configuration>
       </plugin>
       <plugin>
         <groupId>org.xolstice.maven.plugins</groupId>
@@ -73,14 +82,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           </execution>
         </executions>
       </plugin>
-      <plugin>
-        <groupId>com.github.spotbugs</groupId>
-        <artifactId>spotbugs-maven-plugin</artifactId>
-        <configuration>
-          <excludeFilterFile>${basedir}/dev-support/findbugsExcludeFile.xml</excludeFilterFile>
-        </configuration>
-      </plugin>
-
     </plugins>
   </build>
 </project>
