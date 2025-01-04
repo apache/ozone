@@ -230,7 +230,7 @@
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
     <woodstox.version>5.4.0</woodstox.version>
     <zookeeper.version>3.8.4</zookeeper.version>
-    <zstd-jni.version>1.5.6-8</zstd-jni.version>
+    <zstd-jni.version>1.5.6-9</zstd-jni.version>
   </properties>
 
   <dependencyManagement>
