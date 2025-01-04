@@ -18,7 +18,6 @@ package org.apache.hadoop.hdds.cli;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.concurrent.Callable;
 
 import com.google.common.base.Strings;
 import org.apache.hadoop.fs.Path;
@@ -28,13 +27,13 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.security.UserGroupInformation;
 import picocli.CommandLine;
 import picocli.CommandLine.ExitCode;
-import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
 
 /**
  * This is a generic parent class for all the ozone related cli tools.
  */
-public class GenericCli implements Callable<Void>, GenericParentCommand {
+@CommandLine.Command
+public abstract class GenericCli implements GenericParentCommand {
 
   public static final int EXECUTION_ERROR_EXIT_CODE = -1;
 
@@ -71,15 +70,6 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
     ExtensibleParentCommand.addSubcommands(cmd);
   }
 
-  /**
-   * Handle the error when subcommand is required but not set.
-   */
-  public static void missingSubcommand(CommandSpec spec) {
-    System.err.println("Incomplete command");
-    spec.commandLine().usage(System.err);
-    System.exit(EXECUTION_ERROR_EXIT_CODE);
-  }
-
   public void run(String[] argv) {
     int exitCode = execute(argv);
 
@@ -104,11 +94,6 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
   }
 
   @Override
-  public Void call() throws Exception {
-    throw new MissingSubcommandException(cmd);
-  }
-
-  @Override
   public OzoneConfiguration getOzoneConf() {
     return config;
   }
@@ -121,7 +106,7 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
   }
 
   @VisibleForTesting
-  public picocli.CommandLine getCmd() {
+  public CommandLine getCmd() {
     return cmd;
   }
 
