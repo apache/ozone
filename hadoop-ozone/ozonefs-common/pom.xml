@@ -28,6 +28,7 @@
   <properties>
     <file.encoding>UTF-8</file.encoding>
     <downloadSources>true</downloadSources>
+    <sort.skip>true</sort.skip>
   </properties>
 
   <build>
