@@ -150,6 +150,7 @@ message CommandQueueReportProto {
  * A group of commands for the datanode to execute
  */
 message SCMHeartbeatResponseProto {
+  // TODO: change this to DatanodeID
   required string datanodeUUID = 1;
   repeated SCMCommandProto commands = 2;
 

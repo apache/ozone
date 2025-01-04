@@ -25,7 +25,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -38,6 +37,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
@@ -438,7 +438,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     } else {
       // There is no datanode.id file, this might be the first time datanode
       // is started.
-      details = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build();
+      details = DatanodeDetails.newBuilder().setID(DatanodeID.randomID()).build();
       details.setInitialVersion(getInitialVersion());
     }
     // Current version is always overridden to the latest
