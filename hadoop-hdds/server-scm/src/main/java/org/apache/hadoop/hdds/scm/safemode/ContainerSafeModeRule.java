@@ -112,14 +112,10 @@ public class ContainerSafeModeRule extends
     final List<ContainerInfo> containers = containerManager.getContainers(
         ReplicationType.RATIS);
 
-    final Set<ContainerID> containerIDs = containers.parallelStream()
-        .filter(this::isClosed).map(ContainerInfo::containerID)
-        .collect(Collectors.toSet());
-
-    final long missingContainerCount = containerIDs.parallelStream()
-        .filter(this::isMissing).count();
-
-    return missingContainerCount == 0;
+    return containers.stream()
+        .filter(this::isClosed)
+        .map(ContainerInfo::containerID)
+        .noneMatch(this::isMissing);
   }
 
   /**
