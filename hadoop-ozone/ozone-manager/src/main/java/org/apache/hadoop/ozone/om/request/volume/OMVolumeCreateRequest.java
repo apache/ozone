@@ -29,6 +29,7 @@ import com.google.common.base.Preconditions;
 
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.lock.OmLockOpr;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -95,6 +96,14 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
         CreateVolumeRequest.newBuilder().setVolumeInfo(updatedVolumeInfo))
         .setUserInfo(getUserInfo())
         .build();
+  }
+
+  public OmLockOpr.OmLockInfo lock(OzoneManager ozoneManager, OmLockOpr lockOpr) throws IOException {
+    return lockOpr.volumeWriteLock(getOmRequest().getCreateVolumeRequest().getVolumeInfo().getVolume());
+  }
+
+  public void unlock(OmLockOpr lockOpr, OmLockOpr.OmLockInfo lockInfo) {
+    lockOpr.writeUnlock(lockInfo);
   }
 
   @Override

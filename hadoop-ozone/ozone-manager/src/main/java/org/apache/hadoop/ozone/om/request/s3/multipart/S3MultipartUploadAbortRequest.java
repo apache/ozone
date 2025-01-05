@@ -24,6 +24,7 @@ import java.util.Map;
 
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.lock.OmLockOpr;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
@@ -97,6 +98,18 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
         getOmRequest().getAbortMultiPartUploadRequest().toBuilder().setKeyArgs(
             resolvedArgs)).setUserInfo(getUserInfo()).build();
 
+  }
+
+  public OmLockOpr.OmLockInfo lock(OzoneManager ozoneManager, OmLockOpr lockOpr) throws IOException {
+    if (getBucketLayout() == BucketLayout.OBJECT_STORE) {
+      KeyArgs keyArgs = getOmRequest().getAbortMultiPartUploadRequest().getKeyArgs();
+      return lockOpr.obsLock(keyArgs.getBucketName(), keyArgs.getKeyName());
+    }
+    return null;
+  }
+
+  public void unlock(OmLockOpr lockOpr, OmLockOpr.OmLockInfo lockInfo) {
+    lockOpr.writeUnlock(lockInfo);
   }
 
   @Override

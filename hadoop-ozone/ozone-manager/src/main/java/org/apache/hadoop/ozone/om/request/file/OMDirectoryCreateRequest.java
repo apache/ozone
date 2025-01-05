@@ -27,6 +27,7 @@ import java.util.Map;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.lock.OmLockOpr;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -119,6 +120,18 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     return getOmRequest().toBuilder().setCreateDirectoryRequest(
         newCreateDirectoryRequest).setUserInfo(getUserInfo()).build();
 
+  }
+
+  public OmLockOpr.OmLockInfo lock(OzoneManager ozoneManager, OmLockOpr lockOpr) throws IOException {
+    if (getBucketLayout() == BucketLayout.OBJECT_STORE) {
+      KeyArgs keyArgs = getOmRequest().getCreateDirectoryRequest().getKeyArgs();
+      return lockOpr.bucketReadLock(keyArgs.getBucketName());
+    }
+    return null;
+  }
+
+  public void unlock(OmLockOpr lockOpr, OmLockOpr.OmLockInfo lockInfo) {
+    lockOpr.readUnlock(lockInfo);
   }
 
   @Override

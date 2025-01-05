@@ -20,10 +20,12 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.util.Arrays;
 import java.util.Map;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.lock.OmLockOpr;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -118,6 +120,18 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     return resolvedArgs;
   }
 
+  public OmLockOpr.OmLockInfo lock(OzoneManager ozoneManager, OmLockOpr lockOpr) throws IOException {
+    if (getBucketLayout() == BucketLayout.OBJECT_STORE) {
+      KeyArgs keyArgs = getOmRequest().getRenameKeyRequest().getKeyArgs();
+      return lockOpr.obsLock(keyArgs.getBucketName(), Arrays.asList(keyArgs.getKeyName(),
+          getOmRequest().getRenameKeyRequest().getToKeyName()));
+    }
+    return null;
+  }
+
+  public void unlock(OmLockOpr lockOpr, OmLockOpr.OmLockInfo lockInfo) {
+    lockOpr.writeUnlock(lockInfo);
+  }
 
   @Override
   @SuppressWarnings("methodlength")

@@ -100,6 +100,7 @@ import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.om.lock.OmLockOpr;
 import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
 import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
@@ -472,6 +473,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final OzoneLockProvider ozoneLockProvider;
   private final OMPerformanceMetrics perfMetrics;
   private final BucketUtilizationMetrics bucketUtilizationMetrics;
+  private final OmLockOpr omLockOpr;
 
   private boolean fsSnapshotEnabled;
 
@@ -625,6 +627,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         configuration);
     this.ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
         getEnableFileSystemPaths());
+    this.omLockOpr = new OmLockOpr(threadPrefix);
 
     // For testing purpose only, not hit scm from om as Hadoop UGI can't login
     // two principals in the same JVM.
@@ -1752,6 +1755,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       bootstrap(omNodeDetails);
     }
 
+    omLockOpr.start();
+
     omState = State.RUNNING;
     auditMap.put("NewOmState", omState.name());
     SYSTEMAUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMSystemAction.STARTUP, auditMap));
@@ -1829,6 +1834,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     startJVMPauseMonitor();
     setStartTime();
+    omLockOpr.start();
     omState = State.RUNNING;
     auditMap.put("NewOmState", omState.name());
     SYSTEMAUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMSystemAction.STARTUP, auditMap));
@@ -2294,6 +2300,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       keyManager.stop();
       stopSecretManager();
+      omLockOpr.stop();
 
       if (scmTopologyClient != null) {
         scmTopologyClient.stop();
@@ -4527,6 +4534,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public OzoneLockProvider getOzoneLockProvider() {
     return this.ozoneLockProvider;
+  }
+
+  public OmLockOpr getOmLockOpr() {
+    return this.omLockOpr;
   }
 
   public ReplicationConfig getDefaultReplicationConfig() {
