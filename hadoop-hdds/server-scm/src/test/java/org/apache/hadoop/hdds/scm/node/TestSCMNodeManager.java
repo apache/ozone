@@ -77,7 +77,6 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.test.PathUtils;
-import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -185,7 +184,6 @@ public class TestSCMNodeManager {
         TimeUnit.MILLISECONDS);
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
     conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     return conf;
   }
 
@@ -278,7 +276,6 @@ public class TestSCMNodeManager {
    * @throws TimeoutException
    */
   @Test
-  @Unhealthy("HDDS-11986")
   public void testScmLayoutOnHeartbeat() throws Exception {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL,
@@ -396,7 +393,6 @@ public class TestSCMNodeManager {
    * @throws TimeoutException
    */
   @Test
-  @Unhealthy("HDDS-11986")
   public void testScmLayoutOnRegister()
       throws Exception {
 
