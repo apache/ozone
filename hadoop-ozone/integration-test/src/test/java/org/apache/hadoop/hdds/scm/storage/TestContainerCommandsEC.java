@@ -126,7 +126,7 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 /**
  * This class tests container commands on EC containers.
  */
-@Unhealthy
+@Unhealthy("HDDS-12023")
 public class TestContainerCommandsEC {
 
   private static final String ANY_USER = "any";

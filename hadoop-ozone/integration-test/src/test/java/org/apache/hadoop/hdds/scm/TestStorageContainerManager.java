@@ -162,7 +162,7 @@ import static org.mockito.Mockito.verify;
  * Test class that exercises the StorageContainerManager.
  */
 @Timeout(900)
-@Unhealthy
+@Unhealthy("HDDS-12022")
 public class TestStorageContainerManager {
   private static final String LOCALHOST_IP = "127.0.0.1";
   private static XceiverClientManager xceiverClientManager;
@@ -366,7 +366,6 @@ public class TestStorageContainerManager {
 
   @Test
   public void testOldDNRegistersToReInitialisedSCM() throws Exception {
-    LogManager.getLogger(HeartbeatEndpointTask.class).setLevel(Level.DEBUG);
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_SCM_HA_ENABLE_KEY, true);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1000, TimeUnit.MILLISECONDS);
@@ -403,6 +402,7 @@ public class TestStorageContainerManager {
       GenericTestUtils.LogCapturer scmDnHBDispatcherLog =
           GenericTestUtils.LogCapturer.captureLogs(
               SCMDatanodeHeartbeatDispatcher.LOG);
+      LogManager.getLogger(HeartbeatEndpointTask.class).setLevel(Level.DEBUG);
       GenericTestUtils.LogCapturer heartbeatEndpointTaskLog =
           GenericTestUtils.LogCapturer.captureLogs(HeartbeatEndpointTask.LOG);
       GenericTestUtils.LogCapturer versionEndPointTaskLog =
