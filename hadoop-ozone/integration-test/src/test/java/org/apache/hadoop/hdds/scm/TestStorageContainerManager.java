@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -344,8 +345,10 @@ public class TestStorageContainerManager {
       // eventually these TX will success.
       GenericTestUtils.waitFor(() -> {
         try {
-          cluster.getStorageContainerManager().getScmHAManager()
-              .asSCMHADBTransactionBuffer().flush();
+          if (SCMHAUtils.isSCMHAEnabled(cluster.getConf())) {
+            cluster.getStorageContainerManager().getScmHAManager()
+                .asSCMHADBTransactionBuffer().flush();
+          }
           return delLog.getFailedTransactions(-1, 0).size() == 0;
         } catch (IOException e) {
           return false;
@@ -987,8 +990,9 @@ public class TestStorageContainerManager {
       DeletedBlockLog delLog,
       Map<Long, List<Long>> containerBlocksMap)
       throws IOException, TimeoutException {
-    delLog.addTransactions(containerBlocksMap);
-    scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
+    if (SCMHAUtils.isSCMHAEnabled(scm.getConfiguration())) {
+      scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
+    }
   }
 
   private static class CloseContainerCommandMatcher
