@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.recon.tasks.updater;
 import com.google.common.annotations.VisibleForTesting;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
+import org.jooq.exception.DataAccessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,6 +39,7 @@ public class ReconTaskStatusUpdater {
 
   private String taskName;
 
+  @VisibleForTesting
   public ReconTaskStatusUpdater(ReconTaskStatusDao reconTaskStatusDao,
                                 String taskName) {
     this.taskName = taskName;
@@ -45,20 +47,11 @@ public class ReconTaskStatusUpdater {
     this.reconTaskStatus = new ReconTaskStatus(taskName, 0L, 0L, 0, 0);
   }
 
-  public ReconTaskStatusUpdater(ReconTaskStatusDao reconTaskStatusDao,
-                                String taskName, Long lastUpdatedTimestamp, Long lastUpdatedSeqNum,
-                                Integer lastTaskRunStatus, Integer isCurrentTaskRunning) {
-    this.taskName = taskName;
+  public ReconTaskStatusUpdater(ReconTaskStatusDao reconTaskStatusDao, ReconTaskStatus task) {
+    this.taskName = task.getTaskName();
     this.reconTaskStatusDao = reconTaskStatusDao;
-    this.reconTaskStatus = new ReconTaskStatus(taskName, lastUpdatedTimestamp, lastUpdatedSeqNum,
-        lastTaskRunStatus, isCurrentTaskRunning);
-  }
-
-  @VisibleForTesting
-  public ReconTaskStatusUpdater(String taskName, ReconTaskStatusDao reconTaskStatusDao) {
-    this.taskName = taskName;
-    this.reconTaskStatusDao = reconTaskStatusDao;
-    this.reconTaskStatus = new ReconTaskStatus(taskName, 0L, 0L, 0, 0);
+    this.reconTaskStatus = new ReconTaskStatus(taskName, task.getLastUpdatedTimestamp(),
+        task.getLastUpdatedSeqNumber(), task.getLastTaskRunStatus(), task.getIsCurrentTaskRunning());
   }
 
   public void setTaskName(String taskName) {
@@ -80,6 +73,38 @@ public class ReconTaskStatusUpdater {
 
   public void setIsCurrentTaskRunning(int isCurrentTaskRunning) {
     this.reconTaskStatus.setIsCurrentTaskRunning(isCurrentTaskRunning);
+  }
+
+  /**
+   * Helper function to update TASK_STATUS table with task start values.
+   * Set the isCurrentTaskRunning as true, update the timestamp.
+   * Call this function before the actual task processing starts to update table in DB.
+   */
+  public void recordRunStart() {
+    try {
+      this.reconTaskStatus.setIsCurrentTaskRunning(1);
+      this.reconTaskStatus.setLastUpdatedTimestamp(System.currentTimeMillis());
+      updateDetails();
+    } catch (DataAccessException e) {
+      LOG.error("Failed to update table for start of task: {}", this.reconTaskStatus.getTaskName());
+    }
+  }
+
+  /**
+   * Helper function to update TASK_STATUS table with task end values.
+   * Set isCurrentTaskRunning as false, update the timestamp.
+   * Call this function after the actual task processing ends to update table in DB.
+   * It is expected that the task status result (successful/0, failure/-1) is already set
+   * before calling.
+   */
+  public void recordRunCompletion() {
+    try {
+      this.reconTaskStatus.setIsCurrentTaskRunning(0);
+      this.reconTaskStatus.setLastUpdatedTimestamp(System.currentTimeMillis());
+      updateDetails();
+    } catch (DataAccessException e) {
+      LOG.error("Failed to update table for task: {}", this.reconTaskStatus.getTaskName());
+    }
   }
 
   /**

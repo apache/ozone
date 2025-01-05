@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.recon.scm;
 
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
-import org.jooq.exception.DataAccessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,36 +87,6 @@ public abstract class ReconScmTask {
     return true;
   }
 
-  /**
-   * Helper function to update TASK_STATUS table with task end values.
-   * Set isCurrentTaskRunning as false, update the timestamp.
-   * Call this function after the actual task processing ends to update table in DB.
-   */
-  protected void recordSingleRunCompletion() {
-    try {
-      taskStatusUpdater.setIsCurrentTaskRunning(0);
-      taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-      taskStatusUpdater.updateDetails();
-    } catch (DataAccessException e) {
-      LOG.error("Failed to update table for task: {}", getTaskName());
-    }
-  }
-
-  /**
-   * Helper function to update TASK_STATUS table with task start values.
-   * Set the isCurrentTaskRunning as true, update the timestamp.
-   * Call this function before the actual task processing starts to update table in DB.
-   */
-  protected void recordRunStart() {
-    try {
-      taskStatusUpdater.setIsCurrentTaskRunning(1);
-      taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-      taskStatusUpdater.updateDetails();
-    } catch (DataAccessException e) {
-      LOG.error("Failed to update table for start of task: {}", getTaskName());
-    }
-  }
-
   protected boolean canRun() {
     return running;
   }
@@ -135,14 +104,14 @@ public abstract class ReconScmTask {
   protected void initializeAndRunTask() {
     lock.writeLock().lock();
     try {
-      recordRunStart();
+      taskStatusUpdater.recordRunStart();
       runTask();
     } catch (Exception e) {
       LOG.error("{} encountered exception. ", getTaskName(), e);
       taskStatusUpdater.setLastTaskRunStatus(-1);
     } finally {
       try {
-        recordSingleRunCompletion();
+        taskStatusUpdater.recordRunCompletion();
       } catch (Exception e) {
         LOG.error("Exception occurred while trying to record {} completion", getTaskName(), e);
       } finally {

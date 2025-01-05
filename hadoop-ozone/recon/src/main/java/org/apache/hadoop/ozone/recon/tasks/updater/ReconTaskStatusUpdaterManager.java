@@ -51,10 +51,7 @@ public class ReconTaskStatusUpdaterManager {
     List<ReconTaskStatus> tasks = reconTaskStatusDao.findAll();
     for (ReconTaskStatus task: tasks) {
       updaterCache.put(task.getTaskName(),
-          new ReconTaskStatusUpdater(reconTaskStatusDao, task.getTaskName(),
-              task.getLastUpdatedTimestamp(), task.getLastUpdatedSeqNumber(),
-              task.getLastTaskRunStatus(), task.getIsCurrentTaskRunning()
-          ));
+          new ReconTaskStatusUpdater(reconTaskStatusDao, task));
     }
   }
 
@@ -66,33 +63,7 @@ public class ReconTaskStatusUpdaterManager {
    */
   public ReconTaskStatusUpdater getTaskStatusUpdater(String taskName) {
     // If the task is not already present in the DB then we can initialize using initial values
-    return updaterCache.computeIfAbsent(taskName, (name) -> {
-      ReconTaskStatusUpdater taskStatusUpdater = new ReconTaskStatusUpdater(
-          reconTaskStatusDao, name);
-      taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-      // Insert initial values into DB
-      taskStatusUpdater.updateDetails();
-      return taskStatusUpdater;
-    });
-  }
-
-  /**
-   * Gets the updater for the provided task name and updates DB with initial values
-   * if the task is not already present in DB.
-   * @param taskName The name of the task for which we want to get instance of the updater
-   * @param sequenceNumber  The sequence of OM DB for which the task was processed.
-   * @return An instance of {@link ReconTaskStatusUpdater} for the provided task name.
-   */
-  public ReconTaskStatusUpdater getTaskStatusUpdater(String taskName, long sequenceNumber) {
-    // If the task is not already present in the DB then we can initialize using initial values
-    return updaterCache.computeIfAbsent(taskName, (name) -> {
-      ReconTaskStatusUpdater taskStatusUpdater = new ReconTaskStatusUpdater(
-          reconTaskStatusDao, name);
-      taskStatusUpdater.setLastUpdatedSeqNumber(sequenceNumber);
-      taskStatusUpdater.setLastUpdatedTimestamp(System.currentTimeMillis());
-      // Insert initial values into DB
-      taskStatusUpdater.updateDetails();
-      return taskStatusUpdater;
-    });
+    return updaterCache.computeIfAbsent(taskName, (name) ->
+        new ReconTaskStatusUpdater(reconTaskStatusDao, name));
   }
 }

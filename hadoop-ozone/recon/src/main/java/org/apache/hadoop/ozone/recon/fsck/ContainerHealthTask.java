@@ -114,6 +114,7 @@ public class ContainerHealthTask extends ReconScmTask {
       }
     } catch (Throwable t) {
       LOG.error("Exception in Missing Container task Thread.", t);
+      taskStatusUpdater.setLastTaskRunStatus(-1);
       if (t instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }

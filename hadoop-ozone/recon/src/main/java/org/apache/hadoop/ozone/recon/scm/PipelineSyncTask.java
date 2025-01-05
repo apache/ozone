@@ -86,7 +86,6 @@ public class PipelineSyncTask extends ReconScmTask {
   protected void runTask() throws IOException, NodeNotFoundException {
     long start = Time.monotonicNow();
     List<Pipeline> pipelinesFromScm = scmClient.getPipelines();
-    recordRunStart();
     reconPipelineManager.initializePipelines(pipelinesFromScm);
     syncOperationalStateOnDeadNodes();
     LOG.debug("Pipeline sync Thread took {} milliseconds.",
