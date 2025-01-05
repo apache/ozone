@@ -990,6 +990,7 @@ public class TestStorageContainerManager {
       DeletedBlockLog delLog,
       Map<Long, List<Long>> containerBlocksMap)
       throws IOException, TimeoutException {
+    delLog.addTransactions(containerBlocksMap);
     if (SCMHAUtils.isSCMHAEnabled(scm.getConfiguration())) {
       scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
     }
