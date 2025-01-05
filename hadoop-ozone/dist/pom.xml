@@ -33,6 +33,7 @@
     <docker.ozone-runner.version>20241212-1-jdk21</docker.ozone-runner.version>
     <docker.ozone-testkr5b.image>ghcr.io/apache/ozone-testkrb5:20241129-1</docker.ozone-testkr5b.image>
     <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
+    <sort.skip>true</sort.skip>
   </properties>
 
   <build>
