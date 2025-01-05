@@ -226,10 +226,10 @@
 
     <!-- Test dependencies -->
     <dependency>
+      <!-- Needed for mocking RaftServerImpl -->
       <groupId>com.codahale.metrics</groupId>
       <artifactId>metrics-core</artifactId>
       <scope>test</scope>
-      <!-- Needed for mocking RaftServerImpl -->
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
