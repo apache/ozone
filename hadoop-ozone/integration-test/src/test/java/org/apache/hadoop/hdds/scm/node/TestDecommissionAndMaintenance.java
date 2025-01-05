@@ -94,7 +94,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
  * Test from the scmclient for decommission and maintenance.
  */
 @Flaky({"HDDS-6028", "HDDS-6049"})
-@Unhealthy
 public class TestDecommissionAndMaintenance {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestDecommissionAndMaintenance.class);
