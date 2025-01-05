@@ -1,6 +1,6 @@
 ---
-title: Erasure Coding in Ozone 
-summary: Use Erasure Coding algorithm for efficient storage
+title: Find Block Missing Key
+summary: A client-side tool used to locate Block missing Keys
 date: 2024-12-09
 jira: HDDS-11891
 status: draft
