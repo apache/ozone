@@ -84,6 +84,7 @@ public class TestLDBCli {
   private static final String BLOCK_DATA = "block_data";
   public static final String PIPELINES = "pipelines";
   public static final String DUMMY_DB = "anotherKeyTable";
+  public static final String ANOTHER_KEY_TABLE_NAME = "anotherKeyTable";
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private OzoneConfiguration conf;
   private DBStore dbStore;
@@ -424,7 +425,7 @@ public class TestLDBCli {
         "--db", dbStore.getDbLocation().getAbsolutePath(),
         "--schema", DummyDBDefinition.class.getName(),
         "value-schema",
-        "--column-family", DummyDBDefinition.ANOTHER_KEY_TABLE_NAME));
+        "--column-family", ANOTHER_KEY_TABLE_NAME));
 
     int exitCode = cmd.execute(completeScanArgs.toArray(new String[0]));
     assertEquals(0, exitCode, stderr.toString());
@@ -438,7 +439,7 @@ public class TestLDBCli {
         "--db", dbStore.getDbLocation().getAbsolutePath(),
         "--schema", DummyDBDefinition.class.getName(),
         "scan",
-        "--column-family", DummyDBDefinition.ANOTHER_KEY_TABLE_NAME));
+        "--column-family", ANOTHER_KEY_TABLE_NAME));
 
     exitCode = cmd.execute(completeScanArgs.toArray(new String[0]));
     assertEquals(0, exitCode, stderr.toString());
@@ -522,9 +523,9 @@ public class TestLDBCli {
       dbStore = DBStoreBuilder.newBuilder(new OzoneConfiguration())
           .setName("another.db")
           .setPath(tempDir.toPath())
-          .addTable(DummyDBDefinition.ANOTHER_KEY_TABLE_NAME)
+          .addTable(ANOTHER_KEY_TABLE_NAME)
           .build();
-      dbStore.getTable(DummyDBDefinition.ANOTHER_KEY_TABLE_NAME, String.class, String.class)
+      dbStore.getTable(ANOTHER_KEY_TABLE_NAME, String.class, String.class)
           .put("random-key", "random-value");
       break;
 
@@ -562,8 +563,10 @@ public class TestLDBCli {
     return MAPPER.readValue(json, new TypeReference<Map<String, Object>>() { });
   }
 
+  /**
+   * New DBDefinition to test arbitrary schemas for ldb commands.
+   */
   public static class DummyDBDefinition extends DBDefinition.WithMap {
-    public static String ANOTHER_KEY_TABLE_NAME = "anotherKeyTable";
     public static final DBColumnFamilyDefinition<String, String> ANOTHER_KEY_TABLE
         = new DBColumnFamilyDefinition<>(ANOTHER_KEY_TABLE_NAME, StringCodec.get(), StringCodec.get());
     private static final Map<String, DBColumnFamilyDefinition<?, ?>>
