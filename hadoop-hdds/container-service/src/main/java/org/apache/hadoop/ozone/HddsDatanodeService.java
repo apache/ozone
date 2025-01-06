@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -97,7 +98,7 @@ import picocli.CommandLine.Command;
     hidden = true, description = "Start the datanode for ozone",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
-public class HddsDatanodeService extends GenericCli implements Runnable, ServicePlugin {
+public class HddsDatanodeService extends GenericCli implements Callable<Void>, ServicePlugin {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       HddsDatanodeService.class);
@@ -171,7 +172,7 @@ public class HddsDatanodeService extends GenericCli implements Runnable, Service
   }
 
   @Override
-  public void run() {
+  public Void call() throws Exception {
     OzoneConfiguration configuration = getOzoneConf();
     if (printBanner) {
       HddsServerUtil.startupShutdownMessage(HddsVersionInfo.HDDS_VERSION_INFO,
@@ -186,6 +187,7 @@ public class HddsDatanodeService extends GenericCli implements Runnable, Service
         LOG.error("Error during stop Ozone Datanode.", e);
       }
     }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
+    return null;
   }
 
   public void setConfiguration(OzoneConfiguration configuration) {

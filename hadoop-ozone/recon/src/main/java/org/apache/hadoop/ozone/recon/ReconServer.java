@@ -56,6 +56,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.hdds.ratis.RatisHelper.newJvmPauseMonitor;
@@ -70,7 +71,7 @@ import static org.apache.hadoop.util.ExitUtil.terminate;
 /**
  * Recon server main class that stops and starts recon services.
  */
-public class ReconServer extends GenericCli implements Runnable {
+public class ReconServer extends GenericCli implements Callable<Void> {
 
   private static final Logger LOG = LoggerFactory.getLogger(ReconServer.class);
   private Injector injector;
@@ -97,7 +98,7 @@ public class ReconServer extends GenericCli implements Runnable {
   }
 
   @Override
-  public void run() {
+  public Void call() throws Exception {
     String[] originalArgs = getCmd().getParseResult().originalArgs()
         .toArray(new String[0]);
 
@@ -194,6 +195,7 @@ public class ReconServer extends GenericCli implements Runnable {
         LOG.error("Error during stop Recon server", e);
       }
     }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
+    return null;
   }
 
   /**

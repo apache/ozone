@@ -25,6 +25,7 @@ import org.apache.hadoop.io.erasurecode.ErasureCodeNative;
 import picocli.CommandLine;
 
 import java.util.Collections;
+import java.util.concurrent.Callable;
 
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
 
@@ -33,14 +34,14 @@ import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LI
  */
 @CommandLine.Command(name = "ozone checknative",
     description = "Checks if native libraries are loaded")
-public class CheckNative extends GenericCli implements Runnable {
+public class CheckNative extends GenericCli implements Callable<Void> {
 
   public static void main(String[] argv) {
     new CheckNative().run(argv);
   }
 
   @Override
-  public void run() {
+  public Void call() throws Exception {
     boolean nativeHadoopLoaded = org.apache.hadoop.util.NativeCodeLoader.isNativeCodeLoaded();
     String hadoopLibraryName = "";
     String isalDetail = "";
@@ -70,5 +71,6 @@ public class CheckNative extends GenericCli implements Runnable {
       rocksToolsDetail = NativeLibraryLoader.getJniLibraryFileName();
     }
     System.out.printf("rocks-tools: %b %s%n", nativeRocksToolsLoaded, rocksToolsDetail);
+    return null;
   }
 }
