@@ -26,6 +26,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -69,6 +71,8 @@ public class ContainerHealthTask extends ReconScmTask {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerHealthTask.class);
   public static final int FETCH_COUNT = Integer.parseInt(DEFAULT_FETCH_COUNT);
+
+  private ReadWriteLock lock = new ReentrantReadWriteLock(true);
 
   private final StorageContainerServiceProvider scmClient;
   private final ContainerManager containerManager;
@@ -114,7 +118,6 @@ public class ContainerHealthTask extends ReconScmTask {
       }
     } catch (Throwable t) {
       LOG.error("Exception in Missing Container task Thread.", t);
-      taskStatusUpdater.setLastTaskRunStatus(-1);
       if (t instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
@@ -123,6 +126,7 @@ public class ContainerHealthTask extends ReconScmTask {
 
   @Override
   protected void runTask() {
+    lock.writeLock().lock();
     // Map contains all UNHEALTHY STATES as keys and value is another map
     // with 3 keys (CONTAINER_COUNT, TOTAL_KEYS, TOTAL_USED_BYTES) and value
     // is count for each of these 3 stats.
@@ -130,25 +134,29 @@ public class ContainerHealthTask extends ReconScmTask {
     // <MISSING, <TOTAL_USED_BYTES, 2048>>,
     // <EMPTY_MISSING, <CONTAINER_COUNT, 10>>, <EMPTY_MISSING, <TOTAL_KEYS, 2>>,
     // <EMPTY_MISSING, <TOTAL_USED_BYTES, 2048>>
-    Map<UnHealthyContainerStates, Map<String, Long>>
-        unhealthyContainerStateStatsMap;
-    unhealthyContainerStateStatsMap = new HashMap<>(Collections.emptyMap());
-    initializeUnhealthyContainerStateStatsMap(
-        unhealthyContainerStateStatsMap);
-    long start = Time.monotonicNow();
-    long currentTime = System.currentTimeMillis();
-    long existingCount = processExistingDBRecords(currentTime,
-        unhealthyContainerStateStatsMap);
-    LOG.debug("Container Health task thread took {} milliseconds to" +
-            " process {} existing database records.",
-        Time.monotonicNow() - start, existingCount);
+    try {
+      Map<UnHealthyContainerStates, Map<String, Long>>
+          unhealthyContainerStateStatsMap;
+      unhealthyContainerStateStatsMap = new HashMap<>(Collections.emptyMap());
+      initializeUnhealthyContainerStateStatsMap(
+          unhealthyContainerStateStatsMap);
+      long start = Time.monotonicNow();
+      long currentTime = System.currentTimeMillis();
+      long existingCount = processExistingDBRecords(currentTime,
+          unhealthyContainerStateStatsMap);
+      LOG.debug("Container Health task thread took {} milliseconds to" +
+              " process {} existing database records.",
+          Time.monotonicNow() - start, existingCount);
 
-    start = Time.monotonicNow();
-    checkAndProcessContainers(unhealthyContainerStateStatsMap, currentTime);
-    LOG.debug("Container Health Task thread took {} milliseconds to process containers",
-        Time.monotonicNow() - start);
-    taskStatusUpdater.setLastTaskRunStatus(0);
-    processedContainers.clear();
+      start = Time.monotonicNow();
+      checkAndProcessContainers(unhealthyContainerStateStatsMap, currentTime);
+      LOG.debug("Container Health Task thread took {} milliseconds to process containers",
+          Time.monotonicNow() - start);
+      taskStatusUpdater.setLastTaskRunStatus(0);
+      processedContainers.clear();
+    } finally {
+      lock.writeLock().unlock();
+    }
   }
 
   private void checkAndProcessContainers(

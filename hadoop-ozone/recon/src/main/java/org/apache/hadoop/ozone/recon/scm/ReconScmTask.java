@@ -23,9 +23,6 @@ import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-
 /**
  * Any background task that keeps SCM's metadata up to date.
  */
@@ -35,7 +32,6 @@ public abstract class ReconScmTask {
   private Thread taskThread;
   private volatile boolean running;
   private final ReconTaskStatusUpdater taskStatusUpdater;
-  private ReadWriteLock lock = new ReentrantReadWriteLock(true);
 
   protected ReconScmTask(
       ReconTaskStatusUpdaterManager taskStatusUpdaterManager
@@ -102,7 +98,6 @@ public abstract class ReconScmTask {
   protected abstract void run();
 
   protected void initializeAndRunTask() {
-    lock.writeLock().lock();
     try {
       taskStatusUpdater.recordRunStart();
       runTask();
@@ -110,13 +105,7 @@ public abstract class ReconScmTask {
       LOG.error("{} encountered exception. ", getTaskName(), e);
       taskStatusUpdater.setLastTaskRunStatus(-1);
     } finally {
-      try {
-        taskStatusUpdater.recordRunCompletion();
-      } catch (Exception e) {
-        LOG.error("Exception occurred while trying to record {} completion", getTaskName(), e);
-      } finally {
-        lock.writeLock().unlock();
-      }
+      taskStatusUpdater.recordRunCompletion();
     }
   }
 

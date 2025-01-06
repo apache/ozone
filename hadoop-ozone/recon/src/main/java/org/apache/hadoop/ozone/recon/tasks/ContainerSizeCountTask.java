@@ -41,6 +41,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETED;
 import static org.hadoop.ozone.recon.schema.tables.ContainerCountBySizeTable.CONTAINER_COUNT_BY_SIZE;
@@ -64,6 +66,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
   private HashMap<ContainerID, Long> processedContainers = new HashMap<>();
   private Map<ContainerSchemaDefinition.UnHealthyContainerStates, Map<String, Long>>
       unhealthyContainerStateStatsMap;
+  private ReadWriteLock lock = new ReentrantReadWriteLock(true);
   private final ReconTaskStatusUpdater taskStatusUpdater;
 
   public ContainerSizeCountTask(
@@ -176,35 +179,41 @@ public class ContainerSizeCountTask extends ReconScmTask {
 
   @VisibleForTesting
   public void processContainers(List<ContainerInfo> containers) {
+    lock.writeLock().lock();
     boolean processingFailed = false;
-    final Map<ContainerSizeCountKey, Long> containerSizeCountMap
-        = new HashMap<>();
-    final Map<ContainerID, Long> deletedContainers
-        = new HashMap<>(processedContainers);
-    // Loop to handle container create and size-update operations
-    for (ContainerInfo container : containers) {
-      if (container.getState().equals(DELETED)) {
-        continue; // Skip deleted containers
+
+    try {
+      final Map<ContainerSizeCountKey, Long> containerSizeCountMap
+          = new HashMap<>();
+      final Map<ContainerID, Long> deletedContainers
+          = new HashMap<>(processedContainers);
+      // Loop to handle container create and size-update operations
+      for (ContainerInfo container : containers) {
+        if (container.getState().equals(DELETED)) {
+          continue; // Skip deleted containers
+        }
+        deletedContainers.remove(container.containerID());
+        // For New Container being created
+        try {
+          process(container, containerSizeCountMap);
+        } catch (Exception e) {
+          processingFailed = true;
+          // FIXME: it is a bug if there is an exception.
+          LOG.error("FIXME: Failed to process " + container, e);
+        }
       }
-      deletedContainers.remove(container.containerID());
-      // For New Container being created
-      try {
-        process(container, containerSizeCountMap);
-      } catch (Exception e) {
-        processingFailed = true;
-        // FIXME: it is a bug if there is an exception.
-        LOG.error("FIXME: Failed to process " + container, e);
-      }
+
+      // Method to handle Container delete operations
+      handleContainerDeleteOperations(deletedContainers, containerSizeCountMap);
+      // Write to the database
+      writeCountsToDB(false, containerSizeCountMap);
+      containerSizeCountMap.clear();
+
+      LOG.debug("Completed a 'process' run of ContainerSizeCountTask.");
+      taskStatusUpdater.setLastTaskRunStatus(processingFailed ? -1 : 0);
+    } finally {
+      lock.writeLock().unlock();
     }
-
-    // Method to handle Container delete operations
-    handleContainerDeleteOperations(deletedContainers, containerSizeCountMap);
-    // Write to the database
-    writeCountsToDB(false, containerSizeCountMap);
-    containerSizeCountMap.clear();
-
-    LOG.debug("Completed a 'process' run of ContainerSizeCountTask.");
-    taskStatusUpdater.setLastTaskRunStatus(processingFailed ? -1 : 0);
   }
 
   /**

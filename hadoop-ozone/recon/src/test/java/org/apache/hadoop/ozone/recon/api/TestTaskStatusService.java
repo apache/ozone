@@ -18,16 +18,17 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import com.google.inject.AbstractModule;
+import com.google.inject.Injector;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import javax.ws.rs.core.Response;
-import java.nio.file.Path;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -38,9 +39,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * Test for Task Status Service.
  */
 public class TestTaskStatusService extends AbstractReconSqlDBTest {
-
-  @TempDir
-  private Path temporaryFolder;
   private TaskStatusService taskStatusService;
 
   public TestTaskStatusService() {
@@ -49,7 +47,14 @@ public class TestTaskStatusService extends AbstractReconSqlDBTest {
 
   @BeforeEach
   public void setUp() throws Exception {
-    taskStatusService = new TaskStatusService(getDao(ReconTaskStatusDao.class));
+    Injector parentInjector = getInjector();
+    parentInjector.createChildInjector(new AbstractModule() {
+      @Override
+      protected void configure() {
+        taskStatusService = new TaskStatusService();
+        bind(TaskStatusService.class).toInstance(taskStatusService);
+      }
+    });
   }
 
   @ParameterizedTest

@@ -108,6 +108,38 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
   }
 
   @Test
+  public void testTaskRecordsFailureOnException() throws Exception {
+    ReconOmTask reconOmTaskMock = getMockTask("MockTask");
+    OMUpdateEventBatch omUpdateEventBatchMock = mock(OMUpdateEventBatch.class);
+
+    // Throw exception when trying to run task
+    when(reconOmTaskMock.process(any(OMUpdateEventBatch.class)))
+        .thenThrow(new RuntimeException("Mock Failure"));
+    reconTaskController.registerTask(reconOmTaskMock);
+    when(omUpdateEventBatchMock.getLastSequenceNumber()).thenReturn(100L);
+    when(omUpdateEventBatchMock.isEmpty()).thenReturn(false);
+
+    long startTime = System.currentTimeMillis();
+    reconTaskController.consumeOMEvents(
+        omUpdateEventBatchMock,
+        mock(OMMetadataManager.class));
+
+    verify(reconOmTaskMock, times(1))
+        .process(any());
+    long endTime = System.currentTimeMillis();
+
+    ReconTaskStatus reconTaskStatus = reconTaskStatusDao.findById("MockTask");
+    long taskTimeStamp = reconTaskStatus.getLastUpdatedTimestamp();
+    long seqNumber = reconTaskStatus.getLastUpdatedSeqNumber();
+    int taskStatus = reconTaskStatus.getLastTaskRunStatus();
+
+    assertThat(taskTimeStamp).isGreaterThanOrEqualTo(startTime).isLessThanOrEqualTo(endTime);
+    // Task failed so seqNumber should not be updated, and last task status should be -1
+    assertEquals(seqNumber, 0);
+    assertEquals(taskStatus, -1);
+  }
+
+  @Test
   public void testFailedTaskRetryLogic() throws Exception {
     String taskName = "Dummy_" + System.currentTimeMillis();
 
