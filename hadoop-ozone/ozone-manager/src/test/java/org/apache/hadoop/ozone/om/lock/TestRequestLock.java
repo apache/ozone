@@ -88,7 +88,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBuck
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetTimesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolumePropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -282,7 +282,8 @@ public class TestRequestLock {
     omRequest = getReqBuilder(Type.DeleteVolume).setDeleteVolumeRequest(deleteVolumeRequest).build();
     validateLockUnlock(new OMVolumeDeleteRequest(omRequest), omLockOpr, 1);
 
-    SetVolumePropertyRequest volumePropertyRequest = SetVolumePropertyRequest.newBuilder().setVolumeName("testVolume").build();
+    SetVolumePropertyRequest volumePropertyRequest = SetVolumePropertyRequest.newBuilder().setVolumeName("testVolume")
+        .build();
     omRequest = getReqBuilder(Type.SetVolumeProperty).setSetVolumePropertyRequest(volumePropertyRequest).build();
     validateLockUnlock(new OMVolumeSetOwnerRequest(omRequest), omLockOpr, 1);
     validateLockUnlock(new OMVolumeSetQuotaRequest(omRequest), omLockOpr, 1);
