@@ -195,8 +195,8 @@ public class KeyValueHandler extends Handler {
     if (ContainerLayoutVersion.getConfiguredVersion(conf) ==
         ContainerLayoutVersion.FILE_PER_CHUNK) {
       LOG.warn("FILE_PER_CHUNK layout is deprecated. Update to FILE_PER_BLOCK.");
-      OzoneConfiguration.of(conf).setEnum(ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY,
-          ContainerLayoutVersion.FILE_PER_BLOCK);
+      OzoneConfiguration.of(conf).set(ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY,
+          "FILE_PER_BLOCK");
     }
   }
 
