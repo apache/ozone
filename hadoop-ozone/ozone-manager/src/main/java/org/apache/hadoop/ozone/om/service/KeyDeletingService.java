@@ -165,6 +165,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       deletedKeySupplier.reInitItr();
     } catch (IOException ex) {
       LOG.error("Unable to get the iterator.", ex);
+      return queue;
     }
     taskCount.set(keyDeletingCorePoolSize);
     for (int i = 0; i < keyDeletingCorePoolSize; i++) {
@@ -183,6 +184,14 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
    * DeletedKeySupplier class.
    */
   public final class DeletedKeySupplier {
+
+    public DeletedKeySupplier() {
+      try {
+        reInitItr();
+      } catch (IOException ex) {
+
+      }
+    }
     private TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
         deleteKeyTableIterator;
 
