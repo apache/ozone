@@ -352,10 +352,6 @@ public class OzoneManagerServiceProviderImpl
    */
   @VisibleForTesting
   public String getOzoneManagerSnapshotUrl() throws IOException {
-    if (!configuration.getBoolean(
-        OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, false)) {
-      return omDBSnapshotUrl;
-    }
     String omLeaderUrl = omDBSnapshotUrl;
     List<org.apache.hadoop.ozone.om.helpers.ServiceInfo> serviceList =
         ozoneManagerClient.getServiceList();
