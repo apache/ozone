@@ -33,6 +33,7 @@ import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import picocli.CommandLine;
 
+import static com.github.stefanbirkner.systemlambda.SystemLambda.withTextFromSystemIn;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_TABLE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -69,7 +70,7 @@ public class TestTransactionInfoRepair {
   }
 
   @Test
-  public void testUpdateTransactionInfoTableSuccessful() {
+  public void testUpdateTransactionInfoTableSuccessful() throws Exception {
     ManagedRocksDB mdb = mockRockDB();
     testCommand(mdb, mock(ColumnFamilyHandle.class));
 
@@ -81,7 +82,7 @@ public class TestTransactionInfoRepair {
   }
 
   @Test
-  public void testCommandWhenTableNotInDBForGivenPath() {
+  public void testCommandWhenTableNotInDBForGivenPath() throws Exception {
     ManagedRocksDB mdb = mockRockDB();
     testCommand(mdb, null);
     assertThat(err.getOutput())
@@ -104,7 +105,7 @@ public class TestTransactionInfoRepair {
   }
 
 
-  private void testCommand(ManagedRocksDB mdb, ColumnFamilyHandle columnFamilyHandle) {
+  private void testCommand(ManagedRocksDB mdb, ColumnFamilyHandle columnFamilyHandle) throws Exception {
     try (MockedStatic<ManagedRocksDB> mocked = mockStatic(ManagedRocksDB.class);
          MockedStatic<RocksDBUtils> mockUtil = mockStatic(RocksDBUtils.class)) {
       mocked.when(() -> ManagedRocksDB.open(anyString(), anyList(), anyList())).thenReturn(mdb);
@@ -125,12 +126,14 @@ public class TestTransactionInfoRepair {
           .thenReturn(transactionInfo2);
 
       CommandLine cli = new OzoneRepair().getCmd();
-      cli.execute(
-          "om",
-          "update-transaction",
-          "--db", DB_PATH,
-          "--term", String.valueOf(TEST_TERM),
-          "--index", String.valueOf(TEST_INDEX));
+      withTextFromSystemIn("y")
+          .execute(() -> cli.execute(
+              "om",
+              "update-transaction",
+              "--db", DB_PATH,
+              "--term", String.valueOf(TEST_TERM),
+              "--index", String.valueOf(TEST_INDEX)
+          ));
     }
   }
 

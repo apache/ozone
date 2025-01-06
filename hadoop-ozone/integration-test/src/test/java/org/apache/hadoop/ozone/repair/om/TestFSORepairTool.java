@@ -34,7 +34,6 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
-import org.apache.hadoop.ozone.repair.OzoneRepair;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
@@ -49,7 +48,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import picocli.CommandLine;
 
 import java.io.File;
 import java.io.IOException;
@@ -61,6 +59,7 @@ import java.util.List;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.shell.TestOzoneRepairShell.executeRepair;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -82,7 +81,6 @@ public class TestFSORepairTool {
   private static MiniOzoneCluster cluster;
   private static FileSystem fs;
   private static OzoneClient client;
-  private static CommandLine cmd;
   private static String dbPath;
   private static FSORepairTool.Report vol1Report;
   private static FSORepairTool.Report vol2Report;
@@ -103,7 +101,6 @@ public class TestFSORepairTool {
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     fs = FileSystem.get(conf);
 
-    cmd = new OzoneRepair().getCmd();
     dbPath = new File(OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME).getPath();
 
     // Build multiple connected and disconnected trees
@@ -355,7 +352,7 @@ public class TestFSORepairTool {
     }
     argList.addAll(Arrays.asList(args));
 
-    return cmd.execute(argList.toArray(new String[0]));
+    return executeRepair(argList.toArray(new String[0]));
   }
 
   private <K, V> int countTableEntries(Table<K, V> table) throws Exception {

@@ -257,6 +257,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
     <!-- Test dependencies -->
     <dependency>
+      <groupId>com.github.stefanbirkner</groupId>
+      <artifactId>system-lambda</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-hadoop-dependency-test</artifactId>
       <scope>test</scope>
