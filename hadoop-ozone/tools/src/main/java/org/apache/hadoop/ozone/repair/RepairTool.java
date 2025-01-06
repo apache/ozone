@@ -40,15 +40,18 @@ public abstract class RepairTool extends AbstractSubcommand implements Callable<
   }
 
   protected boolean checkIfServiceIsRunning(String serviceName) {
-    String envVariable = String.format("OZONE_%s_RUNNING", serviceName);
-    String runningServices = System.getenv(envVariable);
-    if ("true".equals(runningServices)) {
+    String runningEnvVar = String.format("OZONE_%s_RUNNING", serviceName);
+    String pidEnvVar = String.format("OZONE_%s_PID", serviceName);
+    String isServiceRunning = System.getenv(runningEnvVar);
+    String servicePid = System.getenv(pidEnvVar);
+    if ("true".equals(isServiceRunning)) {
       if (!force) {
-        error("Error: %s is currently running on this host. " +
-              "Stop the service before running the repair tool.", serviceName);
+        error("Error: %s is currently running on this host with PID %s. " +
+            "Stop the service before running the repair tool.", serviceName, servicePid);
         return true;
       } else {
-        info("Warning: --force flag used. Proceeding despite %s being detected as running.", serviceName);
+        info("Warning: --force flag used. Proceeding despite %s being detected as running with PID %s.",
+            serviceName, servicePid);
       }
     } else {
       info("No running %s service detected. Proceeding with repair.", serviceName);
