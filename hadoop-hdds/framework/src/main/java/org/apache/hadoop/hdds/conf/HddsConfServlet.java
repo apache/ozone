@@ -164,6 +164,7 @@ public class HddsConfServlet extends HttpServlet {
           propMap.put(tag, properties);
         } else {
           if (LOG.isDebugEnabled()) {
+            tag = tag.replaceAll("[\n\r]", "_");
             LOG.debug("Not a valid tag {}", tag);
           }
         }
