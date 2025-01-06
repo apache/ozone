@@ -18,8 +18,17 @@
 
 package org.apache.hadoop.ozone.dn.checksum;
 
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -35,7 +44,6 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.TestHelper;
-import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTree;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -44,6 +52,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -51,17 +60,26 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.commons.lang3.RandomStringUtils.randomAlphabetic;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
+import static org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager.getContainerChecksumFile;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.readChecksumFile;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.writeContainerDataTreeProto;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -87,6 +105,8 @@ public class TestContainerCommandReconciliation {
     conf = new OzoneConfiguration();
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
     conf.set(OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+    conf.setStorageSize(OZONE_SCM_CHUNK_SIZE_KEY, 1024 * 1024, StorageUnit.BYTES);
+    conf.setStorageSize(OZONE_SCM_BLOCK_SIZE, 2 * 1024 * 1024, StorageUnit.BYTES);
     // Disable the container scanner so it does not create merkle tree files that interfere with this test.
     conf.getObject(ContainerScannerConfiguration.class).setEnabled(false);
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -155,7 +175,7 @@ public class TestContainerCommandReconciliation {
     HddsDatanodeService targetDN = cluster.getHddsDatanodes().get(0);
     Container<?> container = targetDN.getDatanodeStateMachine().getContainer()
         .getContainerSet().getContainer(containerID);
-    File treeFile = ContainerChecksumTreeManager.getContainerChecksumFile(container.getContainerData());
+    File treeFile = getContainerChecksumFile(container.getContainerData());
     // Closing the container should have generated the tree file.
     assertTrue(treeFile.exists());
     assertTrue(treeFile.delete());
@@ -178,7 +198,7 @@ public class TestContainerCommandReconciliation {
     HddsDatanodeService targetDN = cluster.getHddsDatanodes().get(0);
     Container<?> container = targetDN.getDatanodeStateMachine().getContainer()
         .getContainerSet().getContainer(containerID);
-    File treeFile = ContainerChecksumTreeManager.getContainerChecksumFile(container.getContainerData());
+    File treeFile = getContainerChecksumFile(container.getContainerData());
     assertTrue(treeFile.exists());
     // Make the server unable to read the file.
     assertTrue(treeFile.setReadable(false));
@@ -201,7 +221,7 @@ public class TestContainerCommandReconciliation {
     HddsDatanodeService targetDN = cluster.getHddsDatanodes().get(0);
     Container<?> container = targetDN.getDatanodeStateMachine().getContainer()
         .getContainerSet().getContainer(containerID);
-    File treeFile = ContainerChecksumTreeManager.getContainerChecksumFile(container.getContainerData());
+    File treeFile = getContainerChecksumFile(container.getContainerData());
     Files.write(treeFile.toPath(), new byte[]{1, 2, 3},
         StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
 
@@ -218,7 +238,7 @@ public class TestContainerCommandReconciliation {
     HddsDatanodeService targetDN = cluster.getHddsDatanodes().get(0);
     Container<?> container = targetDN.getDatanodeStateMachine().getContainer()
         .getContainerSet().getContainer(containerID);
-    File treeFile = ContainerChecksumTreeManager.getContainerChecksumFile(container.getContainerData());
+    File treeFile = getContainerChecksumFile(container.getContainerData());
     // TODO After HDDS-10379 the file will already exist and need to be overwritten.
     assertTrue(treeFile.exists());
     Files.write(treeFile.toPath(), new byte[]{},
@@ -252,7 +272,145 @@ public class TestContainerCommandReconciliation {
     }
   }
 
-  private long writeDataAndGetContainer(boolean close) throws Exception {
+  @Test
+  public void testContainerChecksumWithBlockMissing() throws Exception {
+    // 1. Write data to a container.
+    long containerID = writeDataAndGetContainer(true, 20 * 1024 * 1024);
+    Set<DatanodeDetails> peerNodes = cluster.getHddsDatanodes().stream().map(
+        HddsDatanodeService::getDatanodeDetails).collect(Collectors.toSet());
+    HddsDatanodeService hddsDatanodeService = cluster.getHddsDatanodes().get(0);
+    DatanodeStateMachine datanodeStateMachine = hddsDatanodeService.getDatanodeStateMachine();
+    Container<?> container = datanodeStateMachine.getContainer().getContainerSet().getContainer(containerID);
+    KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
+    ContainerProtos.ContainerChecksumInfo oldContainerChecksumInfo = readChecksumFile(container.getContainerData());
+    KeyValueHandler kvHandler = (KeyValueHandler) datanodeStateMachine.getContainer().getDispatcher()
+        .getHandler(ContainerProtos.ContainerType.KeyValueContainer);
+
+    BlockManager blockManager = kvHandler.getBlockManager();
+    List<BlockData> blockDatas = blockManager.listBlock(container, -1, 100);
+    List<BlockData> deletedBlocks = new ArrayList<>();
+    String chunksPath = container.getContainerData().getChunksPath();
+    long oldDataChecksum = oldContainerChecksumInfo.getContainerMerkleTree().getDataChecksum();
+
+    // 2. Delete some blocks to simulate missing blocks.
+    try (DBHandle db = BlockUtils.getDB(containerData, conf);
+         BatchOperation op = db.getStore().getBatchHandler().initBatchOperation()) {
+      for (int i = 0; i < blockDatas.size(); i += 2) {
+        BlockData blockData = blockDatas.get(i);
+        // Delete the block metadata from the container db
+        db.getStore().getBlockDataTable().deleteWithBatch(op, containerData.getBlockKey(blockData.getLocalID()));
+        // Delete the block file.
+        Files.deleteIfExists(Paths.get(chunksPath + "/" + blockData.getBlockID().getLocalID() + ".block"));
+        deletedBlocks.add(blockData);
+      }
+      db.getStore().getBatchHandler().commitBatchOperation(op);
+      db.getStore().flushDB();
+    }
+
+    Files.deleteIfExists(getContainerChecksumFile(container.getContainerData()).toPath());
+    kvHandler.createContainerMerkleTree(container);
+    ContainerProtos.ContainerChecksumInfo containerChecksumAfterBlockDelete =
+        readChecksumFile(container.getContainerData());
+    long dataChecksumAfterBlockDelete = containerChecksumAfterBlockDelete.getContainerMerkleTree().getDataChecksum();
+    // Checksum should have changed after block delete.
+    Assertions.assertNotEquals(oldDataChecksum, dataChecksumAfterBlockDelete);
+
+    // 3. Reconcile the container.
+    kvHandler.reconcileContainer(datanodeStateMachine.getDnContainerOperationClientClient(), container, peerNodes);
+    ContainerProtos.ContainerChecksumInfo newContainerChecksumInfo = readChecksumFile(container.getContainerData());
+    long newDataChecksum = newContainerChecksumInfo.getContainerMerkleTree().getDataChecksum();
+    assertTreesSortedAndMatch(oldContainerChecksumInfo.getContainerMerkleTree(),
+        newContainerChecksumInfo.getContainerMerkleTree());
+    Assertions.assertEquals(oldDataChecksum, newDataChecksum);
+  }
+
+  @Test
+  public void testContainerChecksumChunkCorruption() throws Exception {
+    // 1. Write data to a container.
+    long containerID = writeDataAndGetContainer(true, 20 * 1024 * 1024);
+    Set<DatanodeDetails> peerNodes = cluster.getHddsDatanodes().stream().map(
+        HddsDatanodeService::getDatanodeDetails).collect(Collectors.toSet());
+    HddsDatanodeService hddsDatanodeService = cluster.getHddsDatanodes().get(0);
+    DatanodeStateMachine datanodeStateMachine = hddsDatanodeService.getDatanodeStateMachine();
+    Container<?> container = datanodeStateMachine.getContainer().getContainerSet().getContainer(containerID);
+    KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
+    ContainerProtos.ContainerChecksumInfo oldContainerChecksumInfo = readChecksumFile(container.getContainerData());
+    KeyValueHandler kvHandler = (KeyValueHandler) datanodeStateMachine.getContainer().getDispatcher()
+        .getHandler(ContainerProtos.ContainerType.KeyValueContainer);
+
+    BlockManager blockManager = kvHandler.getBlockManager();
+    List<BlockData> blockDatas = blockManager.listBlock(container, -1, 100);
+    long oldDataChecksum = oldContainerChecksumInfo.getContainerMerkleTree().getDataChecksum();
+
+    // 2. Corrupt first chunk for all the blocks
+    try (DBHandle db = BlockUtils.getDB(containerData, conf);
+         BatchOperation op = db.getStore().getBatchHandler().initBatchOperation()) {
+      for (BlockData blockData : blockDatas) {
+        // Modify the block metadata to simulate chunk corruption.
+        ContainerProtos.BlockData.Builder blockDataBuilder = blockData.getProtoBufMessage().toBuilder();
+        blockDataBuilder.clearChunks();
+
+        ContainerProtos.ChunkInfo chunkInfo = blockData.getChunks().get(0);
+        ContainerProtos.ChecksumData.Builder checksumDataBuilder = ContainerProtos.ChecksumData.newBuilder()
+            .setBytesPerChecksum(chunkInfo.getChecksumData().getBytesPerChecksum())
+            .setType(chunkInfo.getChecksumData().getType());
+
+        for (ByteString checksum : chunkInfo.getChecksumData().getChecksumsList()) {
+          byte[] checksumBytes = checksum.toByteArray();
+          // Modify the checksum bytes to simulate corruption.
+          checksumBytes[0] = (byte) (checksumBytes[0] - 1);
+          checksumDataBuilder.addChecksums(ByteString.copyFrom(checksumBytes)).build();
+        }
+        chunkInfo = chunkInfo.toBuilder().setChecksumData(checksumDataBuilder.build()).build();
+        blockDataBuilder.addChunks(chunkInfo);
+        for (int i = 1; i < blockData.getChunks().size(); i++) {
+          blockDataBuilder.addChunks(blockData.getChunks().get(i));
+        }
+
+        // Modify the block metadata from the container db to simulate chunk corruption.
+        db.getStore().getBlockDataTable().putWithBatch(op, containerData.getBlockKey(blockData.getLocalID()),
+            BlockData.getFromProtoBuf(blockDataBuilder.build()));
+      }
+      db.getStore().getBatchHandler().commitBatchOperation(op);
+      db.getStore().flushDB();
+    }
+
+    Files.deleteIfExists(getContainerChecksumFile(container.getContainerData()).toPath());
+    kvHandler.createContainerMerkleTree(container);
+    // To set unhealthy for chunks that are corrupted.
+    ContainerProtos.ContainerChecksumInfo containerChecksumAfterChunkCorruption =
+        readChecksumFile(container.getContainerData());
+    long dataChecksumAfterAfterChunkCorruption = containerChecksumAfterChunkCorruption
+        .getContainerMerkleTree().getDataChecksum();
+    // Checksum should have changed after chunk corruption.
+    Assertions.assertNotEquals(oldDataChecksum, dataChecksumAfterAfterChunkCorruption);
+
+    // 3. Set Unhealthy for first chunk of all blocks. This should be done by the scanner, Until then this is a
+    // manual step.
+    ContainerProtos.ContainerChecksumInfo.Builder builder = containerChecksumAfterChunkCorruption.toBuilder();
+    List<ContainerProtos.BlockMerkleTree> blockMerkleTreeList = builder.getContainerMerkleTree()
+        .getBlockMerkleTreeList();
+    builder.getContainerMerkleTreeBuilder().clearBlockMerkleTree();
+    for (ContainerProtos.BlockMerkleTree blockMerkleTree : blockMerkleTreeList) {
+      ContainerProtos.BlockMerkleTree.Builder blockMerkleTreeBuilder = blockMerkleTree.toBuilder();
+      List<ContainerProtos.ChunkMerkleTree.Builder> chunkMerkleTreeBuilderList =
+          blockMerkleTreeBuilder.getChunkMerkleTreeBuilderList();
+      chunkMerkleTreeBuilderList.get(0).setIsHealthy(false);
+      builder.getContainerMerkleTreeBuilder().addBlockMerkleTree(blockMerkleTreeBuilder.build());
+    }
+    Files.deleteIfExists(getContainerChecksumFile(container.getContainerData()).toPath());
+    writeContainerDataTreeProto(container.getContainerData(), builder.getContainerMerkleTree());
+
+    // 4. Reconcile the container.
+    kvHandler.reconcileContainer(datanodeStateMachine.getDnContainerOperationClientClient(), container, peerNodes);
+    ContainerProtos.ContainerChecksumInfo newContainerChecksumInfo = readChecksumFile(container.getContainerData());
+    long newDataChecksum = newContainerChecksumInfo.getContainerMerkleTree().getDataChecksum();
+    assertTreesSortedAndMatch(oldContainerChecksumInfo.getContainerMerkleTree(),
+        newContainerChecksumInfo.getContainerMerkleTree());
+    Assertions.assertEquals(oldDataChecksum, newDataChecksum);
+  }
+
+  private long writeDataAndGetContainer(boolean close, int dataLen) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
@@ -260,9 +418,9 @@ public class TestContainerCommandReconciliation {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
 
-    byte[] data = "Test content".getBytes(UTF_8);
+    byte[] data = randomAlphabetic(dataLen).getBytes(UTF_8);
     // Write Key
-    try (OzoneOutputStream os = TestHelper.createKey("testkey", RATIS, THREE, 0, store, volumeName, bucketName)) {
+    try (OzoneOutputStream os = TestHelper.createKey("testkey", RATIS, THREE, dataLen, store, volumeName, bucketName)) {
       IOUtils.write(data, os);
     }
 
@@ -272,6 +430,10 @@ public class TestContainerCommandReconciliation {
       TestHelper.waitForContainerClose(cluster, containerID);
     }
     return containerID;
+  }
+
+  private long writeDataAndGetContainer(boolean close) throws Exception {
+    return writeDataAndGetContainer(close, 5);
   }
 
   public static void writeChecksumFileToDatanodes(long containerID, ContainerMerkleTree tree) throws Exception {

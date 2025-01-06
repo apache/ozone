@@ -121,7 +121,7 @@ public class BlockManagerImpl implements BlockManager {
       // default blockCommitSequenceId for any block is 0. It the putBlock
       // request is not coming via Ratis(for test scenarios), it will be 0.
       // In such cases, we should overwrite the block as well
-      if ((bcsId != 0) && (bcsId <= containerBCSId)) {
+      if ((bcsId != 0) && (bcsId < containerBCSId)) {
         // Since the blockCommitSequenceId stored in the db is greater than
         // equal to blockCommitSequenceId to be updated, it means the putBlock
         // transaction is reapplied in the ContainerStateMachine on restart.

@@ -63,6 +63,7 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
@@ -555,7 +556,7 @@ public class KeyValueHandler extends Handler {
     return getSuccessResponse(request);
   }
 
-  private void createContainerMerkleTree(Container container) {
+  public void createContainerMerkleTree(Container container) {
     if (ContainerChecksumTreeManager.checksumFileExist(container)) {
       return;
     }
@@ -1075,7 +1076,7 @@ public class KeyValueHandler extends Handler {
     // To be set from the Replica's BCSId
     blockData.setBlockCommitSequenceId(blockCommitSequenceId);
 
-    blockManager.putBlock(kvContainer, blockData, false);
+    blockManager.putBlock(kvContainer, blockData, true);
     ContainerProtos.BlockData blockDataProto = blockData.getProtoBufMessage();
     final long numBytes = blockDataProto.getSerializedSize();
     // Increment write stats for PutBlock after write.
@@ -1468,12 +1469,12 @@ public class KeyValueHandler extends Handler {
         for (Map.Entry<Long, List<ContainerProtos.ChunkMerkleTree>> entry : diffReport.getCorruptChunks().entrySet()) {
           reconcileChunk(kvContainer, containerData, tokenHelper, scmBlockSize, xceiverClient, entry);
         }
+        updateContainerChecksum(containerData);
       } finally {
         dnClient.getXceiverClientManager().releaseClient(xceiverClient, false);
       }
     }
 
-    updateContainerChecksum(containerData);
     long dataChecksum = updateContainerChecksum(containerData);
     LOG.info("Checksum data for container {} is updated to {}", containerData.getContainerID(), dataChecksum);
     containerData.setDataChecksum(dataChecksum);
@@ -1500,7 +1501,7 @@ public class KeyValueHandler extends Handler {
                                   ContainerProtos.BlockMerkleTree missingBlock) throws IOException {
     BlockID blockID = new BlockID(containerData.getContainerID(), missingBlock.getBlockID());
     Token<OzoneBlockTokenIdentifier> blockToken = tokenHelper.getBlockToken(blockID, scmBlockSize);
-    // TODo: Cache the blockResponse to reuse it again.
+    // TODO: Cache the blockResponse to reuse it again.
     ContainerProtos.GetBlockResponseProto blockResponse = ContainerProtocolCalls.getBlock(xceiverClient, blockID,
         blockToken, new HashMap<>());
     // TODO: Add BcsId in BlockMerkleTree to avoid this call
@@ -1511,7 +1512,9 @@ public class KeyValueHandler extends Handler {
     for (ContainerProtos.ChunkInfo chunkInfoProto : chunksList) {
       ByteString chunkData = readChunkData(xceiverClient, chunkInfoProto, blockID, blockToken);
       ChunkBuffer chunkBuffer = ChunkBuffer.wrap(chunkData.asReadOnlyByteBuffer());
-      writeChunkForClosedContainer(ChunkInfo.getFromProtoBuf(chunkInfoProto), blockID, chunkBuffer, container);
+      ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
+      chunkInfo.addMetadata(OzoneConsts.CHUNK_OVERWRITE, "true");
+      writeChunkForClosedContainer(chunkInfo, blockID, chunkBuffer, container);
     }
 
     putBlockForClosedContainer(chunksList, container, BlockData.getFromProtoBuf(blockResponse.getBlockData()),
@@ -1553,7 +1556,9 @@ public class KeyValueHandler extends Handler {
       if (offsets.contains(chunkInfoProto.getOffset())) {
         ByteString chunkData = readChunkData(xceiverClient, chunkInfoProto, blockID, blockToken);
         ChunkBuffer chunkBuffer = ChunkBuffer.wrap(chunkData.asReadOnlyByteBuffer());
-        writeChunkForClosedContainer(ChunkInfo.getFromProtoBuf(chunkInfoProto), blockID, chunkBuffer, container);
+        ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
+        chunkInfo.addMetadata(OzoneConsts.CHUNK_OVERWRITE, "true");
+        writeChunkForClosedContainer(chunkInfo, blockID, chunkBuffer, container);
       }
     }
 
