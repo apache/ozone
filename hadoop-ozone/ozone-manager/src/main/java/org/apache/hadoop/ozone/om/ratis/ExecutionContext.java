@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -22,16 +22,21 @@ import org.apache.ratis.server.protocol.TermIndex;
 /**
  * context required for execution of request.
  */
-public class ExecutionContext {
-  private long index;
-  private TermIndex termIndex;
+public final class ExecutionContext {
+  private final long index;
+  private final TermIndex termIndex;
+
+  private ExecutionContext(long index, TermIndex termIndex) {
+    this.index = index;
+    this.termIndex = termIndex;
+  }
+
+  public static ExecutionContext of(long index, TermIndex termIndex) {
+    return new ExecutionContext(index, termIndex);
+  }
 
   public long getIndex() {
     return index;
-  }
-
-  public void setIndex(long index) {
-    this.index = index;
   }
 
   public TermIndex getTermIndex() {
@@ -39,9 +44,5 @@ public class ExecutionContext {
       return TermIndex.valueOf(-1, index);
     }
     return termIndex;
-  }
-
-  public void setTermIndex(TermIndex termIndex) {
-    this.termIndex = termIndex;
   }
 }

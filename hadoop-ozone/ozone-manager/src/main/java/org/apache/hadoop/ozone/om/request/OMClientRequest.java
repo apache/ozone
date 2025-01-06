@@ -145,9 +145,8 @@ public abstract class OMClientRequest implements RequestAuditor {
   /** For testing only. */
   @VisibleForTesting
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, long transactionLogIndex) {
-    ExecutionContext context = new ExecutionContext();
-    context.setTermIndex(TransactionInfo.getTermIndex(transactionLogIndex));
-    context.setIndex(transactionLogIndex);
+    ExecutionContext context = ExecutionContext.of(transactionLogIndex,
+        TransactionInfo.getTermIndex(transactionLogIndex));
     return validateAndUpdateCache(ozoneManager, context);
   }
 

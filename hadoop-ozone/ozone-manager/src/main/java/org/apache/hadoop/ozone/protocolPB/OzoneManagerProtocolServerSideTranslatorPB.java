@@ -307,9 +307,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
           throw ex;
         }
         final TermIndex termIndex = TransactionInfo.getTermIndex(transactionIndex.incrementAndGet());
-        final ExecutionContext context = new ExecutionContext();
-        context.setTermIndex(termIndex);
-        context.setIndex(termIndex.getIndex());
+        final ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
         omClientResponse = handler.handleWriteRequest(request, context, ozoneManagerDoubleBuffer);
       }
     } catch (IOException ex) {
