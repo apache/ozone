@@ -156,7 +156,6 @@ public class TestDirectoryDeletingServiceWithFSO {
 
   @AfterEach
   public void cleanup() {
-    metrics.resetDirectoryMetrics();
     assertDoesNotThrow(() -> {
       Path root = new Path("/");
       FileStatus[] fileStatuses = fs.listStatus(root);
@@ -189,6 +188,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
     assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
 
+    metrics.resetDirectoryMetrics();
     // Delete the appRoot, empty dir
     fs.delete(appRoot, true);
 
@@ -261,6 +261,7 @@ public class TestDirectoryDeletingServiceWithFSO {
 
     long preRunCount = dirDeletingService.getRunCount().get();
 
+    metrics.resetDirectoryMetrics();
     // Delete the appRoot
     fs.delete(appRoot, true);
 
@@ -322,6 +323,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 0);
 
+    metrics.resetDirectoryMetrics();
     // Delete the rootDir, which should delete all keys.
     fs.delete(root, true);
 
