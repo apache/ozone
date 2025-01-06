@@ -26,7 +26,6 @@ OZONE-SITE.XML_ozone.om.nodes.om=om1,om2,om3
 OZONE-SITE.XML_ozone.om.address.om.om1=om1
 OZONE-SITE.XML_ozone.om.address.om.om2=om2
 OZONE-SITE.XML_ozone.om.address.om.om3=om3
-OZONE-SITE.XML_ozone.om.ratis.enable=true
 
 OZONE-SITE.XML_ozone.scm.service.ids=scmservice
 OZONE-SITE.XML_ozone.scm.nodes.scmservice=scm1,scm2,scm3
@@ -54,7 +53,8 @@ OZONE-SITE.XML_ozone.om.s3.grpc.server_enabled=true
 OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
 OZONE-SITE.XML_dfs.container.ratis.datastream.enabled=true
 OZONE-SITE.XML_ozone.http.basedir=/tmp/ozone_http
-
+OZONE-SITE.XML_hdds.container.balancer.balancing.iteration.interval=25s
+OZONE-SITE.XML_hdds.container.balancer.trigger.du.before.move.enable=false
 OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop
 

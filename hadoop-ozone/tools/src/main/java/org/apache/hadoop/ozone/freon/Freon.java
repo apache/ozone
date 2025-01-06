@@ -18,14 +18,12 @@ package org.apache.hadoop.ozone.freon;
 
 import java.io.IOException;
 
+import org.apache.hadoop.hdds.cli.ExtensibleParentCommand;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
-import org.apache.hadoop.ozone.freon.containergenerator.GeneratorDatanode;
-import org.apache.hadoop.ozone.freon.containergenerator.GeneratorOm;
-import org.apache.hadoop.ozone.freon.containergenerator.GeneratorScm;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,53 +38,11 @@ import static org.apache.hadoop.hdds.server.http.HttpServer2.setHttpBaseDir;
 @Command(
     name = "ozone freon",
     description = "Load generator and tester tool for ozone",
-    subcommands = {
-        RandomKeyGenerator.class,
-        OzoneClientKeyGenerator.class,
-        OzoneClientKeyValidator.class,
-        OzoneClientKeyRemover.class,
-        OmKeyGenerator.class,
-        OmBucketGenerator.class,
-        OmBucketRemover.class,
-        HadoopFsGenerator.class,
-        HadoopNestedDirGenerator.class,
-        HadoopDirTreeGenerator.class,
-        HadoopFsValidator.class,
-        SameKeyReader.class,
-        S3KeyGenerator.class,
-        S3BucketGenerator.class,
-        DatanodeChunkGenerator.class,
-        DatanodeChunkValidator.class,
-        DatanodeBlockPutter.class,
-        FollowerAppendLogEntryGenerator.class,
-        ChunkManagerDiskWrite.class,
-        LeaderAppendLogEntryGenerator.class,
-        GeneratorOm.class,
-        GeneratorScm.class,
-        GeneratorDatanode.class,
-        ClosedContainerReplicator.class,
-        StreamingGenerator.class,
-        SCMThroughputBenchmark.class,
-        OmBucketReadWriteFileOps.class,
-        OmBucketReadWriteKeyOps.class,
-        OmRPCLoadGenerator.class,
-        OzoneClientKeyReadWriteListOps.class,
-        RangeKeysGenerator.class,
-        DatanodeSimulator.class,
-        OmMetadataGenerator.class,
-        DNRPCLoadGenerator.class,
-        HsyncGenerator.class,
-        OzoneClientCreator.class,
-    },
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
-public class Freon extends GenericCli {
+public class Freon extends GenericCli implements ExtensibleParentCommand {
 
   public static final Logger LOG = LoggerFactory.getLogger(Freon.class);
-
-  public Freon() {
-    super(Freon.class);
-  }
 
   @Option(names = "--server",
       description = "Enable internal http server to provide metric "
@@ -100,10 +56,15 @@ public class Freon extends GenericCli {
 
   @Override
   public int execute(String[] argv) {
-    conf = createOzoneConfiguration();
+    conf = getOzoneConf();
     HddsServerUtil.initializeMetrics(conf, "ozone-freon");
     TracingUtil.initTracing("freon", conf);
     return super.execute(argv);
+  }
+
+  @Override
+  public Class<?> subcommandType() {
+    return FreonSubcommand.class;
   }
 
   public void stopHttpServer() {

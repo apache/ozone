@@ -12,10 +12,7 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
@@ -25,14 +22,14 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
   <artifactId>hdds-annotation-processing</artifactId>
   <version>2.0.0-SNAPSHOT</version>
-  <description>Apache Ozone annotation processing tools for validating custom
-    annotations at compile time.
-  </description>
-  <name>Apache Ozone Annotation Processing</name>
   <packaging>jar</packaging>
+  <name>Apache Ozone Annotation Processing</name>
+  <description>Apache Ozone annotation processing tools for validating custom
+    annotations at compile time.</description>
 
   <properties>
-    <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
+    <!-- no tests in this module so far -->
+    <maven.test.skip>true</maven.test.skip>
   </properties>
 
   <build>

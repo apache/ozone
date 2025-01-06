@@ -85,9 +85,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   private final RequestValidations requestValidations;
   private final OMPerformanceMetrics perfMetrics;
 
-  // always true, only used in tests
-  private boolean shouldFlushCache = true;
-
   private OMRequest lastRequestToSubmit;
 
 
@@ -313,9 +310,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       return createErrorResponse(request, ex);
     }
     try {
-      if (shouldFlushCache) {
-        omClientResponse.getFlushFuture().get();
-      }
+      omClientResponse.getFlushFuture().get();
       if (LOG.isTraceEnabled()) {
         LOG.trace("Future for {} is completed", request);
       }
@@ -364,13 +359,5 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
    */
   public void awaitDoubleBufferFlush() throws InterruptedException {
     ozoneManagerDoubleBuffer.awaitFlush();
-  }
-
-  @VisibleForTesting
-  public void setShouldFlushCache(boolean shouldFlushCache) {
-    if (ozoneManagerDoubleBuffer != null) {
-      ozoneManagerDoubleBuffer.stopDaemon();
-    }
-    this.shouldFlushCache = shouldFlushCache;
   }
 }

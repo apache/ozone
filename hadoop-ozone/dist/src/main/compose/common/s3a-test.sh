@@ -98,7 +98,7 @@ EOF
   # - ITestS3AContractDistCp: HDDS-10616
   # - ITestS3AContractMkdirWithCreatePerf: HDDS-11662
   # - ITestS3AContractRename: HDDS-10665
-  mvn -B -V --fail-never --no-transfer-progress \
+  mvn ${MAVEN_ARGS:-} --fail-never \
     -Dtest='ITestS3AContract*, ITestS3ACommitterMRJob, !ITestS3AContractBulkDelete, !ITestS3AContractCreate#testOverwrite*EmptyDirectory[*], !ITestS3AContractDistCp, !ITestS3AContractMkdirWithCreatePerf, !ITestS3AContractRename' \
     clean test
 

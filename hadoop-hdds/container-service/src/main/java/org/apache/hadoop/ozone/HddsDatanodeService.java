@@ -102,6 +102,9 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private static final Logger LOG = LoggerFactory.getLogger(
       HddsDatanodeService.class);
 
+  public static final String TESTING_DATANODE_VERSION_INITIAL = "testing.hdds.datanode.version.initial";
+  public static final String TESTING_DATANODE_VERSION_CURRENT = "testing.hdds.datanode.version.current";
+
   private OzoneConfiguration conf;
   private SecurityConfig secConf;
   private DatanodeDetails datanodeDetails;
@@ -169,7 +172,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   @Override
   public Void call() throws Exception {
-    OzoneConfiguration configuration = createOzoneConfiguration();
+    OzoneConfiguration configuration = getOzoneConf();
     if (printBanner) {
       HddsServerUtil.startupShutdownMessage(HddsVersionInfo.HDDS_VERSION_INFO,
           HddsDatanodeService.class, args, LOG, configuration);
@@ -432,15 +435,14 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     DatanodeDetails details;
     if (idFile.exists()) {
       details = ContainerUtils.readDatanodeDetailsFrom(idFile);
-      // Current version is always overridden to the latest
-      details.setCurrentVersion(getDefaultCurrentVersion());
     } else {
       // There is no datanode.id file, this might be the first time datanode
       // is started.
       details = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build();
-      details.setInitialVersion(getDefaultInitialVersion());
-      details.setCurrentVersion(getDefaultCurrentVersion());
+      details.setInitialVersion(getInitialVersion());
     }
+    // Current version is always overridden to the latest
+    details.setCurrentVersion(getCurrentVersion());
     return details;
   }
 
@@ -680,16 +682,14 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   /**
    * Returns the initial version of the datanode.
    */
-  @VisibleForTesting
-  public static int getDefaultInitialVersion() {
-    return DatanodeVersion.CURRENT_VERSION;
+  private int getInitialVersion() {
+    return conf.getInt(TESTING_DATANODE_VERSION_INITIAL, DatanodeVersion.CURRENT_VERSION);
   }
 
   /**
    * Returns the current version of the datanode.
    */
-  @VisibleForTesting
-  public static int getDefaultCurrentVersion() {
-    return DatanodeVersion.CURRENT_VERSION;
+  private int getCurrentVersion() {
+    return conf.getInt(TESTING_DATANODE_VERSION_CURRENT, DatanodeVersion.CURRENT_VERSION);
   }
 }

@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
@@ -33,6 +32,7 @@ import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.UniformDatanodesFactory;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -46,13 +46,15 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.PutBlock;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.WriteChunk;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_CHUNK_READ_NETTY_CHUNKED_NIO_FILE_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -74,15 +76,8 @@ public class TestBlockDataStreamOutput {
   private static String volumeName;
   private static String bucketName;
   private static String keyString;
-  private static final int DN_OLD_VERSION = DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE.toProtoValue();
+  private static final DatanodeVersion DN_OLD_VERSION = DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public static void init() throws Exception {
     chunkSize = 100;
@@ -93,6 +88,7 @@ public class TestBlockDataStreamOutput {
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     conf.setFromObject(clientConfig);
 
+    conf.setBoolean(OZONE_CHUNK_READ_NETTY_CHUNKED_NIO_FILE_KEY, true);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     conf.setQuietMode(false);
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4,
@@ -110,14 +106,16 @@ public class TestBlockDataStreamOutput {
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(5)
-        .setDatanodeCurrentVersion(DN_OLD_VERSION)
+        .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
+            .setCurrentVersion(DN_OLD_VERSION)
+            .build())
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     keyString = UUID.randomUUID().toString();
-    volumeName = "testblockoutputstream";
+    volumeName = "testblockdatastreamoutput";
     bucketName = volumeName;
     objectStore.createVolume(volumeName);
     objectStore.getVolume(volumeName).createBucket(bucketName);
@@ -127,9 +125,6 @@ public class TestBlockDataStreamOutput {
     return UUID.randomUUID().toString();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
@@ -163,6 +158,11 @@ public class TestBlockDataStreamOutput {
   }
 
   static void testWrite(int dataLength) throws Exception {
+    XceiverClientMetrics metrics =
+        XceiverClientManager.getXceiverClientMetrics();
+    long pendingWriteChunkCount = metrics.getPendingContainerOpCountMetrics(WriteChunk);
+    long pendingPutBlockCount = metrics.getPendingContainerOpCountMetrics(PutBlock);
+
     String keyName = getKeyName();
     OzoneDataStreamOutput key = createKey(
         keyName, ReplicationType.RATIS, dataLength);
@@ -171,9 +171,19 @@ public class TestBlockDataStreamOutput {
     // now close the stream, It will update the key length.
     key.close();
     validateData(keyName, data);
+
+    assertEquals(pendingPutBlockCount,
+        metrics.getPendingContainerOpCountMetrics(PutBlock));
+    assertEquals(pendingWriteChunkCount,
+        metrics.getPendingContainerOpCountMetrics(WriteChunk));
   }
 
   private void testWriteWithFailure(int dataLength) throws Exception {
+    XceiverClientMetrics metrics =
+        XceiverClientManager.getXceiverClientMetrics();
+    long pendingWriteChunkCount = metrics.getPendingContainerOpCountMetrics(WriteChunk);
+    long pendingPutBlockCount = metrics.getPendingContainerOpCountMetrics(PutBlock);
+
     String keyName = getKeyName();
     OzoneDataStreamOutput key = createKey(
         keyName, ReplicationType.RATIS, dataLength);
@@ -192,17 +202,24 @@ public class TestBlockDataStreamOutput {
     key.close();
     String dataString = new String(data, UTF_8);
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
+
+    assertEquals(pendingPutBlockCount,
+        metrics.getPendingContainerOpCountMetrics(PutBlock));
+    assertEquals(pendingWriteChunkCount,
+        metrics.getPendingContainerOpCountMetrics(WriteChunk));
   }
 
   @Test
   public void testPutBlockAtBoundary() throws Exception {
-    int dataLength = 500;
+    int dataLength = maxFlushSize + 100;
     XceiverClientMetrics metrics =
         XceiverClientManager.getXceiverClientMetrics();
-    long putBlockCount = metrics.getContainerOpCountMetrics(
-        ContainerProtos.Type.PutBlock);
-    long pendingPutBlockCount = metrics.getPendingContainerOpCountMetrics(
-        ContainerProtos.Type.PutBlock);
+    long writeChunkCount = metrics.getContainerOpCountMetrics(WriteChunk);
+    long putBlockCount = metrics.getContainerOpCountMetrics(PutBlock);
+    long pendingWriteChunkCount = metrics.getPendingContainerOpCountMetrics(WriteChunk);
+    long pendingPutBlockCount = metrics.getPendingContainerOpCountMetrics(PutBlock);
+    long totalOpCount = metrics.getTotalOpCount();
+
     String keyName = getKeyName();
     OzoneDataStreamOutput key = createKey(
         keyName, ReplicationType.RATIS, 0);
@@ -210,14 +227,25 @@ public class TestBlockDataStreamOutput {
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
             .getBytes(UTF_8);
     key.write(ByteBuffer.wrap(data));
-    assertThat(metrics.getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock))
+    assertThat(metrics.getPendingContainerOpCountMetrics(PutBlock))
         .isLessThanOrEqualTo(pendingPutBlockCount + 1);
+    assertThat(metrics.getPendingContainerOpCountMetrics(WriteChunk))
+        .isLessThanOrEqualTo(pendingWriteChunkCount + 5);
     key.close();
     // Since data length is 500 , first putBlock will be at 400(flush boundary)
     // and the other at 500
-    assertEquals(
-        metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock),
-        putBlockCount + 2);
+    assertEquals(putBlockCount + 2,
+        metrics.getContainerOpCountMetrics(PutBlock));
+    // Each chunk is 100 so there will be 500 / 100 = 5 chunks.
+    assertEquals(writeChunkCount + 5,
+        metrics.getContainerOpCountMetrics(WriteChunk));
+    assertEquals(totalOpCount + 7,
+        metrics.getTotalOpCount());
+    assertEquals(pendingPutBlockCount,
+        metrics.getPendingContainerOpCountMetrics(PutBlock));
+    assertEquals(pendingWriteChunkCount,
+        metrics.getPendingContainerOpCountMetrics(WriteChunk));
+
     validateData(keyName, data);
   }
 
@@ -239,20 +267,22 @@ public class TestBlockDataStreamOutput {
     XceiverClientMetrics metrics =
         XceiverClientManager.getXceiverClientMetrics();
     OzoneDataStreamOutput key = createKey(keyName, ReplicationType.RATIS, 0);
-    long writeChunkCount =
-        metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk);
+    long writeChunkCount = metrics.getContainerOpCountMetrics(WriteChunk);
+    long pendingWriteChunkCount = metrics.getPendingContainerOpCountMetrics(WriteChunk);
     byte[] data =
         ContainerTestHelper.getFixedLengthString(keyString, chunkSize / 2)
             .getBytes(UTF_8);
     key.write(ByteBuffer.wrap(data));
     // minPacketSize= 100, so first write of 50 wont trigger a writeChunk
     assertEquals(writeChunkCount,
-        metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
+        metrics.getContainerOpCountMetrics(WriteChunk));
     key.write(ByteBuffer.wrap(data));
     assertEquals(writeChunkCount + 1,
-        metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
+        metrics.getContainerOpCountMetrics(WriteChunk));
     // now close the stream, It will update the key length.
     key.close();
+    assertEquals(pendingWriteChunkCount,
+        metrics.getPendingContainerOpCountMetrics(WriteChunk));
     String dataString = new String(data, UTF_8);
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
@@ -281,7 +311,7 @@ public class TestBlockDataStreamOutput {
     List<HddsDatanodeService> dns = cluster.getHddsDatanodes();
     for (HddsDatanodeService dn : dns) {
       DatanodeDetails details = dn.getDatanodeDetails();
-      assertEquals(DN_OLD_VERSION, details.getCurrentVersion());
+      assertEquals(DN_OLD_VERSION.toProtoValue(), details.getCurrentVersion());
     }
 
     String keyName = getKeyName();
@@ -292,7 +322,7 @@ public class TestBlockDataStreamOutput {
     // Now check 3 DNs in a random pipeline returns the correct DN versions
     List<DatanodeDetails> streamDnDetails = stream.getPipeline().getNodes();
     for (DatanodeDetails details : streamDnDetails) {
-      assertEquals(DN_OLD_VERSION, details.getCurrentVersion());
+      assertEquals(DN_OLD_VERSION.toProtoValue(), details.getCurrentVersion());
     }
   }
 

@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.shell;
 
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.hdds.cli.OzoneAdmin;
+import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.StandardOutputTestBase;
@@ -58,7 +58,8 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
 
   @BeforeAll
   public static void init() throws Exception {
-    conf = new OzoneConfiguration();
+    ozoneAdmin = new OzoneAdmin();
+    conf = ozoneAdmin.getOzoneConf();
     OMRequestTestUtils.configureFSOptimizedPaths(conf, true);
     conf.set(OZONE_RECON_ADDRESS_KEY, "localhost:9888");
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -66,9 +67,6 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
     store = client.getObjectStore();
-
-    // Client uses server conf for this test
-    ozoneAdmin = new OzoneAdmin(conf);
 
     volumeName = UUID.randomUUID().toString();
     bucketOBS = UUID.randomUUID().toString();

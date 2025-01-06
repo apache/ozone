@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -27,11 +27,11 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import com.google.common.collect.Sets;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -48,48 +48,52 @@ import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT_DEFAULT;
+
 /**
  * Class defining Safe mode exit criteria for Containers.
  */
 public class ContainerSafeModeRule extends
     SafeModeExitRule<NodeRegistrationContainerReport> {
 
-  public static final Logger LOG =
-      LoggerFactory.getLogger(ContainerSafeModeRule.class);
+  public static final Logger LOG = LoggerFactory.getLogger(ContainerSafeModeRule.class);
+  private final ContainerManager containerManager;
   // Required cutoff % for containers with at least 1 reported replica.
-  private double safeModeCutoff;
+  private final double safeModeCutoff;
   // Containers read from scm db (excluding containers in ALLOCATED state).
-  private Set<Long> ratisContainers;
-  private Set<Long> ecContainers;
-  private Map<Long, Set<UUID>> ecContainerDNsMap;
+  private final Set<Long> ratisContainers;
+  private final Set<Long> ecContainers;
+  private final Map<Long, Set<UUID>> ecContainerDNsMap;
+  private final AtomicLong ratisContainerWithMinReplicas = new AtomicLong(0);
+  private final AtomicLong ecContainerWithMinReplicas = new AtomicLong(0);
+
   private double ratisMaxContainer;
   private double ecMaxContainer;
-  private AtomicLong ratisContainerWithMinReplicas = new AtomicLong(0);
-  private AtomicLong ecContainerWithMinReplicas = new AtomicLong(0);
-  private final ContainerManager containerManager;
 
-  public ContainerSafeModeRule(String ruleName, EventQueue eventQueue,
-             ConfigurationSource conf,
-             List<ContainerInfo> containers,
-             ContainerManager containerManager, SCMSafeModeManager manager) {
+  public ContainerSafeModeRule(final String ruleName,
+                               final EventQueue eventQueue,
+                               final ConfigurationSource conf,
+                               final ContainerManager containerManager,
+                               final SCMSafeModeManager manager) {
     super(manager, ruleName, eventQueue);
+    this.safeModeCutoff = getSafeModeCutoff(conf);
     this.containerManager = containerManager;
-    safeModeCutoff = conf.getDouble(
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT,
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT_DEFAULT);
-
-    Preconditions.checkArgument(
-        (safeModeCutoff >= 0.0 && safeModeCutoff <= 1.0),
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT  +
-            " value should be >= 0.0 and <= 1.0");
-
-    ratisContainers = new HashSet<>();
-    ecContainers = new HashSet<>();
-    ecContainerDNsMap = new ConcurrentHashMap<>();
-
-    initializeRule(containers);
+    this.ratisContainers = new HashSet<>();
+    this.ecContainers = new HashSet<>();
+    this.ecContainerDNsMap = new ConcurrentHashMap<>();
+    initializeRule();
   }
 
+
+  private static double getSafeModeCutoff(ConfigurationSource conf) {
+    final double cutoff = conf.getDouble(HDDS_SCM_SAFEMODE_THRESHOLD_PCT,
+        HDDS_SCM_SAFEMODE_THRESHOLD_PCT_DEFAULT);
+    Preconditions.checkArgument((cutoff >= 0.0 && cutoff <= 1.0),
+        HDDS_SCM_SAFEMODE_THRESHOLD_PCT  +
+            " value should be >= 0.0 and <= 1.0");
+    return cutoff;
+  }
 
   @Override
   protected TypedEvent<NodeRegistrationContainerReport> getEventType() {
@@ -98,45 +102,59 @@ public class ContainerSafeModeRule extends
 
   @Override
   protected synchronized boolean validate() {
-    return (getCurrentContainerThreshold() >= safeModeCutoff) &&
-        (getCurrentECContainerThreshold() >= safeModeCutoff);
+    if (validateBasedOnReportProcessing()) {
+      return (getCurrentContainerThreshold() >= safeModeCutoff) &&
+          (getCurrentECContainerThreshold() >= safeModeCutoff);
+    }
+
+    // TODO: Split ContainerSafeModeRule into RatisContainerSafeModeRule and
+    //   ECContainerSafeModeRule
+    final List<ContainerInfo> containers = containerManager.getContainers(
+        ReplicationType.RATIS);
+
+    return containers.stream()
+        .filter(this::isClosed)
+        .map(ContainerInfo::containerID)
+        .noneMatch(this::isMissing);
+  }
+
+  /**
+   * Checks if the container has any replica.
+   */
+  private boolean isMissing(ContainerID id) {
+    try {
+      return containerManager.getContainerReplicas(id).isEmpty();
+    } catch (ContainerNotFoundException ex) {
+      /*
+       * This should never happen, in case this happens the container
+       * somehow got removed from SCM.
+       * Safemode rule doesn't have to log/fix this. We will just exclude this
+       * from the rule validation.
+       */
+      return false;
+
+    }
   }
 
   @VisibleForTesting
-  public synchronized double getCurrentContainerThreshold() {
-    if (ratisMaxContainer == 0) {
-      return 1;
-    }
-    return (ratisContainerWithMinReplicas.doubleValue() / ratisMaxContainer);
+  public double getCurrentContainerThreshold() {
+    return ratisMaxContainer == 0 ? 1 :
+        (ratisContainerWithMinReplicas.doubleValue() / ratisMaxContainer);
   }
 
   @VisibleForTesting
-  public synchronized double getCurrentECContainerThreshold() {
-    if (ecMaxContainer == 0) {
-      return 1;
-    }
-    return (ecContainerWithMinReplicas.doubleValue() / ecMaxContainer);
+  public double getCurrentECContainerThreshold() {
+    return ecMaxContainer == 0 ? 1 :
+        (ecContainerWithMinReplicas.doubleValue() / ecMaxContainer);
   }
 
-  private synchronized double getEcMaxContainer() {
-    if (ecMaxContainer == 0) {
-      return 1;
-    }
-    return ecMaxContainer;
-  }
 
-  private synchronized double getRatisMaxContainer() {
-    if (ratisMaxContainer == 0) {
-      return 1;
-    }
-    return ratisMaxContainer;
-  }
-
+  // TODO: Report processing logic will be removed in future. HDDS-11958.
   @Override
   protected synchronized void process(
-      NodeRegistrationContainerReport reportsProto) {
-    DatanodeDetails datanodeDetails = reportsProto.getDatanodeDetails();
-    UUID datanodeUUID = datanodeDetails.getUuid();
+      final NodeRegistrationContainerReport reportsProto) {
+    final DatanodeDetails datanodeDetails = reportsProto.getDatanodeDetails();
+    final UUID datanodeUUID = datanodeDetails.getUuid();
     StorageContainerDatanodeProtocolProtos.ContainerReportsProto report = reportsProto.getReport();
 
     report.getReportsList().forEach(c -> {
@@ -160,9 +178,7 @@ public class ContainerSafeModeRule extends
       SCMSafeModeManager.getLogger().info(
           "SCM in safe mode. {} % containers [Ratis] have at least one"
           + " reported replica, {} % containers [EC] have at N reported replica.",
-          ((ratisContainerWithMinReplicas.doubleValue() / getRatisMaxContainer()) * 100),
-          ((ecContainerWithMinReplicas.doubleValue() / getEcMaxContainer()) * 100)
-      );
+          getCurrentContainerThreshold() * 100, getCurrentECContainerThreshold() * 100);
     }
   }
 
@@ -240,8 +256,8 @@ public class ContainerSafeModeRule extends
     String status = String.format(
         "%1.2f%% of [Ratis] Containers(%s / %s) with at least one reported replica (=%1.2f) >= " +
         "safeModeCutoff (=%1.2f);",
-        (ratisContainerWithMinReplicas.doubleValue() / getRatisMaxContainer()) * 100,
-        ratisContainerWithMinReplicas, (long) getRatisMaxContainer(),
+        getCurrentContainerThreshold() * 100,
+        ratisContainerWithMinReplicas, (long) ratisMaxContainer,
         getCurrentContainerThreshold(), this.safeModeCutoff);
 
     Set<Long> sampleRatisContainers = ratisContainers.stream().
@@ -258,8 +274,8 @@ public class ContainerSafeModeRule extends
     String ecStatus = String.format(
         "%1.2f%% of [EC] Containers(%s / %s) with at least N reported replica (=%1.2f) >= " +
         "safeModeCutoff (=%1.2f);",
-        (ecContainerWithMinReplicas.doubleValue() / getEcMaxContainer()) * 100,
-        ecContainerWithMinReplicas, (long) getEcMaxContainer(),
+        getCurrentECContainerThreshold() * 100,
+        ecContainerWithMinReplicas, (long) ecMaxContainer,
         getCurrentECContainerThreshold(), this.safeModeCutoff);
     status = status.concat("\n").concat(ecStatus);
 
@@ -289,25 +305,19 @@ public class ContainerSafeModeRule extends
 
   @Override
   public synchronized void refresh(boolean forceRefresh) {
-    List<ContainerInfo> containers = containerManager.getContainers();
-    if (forceRefresh) {
-      initializeRule(containers);
-    } else {
-      if (!validate()) {
-        initializeRule(containers);
-      }
+    if (forceRefresh || !validate()) {
+      initializeRule();
     }
   }
 
-  private boolean checkContainerState(LifeCycleState state) {
-    if (state == LifeCycleState.QUASI_CLOSED || state == LifeCycleState.CLOSED) {
-      return true;
-    }
-    return false;
+  private boolean isClosed(ContainerInfo container) {
+    final LifeCycleState state = container.getState();
+    return state == LifeCycleState.QUASI_CLOSED ||
+        state == LifeCycleState.CLOSED;
   }
 
-  private void initializeRule(List<ContainerInfo> containers) {
-
+  private void initializeRule() {
+    final List<ContainerInfo> containers = containerManager.getContainers();
     // Clean up the related data in the map.
     ratisContainers.clear();
     ecContainers.clear();
@@ -319,10 +329,9 @@ public class ContainerSafeModeRule extends
       // created by the client. We are not considering these containers for
       // now. These containers can be handled by tracking pipelines.
 
-      LifeCycleState containerState = container.getState();
       HddsProtos.ReplicationType replicationType = container.getReplicationType();
 
-      if (checkContainerState(containerState) && container.getNumberOfKeys() > 0) {
+      if (isClosed(container) && container.getNumberOfKeys() > 0) {
         // If it's of type Ratis
         if (replicationType.equals(HddsProtos.ReplicationType.RATIS)) {
           ratisContainers.add(container.getContainerID());
