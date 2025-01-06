@@ -26,11 +26,12 @@ ${ENDPOINT_URL}        http://s3g:9878
 ${S3_VOLUME}           s3v
 ${BUCKET}              generated
 ${RCLONE_CONFIG_NAME}  ozone
-
+${RCLONE_CONFIG_PATH}  /tmp/rclone.conf
 
 *** Test Cases ***
 
 Rclone Client Test
     [Setup]    Setup v2 headers
+    Set Environment Variable   RCLONE_CONFIG  ${RCLONE_CONFIG_PATH}
     ${result} =    Execute    rclone config create ${RCLONE_CONFIG_NAME} s3 env_auth=true provider=Other endpoint=${ENDPOINT_URL}
     ${result} =    Execute    rclone copy . ${RCLONE_CONFIG_NAME}:/${S3_VOLUME}/${BUCKET}
