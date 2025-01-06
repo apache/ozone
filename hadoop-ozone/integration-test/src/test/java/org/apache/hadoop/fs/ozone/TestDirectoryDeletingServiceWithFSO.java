@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -111,6 +112,7 @@ public class TestDirectoryDeletingServiceWithFSO {
   private static String volumeName;
   private static String bucketName;
   private static OzoneClient client;
+  private static DeletingServiceMetrics metrics;
 
   @BeforeAll
   public static void init() throws Exception {
@@ -143,6 +145,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
 
     fs = FileSystem.get(conf);
+    metrics = cluster.getOzoneManager().getDeletionMetrics();
   }
 
   @AfterAll
@@ -208,6 +211,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     }
 
     assertThat(dirDeletingService.getRunCount().get()).isGreaterThan(1);
+    assertEquals(1, metrics.getNumDirsPurged());
+    assertEquals(1, metrics.getNumDirsSentForPurge());
   }
 
   /**
@@ -272,6 +277,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     // 15 subDir + 3 parentDir
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 18);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 19);
+    assertEquals(19, metrics.getNumDirsPurged());
+    assertEquals(19, metrics.getNumDirsSentForPurge());
 
     long elapsedRunCount = dirDeletingService.getRunCount().get() - preRunCount;
     assertThat(dirDeletingService.getRunCount().get()).isGreaterThan(1);
@@ -324,6 +331,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getMovedFilesCount, 3);
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 2);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 5);
+    assertEquals(5, metrics.getNumDirsSentForPurge());
+    assertEquals(5, metrics.getNumDirsPurged());
 
     assertThat(dirDeletingService.getRunCount().get()).isGreaterThan(1);
   }

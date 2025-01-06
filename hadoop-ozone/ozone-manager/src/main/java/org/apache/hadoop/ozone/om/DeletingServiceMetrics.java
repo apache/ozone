@@ -84,6 +84,10 @@ public final class DeletingServiceMetrics {
     incrNumSubFilesSentForPurge(filesMove);
   }
 
+  public long getNumDirsSentForPurge() {
+    return numDirsSentForPurge.value();
+  }
+
   /*
    * Total key deletion metrics across all iterations of KeyDeletingService since last restart.
    */
@@ -118,6 +122,9 @@ public final class DeletingServiceMetrics {
   }
   public void incrNumSubDirectoriesMoved(long subDirectories) {
     this.numSubDirsMovedToDeletedDirTable.incr(subDirectories);
+  }
+  public long getNumDirsPurged() {
+    return numDirsPurged.value();
   }
 
   /*
