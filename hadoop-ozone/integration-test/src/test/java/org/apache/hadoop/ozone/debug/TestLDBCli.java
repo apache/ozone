@@ -26,9 +26,12 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.DBDefinition;
+import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -80,6 +83,7 @@ public class TestLDBCli {
   private static final String KEY_TABLE = "keyTable";
   private static final String BLOCK_DATA = "block_data";
   public static final String PIPELINES = "pipelines";
+  public static final String DUMMY_DB = "anotherKeyTable";
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private OzoneConfiguration conf;
   private DBStore dbStore;
@@ -410,6 +414,40 @@ public class TestLDBCli {
     assertEquals("", stderr.toString());
   }
 
+  @Test
+  void testCommandsWithDBDefOverride() throws IOException {
+    // Prepare dummy table
+    prepareTable(DUMMY_DB, true);
+
+    // Prepare args for value-schema command
+    List<String> completeScanArgs = new ArrayList<>(Arrays.asList(
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
+        "--schema", DummyDBDefinition.class.getName(),
+        "value-schema",
+        "--column-family", DummyDBDefinition.ANOTHER_KEY_TABLE_NAME));
+
+    int exitCode = cmd.execute(completeScanArgs.toArray(new String[0]));
+    assertEquals(0, exitCode, stderr.toString());
+    Pattern p = Pattern.compile(".*String.*String.*", Pattern.MULTILINE);
+    Matcher m = p.matcher(stdout.toString());
+    assertTrue(m.find());
+    assertEquals("", stderr.toString());
+
+    // Prepare args for scan command
+    completeScanArgs = new ArrayList<>(Arrays.asList(
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
+        "--schema", DummyDBDefinition.class.getName(),
+        "scan",
+        "--column-family", DummyDBDefinition.ANOTHER_KEY_TABLE_NAME));
+
+    exitCode = cmd.execute(completeScanArgs.toArray(new String[0]));
+    assertEquals(0, exitCode, stderr.toString());
+    p = Pattern.compile(".*random-key.*random-value.*", Pattern.MULTILINE);
+    m = p.matcher(stdout.toString());
+    assertTrue(m.find());
+    assertEquals("", stderr.toString());
+  }
+
   /**
    * Converts String input to a Map and compares to the given Map input.
    * @param expected expected result Map
@@ -473,11 +511,23 @@ public class TestLDBCli {
         }
       }
       break;
+
     case PIPELINES:
       // Empty table
       dbStore = DBStoreBuilder.newBuilder(conf).setName("scm.db")
           .setPath(tempDir.toPath()).addTable(PIPELINES).build();
       break;
+
+    case DUMMY_DB:
+      dbStore = DBStoreBuilder.newBuilder(new OzoneConfiguration())
+          .setName("another.db")
+          .setPath(tempDir.toPath())
+          .addTable(DummyDBDefinition.ANOTHER_KEY_TABLE_NAME)
+          .build();
+      dbStore.getTable(DummyDBDefinition.ANOTHER_KEY_TABLE_NAME, String.class, String.class)
+          .put("random-key", "random-value");
+      break;
+
     default:
       throw new IllegalArgumentException("Unsupported table: " + tableName);
     }
@@ -510,6 +560,25 @@ public class TestLDBCli {
     ObjectWriter objectWriter = DBScanner.JsonSerializationHelper.getWriter();
     String json = objectWriter.writeValueAsString(obj);
     return MAPPER.readValue(json, new TypeReference<Map<String, Object>>() { });
+  }
+
+  public static class DummyDBDefinition extends DBDefinition.WithMap {
+    public static String ANOTHER_KEY_TABLE_NAME = "anotherKeyTable";
+    public static final DBColumnFamilyDefinition<String, String> ANOTHER_KEY_TABLE
+        = new DBColumnFamilyDefinition<>(ANOTHER_KEY_TABLE_NAME, StringCodec.get(), StringCodec.get());
+    private static final Map<String, DBColumnFamilyDefinition<?, ?>>
+        COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(ANOTHER_KEY_TABLE);
+    protected DummyDBDefinition() {
+      super(COLUMN_FAMILIES);
+    }
+    @Override
+    public String getName() {
+      return "another.db";
+    }
+    @Override
+    public String getLocationConfigKey() {
+      return "";
+    }
   }
 
 }

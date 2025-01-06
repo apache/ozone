@@ -18,8 +18,12 @@
 
 package org.apache.hadoop.ozone.debug;
 
+import java.lang.reflect.Constructor;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+
+import java.util.HashSet;
+import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
@@ -34,8 +38,12 @@ import org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_CONTAINER_KEY_DB;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
+import org.reflections.Reflections;
 
 /**
  * Simple factory unit test.
@@ -74,5 +82,47 @@ public class TestDBDefinitionFactory {
     DBDefinitionFactory.setDnDBSchemaVersion("V3");
     definition = DBDefinitionFactory.getDefinition(dbPath, conf);
     assertInstanceOf(DatanodeSchemaThreeDBDefinition.class, definition);
+  }
+
+  @Test
+  public void testGetDefinitionWithOverride() {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    Path dbPath = Paths.get("another.db");
+    DBDefinition definition = DBDefinitionFactory.getDefinition(dbPath, conf, OMDBDefinition.class.getName());
+    assertInstanceOf(OMDBDefinition.class, definition);
+  }
+
+  /*
+   * Test to ensure that any DBDefinition has a default constructor or a constructor with 1 parameter.
+   * This is needed for ldb tools to run with arbitrary DB definitions.
+   */
+  @Test
+  public void testAllDBDefinitionsHaveCorrectConstructor() {
+    Set<Class<? extends DBDefinition.WithMap>> withMapSubclasses = new HashSet<>();
+    try {
+      Reflections reflections = new Reflections("org.apache.hadoop");
+      withMapSubclasses = reflections.getSubTypesOf(DBDefinition.WithMap.class);
+    } catch (Exception e) {
+      fail("Error while finding subclasses: " + e.getMessage());
+    }
+    assertFalse(withMapSubclasses.isEmpty(), "No classes found extending DBDefinition.WithMap");
+    System.out.println(withMapSubclasses);
+
+    // Check constructors for each subclass
+    for (Class<?> clazz : withMapSubclasses) {
+      Constructor<?>[] constructors = clazz.getDeclaredConstructors();
+      boolean hasValidConstructor = false;
+
+      for (Constructor<?> constructor : constructors) {
+        int paramCount = constructor.getParameterCount();
+        if (paramCount == 0 || paramCount == 1) {
+          hasValidConstructor = true;
+          break;
+        }
+      }
+
+      assertTrue(hasValidConstructor,
+          "Class " + clazz.getName() + " does not have a valid constructor (default or single parameter)");
+    }
   }
 }

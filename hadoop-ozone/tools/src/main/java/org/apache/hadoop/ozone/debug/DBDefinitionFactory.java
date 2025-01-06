@@ -99,9 +99,9 @@ public final class DBDefinitionFactory {
     return getDefinition(dbName);
   }
 
-  public static DBDefinition getDefinition(Path dbName, ConfigurationSource config, String overrideDBDef) {
+  public static DBDefinition getDefinition(Path dbPath, ConfigurationSource config, String overrideDBDef) {
     if (overrideDBDef == null) {
-      return getDefinition(dbName, config);
+      return getDefinition(dbPath, config);
     }
     try {
       Class<?> clazz = Class.forName(overrideDBDef);
@@ -114,7 +114,7 @@ public final class DBDefinitionFactory {
         } catch (NoSuchMethodException e) {
           Constructor<?> stringParamConstructor = clazz.getDeclaredConstructor(String.class);
           stringParamConstructor.setAccessible(true);
-          instance = (DBDefinition) stringParamConstructor.newInstance(dbName.toAbsolutePath().toString());
+          instance = (DBDefinition) stringParamConstructor.newInstance(dbPath.toAbsolutePath().toString());
         }
         return instance;
       } else {
