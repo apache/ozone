@@ -29,14 +29,15 @@ import java.util.stream.Collectors;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.om.request.validation.OMLayoutVersionValidator;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
-import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
-import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
-import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.OMClientVersionValidator;
+import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
@@ -384,10 +385,10 @@ public class OMFileCreateRequest extends OMKeyRequest {
     }
   }
 
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+  @OMLayoutVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = CreateFile
+      requestType = CreateFile,
+      applyBefore = OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT
   )
   public static OMRequest disallowCreateFileWithECReplicationConfig(
       OMRequest req, ValidationContext ctx) throws OMException {
@@ -416,10 +417,10 @@ public class OMFileCreateRequest extends OMKeyRequest {
    * @return the validated request
    * @throws OMException if the request is invalid
    */
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+  @OMClientVersionValidator(
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
-      requestType = Type.CreateFile
+      requestType = Type.CreateFile,
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT
   )
   public static OMRequest blockCreateFileWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
