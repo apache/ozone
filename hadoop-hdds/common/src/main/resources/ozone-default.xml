@@ -2046,15 +2046,6 @@
   </property>
 
   <property>
-    <name>ozone.om.ratis.enable</name>
-    <value>true</value>
-    <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
-    <description>Property to enable or disable Ratis server on OM.
-    Please note - this is a temporary property to disable OM Ratis server.
-    </description>
-  </property>
-
-  <property>
     <name>ozone.om.ratis.port</name>
     <value>9872</value>
     <tag>OZONE, OM, RATIS</tag>
@@ -3323,7 +3314,7 @@
   </property>
   <property>
     <name>ozone.recon.om.snapshot.task.interval.delay</name>
-    <value>10m</value>
+    <value>5s</value>
     <tag>OZONE, RECON, OM</tag>
     <description>
       Interval in MINUTES by Recon to request OM DB Snapshot.
@@ -3339,7 +3330,7 @@
   </property>
   <property>
     <name>recon.om.delta.update.limit</name>
-    <value>2000</value>
+    <value>50000</value>
     <tag>OZONE, RECON</tag>
     <description>
       Recon each time get a limited delta updates from OM.
@@ -3360,7 +3351,7 @@
   </property>
   <property>
     <name>recon.om.delta.update.loop.limit</name>
-    <value>10</value>
+    <value>50</value>
     <tag>OZONE, RECON</tag>
     <description>
       The sync between Recon and OM consists of several small

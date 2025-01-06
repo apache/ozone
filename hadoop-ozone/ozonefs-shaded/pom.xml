@@ -29,6 +29,7 @@
   <properties>
     <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
     <shaded.prefix>org.apache.hadoop.ozone.shaded</shaded.prefix>
+    <sort.skip>true</sort.skip>
   </properties>
 
   <dependencies>

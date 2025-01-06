@@ -38,6 +38,7 @@
     <maven.build.timestamp.format>yyyy-MM-dd'T'HH:mm:ssZ</maven.build.timestamp.format>
     <httpfs.build.timestamp>${maven.build.timestamp}</httpfs.build.timestamp>
     <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
+    <sort.skip>true</sort.skip>
   </properties>
 
   <dependencies>
