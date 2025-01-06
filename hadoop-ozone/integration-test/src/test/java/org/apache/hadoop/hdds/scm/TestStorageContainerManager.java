@@ -368,6 +368,7 @@ public class TestStorageContainerManager {
   @Test
   public void testOldDNRegistersToReInitialisedSCM() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 3000, TimeUnit.MILLISECONDS);
 
@@ -379,10 +380,13 @@ public class TestStorageContainerManager {
       cluster.waitForClusterToBeReady();
       HddsDatanodeService datanode = cluster.getHddsDatanodes().get(0);
       StorageContainerManager scm = cluster.getStorageContainerManager();
+      File dbDir = scm.getScmMetadataStore().getStore().getDbLocation();
       scm.stop();
 
       // re-initialise SCM with new clusterID
 
+      GenericTestUtils.deleteDirectory(new File(SCMHAUtils.getRatisStorageDir(conf)));
+      GenericTestUtils.deleteDirectory(dbDir);
       GenericTestUtils.deleteDirectory(
           new File(scm.getScmStorageConfig().getStorageDir()));
       String newClusterId = UUID.randomUUID().toString();
