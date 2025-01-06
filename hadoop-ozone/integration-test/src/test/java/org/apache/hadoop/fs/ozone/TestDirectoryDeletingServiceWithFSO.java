@@ -156,6 +156,7 @@ public class TestDirectoryDeletingServiceWithFSO {
 
   @AfterEach
   public void cleanup() {
+    metrics.resetDirectoryMetrics();
     assertDoesNotThrow(() -> {
       Path root = new Path("/");
       FileStatus[] fileStatuses = fs.listStatus(root);
@@ -200,6 +201,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 1);
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
     assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
+    assertEquals(1, metrics.getNumDirsPurged());
+    assertEquals(1, metrics.getNumDirsSentForPurge());
 
     try (TableIterator<?, ? extends Table.KeyValue<?, OmDirectoryInfo>>
         iterator = dirTable.iterator()) {
@@ -208,8 +211,6 @@ public class TestDirectoryDeletingServiceWithFSO {
     }
 
     assertThat(dirDeletingService.getRunCount().get()).isGreaterThan(1);
-    assertEquals(1, metrics.getNumDirsPurged());
-    assertEquals(1, metrics.getNumDirsSentForPurge());
   }
 
   /**
@@ -274,8 +275,14 @@ public class TestDirectoryDeletingServiceWithFSO {
     // 15 subDir + 3 parentDir
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 18);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 19);
+
+    assertEquals(15, metrics.getNumSubFilesSentForPurge());
+    assertEquals(15, metrics.getNumSubFilesMovedToDeletedTable());
     assertEquals(19, metrics.getNumDirsPurged());
     assertEquals(19, metrics.getNumDirsSentForPurge());
+    assertEquals(18, metrics.getNumSubDirsMovedToDeletedDirTable());
+    assertEquals(18, metrics.getNumSubDirsSentForPurge());
+
 
     long elapsedRunCount = dirDeletingService.getRunCount().get() - preRunCount;
     assertThat(dirDeletingService.getRunCount().get()).isGreaterThan(1);
@@ -330,6 +337,10 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 5);
     assertEquals(5, metrics.getNumDirsSentForPurge());
     assertEquals(5, metrics.getNumDirsPurged());
+    assertEquals(4, metrics.getNumSubDirsMovedToDeletedDirTable());
+    assertEquals(4, metrics.getNumSubDirsSentForPurge());
+    assertEquals(3, metrics.getNumSubFilesSentForPurge());
+    assertEquals(3, metrics.getNumSubFilesMovedToDeletedTable());
 
     assertThat(dirDeletingService.getRunCount().get()).isGreaterThan(1);
   }

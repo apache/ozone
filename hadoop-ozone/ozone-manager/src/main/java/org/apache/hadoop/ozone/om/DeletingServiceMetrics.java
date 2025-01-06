@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -87,6 +88,12 @@ public final class DeletingServiceMetrics {
   public long getNumDirsSentForPurge() {
     return numDirsSentForPurge.value();
   }
+  public long getNumSubDirsSentForPurge() {
+    return numSubDirsSentForPurge.value();
+  }
+  public long getNumSubFilesSentForPurge() {
+    return numSubFilesSentForPurge.value();
+  }
 
   /*
    * Total key deletion metrics across all iterations of KeyDeletingService since last restart.
@@ -126,6 +133,12 @@ public final class DeletingServiceMetrics {
   public long getNumDirsPurged() {
     return numDirsPurged.value();
   }
+  public long getNumSubFilesMovedToDeletedTable() {
+    return numSubFilesMovedToDeletedTable.value();
+  }
+  public long getNumSubDirsMovedToDeletedDirTable() {
+    return numSubDirsMovedToDeletedDirTable.value();
+  }
 
   /*
    * Key purge request metrics.
@@ -135,6 +148,16 @@ public final class DeletingServiceMetrics {
 
   public void incrNumKeysPurged(long keysPurged) {
     this.numKeysPurged.incr(keysPurged);
+  }
+
+  @VisibleForTesting
+  public void resetDirectoryMetrics() {
+    numDirsPurged.set(0);
+    numSubFilesMovedToDeletedTable.set(0);
+    numSubDirsMovedToDeletedDirTable.set(0);
+    numDirsSentForPurge.set(0);
+    numSubDirsSentForPurge.set(0);
+    numSubFilesSentForPurge.set(0);
   }
 
 }
