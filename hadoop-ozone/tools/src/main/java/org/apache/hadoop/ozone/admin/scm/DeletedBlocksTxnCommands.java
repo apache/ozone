@@ -17,11 +17,8 @@
  */
 package org.apache.hadoop.ozone.admin.scm;
 
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import picocli.CommandLine;
-
-import java.util.concurrent.Callable;
 
 /**
  * Subcommand to group container related operations.
@@ -35,15 +32,7 @@ import java.util.concurrent.Callable;
         GetFailedDeletedBlocksTxnSubcommand.class,
         ResetDeletedBlockRetryCountSubcommand.class,
     })
-public class DeletedBlocksTxnCommands implements Callable<Void> {
+public class DeletedBlocksTxnCommands {
 
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
-
-  @Override
-  public Void call() throws Exception {
-    GenericCli.missingSubcommand(spec);
-    return null;
-  }
 }
 

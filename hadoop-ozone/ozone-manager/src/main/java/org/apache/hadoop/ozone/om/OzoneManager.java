@@ -3104,6 +3104,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (null == omRatisServer) {
       return getRatisRolesException("Server is shutting down");
     }
+    String leaderReadiness = omRatisServer.checkLeaderStatus().name();
     final RaftPeerId leaderId = omRatisServer.getLeaderId();
     if (leaderId == null) {
       LOG.error("No leader found");
@@ -3117,7 +3118,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("Failed to getServiceList", e);
       return getRatisRolesException("IO-Exception Occurred, " + e.getMessage());
     }
-    return OmUtils.format(serviceList, port, leaderId.toString());
+    return OmUtils.format(serviceList, port, leaderId.toString(), leaderReadiness);
   }
 
   /**

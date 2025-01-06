@@ -17,7 +17,7 @@
 package org.apache.hadoop.ozone.shell;
 
 
-import org.apache.hadoop.hdds.cli.OzoneAdmin;
+import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -52,6 +52,7 @@ public class TestTransferLeadershipShell {
   private String scmServiceId;
   private int numOfOMs = 3;
   private int numOfSCMs = 3;
+  private OzoneAdmin ozoneAdmin;
 
   private static final long SNAPSHOT_THRESHOLD = 5;
 
@@ -62,7 +63,8 @@ public class TestTransferLeadershipShell {
    */
   @BeforeAll
   public void init() throws Exception {
-    conf = new OzoneConfiguration();
+    ozoneAdmin = new OzoneAdmin();
+    conf = ozoneAdmin.getOzoneConf();
     omServiceId = "om-service-test1";
     scmServiceId = "scm-service-test1";
     conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
@@ -95,7 +97,6 @@ public class TestTransferLeadershipShell {
     omList.remove(oldLeader);
     OzoneManager newLeader = omList.get(0);
     cluster.waitForClusterToBeReady();
-    OzoneAdmin ozoneAdmin = new OzoneAdmin(conf);
     String[] args1 = {"om", "transfer", "-n", newLeader.getOMNodeId()};
     ozoneAdmin.execute(args1);
     Thread.sleep(3000);
@@ -119,7 +120,6 @@ public class TestTransferLeadershipShell {
     scmList.remove(oldLeader);
     StorageContainerManager newLeader = scmList.get(0);
 
-    OzoneAdmin ozoneAdmin = new OzoneAdmin(conf);
     String[] args1 = {"scm", "transfer", "-n", newLeader.getScmId()};
     ozoneAdmin.execute(args1);
     cluster.waitForClusterToBeReady();

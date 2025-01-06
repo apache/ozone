@@ -72,14 +72,18 @@ public class VaultS3SecretStore implements S3SecretStore {
           .nameSpace(nameSpace)
           .sslConfig(sslConfig)
           .build();
-
       this.auth = auth;
-      vault = auth.auth(config);
       this.secretPath = secretPath.endsWith("/")
           ? secretPath.substring(0, secretPath.length() - 1)
           : secretPath;
     } catch (VaultException e) {
       throw new IOException("Failed to initialize remote secret store", e);
+    }
+
+    try {
+      auth();
+    } catch (VaultException e) {
+      LOG.error("Failed to authenticate with remote secret store", e);
     }
   }
 

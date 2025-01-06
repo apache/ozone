@@ -17,10 +17,12 @@
  */
 package org.apache.hadoop.hdds;
 
+import org.apache.hadoop.ozone.Versioned;
+
 /**
  * Base type for component version enums.
  */
-public interface ComponentVersion {
+public interface ComponentVersion extends Versioned {
 
   /**
    * Returns the description of the version enum value.
@@ -34,4 +36,9 @@ public interface ComponentVersion {
    * @return the version associated with the enum value.
    */
   int toProtoValue();
+
+  @Override
+  default int version() {
+    return toProtoValue();
+  }
 }
