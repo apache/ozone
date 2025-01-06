@@ -171,21 +171,24 @@ public final class ContainerUtils {
    * @return {@link DatanodeDetails}
    * @throws IOException If the id file is malformed or other I/O exceptions
    */
-  public static synchronized DatanodeDetails readDatanodeDetailsFrom(File path) throws IOException {
+  public static synchronized DatanodeDetails readDatanodeDetailsFrom(File path)
+      throws IOException {
     if (!path.exists()) {
       throw new IOException("Datanode ID file not found.");
     }
-
     DatanodeDetails datanodeDetails;
     try {
       datanodeDetails = DatanodeIdYaml.readDatanodeIdFile(path);
     } catch (IOException e) {
-      LOG.warn("Error loading DatanodeDetails yaml from {}", path.getAbsolutePath(), e);
+      LOG.warn("Error loading DatanodeDetails yaml from {}",
+          path.getAbsolutePath(), e);
       // Try to load as protobuf before giving up
       try (FileInputStream in = new FileInputStream(path)) {
-        datanodeDetails = DatanodeDetails.getFromProtoBuf(HddsProtos.DatanodeDetailsProto.parseFrom(in));
+        datanodeDetails = DatanodeDetails.getFromProtoBuf(
+            HddsProtos.DatanodeDetailsProto.parseFrom(in));
       } catch (IOException io) {
-        throw new IOException("Failed to parse DatanodeDetails from " + path.getAbsolutePath(), io);
+        throw new IOException("Failed to parse DatanodeDetails from "
+            + path.getAbsolutePath(), io);
       }
     }
 

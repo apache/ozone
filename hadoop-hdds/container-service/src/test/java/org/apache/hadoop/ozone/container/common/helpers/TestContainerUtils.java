@@ -159,9 +159,7 @@ public class TestContainerUtils {
     // Write a single ID to the file and read it out
     File file = new File(tempDir, "valid-values.id");
     ContainerUtils.writeDatanodeDetailsTo(details, file, conf);
-
     DatanodeDetails read = ContainerUtils.readDatanodeDetailsFrom(file);
-
     assertNotEquals(details.toString(), read.toString());
   }
 
