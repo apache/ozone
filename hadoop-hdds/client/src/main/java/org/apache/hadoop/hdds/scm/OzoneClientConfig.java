@@ -481,16 +481,12 @@ public class OzoneClientConfig {
     this.dataStreamBufferFlushSize = dataStreamBufferFlushSize;
   }
 
-  public ChecksumCombineMode getChecksumCombineMode() {
-    try {
-      return ChecksumCombineMode.valueOf(checksumCombineMode);
-    } catch (IllegalArgumentException iae) {
-      LOG.warn("Bad checksum combine mode: {}. Using default {}",
-          checksumCombineMode,
-          ChecksumCombineMode.COMPOSITE_CRC.name());
-      return ChecksumCombineMode.valueOf(
-          ChecksumCombineMode.COMPOSITE_CRC.name());
-    }
+  public String getChecksumCombineMode() {
+    return checksumCombineMode;
+  }
+
+  public void setChecksumCombineMode(String checksumCombineMode) {
+    this.checksumCombineMode = checksumCombineMode;
   }
 
   public void setEcReconstructStripeReadPoolLimit(int poolLimit) {

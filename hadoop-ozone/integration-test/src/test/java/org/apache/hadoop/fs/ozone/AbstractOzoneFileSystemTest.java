@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -2273,6 +2274,23 @@ abstract class AbstractOzoneFileSystemTest {
               () -> FileSystem.get(config));
       assertThat(e.getMessage()).contains("OBJECT_STORE, which does not support file system semantics");
     }
+  }
+
+  @Test
+  public void testGetFileChecksumWithInvalidCombineMode() throws IOException {
+    final String root = "/root";
+    Path rootPath = new Path(fs.getUri().toString() + root);
+    fs.mkdirs(rootPath);
+    Path file = new Path(fs.getUri().toString() + root
+        + "/dummy");
+    ContractTestUtils.touch(fs, file);
+    OzoneClientConfig clientConfig = cluster.getConf().getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumCombineMode("NONE");
+    OzoneConfiguration conf = cluster.getConf();
+    conf.setFromObject(clientConfig);
+    conf.setBoolean("fs.o3fs.impl.disable.cache", true);
+    FileSystem fileSystem = FileSystem.get(conf);
+    assertNull(fileSystem.getFileChecksum(file));
   }
 
   private String getCurrentUser() {
