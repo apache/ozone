@@ -25,6 +25,7 @@ import org.apache.hadoop.io.erasurecode.ErasureCodeNative;
 import picocli.CommandLine;
 
 import java.util.Collections;
+import java.util.concurrent.Callable;
 
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
 
@@ -33,7 +34,7 @@ import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LI
  */
 @CommandLine.Command(name = "ozone checknative",
     description = "Checks if native libraries are loaded")
-public class CheckNative extends GenericCli {
+public class CheckNative extends GenericCli implements Callable<Void> {
 
   public static void main(String[] argv) {
     new CheckNative().run(argv);
