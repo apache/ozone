@@ -2057,7 +2057,7 @@ public class KeyManagerImpl implements KeyManager {
 
   @Override
   public DeleteKeysResult getPendingDeletionSubDirs(long volumeId, long bucketId,
-      OmKeyInfo parentInfo, long numEntries, long remainingBufLimit) throws IOException {
+      OmKeyInfo parentInfo, long remainingBufLimit) throws IOException {
     String seekDirInDB = metadataManager.getOzonePathKey(volumeId, bucketId,
         parentInfo.getObjectID(), "");
     long countEntries = 0;
@@ -2066,14 +2066,14 @@ public class KeyManagerImpl implements KeyManager {
     try (TableIterator<String,
         ? extends Table.KeyValue<String, OmDirectoryInfo>>
         iterator = dirTable.iterator()) {
-      return gatherSubDirsWithIterator(parentInfo, numEntries,
+      return gatherSubDirsWithIterator(parentInfo,
           seekDirInDB, countEntries, iterator, remainingBufLimit);
     }
 
   }
 
   private DeleteKeysResult gatherSubDirsWithIterator(OmKeyInfo parentInfo,
-      long numEntries, String seekDirInDB,
+       String seekDirInDB,
       long countEntries,
       TableIterator<String,
           ? extends Table.KeyValue<String, OmDirectoryInfo>> iterator, long remainingBufLimit)
@@ -2093,6 +2093,9 @@ public class KeyManagerImpl implements KeyManager {
       if (!metadataManager.getDirectoryTable().isExist(entry.getKey())) {
         continue;
       }
+      if (remainingBufLimit - objectSerializedSize < 0){
+        break;
+      }
       String dirName = OMFileRequest.getAbsolutePath(parentInfo.getKeyName(),
           dirInfo.getName());
       OmKeyInfo omKeyInfo = OMFileRequest.getOmKeyInfo(
@@ -2109,12 +2112,11 @@ public class KeyManagerImpl implements KeyManager {
 
   @Override
   public DeleteKeysResult getPendingDeletionSubFiles(long volumeId,
-      long bucketId, OmKeyInfo parentInfo, long numEntries, long remainingBufLimit)
+      long bucketId, OmKeyInfo parentInfo, long remainingBufLimit)
           throws IOException {
     List<OmKeyInfo> files = new ArrayList<>();
     String seekFileInDB = metadataManager.getOzonePathKey(volumeId, bucketId,
         parentInfo.getObjectID(), "");
-    long countEntries = 0;
     long consumedSize = 0;
 
     Table fileTable = metadataManager.getFileTable();
@@ -2134,6 +2136,9 @@ public class KeyManagerImpl implements KeyManager {
         if (!metadataManager.getFileTable().isExist(entry.getKey())) {
           continue;
         }
+        if (remainingBufLimit - objectSerializedSize < 0){
+          break;
+        }
         fileInfo.setFileName(fileInfo.getKeyName());
         String fullKeyPath = OMFileRequest.getAbsolutePath(
             parentInfo.getKeyName(), fileInfo.getKeyName());
@@ -2142,7 +2147,6 @@ public class KeyManagerImpl implements KeyManager {
         files.add(fileInfo);
         remainingBufLimit -= objectSerializedSize;
         consumedSize += objectSerializedSize;
-        countEntries++;
       }
     }
 

@@ -362,7 +362,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     // step-1: get all sub directories under the deletedDir
     DeleteKeysResult subDirDeleteResult =
         keyManager.getPendingDeletionSubDirs(volumeId, bucketId,
-            pendingDeletedDirInfo, remainNum, remainingBufLimit);
+            pendingDeletedDirInfo, remainingBufLimit);
     List<OmKeyInfo> subDirs = subDirDeleteResult.getKeysToDelete();
     remainNum = remainNum - subDirs.size();
     remainingBufLimit -= subDirDeleteResult.getConsumedSize();
@@ -380,7 +380,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     // step-2: get all sub files under the deletedDir
     DeleteKeysResult subFileDeleteResult =
         keyManager.getPendingDeletionSubFiles(volumeId, bucketId,
-            pendingDeletedDirInfo, remainNum, remainingBufLimit);
+            pendingDeletedDirInfo, remainingBufLimit);
     List<OmKeyInfo> subFiles = subFileDeleteResult.getKeysToDelete();
     remainNum = remainNum - subFiles.size();
     remainingBufLimit -= subDirDeleteResult.getConsumedSize();

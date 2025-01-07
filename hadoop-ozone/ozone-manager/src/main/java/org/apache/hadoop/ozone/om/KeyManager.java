@@ -277,23 +277,21 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * Returns all sub directories under the given parent directory.
    *
    * @param parentInfo
-   * @param numEntries
    * @return list of dirs
    * @throws IOException
    */
   DeleteKeysResult getPendingDeletionSubDirs(long volumeId, long bucketId,
-      OmKeyInfo parentInfo, long numEntries, long remainingBufLimit) throws IOException;
+      OmKeyInfo parentInfo, long remainingBufLimit) throws IOException;
 
   /**
    * Returns all sub files under the given parent directory.
    *
    * @param parentInfo
-   * @param numEntries
    * @return list of files
    * @throws IOException
    */
   DeleteKeysResult getPendingDeletionSubFiles(long volumeId,
-      long bucketId, OmKeyInfo parentInfo, long numEntries, long remainingBufLimit)
+      long bucketId, OmKeyInfo parentInfo, long remainingBufLimit)
           throws IOException;
 
   /**
