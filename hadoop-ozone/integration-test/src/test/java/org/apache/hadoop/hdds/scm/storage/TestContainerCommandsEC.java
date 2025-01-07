@@ -79,7 +79,6 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -127,7 +126,6 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 /**
  * This class tests container commands on EC containers.
  */
-@Unhealthy("HDDS-12023")
 public class TestContainerCommandsEC {
 
   private static final String ANY_USER = "any";
@@ -173,7 +171,6 @@ public class TestContainerCommandsEC {
   @BeforeAll
   public static void init() throws Exception {
     config = new OzoneConfiguration();
-    config.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     config.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
     config.setTimeDuration(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     config.setBoolean(OzoneConfigKeys.OZONE_ACL_ENABLED, true);
