@@ -17,12 +17,12 @@
  */
 package org.apache.hadoop.ozone.repair.om;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -35,9 +35,9 @@ import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.repair.OzoneRepair;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
@@ -45,33 +45,40 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * FSORepairTool test cases.
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class TestFSORepairTool {
+
   public static final Logger LOG = LoggerFactory.getLogger(TestFSORepairTool.class);
-  private static final ByteArrayOutputStream OUT = new ByteArrayOutputStream();
-  private static final ByteArrayOutputStream ERR = new ByteArrayOutputStream();
-  private static final PrintStream OLD_OUT = System.out;
-  private static final PrintStream OLD_ERR = System.err;
-  private static final String DEFAULT_ENCODING = UTF_8.name();
+  private static final int ORDER_DRY_RUN = 1;
+  //private static final int ORDER_REPAIR_SOME = 2; // TODO add test case
+  private static final int ORDER_REPAIR_ALL = 3;
+  private static final int ORDER_REPAIR_ALL_AGAIN = 4;
+  private static final int ORDER_RESTART_OM = 5;
+
   private static MiniOzoneCluster cluster;
   private static FileSystem fs;
   private static OzoneClient client;
@@ -81,6 +88,9 @@ public class TestFSORepairTool {
   private static FSORepairTool.Report vol2Report;
   private static FSORepairTool.Report fullReport;
   private static FSORepairTool.Report emptyReport;
+
+  private GenericTestUtils.PrintStreamCapturer out;
+  private GenericTestUtils.PrintStreamCapturer err;
 
   @BeforeAll
   public static void setup() throws Exception {
@@ -137,81 +147,54 @@ public class TestFSORepairTool {
 
   @BeforeEach
   public void init() throws Exception {
-    System.setOut(new PrintStream(OUT, false, DEFAULT_ENCODING));
-    System.setErr(new PrintStream(ERR, false, DEFAULT_ENCODING));
+    out = GenericTestUtils.captureOut();
+    err = GenericTestUtils.captureErr();
   }
 
   @AfterEach
   public void clean() throws Exception {
     // reset stream after each unit test
-    OUT.reset();
-    ERR.reset();
-
-    // restore system streams
-    System.setOut(OLD_OUT);
-    System.setErr(OLD_ERR);
+    IOUtils.closeQuietly(out, err);
   }
 
   @AfterAll
   public static void reset() throws IOException {
-    if (cluster != null) {
-      cluster.shutdown();
-    }
-    if (client != null) {
-      client.close();
-    }
-    IOUtils.closeQuietly(fs);
+    IOUtils.closeQuietly(fs, client, cluster);
   }
 
   /**
    * Test to check a connected tree with one bucket.
    * The output remains the same in debug and repair mode as the tree is connected.
-   * @throws Exception
    */
-  @Order(1)
-  @Test
-  public void testConnectedTreeOneBucket() throws Exception {
+  @Order(ORDER_DRY_RUN)
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testConnectedTreeOneBucket(boolean dryRun) {
     String expectedOutput = serializeReport(vol1Report);
 
-    // Test the connected tree in debug mode.
-    String[] args = new String[] {"om", "fso-tree", "--db", dbPath, "-v", "/vol1", "-b", "bucket1"};
-    int exitCode = cmd.execute(args);
-    assertEquals(0, exitCode);
+    int exitCode = execute(dryRun, "-v", "/vol1", "-b", "bucket1");
+    assertEquals(0, exitCode, err.getOutput());
 
-    String cliOutput = OUT.toString(DEFAULT_ENCODING);
+    String cliOutput = out.getOutput();
     String reportOutput = extractRelevantSection(cliOutput);
-    Assertions.assertEquals(expectedOutput, reportOutput);
-
-    OUT.reset();
-    ERR.reset();
-
-    // Running again in repair mode should give same results since the tree is connected.
-    String[] args1 = new String[] {"om", "fso-tree", "--db", dbPath, "--repair", "-v", "/vol1", "-b", "bucket1"};
-    int exitCode1 = cmd.execute(args1);
-    assertEquals(0, exitCode1);
-
-    String cliOutput1 = OUT.toString(DEFAULT_ENCODING);
-    String reportOutput1 = extractRelevantSection(cliOutput1);
-    Assertions.assertEquals(expectedOutput, reportOutput1);
+    assertEquals(expectedOutput, reportOutput);
   }
 
   /**
    * Test to verify the file size of the tree.
-   * @throws Exception
    */
-  @Order(2)
+  @Order(ORDER_DRY_RUN)
   @Test
-  public void testReportedDataSize() throws Exception {
+  public void testReportedDataSize() {
     String expectedOutput = serializeReport(vol2Report);
 
-    String[] args = new String[] {"om", "fso-tree", "--db", dbPath, "-v", "/vol2"};
-    int exitCode = cmd.execute(args);
+    int exitCode = dryRun("-v", "/vol2");
     assertEquals(0, exitCode);
 
-    String cliOutput = OUT.toString(DEFAULT_ENCODING);
+    String cliOutput = out.getOutput();
     String reportOutput = extractRelevantSection(cliOutput);
 
-    Assertions.assertEquals(expectedOutput, reportOutput);
+    assertEquals(expectedOutput, reportOutput);
   }
 
   /**
@@ -222,132 +205,127 @@ public class TestFSORepairTool {
    * - Non-existent volume.
    * - Using a bucket filter without specifying a volume.
    */
-  @Order(3)
+  @Order(ORDER_DRY_RUN)
   @Test
-  public void testVolumeAndBucketFilter() throws Exception {
+  public void testVolumeFilter() {
+    String expectedOutput1 = serializeReport(vol1Report);
+
     // When volume filter is passed
-    String[] args1 = new String[]{"om", "fso-tree", "--db", dbPath, "--volume", "/vol1"};
-    int exitCode1 = cmd.execute(args1);
+    int exitCode1 = dryRun("--volume", "/vol1");
     assertEquals(0, exitCode1);
 
-    String cliOutput1 = OUT.toString(DEFAULT_ENCODING);
+    String cliOutput1 = out.getOutput();
     String reportOutput1 = extractRelevantSection(cliOutput1);
-    String expectedOutput1 = serializeReport(vol1Report);
-    Assertions.assertEquals(expectedOutput1, reportOutput1);
+    assertEquals(expectedOutput1, reportOutput1);
+  }
 
-    OUT.reset();
-    ERR.reset();
+  @Order(ORDER_DRY_RUN)
+  @Test
+  public void testVolumeAndBucketFilter() {
+    String expectedOutput2 = serializeReport(vol1Report);
 
     // When both volume and bucket filters are passed
-    String[] args2 = new String[]{"om", "fso-tree", "--db", dbPath, "--volume", "/vol1",
-        "--bucket", "bucket1"};
-    int exitCode2 = cmd.execute(args2);
+    int exitCode2 = dryRun("--volume", "/vol1", "--bucket", "bucket1");
     assertEquals(0, exitCode2);
 
-    String cliOutput2 = OUT.toString(DEFAULT_ENCODING);
+    String cliOutput2 = out.getOutput();
     String reportOutput2 = extractRelevantSection(cliOutput2);
-    String expectedOutput2 = serializeReport(vol1Report);
-    Assertions.assertEquals(expectedOutput2, reportOutput2);
+    assertEquals(expectedOutput2, reportOutput2);
+  }
 
-    OUT.reset();
-    ERR.reset();
-
+  @Order(ORDER_DRY_RUN)
+  @Test
+  public void testNonExistentBucket() {
     // When a non-existent bucket filter is passed
-    String[] args3 = new String[]{"om", "fso-tree", "--db", dbPath, "--volume", "/vol1",
-        "--bucket", "bucket3"};
-    int exitCode3 = cmd.execute(args3);
-    assertEquals(0, exitCode3);
-    String cliOutput3 = OUT.toString(DEFAULT_ENCODING);
-    Assertions.assertTrue(cliOutput3.contains("Bucket 'bucket3' does not exist in volume '/vol1'."));
+    int exitCode = dryRun("--volume", "/vol1", "--bucket", "bucket3");
+    assertEquals(0, exitCode);
+    String cliOutput = out.getOutput();
+    assertThat(cliOutput).contains("Bucket 'bucket3' does not exist in volume '/vol1'.");
+  }
 
-    OUT.reset();
-    ERR.reset();
-
+  @Order(ORDER_DRY_RUN)
+  @Test
+  public void testNonExistentVolume() {
     // When a non-existent volume filter is passed
-    String[] args4 = new String[]{"om", "fso-tree", "--db", dbPath, "--volume", "/vol5"};
-    int exitCode4 = cmd.execute(args4);
-    assertEquals(0, exitCode4);
-    String cliOutput4 = OUT.toString(DEFAULT_ENCODING);
-    Assertions.assertTrue(cliOutput4.contains("Volume '/vol5' does not exist."));
+    int exitCode = dryRun("--volume", "/vol5");
+    assertEquals(0, exitCode);
+    String cliOutput = out.getOutput();
+    assertThat(cliOutput).contains("Volume '/vol5' does not exist.");
+  }
 
-    OUT.reset();
-    ERR.reset();
-
+  @Order(ORDER_DRY_RUN)
+  @Test
+  public void testBucketFilterWithoutVolume() {
     // When bucket filter is passed without the volume filter.
-    String[] args5 = new String[]{"om", "fso-tree", "--db", dbPath, "--bucket", "bucket1"};
-    int exitCode5 = cmd.execute(args5);
-    assertEquals(0, exitCode5);
-    String cliOutput5 = OUT.toString(DEFAULT_ENCODING);
-    Assertions.assertTrue(cliOutput5.contains("--bucket flag cannot be used without specifying --volume."));
+    int exitCode = dryRun("--bucket", "bucket1");
+    assertEquals(0, exitCode);
+    String cliOutput = out.getOutput();
+    assertThat(cliOutput).contains("--bucket flag cannot be used without specifying --volume.");
   }
 
   /**
    * Test to verify that non-fso buckets, such as legacy and obs, are skipped during the process.
-   * @throws Exception
    */
-  @Order(4)
+  @Order(ORDER_DRY_RUN)
   @Test
-  public void testNonFSOBucketsSkipped() throws Exception {
-    String[] args = new String[] {"om", "fso-tree", "--db", dbPath};
-    int exitCode = cmd.execute(args);
+  public void testNonFSOBucketsSkipped() {
+    int exitCode = dryRun();
     assertEquals(0, exitCode);
 
-    String cliOutput = OUT.toString(DEFAULT_ENCODING);
-    Assertions.assertTrue(cliOutput.contains("Skipping non-FSO bucket /vol1/obs-bucket"));
-    Assertions.assertTrue(cliOutput.contains("Skipping non-FSO bucket /vol1/legacy-bucket"));
+    String cliOutput = out.getOutput();
+    assertThat(cliOutput).contains("Skipping non-FSO bucket /vol1/obs-bucket");
+    assertThat(cliOutput).contains("Skipping non-FSO bucket /vol1/legacy-bucket");
   }
 
   /**
    * If no file is present inside a vol/bucket, the report statistics should be zero.
-   * @throws Exception
    */
-  @Order(5)
+  @Order(ORDER_DRY_RUN)
   @Test
-  public void testEmptyFileTrees() throws Exception {
+  public void testEmptyFileTrees() {
     String expectedOutput = serializeReport(emptyReport);
 
     // Run on an empty volume and bucket
-    String[] args = new String[] {"om", "fso-tree", "--db", dbPath, "-v", "/vol-empty", "-b", "bucket-empty"};
-    int exitCode = cmd.execute(args);
+    int exitCode = dryRun("-v", "/vol-empty", "-b", "bucket-empty");
     assertEquals(0, exitCode);
 
-    String cliOutput = OUT.toString(DEFAULT_ENCODING);
+    String cliOutput = out.getOutput();
     String reportOutput = extractRelevantSection(cliOutput);
-    Assertions.assertEquals(expectedOutput, reportOutput);
+    assertEquals(expectedOutput, reportOutput);
   }
 
   /**
    * Test in repair mode. This test ensures that:
    * - The initial repair correctly resolves unreferenced objects.
    * - Subsequent repair runs do not find any unreferenced objects to process.
-   * @throws Exception
    */
-  @Order(6)
+  @Order(ORDER_REPAIR_ALL)
   @Test
-  public void testMultipleBucketsAndVolumes() throws Exception {
+  public void testMultipleBucketsAndVolumes() {
     String expectedOutput = serializeReport(fullReport);
 
-    String[] args = new String[] {"om", "fso-tree", "--db", dbPath, "--repair"};
-    int exitCode = cmd.execute(args);
+    int exitCode = repair();
     assertEquals(0, exitCode);
 
-    String cliOutput = OUT.toString(DEFAULT_ENCODING);
+    String cliOutput = out.getOutput();
     String reportOutput = extractRelevantSection(cliOutput);
-    Assertions.assertEquals(expectedOutput, reportOutput);
-    Assertions.assertTrue(cliOutput.contains("Unreferenced:\n\tDirectories: 1\n\tFiles: 3\n\tBytes: 30"));
+    assertEquals(expectedOutput, reportOutput);
+    assertThat(cliOutput).contains("Unreferenced:\n\tDirectories: 1\n\tFiles: 3\n\tBytes: 30");
+  }
 
-    String[] args1 = new String[] {"om", "fso-tree", "--db", dbPath, "--repair"};
-    int exitCode1 = cmd.execute(args1);
-    assertEquals(0, exitCode1);
-    String cliOutput1 = OUT.toString(DEFAULT_ENCODING);
-    Assertions.assertTrue(cliOutput1.contains("Unreferenced:\n\tDirectories: 0\n\tFiles: 0\n\tBytes: 0"));
+  @Order(ORDER_REPAIR_ALL_AGAIN)
+  @Test
+  public void repairAllAgain() {
+    int exitCode = repair();
+    assertEquals(0, exitCode);
+    String cliOutput = out.getOutput();
+    assertThat(cliOutput).contains("Unreferenced:\n\tDirectories: 0\n\tFiles: 0\n\tBytes: 0");
   }
 
   /**
    * Validate cluster state after OM restart by checking the tables.
-   * @throws Exception
    */
-  @Order(7)
+  @Order(ORDER_RESTART_OM)
   @Test
   public void validateClusterAfterRestart() throws Exception {
     cluster.getOzoneManager().restart();
@@ -360,6 +338,24 @@ public class TestFSORepairTool {
     assertEquals(1, countTableEntries(cluster.getOzoneManager().getMetadataManager().getDeletedDirTable()));
     // 3 files are unreferenced and moved to the deletedTable during repair mode.
     assertEquals(3, countTableEntries(cluster.getOzoneManager().getMetadataManager().getDeletedTable()));
+  }
+
+  private int repair(String... args) {
+    return execute(false, args);
+  }
+
+  private int dryRun(String... args) {
+    return execute(true, args);
+  }
+
+  private int execute(boolean dryRun, String... args) {
+    List<String> argList = new ArrayList<>(Arrays.asList("om", "fso-tree", "--db", dbPath));
+    if (!dryRun) {
+      argList.add("--repair");
+    }
+    argList.addAll(Arrays.asList(args));
+
+    return cmd.execute(argList.toArray(new String[0]));
   }
 
   private <K, V> int countTableEntries(Table<K, V> table) throws Exception {
@@ -469,13 +465,13 @@ public class TestFSORepairTool {
     Path dir3 = new Path(bucketPath, "dir3");
     Path file4 = new Path(bucketPath, "file4");
 
-    Assertions.assertTrue(fs.exists(dir1));
-    Assertions.assertTrue(fs.exists(dir2));
-    Assertions.assertTrue(fs.exists(dir3));
-    Assertions.assertTrue(fs.exists(file1));
-    Assertions.assertTrue(fs.exists(file2));
-    Assertions.assertTrue(fs.exists(file3));
-    Assertions.assertTrue(fs.exists(file4));
+    assertTrue(fs.exists(dir1));
+    assertTrue(fs.exists(dir2));
+    assertTrue(fs.exists(dir3));
+    assertTrue(fs.exists(file1));
+    assertTrue(fs.exists(file2));
+    assertTrue(fs.exists(file3));
+    assertTrue(fs.exists(file4));
   }
 
   /**
@@ -530,12 +526,12 @@ public class TestFSORepairTool {
     Path dir3 = new Path(bucketPath, "dir3");
     Path file4 = new Path(bucketPath, "file4");
 
-    Assertions.assertFalse(fs.exists(dir1));
-    Assertions.assertFalse(fs.exists(dir2));
-    Assertions.assertTrue(fs.exists(dir3));
-    Assertions.assertFalse(fs.exists(file1));
-    Assertions.assertFalse(fs.exists(file2));
-    Assertions.assertFalse(fs.exists(file3));
-    Assertions.assertTrue(fs.exists(file4));
+    assertFalse(fs.exists(dir1));
+    assertFalse(fs.exists(dir2));
+    assertTrue(fs.exists(dir3));
+    assertFalse(fs.exists(file1));
+    assertFalse(fs.exists(file2));
+    assertFalse(fs.exists(file3));
+    assertTrue(fs.exists(file4));
   }
 }

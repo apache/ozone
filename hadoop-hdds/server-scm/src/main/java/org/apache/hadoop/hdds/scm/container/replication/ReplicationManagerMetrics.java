@@ -163,8 +163,6 @@ public final class ReplicationManagerMetrics implements MetricsSource {
 
   private final ReplicationManager replicationManager;
 
-  private final boolean legacyReplicationManager;
-
   //EC Metrics
   @Metric("Number of EC Replication commands sent.")
   private MutableCounterLong ecReplicationCmdsSentTotal;
@@ -231,7 +229,6 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   public ReplicationManagerMetrics(ReplicationManager manager) {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
     this.replicationManager = manager;
-    legacyReplicationManager = replicationManager.getConfig().isLegacyEnabled();
   }
 
   public static ReplicationManagerMetrics create(ReplicationManager manager) {
@@ -254,24 +251,10 @@ public final class ReplicationManagerMetrics implements MetricsSource {
         .addGauge(INFLIGHT_EC_REPLICATION, getEcReplication())
         .addGauge(INFLIGHT_EC_DELETION, getEcDeletion());
 
-    if (legacyReplicationManager) {
-      // For non-legacy RM, we don't need to expose these metrics as the timeout
-      // metrics below replace them.
-      builder
-          .addGauge(INFLIGHT_REPLICATION_SKIPPED,
-              getInflightReplicationSkipped())
-          .addGauge(INFLIGHT_DELETION_SKIPPED, getInflightDeletionSkipped())
-          // If not using Legacy RM, move manager should expose its own metrics
-          // and therefore we don't need IN_FLIGHT_MOVE here.
-          .addGauge(INFLIGHT_MOVE, getInflightMove());
-    }
-    if (!legacyReplicationManager) {
-      builder
-          .addGauge(UNDER_REPLICATED_QUEUE,
-              replicationManager.getQueue().underReplicatedQueueSize())
+    builder.addGauge(UNDER_REPLICATED_QUEUE,
+                    replicationManager.getQueue().underReplicatedQueueSize())
           .addGauge(OVER_REPLICATED_QUEUE,
               replicationManager.getQueue().overReplicatedQueueSize());
-    }
 
     ReplicationManagerReport report = replicationManager.getContainerReport();
     for (Map.Entry<HddsProtos.LifeCycleState, MetricsInfo> e :
@@ -289,15 +272,6 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     deletionCmdsSentTotal.snapshot(builder, all);
     replicasDeletedTotal.snapshot(builder, all);
     replicaDeleteTimeoutTotal.snapshot(builder, all);
-    if (legacyReplicationManager) {
-      // As things stand, the new RM does not track bytes sent / completed
-      replicationBytesTotal.snapshot(builder, all);
-      replicationBytesCompletedTotal.snapshot(builder, all);
-      deletionBytesTotal.snapshot(builder, all);
-      deletionBytesCompletedTotal.snapshot(builder, all);
-      replicationTime.snapshot(builder, all);
-      deletionTime.snapshot(builder, all);
-    }
     ecReplicationCmdsSentTotal.snapshot(builder, all);
     ecDeletionCmdsSentTotal.snapshot(builder, all);
     ecReplicasCreatedTotal.snapshot(builder, all);
@@ -385,14 +359,9 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   }
 
   public long getInflightReplication() {
-    if (legacyReplicationManager) {
-      return replicationManager.getLegacyReplicationManager()
-          .getInflightCount(InflightType.REPLICATION);
-    } else {
-      return replicationManager.getContainerReplicaPendingOps()
+    return replicationManager.getContainerReplicaPendingOps()
           .getPendingOpCount(ContainerReplicaOp.PendingOpType.ADD,
               ReplicationType.RATIS);
-    }
   }
 
   public long getInflightReplicationSkipped() {
@@ -400,22 +369,13 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   }
 
   public long getInflightDeletion() {
-    if (legacyReplicationManager) {
-      return replicationManager.getLegacyReplicationManager()
-          .getInflightCount(InflightType.DELETION);
-    } else {
-      return replicationManager.getContainerReplicaPendingOps()
-          .getPendingOpCount(ContainerReplicaOp.PendingOpType.DELETE,
+    return replicationManager.getContainerReplicaPendingOps()
+            .getPendingOpCount(ContainerReplicaOp.PendingOpType.DELETE,
               ReplicationType.RATIS);
-    }
   }
 
   public long getInflightDeletionSkipped() {
     return this.inflightDeletionSkippedTotal.value();
-  }
-
-  public long getInflightMove() {
-    return replicationManager.getInflightMove().size();
   }
 
   public long getReplicationCmdsSentTotal() {

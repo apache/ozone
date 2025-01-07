@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.shell;
 
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.hdds.cli.OzoneAdmin;
+import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.StandardOutputTestBase;

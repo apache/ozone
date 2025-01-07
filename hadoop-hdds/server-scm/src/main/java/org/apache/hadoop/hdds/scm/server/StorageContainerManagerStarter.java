@@ -150,7 +150,7 @@ public class StorageContainerManagerStarter extends GenericCli {
    * is set and print the startup banner message.
    */
   private void commonInit() {
-    conf = createOzoneConfiguration();
+    conf = getOzoneConf();
     TracingUtil.initTracing("StorageContainerManager", conf);
 
     String[] originalArgs = getCmd().getParseResult().originalArgs()

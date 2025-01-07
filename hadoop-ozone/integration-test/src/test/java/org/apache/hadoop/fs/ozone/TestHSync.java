@@ -134,7 +134,6 @@ import static org.apache.hadoop.ozone.TestDataUtil.cleanupDeletedTable;
 import static org.apache.hadoop.ozone.TestDataUtil.cleanupOpenKeyTable;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
@@ -181,7 +180,6 @@ public class TestHSync {
   public static void init() throws Exception {
     final BucketLayout layout = BUCKET_LAYOUT;
 
-    CONF.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
     CONF.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
     CONF.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
     CONF.setBoolean("ozone.client.hbase.enhancements.allowed", true);
@@ -1426,9 +1424,12 @@ public class TestHSync {
       outputStream2.hsync();
       outputStream2.close();
       assertEquals(data1.length() + data2.length(), metrics.getDataCommittedBytes());
+      // wait until double buffer flush
+      cluster.getOzoneManager().awaitDoubleBufferFlush();
 
       Map<String, OmKeyInfo> openKeys = getAllOpenKeys(openKeyTable);
       Map<String, RepeatedOmKeyInfo> deletedKeys = getAllDeletedKeys(deletedTable);
+
       // There should be no key in openKeyTable
       assertEquals(0, openKeys.size());
       // There should be one key in delete table
@@ -1503,6 +1504,8 @@ public class TestHSync {
       // hsync/close second hsync key should success
       outputStream2.hsync();
       outputStream2.close();
+      // wait until double buffer flush
+      cluster.getOzoneManager().awaitDoubleBufferFlush();
 
       Map<String, OmKeyInfo> openKeys = getAllOpenKeys(openKeyTable);
       Map<String, RepeatedOmKeyInfo> deletedKeys = getAllDeletedKeys(deletedTable);

@@ -24,6 +24,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.util.PayloadUtils;
+import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -57,6 +58,7 @@ import java.util.concurrent.atomic.AtomicInteger;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 public class HsyncGenerator extends BaseFreonGenerator implements Callable<Void> {
   private static final Logger LOG = LoggerFactory.getLogger(HsyncGenerator.class);
 
@@ -100,7 +102,7 @@ public class HsyncGenerator extends BaseFreonGenerator implements Callable<Void>
     init();
 
     if (configuration == null) {
-      configuration = freon.createOzoneConfiguration();
+      configuration = freon.getOzoneConf();
     }
     URI uri = URI.create(rootPath);
 

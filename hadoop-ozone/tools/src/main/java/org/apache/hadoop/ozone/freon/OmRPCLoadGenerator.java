@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTrans
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.ozone.util.PayloadUtils;
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -40,6 +41,7 @@ import picocli.CommandLine.Option;
         versionProvider = HddsVersionProvider.class,
         mixinStandardHelpOptions = true,
         showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 public class OmRPCLoadGenerator extends BaseFreonGenerator
         implements Callable<Void> {
 

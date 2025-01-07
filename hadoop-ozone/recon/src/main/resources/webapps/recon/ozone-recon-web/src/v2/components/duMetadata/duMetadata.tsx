@@ -179,11 +179,6 @@ const DUMetadata: React.FC<MetadataProps> = ({
       values.push(moment(objectInfo.modificationTime).format('ll LTS'));
     }
 
-    if (objectInfo?.quotaInBytes !== undefined && objectInfo?.quotaInBytes !== -1) {
-      keys.push('Quota In Bytes');
-      values.push(byteToSize(objectInfo.quotaInBytes, 3));
-    }
-
     if (objectInfo?.quotaInNamespace !== undefined && objectInfo?.quotaInNamespace !== -1) {
       keys.push('Quota In Namespace');
       values.push(byteToSize(objectInfo.quotaInNamespace, 3));

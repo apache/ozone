@@ -26,6 +26,7 @@
   <properties>
     <classpath.skip>false</classpath.skip>
     <pnpm.version>8.15.7</pnpm.version>
+    <sort.skip>true</sort.skip>
   </properties>
   <build>
     <resources>

@@ -179,7 +179,6 @@ class TestContainerReplication {
 
     ReplicationManagerConfiguration repConf =
         conf.getObject(ReplicationManagerConfiguration.class);
-    repConf.setEnableLegacy(enableLegacy);
     repConf.setInterval(Duration.ofSeconds(1));
     repConf.setUnderReplicatedInterval(Duration.ofSeconds(1));
     conf.setFromObject(repConf);

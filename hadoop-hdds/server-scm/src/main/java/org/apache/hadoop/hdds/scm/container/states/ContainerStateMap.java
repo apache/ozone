@@ -316,7 +316,7 @@ public class ContainerStateMap {
    * @param type - Replication type -- StandAlone, Ratis etc.
    * @return NavigableSet
    */
-  NavigableSet<ContainerID> getContainerIDsByType(final ReplicationType type) {
+  public NavigableSet<ContainerID> getContainerIDsByType(final ReplicationType type) {
     Preconditions.checkNotNull(type);
     return typeMap.getCollection(type);
   }
