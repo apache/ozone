@@ -1084,6 +1084,7 @@ public class TestHSync {
           "KeyOutputStream should support hflush()!");
       assertTrue(os.hasCapability(StreamCapabilities.HSYNC),
           "KeyOutputStream should support hsync()!");
+      os.hsync();
     }
 
     CONF.setBoolean(OZONE_FS_DATASTREAM_ENABLED, false);
