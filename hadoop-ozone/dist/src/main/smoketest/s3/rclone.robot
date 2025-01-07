@@ -43,4 +43,4 @@ Rclone Client Test
     Set Environment Variable   RCLONE_CONFIG    ${RCLONE_CONFIG_PATH}
     Set Environment Variable   RCLONE_VERBOSE   ${RCLONE_VERBOSE_LEVEL}
     ${result} =     Execute    rclone config create ${RCLONE_CONFIG_NAME} s3 env_auth=true provider=Other endpoint=${ENDPOINT_URL}
-    ${result} =     Execute    rclone copy ./compose ${RCLONE_CONFIG_NAME}:/${S3_VOLUME}/${BUCKET}
+    ${result} =     Execute    rclone copy /opt/hadoop/smoketest ${RCLONE_CONFIG_NAME}:/${S3_VOLUME}/${BUCKET}
