@@ -29,13 +29,18 @@ ${RCLONE_CONFIG_NAME}       ozone
 ${RCLONE_CONFIG_PATH}       /tmp/rclone.conf
 ${RCLONE_VERBOSE_LEVEL}     2
 
-*** Test Cases ***
+*** Keywords ***
+#   Export access key and secret to the environment
+Setup aws credentials
+    ${accessKey} =      Execute     aws configure get aws_access_key_id
+    ${secret} =         Execute     aws configure get aws_secret_access_key
+    Set Environment Variable        AWS_SECRET_ACCESS_KEY  ${secret}
+    Set Environment Variable        AWS_ACCESS_KEY_ID  ${accessKey}
 
+*** Test Cases ***
 Rclone Client Test
-    [Setup]    Setup v2 headers
+    [Setup]    Setup aws credentials
     Set Environment Variable   RCLONE_CONFIG    ${RCLONE_CONFIG_PATH}
     Set Environment Variable   RCLONE_VERBOSE   ${RCLONE_VERBOSE_LEVEL}
     ${result} =     Execute    rclone config create ${RCLONE_CONFIG_NAME} s3 env_auth=true provider=Other endpoint=${ENDPOINT_URL}
-    ${result} =     Execute    rclone copy . ${RCLONE_CONFIG_NAME}:/${S3_VOLUME}/${BUCKET}
-                    Execute    cat ${RCLONE_CONFIG_PATH}
-                    Execute    env | grep RCLONE
+    ${result} =     Execute    rclone copy ./compose ${RCLONE_CONFIG_NAME}:/${S3_VOLUME}/${BUCKET}
