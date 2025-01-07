@@ -347,6 +347,59 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertThat(dirDeletingService.getRunCount().get()).isGreaterThan(1);
   }
 
+  /**
+   * Test to check the following scenario:
+   * A subdir gets marked for move in DirectoryDeletingService and
+   * marked for delete in AbstractKeyDeletingService#optimizeDirDeletesAndSubmitRequest.
+   */
+  @Test
+  public void testDeleteWithLessDirsButMultipleLevels() throws Exception {
+    Path root = new Path("/rootDir");
+    Path appRoot = new Path(root, "appRoot");
+    Path parent = new Path(appRoot, "parentDir");
+    fs.mkdirs(parent);
+    Path child = new Path(parent, "childFile");
+    ContractTestUtils.touch(fs, child);
+
+    Table<String, OmKeyInfo> deletedDirTable =
+        cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
+    Table<String, OmKeyInfo> keyTable =
+        cluster.getOzoneManager().getMetadataManager().getKeyTable(getFSOBucketLayout());
+    Table<String, OmDirectoryInfo> dirTable = cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
+
+    DirectoryDeletingService dirDeletingService =
+        (DirectoryDeletingService) cluster.getOzoneManager().getKeyManager().getDirDeletingService();
+
+    // Before delete
+    assertTableRowCount(deletedDirTable, 0);
+    assertTableRowCount(dirTable, 3);
+    assertTableRowCount(keyTable, 1);
+
+    assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
+    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
+    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 0);
+
+    metrics.resetDirectoryMetrics();
+    fs.delete(appRoot, true);
+
+    // After delete
+    checkPath(appRoot);
+    assertTableRowCount(deletedDirTable, 0);
+    assertTableRowCount(keyTable, 0);
+    assertTableRowCount(dirTable, 1);
+    assertSubPathsCount(dirDeletingService::getMovedFilesCount, 1);
+    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 2);
+    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
+
+    assertEquals(2, metrics.getNumDirsSentForPurge());
+    assertEquals(2, metrics.getNumDirsPurged());
+    assertEquals(1, metrics.getNumSubDirsMovedToDeletedDirTable());
+    assertEquals(1, metrics.getNumSubDirsSentForPurge());
+    assertEquals(1, metrics.getNumSubFilesSentForPurge());
+    assertEquals(1, metrics.getNumSubFilesMovedToDeletedTable());
+    assertThat(dirDeletingService.getRunCount().get()).isGreaterThan(1);
+  }
+
   @Test
   public void testDeleteWithMultiLevelsBlockDoubleBuffer() throws Exception {
     Path root = new Path("/rootDirdd");

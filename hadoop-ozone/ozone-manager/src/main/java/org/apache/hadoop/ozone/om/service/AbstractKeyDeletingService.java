@@ -465,7 +465,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
               " totalRunCount: {}",
           dirNum, subdirDelNum, subFileNum, (subDirNum - subdirDelNum), limit,
           timeTakenInIteration, rnCnt);
-      metrics.incrementDirectoryDeletionTotalMetrics(dirNum + subdirDelNum, subdirMoved, subFileNum);
+      metrics.incrementDirectoryDeletionTotalMetrics(dirNum + subdirDelNum, subDirNum, subFileNum);
     }
     return remainNum;
   }
