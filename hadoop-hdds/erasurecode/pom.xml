@@ -38,13 +38,13 @@
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
     </dependency>
+
+    <!-- Test dependencies -->
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-config</artifactId>
       <scope>test</scope>
     </dependency>
-
-    <!-- Test dependencies -->
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-hadoop-dependency-test</artifactId>
