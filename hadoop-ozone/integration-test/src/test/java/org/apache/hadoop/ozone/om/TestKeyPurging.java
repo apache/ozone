@@ -138,7 +138,7 @@ public class TestKeyPurging {
     GenericTestUtils.waitFor(
         () -> {
           try {
-            return keyManager.getPendingDeletionKeys(Integer.MAX_VALUE)
+            return keyManager.getPendingDeletionKeys(Integer.MAX_VALUE, "")
                 .getKeyBlocksList().size() == 0;
           } catch (IOException e) {
             return false;
