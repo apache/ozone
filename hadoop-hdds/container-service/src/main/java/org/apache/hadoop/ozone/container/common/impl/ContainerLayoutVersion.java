@@ -48,7 +48,7 @@ public enum ContainerLayoutVersion {
     }
   };
 
-  private static final ContainerLayoutVersion
+  public static final ContainerLayoutVersion
       DEFAULT_LAYOUT = ContainerLayoutVersion.FILE_PER_BLOCK;
 
   private static final List<ContainerLayoutVersion> CONTAINER_LAYOUT_VERSIONS =

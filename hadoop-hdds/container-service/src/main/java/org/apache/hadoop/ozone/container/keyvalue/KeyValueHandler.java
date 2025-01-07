@@ -124,6 +124,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.DEFAULT_LAYOUT;
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 
 import org.apache.hadoop.util.Time;
@@ -194,7 +195,8 @@ public class KeyValueHandler extends Handler {
 
     if (ContainerLayoutVersion.getConfiguredVersion(conf) ==
         ContainerLayoutVersion.FILE_PER_CHUNK) {
-      LOG.warn("FILE_PER_CHUNK layout is not supported. Falling back to default : {}.", DEFAULT_LAYOUT.name());
+      LOG.warn("FILE_PER_CHUNK layout is not supported. Falling back to default : {}.",
+          DEFAULT_LAYOUT.name());
       OzoneConfiguration.of(conf).set(ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY,
           DEFAULT_LAYOUT.name());
     }
