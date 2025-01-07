@@ -559,9 +559,9 @@ public class TestDirectoryDeletingServiceWithFSO {
         Assertions.assertNotEquals(deletePathKey, purgeRequest.getDeletedDir());
       }
       return i.callRealMethod();
-    }).when(service).optimizeDirDeletesAndSubmitRequest(anyLong(), anyLong(),
-        anyLong(), anyLong(), anyList(), anyList(), eq(null), anyLong(),
-        anyLong(), anyLong(), Mockito.any(), any(), anyList());
+    }).when(service).optimizeDirDeletesAndSubmitRequest(anyLong(), anyLong(), anyLong(),
+        anyLong(), anyList(), anyList(), eq(null), anyLong(), anyLong(), Mockito.any(), any(),
+        anyLong());
 
     Mockito.doAnswer(i -> {
       store.createSnapshot(testVolumeName, testBucketName, snap2);
