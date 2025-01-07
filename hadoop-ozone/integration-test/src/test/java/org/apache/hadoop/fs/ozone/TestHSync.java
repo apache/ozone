@@ -134,7 +134,6 @@ import static org.apache.hadoop.ozone.TestDataUtil.cleanupDeletedTable;
 import static org.apache.hadoop.ozone.TestDataUtil.cleanupOpenKeyTable;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
@@ -181,7 +180,6 @@ public class TestHSync {
   public static void init() throws Exception {
     final BucketLayout layout = BUCKET_LAYOUT;
 
-    CONF.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
     CONF.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
     CONF.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
     CONF.setBoolean("ozone.client.hbase.enhancements.allowed", true);
@@ -497,6 +495,52 @@ public class TestHSync {
   }
 
   @Test
+  public void testHSyncOpenKeyCommitAfterExpiry() throws Exception {
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final Path key1 = new Path("hsync-key");
+    final Path key2 = new Path("key2");
+
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      // Create key1 with hsync
+      try (FSDataOutputStream os = fs.create(key1, true)) {
+        os.write(1);
+        os.hsync();
+        // Create key2 without hsync
+        try (FSDataOutputStream os1 = fs.create(key2, true)) {
+          os1.write(1);
+          // There should be 2 key in openFileTable
+          assertThat(2 == getOpenKeyInfo(BUCKET_LAYOUT).size());
+          // One key will be in fileTable as hsynced
+          assertThat(1 == getKeyInfo(BUCKET_LAYOUT).size());
+
+          // Resume openKeyCleanupService
+          openKeyCleanupService.resume();
+          // Verify hsync openKey gets committed eventually
+          // Key without hsync is deleted
+          GenericTestUtils.waitFor(() ->
+              0 == getOpenKeyInfo(BUCKET_LAYOUT).size(), 1000, 12000);
+          // Verify only one key is still present in fileTable
+          assertThat(1 == getKeyInfo(BUCKET_LAYOUT).size());
+
+          // Clean up
+          assertTrue(fs.delete(key1, false));
+          waitForEmptyDeletedTable();
+        } catch (OMException ex) {
+          assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ex.getResult());
+        }
+      } catch (OMException ex) {
+        assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ex.getResult());
+      } finally {
+        openKeyCleanupService.suspend();
+      }
+    }
+  }
+
+  @Test
   public void testHSyncDeletedKey() throws Exception {
     // Verify that a key can't be successfully hsync'ed again after it's deleted,
     // and that key won't reappear after a failed hsync.
@@ -585,6 +629,21 @@ public class TestHSync {
 
     Table<String, OmKeyInfo> openFileTable =
         cluster.getOzoneManager().getMetadataManager().getOpenKeyTable(bucketLayout);
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+             iterator = openFileTable.iterator()) {
+      while (iterator.hasNext()) {
+        omKeyInfo.add(iterator.next().getValue());
+      }
+    } catch (Exception e) {
+    }
+    return omKeyInfo;
+  }
+
+  private List<OmKeyInfo> getKeyInfo(BucketLayout bucketLayout) {
+    List<OmKeyInfo> omKeyInfo = new ArrayList<>();
+
+    Table<String, OmKeyInfo> openFileTable =
+        cluster.getOzoneManager().getMetadataManager().getKeyTable(bucketLayout);
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
              iterator = openFileTable.iterator()) {
       while (iterator.hasNext()) {
@@ -1365,9 +1424,12 @@ public class TestHSync {
       outputStream2.hsync();
       outputStream2.close();
       assertEquals(data1.length() + data2.length(), metrics.getDataCommittedBytes());
+      // wait until double buffer flush
+      cluster.getOzoneManager().awaitDoubleBufferFlush();
 
       Map<String, OmKeyInfo> openKeys = getAllOpenKeys(openKeyTable);
       Map<String, RepeatedOmKeyInfo> deletedKeys = getAllDeletedKeys(deletedTable);
+
       // There should be no key in openKeyTable
       assertEquals(0, openKeys.size());
       // There should be one key in delete table
@@ -1442,6 +1504,8 @@ public class TestHSync {
       // hsync/close second hsync key should success
       outputStream2.hsync();
       outputStream2.close();
+      // wait until double buffer flush
+      cluster.getOzoneManager().awaitDoubleBufferFlush();
 
       Map<String, OmKeyInfo> openKeys = getAllOpenKeys(openKeyTable);
       Map<String, RepeatedOmKeyInfo> deletedKeys = getAllDeletedKeys(deletedTable);

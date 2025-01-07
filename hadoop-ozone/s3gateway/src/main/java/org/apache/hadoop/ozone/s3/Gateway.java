@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.concurrent.Callable;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.cli.GenericCli;
@@ -54,7 +55,7 @@ import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_KERBEROS_
     hidden = true, description = "S3 compatible rest server.",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
-public class Gateway extends GenericCli {
+public class Gateway extends GenericCli implements Callable<Void> {
 
   private static final Logger LOG = LoggerFactory.getLogger(Gateway.class);
 
@@ -75,7 +76,7 @@ public class Gateway extends GenericCli {
 
   @Override
   public Void call() throws Exception {
-    OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
+    OzoneConfiguration ozoneConfiguration = getOzoneConf();
     OzoneConfigurationHolder.setConfiguration(ozoneConfiguration);
     TracingUtil.initTracing("S3gateway", OzoneConfigurationHolder.configuration());
     UserGroupInformation.setConfiguration(OzoneConfigurationHolder.configuration());

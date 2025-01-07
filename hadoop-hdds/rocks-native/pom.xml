@@ -24,6 +24,10 @@
   <name>Apache Ozone HDDS RocksDB Tools</name>
   <artifactId>hdds-rocks-native</artifactId>
 
+  <properties>
+    <sort.skip>true</sort.skip>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>org.apache.ozone</groupId>

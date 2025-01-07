@@ -18,9 +18,8 @@
 package org.apache.hadoop.ozone.admin.nssummary;
 
 import org.apache.hadoop.fs.ozone.OzoneClientUtils;
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.OzoneAdmin;
+import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.hdds.cli.AdminSubcommand;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -63,22 +62,9 @@ import static org.apache.hadoop.hdds.server.http.HttpServer2.HTTP_SCHEME;
         FileSizeDistSubCommand.class
     })
 @MetaInfServices(AdminSubcommand.class)
-public class NSSummaryAdmin extends GenericCli implements AdminSubcommand {
+public class NSSummaryAdmin implements AdminSubcommand {
   @CommandLine.ParentCommand
   private OzoneAdmin parent;
-
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
-
-  public OzoneAdmin getParent() {
-    return parent;
-  }
-
-  @Override
-  public Void call() throws Exception {
-    GenericCli.missingSubcommand(spec);
-    return null;
-  }
 
   private boolean isObjectStoreBucket(OzoneBucket bucket, ObjectStore objectStore) {
     boolean enableFileSystemPaths = getOzoneConfig()

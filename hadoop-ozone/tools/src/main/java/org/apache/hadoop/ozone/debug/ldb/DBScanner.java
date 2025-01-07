@@ -27,7 +27,6 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -47,7 +46,6 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinitio
 import org.apache.hadoop.ozone.debug.DBDefinitionFactory;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
 import org.apache.hadoop.ozone.utils.Filter;
-import org.kohsuke.MetaInfServices;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
@@ -89,8 +87,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
     name = "scan",
     description = "Parse specified metadataTable"
 )
-@MetaInfServices(SubcommandWithParent.class)
-public class DBScanner implements Callable<Void>, SubcommandWithParent {
+public class DBScanner implements Callable<Void> {
 
   public static final Logger LOG = LoggerFactory.getLogger(DBScanner.class);
   private static final String SCHEMA_V3 = "V3";
@@ -644,11 +641,6 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       dbPath = dbPath.substring(0, dbPath.length() - 1);
     }
     return dbPath;
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return RDBParser.class;
   }
 
   /**

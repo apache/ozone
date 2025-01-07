@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -45,6 +46,7 @@ import static org.apache.hadoop.ozone.freon.KeyGeneratorUtil.FILE_DIR_SEPARATOR;
         versionProvider = HddsVersionProvider.class,
         mixinStandardHelpOptions = true,
         showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 public class RangeKeysGenerator extends BaseFreonGenerator
         implements Callable<Void> {
 

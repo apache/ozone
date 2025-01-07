@@ -19,15 +19,14 @@ package org.apache.hadoop.hdds.scm.safemode;
 
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -90,7 +89,7 @@ public class SCMSafeModeManager implements SafeModeManager {
   private AtomicBoolean preCheckComplete = new AtomicBoolean(false);
   private AtomicBoolean forceExitSafeMode = new AtomicBoolean(false);
 
-  private Map<String, SafeModeExitRule> exitRules = new HashMap(1);
+  private Map<String, SafeModeExitRule> exitRules = new HashMap<>(1);
   private Set<String> preCheckRules = new HashSet<>(1);
   private ConfigurationSource config;
   private static final String CONT_EXIT_RULE = "ContainerSafeModeRule";
@@ -104,19 +103,18 @@ public class SCMSafeModeManager implements SafeModeManager {
   private Set<String> validatedPreCheckRules = new HashSet<>(1);
 
   private final EventQueue eventPublisher;
-  private final PipelineManager pipelineManager;
   private final SCMServiceManager serviceManager;
   private final SCMContext scmContext;
 
   private final SafeModeMetrics safeModeMetrics;
 
+
+  // TODO: Remove allContainers argument. (HDDS-11795)
   public SCMSafeModeManager(ConfigurationSource conf,
-             List<ContainerInfo> allContainers,
              ContainerManager containerManager, PipelineManager pipelineManager,
              EventQueue eventQueue, SCMServiceManager serviceManager,
              SCMContext scmContext) {
     this.config = conf;
-    this.pipelineManager = pipelineManager;
     this.eventPublisher = eventQueue;
     this.serviceManager = serviceManager;
     this.scmContext = scmContext;
@@ -126,30 +124,17 @@ public class SCMSafeModeManager implements SafeModeManager {
 
     if (isSafeModeEnabled) {
       this.safeModeMetrics = SafeModeMetrics.create();
-      ContainerSafeModeRule containerSafeModeRule =
-          new ContainerSafeModeRule(CONT_EXIT_RULE, eventQueue, config,
-              allContainers,  containerManager, this);
-      DataNodeSafeModeRule dataNodeSafeModeRule =
-          new DataNodeSafeModeRule(DN_EXIT_RULE, eventQueue, config, this);
-      exitRules.put(CONT_EXIT_RULE, containerSafeModeRule);
-      exitRules.put(DN_EXIT_RULE, dataNodeSafeModeRule);
-      preCheckRules.add(DN_EXIT_RULE);
-      if (conf.getBoolean(
-          HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,
-          HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK_DEFAULT)
-          && pipelineManager != null) {
-        HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =
-            new HealthyPipelineSafeModeRule(HEALTHY_PIPELINE_EXIT_RULE,
-                eventQueue, pipelineManager,
-                this, config, scmContext);
-        OneReplicaPipelineSafeModeRule oneReplicaPipelineSafeModeRule =
-            new OneReplicaPipelineSafeModeRule(
-                ATLEAST_ONE_DATANODE_REPORTED_PIPELINE_EXIT_RULE, eventQueue,
-                pipelineManager, this, conf);
-        exitRules.put(HEALTHY_PIPELINE_EXIT_RULE, healthyPipelineSafeModeRule);
-        exitRules.put(ATLEAST_ONE_DATANODE_REPORTED_PIPELINE_EXIT_RULE,
-            oneReplicaPipelineSafeModeRule);
-      }
+
+      // TODO: Remove the cyclic ("this") dependency (HDDS-11797)
+      SafeModeRuleFactory.initialize(config, scmContext, eventQueue,
+          this, pipelineManager, containerManager);
+      SafeModeRuleFactory factory = SafeModeRuleFactory.getInstance();
+
+      exitRules = factory.getSafeModeRules().stream().collect(
+          Collectors.toMap(SafeModeExitRule::getRuleName, rule -> rule));
+
+      preCheckRules = factory.getPreCheckRules().stream()
+          .map(SafeModeExitRule::getRuleName).collect(Collectors.toSet());
     } else {
       this.safeModeMetrics = null;
       exitSafeMode(eventQueue, true);

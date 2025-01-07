@@ -32,6 +32,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <properties>
     <maven.test.skip>true</maven.test.skip> <!-- no testable code in this module -->
     <spotbugs.skip>true</spotbugs.skip> <!-- only generated code in this module -->
+    <sort.skip>true</sort.skip>
   </properties>
 
   <dependencies>

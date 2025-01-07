@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
@@ -58,6 +59,8 @@ import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * This class tests OneReplicaPipelineSafeModeRule.
@@ -86,7 +89,8 @@ public class TestOneReplicaPipelineSafeModeRule {
     List<ContainerInfo> containers = new ArrayList<>();
     containers.addAll(HddsTestUtils.getContainerInfo(1));
     mockNodeManager = new MockNodeManager(true, nodes);
-
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers()).thenReturn(containers);
     eventQueue = new EventQueue();
     serviceManager = new SCMServiceManager();
     scmContext = SCMContext.emptyContext();
@@ -116,7 +120,7 @@ public class TestOneReplicaPipelineSafeModeRule {
         HddsProtos.ReplicationFactor.ONE);
 
     SCMSafeModeManager scmSafeModeManager =
-        new SCMSafeModeManager(ozoneConfiguration, containers, null,
+        new SCMSafeModeManager(ozoneConfiguration, containerManager,
             pipelineManager, eventQueue, serviceManager, scmContext);
 
     rule = scmSafeModeManager.getOneReplicaPipelineSafeModeRule();

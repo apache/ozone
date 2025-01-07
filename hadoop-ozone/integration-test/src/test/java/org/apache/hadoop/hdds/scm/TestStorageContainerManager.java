@@ -58,7 +58,6 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Incremen
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventExecutor;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
@@ -155,7 +154,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.argThat;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
@@ -323,17 +321,7 @@ public class TestStorageContainerManager {
       // after sometime, all the TX should be proceed and by then
       // the number of containerBlocks of all known containers will be
       // empty again.
-      GenericTestUtils.waitFor(() -> {
-        try {
-          if (SCMHAUtils.isSCMHAEnabled(cluster.getConf())) {
-            cluster.getStorageContainerManager().getScmHAManager()
-                .asSCMHADBTransactionBuffer().flush();
-          }
-          return delLog.getNumOfValidTransactions() == 0;
-        } catch (IOException e) {
-          return false;
-        }
-      }, 1000, 22000);
+      OzoneTestUtils.waitBlockDeleted(cluster.getStorageContainerManager());
       assertTrue(verifyBlocksWithTxnTable(cluster, conf, containerBlocks));
       // Continue the work, add some TXs that with known container names,
       // but unknown block IDs.
@@ -788,10 +776,6 @@ public class TestStorageContainerManager {
       NodeManager nodeManager = mock(NodeManager.class);
       setInternalState(rm, "nodeManager", nodeManager);
 
-      EventPublisher publisher = mock(EventPublisher.class);
-      setInternalState(rm.getLegacyReplicationManager(),
-          "eventPublisher", publisher);
-
       UUID dnUuid = cluster.getHddsDatanodes().iterator().next()
           .getDatanodeDetails().getUuid();
 
@@ -811,15 +795,7 @@ public class TestStorageContainerManager {
       cluster.getStorageContainerManager()
           .getReplicationManager().processAll();
       Thread.sleep(5000);
-
-      if (rm.getConfig().isLegacyEnabled()) {
-        CommandForDatanode commandForDatanode = new CommandForDatanode(
-            dnUuid, closeContainerCommand);
-        verify(publisher).fireEvent(eq(SCMEvents.DATANODE_COMMAND), argThat(new
-            CloseContainerCommandMatcher(dnUuid, commandForDatanode)));
-      } else {
-        verify(nodeManager).addDatanodeCommand(dnUuid, closeContainerCommand);
-      }
+      verify(nodeManager).addDatanodeCommand(dnUuid, closeContainerCommand);
     }
   }
 

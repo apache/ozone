@@ -20,6 +20,7 @@ import com.codahale.metrics.Timer;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -34,6 +35,7 @@ import java.util.concurrent.Callable;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 public class OmBucketRemover extends BaseFreonGenerator
     implements Callable<Void> {
 

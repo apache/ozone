@@ -12,10 +12,7 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
@@ -24,54 +21,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   </parent>
   <artifactId>hdds-common</artifactId>
   <version>2.0.0-SNAPSHOT</version>
-  <description>Apache Ozone Distributed Data Store Common</description>
-  <name>Apache Ozone HDDS Common</name>
   <packaging>jar</packaging>
-
-  <properties>
-  </properties>
+  <name>Apache Ozone HDDS Common</name>
+  <description>Apache Ozone Distributed Data Store Common</description>
 
   <dependencies>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-hadoop-dependency-client</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>info.picocli</groupId>
-      <artifactId>picocli</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.github.stephenc.jcip</groupId>
-      <artifactId>jcip-annotations</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.google.protobuf</groupId>
-      <artifactId>protobuf-java</artifactId>
-      <scope>compile</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.google.guava</groupId>
-      <artifactId>guava</artifactId>
-      <scope>compile</scope>
-    </dependency>
-    <!-- for the annotations in OzoneConfiguration -->
-    <dependency>
-      <groupId>org.glassfish.jaxb</groupId>
-      <artifactId>jaxb-runtime</artifactId>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-lang3</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>commons-collections</groupId>
-      <artifactId>commons-collections</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>commons-io</groupId>
-      <artifactId>commons-io</artifactId>
-    </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-annotations</artifactId>
@@ -89,17 +43,72 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>jackson-datatype-jsr310</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-annotation-processing</artifactId>
+      <groupId>com.github.stephenc.jcip</groupId>
+      <artifactId>jcip-annotations</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-config</artifactId>
+      <groupId>com.google.errorprone</groupId>
+      <artifactId>error_prone_annotations</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.google.protobuf</groupId>
+      <artifactId>protobuf-java</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>commons-collections</groupId>
+      <artifactId>commons-collections</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>commons-validator</groupId>
+      <artifactId>commons-validator</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>info.picocli</groupId>
+      <artifactId>picocli</artifactId>
     </dependency>
 
     <dependency>
-      <groupId>javax.annotation</groupId>
-      <artifactId>javax.annotation-api</artifactId>
+      <groupId>io.dropwizard.metrics</groupId>
+      <artifactId>metrics-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-api</artifactId>
+      <version>${io.grpc.version}</version>
+      <scope>compile</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>com.google.code.findbugs</groupId>
+          <artifactId>jsr305</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>io.jaegertracing</groupId>
+      <artifactId>jaeger-client</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.jaegertracing</groupId>
+      <artifactId>jaeger-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.opentracing</groupId>
+      <artifactId>opentracing-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.opentracing</groupId>
+      <artifactId>opentracing-util</artifactId>
     </dependency>
     <dependency>
       <groupId>jakarta.annotation</groupId>
@@ -111,23 +120,36 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     </dependency>
 
     <dependency>
-      <groupId>io.dropwizard.metrics</groupId>
-      <artifactId>metrics-core</artifactId>
-    </dependency>
-
-    <dependency>
-      <artifactId>ratis-server-api</artifactId>
-      <groupId>org.apache.ratis</groupId>
+      <groupId>javax.annotation</groupId>
+      <artifactId>javax.annotation-api</artifactId>
     </dependency>
     <dependency>
-      <artifactId>ratis-metrics-dropwizard3</artifactId>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-annotation-processing</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-config</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-hadoop-dependency-client</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-interface-admin</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-interface-client</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.apache.ratis</groupId>
-      <exclusions>
-        <exclusion>
-          <groupId>io.dropwizard.metrics</groupId>
-          <artifactId>metrics-core</artifactId>
-        </exclusion>
-      </exclusions>
+      <artifactId>ratis-client</artifactId>
     </dependency>
 
     <dependency>
@@ -135,31 +157,36 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>ratis-common</artifactId>
     </dependency>
     <dependency>
-      <artifactId>ratis-netty</artifactId>
       <groupId>org.apache.ratis</groupId>
+      <artifactId>ratis-grpc</artifactId>
     </dependency>
     <dependency>
-      <artifactId>ratis-grpc</artifactId>
       <groupId>org.apache.ratis</groupId>
+      <artifactId>ratis-metrics-dropwizard3</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>io.dropwizard.metrics</groupId>
+          <artifactId>metrics-core</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ratis</groupId>
+      <artifactId>ratis-netty</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-proto</artifactId>
     </dependency>
+
     <dependency>
       <groupId>org.apache.ratis</groupId>
-      <artifactId>ratis-client</artifactId>
+      <artifactId>ratis-server-api</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-thirdparty-misc</artifactId>
     </dependency>
-    <dependency>
-      <groupId>com.google.errorprone</groupId>
-      <artifactId>error_prone_annotations</artifactId>
-      <optional>true</optional>
-    </dependency>
-
 
     <dependency>
       <groupId>org.bouncycastle</groupId>
@@ -175,32 +202,8 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>bcutil-jdk18on</artifactId>
     </dependency>
     <dependency>
-      <groupId>commons-validator</groupId>
-      <artifactId>commons-validator</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.jaegertracing</groupId>
-      <artifactId>jaeger-client</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.jaegertracing</groupId>
-      <artifactId>jaeger-core</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.jetbrains.kotlin</groupId>
       <artifactId>kotlin-stdlib</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.opentracing</groupId>
-      <artifactId>opentracing-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.opentracing</groupId>
-      <artifactId>opentracing-util</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.yaml</groupId>
-      <artifactId>snakeyaml</artifactId>
     </dependency>
     <dependency>
       <groupId>org.reflections</groupId>
@@ -211,32 +214,22 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>slf4j-api</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-interface-client</artifactId>
+      <groupId>org.yaml</groupId>
+      <artifactId>snakeyaml</artifactId>
     </dependency>
+    <!-- for the annotations in OzoneConfiguration -->
     <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-interface-admin</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.grpc</groupId>
-      <artifactId>grpc-api</artifactId>
-      <version>${io.grpc.version}</version>
-      <scope>compile</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>com.google.code.findbugs</groupId>
-          <artifactId>jsr305</artifactId>
-        </exclusion>
-      </exclusions>
+      <groupId>org.glassfish.jaxb</groupId>
+      <artifactId>jaxb-runtime</artifactId>
+      <scope>provided</scope>
     </dependency>
 
     <!-- Test dependencies -->
     <dependency>
+      <!-- Needed for mocking RaftServerImpl -->
       <groupId>com.codahale.metrics</groupId>
       <artifactId>metrics-core</artifactId>
       <scope>test</scope>
-      <!-- Needed for mocking RaftServerImpl -->
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -258,27 +251,20 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <build>
     <resources>
       <resource>
+        <filtering>false</filtering>
         <directory>${basedir}/src/main/resources</directory>
         <excludes>
           <exclude>hdds-version-info.properties</exclude>
         </excludes>
-        <filtering>false</filtering>
       </resource>
       <resource>
+        <filtering>true</filtering>
         <directory>${basedir}/src/main/resources</directory>
         <includes>
           <include>hdds-version-info.properties</include>
         </includes>
-        <filtering>true</filtering>
       </resource>
     </resources>
-    <extensions>
-      <extension>
-        <groupId>kr.motd.maven</groupId>
-        <artifactId>os-maven-plugin</artifactId>
-        <version>${os-maven-plugin.version}</version>
-      </extension>
-    </extensions>
     <plugins>
       <plugin>
         <groupId>org.apache.hadoop</groupId>
@@ -286,10 +272,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <executions>
           <execution>
             <id>version-info</id>
-            <phase>generate-resources</phase>
             <goals>
               <goal>version-info</goal>
             </goals>
+            <phase>generate-resources</phase>
             <configuration>
               <source>
                 <directory>${basedir}/../</directory>
@@ -330,7 +316,8 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <artifactId>maven-enforcer-plugin</artifactId>
         <executions>
           <execution>
-            <id>ban-annotations</id> <!-- override default restriction from root POM -->
+            <id>ban-annotations</id>
+            <!-- override default restriction from root POM -->
             <configuration>
               <rules>
                 <restrictImports>
@@ -347,5 +334,12 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         </executions>
       </plugin>
     </plugins>
+    <extensions>
+      <extension>
+        <groupId>kr.motd.maven</groupId>
+        <artifactId>os-maven-plugin</artifactId>
+        <version>${os-maven-plugin.version}</version>
+      </extension>
+    </extensions>
   </build>
 </project>

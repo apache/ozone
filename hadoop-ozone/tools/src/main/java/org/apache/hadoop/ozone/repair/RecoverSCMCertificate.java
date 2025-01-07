@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.ozone.repair;
 
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.cli.RepairSubcommand;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
@@ -38,7 +38,6 @@ import org.rocksdb.RocksDBException;
 import picocli.CommandLine;
 
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
@@ -52,7 +51,6 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Optional;
 import java.util.Arrays;
-import java.util.concurrent.Callable;
 
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.VALID_SCM_CERTS;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.DefaultCertificateClient.CERT_FILE_NAME_FORMAT;
@@ -67,8 +65,8 @@ import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.removeTrailingSlas
 @CommandLine.Command(
     name = "cert-recover",
     description = "Recover Deleted SCM Certificate from RocksDB")
-@MetaInfServices(SubcommandWithParent.class)
-public class RecoverSCMCertificate implements Callable<Void>, SubcommandWithParent {
+@MetaInfServices(RepairSubcommand.class)
+public class RecoverSCMCertificate extends RepairTool implements RepairSubcommand {
 
   @CommandLine.Option(names = {"--db"},
       required = true,
@@ -78,24 +76,8 @@ public class RecoverSCMCertificate implements Callable<Void>, SubcommandWithPare
   @CommandLine.ParentCommand
   private OzoneRepair parent;
 
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
-
   @Override
-  public Class<?> getParentType() {
-    return OzoneRepair.class;
-  }
-
-  private PrintWriter err() {
-    return spec.commandLine().getErr();
-  }
-
-  private PrintWriter out() {
-    return spec.commandLine().getOut();
-  }
-
-  @Override
-  public Void call() throws Exception {
+  public void execute() throws Exception {
     dbPath = removeTrailingSlashIfNeeded(dbPath);
     String tableName = VALID_SCM_CERTS.getName();
     DBDefinition dbDefinition =
@@ -117,15 +99,15 @@ public class RecoverSCMCertificate implements Callable<Void>, SubcommandWithPare
         SecurityConfig securityConfig = new SecurityConfig(parent.getOzoneConf());
 
         Map<BigInteger, X509Certificate> allCerts = getAllCerts(columnFamilyDefinition, cfHandle, db);
-        out().println("All Certs in DB : " +  allCerts.keySet());
+        info("All Certs in DB : %s", allCerts.keySet());
         String hostName = InetAddress.getLocalHost().getHostName();
-        out().println("Host: " + hostName);
+        info("Host: %s", hostName);
 
         X509Certificate subCertificate = getSubCertificate(allCerts, hostName);
         X509Certificate rootCertificate = getRootCertificate(allCerts);
 
-        out().println("Sub cert serialID for this host: " + subCertificate.getSerialNumber().toString());
-        out().println("Root cert serialID: " + rootCertificate.getSerialNumber().toString());
+        info("Sub cert serialID for this host: %s", subCertificate.getSerialNumber());
+        info("Root cert serialID: %s", rootCertificate.getSerialNumber());
 
         boolean isRootCA = false;
 
@@ -136,9 +118,8 @@ public class RecoverSCMCertificate implements Callable<Void>, SubcommandWithPare
         storeCerts(subCertificate, rootCertificate, isRootCA, securityConfig);
       }
     } catch (RocksDBException | CertificateException exception) {
-      err().print("Failed to recover scm cert");
+      error("Failed to recover scm cert");
     }
-    return null;
   }
 
   private static ColumnFamilyHandle getColumnFamilyHandle(
@@ -215,17 +196,17 @@ public class RecoverSCMCertificate implements Callable<Void>, SubcommandWithPare
     CertificateCodec certCodec =
         new CertificateCodec(securityConfig, SCMCertificateClient.COMPONENT_NAME);
 
-    out().println("Writing certs to path : " + certCodec.getLocation().toString());
+    info("Writing certs to path : %s", certCodec.getLocation());
 
     CertPath certPath = addRootCertInPath(scmCertificate, rootCertificate);
     CertPath rootCertPath = getRootCertPath(rootCertificate);
     String encodedCert = CertificateCodec.getPEMEncodedString(certPath);
     String certName = String.format(CERT_FILE_NAME_FORMAT,
-        CAType.NONE.getFileNamePrefix() + scmCertificate.getSerialNumber().toString());
+        CAType.NONE.getFileNamePrefix() + scmCertificate.getSerialNumber());
     certCodec.writeCertificate(certName, encodedCert);
 
     String rootCertName = String.format(CERT_FILE_NAME_FORMAT,
-        CAType.SUBORDINATE.getFileNamePrefix() + rootCertificate.getSerialNumber().toString());
+        CAType.SUBORDINATE.getFileNamePrefix() + rootCertificate.getSerialNumber());
     String encodedRootCert = CertificateCodec.getPEMEncodedString(rootCertPath);
     certCodec.writeCertificate(rootCertName, encodedRootCert);
 
@@ -235,7 +216,7 @@ public class RecoverSCMCertificate implements Callable<Void>, SubcommandWithPare
     if (isRootCA) {
       CertificateCodec rootCertCodec =
           new CertificateCodec(securityConfig, OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME);
-      out().println("Writing root certs to path : " + rootCertCodec.getLocation().toString());
+      info("Writing root certs to path : %s", rootCertCodec.getLocation());
       rootCertCodec.writeCertificate(rootCertCodec.getLocation().toAbsolutePath(),
           securityConfig.getCertificateFileName(), encodedRootCert);
     }
