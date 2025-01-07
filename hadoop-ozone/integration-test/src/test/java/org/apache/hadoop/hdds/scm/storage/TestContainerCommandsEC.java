@@ -70,6 +70,7 @@ import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionExcepti
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECContainerOperationClient;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionMetrics;
@@ -172,6 +173,7 @@ public class TestContainerCommandsEC {
   @BeforeAll
   public static void init() throws Exception {
     config = new OzoneConfiguration();
+    config.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     config.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
     config.setTimeDuration(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     config.setBoolean(OzoneConfigKeys.OZONE_ACL_ENABLED, true);
@@ -322,8 +324,10 @@ public class TestContainerCommandsEC {
                 .setTxID(1L)
                 .setCount(10)
                 .build()));
-    dn2Service.getDatanodeStateMachine().getContext()
-        .addCommand(deleteBlocksCommand);
+    StateContext context = dn2Service.getDatanodeStateMachine().getContext();
+    deleteBlocksCommand.setTerm(context.getTermOfLeaderSCM().isPresent() ?
+            context.getTermOfLeaderSCM().getAsLong() : 0);
+    context.addCommand(deleteBlocksCommand);
 
     try (XceiverClientGrpc client = new XceiverClientGrpc(
         createSingleNodePipeline(orphanPipeline, dn2, 1), cluster.getConf())) {
