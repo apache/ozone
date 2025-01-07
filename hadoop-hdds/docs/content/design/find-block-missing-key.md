@@ -56,7 +56,7 @@ This tool only verifies the existence of Block data and metadata. It does not va
 1. Retrieve Key metadata:
     - Gather metadata such as the Key name and BlockID (consisting of ContainerID and localID).
     - After collecting sufficient Key metadata, organize it for further processing.
-    - There are three approaches to retrieve metadata (detailed in [Three Approaches to Retrieve Metadata](https://www.notion.so/meeting-room-Conference-Room-d17916fda32244f2b5edfec93c165cee?pvs=21)).
+    - There are three approaches to retrieve metadata (detailed in [Three Approaches to Retrieve Metadata](#three-approaches-to-retrieve-metadata)).
 2. Organize Keys by Container:
     - Group Keys by their respective Containers in local memory. Keys within the same Container are grouped together, and relevant information is recorded.
 3. Query Container Status:
