@@ -86,7 +86,7 @@ This tool only verifies the existence of Block data and metadata. It does not va
 5. Retry Mechanism: For large clusters, where scans may take significant time, and DN restarts are likely, the tool should support retries to improve reliability.
 
 
-## Three Approaches to Retrieve Metadata
+## <a name="three-approaches-to-retrieve-metadata"></a>Three Approaches to Retrieve Metadata
 
 1. Using `listStatusLight` and `listKeysLight`:
     - Advantages: Lightweight and high performance.
