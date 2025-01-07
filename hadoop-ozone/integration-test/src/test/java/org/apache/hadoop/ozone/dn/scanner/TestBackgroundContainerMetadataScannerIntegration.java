@@ -36,7 +36,11 @@ import java.time.Duration;
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Integration tests for the background container metadata scanner. This
@@ -92,10 +96,16 @@ class TestBackgroundContainerMetadataScannerIntegration
     long closedContainerID = writeDataThenCloseContainer();
     Container<?> closedContainer = getDnContainer(closedContainerID);
     assertEquals(State.CLOSED, closedContainer.getContainerState());
+    assertTrue(containerChecksumFileExists(closedContainerID));
+    waitForScmToSeeReplicaState(closedContainerID, CLOSED);
+    long initialReportedClosedChecksum = getContainerReplica(closedContainerID).getDataChecksum();
 
     long openContainerID = writeDataToOpenContainer();
     Container<?> openContainer = getDnContainer(openContainerID);
     assertEquals(State.OPEN, openContainer.getContainerState());
+    long initialReportedOpenChecksum = getContainerReplica(openContainerID).getDataChecksum();
+    // Open containers should not yet have a checksum generated.
+    assertEquals(0, initialReportedOpenChecksum);
 
     // Corrupt both containers.
     corruption.applyTo(closedContainer);
@@ -110,8 +120,10 @@ class TestBackgroundContainerMetadataScannerIntegration
         500, 5000);
 
     // Wait for SCM to get reports of the unhealthy replicas.
-    waitForScmToSeeUnhealthyReplica(closedContainerID);
-    waitForScmToSeeUnhealthyReplica(openContainerID);
+    waitForScmToSeeReplicaState(closedContainerID, UNHEALTHY);
+    assertNotEquals(initialReportedClosedChecksum, getContainerReplica(closedContainerID).getDataChecksum());
+    waitForScmToSeeReplicaState(openContainerID, UNHEALTHY);
+    assertNotEquals(initialReportedOpenChecksum, getContainerReplica(openContainerID).getDataChecksum());
 
     // Once the unhealthy replica is reported, the open container's lifecycle
     // state in SCM should move to closed.

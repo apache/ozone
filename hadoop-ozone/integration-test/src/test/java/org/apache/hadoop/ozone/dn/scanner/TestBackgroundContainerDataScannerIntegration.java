@@ -20,7 +20,10 @@
 package org.apache.hadoop.ozone.dn.scanner;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions;
@@ -34,8 +37,11 @@ import org.junit.jupiter.params.provider.EnumSource;
 
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Integration tests for the background container data scanner. This scanner
@@ -79,6 +85,10 @@ class TestBackgroundContainerDataScannerIntegration
     // Container corruption has not yet been introduced.
     Container<?> container = getDnContainer(containerID);
     assertEquals(State.CLOSED, container.getContainerState());
+    assertTrue(containerChecksumFileExists(containerID));
+
+    waitForScmToSeeReplicaState(containerID, CLOSED);
+    long initialReportedDataChecksum = getContainerReplica(containerID).getDataChecksum();
 
     corruption.applyTo(container);
 
@@ -89,17 +99,15 @@ class TestBackgroundContainerDataScannerIntegration
         () -> container.getContainerState() == State.UNHEALTHY,
         500, 15_000);
 
-    // Wait for SCM to get a report of the unhealthy replica.
-    waitForScmToSeeUnhealthyReplica(containerID);
+    // Wait for SCM to get a report of the unhealthy replica with a different checksum than before.
+    waitForScmToSeeReplicaState(containerID, UNHEALTHY);
+    long newReportedDataChecksum = getContainerReplica(containerID).getDataChecksum();
+    assertNotEquals(initialReportedDataChecksum, newReportedDataChecksum);
 
     if (corruption == TestContainerCorruptions.TRUNCATED_BLOCK ||
         corruption == TestContainerCorruptions.CORRUPT_BLOCK) {
       // These errors will affect multiple chunks and result in multiple log messages.
       corruption.assertLogged(containerID, logCapturer);
-      // Check a corresponding checksum reported to SCM. This would be zero for metadata errors.
-      // TODO HDDS-11942 This check can be made generic for all faults because every fault provided to the test will
-      //  declare its expected checksum.
-      assertNotEquals(0, getContainerReplica(containerID).getDataChecksum());
     } else {
       // Other corruption types will only lead to a single error.
       corruption.assertLogged(containerID, 1, logCapturer);

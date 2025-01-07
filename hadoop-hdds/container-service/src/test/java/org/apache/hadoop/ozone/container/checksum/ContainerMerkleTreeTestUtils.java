@@ -333,10 +333,9 @@ public final class ContainerMerkleTreeTestUtils {
   /**
    * This function checks whether the container checksum file exists.
    */
-  public static boolean containerChecksumFileExists(HddsDatanodeService hddsDatanode,
-                                                    ContainerInfo containerInfo) {
+  public static boolean containerChecksumFileExists(HddsDatanodeService hddsDatanode, long containerID) {
     OzoneContainer ozoneContainer = hddsDatanode.getDatanodeStateMachine().getContainer();
-    Container container = ozoneContainer.getController().getContainer(containerInfo.getContainerID());
+    Container<?> container = ozoneContainer.getController().getContainer(containerID);
     return ContainerChecksumTreeManager.checksumFileExist(container);
   }
 

@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -59,6 +60,7 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class tests the data scanner functionality.
@@ -119,10 +121,10 @@ public abstract class TestContainerScannerIntegrationAbstract {
     }
   }
 
-  protected void waitForScmToSeeUnhealthyReplica(long containerID)
+  protected void waitForScmToSeeReplicaState(long containerID, State state)
       throws Exception {
     LambdaTestUtils.await(5000, 500,
-        () -> getContainerReplica(containerID).getState() == State.UNHEALTHY);
+        () -> getContainerReplica(containerID).getState() == state);
   }
 
   protected void waitForScmToCloseContainer(long containerID) throws Exception {
@@ -141,6 +143,12 @@ public abstract class TestContainerScannerIntegrationAbstract {
 
   protected Container<?> getDnContainer(long containerID) {
     return getOzoneContainer().getContainerSet().getContainer(containerID);
+  }
+
+  protected boolean containerChecksumFileExists(long containerID) {
+    assertEquals(1, cluster.getHddsDatanodes().size());
+    HddsDatanodeService dn = cluster.getHddsDatanodes().get(0);
+    return ContainerMerkleTreeTestUtils.containerChecksumFileExists(dn, containerID);
   }
 
   protected long writeDataThenCloseContainer() throws Exception {
