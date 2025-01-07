@@ -2093,7 +2093,7 @@ public class KeyManagerImpl implements KeyManager {
       if (!metadataManager.getDirectoryTable().isExist(entry.getKey())) {
         continue;
       }
-      if (remainingBufLimit - objectSerializedSize < 0){
+      if (remainingBufLimit - objectSerializedSize < 0) {
         break;
       }
       String dirName = OMFileRequest.getAbsolutePath(parentInfo.getKeyName(),
@@ -2136,7 +2136,7 @@ public class KeyManagerImpl implements KeyManager {
         if (!metadataManager.getFileTable().isExist(entry.getKey())) {
           continue;
         }
-        if (remainingBufLimit - objectSerializedSize < 0){
+        if (remainingBufLimit - objectSerializedSize < 0) {
           break;
         }
         fileInfo.setFileName(fileInfo.getKeyName());

@@ -422,8 +422,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
             = allSubDirList.get(subDirRecursiveCnt);
         PurgePathRequest request = prepareDeleteDirRequest(
             remainNum, stringOmKeyInfoPair.getValue(),
-            stringOmKeyInfoPair.getKey(), allSubDirList,
-            keyManager,remainingBufLimit);
+            stringOmKeyInfoPair.getKey(), allSubDirList, keyManager,
+            remainingBufLimit);
         if (request == null) {
           break;
         }
