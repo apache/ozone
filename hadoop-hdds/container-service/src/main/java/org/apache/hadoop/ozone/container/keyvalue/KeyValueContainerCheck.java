@@ -378,12 +378,13 @@ public class KeyValueContainerCheck {
           // So, we need to make sure, chunk length > 0, before declaring
           // the missing chunk file.
           if (!block.getChunks().isEmpty() && block.getChunks().get(0).getLen() > 0) {
-            ContainerScanError error = new ContainerScanError(FailureType.MISSING_CHUNK_FILE,
+            ContainerScanError error = new ContainerScanError(FailureType.MISSING_DATA_FILE,
                 new File(containerDataFromDisk.getChunksPath()), new IOException("Missing chunk file " +
                 chunkFile.getAbsolutePath()));
             blockErrors.add(error);
           }
         } else if (chunk.getChecksumData().getType() != ContainerProtos.ChecksumType.NONE) {
+          currentTree.addBlock(block.getBlockID().getLocalID());
           int bytesPerChecksum = chunk.getChecksumData().getBytesPerChecksum();
           ByteBuffer buffer = BUFFER_POOL.getBuffer(bytesPerChecksum);
           // Keep scanning the block even if there are errors with individual chunks.
@@ -427,6 +428,7 @@ public class KeyValueContainerCheck {
     ContainerProtos.ChecksumData.Builder observedChecksumData = chunk.getChecksumData().toBuilder();
     observedChecksumData.clearChecksums();
     boolean chunkHealthy = true;
+    boolean chunkMissing = false;
 
     ChecksumData checksumData =
         ChecksumData.getFromProtoBuf(chunk.getChecksumData());
@@ -481,26 +483,41 @@ public class KeyValueContainerCheck {
               new OzoneChecksumException(message)));
         }
       }
-      // If all the checksums match, also check that the length stored in the metadata matches the number of bytes
-      // seen on the disk.
+
       observedChunkBuilder.setLen(bytesRead);
+      // If we haven't seen any errors after scanning the whole chunk, verify that the length stored in the metadata
+      // matches the number of bytes seen on the disk.
       if (chunkHealthy && bytesRead != chunk.getLen()) {
-        String message = String
-            .format("Inconsistent read for chunk=%s expected length=%d"
-                    + " actual length=%d for block %s",
-                chunk.getChunkName(),
-                chunk.getLen(), bytesRead, block.getBlockID());
-        chunkHealthy = false;
-        scanErrors.add(new ContainerScanError(FailureType.INCONSISTENT_CHUNK_LENGTH, chunkFile,
-            new IOException(message)));
+        if (bytesRead == 0) {
+          // If we could not find any data for the chunk, report it as missing.
+          chunkMissing = true;
+          chunkHealthy = false;
+          String message = String.format("Missing chunk=%s with expected length=%d for block %s",
+                  chunk.getChunkName(), chunk.getLen(), block.getBlockID());
+          scanErrors.add(new ContainerScanError(FailureType.MISSING_CHUNK, chunkFile, new IOException(message)));
+        } else {
+          // We found data for the chunk, but it was shorter than expected.
+          String message = String
+              .format("Inconsistent read for chunk=%s expected length=%d"
+                      + " actual length=%d for block %s",
+                  chunk.getChunkName(),
+                  chunk.getLen(), bytesRead, block.getBlockID());
+          chunkHealthy = false;
+          scanErrors.add(new ContainerScanError(FailureType.INCONSISTENT_CHUNK_LENGTH, chunkFile,
+              new IOException(message)));
+        }
       }
     } catch (IOException ex) {
+      // An unknown error occurred trying to access the chunk. Report it as corrupted.
       chunkHealthy = false;
-      scanErrors.add(new ContainerScanError(FailureType.MISSING_CHUNK_FILE, chunkFile, ex));
+      scanErrors.add(new ContainerScanError(FailureType.CORRUPT_CHUNK, chunkFile, ex));
     }
 
-    observedChunkBuilder.setChecksumData(observedChecksumData);
-    currentTree.addChunks(block.getBlockID().getLocalID(), chunkHealthy, observedChunkBuilder.build());
+    // Missing chunks should not be added to the merkle tree.
+    if (!chunkMissing) {
+      observedChunkBuilder.setChecksumData(observedChecksumData);
+      currentTree.addChunks(block.getBlockID().getLocalID(), chunkHealthy, observedChunkBuilder.build());
+    }
     return scanErrors;
   }
 

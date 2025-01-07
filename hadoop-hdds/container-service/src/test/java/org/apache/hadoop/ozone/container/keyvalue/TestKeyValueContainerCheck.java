@@ -160,6 +160,8 @@ public class TestKeyValueContainerCheck
 
     DataScanResult result = kvCheck.fullCheck(throttler, null);
     assertTrue(result.isHealthy());
+    // The scanner would write the checksum file to disk. `KeyValueContainerCheck` does not, so we will create the
+    // result here.
     ContainerProtos.ContainerChecksumInfo healthyChecksumInfo = ContainerProtos.ContainerChecksumInfo.newBuilder()
         .setContainerID(containerID)
         .setContainerMerkleTree(result.getDataTree().toProto())
@@ -201,6 +203,8 @@ public class TestKeyValueContainerCheck
     // compare it against the original healthy tree. The diff we get back should match the failures we injected.
     ContainerDiffReport diffReport = checksumManager.diff(container.getContainerData(), healthyChecksumInfo);
 
+    LOG.info("Diff of healthy container with actual container {}", diffReport);
+
     // Check that the new tree identified all the expected errors by checking the diff.
     Map<Long, List<ContainerProtos.ChunkMerkleTree>> corruptChunks = diffReport.getCorruptChunks();
     // One block had corrupted chunks.
@@ -208,16 +212,17 @@ public class TestKeyValueContainerCheck
     List<ContainerProtos.ChunkMerkleTree> corruptChunksInBlock = corruptChunks.get(corruptBlockID);
     assertEquals(2, corruptChunksInBlock.size());
 
-    // Check missing block was correctly identified in the tree diff.
-    List<ContainerProtos.BlockMerkleTree> missingBlocks = diffReport.getMissingBlocks();
-    assertEquals(1, missingBlocks.size());
-    assertEquals(missingBlockID, missingBlocks.get(0).getBlockID());
-
     // One block was truncated which resulted in all of its chunks being reported as missing.
     Map<Long, List<ContainerProtos.ChunkMerkleTree>> missingChunks = diffReport.getMissingChunks();
     assertEquals(1, missingChunks.size());
     List<ContainerProtos.ChunkMerkleTree> missingChunksInBlock = missingChunks.get(truncatedBlockID);
     assertEquals(CHUNKS_PER_BLOCK, missingChunksInBlock.size());
+
+    // Check missing block was correctly identified in the tree diff.
+    List<ContainerProtos.BlockMerkleTree> missingBlocks = diffReport.getMissingBlocks();
+    assertEquals(1, missingBlocks.size());
+    assertEquals(missingBlockID, missingBlocks.get(0).getBlockID());
+
   }
 
   /**

@@ -65,6 +65,16 @@ public class ContainerMerkleTree {
   }
 
   /**
+   * Adds an empty block to the tree. This method is not a pre-requisite to {@code addChunks}.
+   * If the block entry already exists, it will not be modified.
+   *
+   * @param blockID The ID of the empty block to add to the tree
+   */
+  public void addBlock(long blockID) {
+    addChunks(blockID, true);
+  }
+
+  /**
    * Uses chunk hashes to compute all remaining hashes in the tree, and returns it as a protobuf object. No checksum
    * computation for the tree happens outside of this method.
    *
