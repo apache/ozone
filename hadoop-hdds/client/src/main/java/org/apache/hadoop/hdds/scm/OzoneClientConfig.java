@@ -481,8 +481,14 @@ public class OzoneClientConfig {
     this.dataStreamBufferFlushSize = dataStreamBufferFlushSize;
   }
 
-  public String getChecksumCombineMode() {
-    return checksumCombineMode;
+  public ChecksumCombineMode getChecksumCombineMode() {
+    try {
+      return ChecksumCombineMode.valueOf(checksumCombineMode);
+    } catch (IllegalArgumentException iae) {
+      LOG.warn("Bad checksum combine mode: {}.",
+          checksumCombineMode);
+      return null;
+    }
   }
 
   public void setChecksumCombineMode(String checksumCombineMode) {

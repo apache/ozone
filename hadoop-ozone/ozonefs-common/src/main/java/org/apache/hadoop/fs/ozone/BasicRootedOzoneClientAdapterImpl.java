@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -1297,12 +1296,9 @@ public class BasicRootedOzoneClientAdapterImpl
   @Override
   public FileChecksum getFileChecksum(String keyName, long length)
       throws IOException {
-    String combineMode = config.getObject(OzoneClientConfig.class)
-        .getChecksumCombineMode();
-    boolean isCombineModeSupported =
-        Arrays.stream(OzoneClientConfig.ChecksumCombineMode.values())
-            .anyMatch(mode -> mode.name().equals(combineMode));
-    if (!isCombineModeSupported) {
+    OzoneClientConfig.ChecksumCombineMode combineMode =
+        config.getObject(OzoneClientConfig.class).getChecksumCombineMode();
+    if (null == combineMode) {
       LOG.error("Unsupported checksum combine mode {}, skipping checksum " +
           "computation", combineMode);
       return null;
@@ -1313,7 +1309,7 @@ public class BasicRootedOzoneClientAdapterImpl
     OzoneBucket bucket = getBucket(ofsPath, false);
     return OzoneClientUtils.getFileChecksumWithCombineMode(
         volume, bucket, ofsPath.getKeyName(),
-        length, OzoneClientConfig.ChecksumCombineMode.valueOf(combineMode),
+        length, combineMode,
         ozoneClient.getObjectStore().getClientProxy());
 
   }
