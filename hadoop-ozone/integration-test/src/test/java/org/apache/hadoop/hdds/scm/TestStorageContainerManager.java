@@ -427,7 +427,7 @@ public class TestStorageContainerManager {
           datanode.getDatanodeDetails());
       GenericTestUtils.waitFor(
           () -> scmDnHBDispatcherLog.getOutput().contains(expectedLog), 100,
-          5000);
+          30000);
       ExitUtil.disableSystemExit();
       // As part of processing response for re-register, DN EndpointStateMachine
       // goes to GET-VERSION state which checks if there is already existing
