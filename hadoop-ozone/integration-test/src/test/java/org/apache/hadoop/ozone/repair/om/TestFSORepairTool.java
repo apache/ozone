@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -87,8 +86,8 @@ public class TestFSORepairTool {
   private static FSORepairTool.Report fullReport;
   private static FSORepairTool.Report emptyReport;
 
-  private GenericTestUtils.PrintStreamCapturer out;
-  private GenericTestUtils.PrintStreamCapturer err;
+  private static GenericTestUtils.PrintStreamCapturer out;
+  private static GenericTestUtils.PrintStreamCapturer err;
 
   @BeforeAll
   public static void setup() throws Exception {
@@ -101,6 +100,8 @@ public class TestFSORepairTool {
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     fs = FileSystem.get(conf);
 
+    out = GenericTestUtils.captureOut();
+    err = GenericTestUtils.captureErr();
     dbPath = new File(OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME).getPath();
 
     // Build multiple connected and disconnected trees
@@ -144,19 +145,13 @@ public class TestFSORepairTool {
 
   @BeforeEach
   public void init() throws Exception {
-    out = GenericTestUtils.captureOut();
-    err = GenericTestUtils.captureErr();
-  }
-
-  @AfterEach
-  public void clean() throws Exception {
-    // reset stream after each unit test
-    IOUtils.closeQuietly(out, err);
+    out.reset();
+    err.reset();
   }
 
   @AfterAll
   public static void reset() throws IOException {
-    IOUtils.closeQuietly(fs, client, cluster);
+    IOUtils.closeQuietly(fs, client, cluster, out, err);
   }
 
   /**
@@ -236,7 +231,7 @@ public class TestFSORepairTool {
     // When a non-existent bucket filter is passed
     int exitCode = dryRun("--volume", "/vol1", "--bucket", "bucket3");
     assertEquals(0, exitCode);
-    String cliOutput = out.getOutput();
+    String cliOutput = err.getOutput();
     assertThat(cliOutput).contains("Bucket 'bucket3' does not exist in volume '/vol1'.");
   }
 
@@ -246,7 +241,7 @@ public class TestFSORepairTool {
     // When a non-existent volume filter is passed
     int exitCode = dryRun("--volume", "/vol5");
     assertEquals(0, exitCode);
-    String cliOutput = out.getOutput();
+    String cliOutput = err.getOutput();
     assertThat(cliOutput).contains("Volume '/vol5' does not exist.");
   }
 
@@ -256,7 +251,7 @@ public class TestFSORepairTool {
     // When bucket filter is passed without the volume filter.
     int exitCode = dryRun("--bucket", "bucket1");
     assertEquals(0, exitCode);
-    String cliOutput = out.getOutput();
+    String cliOutput = err.getOutput();
     assertThat(cliOutput).contains("--bucket flag cannot be used without specifying --volume.");
   }
 
