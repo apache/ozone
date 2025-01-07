@@ -35,6 +35,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 /**
  * Integration tests for the background container data scanner. This scanner
@@ -95,6 +96,10 @@ class TestBackgroundContainerDataScannerIntegration
         corruption == TestContainerCorruptions.CORRUPT_BLOCK) {
       // These errors will affect multiple chunks and result in multiple log messages.
       corruption.assertLogged(containerID, logCapturer);
+      // Check a corresponding checksum reported to SCM. This would be zero for metadata errors.
+      // TODO HDDS-11942 This check can be made generic for all faults because every fault provided to the test will
+      //  declare its expected checksum.
+      assertNotEquals(0, getContainerReplica(containerID).getDataChecksum());
     } else {
       // Other corruption types will only lead to a single error.
       corruption.assertLogged(containerID, 1, logCapturer);
