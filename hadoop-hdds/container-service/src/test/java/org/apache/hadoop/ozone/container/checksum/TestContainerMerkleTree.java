@@ -114,6 +114,42 @@ class TestContainerMerkleTree {
     assertTreesSortedAndMatch(expectedTree, actualTreeProto);
   }
 
+  @Test
+  public void testBuildTreeWithEmptyBlock() {
+    final long blockID = 1;
+    ContainerProtos.BlockMerkleTree blockTree = buildExpectedBlockTree(blockID, Collections.emptyList());
+    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(Collections.singletonList(blockTree));
+
+    // Use the ContainerMerkleTree to build the same tree.
+    ContainerMerkleTree actualTree = new ContainerMerkleTree();
+    actualTree.addBlock(blockID);
+
+    // Ensure the trees match.
+    ContainerProtos.ContainerMerkleTree actualTreeProto = actualTree.toProto();
+    assertTreesSortedAndMatch(expectedTree, actualTreeProto);
+  }
+
+  @Test
+  public void testAddBlockIdempotent() {
+    final long blockID = 1;
+    // Build the expected proto.
+    ContainerProtos.ChunkInfo chunk1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ContainerProtos.BlockMerkleTree blockTree = buildExpectedBlockTree(blockID,
+        Collections.singletonList(buildExpectedChunkTree(chunk1)));
+    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(Collections.singletonList(blockTree));
+
+    // Use the ContainerMerkleTree to build the same tree, calling addBlock in between adding chunks.
+    ContainerMerkleTree actualTree = new ContainerMerkleTree();
+    actualTree.addBlock(blockID);
+    actualTree.addChunks(blockID, true, chunk1);
+    // This should not overwrite the chunk already added to the block.
+    actualTree.addBlock(blockID);
+
+    // Ensure the trees match.
+    ContainerProtos.ContainerMerkleTree actualTreeProto = actualTree.toProto();
+    assertTreesSortedAndMatch(expectedTree, actualTreeProto);
+  }
+
   /**
    * A container is a set of blocks. Make sure the tree implementation is not dependent on continuity of block IDs.
    */
