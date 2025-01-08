@@ -26,15 +26,13 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 
 import jakarta.annotation.Nonnull;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.MULTIPARTINFO_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.*;
 
 /**
  * Response for Multipart Abort Request - prefix layout.
  */
 @CleanupTableInfo(cleanupTables = {OPEN_FILE_TABLE, DELETED_TABLE,
-    MULTIPARTINFO_TABLE})
+    MULTIPARTINFO_TABLE, DIRECTORY_TABLE})
 public class S3MultipartUploadAbortResponseWithFSO
     extends S3MultipartUploadAbortResponse {
 
