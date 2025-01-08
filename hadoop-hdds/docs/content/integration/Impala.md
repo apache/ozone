@@ -1,6 +1,7 @@
 ---
 title: Impala
 weight: 4
+draft: true
 menu:
    main:
       parent: "Application Integrations"
