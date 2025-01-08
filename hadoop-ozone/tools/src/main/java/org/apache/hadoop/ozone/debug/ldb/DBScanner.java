@@ -47,7 +47,6 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinitio
 import org.apache.hadoop.ozone.debug.DBDefinitionFactory;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
 import org.apache.hadoop.ozone.utils.Filter;
-import org.jooq.meta.derby.sys.Sys;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
