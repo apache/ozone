@@ -748,10 +748,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       scmStore.setClusterId(clusterId);
       scmStore.setScmId(scmId);
       scmStore.initialize();
-      //TODO: HDDS-6897
-      //Disabling Ratis for only of MiniOzoneClusterImpl.
-      //MiniOzoneClusterImpl doesn't work with Ratis enabled SCM
-
       scmStore.setSCMHAFlag(true);
       scmStore.persistCurrentState();
       SCMRatisServerImpl.initialize(clusterId, scmId,
