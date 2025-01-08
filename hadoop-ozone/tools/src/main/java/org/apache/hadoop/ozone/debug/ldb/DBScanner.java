@@ -208,7 +208,7 @@ public class DBScanner implements Callable<Void> {
           parent.getDbPath(), cfDescList, cfHandleList)) {
         ManagedCheckpoint cp = ManagedCheckpoint.create(db);
         cp.get().createCheckpoint(checkpointDir);
-        out().println("tej Created checkpoint at " + checkpointDir);
+        err().println("Created checkpoint at " + checkpointDir);
       }
       //Use the checkpoint for ldb operations
       List<ColumnFamilyDescriptor> cfDescListForCheckpoint =
