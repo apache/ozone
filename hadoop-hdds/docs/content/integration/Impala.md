@@ -22,8 +22,6 @@ menu:
   limitations under the License.
 -->
 
-# Overview
-
 Starting with version 4.2.0, Apache Impala provides full support for querying data stored in Apache Ozone. To utilize this functionality, ensure that your Ozone version is 1.4.0 or later.
 
 # Supported Access Protocols
