@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCheckpoint;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
@@ -46,6 +47,7 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinitio
 import org.apache.hadoop.ozone.debug.DBDefinitionFactory;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
 import org.apache.hadoop.ozone.utils.Filter;
+import org.jooq.meta.derby.sys.Sys;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
@@ -65,6 +67,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -199,9 +202,23 @@ public class DBScanner implements Callable<Void> {
         parent.getDbPath().contains(OzoneConsts.CONTAINER_DB_NAME);
 
     boolean success;
+    String dbPath = parent.getDbPath();
+
+    if (parent.getCheckpoint()) {
+      String checkpointDir = parent.getDbPath() + "/checkpoint-ldb-" + (new Random()).nextInt(100);
+      try (ManagedRocksDB db = ManagedRocksDB.openReadOnly(
+          parent.getDbPath(), cfDescList, cfHandleList)) {
+        ManagedCheckpoint cp = ManagedCheckpoint.create(db);
+        cp.get().createCheckpoint(checkpointDir);
+        out().println("tej Created checkpoint at " + checkpointDir);
+        dbPath = checkpointDir;
+      }
+    }
+
     try (ManagedRocksDB db = ManagedRocksDB.openReadOnly(
-        parent.getDbPath(), cfDescList, cfHandleList)) {
-      success = printTable(cfHandleList, db, parent.getDbPath(), schemaV3);
+        dbPath, cfDescList, cfHandleList)) {
+      out().println("tej opened checkpoint");
+      success = printTable(cfHandleList, db, dbPath, schemaV3);
     }
 
     if (!success) {

@@ -43,8 +43,16 @@ public class RDBParser implements DebugSubcommand {
       description = "Database File Path")
   private String dbPath;
 
+  @CommandLine.Option(names = {"--checkpoint"},
+      description = "Create a checkpoint on the DB passed to use for the operations.")
+  private boolean checkpoint;
+
   public String getDbPath() {
     return dbPath;
+  }
+
+  public boolean getCheckpoint() {
+    return checkpoint;
   }
 
   public void setDbPath(String dbPath) {
