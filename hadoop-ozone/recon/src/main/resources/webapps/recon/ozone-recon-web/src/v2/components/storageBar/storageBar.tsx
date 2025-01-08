@@ -71,6 +71,9 @@ const StorageBar: React.FC<StorageReportProps> = ({
     </>
   );
 
+  const percentage = getCapacityPercent(totalUsed, capacity)
+  const progressClassname = (percentage > 80) ? 'capacity-bar-v2-error' : 'capacity-bar-v2';
+
   return (
       <Tooltip
         title={tooltip}
@@ -83,9 +86,9 @@ const StorageBar: React.FC<StorageReportProps> = ({
         }
         <Progress
           strokeLinecap='round'
-          percent={getCapacityPercent(totalUsed, capacity)}
+          percent={percentage}
           success={{ percent: getCapacityPercent(used, capacity) }}
-          className='capacity-bar-v2' strokeWidth={strokeWidth} />
+          className={progressClassname} strokeWidth={strokeWidth} />
       </Tooltip>
   );
 }

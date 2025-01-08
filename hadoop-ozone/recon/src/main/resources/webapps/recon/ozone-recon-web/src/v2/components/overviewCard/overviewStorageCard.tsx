@@ -18,12 +18,13 @@
 
 import React, { HTMLAttributes, useMemo } from 'react';
 import filesize from 'filesize';
-import { Card, Row, Col, Table, Tag } from 'antd';
+import { Card, Row, Col, Table, Tag, Alert } from 'antd';
 
 import EChart from '@/v2/components/eChart/eChart';
 import OverviewCardWrapper from '@/v2/components/overviewCard/overviewCardWrapper';
 
 import { StorageReport } from '@/v2/types/overview.types';
+import { WarningFilled } from '@ant-design/icons';
 
 // ------------- Types -------------- //
 type OverviewStorageCardProps = {
@@ -175,7 +176,16 @@ const OverviewStorageCard: React.FC<OverviewStorageCardProps> = ({
       title='Cluster Capacity'
       headStyle={cardHeadStyle}
       bodyStyle={cardBodyStyle}
-      style={cardStyle}>
+      style={cardStyle}
+      actions={(
+        usagePercentage > 80
+        ? [
+          <div style={{
+            color: '#f5222d'
+          }}> <WarningFilled /> Storage almost full. Free up some space. </div>
+        ]
+        : []
+      )}>
       <Row justify='space-between'>
         <Col
           className='echart-col'
