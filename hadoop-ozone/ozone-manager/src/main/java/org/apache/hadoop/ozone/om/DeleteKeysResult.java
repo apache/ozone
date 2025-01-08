@@ -30,10 +30,13 @@ public class DeleteKeysResult {
   private List<OmKeyInfo> keysToDelete;
   private long consumedSize;
 
+  private boolean processedKeys;
+
   public DeleteKeysResult(List<OmKeyInfo> keysToDelete,
-      long consumedSize) {
+      long consumedSize, boolean processedKeys) {
     this.keysToDelete = keysToDelete;
     this.consumedSize = consumedSize;
+    this.processedKeys = processedKeys;
   }
 
   public List<OmKeyInfo> getKeysToDelete() {
@@ -42,5 +45,9 @@ public class DeleteKeysResult {
 
   public long getConsumedSize() {
     return consumedSize;
+  }
+
+  public boolean isProcessedKeys() {
+    return processedKeys;
   }
 }

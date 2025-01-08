@@ -389,12 +389,10 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       }
     }
 
-    // step-3: Since there is a boundary condition of 'numEntries' in
-    // each batch, check whether the sub paths count reached batch size
-    // limit. If count reached limit then there can be some more child
-    // paths to be visited and will keep the parent deleted directory
-    // for one more pass.
-    String purgeDeletedDir = (remainingBufLimit > 0) ? delDirName :  null;
+    // step-3: If both sub-dirs and sub-files are exhausted under a parent
+    // directory, only then delete the parent.
+    String purgeDeletedDir = subDirDeleteResult.isProcessedKeys() &&
+        subFileDeleteResult.isProcessedKeys() ? delDirName :  null;
     return wrapPurgeRequest(volumeId, bucketId,
         purgeDeletedDir, subFiles, subDirs);
   }

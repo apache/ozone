@@ -2081,6 +2081,7 @@ public class KeyManagerImpl implements KeyManager {
     List<OmKeyInfo> directories = new ArrayList<>();
     iterator.seek(seekDirInDB);
     long consumedSize = 0;
+    boolean processedSubDirs = false;
 
     while (iterator.hasNext() && remainingBufLimit > 0) {
       Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
@@ -2088,6 +2089,7 @@ public class KeyManagerImpl implements KeyManager {
       long objectSerializedSize = entry.getRawValue().length;
       if (!OMFileRequest.isImmediateChild(dirInfo.getParentObjectID(),
           parentInfo.getObjectID())) {
+        processedSubDirs = true;
         break;
       }
       if (!metadataManager.getDirectoryTable().isExist(entry.getKey())) {
@@ -2107,7 +2109,9 @@ public class KeyManagerImpl implements KeyManager {
       consumedSize += objectSerializedSize;
     }
 
-    return new DeleteKeysResult(directories, consumedSize);
+    processedSubDirs = processedSubDirs || (!iterator.hasNext());
+
+    return new DeleteKeysResult(directories, consumedSize, processedSubDirs);
   }
 
   @Override
@@ -2118,6 +2122,7 @@ public class KeyManagerImpl implements KeyManager {
     String seekFileInDB = metadataManager.getOzonePathKey(volumeId, bucketId,
         parentInfo.getObjectID(), "");
     long consumedSize = 0;
+    boolean processedSubFiles = false;
 
     Table fileTable = metadataManager.getFileTable();
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
@@ -2131,6 +2136,7 @@ public class KeyManagerImpl implements KeyManager {
         long objectSerializedSize = entry.getRawValue().length;
         if (!OMFileRequest.isImmediateChild(fileInfo.getParentObjectID(),
             parentInfo.getObjectID())) {
+          processedSubFiles = true;
           break;
         }
         if (!metadataManager.getFileTable().isExist(entry.getKey())) {
@@ -2148,9 +2154,10 @@ public class KeyManagerImpl implements KeyManager {
         remainingBufLimit -= objectSerializedSize;
         consumedSize += objectSerializedSize;
       }
+      processedSubFiles = processedSubFiles || (!iterator.hasNext());
     }
 
-    return new DeleteKeysResult(files, consumedSize);
+    return new DeleteKeysResult(files, consumedSize, processedSubFiles);
   }
 
   public boolean isBucketFSOptimized(String volName, String buckName)

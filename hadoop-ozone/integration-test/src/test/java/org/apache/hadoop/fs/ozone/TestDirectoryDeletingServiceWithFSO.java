@@ -265,8 +265,6 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(dirTable, 1);
 
     assertSubPathsCount(dirDeletingService::getMovedFilesCount, 15);
-    // 15 subDir + 3 parentDir
-    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 18);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 19);
 
     long elapsedRunCount = dirDeletingService.getRunCount().get() - preRunCount;
@@ -318,7 +316,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(dirTable, 0);
 
     assertSubPathsCount(dirDeletingService::getMovedFilesCount, 3);
-    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 2);
+    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 5);
 
     assertThat(dirDeletingService.getRunCount().get()).isGreaterThan(1);
@@ -554,7 +552,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(deletedDirTable, initialDeletedCount + 1);
     assertTableRowCount(renameTable, initialRenameCount + 1);
     Mockito.doAnswer(i -> {
-      List<OzoneManagerProtocolProtos.PurgePathRequest> purgePathRequestList = i.getArgument(5);
+      List<OzoneManagerProtocolProtos.PurgePathRequest> purgePathRequestList = i.getArgument(4);
       for (OzoneManagerProtocolProtos.PurgePathRequest purgeRequest : purgePathRequestList) {
         Assertions.assertNotEquals(deletePathKey, purgeRequest.getDeletedDir());
       }
