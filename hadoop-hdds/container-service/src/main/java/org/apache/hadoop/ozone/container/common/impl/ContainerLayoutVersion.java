@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
  */
 public enum ContainerLayoutVersion {
 
+  @Deprecated /* Use FILE_PER_BLOCK instead */
   FILE_PER_CHUNK(1, "One file per chunk") {
     @Override
     public File getChunkFile(File chunkDir, BlockID blockID, String chunkName) {
@@ -47,7 +48,7 @@ public enum ContainerLayoutVersion {
     }
   };
 
-  private static final ContainerLayoutVersion
+  public static final ContainerLayoutVersion
       DEFAULT_LAYOUT = ContainerLayoutVersion.FILE_PER_BLOCK;
 
   private static final List<ContainerLayoutVersion> CONTAINER_LAYOUT_VERSIONS =

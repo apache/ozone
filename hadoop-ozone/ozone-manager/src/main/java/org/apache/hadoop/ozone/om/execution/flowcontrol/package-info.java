@@ -15,7 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.ozone.om.execution.flowcontrol;
 
-window.onload = function () {
-    document.getElementById('s3gurl').innerHTML = window.location.origin;
-};
+/**
+ * This package contains classes for the execution flow handling.
+ */
