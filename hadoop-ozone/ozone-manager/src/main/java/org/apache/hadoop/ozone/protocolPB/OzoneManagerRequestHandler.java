@@ -44,7 +44,7 @@ import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
-import org.apache.hadoop.ozone.om.ratis.ExecutionContext;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetObjectTaggingRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetObjectTaggingResponse;
 import org.apache.hadoop.ozone.util.PayloadUtils;

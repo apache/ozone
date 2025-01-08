@@ -28,7 +28,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.om.ratis.ExecutionContext;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;

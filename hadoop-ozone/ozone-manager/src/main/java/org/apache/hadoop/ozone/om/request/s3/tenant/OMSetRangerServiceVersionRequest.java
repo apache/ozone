@@ -18,7 +18,7 @@
  */
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
-import org.apache.hadoop.ozone.om.ratis.ExecutionContext;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;

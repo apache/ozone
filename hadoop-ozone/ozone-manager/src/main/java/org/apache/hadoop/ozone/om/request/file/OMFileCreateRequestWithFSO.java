@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.om.request.file;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.ozone.om.ratis.ExecutionContext;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;

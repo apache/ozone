@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.function.BiPredicate;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.ozone.om.ratis.ExecutionContext;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;

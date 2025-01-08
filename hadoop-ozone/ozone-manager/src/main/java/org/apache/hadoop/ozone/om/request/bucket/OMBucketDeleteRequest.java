@@ -23,7 +23,7 @@ import java.nio.file.InvalidPathException;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.apache.hadoop.ozone.om.ratis.ExecutionContext;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;

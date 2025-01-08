@@ -23,7 +23,7 @@ import java.nio.file.InvalidPathException;
 import java.util.Map;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.ozone.om.ratis.ExecutionContext;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;

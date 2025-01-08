@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.request.volume.acl;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.ozone.om.ratis.ExecutionContext;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;

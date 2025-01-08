@@ -15,12 +15,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.om.ratis;
+package org.apache.hadoop.ozone.om.execution.flowcontrol;
 
 import org.apache.ratis.server.protocol.TermIndex;
 
 /**
- * context required for execution of request.
+ * Context required for execution of a request.
  */
 public final class ExecutionContext {
   private final long index;
@@ -28,6 +28,9 @@ public final class ExecutionContext {
 
   private ExecutionContext(long index, TermIndex termIndex) {
     this.index = index;
+    if (null == termIndex) {
+      termIndex = TermIndex.valueOf(-1, index);
+    }
     this.termIndex = termIndex;
   }
 
@@ -40,9 +43,6 @@ public final class ExecutionContext {
   }
 
   public TermIndex getTermIndex() {
-    if (null == termIndex) {
-      return TermIndex.valueOf(-1, index);
-    }
     return termIndex;
   }
 }

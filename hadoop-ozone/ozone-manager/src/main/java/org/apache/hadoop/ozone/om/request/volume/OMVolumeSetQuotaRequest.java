@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.ozone.om.ratis.ExecutionContext;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;

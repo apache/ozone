@@ -23,7 +23,7 @@ import java.util.HashMap;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
-import org.apache.hadoop.ozone.om.ratis.ExecutionContext;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.request.util.OmKeyHSyncUtil;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.ozone.OzoneConsts;
