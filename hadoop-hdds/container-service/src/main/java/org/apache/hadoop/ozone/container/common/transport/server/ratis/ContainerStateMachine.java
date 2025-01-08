@@ -524,21 +524,6 @@ public class ContainerStateMachine extends BaseStateMachine {
     return response;
   }
 
-  private CompletableFuture<ContainerCommandResponseProto> link(
-      ContainerCommandRequestProto requestProto, LogEntryProto entry) {
-    return CompletableFuture.supplyAsync(() -> {
-      final DispatcherContext context = DispatcherContext
-          .newBuilder(DispatcherContext.Op.STREAM_LINK)
-          .setTerm(entry.getTerm())
-          .setLogIndex(entry.getIndex())
-          .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA)
-          .setContainer2BCSIDMap(container2BCSIDMap)
-          .build();
-
-      return dispatchCommand(requestProto, context);
-    }, executor);
-  }
-
   private CompletableFuture<Message> writeStateMachineData(
       ContainerCommandRequestProto requestProto, long entryIndex, long term,
       long startTime) {
