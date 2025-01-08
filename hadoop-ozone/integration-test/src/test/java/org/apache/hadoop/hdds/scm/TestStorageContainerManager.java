@@ -434,9 +434,7 @@ public class TestStorageContainerManager {
             "org.apache.hadoop.ozone.common" +
                 ".InconsistentStorageStateException: Mismatched ClusterIDs");
       } finally {
-        if (scm != null) {
-          scm.stop();
-        }
+        scm.stop();
       }
     }
   }
@@ -673,9 +671,7 @@ public class TestStorageContainerManager {
       String actualVersion = scm.getSoftwareVersion();
       assertEquals(expectedVersion, actualVersion);
     } finally {
-      if (scmStore != null) {
-        scm.stop();
-      }
+      scm.stop();
     }
   }
 
