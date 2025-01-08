@@ -273,7 +273,7 @@ const Datanodes: React.FC<{}> = () => {
               onChange={(value) => {
                 setSearchTerm('');
                 setSearchColumn(value as 'hostname' | 'uuid' | 'version' | 'revision')
-              }}/>
+              }} />
           </div>
           <DatanodesTable
             loading={loading}
@@ -283,28 +283,28 @@ const Datanodes: React.FC<{}> = () => {
             searchColumn={searchColumn}
             searchTerm={debouncedSearch}
             handleSelectionChange={handleSelectionChange}
-            decommissionUuids={decommissionUuids}/>
+            decommissionUuids={decommissionUuids} />
         </div>
       </div>
       <Modal
-          title=''
-          centered={true}
-          visible={modalOpen}
-          onOk={handleModalOk}
-          onCancel={handleModalCancel}
-          closable={false}
-          width={400} >
-            <div style={{
-              margin: '0px 0px 5px 0px',
-              fontSize: '16px',
-              fontWeight: 'bold'
-            }}
+        title=''
+        centered={true}
+        visible={modalOpen}
+        onOk={handleModalOk}
+        onCancel={handleModalCancel}
+        closable={false}
+        width={400} >
+        <div style={{
+          margin: '0px 0px 5px 0px',
+          fontSize: '16px',
+          fontWeight: 'bold'
+        }}
           data-testid='dn-remove-modal'>
-              <WarningFilled className='icon-warning' style={{paddingRight: '8px'}}/>
-              Stop Tracking Datanode
-            </div>
-            Are you sure, you want recon to stop tracking the selected <strong>{selectedRows.length}</strong> datanode(s)?
-        </Modal>
+          <WarningFilled className='icon-warning' style={{ paddingRight: '8px' }} />
+          Stop Tracking Datanode
+        </div>
+        Are you sure, you want recon to stop tracking the selected <strong>{selectedRows.length}</strong> datanode(s)?
+      </Modal>
     </>
   );
 }
