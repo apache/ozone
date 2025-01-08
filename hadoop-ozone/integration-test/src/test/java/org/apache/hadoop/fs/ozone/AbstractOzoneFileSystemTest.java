@@ -2289,8 +2289,9 @@ abstract class AbstractOzoneFileSystemTest {
     OzoneConfiguration conf = cluster.getConf();
     conf.setFromObject(clientConfig);
     conf.setBoolean("fs.o3fs.impl.disable.cache", true);
-    FileSystem fileSystem = FileSystem.get(conf);
-    assertNull(fileSystem.getFileChecksum(file));
+    try (FileSystem fileSystem = FileSystem.get(conf)) {
+      assertNull(fileSystem.getFileChecksum(file));
+    }
   }
 
   private String getCurrentUser() {
