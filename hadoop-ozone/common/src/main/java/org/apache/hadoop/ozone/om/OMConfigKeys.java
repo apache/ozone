@@ -177,10 +177,6 @@ public final class OMConfigKeys {
   /**
    * OM Ratis related configurations.
    */
-  public static final String OZONE_OM_RATIS_ENABLE_KEY
-      = "ozone.om.ratis.enable";
-  public static final boolean OZONE_OM_RATIS_ENABLE_DEFAULT
-      = true;
   public static final String OZONE_OM_RATIS_PORT_KEY
       = "ozone.om.ratis.port";
   public static final int OZONE_OM_RATIS_PORT_DEFAULT

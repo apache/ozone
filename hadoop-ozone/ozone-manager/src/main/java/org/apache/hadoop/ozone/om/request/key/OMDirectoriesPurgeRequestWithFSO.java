@@ -34,8 +34,9 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
-import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -63,7 +64,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     OzoneManagerProtocolProtos.PurgeDirectoriesRequest purgeDirsRequest =
         getOmRequest().getPurgeDirectoriesRequest();
     String fromSnapshot = purgeDirsRequest.hasSnapshotTableKey() ?
@@ -125,7 +126,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
             String ozoneDbKey = omMetadataManager.getOzonePathKey(path.getVolumeId(),
                 path.getBucketId(), keyInfo.getParentObjectID(), keyInfo.getFileName());
             omMetadataManager.getDirectoryTable().addCacheEntry(new CacheKey<>(ozoneDbKey),
-                CacheValue.get(termIndex.getIndex()));
+                CacheValue.get(context.getIndex()));
             volBucketInfoMap.putIfAbsent(volBucketPair, omBucketInfo);
           }
         }
@@ -169,7 +170,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
             String ozoneDbKey = omMetadataManager.getOzonePathKey(path.getVolumeId(),
                 path.getBucketId(), keyInfo.getParentObjectID(), keyInfo.getFileName());
             omMetadataManager.getFileTable().addCacheEntry(new CacheKey<>(ozoneDbKey),
-                CacheValue.get(termIndex.getIndex()));
+                CacheValue.get(context.getIndex()));
             volBucketInfoMap.putIfAbsent(volBucketPair, omBucketInfo);
           }
         }
@@ -182,9 +183,9 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       deletingServiceMetrics.incrNumDirPurged(numDirsDeleted);
 
       if (fromSnapshotInfo != null) {
-        fromSnapshotInfo.setLastTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());
+        fromSnapshotInfo.setLastTransactionInfo(TransactionInfo.valueOf(context.getTermIndex()).toByteString());
         omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(fromSnapshotInfo.getTableKey()),
-            CacheValue.get(termIndex.getIndex(), fromSnapshotInfo));
+            CacheValue.get(context.getIndex(), fromSnapshotInfo));
       }
     } catch (IOException ex) {
       // Case of IOException for fromProtobuf will not happen

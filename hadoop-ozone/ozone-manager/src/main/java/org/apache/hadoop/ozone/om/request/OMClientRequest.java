@@ -23,7 +23,7 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -140,12 +140,14 @@ public abstract class OMClientRequest implements RequestAuditor {
    *
    * @return the response that will be returned to the client.
    */
-  public abstract OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex);
+  public abstract OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context);
 
   /** For testing only. */
   @VisibleForTesting
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, long transactionLogIndex) {
-    return validateAndUpdateCache(ozoneManager, TransactionInfo.getTermIndex(transactionLogIndex));
+    ExecutionContext context = ExecutionContext.of(transactionLogIndex,
+        TransactionInfo.getTermIndex(transactionLogIndex));
+    return validateAndUpdateCache(ozoneManager, context);
   }
 
   @VisibleForTesting
