@@ -558,8 +558,8 @@ public class TestDirectoryDeletingServiceWithFSO {
       for (OzoneManagerProtocolProtos.PurgePathRequest purgeRequest : purgePathRequestList) {
         Assertions.assertNotEquals(deletePathKey, purgeRequest.getDeletedDir());
       }
-      return i.callRealMethod();
-    }).when(service).optimizeDirDeletesAndSubmitRequest(anyLong(), anyLong(), anyLong(),
+      return null;
+    }).when(service).optimizeDirDeletesAndSubmitRequest(anyLong(), anyLong(),
         anyLong(), anyList(), anyList(), eq(null), anyLong(), anyLong(), Mockito.any(), any(),
         anyLong());
 

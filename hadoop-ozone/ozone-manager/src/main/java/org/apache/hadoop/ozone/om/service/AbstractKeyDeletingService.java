@@ -346,7 +346,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   }
 
   protected PurgePathRequest prepareDeleteDirRequest(
-      long remainNum, OmKeyInfo pendingDeletedDirInfo, String delDirName,
+      OmKeyInfo pendingDeletedDirInfo, String delDirName,
       List<Pair<String, OmKeyInfo>> subDirList,
       KeyManager keyManager, long remainingBufLimit) throws IOException {
     // step-0: Get one pending deleted directory
@@ -364,7 +364,6 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         keyManager.getPendingDeletionSubDirs(volumeId, bucketId,
             pendingDeletedDirInfo, remainingBufLimit);
     List<OmKeyInfo> subDirs = subDirDeleteResult.getKeysToDelete();
-    remainNum = remainNum - subDirs.size();
     remainingBufLimit -= subDirDeleteResult.getConsumedSize();
 
     OMMetadataManager omMetadataManager = keyManager.getMetadataManager();
@@ -382,7 +381,6 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         keyManager.getPendingDeletionSubFiles(volumeId, bucketId,
             pendingDeletedDirInfo, remainingBufLimit);
     List<OmKeyInfo> subFiles = subFileDeleteResult.getKeysToDelete();
-    remainNum = remainNum - subFiles.size();
     remainingBufLimit -= subDirDeleteResult.getConsumedSize();
 
     if (LOG.isDebugEnabled()) {
@@ -396,13 +394,13 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     // limit. If count reached limit then there can be some more child
     // paths to be visited and will keep the parent deleted directory
     // for one more pass.
-    String purgeDeletedDir = (remainNum > 0 && remainingBufLimit > 0) ? delDirName :  null;
+    String purgeDeletedDir = (remainingBufLimit > 0) ? delDirName :  null;
     return wrapPurgeRequest(volumeId, bucketId,
         purgeDeletedDir, subFiles, subDirs);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  public long optimizeDirDeletesAndSubmitRequest(long remainNum,
+  public void optimizeDirDeletesAndSubmitRequest(
       long dirNum, long subDirNum, long subFileNum,
       List<Pair<String, OmKeyInfo>> allSubDirList,
       List<PurgePathRequest> purgePathRequestList,
@@ -410,7 +408,6 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       long remainingBufLimit, KeyManager keyManager,
       UUID expectedPreviousSnapshotId, long rnCnt) {
 
-    long limit = remainNum;
     // Optimization to handle delete sub-dir and keys to remove quickly
     // This case will be useful to handle when depth of directory is high
     int subdirDelNum = 0;
@@ -421,19 +418,12 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         Pair<String, OmKeyInfo> stringOmKeyInfoPair
             = allSubDirList.get(subDirRecursiveCnt);
         PurgePathRequest request = prepareDeleteDirRequest(
-            remainNum, stringOmKeyInfoPair.getValue(),
+            stringOmKeyInfoPair.getValue(),
             stringOmKeyInfoPair.getKey(), allSubDirList, keyManager,
             remainingBufLimit);
-        if (request == null) {
-          break;
-        }
         consumedSize += request.getSerializedSize();
         remainingBufLimit -= consumedSize;
         purgePathRequestList.add(request);
-        // reduce remain count for self, sub-files, and sub-directories
-        remainNum = remainNum - 1;
-        remainNum = remainNum - request.getDeletedSubFilesCount();
-        remainNum = remainNum - request.getMarkDeletedSubDirsCount();
         // Count up the purgeDeletedDir, subDirs and subFiles
         if (request.getDeletedDir() != null
             && !request.getDeletedDir().isEmpty()) {
@@ -461,12 +451,11 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       LOG.info("Number of dirs deleted: {}, Number of sub-dir " +
               "deleted: {}, Number of sub-files moved:" +
               " {} to DeletedTable, Number of sub-dirs moved {} to " +
-              "DeletedDirectoryTable, limit per iteration: {}, iteration elapsed: {}ms, " +
+              "DeletedDirectoryTable, iteration elapsed: {}ms, " +
               " totalRunCount: {}",
-          dirNum, subdirDelNum, subFileNum, (subDirNum - subdirDelNum), limit,
+          dirNum, subdirDelNum, subFileNum, (subDirNum - subdirDelNum),
           timeTakenInIteration, rnCnt);
     }
-    return remainNum;
   }
 
   /**

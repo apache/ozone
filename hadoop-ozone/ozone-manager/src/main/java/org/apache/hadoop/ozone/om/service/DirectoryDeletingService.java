@@ -225,12 +225,11 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           long dirNum = 0L;
           long subDirNum = 0L;
           long subFileNum = 0L;
-          long remainNum = pathLimitPerTask;
           long remainingBufLimit = ratisByteLimit;
           int consumedSize = 0;
           List<PurgePathRequest> purgePathRequestList = new ArrayList<>();
           List<Pair<String, OmKeyInfo>> allSubDirList =
-              new ArrayList<>((int) remainNum);
+              new ArrayList<>();
 
           Table.KeyValue<String, OmKeyInfo> pendingDeletedDirInfo;
           // This is to avoid race condition b/w purge request and snapshot chain updation. For AOS taking the global
@@ -252,7 +251,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
                 continue;
               }
 
-              PurgePathRequest request = prepareDeleteDirRequest(remainNum,
+              PurgePathRequest request = prepareDeleteDirRequest(
                   pendingDeletedDirInfo.getValue(),
                   pendingDeletedDirInfo.getKey(), allSubDirList,
                   getOzoneManager().getKeyManager(), remainingBufLimit);
@@ -263,10 +262,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
               consumedSize += request.getSerializedSize();
               remainingBufLimit -= consumedSize;
               purgePathRequestList.add(request);
-              // reduce remain count for self, sub-files, and sub-directories
-              remainNum = remainNum - 1;
-              remainNum = remainNum - request.getDeletedSubFilesCount();
-              remainNum = remainNum - request.getMarkDeletedSubDirsCount();
               // Count up the purgeDeletedDir, subDirs and subFiles
               if (request.getDeletedDir() != null && !request.getDeletedDir()
                   .isEmpty()) {
@@ -276,7 +271,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
               subFileNum += request.getDeletedSubFilesCount();
             }
 
-            optimizeDirDeletesAndSubmitRequest(remainNum, dirNum, subDirNum,
+            optimizeDirDeletesAndSubmitRequest(dirNum, subDirNum,
                 subFileNum, allSubDirList, purgePathRequestList, null,
                 startTime, remainingBufLimit,
                 getOzoneManager().getKeyManager(), expectedPreviousSnapshotId,
