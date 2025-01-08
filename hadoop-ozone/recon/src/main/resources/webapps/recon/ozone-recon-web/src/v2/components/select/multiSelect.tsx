@@ -28,7 +28,6 @@ import {
 } from 'react-select';
 
 import { selectStyles } from "@/v2/constants/select.constants";
-import { optionCSS } from "react-select/src/components/Option";
 
 
 // ------------- Types -------------- //
