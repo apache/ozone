@@ -201,23 +201,28 @@ public class DBScanner implements Callable<Void> {
         parent.getDbPath().contains(OzoneConsts.CONTAINER_DB_NAME);
 
     boolean success;
-    String dbPath = parent.getDbPath();
-
     if (parent.getCheckpoint()) {
       String checkpointDir = parent.getDbPath() + "/checkpoint-ldb-" + (new Random()).nextInt(100);
+      // Create checkpoint
       try (ManagedRocksDB db = ManagedRocksDB.openReadOnly(
           parent.getDbPath(), cfDescList, cfHandleList)) {
         ManagedCheckpoint cp = ManagedCheckpoint.create(db);
         cp.get().createCheckpoint(checkpointDir);
         out().println("tej Created checkpoint at " + checkpointDir);
-        dbPath = checkpointDir;
       }
-    }
-
-    try (ManagedRocksDB db = ManagedRocksDB.openReadOnly(
-        dbPath, cfDescList, cfHandleList)) {
-      out().println("tej opened checkpoint");
-      success = printTable(cfHandleList, db, dbPath, schemaV3);
+      //Use the checkpoint for ldb operations
+      List<ColumnFamilyDescriptor> cfDescListForCheckpoint =
+          RocksDBUtils.getColumnFamilyDescriptors(checkpointDir);
+      final List<ColumnFamilyHandle> cfHandleListForCheckpoint = new ArrayList<>();
+      try (ManagedRocksDB db = ManagedRocksDB.openReadOnly(
+          checkpointDir, cfDescListForCheckpoint, cfHandleListForCheckpoint)) {
+        success = printTable(cfHandleListForCheckpoint, db, parent.getDbPath(), schemaV3);
+      }
+    } else {
+      try (ManagedRocksDB db = ManagedRocksDB.openReadOnly(
+          parent.getDbPath(), cfDescList, cfHandleList)) {
+        success = printTable(cfHandleList, db, parent.getDbPath(), schemaV3);
+      }
     }
 
     if (!success) {
