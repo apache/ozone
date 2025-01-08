@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.container.upgrade;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -117,9 +117,7 @@ public final class VersionedDatanodeFeatures {
      */
     public static String chooseContainerPathID(ConfigurationSource conf,
         String scmID, String clusterID) {
-      boolean scmHAEnabled =
-          conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
-          ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT);
+      boolean scmHAEnabled = SCMHAUtils.isSCMHAEnabled(conf);
       if (isFinalized(HDDSLayoutFeature.SCM_HA) || scmHAEnabled) {
         return clusterID;
       } else {

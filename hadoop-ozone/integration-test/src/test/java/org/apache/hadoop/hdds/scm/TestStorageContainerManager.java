@@ -188,13 +188,13 @@ public class TestStorageContainerManager {
   public void testRpcPermission() throws Exception {
     // Test with default configuration
     OzoneConfiguration defaultConf = new OzoneConfiguration();
-    defaultConf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    SCMHAUtils.setRatisEnabled(true);
     testRpcPermissionWithConf(defaultConf, any -> false, "unknownUser");
 
     // Test with ozone.administrators defined in configuration
     String admins = "adminUser1, adminUser2";
     OzoneConfiguration ozoneConf = new OzoneConfiguration();
-    ozoneConf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    SCMHAUtils.setRatisEnabled(true);
     ozoneConf.setStrings(OzoneConfigKeys.OZONE_ADMINISTRATORS, admins);
     // Non-admin user will get permission denied.
     // Admin user will pass the permission check.
@@ -266,7 +266,7 @@ public class TestStorageContainerManager {
   public void testBlockDeletionTransactions() throws Exception {
     int numKeys = 5;
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    SCMHAUtils.setRatisEnabled(true);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
         TimeUnit.MILLISECONDS);
     DatanodeConfiguration datanodeConfiguration = conf.getObject(
@@ -358,7 +358,7 @@ public class TestStorageContainerManager {
   @Test
   public void testOldDNRegistersToReInitialisedSCM() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    SCMHAUtils.setRatisEnabled(true);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 3000, TimeUnit.MILLISECONDS);
 
@@ -444,7 +444,7 @@ public class TestStorageContainerManager {
   public void testBlockDeletingThrottling() throws Exception {
     int numKeys = 15;
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    SCMHAUtils.setRatisEnabled(true);
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 1, TimeUnit.SECONDS);
     conf.setInt(ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 5);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
@@ -555,7 +555,7 @@ public class TestStorageContainerManager {
   @Test
   public void testSCMInitialization(@TempDir Path tempDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    SCMHAUtils.setRatisEnabled(true);
     Path scmPath = tempDir.resolve("scm-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
 
@@ -577,7 +577,7 @@ public class TestStorageContainerManager {
   @Test
   public void testSCMReinitialization(@TempDir Path tempDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    SCMHAUtils.setRatisEnabled(true);
     Path scmPath = tempDir.resolve("scm-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
     //This will set the cluster id in the version file
@@ -639,7 +639,7 @@ public class TestStorageContainerManager {
   @Test
   void testSCMInitializationFailure(@TempDir Path tempDir) {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    SCMHAUtils.setRatisEnabled(true);
     Path scmPath = tempDir.resolve("scm-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
 
@@ -652,7 +652,7 @@ public class TestStorageContainerManager {
     OzoneConfiguration conf = new OzoneConfiguration();
     Path scmPath = tempDir.resolve("scm-meta");
 
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    SCMHAUtils.setRatisEnabled(true);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
     SCMStorageConfig scmStore = new SCMStorageConfig(conf);
     String clusterId = UUID.randomUUID().toString();
@@ -684,7 +684,7 @@ public class TestStorageContainerManager {
   public void testScmProcessDatanodeHeartbeat() throws Exception {
     String rackName = "/rack1";
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    SCMHAUtils.setRatisEnabled(true);
     conf.setClass(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
         StaticMapping.class, DNSToSwitchMapping.class);
     StaticMapping.addNodeToRack(NetUtils.normalizeHostName(HddsUtils.getHostName(conf)),
@@ -727,7 +727,7 @@ public class TestStorageContainerManager {
   public void testCloseContainerCommandOnRestart() throws Exception {
     int numKeys = 15;
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    SCMHAUtils.setRatisEnabled(true);
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 1, TimeUnit.SECONDS);
     conf.setInt(ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 5);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL,

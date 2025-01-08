@@ -49,7 +49,6 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
@@ -232,7 +231,7 @@ final class TestSecureOzoneCluster {
       conf.setInt(OZONE_SCM_GRPC_PORT_KEY, getFreePort());
       conf.set(OZONE_OM_ADDRESS_KEY,
           InetAddress.getLocalHost().getCanonicalHostName() + ":" + getFreePort());
-      conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
+      SCMHAUtils.setRatisEnabled(false);
 
       DefaultMetricsSystem.setMiniClusterMode(true);
       ExitUtils.disableSystemExit();

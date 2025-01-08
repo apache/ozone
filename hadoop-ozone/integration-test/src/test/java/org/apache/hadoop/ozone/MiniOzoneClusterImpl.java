@@ -40,7 +40,6 @@ import com.amazonaws.client.builder.AwsClientBuilder;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -695,7 +694,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       Path metaDir = Paths.get(path, "ozone-meta");
       Files.createDirectories(metaDir);
       conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.toString());
-      // conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
 
       conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
           DEFAULT_RATIS_RPC_TIMEOUT_SEC, TimeUnit.SECONDS);
@@ -755,9 +753,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       //TODO: HDDS-6897
       //Disabling Ratis for only of MiniOzoneClusterImpl.
       //MiniOzoneClusterImpl doesn't work with Ratis enabled SCM
-      if (StringUtils.isNotEmpty(
-          conf.get(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY))
-              && SCMHAUtils.isSCMHAEnabled(conf)) {
+      if (SCMHAUtils.isSCMHAEnabled(conf)) {
         scmStore.setSCMHAFlag(true);
         scmStore.persistCurrentState();
         SCMRatisServerImpl.initialize(clusterId, scmId,

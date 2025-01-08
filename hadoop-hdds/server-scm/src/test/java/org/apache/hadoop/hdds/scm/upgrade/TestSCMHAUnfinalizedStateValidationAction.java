@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -75,7 +76,7 @@ public class TestSCMHAUnfinalizedStateValidationAction {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION,
         HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, haEnabledBefore);
+    SCMHAUtils.setRatisEnabled(haEnabledBefore);
     conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS, dataPath.toString());
     conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, dataPath.toString());
     // This init should always succeed, since SCM is not pre-finalized yet.
@@ -84,8 +85,7 @@ public class TestSCMHAUnfinalizedStateValidationAction {
     assertTrue(initResult1);
 
     // Set up new pre-finalized SCM.
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
-        haEnabledPreFinalized);
+    SCMHAUtils.setRatisEnabled(haEnabledPreFinalized);
     /* Clusters from Ratis SCM -> Non Ratis SCM
        Ratis SCM -> Non Ratis SCM not supported
      */

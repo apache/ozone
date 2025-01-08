@@ -306,14 +306,13 @@ class TestSCMHAConfiguration {
     SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
     when(scmStorageConfig.getState()).thenReturn(Storage.StorageState.NOT_INITIALIZED);
     SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
-    assertEquals(SCMHAUtils.isSCMHAEnabled(conf),
-        ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT);
+    assertEquals(SCMHAUtils.isSCMHAEnabled(conf), true);
     DefaultConfigManager.clearDefaultConfigs();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
+    SCMHAUtils.setRatisEnabled(false);
     SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
     assertFalse(SCMHAUtils.isSCMHAEnabled(conf));
     DefaultConfigManager.clearDefaultConfigs();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    SCMHAUtils.setRatisEnabled(true);
     SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
     assertTrue(SCMHAUtils.isSCMHAEnabled(conf));
   }
@@ -340,7 +339,7 @@ class TestSCMHAConfiguration {
     when(scmStorageConfig.getState())
         .thenReturn(Storage.StorageState.INITIALIZED);
     when(scmStorageConfig.isSCMHAEnabled()).thenReturn(true);
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
+    SCMHAUtils.setRatisEnabled(false);
     assertThrows(ConfigurationException.class,
             () -> SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig));
   }
@@ -348,16 +347,15 @@ class TestSCMHAConfiguration {
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   void testHAConfig(boolean ratisEnabled) throws IOException {
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, ratisEnabled);
+    SCMHAUtils.setRatisEnabled(ratisEnabled);
     SCMStorageConfig scmStorageConfig = newStorageConfig(ratisEnabled);
     StorageContainerManager.scmInit(conf, scmStorageConfig.getClusterID());
-    assertEquals(ratisEnabled, DefaultConfigManager.getValue(
-        ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, !ratisEnabled));
+    assertEquals(ratisEnabled, SCMHAUtils.isSCMHAEnabled(conf));
   }
 
   @Test
   void testInvalidHAConfig() throws IOException {
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
+    SCMHAUtils.setRatisEnabled(false);
     SCMStorageConfig scmStorageConfig = newStorageConfig(true);
     String clusterID = scmStorageConfig.getClusterID();
     assertThrows(ConfigurationException.class,

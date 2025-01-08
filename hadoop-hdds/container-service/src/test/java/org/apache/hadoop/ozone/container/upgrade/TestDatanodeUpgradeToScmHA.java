@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
@@ -85,7 +86,7 @@ public class TestDatanodeUpgradeToScmHA {
       throws Exception {
     this.scmHAAlreadyEnabled = enableSCMHA;
     conf = new OzoneConfiguration();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, scmHAAlreadyEnabled);
+    SCMHAUtils.setRatisEnabled(scmHAAlreadyEnabled);
     setup();
   }
 
@@ -180,7 +181,7 @@ public class TestDatanodeUpgradeToScmHA {
 
     // Now SCM and enough other DNs finalize to enable SCM HA. This DN is
     // restarted with SCM HA config and gets a different SCM ID.
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    SCMHAUtils.setRatisEnabled(true);
     changeScmID();
 
     dsm = UpgradeTestHelper.restartDatanode(conf, dsm, true, tempFolder, address,
@@ -349,7 +350,7 @@ public class TestDatanodeUpgradeToScmHA {
 
     // Now SCM and enough other DNs finalize to enable SCM HA. This DN is
     // restarted with SCM HA config and gets a different SCM ID.
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    SCMHAUtils.setRatisEnabled(true);
     changeScmID();
     // A new volume is added that must be formatted.
     File preFinVolume2 = UpgradeTestHelper.addHddsVolume(conf, tempFolder);

@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableECContainerProviderConfig;
@@ -171,7 +172,7 @@ public class TestContainerCommandsEC {
   @BeforeAll
   public static void init() throws Exception {
     config = new OzoneConfiguration();
-    config.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    SCMHAUtils.setRatisEnabled(true);
     config.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
     config.setTimeDuration(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     config.setBoolean(OzoneConfigKeys.OZONE_ACL_ENABLED, true);
