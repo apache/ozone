@@ -70,6 +70,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.createBlockMetaData;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -463,8 +464,11 @@ public class TestKeyValueHandler {
 
     KeyValueContainerData data = new KeyValueContainerData(123L, layoutVersion, GB,
         PipelineID.randomId().toString(), randomDatanodeDetails().getUuidString());
+    data.setMetadataPath(tempDir.toString());
+    data.setDbFile(dbFile.toFile());
 
     Container container = new KeyValueContainer(data, conf);
+    createBlockMetaData(data, 5, 3);
     ContainerSet containerSet = new ContainerSet(1000);
     containerSet.addContainer(container);
 

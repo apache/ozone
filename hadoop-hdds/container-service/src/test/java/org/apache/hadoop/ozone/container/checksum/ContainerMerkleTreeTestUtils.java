@@ -17,16 +17,25 @@
  */
 package org.apache.hadoop.ozone.container.checksum;
 
+import com.google.common.collect.Lists;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.ozone.HddsDatanodeService;
+import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
@@ -353,6 +362,29 @@ public final class ContainerMerkleTreeTestUtils {
     } catch (IOException ex) {
       throw new IOException("Error occurred when writing container merkle tree for containerID "
           + data.getContainerID(), ex);
+    }
+  }
+
+  /**
+   * Creates block metadata for the given container with the specified number of blocks and chunks per block.
+   */
+  public static void createBlockMetaData(KeyValueContainerData data, int numOfBlocksPerContainer,
+                                         int numOfChunksPerBlock) throws IOException {
+    try (DBHandle metadata = BlockUtils.getDB(data, new OzoneConfiguration())) {
+      for (int j = 0; j < numOfBlocksPerContainer; j++) {
+        BlockID blockID = new BlockID(data.getContainerID(), j);
+        String blockKey = data.getBlockKey(blockID.getLocalID());
+        BlockData kd = new BlockData(blockID);
+        List<ContainerProtos.ChunkInfo> chunks = Lists.newArrayList();
+        for (int k = 0; k < numOfChunksPerBlock; k++) {
+          long dalaLen = 10L;
+          ChunkInfo chunkInfo = ContainerTestHelper.getChunk(blockID.getLocalID(), k, k * dalaLen, dalaLen);
+          ContainerTestHelper.setDataChecksum(chunkInfo, ContainerTestHelper.getData((int) dalaLen));
+          chunks.add(chunkInfo.getProtoBufMessage());
+        }
+        kd.setChunks(chunks);
+        metadata.getStore().getBlockDataTable().put(blockKey, kd);
+      }
     }
   }
 }
