@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license
  * agreements. See the NOTICE file distributed with this work for additional
@@ -19,30 +19,25 @@
  * permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.repair.quota;
+package org.apache.hadoop.ozone.repair.om.quota;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.repair.RepairTool;
 import picocli.CommandLine;
 
 /**
- * Tool to trigger quota repair.
+ * Tool to get status of last triggered quota repair.
  */
 @CommandLine.Command(
-    name = "start",
-    description = "CLI to trigger quota repair.",
+    name = "status",
+    description = "CLI to get the status of last trigger quota repair if available.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
-public class QuotaTrigger extends RepairTool {
-
-  @CommandLine.ParentCommand
-  private QuotaRepair parent;
+public class QuotaStatus extends RepairTool {
+  @CommandLine.Spec
+  private static CommandLine.Model.CommandSpec spec;
 
   @CommandLine.Option(
       names = {"--service-id", "--om-service-id"},
@@ -59,26 +54,13 @@ public class QuotaTrigger extends RepairTool {
   )
   private String omHost;
 
-  @CommandLine.Option(names = {"--buckets"},
-      required = false,
-      description = "start quota repair for specific buckets. Input will be list of uri separated by comma as" +
-          " /<volume>/<bucket>[,...]")
-  private String buckets;
+  @CommandLine.ParentCommand
+  private QuotaRepair parent;
 
   @Override
   public void execute() throws Exception {
-    List<String> bucketList = Collections.emptyList();
-    if (StringUtils.isNotEmpty(buckets)) {
-      bucketList = Arrays.asList(buckets.split(","));
-    }
-
-    try (OzoneManagerProtocol omClient = parent.createOmClient(omServiceId, omHost, false)) {
-      info("Triggering quota repair for %s",
-          bucketList.isEmpty()
-              ? "all buckets"
-              : ("buckets " + buckets));
-      omClient.startQuotaRepair(bucketList);
-      info(omClient.getQuotaRepairStatus());
+    try (OzoneManagerProtocol ozoneManagerClient = parent.createOmClient(omServiceId, omHost, false)) {
+      info(ozoneManagerClient.getQuotaRepairStatus());
     }
   }
 }
