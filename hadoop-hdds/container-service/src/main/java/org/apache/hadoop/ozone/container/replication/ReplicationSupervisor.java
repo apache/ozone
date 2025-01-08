@@ -240,21 +240,7 @@ public final class ReplicationSupervisor {
       return;
     }
 
-    if (requestCounter.get(task.getMetricName()) == null) {
-      synchronized (this) {
-        if (requestCounter.get(task.getMetricName()) == null) {
-          requestCounter.put(task.getMetricName(), new AtomicLong(0));
-          successCounter.put(task.getMetricName(), new AtomicLong(0));
-          failureCounter.put(task.getMetricName(), new AtomicLong(0));
-          timeoutCounter.put(task.getMetricName(), new AtomicLong(0));
-          skippedCounter.put(task.getMetricName(), new AtomicLong(0));
-          queuedCounter.put(task.getMetricName(), new AtomicLong(0));
-          opsLatencyMs.put(task.getMetricName(), registry.newRate(
-              task.getClass().getSimpleName() + "Ms"));
-          METRICS_MAP.put(task.getMetricName(), task.getMetricDescriptionSegment());
-        }
-      }
-    }
+    initCounters(task);
 
     if (inFlight.add(task)) {
       if (task.getPriority() != ReplicationCommandPriority.LOW) {
@@ -266,6 +252,24 @@ public final class ReplicationSupervisor {
       }
       queuedCounter.get(task.getMetricName()).incrementAndGet();
       executor.execute(new TaskRunner(task));
+    }
+  }
+
+  public void initCounters(AbstractReplicationTask task) {
+    if (requestCounter.get(task.getMetricName()) == null) {
+      synchronized (this) {
+        if (requestCounter.get(task.getMetricName()) == null) {
+          requestCounter.put(task.getMetricName(), new AtomicLong(0));
+          successCounter.put(task.getMetricName(), new AtomicLong(0));
+          failureCounter.put(task.getMetricName(), new AtomicLong(0));
+          timeoutCounter.put(task.getMetricName(), new AtomicLong(0));
+          skippedCounter.put(task.getMetricName(), new AtomicLong(0));
+          queuedCounter.put(task.getMetricName(), new AtomicLong(0));
+          opsLatencyMs.put(task.getMetricName(), registry.newRate(
+                  task.getClass().getSimpleName() + "Ms"));
+          METRICS_MAP.put(task.getMetricName(), task.getMetricDescriptionSegment());
+        }
+      }
     }
   }
 

@@ -236,6 +236,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     timer.time(() -> {
       final ReplicationTask replicationTask =
           replicationTasks.get((int) counter);
+      supervisor.initCounters(replicationTask);
       supervisor.new TaskRunner(replicationTask).run();
       return null;
     });
