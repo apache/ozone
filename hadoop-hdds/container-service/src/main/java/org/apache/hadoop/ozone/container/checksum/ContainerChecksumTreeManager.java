@@ -89,6 +89,9 @@ public class ContainerChecksumTreeManager {
     long containerID = data.getContainerID();
     Lock writeLock = getLock(containerID);
     writeLock.lock();
+    // If there is an error generating the tree and we cannot obtain a final checksum, use 0 to indicate a metadata
+    // failure.
+    long dataChecksum = 0;
     try {
       ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = null;
       try {
@@ -103,14 +106,16 @@ public class ContainerChecksumTreeManager {
 
       ContainerProtos.ContainerMerkleTree treeProto = captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(),
           tree::toProto);
-      long dataChecksum = treeProto.getDataChecksum();
-      data.setDataChecksum(dataChecksum);
       checksumInfoBuilder
           .setContainerID(containerID)
           .setContainerMerkleTree(treeProto);
       write(data, checksumInfoBuilder.build());
+      // If write succeeds, update the checksum in memory. Otherwise 0 will be used to indicate the metadata failure.
+      dataChecksum = treeProto.getDataChecksum();
       LOG.debug("Data merkle tree for container {} updated with container checksum {}", containerID, dataChecksum);
     } finally {
+      // Even if persisting the tree fails, we should still update the data checksum in memory to report back to SCM.
+      data.setDataChecksum(dataChecksum);
       writeLock.unlock();
     }
   }

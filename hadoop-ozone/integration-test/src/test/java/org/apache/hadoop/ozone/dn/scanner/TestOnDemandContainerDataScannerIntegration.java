@@ -34,6 +34,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.Collection;
 
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -102,8 +103,10 @@ class TestOnDemandContainerDataScannerIntegration
     // Container corruption has not yet been introduced.
     Container<?> container = getDnContainer(containerID);
     assertEquals(State.CLOSED, container.getContainerState());
-    long initialReportedDataChecksum = getContainerReplica(containerID).getDataChecksum();
     assertTrue(containerChecksumFileExists(containerID));
+
+    waitForScmToSeeReplicaState(containerID, CLOSED);
+    long initialReportedDataChecksum = getContainerReplica(containerID).getDataChecksum();
 
     // Corrupt the container.
     corruption.applyTo(container);

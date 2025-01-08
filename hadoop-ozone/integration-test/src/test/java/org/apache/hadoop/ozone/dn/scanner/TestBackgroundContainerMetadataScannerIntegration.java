@@ -98,14 +98,14 @@ class TestBackgroundContainerMetadataScannerIntegration
     assertEquals(State.CLOSED, closedContainer.getContainerState());
     assertTrue(containerChecksumFileExists(closedContainerID));
     waitForScmToSeeReplicaState(closedContainerID, CLOSED);
-    long initialReportedClosedChecksum = getContainerReplica(closedContainerID).getDataChecksum();
+    long initialClosedChecksum = getContainerReplica(closedContainerID).getDataChecksum();
+    assertNotEquals(0, initialClosedChecksum);
 
     long openContainerID = writeDataToOpenContainer();
     Container<?> openContainer = getDnContainer(openContainerID);
     assertEquals(State.OPEN, openContainer.getContainerState());
-    long initialReportedOpenChecksum = getContainerReplica(openContainerID).getDataChecksum();
     // Open containers should not yet have a checksum generated.
-    assertEquals(0, initialReportedOpenChecksum);
+    assertEquals(0, getContainerReplica(openContainerID).getDataChecksum());
 
     // Corrupt both containers.
     corruption.applyTo(closedContainer);
@@ -120,10 +120,12 @@ class TestBackgroundContainerMetadataScannerIntegration
         500, 5000);
 
     // Wait for SCM to get reports of the unhealthy replicas.
+    // The metadata scanner does not generate data checksums and the other scanners have been turned off for this
+    // test, so the data checksums should not change.
     waitForScmToSeeReplicaState(closedContainerID, UNHEALTHY);
-    assertNotEquals(initialReportedClosedChecksum, getContainerReplica(closedContainerID).getDataChecksum());
+    assertEquals(initialClosedChecksum, getContainerReplica(closedContainerID).getDataChecksum());
     waitForScmToSeeReplicaState(openContainerID, UNHEALTHY);
-    assertNotEquals(initialReportedOpenChecksum, getContainerReplica(openContainerID).getDataChecksum());
+    assertEquals(0, getContainerReplica(openContainerID).getDataChecksum());
 
     // Once the unhealthy replica is reported, the open container's lifecycle
     // state in SCM should move to closed.

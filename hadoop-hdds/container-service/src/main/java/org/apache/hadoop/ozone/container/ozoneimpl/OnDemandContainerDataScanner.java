@@ -141,6 +141,12 @@ public final class OnDemandContainerDataScanner {
       if (result.isDeleted()) {
         LOG.debug("Container [{}] has been deleted during the data scan.", containerId);
       } else {
+        // Merkle tree write failure should not abort the scanning process. Continue marking the scan as completed.
+        try {
+          instance.checksumManager.writeContainerDataTree(containerData, result.getDataTree());
+        } catch (IOException ex) {
+          LOG.error("Failed to write container merkle tree for container {}", containerId, ex);
+        }
         if (!result.isHealthy()) {
           logUnhealthyScanResult(containerId, result, LOG);
           boolean containerMarkedUnhealthy = instance.containerController
@@ -150,7 +156,6 @@ public final class OnDemandContainerDataScanner {
           }
         }
         instance.metrics.incNumContainersScanned();
-        instance.checksumManager.writeContainerDataTree(containerData, result.getDataTree());
       }
 
       Instant now = Instant.now();
