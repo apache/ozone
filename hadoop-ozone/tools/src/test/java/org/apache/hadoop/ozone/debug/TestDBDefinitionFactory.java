@@ -18,11 +18,11 @@
 
 package org.apache.hadoop.ozone.debug;
 
-import java.lang.reflect.Constructor;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -42,6 +42,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.apache.ratis.util.function.CheckedSupplier;
 import org.junit.jupiter.api.Test;
 import org.reflections.Reflections;
 
@@ -98,31 +99,33 @@ public class TestDBDefinitionFactory {
    */
   @Test
   public void testAllDBDefinitionsHaveCorrectConstructor() {
-    Set<Class<? extends DBDefinition.WithMap>> withMapSubclasses = new HashSet<>();
+    Set<Class<?>> subclasses = new HashSet<>();
     try {
       Reflections reflections = new Reflections("org.apache.hadoop");
-      withMapSubclasses = reflections.getSubTypesOf(DBDefinition.WithMap.class);
+      subclasses.addAll(reflections.getSubTypesOf(DBDefinition.class));
+      subclasses.remove(Class.forName("org.apache.hadoop.hdds.utils.db.DBDefinition$WithMap"));
+      subclasses.remove(Class.forName("org.apache.hadoop.hdds.utils.db.DBDefinition$WithMapInterface"));
+      subclasses.remove(Class.forName(
+          "org.apache.hadoop.ozone.container.metadata.AbstractDatanodeDBDefinition"));
     } catch (Exception e) {
       fail("Error while finding subclasses: " + e.getMessage());
     }
-    assertFalse(withMapSubclasses.isEmpty(), "No classes found extending DBDefinition.WithMap");
-    System.out.println(withMapSubclasses);
+    assertFalse(subclasses.isEmpty(), "No classes found extending DBDefinition");
 
-    // Check constructors for each subclass
-    for (Class<?> clazz : withMapSubclasses) {
-      Constructor<?>[] constructors = clazz.getDeclaredConstructors();
-      boolean hasValidConstructor = false;
-
-      for (Constructor<?> constructor : constructors) {
-        int paramCount = constructor.getParameterCount();
-        if (paramCount == 0 || paramCount == 1) {
-          hasValidConstructor = true;
-          break;
+    for (Class<?> clazz : subclasses) {
+      List<CheckedSupplier<DBDefinition, Exception>> factories =
+          DBDefinitionFactory.getFactories(clazz, "testDbPath", new OzoneConfiguration());
+      boolean hasValidFactory = factories.stream().anyMatch(factory -> {
+        try {
+          factory.get();
+          return true;
+        } catch (Exception e) {
+          return false;
         }
-      }
+      });
 
-      assertTrue(hasValidConstructor,
-          "Class " + clazz.getName() + " does not have a valid constructor (default or single parameter)");
+      assertTrue(hasValidFactory,
+          "Class " + clazz.getName() + " does not have a valid constructor or factory method.");
     }
   }
 }

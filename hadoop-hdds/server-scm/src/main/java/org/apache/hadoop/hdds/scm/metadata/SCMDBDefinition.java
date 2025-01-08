@@ -138,10 +138,6 @@ public class SCMDBDefinition extends DBDefinition.WithMap {
     super(map);
   }
 
-  public SCMDBDefinition() {
-    this(COLUMN_FAMILIES);
-  }
-
   @Override
   public String getName() {
     return "scm.db";

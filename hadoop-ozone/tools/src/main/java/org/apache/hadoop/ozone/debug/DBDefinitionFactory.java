@@ -19,10 +19,12 @@
 package org.apache.hadoop.ozone.debug;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -40,6 +42,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition;
 
 import com.amazonaws.services.kms.model.InvalidArnException;
 import com.google.common.base.Preconditions;
+import org.apache.ratis.util.function.CheckedSupplier;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_CONTAINER_KEY_DB;
@@ -99,6 +102,32 @@ public final class DBDefinitionFactory {
     return getDefinition(dbName);
   }
 
+  public static List<CheckedSupplier<DBDefinition, Exception>> getFactories(
+      Class<?> clazz, String dbPathString, ConfigurationSource config) {
+    return Arrays.asList(
+        () -> {
+          Method factoryMethod = clazz.getDeclaredMethod("get");
+          factoryMethod.setAccessible(true);
+          return (DBDefinition) factoryMethod.invoke(clazz);
+        },
+        () -> {
+          Constructor<?> constructor = clazz.getDeclaredConstructor();
+          constructor.setAccessible(true);
+          return (DBDefinition) constructor.newInstance();
+        },
+        () -> {
+          Constructor<?> constructor = clazz.getDeclaredConstructor(String.class);
+          constructor.setAccessible(true);
+          return (DBDefinition) constructor.newInstance(dbPathString);
+        },
+        () -> {
+          Constructor<?> constructor = clazz.getDeclaredConstructor(String.class, ConfigurationSource.class);
+          constructor.setAccessible(true);
+          return (DBDefinition) constructor.newInstance(dbPathString, config);
+        }
+    );
+  }
+
   public static DBDefinition getDefinition(Path dbPath, ConfigurationSource config, String overrideDBDef) {
     if (overrideDBDef == null) {
       return getDefinition(dbPath, config);
@@ -106,27 +135,21 @@ public final class DBDefinitionFactory {
     try {
       Class<?> clazz = Class.forName(overrideDBDef);
       if (DBDefinition.class.isAssignableFrom(clazz)) {
-        DBDefinition instance;
-        try {
-          Constructor<?> noParamConstructor = clazz.getDeclaredConstructor();
-          noParamConstructor.setAccessible(true);
-          instance = (DBDefinition) noParamConstructor.newInstance();
-        } catch (NoSuchMethodException e) {
-          Constructor<?> stringParamConstructor = clazz.getDeclaredConstructor(String.class);
-          stringParamConstructor.setAccessible(true);
-          instance = (DBDefinition) stringParamConstructor.newInstance(dbPath.toAbsolutePath().toString());
+        String dbPathString = dbPath.toAbsolutePath().toString();
+        for (CheckedSupplier<DBDefinition, Exception> factory : getFactories(clazz, dbPathString, config)) {
+          try {
+            return factory.get();
+          } catch (Exception ignored) {
+          }
         }
-        return instance;
+        throw new IllegalArgumentException("Could not get instance of " + overrideDBDef);
       } else {
         System.err.println("Class does not implement DBDefinition: " + overrideDBDef);
       }
     } catch (ClassNotFoundException e) {
       System.err.println("Class not found: " + overrideDBDef);
-    } catch (InstantiationException | IllegalAccessException | NoSuchMethodException |
-             SecurityException | java.lang.reflect.InvocationTargetException e) {
-      System.err.println("Error creating instance: " + e.getMessage());
     }
-    return null;
+    throw new IllegalArgumentException("Incorrect DBDefinition class.");
   }
 
   private static DBDefinition getReconDBDefinition(String dbName) {

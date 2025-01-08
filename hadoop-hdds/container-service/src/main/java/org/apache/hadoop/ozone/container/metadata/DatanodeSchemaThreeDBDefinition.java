@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.container.metadata;
 
 import com.google.common.primitives.Longs;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
@@ -123,10 +122,6 @@ public class DatanodeSchemaThreeDBDefinition
     DELETE_TRANSACTION.setCfOptions(cfOptions);
     FINALIZE_BLOCKS.setCfOptions(cfOptions);
     LAST_CHUNK_INFO.setCfOptions(cfOptions);
-  }
-
-  public DatanodeSchemaThreeDBDefinition(String dbPath) {
-    super(dbPath, new OzoneConfiguration());
   }
 
   @Override

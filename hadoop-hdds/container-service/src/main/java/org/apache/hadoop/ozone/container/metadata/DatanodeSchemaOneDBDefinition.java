@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.container.metadata;
 
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.CollectionUtils;
@@ -78,10 +77,6 @@ public class DatanodeSchemaOneDBDefinition
   public DatanodeSchemaOneDBDefinition(String dbPath,
       ConfigurationSource config) {
     super(dbPath, config);
-  }
-
-  public DatanodeSchemaOneDBDefinition(String dbPath) {
-    super(dbPath, new OzoneConfiguration());
   }
 
   @Override
