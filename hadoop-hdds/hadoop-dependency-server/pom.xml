@@ -12,10 +12,7 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
@@ -24,126 +21,16 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   </parent>
   <artifactId>hdds-hadoop-dependency-server</artifactId>
   <version>2.0.0-SNAPSHOT</version>
-  <description>Apache Ozone Distributed Data Store Hadoop server dependencies
-  </description>
-  <name>Apache Ozone HDDS Hadoop Server dependencies</name>
   <packaging>jar</packaging>
+  <name>Apache Ozone HDDS Hadoop Server dependencies</name>
+  <description>Apache Ozone Distributed Data Store Hadoop server dependencies</description>
 
   <properties>
-    <maven.test.skip>true</maven.test.skip> <!-- no tests in this module -->
+    <!-- no tests in this module -->
+    <maven.test.skip>true</maven.test.skip>
   </properties>
 
   <dependencies>
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-annotations</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-common</artifactId>
-      <version>${hadoop.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>com.nimbusds</groupId>
-          <artifactId>nimbus-jose-jwt</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.xerial.snappy</groupId>
-          <artifactId>snappy-java</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.curator</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.avro</groupId>
-          <artifactId>avro</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.zookeeper</groupId>
-          <artifactId>zookeeper</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.commons</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.codehaus.jackson</groupId>
-          <artifactId>jackson-mapper-asl</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.codehaus.jackson</groupId>
-          <artifactId>jackson-core-asl</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.codehaus.jackson</groupId>
-          <artifactId>jackson-jaxrs</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.codehaus.jackson</groupId>
-          <artifactId>jackson-xc</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.github.pjfanning</groupId>
-          <artifactId>jersey-json</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.google.code.findbugs</groupId>
-          <artifactId>jsr305</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.sun.jersey</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.kerby</groupId>
-          <artifactId>kerb-simplekdc</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>log4j</groupId>
-          <artifactId>log4j</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>ch.qos.reload4j</groupId>
-          <artifactId>reload4j</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.slf4j</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-auth</artifactId>
-      <version>${hadoop.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>org.apache.curator</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.kerby</groupId>
-          <artifactId>kerb-simplekdc</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.zookeeper</groupId>
-          <artifactId>zookeeper</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>log4j</groupId>
-          <artifactId>log4j</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>ch.qos.reload4j</groupId>
-          <artifactId>reload4j</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.slf4j</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
     <dependency>
       <groupId>com.nimbusds</groupId>
       <artifactId>nimbus-jose-jwt</artifactId>
@@ -155,10 +42,124 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-annotations</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-auth</artifactId>
+      <version>${hadoop.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>ch.qos.reload4j</groupId>
+          <artifactId>reload4j</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>log4j</groupId>
+          <artifactId>log4j</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.curator</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.kerby</groupId>
+          <artifactId>kerb-simplekdc</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.zookeeper</groupId>
+          <artifactId>zookeeper</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
+      <version>${hadoop.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>ch.qos.reload4j</groupId>
+          <artifactId>reload4j</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.github.pjfanning</groupId>
+          <artifactId>jersey-json</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.google.code.findbugs</groupId>
+          <artifactId>jsr305</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.nimbusds</groupId>
+          <artifactId>nimbus-jose-jwt</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.sun.jersey</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>log4j</groupId>
+          <artifactId>log4j</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.avro</groupId>
+          <artifactId>avro</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.commons</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.curator</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.kerby</groupId>
+          <artifactId>kerb-simplekdc</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.zookeeper</groupId>
+          <artifactId>zookeeper</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.codehaus.jackson</groupId>
+          <artifactId>jackson-core-asl</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.codehaus.jackson</groupId>
+          <artifactId>jackson-jaxrs</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.codehaus.jackson</groupId>
+          <artifactId>jackson-mapper-asl</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.codehaus.jackson</groupId>
+          <artifactId>jackson-xc</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.xerial.snappy</groupId>
+          <artifactId>snappy-java</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdfs</artifactId>
       <version>${hadoop.version}</version>
       <scope>compile</scope>
       <exclusions>
+        <exclusion>
+          <groupId>ch.qos.reload4j</groupId>
+          <artifactId>reload4j</artifactId>
+        </exclusion>
         <exclusion>
           <groupId>com.sun.jersey</groupId>
           <artifactId>*</artifactId>
@@ -168,16 +169,12 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>org.fusesource.leveldbjni</groupId>
-          <artifactId>leveldbjni-all</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>log4j</groupId>
           <artifactId>log4j</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>ch.qos.reload4j</groupId>
-          <artifactId>reload4j</artifactId>
+          <groupId>org.fusesource.leveldbjni</groupId>
+          <artifactId>leveldbjni-all</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.slf4j</groupId>

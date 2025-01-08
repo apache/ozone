@@ -23,6 +23,6 @@ import org.junit.jupiter.api.TestInstance;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TestOFS extends AbstractRootedOzoneFileSystemTest {
   TestOFS() {
-    super(BucketLayout.LEGACY, false, false, false, false);
+    super(BucketLayout.LEGACY, false, false);
   }
 }

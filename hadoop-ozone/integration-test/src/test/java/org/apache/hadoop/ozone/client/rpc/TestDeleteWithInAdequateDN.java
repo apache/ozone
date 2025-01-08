@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -65,6 +66,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_I
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
@@ -73,6 +75,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
@@ -103,6 +106,7 @@ public class TestDeleteWithInAdequateDN {
 
     conf = new OzoneConfiguration();
 
+    conf.setBoolean(OZONE_SCM_HA_ENABLE_KEY, true);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 100,
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
@@ -281,6 +285,7 @@ public class TestDeleteWithInAdequateDN {
     //cluster.getOzoneManager().deleteKey(keyArgs);
     client.getObjectStore().getVolume(volumeName).getBucket(bucketName).
         deleteKey("ratis");
+    OzoneTestUtils.flushAndWaitForDeletedBlockLog(cluster.getStorageContainerManager());
     // make sure the chunk was never deleted on the leader even though
     // deleteBlock handler is invoked
 

@@ -225,17 +225,13 @@ public class TestContainerBalancerDatanodeNodeLimit {
   @ParameterizedTest(name = "MockedSCM #{index}: {0}")
   @MethodSource("createMockedSCMs")
   public void testBalancerWithMoveManager(@Nonnull MockedSCM mockedSCM)
-      throws IOException, NodeNotFoundException, TimeoutException {
+      throws IOException, NodeNotFoundException {
     ContainerBalancerConfiguration config = new ContainerBalancerConfigBuilder(mockedSCM.getNodeCount()).build();
 
-    mockedSCM.disableLegacyReplicationManager();
     mockedSCM.startBalancerTask(config);
 
     verify(mockedSCM.getMoveManager(), atLeastOnce()).
         move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class));
-
-    verify(mockedSCM.getReplicationManager(), times(0))
-        .move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class));
   }
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}")
@@ -437,29 +433,19 @@ public class TestContainerBalancerDatanodeNodeLimit {
   @ParameterizedTest(name = "MockedSCM #{index}: {0}")
   @MethodSource("createMockedSCMs")
   public void selectedContainerShouldNotAlreadyHaveBeenSelected(@Nonnull MockedSCM mockedSCM)
-      throws NodeNotFoundException, ContainerNotFoundException, TimeoutException, ContainerReplicaNotFoundException {
+      throws NodeNotFoundException, ContainerNotFoundException, ContainerReplicaNotFoundException {
     ContainerBalancerConfiguration config = new ContainerBalancerConfigBuilder(mockedSCM.getNodeCount()).build();
-
-    mockedSCM.enableLegacyReplicationManager();
-
-    ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
-    int numContainers = task.getContainerToTargetMap().size();
 
     /* Assuming move is called exactly once for each unique container, number of  calls to move should equal number of
      unique containers. If number of  calls to move is more than number of unique containers, at least one container
      has been re-selected. It's expected that number of calls to move should equal number of unique, selected containers
       (from containerToTargetMap).
      */
-    verify(mockedSCM.getReplicationManager(), times(numContainers))
-        .move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class));
-
-    // Try the same test by disabling LegacyReplicationManager so that MoveManager is used.
-    mockedSCM.disableLegacyReplicationManager();
     ContainerBalancerTask nextTask = mockedSCM.startBalancerTask(config);
 
-    numContainers = nextTask.getContainerToTargetMap().size();
+    int numContainers = nextTask.getContainerToTargetMap().size();
     verify(mockedSCM.getMoveManager(), times(numContainers))
-        .move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class));
+            .move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class));
   }
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}")
@@ -478,13 +464,10 @@ public class TestContainerBalancerDatanodeNodeLimit {
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}")
   @MethodSource("createMockedSCMs")
-  public void checkIterationResult(@Nonnull MockedSCM mockedSCM)
-      throws NodeNotFoundException, ContainerNotFoundException, TimeoutException {
+  public void checkIterationResult(@Nonnull MockedSCM mockedSCM) {
     ContainerBalancerConfiguration config = new ContainerBalancerConfigBuilder(mockedSCM.getNodeCount()).build();
     config.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
     config.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
-
-    mockedSCM.enableLegacyReplicationManager();
 
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
     // According to the setup and configurations, this iteration's result should be ITERATION_COMPLETED.
@@ -492,16 +475,12 @@ public class TestContainerBalancerDatanodeNodeLimit {
 
     // Now, limit maxSizeToMovePerIteration but fail all container moves.
     // The result should still be ITERATION_COMPLETED.
-    when(mockedSCM.getReplicationManager()
-        .move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class)))
-        .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY));
     config.setMaxSizeToMovePerIteration(10 * STORAGE_UNIT);
 
     task = mockedSCM.startBalancerTask(config);
     assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED, task.getIterationResult());
 
     //Try the same but use MoveManager for container move instead of legacy RM.
-    mockedSCM.disableLegacyReplicationManager();
     task = mockedSCM.startBalancerTask(config);
     assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED, task.getIterationResult());
   }
@@ -521,30 +500,15 @@ public class TestContainerBalancerDatanodeNodeLimit {
 
     CompletableFuture<MoveManager.MoveResult> completedFuture =
         CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED);
-    when(mockedSCM.getReplicationManager()
-        .move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class)))
-        .thenReturn(completedFuture)
-        .thenAnswer(invocation -> genCompletableFuture(150));
-
-    mockedSCM.enableLegacyReplicationManager();
-    ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
-
-    // According to the setup and configurations, this iteration's result should be ITERATION_COMPLETED.
-    assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED, task.getIterationResult());
-    assertEquals(1, task.getMetrics().getNumContainerMovesCompletedInLatestIteration());
-    assertThat(task.getMetrics().getNumContainerMovesTimeoutInLatestIteration()).isGreaterThanOrEqualTo(1);
-
     /*
-    Test the same but use MoveManager instead of LegacyReplicationManager.
     The first move being 10ms falls within the timeout duration of 500ms. It should be successful. The rest should fail.
      */
-    mockedSCM.disableLegacyReplicationManager();
     when(mockedSCM.getMoveManager()
         .move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class)))
         .thenReturn(completedFuture)
         .thenAnswer(invocation -> genCompletableFuture(150));
 
-    task = mockedSCM.startBalancerTask(config);
+    ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
     assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED, task.getIterationResult());
     assertEquals(1, task.getMetrics().getNumContainerMovesCompletedInLatestIteration());
     assertThat(task.getMetrics().getNumContainerMovesTimeoutInLatestIteration()).isGreaterThanOrEqualTo(1);
@@ -563,24 +527,12 @@ public class TestContainerBalancerDatanodeNodeLimit {
         CompletableFuture.supplyAsync(() -> MoveManager.MoveResult.REPLICATION_FAIL_TIME_OUT);
     CompletableFuture<MoveManager.MoveResult> future2 =
         CompletableFuture.supplyAsync(() -> MoveManager.MoveResult.DELETION_FAIL_TIME_OUT);
-    when(mockedSCM.getReplicationManager()
-        .move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class)))
-        .thenReturn(future, future2);
 
-    mockedSCM.enableLegacyReplicationManager();
-
-    ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
-    assertThat(task.getMetrics().getNumContainerMovesTimeoutInLatestIteration()).isGreaterThan(0);
-    assertEquals(0, task.getMetrics().getNumContainerMovesCompletedInLatestIteration());
-
-    // Try the same test with MoveManager instead of LegacyReplicationManager.
     when(mockedSCM.getMoveManager()
         .move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class)))
         .thenReturn(future).thenAnswer(invocation -> future2);
 
-    mockedSCM.disableLegacyReplicationManager();
-
-    task = mockedSCM.startBalancerTask(config);
+    ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
     assertThat(task.getMetrics().getNumContainerMovesTimeoutInLatestIteration()).isGreaterThan(0);
     assertEquals(0, task.getMetrics().getNumContainerMovesCompletedInLatestIteration());
   }
@@ -598,20 +550,8 @@ public class TestContainerBalancerDatanodeNodeLimit {
 
     CompletableFuture<MoveManager.MoveResult> future = new CompletableFuture<>();
     future.completeExceptionally(new RuntimeException("Runtime Exception"));
-    when(mockedSCM.getReplicationManager()
-        .move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class)))
-        .thenReturn(genCompletableFutureWithException(1))
-        .thenThrow(new ContainerNotFoundException("Test Container not found"))
-        .thenReturn(future);
-
-    mockedSCM.enableLegacyReplicationManager();
-
-    ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
-    assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED, task.getIterationResult());
 
     int expectedMovesFailed = (nodeCount > 6) ? 3 : 1;
-    assertThat(task.getMetrics().getNumContainerMovesFailed()).isGreaterThanOrEqualTo(expectedMovesFailed);
-
     // Try the same test but with MoveManager instead of ReplicationManager.
     when(mockedSCM.getMoveManager()
         .move(any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class)))
@@ -619,8 +559,7 @@ public class TestContainerBalancerDatanodeNodeLimit {
         .thenThrow(new ContainerNotFoundException("Test Container not found"))
         .thenReturn(future);
 
-    mockedSCM.disableLegacyReplicationManager();
-    task = mockedSCM.startBalancerTask(config);
+    ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
     assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED, task.getIterationResult());
     assertThat(task.getMetrics().getNumContainerMovesFailed()).isGreaterThanOrEqualTo(expectedMovesFailed);
   }

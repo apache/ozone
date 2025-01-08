@@ -70,5 +70,14 @@ public interface FindTargetStrategy {
    */
   void resetPotentialTargets(@Nonnull Collection<DatanodeDetails> targets);
 
+  /**
+   * Get a map of the node IDs and the corresponding data sizes moved to each node.
+   * @return nodeId to size entering from node map
+   */
   Map<DatanodeDetails, Long> getSizeEnteringNodes();
+
+  /**
+   * Clear the map of node IDs and their corresponding data sizes that were moved to each node.
+   */
+  void clearSizeEnteringNodes();
 }

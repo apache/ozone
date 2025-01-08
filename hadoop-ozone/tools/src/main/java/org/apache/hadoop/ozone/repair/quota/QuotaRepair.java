@@ -20,8 +20,6 @@ package org.apache.hadoop.ozone.repair.quota;
 
 import java.io.IOException;
 import java.util.Collection;
-import java.util.concurrent.Callable;
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.RepairSubcommand;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
@@ -51,19 +49,10 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
     },
     description = "Operational tool to repair quota in OM DB.")
 @MetaInfServices(RepairSubcommand.class)
-public class QuotaRepair implements Callable<Void>, RepairSubcommand {
-
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
+public class QuotaRepair implements RepairSubcommand {
 
   @CommandLine.ParentCommand
   private OzoneRepair parent;
-
-  @Override
-  public Void call() {
-    GenericCli.missingSubcommand(spec);
-    return null;
-  }
 
   public OzoneManagerProtocolClientSideTranslatorPB createOmClient(
       String omServiceID,
@@ -112,9 +101,5 @@ public class QuotaRepair implements Callable<Void>, RepairSubcommand {
 
   public UserGroupInformation getUser() throws IOException {
     return UserGroupInformation.getCurrentUser();
-  }
-
-  protected OzoneRepair getParent() {
-    return parent;
   }
 }

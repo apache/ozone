@@ -120,7 +120,7 @@ public class TestOneReplicaPipelineSafeModeRule {
         HddsProtos.ReplicationFactor.ONE);
 
     SCMSafeModeManager scmSafeModeManager =
-        new SCMSafeModeManager(ozoneConfiguration, containers, containerManager,
+        new SCMSafeModeManager(ozoneConfiguration, containerManager,
             pipelineManager, eventQueue, serviceManager, scmContext);
 
     rule = scmSafeModeManager.getOneReplicaPipelineSafeModeRule();

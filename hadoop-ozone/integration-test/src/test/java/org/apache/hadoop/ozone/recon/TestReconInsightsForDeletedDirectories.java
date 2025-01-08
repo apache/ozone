@@ -61,7 +61,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -77,8 +76,6 @@ public class TestReconInsightsForDeletedDirectories {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestReconInsightsForDeletedDirectories.class);
 
-  private static boolean omRatisEnabled = true;
-
   private static MiniOzoneCluster cluster;
   private static FileSystem fs;
   private static String volumeName;
@@ -92,7 +89,6 @@ public class TestReconInsightsForDeletedDirectories {
     conf.setInt(OZONE_PATH_DELETING_LIMIT_PER_TASK, 0);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 10000000,
         TimeUnit.MILLISECONDS);
-    conf.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)

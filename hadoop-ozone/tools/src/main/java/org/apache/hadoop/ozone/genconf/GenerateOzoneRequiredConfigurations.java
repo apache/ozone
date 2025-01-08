@@ -41,6 +41,8 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
+
 /**
  * GenerateOzoneRequiredConfigurations - A tool to generate ozone-site.xml<br>
  * This tool generates an ozone-site.xml with minimally required configs.
@@ -56,7 +58,7 @@ import java.util.List;
     description = "Tool to generate template ozone-site.xml",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
-public final class GenerateOzoneRequiredConfigurations extends GenericCli {
+public final class GenerateOzoneRequiredConfigurations extends GenericCli implements Callable<Void> {
 
   @Parameters(arity = "1..1",
       description = "Directory path where ozone-site file should be generated.")

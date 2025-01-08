@@ -156,8 +156,6 @@ public abstract class BaseFileChecksumHelper {
   protected abstract AbstractBlockChecksumComputer getBlockChecksumComputer(List<ContainerProtos.ChunkInfo> chunkInfos,
       long blockLength);
 
-  protected abstract String populateBlockChecksumBuf(ByteBuffer blockChecksumByteBuffer) throws IOException;
-
   protected abstract List<ContainerProtos.ChunkInfo> getChunkInfos(
       OmKeyLocationInfo keyLocationInfo) throws IOException;
 
@@ -166,6 +164,39 @@ public abstract class BaseFileChecksumHelper {
     blockChecksumComputer.compute(getCombineMode());
     return blockChecksumComputer.getOutByteBuffer();
   }
+
+  /**
+   * Parses out the raw blockChecksum bytes from {@code checksumData} byte
+   * buffer according to the blockChecksumType and populates the cumulative
+   * blockChecksumBuf with it.
+   *
+   * @return a debug-string representation of the parsed checksum if
+   *     debug is enabled, otherwise null.
+   */
+
+  protected String populateBlockChecksumBuf(ByteBuffer blockChecksumByteBuffer) throws IOException {
+    String blockChecksumForDebug = null;
+    switch (getCombineMode()) {
+    case MD5MD5CRC:
+      final MD5Hash md5 = new MD5Hash(blockChecksumByteBuffer.array());
+      md5.write(getBlockChecksumBuf());
+      if (LOG.isDebugEnabled()) {
+        blockChecksumForDebug = md5.toString();
+      }
+      break;
+    case COMPOSITE_CRC:
+      byte[] crcBytes = blockChecksumByteBuffer.array();
+      if (LOG.isDebugEnabled()) {
+        blockChecksumForDebug = CrcUtil.toMultiCrcString(crcBytes);
+      }
+      getBlockChecksumBuf().write(crcBytes);
+      break;
+    default:
+      throw new IOException(
+          "Unknown combine mode: " + getCombineMode());
+    }
+    return blockChecksumForDebug;
+  };
 
   /**
    * Compute block checksums block by block and append the raw bytes of the
