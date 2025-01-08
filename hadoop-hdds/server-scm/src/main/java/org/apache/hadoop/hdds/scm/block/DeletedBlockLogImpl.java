@@ -30,6 +30,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Lists;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
@@ -144,6 +145,38 @@ public class DeletedBlockLogImpl
     }
 
     return failedTXs;
+  }
+
+  @Override
+  public List<DeletedBlocksTransaction> getFailedTransactions(int count,
+      long startTxId) throws IOException {
+    lock.lock();
+    try {
+      final List<DeletedBlocksTransaction> failedTXs = Lists.newArrayList();
+      try (TableIterator<Long,
+          ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
+          deletedBlockLogStateManager.getReadOnlyIterator()) {
+        if (count == LIST_ALL_FAILED_TRANSACTIONS) {
+          while (iter.hasNext()) {
+            DeletedBlocksTransaction delTX = iter.next().getValue();
+            if (delTX.getCount() == -1) {
+              failedTXs.add(delTX);
+            }
+          }
+        } else {
+          iter.seek(startTxId);
+          while (iter.hasNext() && failedTXs.size() < count) {
+            DeletedBlocksTransaction delTX = iter.next().getValue();
+            if (delTX.getCount() == -1 && delTX.getTxID() >= startTxId) {
+              failedTXs.add(delTX);
+            }
+          }
+        }
+      }
+      return failedTXs;
+    } finally {
+      lock.unlock();
+    }
   }
 
   /**

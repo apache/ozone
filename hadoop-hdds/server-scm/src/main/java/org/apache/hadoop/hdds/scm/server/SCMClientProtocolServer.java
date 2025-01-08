@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
@@ -905,24 +904,18 @@ public class SCMClientProtocolServer implements
     auditMap.put("count", String.valueOf(count));
     auditMap.put("startTxId", String.valueOf(startTxId));
     try {
-      List<StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction>
-          failedTxns;
-      List<StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction>
-          allFailedTxns = new ArrayList<>();
-      do {
-        failedTxns = scm.getScmBlockManager().getDeletedBlockLog()
-            .getFailedTransactionsBatch(100, startTxId);
-        allFailedTxns.addAll(failedTxns);
-      } while (!failedTxns.isEmpty());
-      result = allFailedTxns.stream()
+      result = scm.getScmBlockManager().getDeletedBlockLog()
+          .getFailedTransactions(count, startTxId).stream()
           .map(DeletedBlocksTransactionInfoWrapper::fromTxn)
           .collect(Collectors.toList());
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
           SCMAction.GET_FAILED_DELETED_BLOCKS_TRANSACTION, auditMap));
       return result;
     } catch (IOException ex) {
-      AUDIT.logReadFailure(buildAuditMessageForFailure(
-          SCMAction.GET_FAILED_DELETED_BLOCKS_TRANSACTION, auditMap, ex));
+      AUDIT.logReadFailure(
+          buildAuditMessageForFailure(
+              SCMAction.GET_FAILED_DELETED_BLOCKS_TRANSACTION, auditMap, ex)
+      );
       throw ex;
     }
   }

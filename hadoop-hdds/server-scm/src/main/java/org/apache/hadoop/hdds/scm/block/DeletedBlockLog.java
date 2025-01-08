@@ -65,6 +65,9 @@ public interface DeletedBlockLog extends Closeable {
   List<DeletedBlocksTransaction> getFailedTransactionsBatch(int batchSize,
       long startTxId) throws IOException;
 
+  List<DeletedBlocksTransaction> getFailedTransactions(int count,
+      long startTxId) throws IOException;
+
   /**
    * Increments count for given list of transactions by 1.
    * The log maintains a valid range of counts for each transaction
