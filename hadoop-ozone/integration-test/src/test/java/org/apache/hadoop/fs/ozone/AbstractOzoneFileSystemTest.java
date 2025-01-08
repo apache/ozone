@@ -1582,40 +1582,44 @@ abstract class AbstractOzoneFileSystemTest {
     Configuration conf = new OzoneConfiguration(cluster.getConf());
     conf.set(FS_DEFAULT_NAME_KEY, rootPath);
     // Set the number of keys to be processed during batch operate.
-    OzoneFileSystem o3FS = (OzoneFileSystem) FileSystem.get(conf);
+    try {
+      OzoneFileSystem o3FS = (OzoneFileSystem) FileSystem.get(conf);
 
-    //Let's reset the clock to control the time.
-    ((BasicOzoneClientAdapterImpl) (o3FS.getAdapter())).setClock(testClock);
+      //Let's reset the clock to control the time.
+      ((BasicOzoneClientAdapterImpl) (o3FS.getAdapter())).setClock(testClock);
 
-    createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key"),
-        ReplicationType.RATIS);
+      createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key"),
+          ReplicationType.RATIS);
 
-    bucket.setReplicationConfig(new ECReplicationConfig("rs-3-2-1024k"));
+      bucket.setReplicationConfig(new ECReplicationConfig("rs-3-2-1024k"));
 
-    //After changing the bucket policy, it should create ec key, but o3fs will
-    // refresh after some time. So, it will be sill old type.
-    createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key1"),
-        ReplicationType.RATIS);
+      //After changing the bucket policy, it should create ec key, but o3fs will
+      // refresh after some time. So, it will be sill old type.
+      createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key1"),
+          ReplicationType.RATIS);
 
-    testClock.fastForward(300 * 1000 + 1);
+      testClock.fastForward(300 * 1000 + 1);
 
-    //After client bucket refresh time, it should create new type what is
-    // available on bucket at that moment.
-    createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key2"),
-        ReplicationType.EC);
+      //After client bucket refresh time, it should create new type what is
+      // available on bucket at that moment.
+      createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key2"),
+          ReplicationType.EC);
 
-    // Rechecking the same steps with changing to Ratis again to check the
-    // behavior is consistent.
-    bucket.setReplicationConfig(
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+      // Rechecking the same steps with changing to Ratis again to check the
+      // behavior is consistent.
+      bucket.setReplicationConfig(RatisReplicationConfig.getInstance(
+          HddsProtos.ReplicationFactor.THREE));
 
-    createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key3"),
-        ReplicationType.EC);
+      createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key3"),
+          ReplicationType.EC);
 
-    testClock.fastForward(300 * 1000 + 1);
+      testClock.fastForward(300 * 1000 + 1);
 
-    createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key4"),
-        ReplicationType.RATIS);
+      createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key4"),
+          ReplicationType.RATIS);
+    } finally {
+      o3fs.close();
+    }
   }
 
   private void createKeyAndAssertKeyType(OzoneBucket bucket,
@@ -1669,9 +1673,11 @@ abstract class AbstractOzoneFileSystemTest {
     OzoneConfiguration conf2 = new OzoneConfiguration(cluster.getConf());
     conf2.setClass("fs.trash.classname", TrashPolicyDefault.class,
         TrashPolicy.class);
-    Trash trashPolicyDefault = new Trash(conf2);
-    assertThrows(IOException.class,
-        () -> trashPolicyDefault.moveToTrash(root));
+    try (FileSystem fs = FileSystem.get(conf2)) {
+      Trash trashPolicyDefault = new Trash(fs, conf2);
+      assertThrows(IOException.class,
+          () -> trashPolicyDefault.moveToTrash(root));
+    }
   }
 
   /**
