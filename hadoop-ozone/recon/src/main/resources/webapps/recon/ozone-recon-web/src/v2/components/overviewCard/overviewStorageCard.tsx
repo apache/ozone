@@ -18,7 +18,7 @@
 
 import React, { HTMLAttributes, useMemo } from 'react';
 import filesize from 'filesize';
-import { Card, Row, Col, Table, Tag, Alert } from 'antd';
+import { Card, Row, Col, Table, Tag } from 'antd';
 
 import EChart from '@/v2/components/eChart/eChart';
 import OverviewCardWrapper from '@/v2/components/overviewCard/overviewCardWrapper';
