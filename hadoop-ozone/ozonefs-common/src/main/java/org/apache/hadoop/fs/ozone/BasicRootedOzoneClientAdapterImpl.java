@@ -1298,13 +1298,10 @@ public class BasicRootedOzoneClientAdapterImpl
       throws IOException {
     OzoneClientConfig.ChecksumCombineMode combineMode =
         config.getObject(OzoneClientConfig.class).getChecksumCombineMode();
-    if (null == combineMode) {
-      LOG.error("Unsupported checksum combine mode {}, skipping checksum " +
-          "computation", combineMode);
+    if (combineMode == null) {
       return null;
     }
     OFSPath ofsPath = new OFSPath(keyName, config);
-
     OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
     OzoneBucket bucket = getBucket(ofsPath, false);
     return OzoneClientUtils.getFileChecksumWithCombineMode(
