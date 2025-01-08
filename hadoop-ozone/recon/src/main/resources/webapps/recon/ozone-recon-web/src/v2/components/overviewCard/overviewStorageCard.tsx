@@ -24,7 +24,6 @@ import EChart from '@/v2/components/eChart/eChart';
 import OverviewCardWrapper from '@/v2/components/overviewCard/overviewCardWrapper';
 
 import { StorageReport } from '@/v2/types/overview.types';
-import { WarningFilled } from '@ant-design/icons';
 
 // ------------- Types -------------- //
 type OverviewStorageCardProps = {
@@ -55,6 +54,10 @@ const cardBodyStyle: React.CSSProperties = { padding: '16px' };
 const cardStyle: React.CSSProperties = {
   boxSizing: 'border-box',
   height: '100%'
+}
+const cardErrorStyle: React.CSSProperties = {
+  borderColor: '#FF4D4E',
+  borderWidth: '1.4px'
 }
 const eChartStyle: React.CSSProperties = {
   width: '280px',
@@ -176,16 +179,7 @@ const OverviewStorageCard: React.FC<OverviewStorageCardProps> = ({
       title='Cluster Capacity'
       headStyle={cardHeadStyle}
       bodyStyle={cardBodyStyle}
-      style={cardStyle}
-      actions={(
-        usagePercentage > 80
-        ? [
-          <div style={{
-            color: '#f5222d'
-          }}> <WarningFilled /> Storage almost full. Free up some space. </div>
-        ]
-        : []
-      )}>
+      style={(usagePercentage > 79) ? {...cardStyle, ...cardErrorStyle} : cardStyle} >
       <Row justify='space-between'>
         <Col
           className='echart-col'
