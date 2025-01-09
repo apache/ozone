@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.dn.scanner;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions;

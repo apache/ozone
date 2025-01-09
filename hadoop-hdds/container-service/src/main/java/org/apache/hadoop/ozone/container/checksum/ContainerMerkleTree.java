@@ -22,7 +22,6 @@ import org.apache.hadoop.ozone.common.ChecksumByteBufferFactory;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 import java.nio.ByteBuffer;
-import java.util.Collection;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
