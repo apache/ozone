@@ -33,8 +33,6 @@ This document explains the HA setup of Storage Container Manager (SCM), please c
 
 ## Configuration
 
-As of Apache Ozone 2.0, SCM HA is always enabled. Test deployments can continue to use single node Ratis for SCM if needed.
-
 One Ozone configuration (`ozone-site.xml`) can support multiple SCM HA node set, multiple Ozone clusters. To select between the available SCM nodes a logical name is required for each of the clusters which can be resolved to the IP addresses (and domain names) of the Storage Container Managers.
 
 This logical name is called `serviceId` and can be configured in the `ozone-site.xml`
@@ -231,5 +229,3 @@ bin/ozone debug ldb --db=/tmp/metadata/scm.db scan --column-family=containers
 Add additional SCM nodes and extend the cluster configuration to reflect the newly added nodes. 
 Bootstrap the newly added SCM nodes with `scm --bootstrap` command and start the SCM service.
 Note: Make sure that the `ozone.scm.primordial.node.id` property is pointed to the existing SCM before you run the `bootstrap` command on the newly added SCM nodes.
-
-If everything is fine, you can extend the cluster configuration with multiple nodes, restart SCM node, and initialize the additional nodes with `scm --bootstrap` command.

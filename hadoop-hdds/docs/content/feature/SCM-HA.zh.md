@@ -33,8 +33,6 @@ Ozone Manager 和 Storage Container Manager 都支持 HA。在这种模式下，
 
 ## 配置
 
-从 Apache Ozone 2.0 开始，SCM HA 默认启用。测试部署如果需要，仍然可以继续使用单节点 Ratis 来运行 SCM。
-
 一个 Ozone 配置(`ozone-site.xml`)可以支持多个SCM HA节点集，多个 Ozone 集群。要在可用的 SCM 节点之间进行选择，每个集群都需要一个逻辑名称，可以将其解析为 Storage Container Manage 的 IP 地址(和域名)。
 
 这个逻辑名称称为 `serviceId`，可以在 `ozone-site.xml` 中配置。
@@ -204,10 +202,8 @@ bin/ozone debug ldb --db=/tmp/metadata/scm.db ls
 bin/ozone debug ldb --db=/tmp/metadata/scm.db scan --column-family=containers
 ```
 
-## 从现有的SCM迁移
+## 从非HA SCM迁移到SCM HA
 
-在升级到 2.0.0 或更高版本后，任何 Ozone 集群的 SCM HA都会启用。 首先为 Ratis ring 配置一个节点（`ozone.scm.nodes.serviceId` 应该有一个元素）。
-
-启动集群并测试它是否正常工作。
-
-如果一切正常，您可以用多个节点扩展集群配置，重新启动 SCM 节点，并使用 `scm --bootstrap` 命令初始化其他节点。
+添加额外的 SCM 节点，并扩展集群配置以包含新添加的节点。
+使用 `scm --bootstrap` 命令为新添加的 SCM 节点引导启动，然后启动 SCM 服务。
+注意：在新添加的 SCM 节点上运行 bootstrap 命令之前，请确保 `ozone.scm.primordial.node.id` 属性指向现有的 SCM。
