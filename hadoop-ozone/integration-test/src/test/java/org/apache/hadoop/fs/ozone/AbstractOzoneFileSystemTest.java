@@ -1582,8 +1582,8 @@ abstract class AbstractOzoneFileSystemTest {
     Configuration conf = new OzoneConfiguration(cluster.getConf());
     conf.set(FS_DEFAULT_NAME_KEY, rootPath);
     // Set the number of keys to be processed during batch operate.
-    try {
-      OzoneFileSystem o3FS = (OzoneFileSystem) FileSystem.get(conf);
+    try (FileSystem fileSystem = FileSystem.get(conf)) {
+      OzoneFileSystem o3FS = (OzoneFileSystem) fileSystem;
 
       //Let's reset the clock to control the time.
       ((BasicOzoneClientAdapterImpl) (o3FS.getAdapter())).setClock(testClock);
@@ -1617,8 +1617,6 @@ abstract class AbstractOzoneFileSystemTest {
 
       createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key4"),
           ReplicationType.RATIS);
-    } finally {
-      o3fs.close();
     }
   }
 
