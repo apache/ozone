@@ -72,7 +72,7 @@ public class ContainerHealthTask extends ReconScmTask {
       LoggerFactory.getLogger(ContainerHealthTask.class);
   public static final int FETCH_COUNT = Integer.parseInt(DEFAULT_FETCH_COUNT);
 
-  private ReadWriteLock lock = new ReentrantReadWriteLock(true);
+  private final ReadWriteLock lock = new ReentrantReadWriteLock(true);
 
   private final StorageContainerServiceProvider scmClient;
   private final ContainerManager containerManager;
@@ -134,9 +134,9 @@ public class ContainerHealthTask extends ReconScmTask {
     // <MISSING, <TOTAL_USED_BYTES, 2048>>,
     // <EMPTY_MISSING, <CONTAINER_COUNT, 10>>, <EMPTY_MISSING, <TOTAL_KEYS, 2>>,
     // <EMPTY_MISSING, <TOTAL_USED_BYTES, 2048>>
+    Map<UnHealthyContainerStates, Map<String, Long>>
+        unhealthyContainerStateStatsMap;
     try {
-      Map<UnHealthyContainerStates, Map<String, Long>>
-          unhealthyContainerStateStatsMap;
       unhealthyContainerStateStatsMap = new HashMap<>(Collections.emptyMap());
       initializeUnhealthyContainerStateStatsMap(
           unhealthyContainerStateStatsMap);

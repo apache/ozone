@@ -557,24 +557,20 @@ public class OzoneManagerServiceProviderImpl
           try (OMDBUpdatesHandler omdbUpdatesHandler =
               new OMDBUpdatesHandler(omMetadataManager)) {
             LOG.info("Obtaining delta updates from Ozone Manager");
-            // Getting and applying delta updates might throw exception
-            // we need to update the DB even if exception is thrown
-            try {
-              // Get updates from OM and apply to local Recon OM DB.
-              reconTaskUpdater.recordRunStart();
-              getAndApplyDeltaUpdatesFromOM(currentSequenceNumber,
-                  omdbUpdatesHandler);
+            // Get updates from OM and apply to local Recon OM DB and update task status in table
+            reconTaskUpdater.recordRunStart();
+            getAndApplyDeltaUpdatesFromOM(currentSequenceNumber,
+                omdbUpdatesHandler);
 
-              reconTaskUpdater.setLastTaskRunStatus(0);
-              reconTaskUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
-            } catch (IOException | RocksDBException e) {
-              LOG.error("Failed to get and apply delta updates with exception", e);
-              reconTaskUpdater.setLastTaskRunStatus(-1);
-              fullSnapshot = true;
-            }
+            reconTaskUpdater.setLastTaskRunStatus(0);
+            reconTaskUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
             // Pass on DB update events to tasks that are listening.
             reconTaskController.consumeOMEvents(new OMUpdateEventBatch(
                 omdbUpdatesHandler.getEvents()), omMetadataManager);
+          } catch (IOException | RocksDBException e) {
+              LOG.error("Failed to get and apply delta updates with exception", e);
+              reconTaskUpdater.setLastTaskRunStatus(-1);
+              fullSnapshot = true;
           } catch (InterruptedException intEx) {
             Thread.currentThread().interrupt();
           } catch (Exception e) {

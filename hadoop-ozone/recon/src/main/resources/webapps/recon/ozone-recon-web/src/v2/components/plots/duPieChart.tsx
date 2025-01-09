@@ -96,13 +96,13 @@ const DUPieChart: React.FC<PieChartProps> = ({
 
     if (subPathCount === 0 || subpaths.length === 0) {
       // No more subpaths available
-      pathLabels = [(path ?? '').split('/').pop() ?? ''];
+      pathLabels = [path.split('/').pop() ?? ''];
       valuesWithMinBlockSize = [0.1];
       percentage = ['100.00'];
       sizeStr = [byteToSize(size, 1)];
     } else {
       pathLabels = subpaths.map(subpath => {
-        const subpathName = (subpath.path ?? '').split('/').pop() ?? '';
+        const subpathName = subpath.path.split('/').pop() ?? '';
         // Diferentiate keys by removing trailing slash
         return (subpath.isKey || subpathName === OTHER_PATH_NAME)
           ? subpathName

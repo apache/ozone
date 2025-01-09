@@ -187,6 +187,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
           = new HashMap<>();
       final Map<ContainerID, Long> deletedContainers
           = new HashMap<>(processedContainers);
+
       // Loop to handle container create and size-update operations
       for (ContainerInfo container : containers) {
         if (container.getState().equals(DELETED)) {
@@ -205,16 +206,17 @@ public class ContainerSizeCountTask extends ReconScmTask {
 
       // Method to handle Container delete operations
       handleContainerDeleteOperations(deletedContainers, containerSizeCountMap);
+
       // Write to the database
       writeCountsToDB(false, containerSizeCountMap);
       containerSizeCountMap.clear();
-
       LOG.debug("Completed a 'process' run of ContainerSizeCountTask.");
       taskStatusUpdater.setLastTaskRunStatus(processingFailed ? -1 : 0);
     } finally {
       lock.writeLock().unlock();
     }
   }
+
 
   /**
    * Populate DB with the counts of container sizes calculated
@@ -312,7 +314,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
    * @param containerSize to calculate the upperSizeBound
    */
   private static void incrementContainerSizeCount(long containerSize,
-                                                  Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
+                    Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
     updateContainerSizeCount(containerSize, 1, containerSizeCountMap);
   }
 
@@ -333,12 +335,12 @@ public class ContainerSizeCountTask extends ReconScmTask {
    * @param containerSize to calculate the upperSizeBound
    */
   private static void decrementContainerSizeCount(long containerSize,
-                                                  Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
+                    Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
     updateContainerSizeCount(containerSize, -1, containerSizeCountMap);
   }
 
   private static void updateContainerSizeCount(long containerSize, int delta,
-                                               Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
+                    Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
     ContainerSizeCountKey key = getContainerSizeCountKey(containerSize);
     containerSizeCountMap.compute(key,
         (k, previous) -> previous != null ? previous + delta : delta);

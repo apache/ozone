@@ -58,10 +58,10 @@ public class PipelineSyncTask extends ReconScmTask {
   private final ReconTaskStatusUpdater taskStatusUpdater;
 
   public PipelineSyncTask(ReconPipelineManager pipelineManager,
-                          ReconNodeManager nodeManager,
-                          StorageContainerServiceProvider scmClient,
-                          ReconTaskConfig reconTaskConfig,
-                          ReconTaskStatusUpdaterManager taskStatusUpdaterManager) {
+      ReconNodeManager nodeManager,
+      StorageContainerServiceProvider scmClient,
+      ReconTaskConfig reconTaskConfig,
+      ReconTaskStatusUpdaterManager taskStatusUpdaterManager) {
     super(taskStatusUpdaterManager);
     this.scmClient = scmClient;
     this.reconPipelineManager = pipelineManager;
