@@ -226,7 +226,7 @@ bin/ozone debug ldb --db=/tmp/metadata/scm.db ls
 bin/ozone debug ldb --db=/tmp/metadata/scm.db scan --column-family=containers
 ```
 
-## Migrating from existing SCM
+## Migrating from Non-HA to HA SCM
 
 Add additional SCM nodes and extend the cluster configuration to reflect the newly added nodes. 
 Bootstrap the newly added SCM nodes with `scm --bootstrap` command and start the SCM service.
