@@ -912,6 +912,8 @@ public class TestOzoneClientMultipartUploadWithFSO {
 
     s3Bucket.completeMultipartUpload(keyName, uploadID, partsMap);
 
+//  OzoneKeyLocations size is 2 because part size is 5MB and ozone.scm.block.size in ozone-site.xml
+//  for integration-test is 4MB
     OzoneKeyDetails s3KeyDetailsOneParts = ozClient.getProxy().getS3KeyDetails(bucketName, keyName, 1);
     assertEquals(2, s3KeyDetailsOneParts.getOzoneKeyLocations().size());
 
