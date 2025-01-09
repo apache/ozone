@@ -1775,7 +1775,7 @@ public class RpcClient implements ClientProtocol {
           .filter(omKeyLocationInfo -> omKeyLocationInfo.getPartNumber() ==
                                        partNumber)
           .collect(Collectors.toList());
-      keyInfo.updateLocationInfoList(filteredKeyLocationInfo, false);
+      keyInfo.updateLocationInfoList(filteredKeyLocationInfo, true, true);
       keyInfo.setDataSize(filteredKeyLocationInfo.stream()
           .mapToLong(OmKeyLocationInfo::getLength)
           .sum());
