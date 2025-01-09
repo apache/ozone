@@ -18,13 +18,11 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmRatisServerConfig;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
-import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.common.Storage;
@@ -35,13 +33,10 @@ import org.apache.ratis.util.TimeDuration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.UUID;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY;
@@ -63,8 +58,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVIC
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -72,7 +65,7 @@ import static org.mockito.Mockito.when;
 /**
  * Test for SCM HA-related configuration.
  */
-class TestSCMHAConfiguration {
+class TestSCMConfiguration {
   private OzoneConfiguration conf;
   @TempDir
   private File tempDir;
@@ -85,7 +78,7 @@ class TestSCMHAConfiguration {
   }
 
   @Test
-  public void testSCMHAConfig() throws Exception {
+  public void testSCMConfig() throws Exception {
     String scmServiceId = "scmserviceId";
     conf.set(ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY, scmServiceId);
 
@@ -225,7 +218,7 @@ class TestSCMHAConfiguration {
 
 
   @Test
-  public void testHAWithSamePortConfig() throws Exception {
+  public void testSamePortConfig() throws Exception {
     String scmServiceId = "scmserviceId";
     conf.set(ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY, scmServiceId);
 
@@ -301,25 +294,7 @@ class TestSCMHAConfiguration {
   }
 
   @Test
-  public void testRatisEnabledDefaultConfigWithoutInitializedSCM()
-      throws IOException {
-    SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
-    when(scmStorageConfig.getState()).thenReturn(Storage.StorageState.NOT_INITIALIZED);
-    SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
-    assertEquals(SCMHAUtils.isSCMHAEnabled(conf),
-        ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT);
-    DefaultConfigManager.clearDefaultConfigs();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
-    SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
-    assertFalse(SCMHAUtils.isSCMHAEnabled(conf));
-    DefaultConfigManager.clearDefaultConfigs();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
-    SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
-    assertTrue(SCMHAUtils.isSCMHAEnabled(conf));
-  }
-
-  @Test
-  public void testRatisEnabledDefaultConfigWithInitializedSCM()
+  public void testDefaultConfigWithInitializedSCM()
       throws IOException {
     SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
     when(scmStorageConfig.getState())
@@ -333,44 +308,4 @@ class TestSCMHAConfiguration {
     DefaultConfigManager.clearDefaultConfigs();
     assertTrue(SCMHAUtils.isSCMHAEnabled(conf));
   }
-
-  @Test
-  public void testRatisEnabledDefaultConflictConfigWithInitializedSCM() {
-    SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
-    when(scmStorageConfig.getState())
-        .thenReturn(Storage.StorageState.INITIALIZED);
-    when(scmStorageConfig.isSCMHAEnabled()).thenReturn(true);
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
-    assertThrows(ConfigurationException.class,
-            () -> SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig));
-  }
-
-  @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void testHAConfig(boolean ratisEnabled) throws IOException {
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, ratisEnabled);
-    SCMStorageConfig scmStorageConfig = newStorageConfig(ratisEnabled);
-    StorageContainerManager.scmInit(conf, scmStorageConfig.getClusterID());
-    assertEquals(ratisEnabled, DefaultConfigManager.getValue(
-        ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, !ratisEnabled));
-  }
-
-  @Test
-  void testInvalidHAConfig() throws IOException {
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
-    SCMStorageConfig scmStorageConfig = newStorageConfig(true);
-    String clusterID = scmStorageConfig.getClusterID();
-    assertThrows(ConfigurationException.class,
-        () -> StorageContainerManager.scmInit(conf, clusterID));
-  }
-
-  private SCMStorageConfig newStorageConfig(
-      boolean ratisEnabled) throws IOException {
-    final SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
-    scmStorageConfig.setClusterId(UUID.randomUUID().toString());
-    scmStorageConfig.setSCMHAFlag(ratisEnabled);
-    scmStorageConfig.initialize();
-    return scmStorageConfig;
-  }
-
 }

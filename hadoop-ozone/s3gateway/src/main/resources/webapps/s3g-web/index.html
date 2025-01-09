@@ -21,15 +21,14 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self';">
     <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
     <meta name="description" content="Apache Ozone S3 gateway">
 
     <title>S3 gateway -- Apache Ozone</title>
 
-    <link href="bootstrap-3.4.1/css/bootstrap.min.css" rel="stylesheet">
-    <link href="hadoop.css" rel="stylesheet">
-    <link href="ozone.css" rel="stylesheet">
+    <link href="static/bootstrap-3.4.1/css/bootstrap.min.css" rel="stylesheet">
+    <link href="static/hadoop.css" rel="stylesheet">
+    <link href="static/ozone.css" rel="stylesheet">
 
 </head>
 
@@ -50,7 +49,7 @@
         </div>
         <div id="navbar" class="collapse navbar-collapse">
             <ul class="nav navbar-nav" id="ui-tabs">
-                <li><a href="docs">Documentation</a></li>
+                <li><a href="static/docs">Documentation</a></li>
 
             </ul>
         </div><!--/.nav-collapse -->
@@ -63,21 +62,12 @@
 
     <h1>S3 gateway</h1>
 
-    <p>This is an endpoint of Apache Ozone S3 gateway. Use it with any
-        AWS S3 compatible tool
-        with setting this url as an endpoint</p>
-
-    <p>For example with aws-cli:</p>
-
-    <pre>aws s3api --endpoint <span id="s3gurl"></span> create-bucket --bucket=wordcount</pre>
-
-    <p>For more information, please check the <a href="docs">documentation.</a>
+    <p>For more information, please check the <a href="static/docs">documentation.</a>
     </p>
 </div><!-- /.container -->
 
-<script src="jquery-3.5.1.min.js"></script>
-<script src="bootstrap-3.4.1/js/bootstrap.min.js"></script>
-<script src="s3g.js"></script>
+<script src="static/jquery-3.5.1.min.js"></script>
+<script src="static/bootstrap-3.4.1/js/bootstrap.min.js"></script>
 
 </body>
 </html>
