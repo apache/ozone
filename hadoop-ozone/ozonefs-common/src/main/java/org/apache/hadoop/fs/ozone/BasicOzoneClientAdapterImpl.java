@@ -647,11 +647,13 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       throws IOException {
     OzoneClientConfig.ChecksumCombineMode combineMode =
         config.getObject(OzoneClientConfig.class).getChecksumCombineMode();
-
+    if (combineMode == null) {
+      return null;
+    }
     return OzoneClientUtils.getFileChecksumWithCombineMode(
         volume, bucket, keyName,
-        length, combineMode, ozoneClient.getObjectStore().getClientProxy());
-
+        length, combineMode,
+        ozoneClient.getObjectStore().getClientProxy());
   }
 
   @Override
