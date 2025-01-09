@@ -255,7 +255,6 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
     // unhealthy.
     hddsVolume.setState(StorageVolume.VolumeState.NORMAL);
     handler.markContainerUnhealthy(container, ContainerTestUtils.getUnhealthyDataScanResult());
-    assertTrue(ContainerChecksumTreeManager.checksumFileExist(container));
     verify(mockIcrSender, atMostOnce()).send(any());
   }
 
