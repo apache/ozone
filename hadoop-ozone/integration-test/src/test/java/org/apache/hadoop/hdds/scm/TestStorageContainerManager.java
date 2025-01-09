@@ -188,13 +188,11 @@ public class TestStorageContainerManager {
   public void testRpcPermission() throws Exception {
     // Test with default configuration
     OzoneConfiguration defaultConf = new OzoneConfiguration();
-    defaultConf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     testRpcPermissionWithConf(defaultConf, any -> false, "unknownUser");
 
     // Test with ozone.administrators defined in configuration
     String admins = "adminUser1, adminUser2";
     OzoneConfiguration ozoneConf = new OzoneConfiguration();
-    ozoneConf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     ozoneConf.setStrings(OzoneConfigKeys.OZONE_ADMINISTRATORS, admins);
     // Non-admin user will get permission denied.
     // Admin user will pass the permission check.
@@ -266,7 +264,6 @@ public class TestStorageContainerManager {
   public void testBlockDeletionTransactions() throws Exception {
     int numKeys = 5;
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
         TimeUnit.MILLISECONDS);
     DatanodeConfiguration datanodeConfiguration = conf.getObject(
@@ -358,7 +355,6 @@ public class TestStorageContainerManager {
   @Test
   public void testOldDNRegistersToReInitialisedSCM() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 3000, TimeUnit.MILLISECONDS);
 
@@ -405,38 +401,41 @@ public class TestStorageContainerManager {
       assertThat(scmDnHBDispatcherLog.getOutput()).isEmpty();
       assertThat(versionEndPointTaskLog.getOutput()).isEmpty();
       // start the new SCM
-      scm.start();
-      // Initially DatanodeStateMachine will be in Running state
-      assertEquals(DatanodeStateMachine.DatanodeStates.RUNNING,
-          dsm.getContext().getState());
-      // DN heartbeats to new SCM, SCM doesn't recognize the node, sends the
-      // command to DN to re-register. Wait for SCM to send re-register command
-      String expectedLog = String.format(
-          "SCM received heartbeat from an unregistered datanode %s. "
-              + "Asking datanode to re-register.",
-          datanode.getDatanodeDetails());
-      GenericTestUtils.waitFor(
-          () -> scmDnHBDispatcherLog.getOutput().contains(expectedLog), 100,
-          30000);
-      ExitUtil.disableSystemExit();
-      // As part of processing response for re-register, DN EndpointStateMachine
-      // goes to GET-VERSION state which checks if there is already existing
-      // version file on the DN & if the clusterID matches with that of the SCM
-      // In this case, it won't match and gets InconsistentStorageStateException
-      // and DN shuts down.
-      String expectedLog2 = "Received SCM notification to register."
-          + " Interrupt HEARTBEAT and transit to GETVERSION state.";
-      GenericTestUtils.waitFor(
-          () -> heartbeatEndpointTaskLog.getOutput().contains(expectedLog2),
-          100, 5000);
-      GenericTestUtils.waitFor(() -> dsm.getContext().getShutdownOnError(), 100,
-          5000);
-      assertEquals(DatanodeStateMachine.DatanodeStates.SHUTDOWN,
-          dsm.getContext().getState());
-      assertThat(versionEndPointTaskLog.getOutput()).contains(
-          "org.apache.hadoop.ozone.common" +
-              ".InconsistentStorageStateException: Mismatched ClusterIDs");
-      scm.stop();
+      try {
+        scm.start();
+        // Initially DatanodeStateMachine will be in Running state
+        assertEquals(DatanodeStateMachine.DatanodeStates.RUNNING,
+            dsm.getContext().getState());
+        // DN heartbeats to new SCM, SCM doesn't recognize the node, sends the
+        // command to DN to re-register. Wait for SCM to send re-register command
+        String expectedLog = String.format(
+            "SCM received heartbeat from an unregistered datanode %s. "
+                + "Asking datanode to re-register.",
+            datanode.getDatanodeDetails());
+        GenericTestUtils.waitFor(
+            () -> scmDnHBDispatcherLog.getOutput().contains(expectedLog), 100,
+            30000);
+        ExitUtil.disableSystemExit();
+        // As part of processing response for re-register, DN EndpointStateMachine
+        // goes to GET-VERSION state which checks if there is already existing
+        // version file on the DN & if the clusterID matches with that of the SCM
+        // In this case, it won't match and gets InconsistentStorageStateException
+        // and DN shuts down.
+        String expectedLog2 = "Received SCM notification to register."
+            + " Interrupt HEARTBEAT and transit to GETVERSION state.";
+        GenericTestUtils.waitFor(
+            () -> heartbeatEndpointTaskLog.getOutput().contains(expectedLog2),
+            100, 5000);
+        GenericTestUtils.waitFor(() -> dsm.getContext().getShutdownOnError(), 100,
+            5000);
+        assertEquals(DatanodeStateMachine.DatanodeStates.SHUTDOWN,
+            dsm.getContext().getState());
+        assertThat(versionEndPointTaskLog.getOutput()).contains(
+            "org.apache.hadoop.ozone.common" +
+                ".InconsistentStorageStateException: Mismatched ClusterIDs");
+      } finally {
+        scm.stop();
+      }
     }
   }
 
@@ -444,7 +443,6 @@ public class TestStorageContainerManager {
   public void testBlockDeletingThrottling() throws Exception {
     int numKeys = 15;
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 1, TimeUnit.SECONDS);
     conf.setInt(ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 5);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
@@ -555,7 +553,6 @@ public class TestStorageContainerManager {
   @Test
   public void testSCMInitialization(@TempDir Path tempDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     Path scmPath = tempDir.resolve("scm-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
 
@@ -577,7 +574,6 @@ public class TestStorageContainerManager {
   @Test
   public void testSCMReinitialization(@TempDir Path tempDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     Path scmPath = tempDir.resolve("scm-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
     //This will set the cluster id in the version file
@@ -639,7 +635,6 @@ public class TestStorageContainerManager {
   @Test
   void testSCMInitializationFailure(@TempDir Path tempDir) {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     Path scmPath = tempDir.resolve("scm-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
 
@@ -652,7 +647,6 @@ public class TestStorageContainerManager {
     OzoneConfiguration conf = new OzoneConfiguration();
     Path scmPath = tempDir.resolve("scm-meta");
 
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
     SCMStorageConfig scmStore = new SCMStorageConfig(conf);
     String clusterId = UUID.randomUUID().toString();
@@ -666,15 +660,19 @@ public class TestStorageContainerManager {
         SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
             .getLocalNodeDetails(), conf);
     StorageContainerManager scm = HddsTestUtils.getScmSimple(conf);
-    scm.start();
-    //Reads the SCM Info from SCM instance
-    ScmInfo scmInfo = scm.getClientProtocolServer().getScmInfo();
-    assertEquals(clusterId, scmInfo.getClusterId());
-    assertEquals(scmId, scmInfo.getScmId());
+    try {
+      scm.start();
+      //Reads the SCM Info from SCM instance
+      ScmInfo scmInfo = scm.getClientProtocolServer().getScmInfo();
+      assertEquals(clusterId, scmInfo.getClusterId());
+      assertEquals(scmId, scmInfo.getScmId());
 
-    String expectedVersion = HddsVersionInfo.HDDS_VERSION_INFO.getVersion();
-    String actualVersion = scm.getSoftwareVersion();
-    assertEquals(expectedVersion, actualVersion);
+      String expectedVersion = HddsVersionInfo.HDDS_VERSION_INFO.getVersion();
+      String actualVersion = scm.getSoftwareVersion();
+      assertEquals(expectedVersion, actualVersion);
+    } finally {
+      scm.stop();
+    }
   }
 
   /**
@@ -684,7 +682,6 @@ public class TestStorageContainerManager {
   public void testScmProcessDatanodeHeartbeat() throws Exception {
     String rackName = "/rack1";
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     conf.setClass(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
         StaticMapping.class, DNSToSwitchMapping.class);
     StaticMapping.addNodeToRack(NetUtils.normalizeHostName(HddsUtils.getHostName(conf)),
@@ -727,7 +724,6 @@ public class TestStorageContainerManager {
   public void testCloseContainerCommandOnRestart() throws Exception {
     int numKeys = 15;
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 1, TimeUnit.SECONDS);
     conf.setInt(ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 5);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
