@@ -128,14 +128,14 @@ public class TestOzoneRepairShell {
   public void testQuotaRepair() throws Exception {
     CommandLine cmd = new OzoneRepair().getCmd();
 
-    int exitCode = cmd.execute("quota", "status", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY));
+    int exitCode = cmd.execute("om", "quota", "status", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY));
     assertEquals(0, exitCode, err);
-    exitCode = cmd.execute("quota", "start", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY));
+    exitCode = cmd.execute("om", "quota", "start", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY));
     assertEquals(0, exitCode, err);
     GenericTestUtils.waitFor(() -> {
       out.reset();
       // verify quota trigger is completed having non-zero lastRunFinishedTime
-      cmd.execute("quota", "status", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY));
+      cmd.execute("om", "quota", "status", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY));
       try {
         return out.get().contains("\"lastRunFinishedTime\":\"\"");
       } catch (Exception ex) {
