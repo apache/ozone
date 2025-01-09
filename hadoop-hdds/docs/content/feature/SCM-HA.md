@@ -228,8 +228,8 @@ bin/ozone debug ldb --db=/tmp/metadata/scm.db scan --column-family=containers
 
 ## Migrating from existing SCM
 
-SCM HA is turned on for any Ozone cluster after upgrade to 2.0.0 or later. First configure only one node for the Ratis ring (`ozone.scm.nodes.serviceId` should have one element).
-
-Start the cluster and test if it works well.
+Add additional SCM nodes and extend the cluster configuration to reflect the newly added nodes. 
+Bootstrap the newly added SCM nodes with `scm --bootstrap` command and start the SCM service.
+Note: Make sure that the `ozone.scm.primordial.node.id` property is pointed to the existing SCM before you run the `bootstrap` command on the newly added SCM nodes.
 
 If everything is fine, you can extend the cluster configuration with multiple nodes, restart SCM node, and initialize the additional nodes with `scm --bootstrap` command.
