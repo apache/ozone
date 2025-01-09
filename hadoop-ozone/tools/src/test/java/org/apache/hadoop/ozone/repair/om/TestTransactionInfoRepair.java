@@ -33,7 +33,7 @@ import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import picocli.CommandLine;
 
-import static com.github.stefanbirkner.systemlambda.SystemLambda.withTextFromSystemIn;
+import static org.apache.ozone.test.IntLambda.withTextFromSystemIn;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_TABLE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -70,7 +70,7 @@ public class TestTransactionInfoRepair {
   }
 
   @Test
-  public void testUpdateTransactionInfoTableSuccessful() throws Exception {
+  public void testUpdateTransactionInfoTableSuccessful() {
     ManagedRocksDB mdb = mockRockDB();
     testCommand(mdb, mock(ColumnFamilyHandle.class));
 
@@ -82,7 +82,7 @@ public class TestTransactionInfoRepair {
   }
 
   @Test
-  public void testCommandWhenTableNotInDBForGivenPath() throws Exception {
+  public void testCommandWhenTableNotInDBForGivenPath() {
     ManagedRocksDB mdb = mockRockDB();
     testCommand(mdb, null);
     assertThat(err.getOutput())
@@ -105,7 +105,7 @@ public class TestTransactionInfoRepair {
   }
 
 
-  private void testCommand(ManagedRocksDB mdb, ColumnFamilyHandle columnFamilyHandle) throws Exception {
+  private void testCommand(ManagedRocksDB mdb, ColumnFamilyHandle columnFamilyHandle) {
     try (MockedStatic<ManagedRocksDB> mocked = mockStatic(ManagedRocksDB.class);
          MockedStatic<RocksDBUtils> mockUtil = mockStatic(RocksDBUtils.class)) {
       mocked.when(() -> ManagedRocksDB.open(anyString(), anyList(), anyList())).thenReturn(mdb);

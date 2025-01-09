@@ -220,7 +220,6 @@
     <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
     <surefire.fork.timeout>1200</surefire.fork.timeout>
     <swagger-annotations-version>1.5.4</swagger-annotations-version>
-    <system-lambda.version>1.2.1</system-lambda.version>
     <test.build.data>${test.build.dir}</test.build.data>
     <test.build.dir>${project.build.directory}/test-dir</test.build.dir>
     <!-- number of threads/forks to use when running tests in parallel, see parallel-tests profile -->
@@ -343,11 +342,6 @@
         <groupId>com.github.luben</groupId>
         <artifactId>zstd-jni</artifactId>
         <version>${zstd-jni.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.github.stefanbirkner</groupId>
-        <artifactId>system-lambda</artifactId>
-        <version>${system-lambda.version}</version>
       </dependency>
       <dependency>
         <groupId>com.github.stephenc.jcip</groupId>

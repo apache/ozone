@@ -33,13 +33,12 @@ import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
 
 import java.io.File;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static com.github.stefanbirkner.systemlambda.SystemLambda.withTextFromSystemIn;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.ozone.test.IntLambda.withTextFromSystemIn;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -81,6 +80,7 @@ public class TestOzoneRepairShell {
 
   @Test
   public void testUpdateTransactionInfoTable() throws Exception {
+    CommandLine cmd = new OzoneRepair().getCmd();
     String dbPath = new File(OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME).getPath();
 
     cluster.getOzoneManager().stop();
@@ -90,7 +90,11 @@ public class TestOzoneRepairShell {
 
     String testTerm = "1111";
     String testIndex = "1111";
-    int exitCode = executeRepair("om", "update-transaction", "--db", dbPath, "--term", testTerm, "--index", testIndex);
+    int exitCode = withTextFromSystemIn("y")
+        .execute(() -> cmd.execute("om", "update-transaction",
+            "--db", dbPath,
+            "--term", testTerm,
+            "--index", testIndex));
     assertEquals(0, exitCode, err);
     assertThat(out.get())
         .contains(
@@ -102,8 +106,11 @@ public class TestOzoneRepairShell {
     String cmdOut2 = scanTransactionInfoTable(dbPath);
     assertThat(cmdOut2).contains(testTerm + "#" + testIndex);
 
-    executeRepair("om", "update-transaction", "--db", dbPath, "--term",
-        originalHighestTermIndex[0], "--index", originalHighestTermIndex[1]);
+    withTextFromSystemIn("y")
+        .execute(() -> cmd.execute("om", "update-transaction",
+            "--db", dbPath,
+            "--term", originalHighestTermIndex[0],
+            "--index", originalHighestTermIndex[1]));
     cluster.getOzoneManager().restart();
     try (OzoneClient ozoneClient = cluster.newClient()) {
       ozoneClient.getObjectStore().createVolume("vol1");
@@ -131,8 +138,11 @@ public class TestOzoneRepairShell {
 
     int exitCode = cmd.execute("quota", "status", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY));
     assertEquals(0, exitCode, err);
-    exitCode = executeRepair("quota", "start", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY));
+
+    exitCode = withTextFromSystemIn("y")
+        .execute(() -> cmd.execute("quota", "start", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY)));
     assertEquals(0, exitCode, err);
+
     GenericTestUtils.waitFor(() -> {
       out.reset();
       // verify quota trigger is completed having non-zero lastRunFinishedTime
@@ -144,24 +154,5 @@ public class TestOzoneRepairShell {
       }
       return false;
     }, 1000, 10000);
-  }
-
-  /**
-   * Executes "ozone repair" command, passing "y" to confirmation prompt.
-   * @param args arguments to pass to the command
-   * @return exit code
-   */
-  public static int executeRepair(String... args) {
-    final CommandLine cmd = new OzoneRepair().getCmd();
-    final AtomicInteger rc = new AtomicInteger();
-    try {
-      withTextFromSystemIn("y")
-          .execute(() -> rc.set(cmd.execute(args)));
-    } catch (RuntimeException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-    return rc.get();
   }
 }
