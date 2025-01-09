@@ -33,14 +33,8 @@ This document explains the HA setup of Storage Container Manager (SCM), please c
 
 ## Configuration
 
-HA mode of Storage Container Manager can be enabled with the following settings in `ozone-site.xml`:
+As of Apache Ozone 2.0, SCM HA is always enabled. Test deployments can continue to use single node Ratis for SCM if needed.
 
-```XML
-<property>
-   <name>ozone.scm.ratis.enable</name>
-   <value>true</value>
-</property>
-```
 One Ozone configuration (`ozone-site.xml`) can support multiple SCM HA node set, multiple Ozone clusters. To select between the available SCM nodes a logical name is required for each of the clusters which can be resolved to the IP addresses (and domain names) of the Storage Container Managers.
 
 This logical name is called `serviceId` and can be configured in the `ozone-site.xml`
@@ -234,7 +228,7 @@ bin/ozone debug ldb --db=/tmp/metadata/scm.db scan --column-family=containers
 
 ## Migrating from existing SCM
 
-SCM HA can be turned on on any Ozone cluster. First enable Ratis (`ozone.scm.ratis.enable`) and configure only one node for the Ratis ring (`ozone.scm.nodes.serviceId` should have one element).
+SCM HA is turned on for any Ozone cluster after upgrade to 2.0.0 or later. First configure only one node for the Ratis ring (`ozone.scm.nodes.serviceId` should have one element).
 
 Start the cluster and test if it works well.
 
