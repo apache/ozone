@@ -1518,7 +1518,107 @@ public class TestKeyManagerImpl {
     assertEquals(errorMessage, omEx.getMessage());
   }
 
-  /**
+  @Test
+  void testGetAllPartsWhenZeroPartNumber() throws IOException {
+    String keyName = RandomStringUtils.randomAlphabetic(5);
+
+    String volume = VOLUME_NAME;
+
+    initKeyTableForMultipartTest(keyName, volume);
+
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+            .setVolumeName(volume)
+            .setBucketName(BUCKET_NAME)
+            .setKeyName(keyName)
+            .setMultipartUploadPartNumber(0)
+            .build();
+    OmKeyInfo omKeyInfo = keyManager.getKeyInfo(keyArgs, resolvedBucket(), "test");
+    assertEquals(keyName, omKeyInfo.getKeyName());
+    assertNotNull(omKeyInfo.getLatestVersionLocations());
+
+    List<OmKeyLocationInfo> locationList = omKeyInfo.getLatestVersionLocations().getLocationList();
+    assertNotNull(locationList);
+    assertEquals(5, locationList.size());
+    for (int i = 0; i < 5; i++) {
+      assertEquals(i, locationList.get(i).getPartNumber());
+    }
+  }
+
+  @Test
+  void testGetParticularPart() throws IOException {
+    String keyName = RandomStringUtils.randomAlphabetic(5);
+
+    String volume = VOLUME_NAME;
+
+    initKeyTableForMultipartTest(keyName, volume);
+
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+            .setVolumeName(volume)
+            .setBucketName(BUCKET_NAME)
+            .setKeyName(keyName)
+            .setMultipartUploadPartNumber(3)
+            .build();
+    OmKeyInfo omKeyInfo = keyManager.getKeyInfo(keyArgs, resolvedBucket(), "test");
+    assertEquals(keyName, omKeyInfo.getKeyName());
+    assertNotNull(omKeyInfo.getLatestVersionLocations());
+
+    List<OmKeyLocationInfo> locationList = omKeyInfo.getLatestVersionLocations().getLocationList();
+    assertNotNull(locationList);
+    assertEquals(1, locationList.size());
+    assertEquals(3, locationList.get(0).getPartNumber());
+  }
+
+  @Test
+  void testGetNotExistedPart() throws IOException {
+    String keyName = RandomStringUtils.randomAlphabetic(5);
+
+    String volume = VOLUME_NAME;
+
+    initKeyTableForMultipartTest(keyName, volume);
+
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+            .setVolumeName(volume)
+            .setBucketName(BUCKET_NAME)
+            .setKeyName(keyName)
+            .setMultipartUploadPartNumber(99)
+            .build();
+    OmKeyInfo omKeyInfo = keyManager.getKeyInfo(keyArgs, resolvedBucket(), "test");
+    assertEquals(keyName, omKeyInfo.getKeyName());
+    assertNotNull(omKeyInfo.getLatestVersionLocations());
+
+    List<OmKeyLocationInfo> locationList = omKeyInfo.getLatestVersionLocations().getLocationList();
+    assertNotNull(locationList);
+    assertEquals(0, locationList.size());
+  }
+
+  private void initKeyTableForMultipartTest(String keyName, String volume) throws IOException {
+    List<OmKeyLocationInfoGroup> locationInfoGroups = new ArrayList<>();
+    List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
+    for (int i = 0; i < 5; i++) {
+      OmKeyLocationInfo locationInfo1 = new OmKeyLocationInfo.Builder()
+              .setBlockID(new BlockID(i, i))
+              .setPartNumber(i)
+              .build();
+      locationInfoList.add(locationInfo1);
+    }
+
+    OmKeyLocationInfoGroup locationInfoGroup = new OmKeyLocationInfoGroup(0, locationInfoList);
+    locationInfoGroups.add(locationInfoGroup);
+    locationInfoGroup.setMultipartKey(true);
+
+    OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
+            .setKeyName(keyName)
+            .setBucketName(BUCKET_NAME)
+            .setVolumeName(volume)
+            .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+            .setOmKeyLocationInfos(locationInfoGroups)
+            .build();
+
+    String key = String.format("/%s/%s/%s", volume, BUCKET_NAME, keyName);
+    metadataManager.getKeyTable(BucketLayout.LEGACY).put(key, omKeyInfo);
+  }
+
+    /**
    * Get Random pipeline.
    * @return pipeline
    */

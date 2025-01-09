@@ -660,6 +660,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setHeadOp(keyArgs.getHeadOp())
         .setForceUpdateContainerCacheFromSCM(
             keyArgs.getForceUpdateContainerCacheFromSCM())
+        .setMultipartUploadPartNumber(keyArgs.getMultipartNumber())
         .build();
     KeyInfoWithVolumeContext keyInfo = impl.getKeyInfo(omKeyArgs,
         request.getAssumeS3Context());
