@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.repair.om.quota;
 
 import java.io.IOException;
 import java.util.Collection;
+
+import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
@@ -45,14 +47,14 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
         QuotaTrigger.class,
     },
     description = "Operational tool to repair quota in OM DB.")
-public class QuotaRepair {
+public class QuotaRepair extends AbstractSubcommand {
 
   public OzoneManagerProtocolClientSideTranslatorPB createOmClient(
       String omServiceID,
       String omHost,
       boolean forceHA
   ) throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = getOzoneConf();
     if (omHost != null && !omHost.isEmpty()) {
       omServiceID = null;
       conf.set(OZONE_OM_ADDRESS_KEY, omHost);
@@ -86,7 +88,7 @@ public class QuotaRepair {
   }
 
   private Collection<String> getConfiguredServiceIds() {
-    OzoneConfiguration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = getOzoneConf();
     Collection<String> omServiceIds =
         conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY);
     return omServiceIds;
