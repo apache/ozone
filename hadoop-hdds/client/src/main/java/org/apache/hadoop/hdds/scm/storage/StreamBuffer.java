@@ -39,8 +39,8 @@ public class StreamBuffer {
     return buffer.duplicate();
   }
 
-  public int length() {
-    return buffer.limit() - buffer.position();
+  public int remaining() {
+    return buffer.remaining();
   }
 
   public int position() {

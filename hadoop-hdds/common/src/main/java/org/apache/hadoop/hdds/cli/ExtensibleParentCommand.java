@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.cli;
 import picocli.CommandLine;
 
 import java.util.ServiceLoader;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
 /**
  * Interface for parent commands that accept subcommands to be dynamically registered.
@@ -40,11 +42,13 @@ public interface ExtensibleParentCommand {
     if (command instanceof ExtensibleParentCommand) {
       ExtensibleParentCommand parentCommand = (ExtensibleParentCommand) command;
       ServiceLoader<?> subcommands = ServiceLoader.load(parentCommand.subcommandType());
+      SortedMap<String, CommandLine> sorted = new TreeMap<>();
       for (Object subcommand : subcommands) {
         final CommandLine.Command commandAnnotation = subcommand.getClass().getAnnotation(CommandLine.Command.class);
         CommandLine subcommandCommandLine = new CommandLine(subcommand, cli.getFactory());
-        cli.addSubcommand(commandAnnotation.name(), subcommandCommandLine);
+        sorted.put(commandAnnotation.name(), subcommandCommandLine);
       }
+      sorted.forEach(cli::addSubcommand);
     }
 
     // process subcommands recursively

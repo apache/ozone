@@ -24,10 +24,10 @@ package org.apache.hadoop.ozone.repair.quota;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.Callable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.repair.RepairTool;
 import picocli.CommandLine;
 
 /**
@@ -39,9 +39,7 @@ import picocli.CommandLine;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
-public class QuotaTrigger implements Callable<Void>  {
-  @CommandLine.Spec
-  private static CommandLine.Model.CommandSpec spec;
+public class QuotaTrigger extends RepairTool {
 
   @CommandLine.ParentCommand
   private QuotaRepair parent;
@@ -68,25 +66,19 @@ public class QuotaTrigger implements Callable<Void>  {
   private String buckets;
 
   @Override
-  public Void call() throws Exception {
+  public void execute() throws Exception {
     List<String> bucketList = Collections.emptyList();
     if (StringUtils.isNotEmpty(buckets)) {
       bucketList = Arrays.asList(buckets.split(","));
     }
-    
-    OzoneManagerProtocol ozoneManagerClient =
-        parent.createOmClient(omServiceId, omHost, false);
-    try {
-      ozoneManagerClient.startQuotaRepair(bucketList);
-      System.out.println(ozoneManagerClient.getQuotaRepairStatus());
-    } catch (Exception ex) {
-      System.out.println(ex.getMessage());
+
+    try (OzoneManagerProtocol omClient = parent.createOmClient(omServiceId, omHost, false)) {
+      info("Triggering quota repair for %s",
+          bucketList.isEmpty()
+              ? "all buckets"
+              : ("buckets " + buckets));
+      omClient.startQuotaRepair(bucketList);
+      info(omClient.getQuotaRepairStatus());
     }
-    return null;
   }
-
-  protected QuotaRepair getParent() {
-    return parent;
-  }
-
 }

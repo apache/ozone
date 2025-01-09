@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketDeleteRequest;
@@ -316,7 +317,8 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
         new OMBucketDeleteRequest(omRequest);
 
     final TermIndex termIndex = TermIndex.valueOf(term, transactionID);
-    OMClientResponse omClientResponse = omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, termIndex);
+    final ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
+    OMClientResponse omClientResponse = omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, context);
     doubleBuffer.add(omClientResponse, termIndex);
     return omClientResponse;
   }
@@ -459,7 +461,8 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     }
 
     final TermIndex termIndex = TransactionInfo.getTermIndex(transactionId);
-    OMClientResponse omClientResponse = omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, termIndex);
+    final ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
+    OMClientResponse omClientResponse = omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, context);
     doubleBuffer.add(omClientResponse, termIndex);
     return omClientResponse;
   }
@@ -485,7 +488,8 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     }
 
     final TermIndex termIndex = TermIndex.valueOf(term, transactionID);
-    OMClientResponse omClientResponse = omBucketCreateRequest.validateAndUpdateCache(ozoneManager, termIndex);
+    final ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
+    OMClientResponse omClientResponse = omBucketCreateRequest.validateAndUpdateCache(ozoneManager, context);
     doubleBuffer.add(omClientResponse, termIndex);
     return (OMBucketCreateResponse) omClientResponse;
   }

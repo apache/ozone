@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
@@ -69,6 +70,8 @@ public class FilePerChunkStrategy implements ChunkManager {
   private final int readMappedBufferThreshold;
   private final int readMappedBufferMaxCount;
   private final MappedBufferManager mappedBufferManager;
+
+  private final boolean readNettyChunkedNioFile;
   private final VolumeSet volumeSet;
 
   public FilePerChunkStrategy(boolean sync, BlockManager manager,
@@ -88,6 +91,8 @@ public class FilePerChunkStrategy implements ChunkManager {
     } else {
       mappedBufferManager = null;
     }
+
+    this.readNettyChunkedNioFile = manager != null && manager.isReadNettyChunkedNioFile();
   }
 
   private static void checkLayoutVersion(Container container) {
@@ -214,7 +219,7 @@ public class FilePerChunkStrategy implements ChunkManager {
    * TODO: Explore if we need to do that for ozone.
    */
   @Override
-  public ChunkBuffer readChunk(Container container, BlockID blockID,
+  public ChunkBufferToByteString readChunk(Container container, BlockID blockID,
       ChunkInfo info, DispatcherContext dispatcherContext)
       throws StorageContainerException {
 
@@ -274,6 +279,9 @@ public class FilePerChunkStrategy implements ChunkManager {
         if (file.exists()) {
           long offset = info.getOffset() - chunkFileOffset;
           Preconditions.checkState(offset >= 0);
+          if (readNettyChunkedNioFile && dispatcherContext != null && dispatcherContext.isReleaseSupported()) {
+            return ChunkUtils.readData(file, bufferCapacity, offset, len, volume, dispatcherContext);
+          }
           return ChunkUtils.readData(len, bufferCapacity, file, offset, volume,
               readMappedBufferThreshold, readMappedBufferMaxCount > 0, mappedBufferManager);
         }

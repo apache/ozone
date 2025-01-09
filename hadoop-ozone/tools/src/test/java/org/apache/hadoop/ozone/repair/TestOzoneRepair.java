@@ -67,7 +67,7 @@ public class TestOzoneRepair {
     OzoneRepair ozoneRepair = new OzoneRepair();
     System.setIn(new ByteArrayInputStream("N".getBytes(DEFAULT_ENCODING)));
 
-    int res = ozoneRepair.execute(new String[]{});
+    int res = ozoneRepair.execute(new String[]{"om", "fso-tree"});
     assertEquals(1, res);
     assertThat(out.toString(DEFAULT_ENCODING)).contains("Aborting command.");
     // prompt should contain the current user name as well
@@ -79,10 +79,31 @@ public class TestOzoneRepair {
     OzoneRepair ozoneRepair = new OzoneRepair();
     System.setIn(new ByteArrayInputStream("y".getBytes(DEFAULT_ENCODING)));
 
-    ozoneRepair.execute(new String[]{});
+    ozoneRepair.execute(new String[]{"om", "fso-tree"});
     assertThat(out.toString(DEFAULT_ENCODING)).contains("Run as user: " + OZONE_USER);
     // prompt should contain the current user name as well
     assertThat(err.toString(DEFAULT_ENCODING)).contains("ATTENTION: Running as user " + OZONE_USER);
+  }
+
+  @Test
+  void testOzoneRepairSkipsPromptWhenNoSubcommandProvided() throws Exception {
+    OzoneRepair ozoneRepair = new OzoneRepair();
+
+    // when no argument is passed, prompt should not be displayed
+    ozoneRepair.execute(new String[]{});
+    assertThat(err.toString(DEFAULT_ENCODING)).doesNotContain("ATTENTION: Running as user " + OZONE_USER);
+  }
+
+  @Test
+  void testOzoneRepairSkipsPromptWhenHelpFlagProvided() throws Exception {
+    OzoneRepair ozoneRepair = new OzoneRepair();
+
+    // when --help or -h flag is passed, prompt should not be displayed
+    ozoneRepair.execute(new String[]{"--help"});
+    assertThat(err.toString(DEFAULT_ENCODING)).doesNotContain("ATTENTION: Running as user " + OZONE_USER);
+
+    ozoneRepair.execute(new String[]{"-h"});
+    assertThat(err.toString(DEFAULT_ENCODING)).doesNotContain("ATTENTION: Running as user " + OZONE_USER);
   }
 
 }

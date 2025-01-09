@@ -62,7 +62,7 @@ public class MetricsSubCommand extends BaseInsightSubCommand
   @Override
   public Void call() throws Exception {
     OzoneConfiguration conf =
-        getInsightCommand().createOzoneConfiguration();
+        getInsightCommand().getOzoneConf();
     InsightPoint insight =
         getInsight(conf, insightName);
     Set<Component> sources =

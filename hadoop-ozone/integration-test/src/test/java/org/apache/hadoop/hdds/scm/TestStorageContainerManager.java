@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
@@ -92,7 +93,6 @@ import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.Time;
 import org.apache.log4j.Level;
@@ -142,15 +142,12 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_C
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.mockRemoteUser;
 import static org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils.setInternalState;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
-import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
@@ -321,17 +318,7 @@ public class TestStorageContainerManager {
       // after sometime, all the TX should be proceed and by then
       // the number of containerBlocks of all known containers will be
       // empty again.
-      GenericTestUtils.waitFor(() -> {
-        try {
-          if (SCMHAUtils.isSCMHAEnabled(cluster.getConf())) {
-            cluster.getStorageContainerManager().getScmHAManager()
-                .asSCMHADBTransactionBuffer().flush();
-          }
-          return delLog.getNumOfValidTransactions() == 0;
-        } catch (IOException e) {
-          return false;
-        }
-      }, 1000, 22000);
+      OzoneTestUtils.waitBlockDeleted(cluster.getStorageContainerManager());
       assertTrue(verifyBlocksWithTxnTable(cluster, conf, containerBlocks));
       // Continue the work, add some TXs that with known container names,
       // but unknown block IDs.
@@ -379,10 +366,13 @@ public class TestStorageContainerManager {
       cluster.waitForClusterToBeReady();
       HddsDatanodeService datanode = cluster.getHddsDatanodes().get(0);
       StorageContainerManager scm = cluster.getStorageContainerManager();
+      File dbDir = scm.getScmMetadataStore().getStore().getDbLocation();
       scm.stop();
 
       // re-initialise SCM with new clusterID
 
+      GenericTestUtils.deleteDirectory(new File(SCMHAUtils.getRatisStorageDir(conf)));
+      GenericTestUtils.deleteDirectory(dbDir);
       GenericTestUtils.deleteDirectory(
           new File(scm.getScmStorageConfig().getStorageDir()));
       String newClusterId = UUID.randomUUID().toString();
@@ -411,37 +401,41 @@ public class TestStorageContainerManager {
       assertThat(scmDnHBDispatcherLog.getOutput()).isEmpty();
       assertThat(versionEndPointTaskLog.getOutput()).isEmpty();
       // start the new SCM
-      scm.start();
-      // Initially DatanodeStateMachine will be in Running state
-      assertEquals(DatanodeStateMachine.DatanodeStates.RUNNING,
-          dsm.getContext().getState());
-      // DN heartbeats to new SCM, SCM doesn't recognize the node, sends the
-      // command to DN to re-register. Wait for SCM to send re-register command
-      String expectedLog = String.format(
-          "SCM received heartbeat from an unregistered datanode %s. "
-              + "Asking datanode to re-register.",
-          datanode.getDatanodeDetails());
-      GenericTestUtils.waitFor(
-          () -> scmDnHBDispatcherLog.getOutput().contains(expectedLog), 100,
-          5000);
-      ExitUtil.disableSystemExit();
-      // As part of processing response for re-register, DN EndpointStateMachine
-      // goes to GET-VERSION state which checks if there is already existing
-      // version file on the DN & if the clusterID matches with that of the SCM
-      // In this case, it won't match and gets InconsistentStorageStateException
-      // and DN shuts down.
-      String expectedLog2 = "Received SCM notification to register."
-          + " Interrupt HEARTBEAT and transit to GETVERSION state.";
-      GenericTestUtils.waitFor(
-          () -> heartbeatEndpointTaskLog.getOutput().contains(expectedLog2),
-          100, 5000);
-      GenericTestUtils.waitFor(() -> dsm.getContext().getShutdownOnError(), 100,
-          5000);
-      assertEquals(DatanodeStateMachine.DatanodeStates.SHUTDOWN,
-          dsm.getContext().getState());
-      assertThat(versionEndPointTaskLog.getOutput()).contains(
-          "org.apache.hadoop.ozone.common" +
-              ".InconsistentStorageStateException: Mismatched ClusterIDs");
+      try {
+        scm.start();
+        // Initially DatanodeStateMachine will be in Running state
+        assertEquals(DatanodeStateMachine.DatanodeStates.RUNNING,
+            dsm.getContext().getState());
+        // DN heartbeats to new SCM, SCM doesn't recognize the node, sends the
+        // command to DN to re-register. Wait for SCM to send re-register command
+        String expectedLog = String.format(
+            "SCM received heartbeat from an unregistered datanode %s. "
+                + "Asking datanode to re-register.",
+            datanode.getDatanodeDetails());
+        GenericTestUtils.waitFor(
+            () -> scmDnHBDispatcherLog.getOutput().contains(expectedLog), 100,
+            30000);
+        ExitUtil.disableSystemExit();
+        // As part of processing response for re-register, DN EndpointStateMachine
+        // goes to GET-VERSION state which checks if there is already existing
+        // version file on the DN & if the clusterID matches with that of the SCM
+        // In this case, it won't match and gets InconsistentStorageStateException
+        // and DN shuts down.
+        String expectedLog2 = "Received SCM notification to register."
+            + " Interrupt HEARTBEAT and transit to GETVERSION state.";
+        GenericTestUtils.waitFor(
+            () -> heartbeatEndpointTaskLog.getOutput().contains(expectedLog2),
+            100, 5000);
+        GenericTestUtils.waitFor(() -> dsm.getContext().getShutdownOnError(), 100,
+            5000);
+        assertEquals(DatanodeStateMachine.DatanodeStates.SHUTDOWN,
+            dsm.getContext().getState());
+        assertThat(versionEndPointTaskLog.getOutput()).contains(
+            "org.apache.hadoop.ozone.common" +
+                ".InconsistentStorageStateException: Mismatched ClusterIDs");
+      } finally {
+        scm.stop();
+      }
     }
   }
 
@@ -574,21 +568,6 @@ public class TestStorageContainerManager {
     assertEquals(NodeType.SCM, scmStore.getNodeType());
     assertEquals(testClusterId, scmStore.getClusterID());
     assertTrue(scmStore.isSCMHAEnabled());
-  }
-
-  @Test
-  public void testSCMInitializationWithHAEnabled(@TempDir Path tempDir) throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
-    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, "10s");
-    Path scmPath = tempDir.resolve("scm-meta");
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
-
-    final UUID clusterId = UUID.randomUUID();
-    // This will initialize SCM
-    StorageContainerManager.scmInit(conf, clusterId.toString());
-    SCMStorageConfig scmStore = new SCMStorageConfig(conf);
-    assertTrue(scmStore.isSCMHAEnabled());
     validateRatisGroupExists(conf, clusterId.toString());
   }
 
@@ -674,17 +653,26 @@ public class TestStorageContainerManager {
     String scmId = UUID.randomUUID().toString();
     scmStore.setClusterId(clusterId);
     scmStore.setScmId(scmId);
+    scmStore.setSCMHAFlag(true);
     // writes the version file properties
     scmStore.initialize();
+    SCMRatisServerImpl.initialize(clusterId, scmId,
+        SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
+            .getLocalNodeDetails(), conf);
     StorageContainerManager scm = HddsTestUtils.getScmSimple(conf);
-    //Reads the SCM Info from SCM instance
-    ScmInfo scmInfo = scm.getClientProtocolServer().getScmInfo();
-    assertEquals(clusterId, scmInfo.getClusterId());
-    assertEquals(scmId, scmInfo.getScmId());
+    try {
+      scm.start();
+      //Reads the SCM Info from SCM instance
+      ScmInfo scmInfo = scm.getClientProtocolServer().getScmInfo();
+      assertEquals(clusterId, scmInfo.getClusterId());
+      assertEquals(scmId, scmInfo.getScmId());
 
-    String expectedVersion = HddsVersionInfo.HDDS_VERSION_INFO.getVersion();
-    String actualVersion = scm.getSoftwareVersion();
-    assertEquals(expectedVersion, actualVersion);
+      String expectedVersion = HddsVersionInfo.HDDS_VERSION_INFO.getVersion();
+      String actualVersion = scm.getSoftwareVersion();
+      assertEquals(expectedVersion, actualVersion);
+    } finally {
+      scm.stop();
+    }
   }
 
   /**
@@ -951,35 +939,6 @@ public class TestStorageContainerManager {
     assertEquals(containerReportExecutors.scheduledEvents(),
         containerReportExecutors.queuedEvents());
     containerReportExecutors.close();
-  }
-
-  @Test
-  public void testNonRatisToRatis()
-      throws IOException, AuthenticationException, InterruptedException,
-      TimeoutException {
-    final OzoneConfiguration conf = new OzoneConfiguration();
-    try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
-        .build()) {
-      final StorageContainerManager nonRatisSCM = cluster
-          .getStorageContainerManager();
-      assertNull(nonRatisSCM.getScmHAManager().getRatisServer());
-      assertFalse(nonRatisSCM.getScmStorageConfig().isSCMHAEnabled());
-      nonRatisSCM.stop();
-      nonRatisSCM.join();
-
-      DefaultConfigManager.clearDefaultConfigs();
-      conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
-      StorageContainerManager.scmInit(conf, cluster.getClusterId());
-      conf.setInt(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY, getFreePort());
-      conf.unset(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY);
-      cluster.restartStorageContainerManager(false);
-
-      final StorageContainerManager ratisSCM = cluster
-          .getStorageContainerManager();
-      assertNotNull(ratisSCM.getScmHAManager().getRatisServer());
-      assertTrue(ratisSCM.getScmStorageConfig().isSCMHAEnabled());
-    }
   }
 
   private void addTransactions(StorageContainerManager scm,

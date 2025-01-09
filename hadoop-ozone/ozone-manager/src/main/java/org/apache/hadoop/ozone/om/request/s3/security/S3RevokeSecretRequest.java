@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.s3.security;
 
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -78,7 +78,7 @@ public class S3RevokeSecretRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
 
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse =

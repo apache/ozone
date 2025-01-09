@@ -37,6 +37,7 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 import java.io.IOException;
+import java.util.concurrent.Callable;
 
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 
@@ -49,7 +50,7 @@ import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_H
     hidden = true, description = "Start or initialize the scm server.",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
-public class StorageContainerManagerStarter extends GenericCli {
+public class StorageContainerManagerStarter extends GenericCli implements Callable<Void> {
 
   private OzoneConfiguration conf;
   private SCMStarterInterface receiver;
@@ -150,7 +151,7 @@ public class StorageContainerManagerStarter extends GenericCli {
    * is set and print the startup banner message.
    */
   private void commonInit() {
-    conf = createOzoneConfiguration();
+    conf = getOzoneConf();
     TracingUtil.initTracing("StorageContainerManager", conf);
 
     String[] originalArgs = getCmd().getParseResult().originalArgs()

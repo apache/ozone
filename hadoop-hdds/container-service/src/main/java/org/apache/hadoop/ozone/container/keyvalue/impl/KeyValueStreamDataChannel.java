@@ -20,14 +20,11 @@ package org.apache.hadoop.ozone.container.keyvalue.impl;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
 import org.apache.ratis.util.ReferenceCountedObject;
 import org.slf4j.Logger;
@@ -36,9 +33,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * This class is used to get the DataChannel for streaming.
@@ -53,8 +48,6 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
 
   private final Buffers buffers = new Buffers(
       BlockDataStreamOutput.PUT_BLOCK_REQUEST_LENGTH_MAX);
-  private final AtomicReference<ContainerCommandRequestProto> putBlockRequest
-      = new AtomicReference<>();
   private final AtomicBoolean closed = new AtomicBoolean();
 
   KeyValueStreamDataChannel(File file, ContainerData containerData,
@@ -90,7 +83,7 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
     return src.get().remaining();
   }
 
-  private static void writeFully(ByteBuffer b, WriteMethod writeMethod)
+  static void writeFully(ByteBuffer b, WriteMethod writeMethod)
       throws IOException {
     while (b.remaining() > 0) {
       final int written = writeMethod.applyAsInt(b);
@@ -98,11 +91,6 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
         throw new IOException("Unable to write");
       }
     }
-  }
-
-  public ContainerCommandRequestProto getPutBlockRequest() {
-    return Objects.requireNonNull(putBlockRequest.get(),
-        () -> "putBlockRequest == null, " + this);
   }
 
   void assertOpen() throws IOException {
@@ -115,7 +103,7 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
   public void close() throws IOException {
     if (closed.compareAndSet(false, true)) {
       try {
-        putBlockRequest.set(closeBuffers(buffers, super::writeFileChannel));
+        writeBuffers();
       } finally {
         super.close();
       }
@@ -130,22 +118,23 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
     }
   }
 
-  static ContainerCommandRequestProto closeBuffers(
-      Buffers buffers, WriteMethod writeMethod) throws IOException {
+  /**
+   * Write the data in {@link #buffers} to the channel.
+   * Note that the PutBlock proto at the end is ignored; see HDDS-12007.
+   */
+  private void writeBuffers() throws IOException {
     final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll();
     final ByteBuf buf = ref.retain();
-    final ContainerCommandRequestProto putBlockRequest;
     try {
-      putBlockRequest = readPutBlockRequest(buf);
+      setEndIndex(buf);
       // write the remaining data
-      writeFully(buf.nioBuffer(), writeMethod);
+      writeFully(buf.nioBuffer(), super::writeFileChannel);
     } finally {
       ref.release();
     }
-    return putBlockRequest;
   }
 
-  private static int readProtoLength(ByteBuf b, int lengthIndex) {
+  static int readProtoLength(ByteBuf b, int lengthIndex) {
     final int readerIndex = b.readerIndex();
     LOG.debug("{}, lengthIndex = {}, readerIndex = {}",
         b, lengthIndex, readerIndex);
@@ -158,8 +147,8 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
     return b.nioBuffer().getInt();
   }
 
-  static ContainerCommandRequestProto readPutBlockRequest(ByteBuf b)
-      throws IOException {
+  /** Set end index to the proto index in order to ignore the proto. */
+  static void setEndIndex(ByteBuf b) {
     //   readerIndex   protoIndex   lengthIndex    readerIndex+readableBytes
     //         V            V             V                              V
     // format: |--- data ---|--- proto ---|--- proto length (4 bytes) ---|
@@ -168,37 +157,7 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
     final int protoLength = readProtoLength(b.duplicate(), lengthIndex);
     final int protoIndex = lengthIndex - protoLength;
 
-    final ContainerCommandRequestProto proto;
-    try {
-      proto = readPutBlockRequest(b.slice(protoIndex, protoLength).nioBuffer());
-    } catch (Throwable t) {
-      RatisHelper.debug(b, "catch", LOG);
-      throw new IOException("Failed to readPutBlockRequest from " + b
-          + ": readerIndex=" + readerIndex
-          + ", protoIndex=" + protoIndex
-          + ", protoLength=" + protoLength
-          + ", lengthIndex=" + lengthIndex, t);
-    }
-
     // set index for reading data
     b.writerIndex(protoIndex);
-
-    return proto;
-  }
-
-  private static ContainerCommandRequestProto readPutBlockRequest(ByteBuffer b)
-      throws IOException {
-    RatisHelper.debug(b, "readPutBlockRequest", LOG);
-    final ByteString byteString = ByteString.copyFrom(b);
-
-    final ContainerCommandRequestProto request =
-        ContainerCommandRequestMessage.toProto(byteString, null);
-
-    if (!request.hasPutBlock()) {
-      throw new StorageContainerException(
-          "Malformed PutBlock request. trace ID: " + request.getTraceID(),
-          ContainerProtos.Result.MALFORMED_REQUEST);
-    }
-    return request;
   }
 }

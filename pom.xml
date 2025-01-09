@@ -34,7 +34,7 @@
     <apache-rat-plugin.version>0.16.1</apache-rat-plugin.version>
     <aspectj-plugin.version>1.14</aspectj-plugin.version>
     <aspectj.version>1.9.7</aspectj.version>
-    <assertj.version>3.27.0</assertj.version>
+    <assertj.version>3.27.1</assertj.version>
     <aws-java-sdk.version>1.12.661</aws-java-sdk.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.79</bouncycastle.version>
@@ -215,7 +215,7 @@
     <sortpom-maven-plugin.version>3.0.1</sortpom-maven-plugin.version>
     <spotbugs.version>3.1.12.2</spotbugs.version>
     <spring.version>5.3.39</spring.version>
-    <sqlite.version>3.47.1.0</sqlite.version>
+    <sqlite.version>3.47.2.0</sqlite.version>
     <stax2.version>4.2.2</stax2.version>
     <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
     <surefire.fork.timeout>1200</surefire.fork.timeout>
@@ -230,7 +230,7 @@
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
     <woodstox.version>5.4.0</woodstox.version>
     <zookeeper.version>3.8.4</zookeeper.version>
-    <zstd-jni.version>1.5.6-8</zstd-jni.version>
+    <zstd-jni.version>1.5.6-9</zstd-jni.version>
   </properties>
 
   <dependencyManagement>

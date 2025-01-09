@@ -85,7 +85,7 @@ public final class  ReconServerConfigKeys {
   public static final String OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY =
       "ozone.recon.om.snapshot.task.interval.delay";
   public static final String OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT
-      = "10m";
+      = "5s";
   @Deprecated
   public static final String RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY =
       "recon.om.snapshot.task.interval.delay";
@@ -98,10 +98,10 @@ public final class  ReconServerConfigKeys {
 
   public static final String RECON_OM_DELTA_UPDATE_LIMIT =
       "recon.om.delta.update.limit";
-  public static final long RECON_OM_DELTA_UPDATE_LIMIT_DEFUALT = 2000;
+  public static final long RECON_OM_DELTA_UPDATE_LIMIT_DEFAULT = 50000;
   public static final String RECON_OM_DELTA_UPDATE_LOOP_LIMIT =
       "recon.om.delta.update.loop.limit";
-  public static final int RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFUALT = 10;
+  public static final int RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFAULT = 50;
 
   public static final String OZONE_RECON_TASK_THREAD_COUNT_KEY =
       "ozone.recon.task.thread.count";
