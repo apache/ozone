@@ -87,9 +87,9 @@ public abstract class GenericCli implements GenericParentCommand {
     //message could be null in case of NPE. This is unexpected so we can
     //print out the stack trace.
     if (verbose || Strings.isNullOrEmpty(error.getMessage())) {
-      error.printStackTrace(System.err);
+      error.printStackTrace(cmd.getErr());
     } else {
-      System.err.println(error.getMessage().split("\n")[0]);
+      cmd.getErr().println(error.getMessage().split("\n")[0]);
     }
   }
 

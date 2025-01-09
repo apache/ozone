@@ -92,8 +92,8 @@ public class StorageContainerManagerStarter extends GenericCli implements Callab
       versionProvider = HddsVersionProvider.class)
   public void generateClusterId() {
     commonInit();
-    System.out.println("Generating new cluster id:");
-    System.out.println(receiver.generateClusterId());
+    getCmd().getOut().println("Generating new cluster id:");
+    getCmd().getOut().println(receiver.generateClusterId());
   }
 
   /**

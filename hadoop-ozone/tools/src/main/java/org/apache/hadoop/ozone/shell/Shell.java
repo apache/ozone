@@ -109,7 +109,7 @@ public abstract class Shell extends GenericCli {
     if (omException != null && !isVerbose()) {
       // In non-verbose mode, reformat OMExceptions as error messages to the
       // user.
-      System.err.println(String.format("%s %s", omException.getResult().name(),
+      getCmd().getErr().println(String.format("%s %s", omException.getResult().name(),
               omException.getMessage()));
     } else {
       // Prints the stack trace when in verbose mode.
