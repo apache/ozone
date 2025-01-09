@@ -1602,7 +1602,7 @@ public class TestKeyManagerImpl {
       locationInfoList.add(locationInfo1);
     }
 
-    OmKeyLocationInfoGroup locationInfoGroup = new OmKeyLocationInfoGroup(1, locationInfoList);
+    OmKeyLocationInfoGroup locationInfoGroup = new OmKeyLocationInfoGroup(0, locationInfoList);
     locationInfoGroups.add(locationInfoGroup);
     locationInfoGroup.setMultipartKey(true);
 
