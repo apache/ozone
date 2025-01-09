@@ -19,7 +19,9 @@
 package org.apache.hadoop.ozone.shell;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+
 import picocli.CommandLine;
 import picocli.shell.jline3.PicocliCommands.PicocliCommandsFactory;
 
@@ -85,7 +87,9 @@ public abstract class Shell extends GenericCli {
       spec.name(""); // use short name (e.g. "token get" instead of "ozone sh token get")
       new REPL(this, getCmd(), (PicocliCommandsFactory) getCmd().getFactory());
     } else {
-      super.run(argv);
+      TracingUtil.initTracing("shell", getOzoneConf());
+      String spanName = spec.name() + " " + String.join(" ", argv);
+      TracingUtil.executeInNewSpan(spanName, () -> super.run(argv));
     }
   }
 

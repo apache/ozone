@@ -15,13 +15,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.fs.ozone;
+package org.apache.hadoop.ozone.om.execution.flowcontrol;
 
-import org.junit.jupiter.api.TestInstance;
+import org.apache.ratis.server.protocol.TermIndex;
 
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class TestOFSWithFSOAndCacheOnly extends AbstractRootedOzoneFileSystemTestWithFSO {
-  TestOFSWithFSOAndCacheOnly() {
-    super(false, false, true);
+/**
+ * Context required for execution of a request.
+ */
+public final class ExecutionContext {
+  private final long index;
+  private final TermIndex termIndex;
+
+  private ExecutionContext(long index, TermIndex termIndex) {
+    this.index = index;
+    if (null == termIndex) {
+      termIndex = TermIndex.valueOf(-1, index);
+    }
+    this.termIndex = termIndex;
+  }
+
+  public static ExecutionContext of(long index, TermIndex termIndex) {
+    return new ExecutionContext(index, termIndex);
+  }
+
+  public long getIndex() {
+    return index;
+  }
+
+  public TermIndex getTermIndex() {
+    return termIndex;
   }
 }

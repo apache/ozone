@@ -238,7 +238,7 @@ Create key with custom etag metadata and expect it won't conflict with ETag resp
     ${file_md5_checksum}                    Execute                             md5sum /tmp/small_file | awk '{print $1}'
                                             Execute AWSS3CliDebug               cp --metadata "ETag=custom-etag-value" /tmp/small_file s3://${BUCKET}/test_file
     ${result}                               Execute AWSS3CliDebug               cp s3://${BUCKET}/test_file /tmp/test_file_downloaded
-    ${match}    ${ETag}     ${etagCustom}   Should Match Regexp                 ${result}    HEAD /${BUCKET}/test_file\ .*?Response headers.*?ETag':\ '"(.*?)"'.*?x-amz-meta-etag':\ '(.*?)'     flags=DOTALL
+    ${match}    ${ETag}     ${etagCustom}   Should Match Regexp                 ${result}    HEAD /${BUCKET}/test_file\ .*?Response headers.*?ETag':\ '"(.*?)"'.*?x-amz-meta-etag':\ '(.*?)'     flags=DOTALL | IGNORECASE
                                             Should Be Equal As Strings          ${ETag}     ${file_md5_checksum}
                                             Should BE Equal As Strings          ${etagCustom}       custom-etag-value
                                             Should Not Be Equal As Strings      ${ETag}     ${etagCustom}
@@ -262,9 +262,9 @@ Create key twice with different content and expect different ETags
                                 Execute                    head -c 1MiB </dev/urandom > /tmp/file1
                                 Execute                    head -c 1MiB </dev/urandom > /tmp/file2
     ${file1UploadResult}        Execute AWSS3CliDebug      cp /tmp/file1 s3://${BUCKET}/test_key_to_check_etag_differences
-    ${match}    ${etag1}        Should Match Regexp        ${file1UploadResult}     PUT /${BUCKET}/test_key_to_check_etag_differences\ .*?Response headers.*?ETag':\ '"(.*?)"'    flags=DOTALL
+    ${match}    ${etag1}        Should Match Regexp        ${file1UploadResult}     PUT /${BUCKET}/test_key_to_check_etag_differences\ .*?Response headers.*?ETag':\ '"(.*?)"'    flags=DOTALL | IGNORECASE
     ${file2UploadResult}        Execute AWSS3CliDebug      cp /tmp/file2 s3://${BUCKET}/test_key_to_check_etag_differences
-    ${match}    ${etag2}        Should Match Regexp        ${file2UploadResult}     PUT /${BUCKET}/test_key_to_check_etag_differences\ .*?Response headers.*?ETag':\ '"(.*?)"'    flags=DOTALL
+    ${match}    ${etag2}        Should Match Regexp        ${file2UploadResult}     PUT /${BUCKET}/test_key_to_check_etag_differences\ .*?Response headers.*?ETag':\ '"(.*?)"'    flags=DOTALL | IGNORECASE
                                 Should Not Be Equal As Strings  ${etag1}    ${etag2}
                                 # clean up
                                 Execute AWSS3Cli           rm s3://${BUCKET}/test_key_to_check_etag_differences

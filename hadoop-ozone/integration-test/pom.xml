@@ -28,6 +28,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <name>Apache Ozone Integration Tests</name>
   <packaging>jar</packaging>
 
+  <properties>
+    <sort.skip>true</sort.skip>
+  </properties>
+
   <dependencies>
 
     <dependency>
