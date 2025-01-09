@@ -102,9 +102,19 @@ public final class DBDefinitionFactory {
     return getDefinition(dbName);
   }
 
-  public static List<CheckedSupplier<DBDefinition, Exception>> getFactories(
+  static List<CheckedSupplier<DBDefinition, Exception>> getFactories(
       Class<?> clazz, String dbPathString, ConfigurationSource config) {
     return Arrays.asList(
+        () -> {
+          Constructor<?> constructor = clazz.getDeclaredConstructor(String.class, ConfigurationSource.class);
+          constructor.setAccessible(true);
+          return (DBDefinition) constructor.newInstance(dbPathString, config);
+        },
+        () -> {
+          Constructor<?> constructor = clazz.getDeclaredConstructor(String.class);
+          constructor.setAccessible(true);
+          return (DBDefinition) constructor.newInstance(dbPathString);
+        },
         () -> {
           Method factoryMethod = clazz.getDeclaredMethod("get");
           factoryMethod.setAccessible(true);
@@ -114,16 +124,6 @@ public final class DBDefinitionFactory {
           Constructor<?> constructor = clazz.getDeclaredConstructor();
           constructor.setAccessible(true);
           return (DBDefinition) constructor.newInstance();
-        },
-        () -> {
-          Constructor<?> constructor = clazz.getDeclaredConstructor(String.class);
-          constructor.setAccessible(true);
-          return (DBDefinition) constructor.newInstance(dbPathString);
-        },
-        () -> {
-          Constructor<?> constructor = clazz.getDeclaredConstructor(String.class, ConfigurationSource.class);
-          constructor.setAccessible(true);
-          return (DBDefinition) constructor.newInstance(dbPathString, config);
         }
     );
   }

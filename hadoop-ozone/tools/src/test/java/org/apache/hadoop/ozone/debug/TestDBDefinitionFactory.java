@@ -28,6 +28,7 @@ import java.util.Set;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
+import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaOneDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaTwoDBDefinition;
@@ -101,12 +102,11 @@ public class TestDBDefinitionFactory {
   public void testAllDBDefinitionsHaveCorrectConstructor() {
     Set<Class<?>> subclasses = new HashSet<>();
     try {
-      Reflections reflections = new Reflections("org.apache.hadoop");
+      Reflections reflections = new Reflections("org.apache");
       subclasses.addAll(reflections.getSubTypesOf(DBDefinition.class));
-      subclasses.remove(Class.forName("org.apache.hadoop.hdds.utils.db.DBDefinition$WithMap"));
-      subclasses.remove(Class.forName("org.apache.hadoop.hdds.utils.db.DBDefinition$WithMapInterface"));
-      subclasses.remove(Class.forName(
-          "org.apache.hadoop.ozone.container.metadata.AbstractDatanodeDBDefinition"));
+      subclasses.remove(DBDefinition.WithMap.class);
+      subclasses.remove(DBDefinition.WithMapInterface.class);
+      subclasses.remove(AbstractDatanodeDBDefinition.class);
     } catch (Exception e) {
       fail("Error while finding subclasses: " + e.getMessage());
     }
