@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.Set;
 import java.util.Map;
+import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
@@ -121,55 +122,19 @@ public class DeletedBlockLogImpl
   }
 
   @Override
-  public List<DeletedBlocksTransaction> getFailedTransactionsBatch(
-      int batchSize, long startTxId) throws IOException {
-    List<DeletedBlocksTransaction> failedTXs = new ArrayList<>();
-
-    lock.lock();
-    try {
-      try (
-          TableIterator<Long, ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
-              deletedBlockLogStateManager.getReadOnlyIterator()) {
-
-        iter.seek(startTxId);
-
-        while (iter.hasNext() && failedTXs.size() < batchSize) {
-          DeletedBlocksTransaction delTX = iter.next().getValue();
-          if (delTX.getCount() == -1) {
-            failedTXs.add(delTX);
-          }
-        }
-      }
-    } finally {
-      lock.unlock();
-    }
-
-    return failedTXs;
-  }
-
-  @Override
   public List<DeletedBlocksTransaction> getFailedTransactions(int count,
       long startTxId) throws IOException {
     lock.lock();
     try {
       final List<DeletedBlocksTransaction> failedTXs = Lists.newArrayList();
-      try (TableIterator<Long,
-          ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
-          deletedBlockLogStateManager.getReadOnlyIterator()) {
-        if (count == LIST_ALL_FAILED_TRANSACTIONS) {
-          while (iter.hasNext()) {
-            DeletedBlocksTransaction delTX = iter.next().getValue();
-            if (delTX.getCount() == -1) {
-              failedTXs.add(delTX);
-            }
-          }
-        } else {
-          iter.seek(startTxId);
-          while (iter.hasNext() && failedTXs.size() < count) {
-            DeletedBlocksTransaction delTX = iter.next().getValue();
-            if (delTX.getCount() == -1 && delTX.getTxID() >= startTxId) {
-              failedTXs.add(delTX);
-            }
+      try (
+          TableIterator<Long, ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
+              deletedBlockLogStateManager.getReadOnlyIterator()) {
+        iter.seek(startTxId);
+        while (iter.hasNext() && failedTXs.size() < count) {
+          DeletedBlocksTransaction delTX = iter.next().getValue();
+          if (delTX.getCount() == -1 && delTX.getTxID() >= startTxId) {
+            failedTXs.add(delTX);
           }
         }
       }
@@ -212,7 +177,7 @@ public class DeletedBlockLogImpl
         List<DeletedBlocksTransaction> batch;
         do {
           // Fetch the batch of failed transactions
-          batch = getFailedTransactionsBatch(batchSize, startTxId);
+          batch = getFailedTransactions(batchSize, startTxId);
 
           // If the batch is empty, skip further processing
           if (!batch.isEmpty()) {
@@ -234,40 +199,21 @@ public class DeletedBlockLogImpl
             // Update startTxId to continue from the last processed transaction in the next iteration
             startTxId = batch.get(batch.size() - 1).getTxID() + 1;
           }
-
         } while (!batch.isEmpty());
       } else {
-        // Process txIDs provided by the user in batches
-        for (List<Long> batch : partitionList(txIDs, batchSize)) {
-          lock.lock();
-          try {
-            transactionStatusManager.resetRetryCount(batch);
-            int batchProcessed = deletedBlockLogStateManager.resetRetryCountOfTransactionInDB(
-                new ArrayList<>(batch));
-
-            totalProcessed += batchProcessed;
-          } finally {
-            lock.unlock();
-          }
+        lock.lock();
+        try {
+          transactionStatusManager.resetRetryCount(txIDs);
+          return deletedBlockLogStateManager.resetRetryCountOfTransactionInDB(
+              new ArrayList<>(new HashSet<>(txIDs)));
+        } finally {
+          lock.unlock();
         }
       }
-
       return totalProcessed;
     } catch (Exception e) {
       throw new IOException("Error during transaction reset", e);
     }
-  }
-
-
-  /**
-   * Helper method to partition a list into smaller batches.
-   */
-  private <T> List<List<T>> partitionList(List<T> list, int batchSize) {
-    List<List<T>> partitions = new ArrayList<>();
-    for (int i = 0; i < list.size(); i += batchSize) {
-      partitions.add(list.subList(i, Math.min(i + batchSize, list.size())));
-    }
-    return partitions;
   }
 
   private DeletedBlocksTransaction constructNewTransaction(

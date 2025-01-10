@@ -57,14 +57,11 @@ public interface DeletedBlockLog extends Closeable {
    * considered to be failed if it has been sent more than MAX_RETRY limit
    * and its count is reset to -1.
    *
-   * @param batchSize Number of failed transactions to be processed in a batch.
+   * @param count Number of failed transactions to be returned.
    * @param startTxId The least transaction id to start with.
    * @return a list of failed deleted block transactions.
    * @throws IOException
    */
-  List<DeletedBlocksTransaction> getFailedTransactionsBatch(int batchSize,
-      long startTxId) throws IOException;
-
   List<DeletedBlocksTransaction> getFailedTransactions(int count,
       long startTxId) throws IOException;
 

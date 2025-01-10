@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
@@ -904,18 +905,19 @@ public class SCMClientProtocolServer implements
     auditMap.put("count", String.valueOf(count));
     auditMap.put("startTxId", String.valueOf(startTxId));
     try {
-      result = scm.getScmBlockManager().getDeletedBlockLog()
-          .getFailedTransactions(count, startTxId).stream()
-          .map(DeletedBlocksTransactionInfoWrapper::fromTxn)
-          .collect(Collectors.toList());
+      int transactionCount = (count == -1) ? Integer.MAX_VALUE : count;
+      List<StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction>
+          failedTXs = scm.getScmBlockManager().getDeletedBlockLog()
+          .getFailedTransactions(transactionCount, startTxId);
+      result =
+          failedTXs.stream().map(DeletedBlocksTransactionInfoWrapper::fromTxn)
+              .collect(Collectors.toList());
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
           SCMAction.GET_FAILED_DELETED_BLOCKS_TRANSACTION, auditMap));
       return result;
     } catch (IOException ex) {
-      AUDIT.logReadFailure(
-          buildAuditMessageForFailure(
-              SCMAction.GET_FAILED_DELETED_BLOCKS_TRANSACTION, auditMap, ex)
-      );
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
+          SCMAction.GET_FAILED_DELETED_BLOCKS_TRANSACTION, auditMap, ex));
       throw ex;
     }
   }
