@@ -86,7 +86,7 @@ public class ValueSchema implements Callable<Void> {
 
     String dbPath = parent.getDbPath();
     Map<String, Object> fields = new HashMap<>();
-    success = getValueFields(dbPath, fields, depth, tableName, dnDBSchemaVersion);
+    success = getValueFields(dbPath, fields, depth, tableName, dnDBSchemaVersion, parent.getDbDefinition());
 
     out().println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(fields));
 
@@ -100,11 +100,11 @@ public class ValueSchema implements Callable<Void> {
   }
 
   public static boolean getValueFields(String dbPath, Map<String, Object> valueSchema, int d, String table,
-                                       String dnDBSchemaVersion) {
+                                       String dnDBSchemaVersion, String dbDef) {
 
     dbPath = removeTrailingSlashIfNeeded(dbPath);
     DBDefinitionFactory.setDnDBSchemaVersion(dnDBSchemaVersion);
-    DBDefinition dbDefinition = DBDefinitionFactory.getDefinition(Paths.get(dbPath), new OzoneConfiguration());
+    DBDefinition dbDefinition = DBDefinitionFactory.getDefinition(Paths.get(dbPath), new OzoneConfiguration(), dbDef);
     if (dbDefinition == null) {
       err().println("Error: Incorrect DB Path");
       return false;

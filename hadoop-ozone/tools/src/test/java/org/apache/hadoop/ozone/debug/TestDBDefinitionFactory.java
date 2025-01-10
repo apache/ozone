@@ -21,9 +21,14 @@ package org.apache.hadoop.ozone.debug;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
+import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaOneDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaTwoDBDefinition;
@@ -34,8 +39,13 @@ import org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_CONTAINER_KEY_DB;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.apache.ratis.util.function.CheckedSupplier;
 import org.junit.jupiter.api.Test;
+import org.reflections.Reflections;
 
 /**
  * Simple factory unit test.
@@ -74,5 +84,48 @@ public class TestDBDefinitionFactory {
     DBDefinitionFactory.setDnDBSchemaVersion("V3");
     definition = DBDefinitionFactory.getDefinition(dbPath, conf);
     assertInstanceOf(DatanodeSchemaThreeDBDefinition.class, definition);
+  }
+
+  @Test
+  public void testGetDefinitionWithOverride() {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    Path dbPath = Paths.get("another.db");
+    DBDefinition definition = DBDefinitionFactory.getDefinition(dbPath, conf, OMDBDefinition.class.getName());
+    assertInstanceOf(OMDBDefinition.class, definition);
+  }
+
+  /*
+   * Test to ensure that any DBDefinition has a default constructor or a constructor with 1 parameter.
+   * This is needed for ldb tools to run with arbitrary DB definitions.
+   */
+  @Test
+  public void testAllDBDefinitionsHaveCorrectConstructor() {
+    Set<Class<?>> subclasses = new HashSet<>();
+    try {
+      Reflections reflections = new Reflections("org.apache");
+      subclasses.addAll(reflections.getSubTypesOf(DBDefinition.class));
+      subclasses.remove(DBDefinition.WithMap.class);
+      subclasses.remove(DBDefinition.WithMapInterface.class);
+      subclasses.remove(AbstractDatanodeDBDefinition.class);
+    } catch (Exception e) {
+      fail("Error while finding subclasses: " + e.getMessage());
+    }
+    assertFalse(subclasses.isEmpty(), "No classes found extending DBDefinition");
+
+    for (Class<?> clazz : subclasses) {
+      List<CheckedSupplier<DBDefinition, Exception>> factories =
+          DBDefinitionFactory.getFactories(clazz, "testDbPath", new OzoneConfiguration());
+      boolean hasValidFactory = factories.stream().anyMatch(factory -> {
+        try {
+          factory.get();
+          return true;
+        } catch (Exception e) {
+          return false;
+        }
+      });
+
+      assertTrue(hasValidFactory,
+          "Class " + clazz.getName() + " does not have a valid constructor or factory method.");
+    }
   }
 }
