@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.om.request.s3.security;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -100,7 +100,7 @@ public class OMSetSecretRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
@@ -124,7 +124,7 @@ public class OMSetSecretRequest extends OMClientRequest {
 
             // Update S3SecretTable cache entry in this case
             // Set the transactionLogIndex to be used for updating.
-            final S3SecretValue newS3SecretValue = S3SecretValue.of(accessId, secretKey, termIndex.getIndex());
+            final S3SecretValue newS3SecretValue = S3SecretValue.of(accessId, secretKey, context.getIndex());
             s3SecretManager.updateCache(accessId, newS3SecretValue);
 
             // Compose response

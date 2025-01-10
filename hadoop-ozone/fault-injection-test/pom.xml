@@ -28,6 +28,10 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <name>Apache Ozone Fault Injection Tests</name>
   <packaging>pom</packaging>
 
+  <properties>
+    <sort.skip>true</sort.skip>
+  </properties>
+
   <modules>
     <module>network-tests</module>
     <module>mini-chaos-tests</module>

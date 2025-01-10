@@ -26,8 +26,9 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
-import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -61,7 +62,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     PurgeKeysRequest purgeKeysRequest = getOmRequest().getPurgeKeysRequest();
     List<DeletedKeys> bucketDeletedKeysList = purgeKeysRequest.getDeletedKeysList();
     List<SnapshotMoveKeyInfos> keysToUpdateList = purgeKeysRequest.getKeysToUpdateList();
@@ -93,9 +94,14 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
 
     List<String> keysToBePurgedList = new ArrayList<>();
 
+    int numKeysDeleted = 0;
     for (DeletedKeys bucketWithDeleteKeys : bucketDeletedKeysList) {
-      keysToBePurgedList.addAll(bucketWithDeleteKeys.getKeysList());
+      List<String> keysList = bucketWithDeleteKeys.getKeysList();
+      keysToBePurgedList.addAll(keysList);
+      numKeysDeleted = numKeysDeleted + keysList.size();
     }
+    DeletingServiceMetrics deletingServiceMetrics = ozoneManager.getDeletionMetrics();
+    deletingServiceMetrics.incrNumKeysPurged(numKeysDeleted);
 
     if (keysToBePurgedList.isEmpty()) {
       return new OMKeyPurgeResponse(createErrorOMResponse(omResponse,
@@ -107,9 +113,9 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     // services.
     try {
       if (fromSnapshotInfo != null) {
-        fromSnapshotInfo.setLastTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());
+        fromSnapshotInfo.setLastTransactionInfo(TransactionInfo.valueOf(context.getTermIndex()).toByteString());
         omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(fromSnapshotInfo.getTableKey()),
-            CacheValue.get(termIndex.getIndex(), fromSnapshotInfo));
+            CacheValue.get(context.getIndex(), fromSnapshotInfo));
       }
     } catch (IOException e) {
       return new OMKeyPurgeResponse(createErrorOMResponse(omResponse, e));

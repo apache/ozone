@@ -250,6 +250,7 @@ public final class HttpServer2 implements FilterContainer {
 
     private boolean xFrameEnabled;
     private XFrameOption xFrameOption = XFrameOption.SAMEORIGIN;
+    private boolean skipDefaultApps;
 
     public Builder setName(String serverName) {
       this.name = serverName;
@@ -446,6 +447,11 @@ public final class HttpServer2 implements FilterContainer {
       excludeCiphers = sslConf.get(SSLFactory.SSL_SERVER_EXCLUDE_CIPHER_LIST);
     }
 
+    public Builder withoutDefaultApps() {
+      this.skipDefaultApps = true;
+      return this;
+    }
+
     public HttpServer2 build() throws IOException {
       Preconditions.checkNotNull(name, "name is not set");
       Preconditions.checkState(!endpoints.isEmpty(), "No endpoints specified");
@@ -592,18 +598,13 @@ public final class HttpServer2 implements FilterContainer {
 
     this.findPort = b.findPort;
     this.portRanges = b.portRanges;
-    initializeWebServer(b.name, b.hostName, b.conf, b.pathSpecs,
-        b.authFilterConfigurationPrefix, b.securityEnabled);
+    initializeWebServer(b);
   }
 
-  private void initializeWebServer(String name, String hostName,
-      MutableConfigurationSource conf, String[] pathSpecs,
-      String authFilterConfigPrefix,
-      boolean securityEnabled) throws IOException {
-
+  private void initializeWebServer(Builder builder) throws IOException {
     Preconditions.checkNotNull(webAppContext);
 
-    int maxThreads = conf.getInt(HTTP_MAX_THREADS_KEY, -1);
+    int maxThreads = builder.conf.getInt(HTTP_MAX_THREADS_KEY, -1);
     // If HTTP_MAX_THREADS is not configured, QueueThreadPool() will use the
     // default value (currently 250).
 
@@ -613,13 +614,13 @@ public final class HttpServer2 implements FilterContainer {
       threadPool.setMaxThreads(maxThreads);
     }
 
-    metrics = HttpServer2Metrics.create(threadPool, name);
+    metrics = HttpServer2Metrics.create(threadPool, builder.name);
     SessionHandler handler = webAppContext.getSessionHandler();
     handler.setHttpOnly(true);
     handler.getSessionCookieConfig().setSecure(true);
 
     ContextHandlerCollection contexts = new ContextHandlerCollection();
-    RequestLog requestLog = HttpRequestLog.getRequestLog(name);
+    RequestLog requestLog = HttpRequestLog.getRequestLog(builder.name);
 
     handlers.addHandler(contexts);
     if (requestLog != null) {
@@ -628,20 +629,22 @@ public final class HttpServer2 implements FilterContainer {
       handlers.addHandler(requestLogHandler);
     }
     handlers.addHandler(webAppContext);
-    final String appDir = getWebAppsPath(name);
-    addDefaultApps(contexts, appDir, conf);
+    final String appDir = getWebAppsPath(builder.name);
+    if (!builder.skipDefaultApps) {
+      addDefaultApps(contexts, appDir, builder.conf);
+    }
     webServer.setHandler(handlers);
-    Map<String, String> config = generateFilterConfiguration(conf);
+    Map<String, String> config = generateFilterConfiguration(builder.conf);
     addGlobalFilter("safety", QuotingInputFilter.class.getName(), config);
-    final FilterInitializer[] initializers = getFilterInitializers(conf);
+    final FilterInitializer[] initializers = getFilterInitializers(builder.conf);
     if (initializers != null) {
-      conf.set(BIND_ADDRESS, hostName);
+      builder.conf.set(BIND_ADDRESS, builder.hostName);
       org.apache.hadoop.conf.Configuration hadoopConf =
-          LegacyHadoopConfigurationSource.asHadoopConfiguration(conf);
+          LegacyHadoopConfigurationSource.asHadoopConfiguration(builder.conf);
       Map<String, String> filterConfig = getFilterConfigMap(hadoopConf,
-          authFilterConfigPrefix);
+          builder.authFilterConfigurationPrefix);
       for (FilterInitializer c : initializers) {
-        if ((c instanceof AuthenticationFilterInitializer) && securityEnabled) {
+        if ((c instanceof AuthenticationFilterInitializer) && builder.securityEnabled) {
           addFilter("authentication",
               AuthenticationFilter.class.getName(), filterConfig);
         } else {
@@ -650,10 +653,12 @@ public final class HttpServer2 implements FilterContainer {
       }
     }
 
-    addDefaultServlets();
+    if (!builder.skipDefaultApps) {
+      addDefaultServlets();
+    }
 
-    if (pathSpecs != null) {
-      for (String path : pathSpecs) {
+    if (builder.pathSpecs != null) {
+      for (String path : builder.pathSpecs) {
         LOG.info("adding path spec: {}", path);
         addFilterPathMapping(path, webAppContext);
       }

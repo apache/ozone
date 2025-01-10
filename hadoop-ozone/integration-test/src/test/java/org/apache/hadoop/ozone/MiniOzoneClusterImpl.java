@@ -40,8 +40,6 @@ import com.amazonaws.client.builder.AwsClientBuilder;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -51,7 +49,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
-import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -110,8 +107,6 @@ import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
 
 import org.hadoop.ozone.recon.codegen.ReconSqlDbConfig;
-import org.mockito.MockedStatic;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -145,7 +140,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   private CertificateClient caClient;
   private final Set<AutoCloseable> clients = ConcurrentHashMap.newKeySet();
   private SecretKeyClient secretKeyClient;
-  private static MockedStatic mockDNStatic = Mockito.mockStatic(HddsDatanodeService.class);
 
   /**
    * Creates a new MiniOzoneCluster with Recon.
@@ -195,10 +189,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
   public void waitForSCMToBeReady() throws TimeoutException,
       InterruptedException {
-    if (SCMHAUtils.isSCMHAEnabled(conf)) {
-      GenericTestUtils.waitFor(scm::checkLeader,
-          1000, waitForClusterToBeReadyTimeout);
-    }
+    GenericTestUtils.waitFor(scm::checkLeader,
+        1000, waitForClusterToBeReadyTimeout);
   }
 
   public StorageContainerManager getActiveSCM() {
@@ -425,16 +417,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         return true;
       }
     }, 1000, waitForClusterToBeReadyTimeout);
-  }
-
-  private static void overrideDatanodeVersions(int dnInitialVersion, int dnCurrentVersion) {
-    // FUTURE_VERSION (-1) is not a valid version for a datanode, using it as a marker when version is not overridden
-    if (dnInitialVersion != DatanodeVersion.FUTURE_VERSION.toProtoValue()) {
-      mockDNStatic.when(HddsDatanodeService::getDefaultInitialVersion).thenReturn(dnInitialVersion);
-    }
-    if (dnCurrentVersion != DatanodeVersion.FUTURE_VERSION.toProtoValue()) {
-      mockDNStatic.when(HddsDatanodeService::getDefaultCurrentVersion).thenReturn(dnCurrentVersion);
-    }
   }
 
   @Override
@@ -766,18 +748,12 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       scmStore.setClusterId(clusterId);
       scmStore.setScmId(scmId);
       scmStore.initialize();
-      //TODO: HDDS-6897
-      //Disabling Ratis for only of MiniOzoneClusterImpl.
-      //MiniOzoneClusterImpl doesn't work with Ratis enabled SCM
-      if (StringUtils.isNotEmpty(
-          conf.get(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY))
-              && SCMHAUtils.isSCMHAEnabled(conf)) {
-        scmStore.setSCMHAFlag(true);
-        scmStore.persistCurrentState();
-        SCMRatisServerImpl.initialize(clusterId, scmId,
-                SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
-                        .getLocalNodeDetails(), conf);
-      }
+      scmStore.setSCMHAFlag(true);
+      scmStore.persistCurrentState();
+      SCMRatisServerImpl.initialize(clusterId, scmId,
+          SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
+              .getLocalNodeDetails(), conf);
+
     }
 
     void initializeOmStorage(OMStorage omStorage) throws IOException {
@@ -869,9 +845,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         throws IOException {
       List<HddsDatanodeService> hddsDatanodes = new ArrayList<>();
 
-      // Override default datanode initial and current version if necessary
-      overrideDatanodeVersions(dnInitialVersion, dnCurrentVersion);
-
       for (int i = 0; i < numOfDatanodes; i++) {
         OzoneConfiguration dnConf = dnFactory.apply(conf);
 
@@ -893,6 +866,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           localhostWithFreePort());
       conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
           "3s");
+      conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY, getFreePort());
+      conf.setInt(ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY, getFreePort());
     }
 
     private void configureOM() {
