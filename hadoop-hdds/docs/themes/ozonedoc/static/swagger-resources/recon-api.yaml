@@ -326,6 +326,11 @@ paths:
           schema:
             type: integer
             default: 1000
+        - name: startPrefix
+          in: query
+          description: Will return keys matching this prefix
+          schema:
+            type: integer
         - name: includeFso
           in: query
           description: Boolean value to determine whether to include FSO keys or not
