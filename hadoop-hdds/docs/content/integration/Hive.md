@@ -121,16 +121,16 @@ LOCATION 'ofs://ozone1/vol1/bucket1/table1';
 
 * With external tables, the data is expected to be created and managed by another tool.
 * Hive queries the data as-is.
-* The metadata is stored under the external warehouse directory.
 * Note: Dropping an external table in Hive does not delete the associated data.
 
-You can also have the metadata for the external tables stored in Ozone too by applying the following configuration in the `hive-site.xml` file:
+To set a default path for external tables, configure the following property in the `hive-site.xml` file:
 ```xml
 <property>
   <name>hive.metastore.warehouse.external.dir</name>
   <value>ofs://ozone1/vol1/bucket1/external/</value>
 </property>
 ```
+This property specifies the base directory for external tables when no explicit `LOCATION` is provided.
 
 ### Verifying the External Table Path
 To confirm the table's metadata and location, use:
