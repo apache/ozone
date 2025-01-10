@@ -48,7 +48,9 @@ public abstract class RepairTool extends AbstractSubcommand implements Callable<
 
   @Override
   public final Void call() throws Exception {
-    confirmUser();
+    if (!dryRun) {
+      confirmUser();
+    }
     execute();
     return null;
   }
