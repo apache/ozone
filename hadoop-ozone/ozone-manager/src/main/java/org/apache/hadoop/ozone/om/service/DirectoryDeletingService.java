@@ -255,9 +255,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
                   pendingDeletedDirInfo.getValue(),
                   pendingDeletedDirInfo.getKey(), allSubDirList,
                   getOzoneManager().getKeyManager(), remainingBufLimit);
-              if (request == null) {
-                break;
-              }
 
               consumedSize += request.getSerializedSize();
               remainingBufLimit -= consumedSize;

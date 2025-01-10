@@ -384,7 +384,6 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         keyManager.getPendingDeletionSubFiles(volumeId, bucketId,
             pendingDeletedDirInfo, remainingBufLimit);
     List<OmKeyInfo> subFiles = subFileDeleteResult.getKeysToDelete();
-    remainingBufLimit -= subDirDeleteResult.getConsumedSize();
 
     if (LOG.isDebugEnabled()) {
       for (OmKeyInfo fileInfo : subFiles) {
