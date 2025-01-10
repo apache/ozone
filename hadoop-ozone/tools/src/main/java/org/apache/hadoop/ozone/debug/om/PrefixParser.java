@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug;
+package org.apache.hadoop.ozone.debug.om;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -53,8 +53,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 @CommandLine.Command(
     name = "prefix",
     description = "Parse prefix contents")
-@MetaInfServices(DebugSubcommand.class)
-public class PrefixParser implements Callable<Void>, DebugSubcommand {
+public class PrefixParser implements Callable<Void> {
 
   /**
    * Types to represent the level or path component type.
@@ -69,9 +68,6 @@ public class PrefixParser implements Callable<Void>, DebugSubcommand {
   }
 
   private final int[] parserStats = new int[Types.values().length];
-
-  @Spec
-  private CommandSpec spec;
 
   @CommandLine.Option(names = {"--db"},
       required = true,
