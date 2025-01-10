@@ -187,11 +187,6 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>ozone-filesystem-hadoop2</artifactId>
-        <version>${ozone.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
         <artifactId>ozone-filesystem-hadoop3</artifactId>
         <version>${ozone.version}</version>
       </dependency>
@@ -378,7 +373,6 @@
         </property>
       </activation>
       <modules>
-        <module>ozonefs-hadoop2</module>
         <module>ozonefs-hadoop3</module>
         <module>ozonefs-hadoop3-client</module>
         <module>ozonefs-shaded</module>
@@ -387,7 +381,6 @@
     <profile>
       <id>go-offline</id>
       <modules>
-        <module>ozonefs-hadoop2</module>
         <module>ozonefs-shaded</module>
       </modules>
     </profile>
