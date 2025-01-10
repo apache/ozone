@@ -30,8 +30,6 @@ import static org.apache.hadoop.ozone.container.common.impl.ContainerData.CHARSE
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -192,17 +190,7 @@ public final class ContainerUtils {
       }
     }
 
-    try {
-      InetAddress inetAddress = InetAddress.getByName(datanodeDetails.getHostName());
-
-      if (!inetAddress.getHostAddress().equals(datanodeDetails.getIpAddress())) {
-        LOG.warn("Resolved IP address '{}' differs from the persisted IP address '{}' for datanode '{}'. Will use the resolved IP address from now on",
-            inetAddress.getHostAddress(), datanodeDetails.getIpAddress(), datanodeDetails.getHostName());
-        datanodeDetails.setIpAddress(inetAddress.getHostAddress());
-      }
-    } catch (UnknownHostException e) {
-      LOG.warn("Failed to validate IP address for the datanode '{}'", datanodeDetails.getHostName(), e);
-    }
+    datanodeDetails.validateDatanodeIpAddress();
 
     return datanodeDetails;
   }

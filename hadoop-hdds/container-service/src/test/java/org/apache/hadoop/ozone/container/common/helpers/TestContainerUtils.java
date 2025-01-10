@@ -46,7 +46,6 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.HddsUtils.processForDebug;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getDummyCommandRequestProto;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -155,12 +154,12 @@ public class TestContainerUtils {
   }
 
   private void assertWriteReadWithChangedIpAddress(@TempDir File tempDir,
-                                                   DatanodeDetails details) throws IOException {
+      DatanodeDetails details) throws IOException {
     // Write a single ID to the file and read it out
     File file = new File(tempDir, "valid-values.id");
     ContainerUtils.writeDatanodeDetailsTo(details, file, conf);
     DatanodeDetails read = ContainerUtils.readDatanodeDetailsFrom(file);
-    assertNotEquals(details.toString(), read.toString());
+    assertEquals("127.0.0.1", read.getIpAddress());
   }
 
   private void createMalformedIDFile(File malformedFile)
