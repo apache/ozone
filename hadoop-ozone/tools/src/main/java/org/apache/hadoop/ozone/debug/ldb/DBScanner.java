@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedCheckpoint;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
@@ -66,7 +65,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -201,28 +199,9 @@ public class DBScanner implements Callable<Void> {
         parent.getDbPath().contains(OzoneConsts.CONTAINER_DB_NAME);
 
     boolean success;
-    if (parent.getCheckpoint()) {
-      String checkpointDir = parent.getDbPath() + "/checkpoint-ldb-" + (new Random()).nextInt(100);
-      // Create checkpoint
-      try (ManagedRocksDB db = ManagedRocksDB.openReadOnly(
-          parent.getDbPath(), cfDescList, cfHandleList)) {
-        ManagedCheckpoint cp = ManagedCheckpoint.create(db);
-        cp.get().createCheckpoint(checkpointDir);
-        err().println("Created checkpoint at " + checkpointDir);
-      }
-      //Use the checkpoint for ldb operations
-      List<ColumnFamilyDescriptor> cfDescListForCheckpoint =
-          RocksDBUtils.getColumnFamilyDescriptors(checkpointDir);
-      final List<ColumnFamilyHandle> cfHandleListForCheckpoint = new ArrayList<>();
-      try (ManagedRocksDB db = ManagedRocksDB.openReadOnly(
-          checkpointDir, cfDescListForCheckpoint, cfHandleListForCheckpoint)) {
-        success = printTable(cfHandleListForCheckpoint, db, parent.getDbPath(), schemaV3);
-      }
-    } else {
-      try (ManagedRocksDB db = ManagedRocksDB.openReadOnly(
-          parent.getDbPath(), cfDescList, cfHandleList)) {
-        success = printTable(cfHandleList, db, parent.getDbPath(), schemaV3);
-      }
+    try (ManagedRocksDB db = ManagedRocksDB.openReadOnly(
+        parent.getDbPath(), cfDescList, cfHandleList)) {
+      success = printTable(cfHandleList, db, parent.getDbPath(), schemaV3);
     }
 
     if (!success) {
