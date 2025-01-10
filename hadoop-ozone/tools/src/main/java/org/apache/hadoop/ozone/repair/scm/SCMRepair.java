@@ -30,6 +30,7 @@ import picocli.CommandLine;
     description = "Operational tool to repair SCM.",
     subcommands = {
         CertRepair.class,
+        TransactionInfoRepairSCM.class
     }
 )
 @MetaInfServices(RepairSubcommand.class)

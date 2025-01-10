@@ -45,11 +45,11 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_
  */
 @CommandLine.Command(
     name = "update-transaction",
-    description = "CLI to update the highest index in transactionInfoTable. Currently it is only supported for OM.",
+    description = "CLI to update the highest index in OM transactionInfoTable.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
-public class TransactionInfoRepair extends RepairTool {
+public class TransactionInfoRepairOM extends RepairTool {
 
   @CommandLine.Option(names = {"--db"},
       required = true,

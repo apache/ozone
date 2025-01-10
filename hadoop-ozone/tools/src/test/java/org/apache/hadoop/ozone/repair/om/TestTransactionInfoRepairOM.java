@@ -47,10 +47,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 
 /**
- * Tests TransactionInfoRepair.
+ * Tests TransactionInfoRepairOM.
  */
-public class TestTransactionInfoRepair {
-
+public class TestTransactionInfoRepairOM {
 
   private static final String DB_PATH = "testDBPath";
   private static final long TEST_TERM = 1;

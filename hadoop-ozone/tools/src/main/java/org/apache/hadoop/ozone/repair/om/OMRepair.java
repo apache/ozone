@@ -30,7 +30,7 @@ import picocli.CommandLine;
     subcommands = {
         FSORepairTool.class,
         SnapshotRepair.class,
-        TransactionInfoRepair.class,
+        TransactionInfoRepairOM.class,
         QuotaRepair.class
     },
     description = "Operational tool to repair OM.")
