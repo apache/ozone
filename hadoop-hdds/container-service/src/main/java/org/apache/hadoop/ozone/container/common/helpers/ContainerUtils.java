@@ -196,7 +196,7 @@ public final class ContainerUtils {
       InetAddress inetAddress = InetAddress.getByName(datanodeDetails.getHostName());
 
       if (!inetAddress.getHostAddress().equals(datanodeDetails.getIpAddress())) {
-        LOG.warn("Resolved IP address '{}' differs from the persisted IP address '{}' for the datanode '{}'",
+        LOG.warn("Resolved IP address '{}' differs from the persisted IP address '{}' for datanode '{}'. Will use the resolved IP address from now on",
             inetAddress.getHostAddress(), datanodeDetails.getIpAddress(), datanodeDetails.getHostName());
         datanodeDetails.setIpAddress(inetAddress.getHostAddress());
       }
