@@ -27,7 +27,7 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(
     name = "om",
-    description = "Runs OM related subcommands.",
+    description = "Debug commands related to OM.",
     subcommands = {
         PrefixParser.class
     }
