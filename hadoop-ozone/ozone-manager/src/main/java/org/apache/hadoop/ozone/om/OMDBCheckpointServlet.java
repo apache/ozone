@@ -203,6 +203,10 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     Map<String, Map<Path, Path>> paths = new HashMap<>();
     Path metaDirPath = getMetaDirPath(checkpointLocation);
     for (String s : toExcludeList) {
+      Path fileName = Paths.get(s).getFileName();
+      if (fileName == null) {
+        continue;
+      }
       Path destPath = Paths.get(metaDirPath.toString(), s);
       if (destPath.toString().startsWith(
           sstBackupDir.getOriginalDir().toString())) {
@@ -212,12 +216,12 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
             sstBackupDir.getOriginalDir().toString().length() + 1;
         Path srcPath = Paths.get(sstBackupDir.getTmpDir().toString(),
             truncateFileName(truncateLength, destPath));
-        paths.computeIfAbsent(srcPath.getFileName().toString(), (k) -> new HashMap<>()).put(srcPath, destPath);
+        paths.computeIfAbsent(fileName.toString(), (k) -> new HashMap<>()).put(srcPath, destPath);
       } else if (!s.startsWith(OM_SNAPSHOT_DIR)) {
         Path fixedPath = Paths.get(checkpointLocation.toString(), s);
-        paths.computeIfAbsent(fixedPath.getFileName().toString(), (k) -> new HashMap<>()).put(fixedPath, fixedPath);
+        paths.computeIfAbsent(fileName.toString(), (k) -> new HashMap<>()).put(fixedPath, fixedPath);
       } else {
-        paths.computeIfAbsent(destPath.getFileName().toString(), (k) -> new HashMap<>()).put(destPath, destPath);
+        paths.computeIfAbsent(fileName.toString(), (k) -> new HashMap<>()).put(destPath, destPath);
       }
     }
     return paths;
@@ -460,8 +464,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     if (destDir != null) {
       destFile = Paths.get(destDir.toString(), fileName);
     }
-    if (sstFilesToExclude.getOrDefault(file.getFileName().getFileName().toString(), Collections.emptyMap())
-        .containsKey(file)) {
+    if (sstFilesToExclude.getOrDefault(fileNamePath.toString(), Collections.emptyMap()).containsKey(file)) {
       excluded.add(destFile.toString());
     } else {
       if (fileName.endsWith(ROCKSDB_SST_SUFFIX)) {
@@ -476,13 +479,13 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
             hardLinkFiles.put(destFile, linkPath);
           } else {
             // Add to tarball.
-            copyFiles.computeIfAbsent(file.getFileName().toString(), (k) -> new HashMap<>()).put(file, destFile);
+            copyFiles.computeIfAbsent(fileNamePath.toString(), (k) -> new HashMap<>()).put(file, destFile);
             fileSize = Files.size(file);
           }
         }
       } else {
         // Not sst file.
-        copyFiles.computeIfAbsent(file.getFileName().toString(), (k) -> new HashMap<>()).put(file, destFile);
+        copyFiles.computeIfAbsent(fileNamePath.toString(), (k) -> new HashMap<>()).put(file, destFile);
       }
     }
     return fileSize;
