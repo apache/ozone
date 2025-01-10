@@ -78,8 +78,6 @@ ofs://omservice/tmp/key1
 export HADOOP_CLASSPATH=/opt/ozone/share/ozone/lib/ozone-filesystem-hadoop3-*.jar:$HADOOP_CLASSPATH
 {{< /highlight >}}
 
-(请注意: 在 Hadoop 2.x 中, 请使用 `ozone-filesystem-hadoop2-*.jar`)
-
 当默认的文件系统被建立，用户可以运行命令例如ls，put，mkdir等。
 例如：
 

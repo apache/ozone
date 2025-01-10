@@ -108,8 +108,6 @@ ozone.example.config
 > $ `ozone admin reconfig --service=DATANODE --in-service-datanodes properties`<br>
 Datanode: Node [hadoop1:19864] Reconfigurable properties:<br>
 ozone.example.config<br>
-Datanode: Node [hadoop2:19864] Reconfigurable properties:<br>
-ozone.example.config<br>
 Datanode: Node [hadoop3:19864] Reconfigurable properties:<br>
 ozone.example.config<br>
 Reconfig successfully 3 nodes, failure 0 nodes.<br>
