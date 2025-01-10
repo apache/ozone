@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
@@ -371,17 +372,17 @@ class TestOmSnapshotManager {
         "backup.sst");
     truncateLength = leaderDir.toString().length() + 1;
     existingSstList.add(truncateFileName(truncateLength, destSstBackup));
-    Map<Path, Path> normalizedMap =
+    Map<String, Map<Path, Path>> normalizedMap =
         OMDBCheckpointServlet.normalizeExcludeList(existingSstList,
         leaderCheckpointDir.toPath(), sstBackupDir);
-    Map<Path, Path> expectedMap = new TreeMap<>();
+    Map<String, Map<Path, Path>> expectedMap = new TreeMap<>();
     Path s1 = Paths.get(leaderSnapDir1.toString(), "s1.sst");
     Path noLink = Paths.get(leaderSnapDir2.toString(), "noLink.sst");
     Path f1 = Paths.get(leaderCheckpointDir.toString(), "f1.sst");
-    expectedMap.put(s1, s1);
-    expectedMap.put(noLink, noLink);
-    expectedMap.put(f1, f1);
-    expectedMap.put(srcSstBackup, destSstBackup);
+    expectedMap.put("s1.sst", ImmutableMap.of(s1, s1));
+    expectedMap.put("noLink.sst", ImmutableMap.of(noLink, noLink));
+    expectedMap.put("f1.sst", ImmutableMap.of(f1, f1));
+    expectedMap.put("backup.sst", ImmutableMap.of(srcSstBackup, destSstBackup));
     assertEquals(expectedMap, new TreeMap<>(normalizedMap));
   }
 
@@ -418,10 +419,11 @@ class TestOmSnapshotManager {
     Files.write(addNonSstToCopiedFiles,
         "dummyData".getBytes(StandardCharsets.UTF_8));
 
-    Map<Path, Path> toExcludeFiles = new HashMap<>();
-    toExcludeFiles.put(excludeFile, excludeFile);
-    Map<Path, Path> copyFiles = new HashMap<>();
-    copyFiles.put(copyFile, copyFile);
+    Map<String, Map<Path, Path>> toExcludeFiles = new HashMap<>();
+    toExcludeFiles.computeIfAbsent(excludeFile.getFileName().toString(), (k) -> new HashMap<>()).put(excludeFile,
+        excludeFile);
+    Map<String, Map<Path, Path>> copyFiles = new HashMap<>();
+    copyFiles.computeIfAbsent(copyFile.getFileName().toString(), (k) -> new HashMap<>()).put(copyFile, copyFile);
     List<String> excluded = new ArrayList<>();
     Map<Path, Path> hardLinkFiles = new HashMap<>();
     long fileSize;
@@ -461,10 +463,10 @@ class TestOmSnapshotManager {
         toExcludeFiles, excluded, null);
     assertEquals(excluded.size(), 0);
     assertEquals(copyFiles.size(), 2);
-    assertEquals(copyFiles.get(addToCopiedFiles), addToCopiedFiles);
+    assertEquals(copyFiles.get(addToCopiedFiles.getFileName().toString()).get(addToCopiedFiles), addToCopiedFiles);
     assertEquals(fileSize, expectedFileSize);
     copyFiles = new HashMap<>();
-    copyFiles.put(copyFile, copyFile);
+    copyFiles.computeIfAbsent(copyFile.getFileName().toString(), (k) -> new HashMap<>()).put(copyFile, copyFile);
 
     // Confirm the addNonSstToCopiedFiles gets added to list of copied files
     fileSize = processFile(addNonSstToCopiedFiles, copyFiles, hardLinkFiles,
@@ -472,7 +474,7 @@ class TestOmSnapshotManager {
     assertEquals(excluded.size(), 0);
     assertEquals(copyFiles.size(), 2);
     assertEquals(fileSize, 0);
-    assertEquals(copyFiles.get(addNonSstToCopiedFiles),
+    assertEquals(copyFiles.get(addNonSstToCopiedFiles.getFileName().toString()).get(addNonSstToCopiedFiles),
         addNonSstToCopiedFiles);
   }
 
@@ -539,10 +541,10 @@ class TestOmSnapshotManager {
         "dummyData".getBytes(StandardCharsets.UTF_8));
 
     // Create test data structures.
-    Map<Path, Path> toExcludeFiles = new HashMap<>();
-    toExcludeFiles.put(excludeFile, destExcludeFile);
-    Map<Path, Path> copyFiles = new HashMap<>();
-    copyFiles.put(copyFile, destCopyFile);
+    Map<String, Map<Path, Path>> toExcludeFiles = new HashMap<>();
+    toExcludeFiles.put(excludeFile.getFileName().toString(), ImmutableMap.of(excludeFile, destExcludeFile));
+    Map<String, Map<Path, Path>> copyFiles = new HashMap<>();
+    copyFiles.computeIfAbsent(copyFile.getFileName().toString(), (k) -> new HashMap<>()).put(copyFile, destCopyFile);
     List<String> excluded = new ArrayList<>();
     Map<Path, Path> hardLinkFiles = new HashMap<>();
     long fileSize;
@@ -575,11 +577,11 @@ class TestOmSnapshotManager {
     assertEquals(excluded.size(), 0);
     assertEquals(copyFiles.size(), 2);
     assertEquals(hardLinkFiles.size(), 0);
-    assertEquals(copyFiles.get(sameNameAsExcludeFile),
+    assertEquals(copyFiles.get(sameNameAsExcludeFile.getFileName().toString()).get(sameNameAsExcludeFile),
         destSameNameAsExcludeFile);
     assertEquals(fileSize, expectedFileSize);
     copyFiles = new HashMap<>();
-    copyFiles.put(copyFile, destCopyFile);
+    copyFiles.computeIfAbsent(copyFile.getFileName().toString(), (k) -> new HashMap<>()).put(copyFile, destCopyFile);
 
 
     // Confirm the file with same name as copy file gets copied.
@@ -588,11 +590,11 @@ class TestOmSnapshotManager {
     assertEquals(excluded.size(), 0);
     assertEquals(copyFiles.size(), 2);
     assertEquals(hardLinkFiles.size(), 0);
-    assertEquals(copyFiles.get(sameNameAsCopyFile),
+    assertEquals(copyFiles.get(sameNameAsCopyFile.getFileName().toString()).get(sameNameAsCopyFile),
         destSameNameAsCopyFile);
     assertEquals(fileSize, expectedFileSize);
     copyFiles = new HashMap<>();
-    copyFiles.put(copyFile, destCopyFile);
+    copyFiles.computeIfAbsent(copyFile.getFileName().toString(), (k) -> new HashMap<>()).put(copyFile, destCopyFile);
 
 
     // Confirm the linkToCopiedFile gets added as a link.
@@ -611,11 +613,11 @@ class TestOmSnapshotManager {
         toExcludeFiles, excluded, destAddToCopiedFiles.getParent());
     assertEquals(excluded.size(), 0);
     assertEquals(copyFiles.size(), 2);
-    assertEquals(copyFiles.get(addToCopiedFiles),
+    assertEquals(copyFiles.get(addToCopiedFiles.getFileName().toString()).get(addToCopiedFiles),
         destAddToCopiedFiles);
     assertEquals(fileSize, expectedFileSize);
     copyFiles = new HashMap<>();
-    copyFiles.put(copyFile, destCopyFile);
+    copyFiles.computeIfAbsent(copyFile.getFileName().toString(), (k) -> new HashMap<>()).put(copyFile, destCopyFile);
 
     // Confirm the addNonSstToCopiedFiles gets added to list of copied files
     fileSize = processFile(addNonSstToCopiedFiles, copyFiles, hardLinkFiles,
@@ -623,7 +625,7 @@ class TestOmSnapshotManager {
     assertEquals(excluded.size(), 0);
     assertEquals(copyFiles.size(), 2);
     assertEquals(fileSize, 0);
-    assertEquals(copyFiles.get(addNonSstToCopiedFiles),
+    assertEquals(copyFiles.get(addNonSstToCopiedFiles.getFileName().toString()).get(addNonSstToCopiedFiles),
         destAddNonSstToCopiedFiles);
   }
 
