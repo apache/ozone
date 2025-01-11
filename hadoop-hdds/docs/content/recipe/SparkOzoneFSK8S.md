@@ -2,6 +2,7 @@
 title: Spark in Kubernetes with OzoneFS
 linktitle: Spark
 summary: How to use Apache Spark with Ozone on K8s?
+draft: true
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
