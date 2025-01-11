@@ -16,30 +16,20 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.repair;
+package org.apache.hadoop.ozone.repair.scm.cert;
 
-import org.apache.hadoop.hdds.cli.ExtensibleParentCommand;
-import org.apache.hadoop.hdds.cli.GenericCli;
-import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.RepairSubcommand;
 import picocli.CommandLine;
 
 /**
- * Ozone Repair Command line tool.
+ * A dedicated subcommand for all certificate related repairs on SCM.
  */
-@CommandLine.Command(name = "ozone repair",
-    description = "Advanced tool to repair Ozone. The nodes being repaired " +
-        "must be stopped before the tool is run.",
-    versionProvider = HddsVersionProvider.class,
-    mixinStandardHelpOptions = true)
-public class OzoneRepair extends GenericCli implements ExtensibleParentCommand {
 
-  public static void main(String[] argv) {
-    new OzoneRepair().run(argv);
-  }
+@CommandLine.Command(name = "cert",
+    description = "Subcommand for all certificate related repairs on SCM",
+    subcommands = {
+        RecoverSCMCertificate.class
+    }
+)
+public class CertRepair {
 
-  @Override
-  public Class<?> subcommandType() {
-    return RepairSubcommand.class;
-  }
 }

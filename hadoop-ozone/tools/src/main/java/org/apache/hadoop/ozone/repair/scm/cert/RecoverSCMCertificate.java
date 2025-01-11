@@ -15,9 +15,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.ozone.repair;
+package org.apache.hadoop.ozone.repair.scm.cert;
 
-import org.apache.hadoop.hdds.cli.RepairSubcommand;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
@@ -31,7 +30,8 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.debug.DBDefinitionFactory;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
 import java.security.cert.CertificateFactory;
-import org.kohsuke.MetaInfServices;
+
+import org.apache.hadoop.ozone.repair.RepairTool;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
@@ -63,21 +63,19 @@ import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.removeTrailingSlas
  * and  private keys of the SCM are intact.
  */
 @CommandLine.Command(
-    name = "cert-recover",
+    name = "recover",
     description = "Recover Deleted SCM Certificate from RocksDB")
-@MetaInfServices(RepairSubcommand.class)
-public class RecoverSCMCertificate extends RepairTool implements RepairSubcommand {
-
+public class RecoverSCMCertificate extends RepairTool {
   @CommandLine.Option(names = {"--db"},
       required = true,
       description = "SCM DB Path")
   private String dbPath;
 
-  @CommandLine.ParentCommand
-  private OzoneRepair parent;
-
   @Override
   public void execute() throws Exception {
+    if (checkIfServiceIsRunning("SCM")) {
+      return;
+    }
     dbPath = removeTrailingSlashIfNeeded(dbPath);
     String tableName = VALID_SCM_CERTS.getName();
     DBDefinition dbDefinition =
@@ -96,7 +94,7 @@ public class RecoverSCMCertificate extends RepairTool implements RepairSubcomman
       try (ManagedRocksDB db = ManagedRocksDB.openReadOnly(dbPath, cfDescList,
           cfHandleList)) {
         cfHandle = getColumnFamilyHandle(cfHandleList, tableNameBytes);
-        SecurityConfig securityConfig = new SecurityConfig(parent.getOzoneConf());
+        SecurityConfig securityConfig = new SecurityConfig(getOzoneConf());
 
         Map<BigInteger, X509Certificate> allCerts = getAllCerts(columnFamilyDefinition, cfHandle, db);
         info("All Certs in DB : %s", allCerts.keySet());

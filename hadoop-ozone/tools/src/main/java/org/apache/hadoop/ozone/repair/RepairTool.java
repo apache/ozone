@@ -21,10 +21,16 @@ import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import picocli.CommandLine;
 
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
+import java.util.Scanner;
 import java.util.concurrent.Callable;
 
 /** Parent class for all actionable repair commands. */
 public abstract class RepairTool extends AbstractSubcommand implements Callable<Void> {
+
+  private static final String WARNING_SYS_USER_MESSAGE =
+      "ATTENTION: Running as user %s. Make sure this is the same user used to run the Ozone process." +
+          " Are you sure you want to continue (y/N)? ";
 
   @CommandLine.Option(names = {"--force"},
       description = "Use this flag if you want to bypass the check in false-positive cases.")
@@ -35,6 +41,7 @@ public abstract class RepairTool extends AbstractSubcommand implements Callable<
 
   @Override
   public final Void call() throws Exception {
+    confirmUser();
     execute();
     return null;
   }
@@ -84,4 +91,25 @@ public abstract class RepairTool extends AbstractSubcommand implements Callable<
     return msg;
   }
 
+  protected void confirmUser() {
+    final String currentUser = getSystemUserName();
+    final boolean confirmed = "y".equalsIgnoreCase(getConsoleReadLineWithFormat(currentUser));
+
+    if (!confirmed) {
+      throw new IllegalStateException("Aborting command.");
+    }
+
+    info("Run as user: " + currentUser);
+  }
+
+  private String getSystemUserName() {
+    return System.getProperty("user.name");
+  }
+
+  private String getConsoleReadLineWithFormat(String currentUser) {
+    err().printf(WARNING_SYS_USER_MESSAGE, currentUser);
+    return new Scanner(System.in, StandardCharsets.UTF_8.name())
+        .nextLine()
+        .trim();
+  }
 }
