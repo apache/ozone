@@ -22,10 +22,9 @@ menu:
   limitations under the License.
 -->
 
-# Overview
 Apache Hive has supported Apache Ozone since Hive 4.0. To enable Hive to work with Ozone paths, ensure that the `ozone-filesystem-hadoop3` JAR is added to the Hive classpath.
 
-# Supported Access Protocols
+## Supported Access Protocols
 
 Hive supports the following protocols for accessing Ozone data:
 
@@ -33,22 +32,22 @@ Hive supports the following protocols for accessing Ozone data:
 * o3fs
 * s3a
 
-# Supported Replication Types
+## Supported Replication Types
 
 Hive is compatible with Ozone buckets configured with either:
 
 * RATIS (Replication)
 * Erasure Coding
 
-# Accessing Ozone Data in Hive
+## Accessing Ozone Data in Hive
 
 Hive provides two methods to interact with data in Ozone:
 
 * Managed Tables
 * External Tables
 
-## Managed Tables
-### Configuring the Hive Warehouse Directory in Ozone
+### Managed Tables
+#### Configuring the Hive Warehouse Directory in Ozone
 To store managed tables in Ozone, update the following properties in the `hive-site.xml` configuration file:
 
 ```xml
@@ -58,7 +57,7 @@ To store managed tables in Ozone, update the following properties in the `hive-s
 </property>
 ```
 
-### Creating a Managed Table
+#### Creating a Managed Table
 You can create a managed table with a standard `CREATE TABLE` statement:
 
 ```sql
@@ -68,14 +67,14 @@ CREATE TABLE myTable (
 );
 ```
 
-### Loading Data into a Managed Table
+#### Loading Data into a Managed Table
 Data can be loaded into a Hive table from an Ozone location:
 
 ```sql
 LOAD DATA INPATH 'ofs://ozone1/vol1/bucket1/table.csv' INTO TABLE myTable;
 ```
 
-### Specifying a Custom Ozone Path
+#### Specifying a Custom Ozone Path
 You can define a custom Ozone path for a database using the `MANAGEDLOCATION` clause:
 
 ```sql
@@ -85,7 +84,7 @@ CREATE DATABASE d1 MANAGEDLOCATION 'ofs://ozone1/vol1/bucket1/data';
 Tables created in the database d1 will be stored under the specified path:
 `ofs://ozone1/vol1/bucket1/data`
 
-### Verifying the Ozone Path
+#### Verifying the Ozone Path
 You can confirm that Hive references the correct Ozone path using:
 
 ```sql
@@ -106,11 +105,11 @@ Output Example:
 +----------------------------------------------------+
 ```
 
-## External Tables
+### External Tables
 
 Hive allows the creation of external tables to query existing data stored in Ozone.
 
-### Creating an External Table
+#### Creating an External Table
 ```sql
 CREATE EXTERNAL TABLE external_table (
     id INT,
@@ -132,7 +131,7 @@ To set a default path for external tables, configure the following property in t
 ```
 This property specifies the base directory for external tables when no explicit `LOCATION` is provided.
 
-### Verifying the External Table Path
+#### Verifying the External Table Path
 To confirm the table's metadata and location, use:
 
 ```sql
@@ -161,7 +160,7 @@ Output Example:
 +----------------------------------------------------+
 ```
 
-# Using the S3A Protocol
+## Using the S3A Protocol
 In addition to ofs, Hive can access Ozone using the S3 Gateway via the S3A file system.
 
 For more information, consult:
