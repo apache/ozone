@@ -1,5 +1,5 @@
 ---
-title: DistCp
+title: Hadoop DistCp
 weight: 4
 menu:
    main:
@@ -21,8 +21,6 @@ menu:
   See the License for the specific language governing permissions and
   limitations under the License.
 -->
-
-# Hadoop DistCp
 
 [Hadoop DistCP](https://hadoop.apache.org/docs/current/hadoop-distcp/DistCp.html) is a command line, MapReduce-based tool for bulk data copying.
 
