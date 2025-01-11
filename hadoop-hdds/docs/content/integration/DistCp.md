@@ -22,7 +22,7 @@ menu:
   limitations under the License.
 -->
 
-[Hadoop DistCP](https://hadoop.apache.org/docs/current/hadoop-distcp/DistCp.html) is a command line, MapReduce-based tool for bulk data copying.
+[Hadoop DistCp](https://hadoop.apache.org/docs/current/hadoop-distcp/DistCp.html) is a command line, MapReduce-based tool for bulk data copying.
 
 The `hadoop distcp` command can be used to copy data to and from Ozone and any Hadoop compatible file systems, such as HDFS or S3A.
 
@@ -86,4 +86,4 @@ By specifying the appropriate checksum configuration or skipping the validation,
 
 When data resides in an HDFS encryption zone or Ozone encrypted buckets, the file checksum will not match. This is because the underlying block data differs due to the use of a new EDEK (Encryption Data Encryption Key) at the destination. In such cases, specify the `-skipcrccheck` parameter to avoid job failures.
 
-For more information about using Hadoop DistCP, consult the [DistCp Guide](https://hadoop.apache.org/docs/current/hadoop-distcp/DistCp.html).
+For more information about using Hadoop DistCp, consult the [DistCp Guide](https://hadoop.apache.org/docs/current/hadoop-distcp/DistCp.html).
