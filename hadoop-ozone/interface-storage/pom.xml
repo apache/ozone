@@ -28,6 +28,7 @@
   <name>Apache Ozone Storage Interface</name>
   <packaging>jar</packaging>
   <properties>
+    <sort.skip>true</sort.skip>
   </properties>
   <dependencies>
 

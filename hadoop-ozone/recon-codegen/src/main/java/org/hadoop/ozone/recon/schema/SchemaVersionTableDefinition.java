@@ -24,12 +24,16 @@ import com.google.inject.Singleton;
 import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 
 import static org.hadoop.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
+import static org.hadoop.ozone.recon.codegen.SqlDbUtils.listAllTables;
+import static org.jooq.impl.DSL.name;
 
 /**
  * Class for managing the schema of the SchemaVersion table.
@@ -37,9 +41,11 @@ import static org.hadoop.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
 @Singleton
 public class SchemaVersionTableDefinition implements ReconSchemaDefinition {
 
+  private static final Logger LOG = LoggerFactory.getLogger(SchemaVersionTableDefinition.class);
+
   public static final String SCHEMA_VERSION_TABLE_NAME = "RECON_SCHEMA_VERSION";
   private final DataSource dataSource;
-  private DSLContext dslContext;
+  private int latestSLV;
 
   @Inject
   public SchemaVersionTableDefinition(DataSource dataSource) {
@@ -48,22 +54,56 @@ public class SchemaVersionTableDefinition implements ReconSchemaDefinition {
 
   @Override
   public void initializeSchema() throws SQLException {
-    Connection conn = dataSource.getConnection();
-    dslContext = DSL.using(conn);
+    try (Connection conn = dataSource.getConnection()) {
+      DSLContext localDslContext = DSL.using(conn);
 
-    if (!TABLE_EXISTS_CHECK.test(conn, SCHEMA_VERSION_TABLE_NAME)) {
-      createSchemaVersionTable();
+      if (!TABLE_EXISTS_CHECK.test(conn, SCHEMA_VERSION_TABLE_NAME)) {
+        // If the RECON_SCHEMA_VERSION table does not exist, check for other tables
+        // to identify if it is a fresh install
+        boolean isFreshInstall = listAllTables(conn).isEmpty();
+        createSchemaVersionTable(localDslContext);
+
+        if (isFreshInstall) {
+          // Fresh install: Set the SLV to the latest version
+          insertInitialSLV(localDslContext, latestSLV);
+        }
+      }
     }
   }
 
   /**
    * Create the Schema Version table.
+   *
+   * @param dslContext The DSLContext to use for the operation.
    */
-  private void createSchemaVersionTable() throws SQLException {
+  private void createSchemaVersionTable(DSLContext dslContext) {
     dslContext.createTableIfNotExists(SCHEMA_VERSION_TABLE_NAME)
         .column("version_number", SQLDataType.INTEGER.nullable(false))
         .column("applied_on", SQLDataType.TIMESTAMP.defaultValue(DSL.currentTimestamp()))
         .execute();
   }
 
+  /**
+   * Inserts the initial SLV into the Schema Version table.
+   *
+   * @param dslContext The DSLContext to use for the operation.
+   * @param slv        The initial SLV value.
+   */
+  private void insertInitialSLV(DSLContext dslContext, int slv) {
+    dslContext.insertInto(DSL.table(SCHEMA_VERSION_TABLE_NAME))
+        .columns(DSL.field(name("version_number")),
+            DSL.field(name("applied_on")))
+        .values(slv, DSL.currentTimestamp())
+        .execute();
+    LOG.info("Inserted initial SLV '{}' into SchemaVersion table.", slv);
+  }
+
+  /**
+   * Set the latest SLV.
+   *
+   * @param slv The latest Software Layout Version.
+   */
+  public void setLatestSLV(int slv) {
+    this.latestSLV = slv;
+  }
 }

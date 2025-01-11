@@ -73,7 +73,7 @@ public class ReconLayoutVersionManager {
     return Arrays.stream(ReconLayoutFeature.values())
         .mapToInt(ReconLayoutFeature::getVersion)
         .max()
-        .orElse(0); // Default to 0 if no features are defined
+        .orElse(0);
   }
 
   /**
