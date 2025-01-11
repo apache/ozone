@@ -25,6 +25,7 @@ import picocli.CommandLine;
 
 import java.io.IOException;
 import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.util.List;
 
 /**
@@ -52,7 +53,7 @@ public class AclOption implements CommandLine.ITypeConverter<OzoneAcl> {
     return ImmutableList.copyOf(values);
   }
 
-  public void addTo(OzoneObj obj, ObjectStore objectStore, PrintStream out)
+  public void addTo(OzoneObj obj, ObjectStore objectStore, PrintWriter out)
       throws IOException {
     for (OzoneAcl acl : getAclList()) {
       boolean result = objectStore.addAcl(obj, acl);
@@ -65,7 +66,7 @@ public class AclOption implements CommandLine.ITypeConverter<OzoneAcl> {
     }
   }
 
-  public void removeFrom(OzoneObj obj, ObjectStore objectStore, PrintStream out)
+  public void removeFrom(OzoneObj obj, ObjectStore objectStore, PrintWriter out)
       throws IOException {
     for (OzoneAcl acl : getAclList()) {
       boolean result = objectStore.removeAcl(obj, acl);
@@ -78,7 +79,7 @@ public class AclOption implements CommandLine.ITypeConverter<OzoneAcl> {
     }
   }
 
-  public void setOn(OzoneObj obj, ObjectStore objectStore, PrintStream out)
+  public void setOn(OzoneObj obj, ObjectStore objectStore, PrintWriter out)
       throws IOException {
     objectStore.setAcl(obj, getAclList());
     out.println("ACLs set successfully.");

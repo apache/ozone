@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.ratis.util.MemoizedSupplier;
 import picocli.CommandLine;
 
+import java.io.PrintWriter;
 import java.util.function.Supplier;
 
 /** Base functionality for all Ozone subcommands. */
@@ -77,4 +78,8 @@ public abstract class AbstractSubcommand {
       return conf;
     }
   }
+
+  protected PrintWriter out() { return spec().commandLine().getOut(); }
+
+  protected PrintWriter err() { return spec().commandLine().getErr(); }
 }

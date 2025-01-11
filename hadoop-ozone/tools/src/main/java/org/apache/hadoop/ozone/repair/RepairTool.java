@@ -74,16 +74,6 @@ public abstract class RepairTool extends AbstractSubcommand implements Callable<
     err().println(formatMessage(msg, args));
   }
 
-  private PrintWriter out() {
-    return spec().commandLine()
-        .getOut();
-  }
-
-  private PrintWriter err() {
-    return spec().commandLine()
-        .getErr();
-  }
-
   private String formatMessage(String msg, Object[] args) {
     if (args != null && args.length > 0) {
       msg = String.format(msg, args);

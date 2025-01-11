@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.cli.container;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -56,13 +57,10 @@ import java.util.concurrent.Callable;
         "for this datanode.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class UpgradeSubcommand implements Callable<Void> {
+public class UpgradeSubcommand extends AbstractSubcommand implements Callable<Void> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(UpgradeSubcommand.class);
-
-  @CommandLine.Spec
-  private static CommandLine.Model.CommandSpec spec;
 
   @CommandLine.Option(names = {"--volume"},
       required = false,
@@ -193,13 +191,5 @@ public class UpgradeSubcommand implements Callable<Void> {
       ozoneConfiguration = new OzoneConfiguration();
     }
     return ozoneConfiguration;
-  }
-
-  private static PrintWriter err() {
-    return spec.commandLine().getErr();
-  }
-
-  private static PrintWriter out() {
-    return spec.commandLine().getOut();
   }
 }
