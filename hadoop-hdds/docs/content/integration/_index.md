@@ -1,6 +1,5 @@
 ---
 title: "Application Integrations"
-draft: true
 menu:
    main:
       weight: 5
