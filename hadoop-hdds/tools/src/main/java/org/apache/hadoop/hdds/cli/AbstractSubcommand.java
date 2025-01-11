@@ -79,7 +79,11 @@ public abstract class AbstractSubcommand {
     }
   }
 
-  protected PrintWriter out() { return spec().commandLine().getOut(); }
+  protected PrintWriter out() {
+    return spec().commandLine().getOut();
+  }
 
-  protected PrintWriter err() { return spec().commandLine().getErr(); }
+  protected PrintWriter err() {
+    return spec().commandLine().getErr();
+  }
 }

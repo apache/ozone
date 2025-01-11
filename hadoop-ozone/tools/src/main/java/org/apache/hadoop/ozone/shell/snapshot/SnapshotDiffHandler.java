@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import picocli.CommandLine;
 
 import java.io.IOException;
-import java.io.PrintStream;
 import java.io.PrintWriter;
 
 import static org.apache.hadoop.hdds.server.JsonUtils.toJsonStringWithDefaultPrettyPrinter;

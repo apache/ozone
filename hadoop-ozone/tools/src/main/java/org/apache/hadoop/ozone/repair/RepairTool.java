@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.repair;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import picocli.CommandLine;
 
-import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.Scanner;
 import java.util.concurrent.Callable;

@@ -30,7 +30,6 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
