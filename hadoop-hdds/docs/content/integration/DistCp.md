@@ -31,7 +31,7 @@ The `hadoop distcp` command can be used to copy data to and from Ozone and any H
 To copy files from a source Ozone cluster directory to a destination Ozone cluster directory, use the following command:
 
 ```bash
-  hadoop distcp ofs://ozone1/vol1/bucket/dir1 ofs://ozone2/vol2/bucket2/dir2
+hadoop distcp ofs://ozone1/vol1/bucket/dir1 ofs://ozone2/vol2/bucket2/dir2
 ```
 
 You must define the service IDs for both `ozone1` and `ozone2` clusters in the `ozone-site.xml` configuration file. For example:
