@@ -93,11 +93,9 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.collect.Sets;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
@@ -123,6 +121,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -155,7 +154,8 @@ import static org.mockito.Mockito.when;
  */
 @Timeout(300)
 public class TestKeyManagerImpl {
-
+  @TempDir
+  private static File dir;
   private static PrefixManager prefixManager;
   private static KeyManagerImpl keyManager;
   private static NodeManager nodeManager;
@@ -164,7 +164,6 @@ public class TestKeyManagerImpl {
   private static StorageContainerLocationProtocol mockScmContainerClient;
   private static OzoneConfiguration conf;
   private static OMMetadataManager metadataManager;
-  private static File dir;
   private static long scmBlockSize;
   private static final String KEY_NAME = "key1";
   private static final String BUCKET_NAME = "bucket1";
@@ -179,7 +178,6 @@ public class TestKeyManagerImpl {
   public static void setUp() throws Exception {
     ExitUtils.disableSystemExit();
     conf = new OzoneConfiguration();
-    dir = GenericTestUtils.getRandomizedTestDir();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
     conf.set(OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY, "true");
     final String rootPath = String.format("%s://%s/", OZONE_OFS_URI_SCHEME,
@@ -243,7 +241,6 @@ public class TestKeyManagerImpl {
     scm.stop();
     scm.join();
     om.stop();
-    FileUtils.deleteDirectory(dir);
   }
 
   @BeforeEach
@@ -340,8 +337,7 @@ public class TestKeyManagerImpl {
         .setKeyName(KEY_NAME)
         .setDataSize(1000)
         .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
-        .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
-            ALL, ALL))
+        .setAcls(OzoneAclUtil.getAclList(ugi, ALL, ALL))
         .build();
     OMException omException = assertThrows(OMException.class,
         () -> writeClient.openKey(keyArgs));
@@ -1522,7 +1518,107 @@ public class TestKeyManagerImpl {
     assertEquals(errorMessage, omEx.getMessage());
   }
 
-  /**
+  @Test
+  void testGetAllPartsWhenZeroPartNumber() throws IOException {
+    String keyName = RandomStringUtils.randomAlphabetic(5);
+
+    String volume = VOLUME_NAME;
+
+    initKeyTableForMultipartTest(keyName, volume);
+
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+            .setVolumeName(volume)
+            .setBucketName(BUCKET_NAME)
+            .setKeyName(keyName)
+            .setMultipartUploadPartNumber(0)
+            .build();
+    OmKeyInfo omKeyInfo = keyManager.getKeyInfo(keyArgs, resolvedBucket(), "test");
+    assertEquals(keyName, omKeyInfo.getKeyName());
+    assertNotNull(omKeyInfo.getLatestVersionLocations());
+
+    List<OmKeyLocationInfo> locationList = omKeyInfo.getLatestVersionLocations().getLocationList();
+    assertNotNull(locationList);
+    assertEquals(5, locationList.size());
+    for (int i = 0; i < 5; i++) {
+      assertEquals(i, locationList.get(i).getPartNumber());
+    }
+  }
+
+  @Test
+  void testGetParticularPart() throws IOException {
+    String keyName = RandomStringUtils.randomAlphabetic(5);
+
+    String volume = VOLUME_NAME;
+
+    initKeyTableForMultipartTest(keyName, volume);
+
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+            .setVolumeName(volume)
+            .setBucketName(BUCKET_NAME)
+            .setKeyName(keyName)
+            .setMultipartUploadPartNumber(3)
+            .build();
+    OmKeyInfo omKeyInfo = keyManager.getKeyInfo(keyArgs, resolvedBucket(), "test");
+    assertEquals(keyName, omKeyInfo.getKeyName());
+    assertNotNull(omKeyInfo.getLatestVersionLocations());
+
+    List<OmKeyLocationInfo> locationList = omKeyInfo.getLatestVersionLocations().getLocationList();
+    assertNotNull(locationList);
+    assertEquals(1, locationList.size());
+    assertEquals(3, locationList.get(0).getPartNumber());
+  }
+
+  @Test
+  void testGetNotExistedPart() throws IOException {
+    String keyName = RandomStringUtils.randomAlphabetic(5);
+
+    String volume = VOLUME_NAME;
+
+    initKeyTableForMultipartTest(keyName, volume);
+
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+            .setVolumeName(volume)
+            .setBucketName(BUCKET_NAME)
+            .setKeyName(keyName)
+            .setMultipartUploadPartNumber(99)
+            .build();
+    OmKeyInfo omKeyInfo = keyManager.getKeyInfo(keyArgs, resolvedBucket(), "test");
+    assertEquals(keyName, omKeyInfo.getKeyName());
+    assertNotNull(omKeyInfo.getLatestVersionLocations());
+
+    List<OmKeyLocationInfo> locationList = omKeyInfo.getLatestVersionLocations().getLocationList();
+    assertNotNull(locationList);
+    assertEquals(0, locationList.size());
+  }
+
+  private void initKeyTableForMultipartTest(String keyName, String volume) throws IOException {
+    List<OmKeyLocationInfoGroup> locationInfoGroups = new ArrayList<>();
+    List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
+    for (int i = 0; i < 5; i++) {
+      OmKeyLocationInfo locationInfo1 = new OmKeyLocationInfo.Builder()
+              .setBlockID(new BlockID(i, i))
+              .setPartNumber(i)
+              .build();
+      locationInfoList.add(locationInfo1);
+    }
+
+    OmKeyLocationInfoGroup locationInfoGroup = new OmKeyLocationInfoGroup(0, locationInfoList);
+    locationInfoGroups.add(locationInfoGroup);
+    locationInfoGroup.setMultipartKey(true);
+
+    OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
+            .setKeyName(keyName)
+            .setBucketName(BUCKET_NAME)
+            .setVolumeName(volume)
+            .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+            .setOmKeyLocationInfos(locationInfoGroups)
+            .build();
+
+    String key = String.format("/%s/%s/%s", volume, BUCKET_NAME, keyName);
+    metadataManager.getKeyTable(BucketLayout.LEGACY).put(key, omKeyInfo);
+  }
+
+    /**
    * Get Random pipeline.
    * @return pipeline
    */
@@ -1698,8 +1794,7 @@ public class TestKeyManagerImpl {
         .setDataSize(0)
         .setReplicationConfig(
             StandaloneReplicationConfig.getInstance(ONE))
-        .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
-            ALL, ALL))
+        .setAcls(OzoneAclUtil.getAclList(ugi, ALL, ALL))
         .setVolumeName(VOLUME_NAME)
         .setOwnerName(ugi.getShortUserName());
   }

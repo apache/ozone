@@ -38,7 +38,6 @@ import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.ParentCommand;
 import picocli.CommandLine.Help.Visibility;
 import picocli.CommandLine.Option;
 
@@ -82,9 +81,6 @@ public class ListSubcommand extends ScmSubcommand {
 
   private static final ObjectWriter WRITER;
 
-  @ParentCommand
-  private ContainerCommands parent;
-
   static {
     ObjectMapper mapper = new ObjectMapper()
         .registerModule(new JavaTimeModule())
@@ -116,7 +112,7 @@ public class ListSubcommand extends ScmSubcommand {
           replication, new OzoneConfiguration());
     }
 
-    int maxCountAllowed = parent.getParent().getOzoneConf()
+    int maxCountAllowed = getOzoneConf()
         .getInt(ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT,
             ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT_DEFAULT);
 

@@ -23,6 +23,7 @@ import java.util.NavigableSet;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
@@ -113,6 +114,12 @@ public interface ContainerStateManager {
    *
    */
   Set<ContainerID> getContainerIDs(LifeCycleState state);
+
+
+  /**
+   * Returns the IDs of the Containers whose ReplicationType matches the given type.
+   */
+  Set<ContainerID> getContainerIDs(ReplicationType type);
 
   /**
    *

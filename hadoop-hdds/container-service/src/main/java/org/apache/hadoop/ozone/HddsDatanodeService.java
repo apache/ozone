@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -40,6 +41,7 @@ import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.DefaultSecretKeyClient;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
@@ -96,10 +98,13 @@ import picocli.CommandLine.Command;
     hidden = true, description = "Start the datanode for ozone",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
-public class HddsDatanodeService extends GenericCli implements ServicePlugin {
+public class HddsDatanodeService extends GenericCli implements Callable<Void>, ServicePlugin {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       HddsDatanodeService.class);
+
+  public static final String TESTING_DATANODE_VERSION_INITIAL = "testing.hdds.datanode.version.initial";
+  public static final String TESTING_DATANODE_VERSION_CURRENT = "testing.hdds.datanode.version.current";
 
   private OzoneConfiguration conf;
   private SecurityConfig secConf;
@@ -116,8 +121,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
   private List<RatisDropwizardExports.MetricReporter> ratisReporterList = null;
-  private DNMXBeanImpl serviceRuntimeInfo =
-      new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) { };
+  private DNMXBeanImpl serviceRuntimeInfo;
   private ObjectName dnInfoBeanName;
   private HddsDatanodeClientProtocolServer clientProtocolServer;
   private OzoneAdmins admins;
@@ -169,7 +173,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   @Override
   public Void call() throws Exception {
-    OzoneConfiguration configuration = createOzoneConfiguration();
+    OzoneConfiguration configuration = getOzoneConf();
     if (printBanner) {
       HddsServerUtil.startupShutdownMessage(HddsVersionInfo.HDDS_VERSION_INFO,
           HddsDatanodeService.class, args, LOG, configuration);
@@ -210,6 +214,12 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   public void start() {
+    serviceRuntimeInfo = new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) {
+      @Override
+      public String getNamespace() {
+        return SCMHAUtils.getScmServiceId(conf);
+      }
+    };
     serviceRuntimeInfo.setStartTime();
 
     ratisReporterList = RatisDropwizardExports
@@ -222,6 +232,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       String ip = InetAddress.getByName(hostname).getHostAddress();
       datanodeDetails = initializeDatanodeDetails();
       datanodeDetails.setHostName(hostname);
+      serviceRuntimeInfo.setHostName(hostname);
       datanodeDetails.setIpAddress(ip);
       datanodeDetails.setVersion(
           HddsVersionInfo.HDDS_VERSION_INFO.getVersion());
@@ -294,22 +305,29 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         httpServer = new HddsDatanodeHttpServer(conf);
         httpServer.start();
         HttpConfig.Policy policy = HttpConfig.getHttpPolicy(conf);
+
         if (policy.isHttpEnabled()) {
-          datanodeDetails.setPort(DatanodeDetails.newPort(HTTP,
-                  httpServer.getHttpAddress().getPort()));
+          int httpPort = httpServer.getHttpAddress().getPort();
+          datanodeDetails.setPort(DatanodeDetails.newPort(HTTP, httpPort));
+          serviceRuntimeInfo.setHttpPort(String.valueOf(httpPort));
         }
+
         if (policy.isHttpsEnabled()) {
-          datanodeDetails.setPort(DatanodeDetails.newPort(HTTPS,
-                  httpServer.getHttpsAddress().getPort()));
+          int httpsPort = httpServer.getHttpAddress().getPort();
+          datanodeDetails.setPort(DatanodeDetails.newPort(HTTPS, httpsPort));
+          serviceRuntimeInfo.setHttpsPort(String.valueOf(httpsPort));
         }
+
       } catch (Exception ex) {
         LOG.error("HttpServer failed to start.", ex);
       }
 
-
       clientProtocolServer = new HddsDatanodeClientProtocolServer(
           datanodeDetails, conf, HddsVersionInfo.HDDS_VERSION_INFO,
           reconfigurationHandler);
+
+      int clientRpcport = clientProtocolServer.getClientRpcAddress().getPort();
+      serviceRuntimeInfo.setClientRpcPort(String.valueOf(clientRpcport));
 
       // Get admin list
       String starterUser =
@@ -418,15 +436,14 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     DatanodeDetails details;
     if (idFile.exists()) {
       details = ContainerUtils.readDatanodeDetailsFrom(idFile);
-      // Current version is always overridden to the latest
-      details.setCurrentVersion(getDefaultCurrentVersion());
     } else {
       // There is no datanode.id file, this might be the first time datanode
       // is started.
       details = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build();
-      details.setInitialVersion(getDefaultInitialVersion());
-      details.setCurrentVersion(getDefaultCurrentVersion());
+      details.setInitialVersion(getInitialVersion());
     }
+    // Current version is always overridden to the latest
+    details.setCurrentVersion(getCurrentVersion());
     return details;
   }
 
@@ -666,16 +683,14 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   /**
    * Returns the initial version of the datanode.
    */
-  @VisibleForTesting
-  public static int getDefaultInitialVersion() {
-    return DatanodeVersion.CURRENT_VERSION;
+  private int getInitialVersion() {
+    return conf.getInt(TESTING_DATANODE_VERSION_INITIAL, DatanodeVersion.CURRENT_VERSION);
   }
 
   /**
    * Returns the current version of the datanode.
    */
-  @VisibleForTesting
-  public static int getDefaultCurrentVersion() {
-    return DatanodeVersion.CURRENT_VERSION;
+  private int getCurrentVersion() {
+    return conf.getInt(TESTING_DATANODE_VERSION_CURRENT, DatanodeVersion.CURRENT_VERSION);
   }
 }

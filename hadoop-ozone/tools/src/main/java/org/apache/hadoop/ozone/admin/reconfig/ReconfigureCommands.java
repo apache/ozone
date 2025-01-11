@@ -17,22 +17,18 @@
  */
 package org.apache.hadoop.ozone.admin.reconfig;
 
-import org.apache.hadoop.hdds.cli.GenericCli;
+import org.apache.hadoop.hdds.cli.AdminSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.OzoneAdmin;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Model.CommandSpec;
-import picocli.CommandLine.Spec;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.Callable;
 
 /**
  * Subcommand to group reconfigure OM related operations.
@@ -47,15 +43,11 @@ import java.util.concurrent.Callable;
         ReconfigureStatusSubcommand.class,
         ReconfigurePropertiesSubcommand.class
     })
-@MetaInfServices(SubcommandWithParent.class)
-public class ReconfigureCommands implements Callable<Void>,
-    SubcommandWithParent {
+@MetaInfServices(AdminSubcommand.class)
+public class ReconfigureCommands implements AdminSubcommand {
 
   @CommandLine.ParentCommand
   private OzoneAdmin parent;
-
-  @Spec
-  private CommandSpec spec;
 
   @CommandLine.Option(names = {"--service"},
       description = "service: OM, SCM, DATANODE.",
@@ -73,23 +65,12 @@ public class ReconfigureCommands implements Callable<Void>,
       required = false)
   private boolean batchReconfigDatanodes;
 
-  @Override
-  public Void call() throws Exception {
-    GenericCli.missingSubcommand(spec);
-    return null;
-  }
-
   public String getAddress() {
     return address;
   }
 
   public HddsProtos.NodeType getService() {
     return HddsProtos.NodeType.valueOf(service);
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return OzoneAdmin.class;
   }
 
   public boolean isBatchReconfigDatanodes() {

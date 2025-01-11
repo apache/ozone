@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
@@ -84,9 +85,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       ProtocolMessageEnum> dispatcher;
   private final RequestValidations requestValidations;
   private final OMPerformanceMetrics perfMetrics;
-
-  // always true, only used in tests
-  private boolean shouldFlushCache = true;
 
   private OMRequest lastRequestToSubmit;
 
@@ -176,9 +174,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     return response;
   }
 
-  private OMResponse internalProcessRequest(OMRequest request) throws
-      ServiceException {
-    OMClientRequest omClientRequest = null;
+  private OMResponse internalProcessRequest(OMRequest request) throws ServiceException {
     boolean s3Auth = false;
 
     try {
@@ -207,7 +203,16 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       if (!s3Auth) {
         OzoneManagerRatisUtils.checkLeaderStatus(ozoneManager);
       }
-      OMRequest requestToSubmit;
+
+      // check retry cache
+      final OMResponse cached = omRatisServer.checkRetryCache();
+      if (cached != null) {
+        return cached;
+      }
+
+      // process new request
+      OMClientRequest omClientRequest = null;
+      final OMRequest requestToSubmit;
       try {
         omClientRequest = createClientRequest(request, ozoneManager);
         // TODO: Note: Due to HDDS-6055, createClientRequest() could now
@@ -215,6 +220,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         //  Added the assertion.
         assert (omClientRequest != null);
         OMClientRequest finalOmClientRequest = omClientRequest;
+
         requestToSubmit = preExecute(finalOmClientRequest);
         this.lastRequestToSubmit = requestToSubmit;
       } catch (IOException ex) {
@@ -225,7 +231,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         return createErrorResponse(request, ex);
       }
 
-      OMResponse response = submitRequestToRatis(requestToSubmit);
+      final OMResponse response = omRatisServer.submitRequest(requestToSubmit);
       if (!response.getSuccess()) {
         omClientRequest.handleRequestFailure(ozoneManager);
       }
@@ -244,14 +250,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   @VisibleForTesting
   public OMRequest getLastRequestToSubmit() {
     return lastRequestToSubmit;
-  }
-
-  /**
-   * Submits request to OM's Ratis server.
-   */
-  private OMResponse submitRequestToRatis(OMRequest request)
-      throws ServiceException {
-    return omRatisServer.submitRequest(request);
   }
 
   private OMResponse submitReadRequestToOM(OMRequest request)
@@ -306,16 +304,15 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
           throw ex;
         }
         final TermIndex termIndex = TransactionInfo.getTermIndex(transactionIndex.incrementAndGet());
-        omClientResponse = handler.handleWriteRequest(request, termIndex, ozoneManagerDoubleBuffer);
+        final ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
+        omClientResponse = handler.handleWriteRequest(request, context, ozoneManagerDoubleBuffer);
       }
     } catch (IOException ex) {
       // As some preExecute returns error. So handle here.
       return createErrorResponse(request, ex);
     }
     try {
-      if (shouldFlushCache) {
-        omClientResponse.getFlushFuture().get();
-      }
+      omClientResponse.getFlushFuture().get();
       if (LOG.isTraceEnabled()) {
         LOG.trace("Future for {} is completed", request);
       }
@@ -364,13 +361,5 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
    */
   public void awaitDoubleBufferFlush() throws InterruptedException {
     ozoneManagerDoubleBuffer.awaitFlush();
-  }
-
-  @VisibleForTesting
-  public void setShouldFlushCache(boolean shouldFlushCache) {
-    if (ozoneManagerDoubleBuffer != null) {
-      ozoneManagerDoubleBuffer.stopDaemon();
-    }
-    this.shouldFlushCache = shouldFlushCache;
   }
 }

@@ -24,7 +24,9 @@
   <modelVersion>4.0.0</modelVersion>
   <artifactId>ozone-recon</artifactId>
   <properties>
+    <classpath.skip>false</classpath.skip>
     <pnpm.version>8.15.7</pnpm.version>
+    <sort.skip>true</sort.skip>
   </properties>
   <build>
     <resources>
@@ -209,6 +211,9 @@
               <resources>
                 <resource>
                   <directory>${basedir}/src/main/resources/webapps/recon/ozone-recon-web/build</directory>
+                  <excludes>
+                    <exclude>static/**</exclude>
+                  </excludes>
                   <filtering>true</filtering>
                 </resource>
               </resources>
@@ -229,6 +234,7 @@
                 </resource>
               </resources>
               <nonFilteredFileExtensions>
+                <nonFilteredFileExtension>woff</nonFilteredFileExtension>
                 <nonFilteredFileExtension>woff2</nonFilteredFileExtension>
               </nonFilteredFileExtensions>
             </configuration>

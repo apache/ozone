@@ -18,11 +18,13 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -75,8 +77,8 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       LoggerFactory.getLogger(OMSnapshotCreateRequest.class);
 
   private final String snapshotPath;
-  private final String volumeName;
-  private final String bucketName;
+  private String volumeName;
+  private String bucketName;
   private final String snapshotName;
   private final SnapshotInfo snapshotInfo;
 
@@ -106,7 +108,11 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     final OMRequest omRequest = super.preExecute(ozoneManager);
     // Verify name
     OmUtils.validateSnapshotName(snapshotName);
-
+    // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
+    // permission check, since linked bucket permissions and source bucket permissions could be different.
+    ResolvedBucket bucket = ozoneManager.resolveBucketLink(Pair.of(volumeName, bucketName), this);
+    this.volumeName = bucket.realVolume();
+    this.bucketName = bucket.realBucket();
     UserGroupInformation ugi = createUGIForApi();
     String bucketOwner = ozoneManager.getBucketOwner(volumeName, bucketName,
         IAccessAuthorizer.ACLType.READ, OzoneObj.ResourceType.BUCKET);
@@ -116,16 +122,16 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
           "Only bucket owners and Ozone admins can create snapshots",
           OMException.ResultCodes.PERMISSION_DENIED);
     }
-
-    return omRequest.toBuilder().setCreateSnapshotRequest(
-        omRequest.getCreateSnapshotRequest().toBuilder()
-            .setSnapshotId(toProtobuf(UUID.randomUUID()))
-            .setCreationTime(Time.now())
-            .build()).build();
+    CreateSnapshotRequest.Builder createSnapshotRequest = omRequest.getCreateSnapshotRequest().toBuilder()
+        .setSnapshotId(toProtobuf(UUID.randomUUID()))
+        .setVolumeName(volumeName)
+        .setBucketName(this.bucketName)
+        .setCreationTime(Time.now());
+    return omRequest.toBuilder().setCreateSnapshotRequest(createSnapshotRequest.build()).build();
   }
   
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumSnapshotCreates();
@@ -167,7 +173,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
           ((RDBStore) omMetadataManager.getStore()).getDb()
               .getLatestSequenceNumber();
       snapshotInfo.setDbTxSequenceNumber(dbLatestSequenceNumber);
-      snapshotInfo.setLastTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());
+      snapshotInfo.setLastTransactionInfo(TransactionInfo.valueOf(context.getTermIndex()).toByteString());
       // Snapshot referenced size should be bucket's used bytes
       OmBucketInfo omBucketInfo =
           getBucketInfo(omMetadataManager, volumeName, bucketName);
@@ -184,7 +190,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       //  pre-replicated key size counter in OmBucketInfo.
       snapshotInfo.setReferencedSize(estimateBucketDataSize(omBucketInfo));
 
-      addSnapshotInfoToSnapshotChainAndCache(omMetadataManager, termIndex.getIndex());
+      addSnapshotInfoToSnapshotChainAndCache(omMetadataManager, context.getIndex());
 
       omResponse.setCreateSnapshotResponse(
           CreateSnapshotResponse.newBuilder()

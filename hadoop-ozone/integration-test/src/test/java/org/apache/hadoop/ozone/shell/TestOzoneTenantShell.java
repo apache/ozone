@@ -21,7 +21,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.retry.RetryInvocationHandler;
@@ -44,6 +43,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -54,6 +54,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.nio.file.Path;
 import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
 import java.util.List;
@@ -91,7 +92,8 @@ public class TestOzoneTenantShell {
    * Set the timeout for every test.
    */
 
-  private static File baseDir;
+  @TempDir
+  private static Path path;
   private static File testFile;
   private static final File AUDIT_LOG_FILE = new File("audit.log");
 
@@ -137,11 +139,6 @@ public class TestOzoneTenantShell {
       conf.setBoolean(OZONE_OM_TENANT_DEV_SKIP_RANGER, true);
     }
 
-    String path = GenericTestUtils.getTempPath(
-        TestOzoneTenantShell.class.getSimpleName());
-    baseDir = new File(path);
-    baseDir.mkdirs();
-
     testFile = new File(path + OzoneConsts.OZONE_URI_DELIMITER + "testFile");
     testFile.getParentFile().mkdirs();
     testFile.createNewFile();
@@ -167,10 +164,6 @@ public class TestOzoneTenantShell {
   public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
-    }
-
-    if (baseDir != null) {
-      FileUtil.fullyDelete(baseDir, true);
     }
 
     if (AUDIT_LOG_FILE.exists()) {

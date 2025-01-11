@@ -24,6 +24,10 @@
   <name>Apache Ozone HDDS RocksDB Tools</name>
   <artifactId>hdds-rocks-native</artifactId>
 
+  <properties>
+    <sort.skip>true</sort.skip>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -385,7 +389,7 @@
             <artifactId>maven-dependency-plugin</artifactId>
             <executions>
               <execution>
-                <id>copy-jars</id>
+                <id>copy-dependencies</id>
                 <phase>process-sources</phase>
                 <goals>
                   <goal>copy-dependencies</goal>

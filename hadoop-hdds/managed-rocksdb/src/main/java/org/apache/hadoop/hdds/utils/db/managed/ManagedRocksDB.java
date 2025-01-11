@@ -18,6 +18,7 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import org.apache.commons.io.FilenameUtils;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.DBOptions;
@@ -31,6 +32,8 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Managed {@link RocksDB}.
@@ -101,5 +104,15 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
     this.get().deleteFile(sstFileName);
     File file = new File(fileToBeDeleted.path(), fileToBeDeleted.fileName());
     ManagedRocksObjectUtils.waitForFileDelete(file, Duration.ofSeconds(60));
+  }
+
+  public static Map<String, LiveFileMetaData> getLiveMetadataForSSTFiles(RocksDB db) {
+    return db.getLiveFilesMetaData().stream().collect(
+            Collectors.toMap(liveFileMetaData -> FilenameUtils.getBaseName(liveFileMetaData.fileName()),
+                liveFileMetaData -> liveFileMetaData));
+  }
+
+  public Map<String, LiveFileMetaData> getLiveMetadataForSSTFiles() {
+    return getLiveMetadataForSSTFiles(this.get());
   }
 }

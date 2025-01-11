@@ -278,6 +278,7 @@ public final class OmUtils {
     case SetSafeMode:
     case PrintCompactionLogDag:
     case GetSnapshotInfo:
+    case GetObjectTagging:
     case GetQuotaRepairStatus:
     case StartQuotaRepair:
       return true;
@@ -339,6 +340,8 @@ public final class OmUtils {
     case AbortExpiredMultiPartUploads:
     case SetSnapshotProperty:
     case QuotaRepair:
+    case PutObjectTagging:
+    case DeleteObjectTagging:
     case UnknownCommand:
       return false;
     case EchoRPC:
@@ -767,7 +770,7 @@ public final class OmUtils {
         normalizedKeyName = new Path(OM_KEY_PREFIX + keyName)
             .toUri().getPath();
       }
-      if (!keyName.equals(normalizedKeyName) && LOG.isDebugEnabled()) {
+      if (LOG.isDebugEnabled() && !keyName.equals(normalizedKeyName)) {
         LOG.debug("Normalized key {} to {} ", keyName,
             normalizedKeyName.substring(1));
       }
@@ -920,7 +923,7 @@ public final class OmUtils {
   }
   
   public static List<List<String>> format(
-          List<ServiceInfo> nodes, int port, String leaderId) {
+          List<ServiceInfo> nodes, int port, String leaderId, String leaderReadiness) {
     List<List<String>> omInfoList = new ArrayList<>();
     // Ensuring OM's are printed in correct order
     List<ServiceInfo> omNodes = nodes.stream()
@@ -937,6 +940,7 @@ public final class OmUtils {
         omInfo.add(info.getOmRoleInfo().getNodeId());
         omInfo.add(String.valueOf(port));
         omInfo.add(role);
+        omInfo.add(leaderReadiness);
         omInfoList.add(omInfo);
       }
     }

@@ -65,6 +65,7 @@ import org.apache.hadoop.hdds.utils.ResourceCache;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel;
@@ -78,6 +79,7 @@ import org.apache.ratis.proto.RaftProtos.StateMachineEntryProto;
 import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientRequest;
+import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeer;
@@ -202,6 +204,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   private final boolean waitOnBothFollowers;
   private final HddsDatanodeService datanodeService;
   private static Semaphore semaphore = new Semaphore(1);
+  private final AtomicBoolean peersValidated;
 
   /**
    * CSM metrics.
@@ -252,6 +255,7 @@ public class ContainerStateMachine extends BaseStateMachine {
             HDDS_CONTAINER_RATIS_STATEMACHINE_MAX_PENDING_APPLY_TXNS_DEFAULT);
     applyTransactionSemaphore = new Semaphore(maxPendingApplyTransactions);
     stateMachineHealthy = new AtomicBoolean(true);
+    this.peersValidated = new AtomicBoolean(false);
 
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
         .setNameFormat(
@@ -263,6 +267,19 @@ public class ContainerStateMachine extends BaseStateMachine {
     this.waitOnBothFollowers = conf.getObject(
         DatanodeConfiguration.class).waitOnAllFollowers();
 
+  }
+
+  private void validatePeers() throws IOException {
+    if (this.peersValidated.get()) {
+      return;
+    }
+    final RaftGroup group = ratisServer.getServerDivision(getGroupId()).getGroup();
+    final RaftPeerId selfId = ratisServer.getServer().getId();
+    if (group.getPeer(selfId) == null) {
+      throw new StorageContainerException("Current datanode " + selfId + " is not a member of " + group,
+          ContainerProtos.Result.INVALID_CONFIG);
+    }
+    peersValidated.set(true);
   }
 
   @Override
@@ -507,21 +524,6 @@ public class ContainerStateMachine extends BaseStateMachine {
     return response;
   }
 
-  private CompletableFuture<ContainerCommandResponseProto> link(
-      ContainerCommandRequestProto requestProto, LogEntryProto entry) {
-    return CompletableFuture.supplyAsync(() -> {
-      final DispatcherContext context = DispatcherContext
-          .newBuilder(DispatcherContext.Op.STREAM_LINK)
-          .setTerm(entry.getTerm())
-          .setLogIndex(entry.getIndex())
-          .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA)
-          .setContainer2BCSIDMap(container2BCSIDMap)
-          .build();
-
-      return dispatchCommand(requestProto, context);
-    }, executor);
-  }
-
   private CompletableFuture<Message> writeStateMachineData(
       ContainerCommandRequestProto requestProto, long entryIndex, long term,
       long startTime) {
@@ -672,29 +674,8 @@ public class ContainerStateMachine extends BaseStateMachine {
 
     final KeyValueStreamDataChannel kvStreamDataChannel =
         (KeyValueStreamDataChannel) dataChannel;
-
-    final ContainerCommandRequestProto request =
-        kvStreamDataChannel.getPutBlockRequest();
-
-    return link(request, entry).whenComplete((response, e) -> {
-      if (e != null) {
-        LOG.warn("Failed to link logEntry {} for request {}",
-            TermIndex.valueOf(entry), request, e);
-      }
-      if (response != null) {
-        final ContainerProtos.Result result = response.getResult();
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("{} to link logEntry {} for request {}, response: {}",
-              result, TermIndex.valueOf(entry), request, response);
-        }
-        if (result == ContainerProtos.Result.SUCCESS) {
-          kvStreamDataChannel.setLinked();
-          return;
-        }
-      }
-      // failed to link, cleanup
-      kvStreamDataChannel.cleanUp();
-    });
+    kvStreamDataChannel.setLinked();
+    return CompletableFuture.completedFuture(null);
   }
 
   private ExecutorService getChunkExecutor(WriteChunkRequestProto req) {
@@ -962,6 +943,11 @@ public class ContainerStateMachine extends BaseStateMachine {
     final CheckedSupplier<ContainerCommandResponseProto, Exception> task
         = () -> {
           try {
+            try {
+              this.validatePeers();
+            } catch (StorageContainerException e) {
+              return ContainerUtils.logAndReturnError(LOG, e, request);
+            }
             long timeNow = Time.monotonicNowNanos();
             long queueingDelay = timeNow - context.getStartTime();
             metrics.recordQueueingDelay(request.getCmdType(), queueingDelay);
@@ -983,12 +969,15 @@ public class ContainerStateMachine extends BaseStateMachine {
       try {
         RaftServer.Division division = ratisServer.getServer().getDivision(getGroupId());
         if (division.getInfo().isLeader()) {
-          long minIndex = Arrays.stream(division.getInfo()
-              .getFollowerNextIndices()).min().getAsLong();
-          LOG.debug("Removing data corresponding to log index {} min index {} "
-                  + "from cache", index, minIndex);
-          removeCacheDataUpTo(Math.min(minIndex, index));
+          Arrays.stream(division.getInfo()
+              .getFollowerNextIndices()).min().ifPresent(minIndex -> {
+                removeCacheDataUpTo(Math.min(minIndex, index));
+                LOG.debug("Removing data corresponding to log index {} min index {} "
+                    + "from cache", index, minIndex);
+              });
         }
+      } catch (RuntimeException e) {
+        throw e;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }

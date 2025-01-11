@@ -31,5 +31,5 @@ export const breadcrumbNameMap: IBreadcrumbNameMap = {
   '/Insights': 'Insights',
   '/DiskUsage': 'Disk Usage',
   '/Heatmap': 'Heatmap',
-  '/Om': 'Om',
+  '/Om': 'Om'
 };

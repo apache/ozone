@@ -49,7 +49,7 @@ public abstract class S3Handler extends Handler {
 
   @Override
   protected OzoneClient createClient(OzoneAddress address)
-      throws IOException, OzoneClientException {
+      throws IOException {
     return address.createClientForS3Commands(getConf(), omServiceID);
   }
 

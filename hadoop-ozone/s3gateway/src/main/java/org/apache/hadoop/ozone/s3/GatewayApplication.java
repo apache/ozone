@@ -24,6 +24,6 @@ import org.glassfish.jersey.server.ResourceConfig;
  */
 public class GatewayApplication extends ResourceConfig {
   public GatewayApplication() {
-    packages("org.apache.hadoop.ozone.s3", "org.apache.hadoop.ozone.s3secret");
+    packages("org.apache.hadoop.ozone.s3");
   }
 }

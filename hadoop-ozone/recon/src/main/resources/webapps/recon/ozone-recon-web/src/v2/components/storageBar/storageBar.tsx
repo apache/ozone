@@ -19,10 +19,8 @@
 import React from 'react';
 import { Progress } from 'antd';
 import filesize from 'filesize';
-import Icon from '@ant-design/icons';
 import Tooltip from 'antd/lib/tooltip';
 
-import { FilledIcon } from '@/utils/themeIcons';
 import { getCapacityPercent } from '@/utils/common';
 import type { StorageReport } from '@/v2/types/overview.types';
 
@@ -52,24 +50,30 @@ const StorageBar: React.FC<StorageReportProps> = ({
   const totalUsed = capacity - remaining;
   const tooltip = (
     <>
-      <div>
-        <Icon component={FilledIcon} className='ozone-used-bg-v2' />
-        Ozone Used ({size(used)})
-      </div>
-      <div>
-        <Icon component={FilledIcon} className='non-ozone-used-bg-v2' />
-        Non Ozone Used ({size(nonOzoneUsed)})
-      </div>
-      <div>
-        <Icon component={FilledIcon} className='remaining-bg-v2' />
-        Remaining ({size(remaining)})
-      </div>
-      <div>
-        <Icon component={FilledIcon} className='committed-bg-v2' />
-        Container Pre-allocated ({size(committed)})
-      </div>
+      <table cellPadding={5}>
+        <tbody>
+          <tr>
+            <td>Ozone Used</td>
+            <td><strong>{size(used)}</strong></td>
+          </tr>
+          <tr>
+            <td>Non Ozone Used</td>
+            <td><strong>{size(nonOzoneUsed)}</strong></td>
+          </tr>
+          <tr>
+            <td>Remaining</td>
+            <td><strong>{size(remaining)}</strong></td>
+          </tr>
+          <tr>
+            <td>Container Pre-allocated</td>
+            <td><strong>{size(committed)}</strong></td>
+          </tr>
+        </tbody>
+      </table>
     </>
   );
+
+  const percentage = getCapacityPercent(totalUsed, capacity)
 
   return (
       <Tooltip
@@ -83,9 +87,9 @@ const StorageBar: React.FC<StorageReportProps> = ({
         }
         <Progress
           strokeLinecap='round'
-          percent={getCapacityPercent(totalUsed, capacity)}
-          success={{ percent: getCapacityPercent(used, capacity) }}
-          className='capacity-bar-v2' strokeWidth={strokeWidth} />
+          percent={percentage}
+          strokeColor={(percentage > 80) ? '#FF4D4E' : '#52C41A'}
+          className={(percentage > 80) ? 'capacity-bar-v2-error' : 'capacity-bar-v2'} strokeWidth={strokeWidth} />
       </Tooltip>
   );
 }

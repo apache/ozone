@@ -19,9 +19,10 @@
 package org.apache.hadoop.ozone.container.common.transport.server;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.ratis.grpc.util.ZeroCopyMessageMarshaller;
 import org.apache.ratis.thirdparty.com.google.protobuf.MessageLite;
 import org.apache.ratis.thirdparty.io.grpc.MethodDescriptor;
@@ -31,7 +32,6 @@ import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.InputStream;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc.getSendMethod;
@@ -45,28 +45,20 @@ public class GrpcXceiverService extends
       LOG = LoggerFactory.getLogger(GrpcXceiverService.class);
 
   private final ContainerDispatcher dispatcher;
-  private final boolean zeroCopyEnabled;
   private final ZeroCopyMessageMarshaller<ContainerCommandRequestProto>
       zeroCopyMessageMarshaller = new ZeroCopyMessageMarshaller<>(
           ContainerCommandRequestProto.getDefaultInstance());
 
-  public GrpcXceiverService(ContainerDispatcher dispatcher,
-      boolean zeroCopyEnabled) {
+  public GrpcXceiverService(ContainerDispatcher dispatcher) {
     this.dispatcher = dispatcher;
-    this.zeroCopyEnabled = zeroCopyEnabled;
   }
 
   /**
-   * Bind service with zerocopy marshaller equipped for the `send` API if
-   * zerocopy is enabled.
+   * Bind service with zerocopy marshaller equipped for the `send` API.
    * @return  service definition.
    */
   public ServerServiceDefinition bindServiceWithZeroCopy() {
     ServerServiceDefinition orig = super.bindService();
-    if (!zeroCopyEnabled) {
-      LOG.info("Zerocopy is not enabled.");
-      return orig;
-    }
 
     ServerServiceDefinition.Builder builder =
         ServerServiceDefinition.builder(orig.getServiceDescriptor().getName());
@@ -107,9 +99,13 @@ public class GrpcXceiverService extends
 
       @Override
       public void onNext(ContainerCommandRequestProto request) {
+        final DispatcherContext context = request.getCmdType() != Type.ReadChunk ? null
+            : DispatcherContext.newBuilder(DispatcherContext.Op.HANDLE_READ_CHUNK)
+            .setReleaseSupported(true)
+            .build();
+
         try {
-          ContainerCommandResponseProto resp =
-              dispatcher.dispatch(request, null);
+          final ContainerCommandResponseProto resp = dispatcher.dispatch(request, context);
           responseObserver.onNext(resp);
         } catch (Throwable e) {
           LOG.error("Got exception when processing"
@@ -117,9 +113,9 @@ public class GrpcXceiverService extends
           isClosed.set(true);
           responseObserver.onError(e);
         } finally {
-          InputStream popStream = zeroCopyMessageMarshaller.popStream(request);
-          if (popStream != null) {
-            IOUtils.close(LOG, popStream);
+          zeroCopyMessageMarshaller.release(request);
+          if (context != null) {
+            context.release();
           }
         }
       }

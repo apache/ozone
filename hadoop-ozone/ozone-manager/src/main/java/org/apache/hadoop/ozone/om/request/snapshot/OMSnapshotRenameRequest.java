@@ -25,6 +25,8 @@ import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAP
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
@@ -32,8 +34,10 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -49,7 +53,6 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
-import org.apache.ratis.server.protocol.TermIndex;
 
 /**
  * Changes snapshot name.
@@ -75,6 +78,11 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
 
     String volumeName = renameSnapshotRequest.getVolumeName();
     String bucketName = renameSnapshotRequest.getBucketName();
+    // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
+    // permission check, since linked bucket permissions and source bucket permissions could be different.
+    ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(Pair.of(volumeName, bucketName), this);
+    volumeName = resolvedBucket.realVolume();
+    bucketName = resolvedBucket.realBucket();
 
     // Permission check
     UserGroupInformation ugi = createUGIForApi();
@@ -103,8 +111,7 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
 
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-                                                 TermIndex termIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     boolean acquiredBucketLock = false;
     boolean acquiredSnapshotOldLock = false;
     boolean acquiredSnapshotNewLock = false;
@@ -180,11 +187,11 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
 
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(
           new CacheKey<>(snapshotOldTableKey),
-          CacheValue.get(termIndex.getIndex()));
+          CacheValue.get(context.getIndex()));
 
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(
           new CacheKey<>(snapshotNewTableKey),
-          CacheValue.get(termIndex.getIndex(), snapshotOldInfo));
+          CacheValue.get(context.getIndex(), snapshotOldInfo));
 
       omMetadataManager.getSnapshotChainManager().updateSnapshot(snapshotOldInfo);
 
