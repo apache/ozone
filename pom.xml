@@ -201,7 +201,7 @@
     <ranger.version>2.3.0</ranger.version>
     <ratis.thirdparty.version>1.0.6</ratis.thirdparty.version>
     <ratis.version>3.1.2</ratis.version>
-    <re2j.version>1.7</re2j.version>
+    <re2j.version>1.8</re2j.version>
     <reflections.version>0.10.2</reflections.version>
     <reload4j.version>1.2.26</reload4j.version>
     <restrict-imports.enforcer.version>2.6.0</restrict-imports.enforcer.version>
