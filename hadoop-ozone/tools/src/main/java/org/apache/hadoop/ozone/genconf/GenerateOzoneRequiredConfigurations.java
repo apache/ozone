@@ -145,9 +145,9 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli implem
       m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
       m.marshal(generatedConfig, output);
 
-      getCmd().getOut().println("ozone-site.xml has been generated at " + path);
+      out().println("ozone-site.xml has been generated at " + path);
     } else {
-      getCmd().getOut().printf("ozone-site.xml already exists at %s and " +
+      out().printf("ozone-site.xml already exists at %s and " +
           "will not be overwritten%n", path);
     }
 

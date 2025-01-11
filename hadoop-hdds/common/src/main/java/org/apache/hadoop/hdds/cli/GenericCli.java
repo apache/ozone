@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.cli;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.Map;
 
 import com.google.common.base.Strings;
@@ -113,5 +114,13 @@ public abstract class GenericCli implements GenericParentCommand {
   @Override
   public boolean isVerbose() {
     return verbose;
+  }
+
+  protected PrintWriter out() {
+    return cmd.getOut();
+  }
+
+  protected PrintWriter err() {
+    return cmd.getErr();
   }
 }

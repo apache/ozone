@@ -45,11 +45,11 @@ import picocli.CommandLine;
 public class OzoneGetConf extends GenericCli {
 
   void printError(String message) {
-    getCmd().getErr().println(message);
+    err().println(message);
   }
 
   void printOut(String message) {
-    getCmd().getOut().println(message);
+    out().println(message);
   }
 
   OzoneConfiguration getConf() {
