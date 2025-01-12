@@ -49,10 +49,10 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 import picocli.CommandLine;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.nio.file.Path;
 import java.security.PrivilegedExceptionAction;
@@ -102,10 +102,8 @@ public class TestOzoneTenantShell {
   private static OzoneShell ozoneSh = null;
   private static TenantShell tenantShell = null;
 
-  private final ByteArrayOutputStream out = new ByteArrayOutputStream();
-  private final ByteArrayOutputStream err = new ByteArrayOutputStream();
-  private static final PrintStream OLD_OUT = System.out;
-  private static final PrintStream OLD_ERR = System.err;
+  private static final StringWriter out = new StringWriter();
+  private static final StringWriter err = new StringWriter();
 
   private static String omServiceId;
   private static int numOfOMs;
@@ -173,9 +171,10 @@ public class TestOzoneTenantShell {
 
   @BeforeEach
   public void setup() throws UnsupportedEncodingException {
-    System.setOut(new PrintStream(out, false, UTF_8.name()));
-    System.setErr(new PrintStream(err, false, UTF_8.name()));
-
+    tenantShell.getCmd().setOut(new PrintWriter(out));
+    tenantShell.getCmd().setErr(new PrintWriter(err));
+    ozoneSh.getCmd().setOut(new PrintWriter(out));
+    ozoneSh.getCmd().setErr(new PrintWriter(err));
     // Suppress OMNotLeaderException in the log
     GenericTestUtils.setLogLevel(RetryInvocationHandler.LOG, Level.WARN);
     // Enable debug logging for interested classes
@@ -190,12 +189,8 @@ public class TestOzoneTenantShell {
   @AfterEach
   public void reset() {
     // reset stream after each unit test
-    out.reset();
-    err.reset();
-
-    // restore system streams
-    System.setOut(OLD_OUT);
-    System.setErr(OLD_ERR);
+    out.getBuffer().setLength(0);
+    err.getBuffer().setLength(0);
   }
 
   /**
@@ -204,10 +199,9 @@ public class TestOzoneTenantShell {
   private int execute(GenericCli shell, String[] args) {
     LOG.info("Executing shell command with args {}", Arrays.asList(args));
     CommandLine cmd = shell.getCmd();
-
     CommandLine.IExecutionExceptionHandler exceptionHandler =
         (ex, commandLine, parseResult) -> {
-          new PrintStream(err, true, DEFAULT_ENCODING).println(ex.getMessage());
+          new PrintWriter(err).println(ex.getMessage());
           return commandLine.getCommandSpec().exitCodeOnExecutionException();
         };
 
@@ -310,25 +304,25 @@ public class TestOzoneTenantShell {
   /**
    * Helper function that checks command output AND clears it.
    */
-  private void checkOutput(ByteArrayOutputStream stream, String stringToMatch,
+  private void checkOutput(StringWriter writer, String stringToMatch,
                            boolean exactMatch) throws IOException {
-    stream.flush();
-    final String str = stream.toString(DEFAULT_ENCODING);
+    writer.flush();
+    final String str = writer.toString();
     checkOutput(str, stringToMatch, exactMatch);
-    stream.reset();
+    writer.getBuffer().setLength(0);
   }
 
-  private void checkOutput(ByteArrayOutputStream stream, String stringToMatch,
+  private void checkOutput(StringWriter writer, String stringToMatch,
       boolean exactMatch, boolean expectValidJSON) throws IOException {
-    stream.flush();
-    final String str = stream.toString(DEFAULT_ENCODING);
+    writer.flush();
+    final String str = writer.toString();
     if (expectValidJSON) {
       // Verify if the String can be parsed as a valid JSON
       final ObjectMapper objectMapper = new ObjectMapper();
       objectMapper.readTree(str);
     }
     checkOutput(str, stringToMatch, exactMatch);
-    stream.reset();
+    writer.getBuffer().setLength(0);
   }
 
   private void checkOutput(String str, String stringToMatch,
@@ -421,6 +415,7 @@ public class TestOzoneTenantShell {
     checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {"list"});
+    String test = out.toString();
     checkOutput(out, "finance\n", true);
     checkOutput(err, "", true);
 
