@@ -415,7 +415,6 @@ public class TestOzoneTenantShell {
     checkOutput(ERR, "", true);
 
     executeHA(tenantShell, new String[] {"list"});
-    String test = OUT.toString();
     checkOutput(OUT, "finance\n", true);
     checkOutput(ERR, "", true);
 
