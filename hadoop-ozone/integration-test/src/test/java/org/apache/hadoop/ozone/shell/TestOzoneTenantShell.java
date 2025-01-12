@@ -201,7 +201,9 @@ public class TestOzoneTenantShell {
     CommandLine cmd = shell.getCmd();
     CommandLine.IExecutionExceptionHandler exceptionHandler =
         (ex, commandLine, parseResult) -> {
-          new PrintWriter(ERR).println(ex.getMessage());
+          try (PrintWriter writer = new PrintWriter(ERR)) {
+            writer.println(ex.getMessage());
+          }
           return commandLine.getCommandSpec().exitCodeOnExecutionException();
         };
 
