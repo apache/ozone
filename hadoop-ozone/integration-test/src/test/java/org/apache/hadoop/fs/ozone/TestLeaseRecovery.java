@@ -108,6 +108,7 @@ public class TestLeaseRecovery extends OzoneTestBase {
   private String dir;
   private Path file;
   private GenericTestUtils.LogCapturer xceiverClientLogs;
+  private RootedOzoneFileSystem fs;
 
   /**
    * Closing the output stream after lease recovery throws because the key
@@ -177,12 +178,14 @@ public class TestLeaseRecovery extends OzoneTestBase {
   }
 
   @BeforeEach
-  void beforeEach() {
+  void beforeEach() throws Exception {
     file = new Path(dir, "file-" + getTestName() + "-" + FILE_COUNTER.incrementAndGet());
+    fs = (RootedOzoneFileSystem) FileSystem.get(conf);
   }
 
   @AfterEach
   void afterEach() {
+    IOUtils.closeQuietly(fs);
     xceiverClientLogs.clearOutput();
     KeyValueHandler.setInjector(null);
   }
@@ -198,8 +201,6 @@ public class TestLeaseRecovery extends OzoneTestBase {
   @ParameterizedTest
   @ValueSource(ints = {1 << 17, (1 << 17) + 1, (1 << 17) - 1})
   public void testRecovery(int dataSize) throws Exception {
-    RootedOzoneFileSystem fs = (RootedOzoneFileSystem)FileSystem.get(conf);
-
     final byte[] data = getData(dataSize);
 
     final FSDataOutputStream stream = fs.create(file, true);
@@ -231,8 +232,6 @@ public class TestLeaseRecovery extends OzoneTestBase {
 
   @Test
   public void testRecoveryWithoutHsyncHflushOnLastBlock() throws Exception {
-    RootedOzoneFileSystem fs = (RootedOzoneFileSystem)FileSystem.get(conf);
-
     int blockSize = (int) cluster.getOzoneManager().getConfiguration().getStorageSize(
         OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
 
@@ -272,13 +271,11 @@ public class TestLeaseRecovery extends OzoneTestBase {
     String obsDir = OZONE_ROOT + obsBucket.getVolumeName() + OZONE_URI_DELIMITER + obsBucket.getName();
     Path obsFile = new Path(obsDir, "file" + getTestName() + FILE_COUNTER.incrementAndGet());
 
-    RootedOzoneFileSystem fs = (RootedOzoneFileSystem) FileSystem.get(conf);
     assertThrows(IllegalArgumentException.class, () -> fs.recoverLease(obsFile));
   }
 
   @Test
   public void testFinalizeBlockFailure() throws Exception {
-    RootedOzoneFileSystem fs = (RootedOzoneFileSystem)FileSystem.get(conf);
     int dataSize = 100;
     final byte[] data = getData(dataSize);
 
@@ -320,7 +317,6 @@ public class TestLeaseRecovery extends OzoneTestBase {
 
   @Test
   public void testBlockPipelineClosed() throws Exception {
-    RootedOzoneFileSystem fs = (RootedOzoneFileSystem)FileSystem.get(conf);
     int dataSize = 100;
     final byte[] data = getData(dataSize);
 
@@ -363,58 +359,59 @@ public class TestLeaseRecovery extends OzoneTestBase {
   @ValueSource(booleans = {false, true})
   public void testGetCommittedBlockLengthTimeout(boolean forceRecovery) throws Exception {
     // reduce read timeout
-    conf.set(OZONE_CLIENT_READ_TIMEOUT, "2s");
+    OzoneConfiguration clientConf = new OzoneConfiguration(conf);
+    clientConf.set(OZONE_CLIENT_READ_TIMEOUT, "2s");
     // set force recovery
     System.setProperty(FORCE_LEASE_RECOVERY_ENV, String.valueOf(forceRecovery));
-    RootedOzoneFileSystem fs = (RootedOzoneFileSystem)FileSystem.get(conf);
-    int dataSize = 100;
-    final byte[] data = getData(dataSize);
+    try (RootedOzoneFileSystem fs = (RootedOzoneFileSystem)FileSystem.get(clientConf)) {
+      int dataSize = 100;
+      final byte[] data = getData(dataSize);
 
-    final FSDataOutputStream stream = fs.create(file, true);
-    try {
-      stream.write(data);
-      stream.hsync();
-      assertFalse(fs.isFileClosed(file));
+      final FSDataOutputStream stream = fs.create(file, true);
+      try {
+        stream.write(data);
+        stream.hsync();
+        assertFalse(fs.isFileClosed(file));
 
-      // write more data without hsync
-      stream.write(data);
-      stream.flush();
+        // write more data without hsync
+        stream.write(data);
+        stream.flush();
 
-      // close the pipeline and container
-      closeLatestContainer();
-      // pause getCommittedBlockLength handling on all DNs to make sure all getCommittedBlockLength will time out
-      FaultInjectorImpl injector = new FaultInjectorImpl();
-      injector.setType(ContainerProtos.Type.GetCommittedBlockLength);
-      KeyValueHandler.setInjector(injector);
-      if (!forceRecovery) {
-        assertThrows(IOException.class, () -> fs.recoverLease(file));
-        return;
-      } else {
-        fs.recoverLease(file);
+        // close the pipeline and container
+        closeLatestContainer();
+        // pause getCommittedBlockLength handling on all DNs to make sure all getCommittedBlockLength will time out
+        FaultInjectorImpl injector = new FaultInjectorImpl();
+        injector.setType(ContainerProtos.Type.GetCommittedBlockLength);
+        KeyValueHandler.setInjector(injector);
+        if (!forceRecovery) {
+          assertThrows(IOException.class, () -> fs.recoverLease(file));
+          return;
+        } else {
+          fs.recoverLease(file);
+        }
+        assertEquals(3, StringUtils.countMatches(xceiverClientLogs.getOutput(),
+            "Executing command cmdType: GetCommittedBlockLength"));
+
+        // The lease should have been recovered.
+        assertTrue(fs.isFileClosed(file), "File should be closed");
+        FileStatus fileStatus = fs.getFileStatus(file);
+        // Since all DNs are out, then the length in OM keyInfo will be used as the final file length
+        assertEquals(dataSize, fileStatus.getLen());
+      } finally {
+        if (!forceRecovery) {
+          closeIgnoringOMException(stream, OMException.ResultCodes.KEY_UNDER_LEASE_RECOVERY);
+        } else {
+          closeIgnoringKeyNotFound(stream);
+        }
       }
-      assertEquals(3, StringUtils.countMatches(xceiverClientLogs.getOutput(),
-          "Executing command cmdType: GetCommittedBlockLength"));
 
-      // The lease should have been recovered.
-      assertTrue(fs.isFileClosed(file), "File should be closed");
-      FileStatus fileStatus = fs.getFileStatus(file);
-      // Since all DNs are out, then the length in OM keyInfo will be used as the final file length
-      assertEquals(dataSize, fileStatus.getLen());
-    } finally {
-      if (!forceRecovery) {
-        closeIgnoringOMException(stream, OMException.ResultCodes.KEY_UNDER_LEASE_RECOVERY);
-      } else {
-        closeIgnoringKeyNotFound(stream);
-      }
+      // open it again, make sure the data is correct
+      verifyData(data, dataSize, file, fs);
     }
-
-    // open it again, make sure the data is correct
-    verifyData(data, dataSize, file, fs);
   }
 
   @Test
   public void testGetCommittedBlockLengthWithException() throws Exception {
-    RootedOzoneFileSystem fs = (RootedOzoneFileSystem)FileSystem.get(conf);
     int dataSize = 100;
     final byte[] data = getData(dataSize);
 
@@ -462,41 +459,42 @@ public class TestLeaseRecovery extends OzoneTestBase {
   @Order(Integer.MAX_VALUE)
   public void testOMConnectionFailure() throws Exception {
     // reduce hadoop RPC retry max attempts
-    conf.setInt(OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, 5);
-    conf.setLong(OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY, 100);
-    RootedOzoneFileSystem fs = (RootedOzoneFileSystem)FileSystem.get(conf);
-    int dataSize = 100;
-    final byte[] data = getData(dataSize);
+    OzoneConfiguration clientConf = new OzoneConfiguration(conf);
+    clientConf.setInt(OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, 5);
+    clientConf.setLong(OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY, 100);
+    try (RootedOzoneFileSystem fs = (RootedOzoneFileSystem) FileSystem.get(clientConf)) {
+      int dataSize = 100;
+      final byte[] data = getData(dataSize);
 
-    final FSDataOutputStream stream = fs.create(file, true);
-    OzoneManager om = cluster.getOzoneManager();
-    try {
-      stream.write(data);
-      stream.hsync();
-      assertFalse(fs.isFileClosed(file));
-
-      // close OM
-      if (om.stop()) {
-        om.join();
-      }
-      assertThrows(ConnectException.class, () -> fs.recoverLease(file));
-    } finally {
+      final FSDataOutputStream stream = fs.create(file, true);
+      OzoneManager om = cluster.getOzoneManager();
       try {
-        stream.close();
-      } catch (Throwable e) {
-      }
-    }
+        stream.write(data);
+        stream.hsync();
+        assertFalse(fs.isFileClosed(file));
 
-    om.restart();
-    cluster.waitForClusterToBeReady();
-    assertTrue(fs.recoverLease(file));
+        // close OM
+        if (om.stop()) {
+          om.join();
+        }
+        assertThrows(ConnectException.class, () -> fs.recoverLease(file));
+      } finally {
+        try {
+          stream.close();
+        } catch (Throwable e) {
+        }
+      }
+
+      om.restart();
+      cluster.waitForClusterToBeReady();
+      assertTrue(fs.recoverLease(file));
+    }
   }
 
   @Test
   public void testRecoverWrongFile() throws Exception {
     final Path notExistFile = new Path(dir, "file1");
 
-    RootedOzoneFileSystem fs = (RootedOzoneFileSystem)FileSystem.get(conf);
     int dataSize = 100;
     final byte[] data = getData(dataSize);
 
@@ -514,8 +512,6 @@ public class TestLeaseRecovery extends OzoneTestBase {
 
   @Test
   public void testRecoveryWithoutBlocks() throws Exception {
-    RootedOzoneFileSystem fs = (RootedOzoneFileSystem)FileSystem.get(conf);
-
     final FSDataOutputStream stream = fs.create(file, true);
     try {
       stream.hsync();
@@ -535,7 +531,6 @@ public class TestLeaseRecovery extends OzoneTestBase {
 
   @Test
   public void testRecoveryWithPartialFilledHsyncBlock() throws Exception {
-    RootedOzoneFileSystem fs = (RootedOzoneFileSystem)FileSystem.get(conf);
     int blockSize = (int) cluster.getOzoneManager().getConfiguration().getStorageSize(
         OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
     final byte[] data = getData(blockSize - 1);
@@ -591,7 +586,6 @@ public class TestLeaseRecovery extends OzoneTestBase {
 
   @Test
   public void testRecoveryWithSameBlockCountInOpenFileAndFileTable() throws Exception {
-    RootedOzoneFileSystem fs = (RootedOzoneFileSystem)FileSystem.get(conf);
     int blockSize = (int) cluster.getOzoneManager().getConfiguration().getStorageSize(
         OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
     final byte[] data = getData(blockSize / 2 - 1);
@@ -627,8 +621,8 @@ public class TestLeaseRecovery extends OzoneTestBase {
     verifyData(data, (blockSize / 2 - 1) * 2, file, fs);
   }
 
-  private void verifyData(byte[] data, int dataSize, Path filePath, RootedOzoneFileSystem fs) throws IOException {
-    try (FSDataInputStream fdis = fs.open(filePath)) {
+  private void verifyData(byte[] data, int dataSize, Path filePath, FileSystem fileSystem) throws IOException {
+    try (FSDataInputStream fdis = fileSystem.open(filePath)) {
       int bufferSize = dataSize > data.length ? dataSize / 2 : dataSize;
       while (dataSize > 0) {
         byte[] readData = new byte[bufferSize];
