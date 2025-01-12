@@ -97,10 +97,10 @@ public class ValueSchema extends AbstractSubcommand implements Callable<Void> {
   }
 
   public boolean getValueFields(String dbPath, Map<String, Object> valueSchema, int d, String table,
-                                       String dnDBSchemaVersion) {
+                                       String dndbschemaversion) {
 
     dbPath = removeTrailingSlashIfNeeded(dbPath);
-    DBDefinitionFactory.setDnDBSchemaVersion(dnDBSchemaVersion);
+    DBDefinitionFactory.setDnDBSchemaVersion(dndbschemaversion);
     DBDefinition dbDefinition = DBDefinitionFactory.getDefinition(Paths.get(dbPath), new OzoneConfiguration());
     if (dbDefinition == null) {
       err().println("Error: Incorrect DB Path");
