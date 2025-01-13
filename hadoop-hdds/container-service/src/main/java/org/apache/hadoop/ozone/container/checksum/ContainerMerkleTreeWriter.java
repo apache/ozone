@@ -151,11 +151,20 @@ public class ContainerMerkleTreeWriter {
    * This class computes one checksum for the whole chunk by aggregating these.
    */
   private static class ChunkMerkleTreeWriter {
-    private ContainerProtos.ChunkInfo chunk;
-    private boolean isHealthy = true;
+    private final long length;
+    private final long offset;
+    private final boolean isHealthy;
+    private final long chunkDataChecksum;
 
     ChunkMerkleTreeWriter(ContainerProtos.ChunkInfo chunk) {
-      this.chunk = chunk;
+      length = chunk.getLen();
+      offset = chunk.getOffset();
+      isHealthy = true;
+      ChecksumByteBuffer checksumImpl = ChecksumByteBufferFactory.crc32Impl();
+      for (ByteString checksum: chunk.getChecksumData().getChecksumsList()) {
+        checksumImpl.update(checksum.asReadOnlyByteBuffer());
+      }
+      this.chunkDataChecksum = checksumImpl.getValue();
     }
 
     /**
@@ -165,16 +174,11 @@ public class ContainerMerkleTreeWriter {
      * @return A complete protobuf representation of this chunk as a leaf in the container merkle tree.
      */
     public ContainerProtos.ChunkMerkleTree toProto() {
-      ChecksumByteBuffer checksumImpl = ChecksumByteBufferFactory.crc32Impl();
-      for (ByteString checksum: chunk.getChecksumData().getChecksumsList()) {
-        checksumImpl.update(checksum.asReadOnlyByteBuffer());
-      }
-
       return ContainerProtos.ChunkMerkleTree.newBuilder()
-          .setOffset(chunk.getOffset())
-          .setLength(chunk.getLen())
+          .setOffset(offset)
+          .setLength(length)
           .setIsHealthy(isHealthy)
-          .setChunkDataChecksum(checksumImpl.getValue())
+          .setChunkDataChecksum(chunkDataChecksum)
           .build();
     }
   }
