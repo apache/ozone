@@ -29,7 +29,7 @@ import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
-import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTree;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
@@ -193,7 +193,7 @@ public class KeyValueContainerCheck {
     LOG.debug("Running data checks for container {}", containerID);
     try {
       // TODO HDDS-10374 this tree will get updated with the container's contents as it is scanned.
-      ContainerMerkleTree dataTree = new ContainerMerkleTree();
+      ContainerMerkleTreeWriter dataTree = new ContainerMerkleTreeWriter();
       List<ContainerScanError> dataErrors = scanData(dataTree, throttler, canceler);
       if (containerIsDeleted()) {
         return DataScanResult.deleted();
@@ -209,8 +209,8 @@ public class KeyValueContainerCheck {
     }
   }
 
-  private List<ContainerScanError> scanData(ContainerMerkleTree currentTree, DataTransferThrottler throttler,
-      Canceler canceler) {
+  private List<ContainerScanError> scanData(ContainerMerkleTreeWriter currentTree, DataTransferThrottler throttler,
+                                            Canceler canceler) {
     Preconditions.checkState(containerDataFromDisk != null,
         "invoke loadContainerData prior to calling this function");
 
@@ -341,7 +341,7 @@ public class KeyValueContainerCheck {
   }
 
   private List<ContainerScanError> scanBlock(DBHandle db, File dbFile, BlockData block,
-      DataTransferThrottler throttler, Canceler canceler, ContainerMerkleTree currentTree) {
+      DataTransferThrottler throttler, Canceler canceler, ContainerMerkleTreeWriter currentTree) {
     ContainerLayoutVersion layout = containerDataFromDisk.getLayoutVersion();
 
     List<ContainerScanError> blockErrors = new ArrayList<>();
@@ -417,8 +417,8 @@ public class KeyValueContainerCheck {
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   private static List<ContainerScanError> verifyChecksum(BlockData block,
-      ContainerProtos.ChunkInfo chunk, File chunkFile, ContainerLayoutVersion layout, ByteBuffer buffer,
-      ContainerMerkleTree currentTree, DataTransferThrottler throttler, Canceler canceler) {
+                                                         ContainerProtos.ChunkInfo chunk, File chunkFile, ContainerLayoutVersion layout, ByteBuffer buffer,
+                                                         ContainerMerkleTreeWriter currentTree, DataTransferThrottler throttler, Canceler canceler) {
 
     List<ContainerScanError> scanErrors = new ArrayList<>();
 

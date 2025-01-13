@@ -36,7 +36,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
-import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTree;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
@@ -237,7 +237,7 @@ public class TestContainerCommandReconciliation {
     long containerID = writeDataAndGetContainer(true);
     // Overwrite the existing tree with a custom one for testing. We will check that it is returned properly from the
     // API.
-    ContainerMerkleTree tree = buildTestTree(conf);
+    ContainerMerkleTreeWriter tree = buildTestTree(conf);
     writeChecksumFileToDatanodes(containerID, tree);
 
     // Verify trees match on all replicas.
@@ -274,7 +274,7 @@ public class TestContainerCommandReconciliation {
     return containerID;
   }
 
-  public static void writeChecksumFileToDatanodes(long containerID, ContainerMerkleTree tree) throws Exception {
+  public static void writeChecksumFileToDatanodes(long containerID, ContainerMerkleTreeWriter tree) throws Exception {
     // Write Container Merkle Tree
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
       KeyValueHandler keyValueHandler =

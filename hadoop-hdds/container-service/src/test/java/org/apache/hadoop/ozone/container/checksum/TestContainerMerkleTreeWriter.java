@@ -38,7 +38,7 @@ import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTest
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
-class TestContainerMerkleTree {
+class TestContainerMerkleTreeWriter {
   private ConfigurationSource config;
   private long chunkSize;
 
@@ -51,7 +51,7 @@ class TestContainerMerkleTree {
 
   @Test
   public void testBuildEmptyTree() {
-    ContainerMerkleTree tree = new ContainerMerkleTree();
+    ContainerMerkleTreeWriter tree = new ContainerMerkleTreeWriter();
     ContainerProtos.ContainerMerkleTree treeProto = tree.toProto();
     assertEquals(0, treeProto.getDataChecksum());
     assertEquals(0, treeProto.getBlockMerkleTreeCount());
@@ -70,7 +70,7 @@ class TestContainerMerkleTree {
     ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(Collections.singletonList(blockTree));
 
     // Use the ContainerMerkleTree to build the same tree.
-    ContainerMerkleTree actualTree = new ContainerMerkleTree();
+    ContainerMerkleTreeWriter actualTree = new ContainerMerkleTreeWriter();
     actualTree.addChunks(blockID, Collections.singletonList(chunk));
 
     // Ensure the trees match.
@@ -106,7 +106,7 @@ class TestContainerMerkleTree {
     ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(Collections.singletonList(blockTree));
 
     // Use the ContainerMerkleTree to build the same tree.
-    ContainerMerkleTree actualTree = new ContainerMerkleTree();
+    ContainerMerkleTreeWriter actualTree = new ContainerMerkleTreeWriter();
     actualTree.addChunks(blockID, Arrays.asList(chunk1, chunk3));
 
     // Ensure the trees match.
@@ -137,7 +137,7 @@ class TestContainerMerkleTree {
 
     // Use the ContainerMerkleTree to build the same tree.
     // Add blocks and chunks out of order to test sorting.
-    ContainerMerkleTree actualTree = new ContainerMerkleTree();
+    ContainerMerkleTreeWriter actualTree = new ContainerMerkleTreeWriter();
     actualTree.addChunks(blockID3, Arrays.asList(b3c2, b3c1));
     actualTree.addChunks(blockID1, Arrays.asList(b1c1, b1c2));
 
@@ -172,7 +172,7 @@ class TestContainerMerkleTree {
 
     // Use the ContainerMerkleTree to build the same tree.
     // Test building by adding chunks to the blocks individually and out of order.
-    ContainerMerkleTree actualTree = new ContainerMerkleTree();
+    ContainerMerkleTreeWriter actualTree = new ContainerMerkleTreeWriter();
     // Add all of block 2 first.
     actualTree.addChunks(blockID2, Arrays.asList(b2c1, b2c2));
     // Then add block 1 in multiple steps wth chunks out of order.

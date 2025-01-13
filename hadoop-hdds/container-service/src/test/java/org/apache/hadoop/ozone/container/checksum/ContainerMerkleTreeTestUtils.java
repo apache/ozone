@@ -138,15 +138,15 @@ public final class ContainerMerkleTreeTestUtils {
   }
 
   /**
-   * Builds a {@link ContainerMerkleTree} representing arbitrary data. This can be used to test that the same
+   * Builds a {@link ContainerMerkleTreeWriter} representing arbitrary data. This can be used to test that the same
    * structure is preserved throughout serialization, deserialization, and API calls.
    */
-  public static ContainerMerkleTree buildTestTree(ConfigurationSource conf) {
+  public static ContainerMerkleTreeWriter buildTestTree(ConfigurationSource conf) {
     return buildTestTree(conf, 5);
   }
 
-  public static ContainerMerkleTree buildTestTree(ConfigurationSource conf, int numBlocks) {
-    ContainerMerkleTree tree = new ContainerMerkleTree();
+  public static ContainerMerkleTreeWriter buildTestTree(ConfigurationSource conf, int numBlocks) {
+    ContainerMerkleTreeWriter tree = new ContainerMerkleTreeWriter();
     byte byteValue = 1;
     for (int blockIndex = 1; blockIndex <= numBlocks; blockIndex++) {
       List<ContainerProtos.ChunkInfo> chunks = new ArrayList<>();
@@ -162,7 +162,7 @@ public final class ContainerMerkleTreeTestUtils {
    * Returns a Pair of merkle tree and the expected container diff for that merkle tree.
    */
   public static Pair<ContainerProtos.ContainerMerkleTree, ContainerDiffReport>
-      buildTestTreeWithMismatches(ContainerMerkleTree originalTree, int numMissingBlocks, int numMissingChunks,
+      buildTestTreeWithMismatches(ContainerMerkleTreeWriter originalTree, int numMissingBlocks, int numMissingChunks,
                                   int numCorruptChunks) {
 
     ContainerProtos.ContainerMerkleTree.Builder treeBuilder = originalTree.toProto().toBuilder();

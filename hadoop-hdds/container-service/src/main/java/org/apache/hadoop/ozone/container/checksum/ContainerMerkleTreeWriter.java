@@ -27,7 +27,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 
 /**
- * This class represents a Merkle tree that provides one checksum for all data within a container.
+ * This class constructs a Merkle tree that provides one checksum for all data within a container.
  *
  * As the leaves of the tree, a checksum for each chunk is computed by taking a checksum of all checksums within that
  * chunk. Each chunk checksum in a block is further checksummed together to generate the block level checksum. Finally,
@@ -37,17 +37,17 @@ import java.util.TreeMap;
  *
  * This class can be used to construct a consistent and completely filled {@link ContainerProtos.ContainerMerkleTree}
  * object. It allows building a container merkle tree from scratch by incrementally adding chunks.
- * The final checksums at higher levels of the tree are not calculated until
- * {@link ContainerMerkleTree#toProto} is called.
+ * The final checksums above the leaf levels of the tree are not calculated until
+ * {@link ContainerMerkleTreeWriter#toProto} is called.
  */
-public class ContainerMerkleTree {
+public class ContainerMerkleTreeWriter {
 
-  private final SortedMap<Long, BlockMerkleTree> id2Block;
+  private final SortedMap<Long, BlockMerkleTreeWriter> id2Block;
 
   /**
    * Constructs an empty Container merkle tree object.
    */
-  public ContainerMerkleTree() {
+  public ContainerMerkleTreeWriter() {
     id2Block = new TreeMap<>();
   }
 
@@ -59,7 +59,7 @@ public class ContainerMerkleTree {
    * @param chunks A list of chunks to add to this block. The chunks will be sorted internally by their offset.
    */
   public void addChunks(long blockID, Collection<ContainerProtos.ChunkInfo> chunks) {
-    id2Block.computeIfAbsent(blockID, BlockMerkleTree::new).addChunks(chunks);
+    id2Block.computeIfAbsent(blockID, BlockMerkleTreeWriter::new).addChunks(chunks);
   }
 
   /**
@@ -74,7 +74,7 @@ public class ContainerMerkleTree {
     ChecksumByteBuffer checksumImpl = ChecksumByteBufferFactory.crc32Impl();
     ByteBuffer containerChecksumBuffer = ByteBuffer.allocate(Long.BYTES * id2Block.size());
 
-    for (BlockMerkleTree blockTree: id2Block.values()) {
+    for (BlockMerkleTreeWriter blockTree: id2Block.values()) {
       ContainerProtos.BlockMerkleTree blockTreeProto = blockTree.toProto();
       containerTreeBuilder.addBlockMerkleTree(blockTreeProto);
       // Add the block's checksum to the buffer that will be used to calculate the container checksum.
@@ -89,15 +89,15 @@ public class ContainerMerkleTree {
   }
 
   /**
-   * Represents a merkle tree for a single block within a container.
+   * Constructs a merkle tree for a single block within a container.
    */
-  private static class BlockMerkleTree {
+  private static class BlockMerkleTreeWriter {
     // Map of each offset within the block to its chunk info.
     // Chunk order in the checksum is determined by their offset.
-    private final SortedMap<Long, ChunkMerkleTree> offset2Chunk;
+    private final SortedMap<Long, ChunkMerkleTreeWriter> offset2Chunk;
     private final long blockID;
 
-    BlockMerkleTree(long blockID) {
+    BlockMerkleTreeWriter(long blockID) {
       this.blockID = blockID;
       this.offset2Chunk = new TreeMap<>();
     }
@@ -110,7 +110,7 @@ public class ContainerMerkleTree {
      */
     public void addChunks(Collection<ContainerProtos.ChunkInfo> chunks) {
       for (ContainerProtos.ChunkInfo chunk: chunks) {
-        offset2Chunk.put(chunk.getOffset(), new ChunkMerkleTree(chunk));
+        offset2Chunk.put(chunk.getOffset(), new ChunkMerkleTreeWriter(chunk));
       }
     }
 
@@ -125,7 +125,7 @@ public class ContainerMerkleTree {
       ChecksumByteBuffer checksumImpl = ChecksumByteBufferFactory.crc32Impl();
       ByteBuffer blockChecksumBuffer = ByteBuffer.allocate(Long.BYTES * offset2Chunk.size());
 
-      for (ChunkMerkleTree chunkTree: offset2Chunk.values()) {
+      for (ChunkMerkleTreeWriter chunkTree: offset2Chunk.values()) {
         // Ordering of checksums within a chunk is assumed to be in the order they are written.
         // This assumption is already built in to the code that reads and writes the values (see
         // ChunkInputStream#validateChunk for an example on the client read path).
@@ -146,15 +146,15 @@ public class ContainerMerkleTree {
   }
 
   /**
-   * Represents a merkle tree for a single chunk within a container.
+   * Constructs a merkle tree for a single chunk within a container.
    * Each chunk has multiple checksums within it at each "bytesPerChecksum" interval.
    * This class computes one checksum for the whole chunk by aggregating these.
    */
-  private static class ChunkMerkleTree {
+  private static class ChunkMerkleTreeWriter {
     private ContainerProtos.ChunkInfo chunk;
     private boolean isHealthy = true;
 
-    ChunkMerkleTree(ContainerProtos.ChunkInfo chunk) {
+    ChunkMerkleTreeWriter(ContainerProtos.ChunkInfo chunk) {
       this.chunk = chunk;
     }
 

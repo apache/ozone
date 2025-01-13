@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTree;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils;
 import org.junit.jupiter.api.Test;
 
@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 class TestDataScanResult {
-  private static final ContainerMerkleTree TREE = ContainerMerkleTreeTestUtils.buildTestTree(new OzoneConfiguration());
+  private static final ContainerMerkleTreeWriter TREE = ContainerMerkleTreeTestUtils.buildTestTree(new OzoneConfiguration());
 
   @Test
   void testFromEmptyErrors() {

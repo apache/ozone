@@ -39,7 +39,7 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
-import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTree;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -277,14 +277,14 @@ public final class ContainerTestUtils {
   }
 
   public static DataScanResult getHealthyDataScanResult() {
-    return DataScanResult.fromErrors(Collections.emptyList(), new ContainerMerkleTree());
+    return DataScanResult.fromErrors(Collections.emptyList(), new ContainerMerkleTreeWriter());
   }
 
   /**
    * Construct an unhealthy scan result to use for testing purposes.
    */
   public static DataScanResult getUnhealthyDataScanResult() {
-    return DataScanResult.fromErrors(Collections.singletonList(getDataScanError()), new ContainerMerkleTree());
+    return DataScanResult.fromErrors(Collections.singletonList(getDataScanError()), new ContainerMerkleTreeWriter());
   }
 
   public static MetadataScanResult getHealthyMetadataScanResult() {
