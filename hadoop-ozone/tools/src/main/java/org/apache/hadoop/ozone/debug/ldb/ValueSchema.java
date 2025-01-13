@@ -83,7 +83,7 @@ public class ValueSchema extends AbstractSubcommand implements Callable<Void> {
 
     String dbPath = parent.getDbPath();
     Map<String, Object> fields = new HashMap<>();
-    success = getValueFields(dbPath, fields, depth, tableName, dnDBSchemaVersion);
+    success = getValueFields(dbPath, fields);
 
     out().println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(fields));
 
@@ -96,25 +96,24 @@ public class ValueSchema extends AbstractSubcommand implements Callable<Void> {
     return null;
   }
 
-  public boolean getValueFields(String dbPath, Map<String, Object> valueSchema, int d, String table,
-                                       String dndbschemaversion) {
+  public boolean getValueFields(String dbPath, Map<String, Object> valueSchema) {
 
     dbPath = removeTrailingSlashIfNeeded(dbPath);
-    DBDefinitionFactory.setDnDBSchemaVersion(dndbschemaversion);
+    DBDefinitionFactory.setDnDBSchemaVersion(dnDBSchemaVersion);
     DBDefinition dbDefinition = DBDefinitionFactory.getDefinition(Paths.get(dbPath), new OzoneConfiguration());
     if (dbDefinition == null) {
       err().println("Error: Incorrect DB Path");
       return false;
     }
     final DBColumnFamilyDefinition<?, ?> columnFamilyDefinition =
-        dbDefinition.getColumnFamily(table);
+        dbDefinition.getColumnFamily(tableName);
     if (columnFamilyDefinition == null) {
-      err().print("Error: Table with name '" + table + "' not found");
+      err().print("Error: Table with name '" + tableName + "' not found");
       return false;
     }
 
     Class<?> c = columnFamilyDefinition.getValueType();
-    valueSchema.put(c.getSimpleName(), getFieldsStructure(c, d));
+    valueSchema.put(c.getSimpleName(), getFieldsStructure(c, depth));
 
     return true;
   }
