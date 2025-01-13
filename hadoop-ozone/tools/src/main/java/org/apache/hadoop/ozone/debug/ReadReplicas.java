@@ -139,7 +139,9 @@ public class ReadReplicas extends KeyHandler implements DebugSubcommand {
       File manifestFile
           = new File(dir, manifestFileName);
       System.out.println("Writing manifest file: " + manifestFile.getAbsolutePath());
-      Files.createDirectories(Paths.get(manifestFile.getParent()));
+      if (manifestFile.getParent() != null) {
+        Files.createDirectories(Paths.get(manifestFile.getParent()));
+      }
       Files.write(manifestFile.toPath(),
           prettyJson.getBytes(StandardCharsets.UTF_8));
     } finally {
@@ -185,7 +187,9 @@ public class ReadReplicas extends KeyHandler implements DebugSubcommand {
         String fileName = keyName + "_block" + blockIndex + "_" +
             datanode.getHostName();
         Path path = new File(dir, fileName).toPath();
-        Files.createDirectories(path.getParent());
+        if (path.getParent() != null) {
+          Files.createDirectories(path.getParent());
+        }
         System.out.println("Writing block file: " + path.toAbsolutePath());
 
         try (InputStream is = replica.getValue()) {
