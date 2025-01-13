@@ -216,7 +216,7 @@ public class ContainerChecksumTreeManager {
         // TODO: HDDS-11765 - Handle missed block deletions from the deleted block ids.
         if (!thisDeletedBlockSet.contains(thisBlockMerkleTree.getBlockID()) &&
             !peerDeletedBlockSet.contains(thisBlockMerkleTree.getBlockID()) &&
-            thisBlockMerkleTree.getBlockChecksum() != peerBlockMerkleTree.getBlockChecksum()) {
+            thisBlockMerkleTree.getBlockDataChecksum() != peerBlockMerkleTree.getBlockDataChecksum()) {
           compareBlockMerkleTree(thisBlockMerkleTree, peerBlockMerkleTree, report);
         }
         thisIdx++;
@@ -267,7 +267,7 @@ public class ContainerChecksumTreeManager {
         // thisTree = Unhealthy, peerTree = Healthy -> Add to corrupt chunk.
         // thisTree = Healthy, peerTree = unhealthy -> Do nothing as thisTree is healthy.
         // thisTree = Unhealthy, peerTree = Unhealthy -> Do Nothing as both are corrupt.
-        if (thisChunkMerkleTree.getChunkChecksum() != peerChunkMerkleTree.getChunkChecksum() &&
+        if (thisChunkMerkleTree.getChunkDataChecksum() != peerChunkMerkleTree.getChunkDataChecksum() &&
             !thisChunkMerkleTree.getIsHealthy() && peerChunkMerkleTree.getIsHealthy()) {
           report.addCorruptChunk(peerBlockMerkleTree.getBlockID(), peerChunkMerkleTree);
         }

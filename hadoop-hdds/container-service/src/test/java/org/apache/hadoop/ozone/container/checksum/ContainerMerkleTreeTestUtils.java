@@ -74,7 +74,7 @@ public final class ContainerMerkleTreeTestUtils {
       prevBlockID = currentBlockID;
 
       assertEquals(expectedBlockTree.getBlockID(), actualBlockTree.getBlockID());
-      assertEquals(expectedBlockTree.getBlockChecksum(), actualBlockTree.getBlockChecksum());
+      assertEquals(expectedBlockTree.getBlockDataChecksum(), actualBlockTree.getBlockDataChecksum());
 
       long prevChunkOffset = -1;
       for (int chunkIndex = 0; chunkIndex < expectedBlockTree.getChunkMerkleTreeCount(); chunkIndex++) {
@@ -88,7 +88,7 @@ public final class ContainerMerkleTreeTestUtils {
 
         assertEquals(expectedChunkTree.getOffset(), actualChunkTree.getOffset());
         assertEquals(expectedChunkTree.getLength(), actualChunkTree.getLength());
-        assertEquals(expectedChunkTree.getChunkChecksum(), actualChunkTree.getChunkChecksum());
+        assertEquals(expectedChunkTree.getChunkDataChecksum(), actualChunkTree.getChunkDataChecksum());
       }
     }
   }
@@ -215,7 +215,7 @@ public final class ContainerMerkleTreeTestUtils {
         ContainerProtos.ChunkMerkleTree chunkMerkleTree = blockBuilder.getChunkMerkleTree(randomChunkIndex);
         diff.addMissingChunk(blockBuilder.getBlockID(), chunkMerkleTree);
         blockBuilder.removeChunkMerkleTree(randomChunkIndex);
-        blockBuilder.setBlockChecksum(random.nextLong());
+        blockBuilder.setBlockDataChecksum(random.nextLong());
         treeBuilder.setDataChecksum(random.nextLong());
       }
     }
@@ -248,9 +248,9 @@ public final class ContainerMerkleTreeTestUtils {
         // Corrupt the selected chunk
         ContainerProtos.ChunkMerkleTree.Builder chunkBuilder = blockBuilder.getChunkMerkleTreeBuilder(randomChunkIndex);
         diff.addCorruptChunk(blockBuilder.getBlockID(), chunkBuilder.build());
-        chunkBuilder.setChunkChecksum(chunkBuilder.getChunkChecksum() + random.nextInt(1000) + 1);
+        chunkBuilder.setChunkDataChecksum(chunkBuilder.getChunkDataChecksum() + random.nextInt(1000) + 1);
         chunkBuilder.setIsHealthy(false);
-        blockBuilder.setBlockChecksum(random.nextLong());
+        blockBuilder.setBlockDataChecksum(random.nextLong());
         treeBuilder.setDataChecksum(random.nextLong());
       }
     }
@@ -277,7 +277,7 @@ public final class ContainerMerkleTreeTestUtils {
       assertEquals(expectedBlockMerkleTree.getBlockID(), actualBlockMerkleTree.getBlockID());
       assertEquals(expectedBlockMerkleTree.getChunkMerkleTreeCount(),
           actualBlockMerkleTree.getChunkMerkleTreeCount());
-      assertEquals(expectedBlockMerkleTree.getBlockChecksum(), actualBlockMerkleTree.getBlockChecksum());
+      assertEquals(expectedBlockMerkleTree.getBlockDataChecksum(), actualBlockMerkleTree.getBlockDataChecksum());
       assertEqualsChunkMerkleTree(expectedBlockMerkleTree.getChunkMerkleTreeList(),
           actualBlockMerkleTree.getChunkMerkleTreeList(), expectedBlockMerkleTree.getBlockID());
     }
@@ -326,7 +326,7 @@ public final class ContainerMerkleTreeTestUtils {
       ContainerProtos.ChunkMerkleTree actualChunk = actualChunkMerkleTreeList.get(j);
       assertEquals(expectedChunk.getOffset(), actualChunk.getOffset(), "Mismatch in chunk offset for block "
           + blockId);
-      assertEquals(expectedChunk.getChunkChecksum(), actualChunk.getChunkChecksum(),
+      assertEquals(expectedChunk.getChunkDataChecksum(), actualChunk.getChunkDataChecksum(),
           "Mismatch in chunk checksum for block " + blockId);
     }
   }

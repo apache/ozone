@@ -78,7 +78,7 @@ public class ContainerMerkleTreeWriter {
       ContainerProtos.BlockMerkleTree blockTreeProto = blockTree.toProto();
       containerTreeBuilder.addBlockMerkleTree(blockTreeProto);
       // Add the block's checksum to the buffer that will be used to calculate the container checksum.
-      containerChecksumBuffer.putLong(blockTreeProto.getBlockChecksum());
+      containerChecksumBuffer.putLong(blockTreeProto.getBlockDataChecksum());
     }
     containerChecksumBuffer.flip();
     checksumImpl.update(containerChecksumBuffer);
@@ -133,14 +133,14 @@ public class ContainerMerkleTreeWriter {
         // correct order.
         ContainerProtos.ChunkMerkleTree chunkTreeProto = chunkTree.toProto();
         blockTreeBuilder.addChunkMerkleTree(chunkTreeProto);
-        blockChecksumBuffer.putLong(chunkTreeProto.getChunkChecksum());
+        blockChecksumBuffer.putLong(chunkTreeProto.getChunkDataChecksum());
       }
       blockChecksumBuffer.flip();
       checksumImpl.update(blockChecksumBuffer);
 
       return blockTreeBuilder
           .setBlockID(blockID)
-          .setBlockChecksum(checksumImpl.getValue())
+          .setBlockDataChecksum(checksumImpl.getValue())
           .build();
     }
   }
@@ -174,7 +174,7 @@ public class ContainerMerkleTreeWriter {
           .setOffset(chunk.getOffset())
           .setLength(chunk.getLen())
           .setIsHealthy(isHealthy)
-          .setChunkChecksum(checksumImpl.getValue())
+          .setChunkDataChecksum(checksumImpl.getValue())
           .build();
     }
   }

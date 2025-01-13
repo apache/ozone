@@ -84,12 +84,12 @@ class TestContainerMerkleTreeWriter {
     ContainerProtos.BlockMerkleTree actualBlockTree = actualTreeProto.getBlockMerkleTree(0);
     assertEquals(1, actualBlockTree.getBlockID());
     assertEquals(1, actualBlockTree.getChunkMerkleTreeCount());
-    assertNotEquals(0, actualBlockTree.getBlockChecksum());
+    assertNotEquals(0, actualBlockTree.getBlockDataChecksum());
 
     ContainerProtos.ChunkMerkleTree actualChunkTree = actualBlockTree.getChunkMerkleTree(0);
     assertEquals(0, actualChunkTree.getOffset());
     assertEquals(chunkSize, actualChunkTree.getLength());
-    assertNotEquals(0, actualChunkTree.getChunkChecksum());
+    assertNotEquals(0, actualChunkTree.getChunkDataChecksum());
   }
 
   @Test
@@ -192,7 +192,7 @@ class TestContainerMerkleTreeWriter {
         .addAllBlockMerkleTree(blocks)
         .setDataChecksum(computeExpectedChecksum(
             blocks.stream()
-                .map(ContainerProtos.BlockMerkleTree::getBlockChecksum)
+                .map(ContainerProtos.BlockMerkleTree::getBlockDataChecksum)
                 .collect(Collectors.toList())))
         .build();
   }
@@ -201,9 +201,9 @@ class TestContainerMerkleTreeWriter {
       List<ContainerProtos.ChunkMerkleTree> chunks) {
     return ContainerProtos.BlockMerkleTree.newBuilder()
         .setBlockID(blockID)
-        .setBlockChecksum(computeExpectedChecksum(
+        .setBlockDataChecksum(computeExpectedChecksum(
             chunks.stream()
-                .map(ContainerProtos.ChunkMerkleTree::getChunkChecksum)
+                .map(ContainerProtos.ChunkMerkleTree::getChunkDataChecksum)
                 .collect(Collectors.toList())))
         .addAllChunkMerkleTree(chunks)
         .build();
@@ -213,7 +213,7 @@ class TestContainerMerkleTreeWriter {
     return ContainerProtos.ChunkMerkleTree.newBuilder()
         .setOffset(chunk.getOffset())
         .setLength(chunk.getLen())
-        .setChunkChecksum(computeExpectedChunkChecksum(chunk.getChecksumData().getChecksumsList()))
+        .setChunkDataChecksum(computeExpectedChunkChecksum(chunk.getChecksumData().getChecksumsList()))
         .build();
   }
 
