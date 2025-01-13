@@ -187,8 +187,9 @@ public class ReadReplicas extends KeyHandler implements DebugSubcommand {
         String fileName = keyName + "_block" + blockIndex + "_" +
             datanode.getHostName();
         Path path = new File(dir, fileName).toPath();
-        if (path.getParent() != null) {
-          Files.createDirectories(path.getParent());
+        Path parentPath = path.getParent();
+        if (parentPath != null) {
+          Files.createDirectories(parentPath);
         }
         System.out.println("Writing block file: " + path.toAbsolutePath());
 
