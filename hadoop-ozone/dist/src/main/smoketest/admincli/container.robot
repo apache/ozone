@@ -144,5 +144,5 @@ Reconcile closed container
     Should Not Be Equal As Strings    0    ${data_checksum}
     Container checksums should match    ${container}    ${data_checksum}
     # Check that reconcile CLI returns success. Without fault injection, there is no change expected to the
-    # container's checksums to inidcate it made a difference
+    # container's checksums to indicate it made a difference
     Execute    ozone admin container reconcile ${container}

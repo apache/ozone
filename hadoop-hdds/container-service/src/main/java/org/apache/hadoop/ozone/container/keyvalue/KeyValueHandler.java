@@ -556,7 +556,7 @@ public class KeyValueHandler extends Handler {
    *
    * @param container The container which will have a tree generated.
    */
-  private void createContainerMerkleTree(Container container) {
+  private void createContainerMerkleTreeFromMetadata(Container container) {
     if (ContainerChecksumTreeManager.checksumFileExist(container)) {
       return;
     }
@@ -1325,7 +1325,7 @@ public class KeyValueHandler extends Handler {
     } finally {
       container.writeUnlock();
     }
-    createContainerMerkleTree(container);
+    createContainerMerkleTreeFromMetadata(container);
     ContainerLogger.logClosing(container.getContainerData());
     sendICR(container);
   }
@@ -1388,7 +1388,7 @@ public class KeyValueHandler extends Handler {
     } finally {
       container.writeUnlock();
     }
-    createContainerMerkleTree(container);
+    createContainerMerkleTreeFromMetadata(container);
     ContainerLogger.logQuasiClosed(container.getContainerData(), reason);
     sendICR(container);
   }
@@ -1422,7 +1422,7 @@ public class KeyValueHandler extends Handler {
     } finally {
       container.writeUnlock();
     }
-    createContainerMerkleTree(container);
+    createContainerMerkleTreeFromMetadata(container);
     ContainerLogger.logClosed(container.getContainerData());
     sendICR(container);
   }
