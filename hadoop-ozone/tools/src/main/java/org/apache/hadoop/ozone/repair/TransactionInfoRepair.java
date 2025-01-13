@@ -19,15 +19,17 @@
  * permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.repair.om;
+package org.apache.hadoop.ozone.repair;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
-import org.apache.hadoop.ozone.repair.RepairTool;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
@@ -38,18 +40,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_TABLE;
 
 /**
- * Tool to update the highest term-index in transactionInfoTable.
+ * Tool to update the highest term-index in transaction info table.
  */
 @CommandLine.Command(
     name = "update-transaction",
-    description = "CLI to update the highest index in OM transactionInfoTable.",
+    description = "CLI to update the highest index in transaction info table.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
-public class TransactionInfoRepairOM extends RepairTool {
+public class TransactionInfoRepair extends RepairTool {
 
   @CommandLine.Option(names = {"--db"},
       required = true,
@@ -58,17 +59,18 @@ public class TransactionInfoRepairOM extends RepairTool {
 
   @CommandLine.Option(names = {"--term"},
       required = true,
-      description = "Highest term of transactionInfoTable. The input should be non-zero long integer.")
+      description = "Highest term to set. The input should be non-zero long integer.")
   private long highestTransactionTerm;
 
   @CommandLine.Option(names = {"--index"},
       required = true,
-      description = "Highest index of transactionInfoTable. The input should be non-zero long integer.")
+      description = "Highest index to set. The input should be non-zero long integer.")
   private long highestTransactionIndex;
 
   @Override
   public void execute() throws Exception {
-    if (checkIfServiceIsRunning("OM")) {
+    final Component component = getComponent();
+    if (checkIfServiceIsRunning(component.name())) {
       return;
     }
     List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
@@ -76,9 +78,10 @@ public class TransactionInfoRepairOM extends RepairTool {
         dbPath);
 
     try (ManagedRocksDB db = ManagedRocksDB.open(dbPath, cfDescList, cfHandleList)) {
-      ColumnFamilyHandle transactionInfoCfh = RocksDBUtils.getColumnFamilyHandle(TRANSACTION_INFO_TABLE, cfHandleList);
+      String columnFamilyName = component.columnFamilyDefinition.getName();
+      ColumnFamilyHandle transactionInfoCfh = RocksDBUtils.getColumnFamilyHandle(columnFamilyName, cfHandleList);
       if (transactionInfoCfh == null) {
-        throw new IllegalArgumentException(TRANSACTION_INFO_TABLE +
+        throw new IllegalArgumentException(columnFamilyName +
             " is not in a column family in DB for the given path.");
       }
       TransactionInfo originalTransactionInfo =
@@ -97,11 +100,32 @@ public class TransactionInfoRepairOM extends RepairTool {
               TransactionInfo.getCodec()).getTermIndex());
     } catch (RocksDBException exception) {
       error("Failed to update the RocksDB for the given path: %s", dbPath);
-      error(
-          "Make sure that Ozone entity (OM) is not running for the give database path and current host.");
       throw new IOException("Failed to update RocksDB.", exception);
     } finally {
       IOUtils.closeQuietly(cfHandleList);
+    }
+  }
+
+  private Component getComponent() {
+    final String parent = spec().parent().name();
+    switch (parent) {
+    case "om":
+      return Component.OM;
+    case "scm":
+      return Component.SCM;
+    default:
+      throw new IllegalStateException("Unknown component: " + parent);
+    }
+  }
+
+  private enum Component {
+    OM(OMDBDefinition.TRANSACTION_INFO_TABLE),
+    SCM(SCMDBDefinition.TRANSACTIONINFO);
+
+    private final DBColumnFamilyDefinition<String, TransactionInfo> columnFamilyDefinition;
+
+    Component(DBColumnFamilyDefinition<String, TransactionInfo> columnFamilyDefinition) {
+      this.columnFamilyDefinition = columnFamilyDefinition;
     }
   }
 }

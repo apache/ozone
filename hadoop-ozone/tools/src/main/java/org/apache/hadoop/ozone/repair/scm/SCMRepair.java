@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.repair.scm;
 
 import org.apache.hadoop.hdds.cli.RepairSubcommand;
+import org.apache.hadoop.ozone.repair.TransactionInfoRepair;
 import org.apache.hadoop.ozone.repair.scm.cert.CertRepair;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
@@ -30,7 +31,7 @@ import picocli.CommandLine;
     description = "Operational tool to repair SCM.",
     subcommands = {
         CertRepair.class,
-        TransactionInfoRepairSCM.class
+        TransactionInfoRepair.class
     }
 )
 @MetaInfServices(RepairSubcommand.class)

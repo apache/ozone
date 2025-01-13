@@ -15,18 +15,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.repair.om;
+package org.apache.hadoop.ozone.repair;
 
+import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
-import org.apache.hadoop.ozone.repair.OzoneRepair;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDB;
@@ -35,7 +37,6 @@ import picocli.CommandLine;
 
 import static org.apache.ozone.test.IntLambda.withTextFromSystemIn;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_TABLE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
@@ -47,9 +48,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 
 /**
- * Tests TransactionInfoRepairOM.
+ * Tests TransactionInfoRepair.
  */
-public class TestTransactionInfoRepairOM {
+public class TestTransactionInfoRepair {
 
   private static final String DB_PATH = "testDBPath";
   private static final long TEST_TERM = 1;
@@ -68,10 +69,11 @@ public class TestTransactionInfoRepairOM {
     IOUtils.closeQuietly(out, err);
   }
 
-  @Test
-  public void testUpdateTransactionInfoTableSuccessful() {
+  @ParameterizedTest
+  @ValueSource(strings = {"om", "scm"})
+  public void testUpdateTransactionInfoTableSuccessful(String parent) {
     ManagedRocksDB mdb = mockRockDB();
-    testCommand(mdb, mock(ColumnFamilyHandle.class));
+    testCommand(parent, mdb, mock(ColumnFamilyHandle.class));
 
     assertThat(out.getOutput())
         .contains(
@@ -80,16 +82,18 @@ public class TestTransactionInfoRepairOM {
         );
   }
 
-  @Test
-  public void testCommandWhenTableNotInDBForGivenPath() {
+  @ParameterizedTest
+  @ValueSource(strings = {"om", "scm"})
+  public void testCommandWhenTableNotInDBForGivenPath(String parent) {
     ManagedRocksDB mdb = mockRockDB();
-    testCommand(mdb, null);
+    testCommand(parent, mdb, null);
     assertThat(err.getOutput())
-        .contains(TRANSACTION_INFO_TABLE + " is not in a column family in DB for the given path");
+        .contains(getColumnFamilyName(parent) + " is not in a column family in DB for the given path");
   }
 
-  @Test
-  public void testCommandWhenFailToUpdateRocksDBForGivenPath() throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {"om", "scm"})
+  public void testCommandWhenFailToUpdateRocksDBForGivenPath(String parent) throws Exception {
     ManagedRocksDB mdb = mockRockDB();
     RocksDB rdb = mdb.get();
 
@@ -97,18 +101,18 @@ public class TestTransactionInfoRepairOM {
     doThrow(RocksDBException.class).when(rdb)
         .put(eq(mock), any(byte[].class), any(byte[].class));
 
-    testCommand(mdb, mock);
+    testCommand(parent, mdb, mock);
 
     assertThat(err.getOutput())
         .contains("Failed to update RocksDB.");
   }
 
-
-  private void testCommand(ManagedRocksDB mdb, ColumnFamilyHandle columnFamilyHandle) {
+  private void testCommand(String component, ManagedRocksDB mdb, ColumnFamilyHandle columnFamilyHandle) {
+    final String expectedColumnFamilyName = getColumnFamilyName(component);
     try (MockedStatic<ManagedRocksDB> mocked = mockStatic(ManagedRocksDB.class);
          MockedStatic<RocksDBUtils> mockUtil = mockStatic(RocksDBUtils.class)) {
       mocked.when(() -> ManagedRocksDB.open(anyString(), anyList(), anyList())).thenReturn(mdb);
-      mockUtil.when(() -> RocksDBUtils.getColumnFamilyHandle(anyString(), anyList()))
+      mockUtil.when(() -> RocksDBUtils.getColumnFamilyHandle(eq(expectedColumnFamilyName), anyList()))
           .thenReturn(columnFamilyHandle);
 
       mockUtil.when(() -> RocksDBUtils.getValue(eq(mdb), eq(columnFamilyHandle), eq(TRANSACTION_INFO_KEY),
@@ -127,12 +131,20 @@ public class TestTransactionInfoRepairOM {
       CommandLine cli = new OzoneRepair().getCmd();
       withTextFromSystemIn("y")
           .execute(() -> cli.execute(
-              "om",
+              component,
               "update-transaction",
               "--db", DB_PATH,
               "--term", String.valueOf(TEST_TERM),
               "--index", String.valueOf(TEST_INDEX)
           ));
+    }
+  }
+
+  private String getColumnFamilyName(String component) {
+    switch (component) {
+    case "om": return OMDBDefinition.TRANSACTION_INFO_TABLE.getName();
+    case "scm": return SCMDBDefinition.TRANSACTIONINFO.getName();
+    default: return "";
     }
   }
 
