@@ -45,6 +45,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -135,9 +136,10 @@ public class ReadReplicas extends KeyHandler implements DebugSubcommand {
       String prettyJson = JsonUtils.toJsonStringWithDefaultPrettyPrinter(result);
 
       String manifestFileName = keyName + "_manifest";
-      System.out.println("Writing manifest file : " + manifestFileName);
       File manifestFile
           = new File(dir, manifestFileName);
+      System.out.println("Writing manifest file: " + manifestFile.getAbsolutePath());
+      Files.createDirectories(Paths.get(manifestFile.getParent()));
       Files.write(manifestFile.toPath(),
           prettyJson.getBytes(StandardCharsets.UTF_8));
     } finally {
@@ -182,8 +184,9 @@ public class ReadReplicas extends KeyHandler implements DebugSubcommand {
 
         String fileName = keyName + "_block" + blockIndex + "_" +
             datanode.getHostName();
-        System.out.println("Writing : " + fileName);
         Path path = new File(dir, fileName).toPath();
+        Files.createDirectories(path.getParent());
+        System.out.println("Writing block file: " + path.toAbsolutePath());
 
         try (InputStream is = replica.getValue()) {
           Files.copy(is, path, StandardCopyOption.REPLACE_EXISTING);
@@ -231,11 +234,11 @@ public class ReadReplicas extends KeyHandler implements DebugSubcommand {
         = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date());
     String directoryName = volumeName + "_" + bucketName + "_" + keyName +
         "_" + fileSuffix;
-    System.out.println("Creating directory : " + directoryName);
     File dir = new File(outputDir, directoryName);
+    System.out.println("Creating directory: " + dir.getAbsolutePath());
     if (!dir.exists()) {
-      if (dir.mkdir()) {
-        System.out.println("Successfully created!");
+      if (dir.mkdirs()) {
+        System.out.println("Successfully created directory: " + dir.getAbsolutePath());
       } else {
         throw new IOException(String.format(
             "Failed to create directory %s.", dir));

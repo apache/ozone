@@ -574,12 +574,13 @@ execute_debug_tests() {
 
   local volume="cli-debug-volume${prefix}"
   local bucket="cli-debug-bucket"
-  local key="testfile"
+  local key="testfileprefix/testfile"
 
   execute_robot_test ${SCM} -v "PREFIX:${prefix}" debug/ozone-debug-tests.robot
 
   # get block locations for key
   local chunkinfo="${key}-blocks-${prefix}"
+  mkdir -p $(dirname "$chunkinfo")
   docker-compose exec -T ${SCM} bash -c "ozone debug chunkinfo ${volume}/${bucket}/${key}" > "$chunkinfo"
   local host="$(jq -r '.KeyLocations[0][0]["Datanode-HostName"]' ${chunkinfo})"
   local container="${host%%.*}"

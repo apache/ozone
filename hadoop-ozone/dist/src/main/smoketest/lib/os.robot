@@ -66,3 +66,8 @@ Get Random Filename
 List All Processes
     ${output} =    Execute    ps aux
     [return]    ${output}
+
+Count Files In Directory Recursively
+    [Arguments]                     ${PATH}
+    ${count_files} =                Execute          find ${PATH} -type f | wc -l
+    [Return]                        ${count_files}

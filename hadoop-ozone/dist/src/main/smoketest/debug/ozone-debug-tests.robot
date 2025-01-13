@@ -26,12 +26,14 @@ ${PREFIX}           ${EMPTY}
 ${VOLUME}           cli-debug-volume${PREFIX}
 ${BUCKET}           cli-debug-bucket
 ${DEBUGKEY}         debugKey
-${TESTFILE}         testfile
+${TESTFILEPREFIX}   testfileprefix/
+${TESTFILE}         ${TESTFILEPREFIX}testfile
 
 *** Keywords ***
 Write keys
     Execute             ozone sh volume create o3://om/${VOLUME} --space-quota 100TB --namespace-quota 100
     Execute             ozone sh bucket create o3://om/${VOLUME}/${BUCKET} --space-quota 1TB
+    Execute             mkdir -p ${TEMP_DIR}/${TESTFILEPREFIX}
     Execute             dd if=/dev/urandom of=${TEMP_DIR}/${TESTFILE} bs=100000 count=15
     Execute             ozone sh key put o3://om/${VOLUME}/${BUCKET}/${TESTFILE} ${TEMP_DIR}/${TESTFILE}
 
@@ -40,7 +42,7 @@ Test ozone debug read-replicas
     ${directory} =                      Execute read-replicas CLI tool
     Set Test Variable    ${DIR}         ${directory}
 
-    ${count_files} =                    Count Files In Directory    ${directory}
+    ${count_files} =                    Count Files In Directory Recursively    ${directory}
     Should Be Equal As Integers         ${count_files}     7
 
     ${json} =                           Read Replicas Manifest

@@ -23,14 +23,15 @@ Test Timeout        5 minute
 ${PREFIX}           ${EMPTY}
 ${VOLUME}           cli-debug-volume${PREFIX}
 ${BUCKET}           cli-debug-bucket
-${TESTFILE}         testfile
+${TESTFILEPREFIX}   testfileprefix/
+${TESTFILE}         ${TESTFILEPREFIX}testfile
 
 *** Test Cases ***
 Test ozone debug read-replicas with one datanode DEAD
     ${directory} =                 Execute read-replicas CLI tool
     Set Test Variable    ${DIR}         ${directory}
 
-    ${count_files} =               Count Files In Directory    ${directory}
+    ${count_files} =               Count Files In Directory Recursively    ${directory}
     Should Be Equal As Integers    ${count_files}     5
 
     ${json} =                      Read Replicas Manifest
