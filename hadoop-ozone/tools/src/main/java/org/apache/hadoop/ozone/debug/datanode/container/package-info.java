@@ -19,4 +19,4 @@
 /**
  * Contains all of the datanode container replica related commands.
  */
-package org.apache.hadoop.ozone.debug.container;
+package org.apache.hadoop.ozone.debug.datanode.container;

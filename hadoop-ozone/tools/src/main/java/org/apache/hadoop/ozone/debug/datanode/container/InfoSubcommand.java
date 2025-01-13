@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.container;
+package org.apache.hadoop.ozone.debug.datanode.container;
 
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import picocli.CommandLine;
@@ -24,24 +24,30 @@ import picocli.CommandLine.Command;
 
 import java.util.concurrent.Callable;
 
-import static org.apache.hadoop.ozone.debug.container.ContainerCommands.outputContainer;
+import static org.apache.hadoop.ozone.debug.datanode.container.ContainerCommands.outputContainer;
 
 /**
- * Handles {@code ozone debug container list} command.
+ * Handles {@code ozone debug datanode container info} command.
  */
 @Command(
-    name = "list",
-    description = "Show container info of all container replicas on datanode")
-public class ListSubcommand implements Callable<Void> {
+    name = "info",
+    description = "Show container info of a container replica on datanode")
+public class InfoSubcommand implements Callable<Void> {
 
   @CommandLine.ParentCommand
   private ContainerCommands parent;
+
+  @CommandLine.Option(names = {"--container"},
+      required = true,
+      description = "Container Id")
+  private long containerId;
 
   @Override
   public Void call() throws Exception {
     parent.loadContainersFromVolumes();
 
-    for (Container<?> container : parent.getController().getContainers()) {
+    Container container = parent.getController().getContainer(containerId);
+    if (container != null) {
       outputContainer(container.getContainerData());
     }
 

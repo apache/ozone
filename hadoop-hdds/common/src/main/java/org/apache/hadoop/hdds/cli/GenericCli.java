@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.cli;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.Map;
 
 import com.google.common.base.Strings;
@@ -87,9 +88,9 @@ public abstract class GenericCli implements GenericParentCommand {
     //message could be null in case of NPE. This is unexpected so we can
     //print out the stack trace.
     if (verbose || Strings.isNullOrEmpty(error.getMessage())) {
-      error.printStackTrace(System.err);
+      error.printStackTrace(cmd.getErr());
     } else {
-      System.err.println(error.getMessage().split("\n")[0]);
+      cmd.getErr().println(error.getMessage().split("\n")[0]);
     }
   }
 
@@ -113,5 +114,13 @@ public abstract class GenericCli implements GenericParentCommand {
   @Override
   public boolean isVerbose() {
     return verbose;
+  }
+
+  protected PrintWriter out() {
+    return cmd.getOut();
+  }
+
+  protected PrintWriter err() {
+    return cmd.getErr();
   }
 }

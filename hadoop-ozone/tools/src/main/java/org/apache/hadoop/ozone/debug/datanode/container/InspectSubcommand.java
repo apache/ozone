@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.container;
+package org.apache.hadoop.ozone.debug.datanode.container;
 
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -33,7 +33,7 @@ import java.io.IOException;
 import java.util.concurrent.Callable;
 
 /**
- * {@code ozone debug container inspect},
+ * {@code ozone debug datanode container inspect},
  * a command to run {@link KeyValueContainerMetadataInspector}.
  */
 @Command(
