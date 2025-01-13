@@ -37,18 +37,18 @@ public abstract class RepairTool extends AbstractSubcommand implements Callable<
       description = "Use this flag if you want to bypass the check in false-positive cases.")
   private boolean force;
 
-  @CommandLine.Option(names = {"--dry-run"},
+  @CommandLine.Option(names = {"--repair"},
       defaultValue = "false",
       fallbackValue = "true",
-      description = "Simulate repair, but do not make any changes")
-  private boolean dryRun;
+      description = "Whether to make permanent changes, or only show what would be done (i.e. dry-run mode)")
+  private boolean repair;
 
   /** Hook method for subclasses for performing actual repair task. */
   protected abstract void execute() throws Exception;
 
   @Override
   public final Void call() throws Exception {
-    if (!dryRun) {
+    if (!isDryRun()) {
       confirmUser();
     }
     execute();
@@ -76,7 +76,7 @@ public abstract class RepairTool extends AbstractSubcommand implements Callable<
   }
 
   protected boolean isDryRun() {
-    return dryRun;
+    return !repair;
   }
 
   protected void info(String msg, Object... args) {

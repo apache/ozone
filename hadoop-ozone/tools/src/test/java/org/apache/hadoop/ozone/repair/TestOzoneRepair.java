@@ -69,10 +69,10 @@ public class TestOzoneRepair {
     System.setProperty("user.name", OLD_USER);
   }
 
-  /** All leaf subcommands should support {@code --dry-run},
+  /** All leaf subcommands should support {@code --repair},
    * except if marked as {@link ReadOnlyCommand}. */
   @Test
-  void subcommandsSupportDryRun() {
+  void subcommandsSupportRepairFlag() {
     assertSubcommandOptionRecursively(new OzoneRepair().getCmd());
   }
 
@@ -85,8 +85,8 @@ public class TestOzoneRepair {
       if (!(userObject instanceof ReadOnlyCommand)) {
         assertThat(spec.optionsMap().keySet())
             .as(() -> "'" + spec.qualifiedName() + "' defined by " + userObject.getClass()
-                + " should support --dry-run or implement " + ReadOnlyCommand.class)
-            .contains("--dry-run");
+                + " should support --repair or implement " + ReadOnlyCommand.class)
+            .contains("--repair");
       }
     } else {
       // parent command
@@ -101,7 +101,7 @@ public class TestOzoneRepair {
     OzoneRepair ozoneRepair = new OzoneRepair();
     System.setIn(new ByteArrayInputStream("N".getBytes(DEFAULT_ENCODING)));
 
-    int res = ozoneRepair.execute(new String[]{"om", "fso-tree", "--db", "/dev/null"});
+    int res = ozoneRepair.execute(new String[]{"om", "fso-tree", "--repair", "--db", "/dev/null"});
     assertThat(res).isNotEqualTo(CommandLine.ExitCode.OK);
     assertThat(err.toString(DEFAULT_ENCODING)).contains("Aborting command.");
     // prompt should contain the current user name as well
@@ -113,7 +113,7 @@ public class TestOzoneRepair {
     OzoneRepair ozoneRepair = new OzoneRepair();
     System.setIn(new ByteArrayInputStream("y".getBytes(DEFAULT_ENCODING)));
 
-    ozoneRepair.execute(new String[]{"om", "fso-tree", "--db", "/dev/null"});
+    ozoneRepair.execute(new String[]{"om", "fso-tree", "--repair", "--db", "/dev/null"});
     assertThat(out.toString(DEFAULT_ENCODING)).contains("Run as user: " + OZONE_USER);
     // prompt should contain the current user name as well
     assertThat(err.toString(DEFAULT_ENCODING)).contains("ATTENTION: Running as user " + OZONE_USER);
@@ -126,7 +126,8 @@ public class TestOzoneRepair {
         singletonList("om"),
         asList("om", "fso-tree"),
         asList("om", "fso-tree", "-h"),
-        asList("om", "fso-tree", "--help")
+        asList("om", "fso-tree", "--help"),
+        asList("om", "fso-tree", "--db", "/dev/null") // dry-run
     );
   }
 

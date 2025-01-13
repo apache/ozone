@@ -92,6 +92,7 @@ public class TestOzoneRepairShell {
     String testIndex = "1111";
     int exitCode = withTextFromSystemIn("y")
         .execute(() -> cmd.execute("om", "update-transaction",
+            "--repair",
             "--db", dbPath,
             "--term", testTerm,
             "--index", testIndex));
@@ -108,6 +109,7 @@ public class TestOzoneRepairShell {
 
     withTextFromSystemIn("y")
         .execute(() -> cmd.execute("om", "update-transaction",
+            "--repair",
             "--db", dbPath,
             "--term", originalHighestTermIndex[0],
             "--index", originalHighestTermIndex[1]));
@@ -136,17 +138,18 @@ public class TestOzoneRepairShell {
   public void testQuotaRepair() throws Exception {
     CommandLine cmd = new OzoneRepair().getCmd();
 
-    int exitCode = cmd.execute("om", "quota", "status", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY));
+    String omAddress = conf.get(OZONE_OM_ADDRESS_KEY);
+    int exitCode = cmd.execute("om", "quota", "status", "--service-host", omAddress);
     assertEquals(0, exitCode, err);
 
     exitCode = withTextFromSystemIn("y")
-        .execute(() -> cmd.execute("om", "quota", "start", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY)));
+        .execute(() -> cmd.execute("om", "quota", "start", "--repair", "--service-host", omAddress));
     assertEquals(0, exitCode, err);
 
     GenericTestUtils.waitFor(() -> {
       out.reset();
       // verify quota trigger is completed having non-zero lastRunFinishedTime
-      cmd.execute("om", "quota", "status", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY));
+      cmd.execute("om", "quota", "status", "--service-host", omAddress);
       try {
         return out.get().contains("\"lastRunFinishedTime\":\"\"");
       } catch (Exception ex) {
