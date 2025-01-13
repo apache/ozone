@@ -110,6 +110,8 @@ public class ContainerSizeCountTask extends ReconScmTask {
       if (t instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
+      taskStatusUpdater.setLastTaskRunStatus(-1);
+      taskStatusUpdater.recordRunCompletion();
     }
   }
 

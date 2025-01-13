@@ -44,19 +44,15 @@ public abstract class ReconScmTask {
    * Start underlying start thread.
    */
   public synchronized void start() {
-    try {
-      if (!isRunning()) {
-        LOG.info("Starting {} Thread.", getTaskName());
-        running = true;
-        taskThread = new Thread(this::run, "Recon-" + getTaskName());
-        taskThread.setName(getTaskName());
-        taskThread.setDaemon(true);
-        taskThread.start();
-      } else {
-        LOG.info("{} Thread is already running.", getTaskName());
-      }
-    } catch (Exception e) {
-      LOG.error("Failed to start {} thread due to exception", getTaskName(), e);
+    if (!isRunning()) {
+      LOG.info("Starting {} Thread.", getTaskName());
+      running = true;
+      taskThread = new Thread(this::run, "Recon-" + getTaskName());
+      taskThread.setName(getTaskName());
+      taskThread.setDaemon(true);
+      taskThread.start();
+    } else {
+      LOG.info("{} Thread is already running.", getTaskName());
     }
   }
 
@@ -97,16 +93,10 @@ public abstract class ReconScmTask {
 
   protected abstract void run();
 
-  protected void initializeAndRunTask() {
-    try {
-      taskStatusUpdater.recordRunStart();
-      runTask();
-    } catch (Exception e) {
-      LOG.error("{} encountered exception. ", getTaskName(), e);
-      taskStatusUpdater.setLastTaskRunStatus(-1);
-    } finally {
-      taskStatusUpdater.recordRunCompletion();
-    }
+  protected void initializeAndRunTask() throws Exception {
+    taskStatusUpdater.recordRunStart();
+    runTask();
+    taskStatusUpdater.recordRunCompletion();
   }
 
   /**

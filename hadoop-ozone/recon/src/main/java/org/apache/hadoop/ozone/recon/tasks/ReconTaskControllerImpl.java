@@ -171,6 +171,9 @@ public class ReconTaskControllerImpl implements ReconTaskController {
             try {
               return task.call();
             } catch (Exception e) {
+              if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+              }
               // Wrap the exception with the task name
               throw new TaskExecutionException(task.getTaskName(), e);
             }
@@ -241,6 +244,10 @@ public class ReconTaskControllerImpl implements ReconTaskController {
           try {
             return task.call();
           } catch (Exception e) {
+            if (e instanceof InterruptedException) {
+              Thread.currentThread().interrupt();
+            }
+            // Wrap the exception with the task name
             throw new TaskExecutionException(task.getTaskName(), e);
           }
         }, executorService).thenAccept(result -> {
