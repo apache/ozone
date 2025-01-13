@@ -82,11 +82,16 @@ public class ContainerChecksumTreeManager {
    * The data merkle tree within the file is replaced with the {@code tree} parameter, but all other content of the
    * file remains unchanged.
    * Concurrent writes to the same file are coordinated internally.
+   * This method also updates the container's data checksum in the {@code data} parameter, which will be seen by SCM
+   * on container reports.
    */
   public void writeContainerDataTree(ContainerData data, ContainerMerkleTree tree) throws IOException {
     long containerID = data.getContainerID();
     Lock writeLock = getLock(containerID);
     writeLock.lock();
+    // If there is an error generating the tree and we cannot obtain a final checksum, use 0 to indicate a metadata
+    // failure.
+    long dataChecksum = 0;
     try {
       ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = null;
       try {
@@ -99,12 +104,18 @@ public class ContainerChecksumTreeManager {
         checksumInfoBuilder = ContainerProtos.ContainerChecksumInfo.newBuilder();
       }
 
+      ContainerProtos.ContainerMerkleTree treeProto = captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(),
+          tree::toProto);
       checksumInfoBuilder
           .setContainerID(containerID)
-          .setContainerMerkleTree(captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(), tree::toProto));
+          .setContainerMerkleTree(treeProto);
       write(data, checksumInfoBuilder.build());
-      LOG.debug("Data merkle tree for container {} updated", containerID);
+      // If write succeeds, update the checksum in memory. Otherwise 0 will be used to indicate the metadata failure.
+      dataChecksum = treeProto.getDataChecksum();
+      LOG.debug("Data merkle tree for container {} updated with container checksum {}", containerID, dataChecksum);
     } finally {
+      // Even if persisting the tree fails, we should still update the data checksum in memory to report back to SCM.
+      data.setDataChecksum(dataChecksum);
       writeLock.unlock();
     }
   }
@@ -384,7 +395,7 @@ public class ContainerChecksumTreeManager {
     return this.metrics;
   }
 
-  public static boolean checksumFileExist(Container container) {
+  public static boolean checksumFileExist(Container<?> container) {
     File checksumFile = getContainerChecksumFile(container.getContainerData());
     return checksumFile.exists();
   }

@@ -577,7 +577,16 @@ public class KeyValueHandler extends Handler {
     return getSuccessResponse(request);
   }
 
-  private void createContainerMerkleTree(Container container) {
+  /**
+   * Write the merkle tree for this container using the existing checksum metadata only. The data is not read or
+   * validated by this method, so it is expected to run quickly.
+   *
+   * If a checksum file already exists on the disk, this method will do nothing. The existing file would have either
+   * been made from the metadata or data itself so there is no need to recreate it from the metadata.
+   *
+   * @param container The container which will have a tree generated.
+   */
+  private void createContainerMerkleTreeFromMetadata(Container container) {
     if (ContainerChecksumTreeManager.checksumFileExist(container)) {
       return;
     }
@@ -590,8 +599,9 @@ public class KeyValueHandler extends Handler {
                getBlockIterator(containerData.getContainerID())) {
         while (blockIterator.hasNext()) {
           BlockData blockData = blockIterator.nextBlock();
-          List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
-          merkleTree.addChunks(blockData.getLocalID(), chunkInfos);
+          // All chunks are assumed to be healthy until the scanner inspects them to determine otherwise.
+          merkleTree.addChunks(blockData.getLocalID(), true,
+              blockData.getChunks().toArray(new ContainerProtos.ChunkInfo[0]));
         }
       }
       checksumManager.writeContainerDataTree(containerData, merkleTree);
@@ -1335,7 +1345,7 @@ public class KeyValueHandler extends Handler {
     } finally {
       container.writeUnlock();
     }
-    createContainerMerkleTree(container);
+    createContainerMerkleTreeFromMetadata(container);
     ContainerLogger.logClosing(container.getContainerData());
     sendICR(container);
   }
@@ -1368,7 +1378,6 @@ public class KeyValueHandler extends Handler {
     } finally {
       container.writeUnlock();
     }
-    createContainerMerkleTree(container);
     // Even if the container file is corrupted/missing and the unhealthy
     // update fails, the unhealthy state is kept in memory and sent to
     // SCM. Write a corresponding entry to the container log as well.
@@ -1399,7 +1408,7 @@ public class KeyValueHandler extends Handler {
     } finally {
       container.writeUnlock();
     }
-    createContainerMerkleTree(container);
+    createContainerMerkleTreeFromMetadata(container);
     ContainerLogger.logQuasiClosed(container.getContainerData(), reason);
     sendICR(container);
   }
@@ -1433,7 +1442,7 @@ public class KeyValueHandler extends Handler {
     } finally {
       container.writeUnlock();
     }
-    createContainerMerkleTree(container);
+    createContainerMerkleTreeFromMetadata(container);
     ContainerLogger.logClosed(container.getContainerData());
     sendICR(container);
   }

@@ -34,7 +34,11 @@ import org.junit.jupiter.params.provider.EnumSource;
 
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Integration tests for the background container data scanner. This scanner
@@ -78,6 +82,10 @@ class TestBackgroundContainerDataScannerIntegration
     // Container corruption has not yet been introduced.
     Container<?> container = getDnContainer(containerID);
     assertEquals(State.CLOSED, container.getContainerState());
+    assertTrue(containerChecksumFileExists(containerID));
+
+    waitForScmToSeeReplicaState(containerID, CLOSED);
+    long initialReportedDataChecksum = getContainerReplica(containerID).getDataChecksum();
 
     corruption.applyTo(container);
 
@@ -88,8 +96,10 @@ class TestBackgroundContainerDataScannerIntegration
         () -> container.getContainerState() == State.UNHEALTHY,
         500, 15_000);
 
-    // Wait for SCM to get a report of the unhealthy replica.
-    waitForScmToSeeUnhealthyReplica(containerID);
+    // Wait for SCM to get a report of the unhealthy replica with a different checksum than before.
+    waitForScmToSeeReplicaState(containerID, UNHEALTHY);
+    long newReportedDataChecksum = getContainerReplica(containerID).getDataChecksum();
+    assertNotEquals(initialReportedDataChecksum, newReportedDataChecksum);
 
     if (corruption == TestContainerCorruptions.TRUNCATED_BLOCK ||
         corruption == TestContainerCorruptions.CORRUPT_BLOCK) {

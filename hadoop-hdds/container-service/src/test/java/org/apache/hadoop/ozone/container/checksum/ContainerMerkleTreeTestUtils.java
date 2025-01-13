@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -35,7 +34,6 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -149,11 +147,10 @@ public final class ContainerMerkleTreeTestUtils {
     ContainerMerkleTree tree = new ContainerMerkleTree();
     byte byteValue = 1;
     for (int blockIndex = 1; blockIndex <= numBlocks; blockIndex++) {
-      List<ContainerProtos.ChunkInfo> chunks = new ArrayList<>();
       for (int chunkIndex = 0; chunkIndex < 4; chunkIndex++) {
-        chunks.add(buildChunk(conf, chunkIndex, ByteBuffer.wrap(new byte[]{byteValue++, byteValue++, byteValue++})));
+        tree.addChunks(blockIndex, true,
+            buildChunk(conf, chunkIndex, ByteBuffer.wrap(new byte[]{byteValue++, byteValue++, byteValue++})));
       }
-      tree.addChunks(blockIndex, chunks);
     }
     return tree;
   }
@@ -334,10 +331,9 @@ public final class ContainerMerkleTreeTestUtils {
   /**
    * This function checks whether the container checksum file exists.
    */
-  public static boolean containerChecksumFileExists(HddsDatanodeService hddsDatanode,
-                                                    ContainerInfo containerInfo) {
+  public static boolean containerChecksumFileExists(HddsDatanodeService hddsDatanode, long containerID) {
     OzoneContainer ozoneContainer = hddsDatanode.getDatanodeStateMachine().getContainer();
-    Container container = ozoneContainer.getController().getContainer(containerInfo.getContainerID());
+    Container<?> container = ozoneContainer.getController().getContainer(containerID);
     return ContainerChecksumTreeManager.checksumFileExist(container);
   }
 

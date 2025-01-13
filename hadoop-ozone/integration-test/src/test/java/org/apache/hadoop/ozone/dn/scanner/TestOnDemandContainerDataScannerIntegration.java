@@ -33,7 +33,11 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.Collection;
 
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Integration tests for the on demand container data scanner. This scanner
@@ -98,6 +102,11 @@ class TestOnDemandContainerDataScannerIntegration
     // Container corruption has not yet been introduced.
     Container<?> container = getDnContainer(containerID);
     assertEquals(State.CLOSED, container.getContainerState());
+    assertTrue(containerChecksumFileExists(containerID));
+
+    waitForScmToSeeReplicaState(containerID, CLOSED);
+    long initialReportedDataChecksum = getContainerReplica(containerID).getDataChecksum();
+
     // Corrupt the container.
     corruption.applyTo(container);
     // This method will check that reading from the corrupted key returns an
@@ -110,7 +119,9 @@ class TestOnDemandContainerDataScannerIntegration
         500, 5000);
 
     // Wait for SCM to get a report of the unhealthy replica.
-    waitForScmToSeeUnhealthyReplica(containerID);
+    waitForScmToSeeReplicaState(containerID, UNHEALTHY);
     corruption.assertLogged(containerID, 1, logCapturer);
+    long newReportedDataChecksum = getContainerReplica(containerID).getDataChecksum();
+    assertNotEquals(initialReportedDataChecksum, newReportedDataChecksum);
   }
 }

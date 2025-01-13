@@ -93,7 +93,7 @@ public enum TestContainerCorruptions {
   MISSING_BLOCK((container, blockID) -> {
     File blockFile = getBlock(container, blockID);
     assertTrue(blockFile.delete());
-  }, ContainerScanError.FailureType.MISSING_CHUNK_FILE),
+  }, ContainerScanError.FailureType.MISSING_DATA_FILE),
 
   CORRUPT_CONTAINER_FILE((container, blockID) -> {
     File containerFile = container.getContainerFile();
@@ -113,7 +113,7 @@ public enum TestContainerCorruptions {
   TRUNCATED_BLOCK((container, blockID) -> {
     File blockFile = getBlock(container, blockID);
     truncateFile(blockFile);
-  }, ContainerScanError.FailureType.INCONSISTENT_CHUNK_LENGTH);
+  }, ContainerScanError.FailureType.MISSING_CHUNK);
 
   private final BiConsumer<Container<?>, Long> corruption;
   private final ContainerScanError.FailureType expectedResult;
