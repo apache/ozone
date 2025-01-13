@@ -558,13 +558,13 @@ message SendContainerResponse {
 message ChunkMerkleTree {
   optional int64 offset = 1;
   optional int64 length = 2;
-  optional int64 chunkDataChecksum = 3;
+  optional int64 dataChecksum = 3;
   optional bool isHealthy = 4;
 }
 
 message BlockMerkleTree {
   optional int64 blockID = 1;
-  optional int64 blockDataChecksum = 2;
+  optional int64 dataChecksum = 2;
   repeated ChunkMerkleTree chunkMerkleTree = 3;
 }
 

@@ -78,7 +78,7 @@ public class ContainerMerkleTreeWriter {
       ContainerProtos.BlockMerkleTree blockTreeProto = blockTree.toProto();
       containerTreeBuilder.addBlockMerkleTree(blockTreeProto);
       // Add the block's checksum to the buffer that will be used to calculate the container checksum.
-      containerChecksumBuffer.putLong(blockTreeProto.getBlockDataChecksum());
+      containerChecksumBuffer.putLong(blockTreeProto.getDataChecksum());
     }
     containerChecksumBuffer.flip();
     checksumImpl.update(containerChecksumBuffer);
@@ -133,14 +133,14 @@ public class ContainerMerkleTreeWriter {
         // correct order.
         ContainerProtos.ChunkMerkleTree chunkTreeProto = chunkTree.toProto();
         blockTreeBuilder.addChunkMerkleTree(chunkTreeProto);
-        blockChecksumBuffer.putLong(chunkTreeProto.getChunkDataChecksum());
+        blockChecksumBuffer.putLong(chunkTreeProto.getDataChecksum());
       }
       blockChecksumBuffer.flip();
       checksumImpl.update(blockChecksumBuffer);
 
       return blockTreeBuilder
           .setBlockID(blockID)
-          .setBlockDataChecksum(checksumImpl.getValue())
+          .setDataChecksum(checksumImpl.getValue())
           .build();
     }
   }
@@ -154,7 +154,7 @@ public class ContainerMerkleTreeWriter {
     private final long length;
     private final long offset;
     private final boolean isHealthy;
-    private final long chunkDataChecksum;
+    private final long dataChecksum;
 
     ChunkMerkleTreeWriter(ContainerProtos.ChunkInfo chunk) {
       length = chunk.getLen();
@@ -164,7 +164,7 @@ public class ContainerMerkleTreeWriter {
       for (ByteString checksum: chunk.getChecksumData().getChecksumsList()) {
         checksumImpl.update(checksum.asReadOnlyByteBuffer());
       }
-      this.chunkDataChecksum = checksumImpl.getValue();
+      this.dataChecksum = checksumImpl.getValue();
     }
 
     /**
@@ -178,7 +178,7 @@ public class ContainerMerkleTreeWriter {
           .setOffset(offset)
           .setLength(length)
           .setIsHealthy(isHealthy)
-          .setChunkDataChecksum(chunkDataChecksum)
+          .setDataChecksum(dataChecksum)
           .build();
     }
   }
