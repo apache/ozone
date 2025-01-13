@@ -34,7 +34,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 class TestDataScanResult {
-  private static final ContainerMerkleTreeWriter TREE = ContainerMerkleTreeTestUtils.buildTestTree(new OzoneConfiguration());
+  private static final ContainerMerkleTreeWriter TREE =
+      ContainerMerkleTreeTestUtils.buildTestTree(new OzoneConfiguration());
 
   @Test
   void testFromEmptyErrors() {

@@ -417,8 +417,8 @@ public class KeyValueContainerCheck {
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   private static List<ContainerScanError> verifyChecksum(BlockData block,
-                                                         ContainerProtos.ChunkInfo chunk, File chunkFile, ContainerLayoutVersion layout, ByteBuffer buffer,
-                                                         ContainerMerkleTreeWriter currentTree, DataTransferThrottler throttler, Canceler canceler) {
+      ContainerProtos.ChunkInfo chunk, File chunkFile, ContainerLayoutVersion layout, ByteBuffer buffer,
+      ContainerMerkleTreeWriter currentTree, DataTransferThrottler throttler, Canceler canceler) {
 
     List<ContainerScanError> scanErrors = new ArrayList<>();
 
