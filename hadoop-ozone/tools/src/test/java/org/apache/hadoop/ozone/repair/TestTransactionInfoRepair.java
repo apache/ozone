@@ -71,9 +71,9 @@ public class TestTransactionInfoRepair {
 
   @ParameterizedTest
   @ValueSource(strings = {"om", "scm"})
-  public void testUpdateTransactionInfoTableSuccessful(String parent) {
+  public void testUpdateTransactionInfoTableSuccessful(String component) {
     ManagedRocksDB mdb = mockRockDB();
-    testCommand(parent, mdb, mock(ColumnFamilyHandle.class));
+    testCommand(component, mdb, mock(ColumnFamilyHandle.class));
 
     assertThat(out.getOutput())
         .contains(
@@ -84,16 +84,16 @@ public class TestTransactionInfoRepair {
 
   @ParameterizedTest
   @ValueSource(strings = {"om", "scm"})
-  public void testCommandWhenTableNotInDBForGivenPath(String parent) {
+  public void testCommandWhenTableNotInDBForGivenPath(String component) {
     ManagedRocksDB mdb = mockRockDB();
-    testCommand(parent, mdb, null);
+    testCommand(component, mdb, null);
     assertThat(err.getOutput())
-        .contains(getColumnFamilyName(parent) + " is not in a column family in DB for the given path");
+        .contains(getColumnFamilyName(component) + " is not in a column family in DB for the given path");
   }
 
   @ParameterizedTest
   @ValueSource(strings = {"om", "scm"})
-  public void testCommandWhenFailToUpdateRocksDBForGivenPath(String parent) throws Exception {
+  public void testCommandWhenFailToUpdateRocksDBForGivenPath(String component) throws Exception {
     ManagedRocksDB mdb = mockRockDB();
     RocksDB rdb = mdb.get();
 
@@ -101,7 +101,7 @@ public class TestTransactionInfoRepair {
     doThrow(RocksDBException.class).when(rdb)
         .put(eq(mock), any(byte[].class), any(byte[].class));
 
-    testCommand(parent, mdb, mock);
+    testCommand(component, mdb, mock);
 
     assertThat(err.getOutput())
         .contains("Failed to update RocksDB.");
