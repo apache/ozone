@@ -139,8 +139,9 @@ public class ReadReplicas extends KeyHandler implements DebugSubcommand {
       File manifestFile
           = new File(dir, manifestFileName);
       System.out.println("Writing manifest file: " + manifestFile.getAbsolutePath());
-      if (manifestFile.getParent() != null) {
-        Files.createDirectories(Paths.get(manifestFile.getParent()));
+      Path parentPath = manifestFile.getParentFile() != null ? manifestFile.getParentFile().toPath() : null;
+      if (parentPath != null) {
+        Files.createDirectories(parentPath);
       }
       Files.write(manifestFile.toPath(),
           prettyJson.getBytes(StandardCharsets.UTF_8));
