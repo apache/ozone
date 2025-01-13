@@ -33,6 +33,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -206,6 +207,16 @@ public class TestKeyStorage {
       assertThat(e.getMessage()).isEqualTo(ERROR_MSG);
       e = assertThrows(IOException.class, storage::readPublicKey);
       assertThat(e.getMessage()).isEqualTo(ERROR_MSG);
+    }
+
+    @Test
+    @DisplayName("an attempt to overwrite an internal key throws FileAlreadyExists exception.")
+    public void testExternalKeysAreNotOverWritable() throws Exception {
+      KeyStorage storage = new KeyStorage(config, COMPONENT);
+      storage.storePublicKey(keys.getPublic());
+      storage.storePrivateKey(keys.getPrivate());
+      assertThrows(FileAlreadyExistsException.class, () -> storage.storePublicKey(keys.getPublic()));
+      assertThrows(FileAlreadyExistsException.class, () -> storage.storePrivateKey(keys.getPrivate()));
     }
 
     @Test
