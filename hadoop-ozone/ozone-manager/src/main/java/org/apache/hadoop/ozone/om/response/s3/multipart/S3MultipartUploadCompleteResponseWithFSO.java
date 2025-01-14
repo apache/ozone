@@ -33,7 +33,11 @@ import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.List;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.*;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.MULTIPARTINFO_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 
 /**
  * Response for Multipart Upload Complete request.
