@@ -144,7 +144,6 @@ public class TestOMDbCheckpointServlet {
   private String snapshotDirName2;
   private Path compactionDirPath;
   private DBCheckpoint dbCheckpoint;
-  private String method;
   @TempDir
   private Path folder;
   private static final String FABRICATED_FILE_NAME = "fabricatedFile.sst";
@@ -256,9 +255,7 @@ public class TestOMDbCheckpointServlet {
     testWriteDbDataWithToExcludeFileList();
   }
 
-  private void testEndpoint(String httpMethod) throws Exception {
-    this.method = httpMethod;
-
+  private void testEndpoint(String method) throws Exception {
     setupMocks();
 
     final OzoneManager om = cluster.getOzoneManager();
@@ -277,7 +274,7 @@ public class TestOMDbCheckpointServlet {
     toExcludeList.add("sstFile1.sst");
     toExcludeList.add("sstFile2.sst");
 
-    setupHttpMethod(toExcludeList);
+    setupHttpMethod(method, toExcludeList);
 
     when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
 
@@ -285,7 +282,7 @@ public class TestOMDbCheckpointServlet {
     long initialCheckpointCount =
         omMetrics.getDBCheckpointMetrics().getNumCheckpoints();
 
-    doEndpoint();
+    doEndpoint(method);
 
     assertThat(tempFile.length()).isGreaterThan(0);
     assertThat(omMetrics.getDBCheckpointMetrics().getLastCheckpointCreationTimeTaken())
@@ -338,9 +335,7 @@ public class TestOMDbCheckpointServlet {
     testSpnegoEnabled("GET");
   }
 
-  private void testSpnegoEnabled(String httpMethod) throws Exception {
-    this.method = httpMethod;
-
+  private void testSpnegoEnabled(String method) throws Exception {
     setupMocks();
 
     final OzoneManager om = cluster.getOzoneManager();
@@ -358,9 +353,9 @@ public class TestOMDbCheckpointServlet {
 
     omDbCheckpointServletMock.init();
 
-    setupHttpMethod(new ArrayList<>());
+    setupHttpMethod(method, new ArrayList<>());
 
-    doEndpoint();
+    doEndpoint(method);
 
     // Response status should be set to 403 Forbidden since there was no user
     // principal set in the request
@@ -373,7 +368,7 @@ public class TestOMDbCheckpointServlet {
     when(userPrincipalMock.getName()).thenReturn("dn/localhost@REALM");
     when(requestMock.getUserPrincipal()).thenReturn(userPrincipalMock);
 
-    doEndpoint();
+    doEndpoint(method);
 
     // Verify that the Response status is set to 403 again for DN user.
     verify(responseMock, times(2)).setStatus(HttpServletResponse.SC_FORBIDDEN);
@@ -384,7 +379,7 @@ public class TestOMDbCheckpointServlet {
     when(requestMock.getUserPrincipal()).thenReturn(userPrincipalMock);
     when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
 
-    doEndpoint();
+    doEndpoint(method);
 
     // Recon user should be able to access the servlet and download the
     // snapshot
@@ -611,7 +606,7 @@ public class TestOMDbCheckpointServlet {
   /**
    * Calls endpoint in regards to parametrized HTTP method.
    */
-  private void doEndpoint() {
+  private void doEndpoint(String method) {
     if (method.equals("POST")) {
       omDbCheckpointServletMock.doPost(requestMock, responseMock);
     } else {
@@ -621,10 +616,11 @@ public class TestOMDbCheckpointServlet {
 
   /**
    * Setups HTTP method details depending on parametrized HTTP method.
+   *
    * @param toExcludeList SST file names to be excluded.
    * @throws IOException
    */
-  private void setupHttpMethod(List<String> toExcludeList) throws IOException {
+  private void setupHttpMethod(String method, List<String> toExcludeList) throws IOException {
     if (method.equals("POST")) {
       setupPostMethod(toExcludeList);
     } else {
