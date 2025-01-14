@@ -903,9 +903,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         getMultipartKey(volume, bucket, key, uploadId);
     final OmMultipartKeyInfo multipartKeyInfo =
         getMultipartInfoTable().get(nonFSOMultipartKey);
-    long parentId = multipartKeyInfo.getParentID();
+    final long parentId = multipartKeyInfo.getParentID();
 
-    String fileName = OzoneFSUtils.getFileName(key);
+    final String fileName = OzoneFSUtils.getFileName(key);
     return getMultipartKey(volumeId, bucketId, parentId,
             fileName, uploadId);
   }
