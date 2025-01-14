@@ -656,4 +656,7 @@ public class OzoneContainer {
     }
   }
 
+  public DatanodeDetails getDatanodeDetails() {
+    return datanodeDetails;
+  }
 }

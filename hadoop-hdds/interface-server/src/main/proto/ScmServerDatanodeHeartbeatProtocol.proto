@@ -44,6 +44,7 @@ message SCMDatanodeRequest {
   optional SCMVersionRequestProto getVersionRequest = 3;
   optional SCMRegisterRequestProto registerRequest = 4;
   optional SCMHeartbeatRequestProto sendHeartbeatRequest = 5;
+  optional NodePreviousStateRequestProto nodePreviousStateRequest = 6;
 }
 
 message SCMDatanodeResponse {
@@ -60,6 +61,7 @@ message SCMDatanodeResponse {
   optional SCMVersionResponseProto getVersionResponse = 6;
   optional SCMRegisteredResponseProto registerResponse = 7;
   optional SCMHeartbeatResponseProto sendHeartbeatResponse = 8;
+  optional NodePreviousStateResponseProto nodePreviousStateResponse = 9;
 
 }
 
@@ -67,6 +69,7 @@ enum Type {
   GetVersion = 1;
   Register = 2;
   SendHeartbeat = 3;
+  NodePreviousState = 4;
 }
 
 enum Status {
@@ -124,6 +127,10 @@ message SCMRegisteredResponseProto {
   optional string networkLocation = 8;
 }
 
+message NodePreviousStateRequestProto {
+  required string datanodeUUID = 1;
+}
+
 /**
 * This message is send by data node to indicate that it is alive or it is
 * registering with the node manager.
@@ -156,6 +163,11 @@ message SCMHeartbeatResponseProto {
   // Same as term in SCMCommandProto
   optional int64 term = 3;
 }
+
+message NodePreviousStateResponseProto {
+  optional NodeState previousState = 1;
+}
+
 
 message SCMNodeAddressList {
   repeated string addressList = 1;

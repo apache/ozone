@@ -37,6 +37,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodePreviousStateRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodePreviousStateResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconstructECContainersCommandProto;
@@ -50,6 +52,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -272,6 +276,24 @@ public class SCMDatanodeProtocolServer implements
             buildAuditMessageForSuccess(SCMAction.REGISTER, auditMap));
       }
     }
+  }
+
+  @Override
+  public NodePreviousStateResponseProto getNodePreviousState(NodePreviousStateRequestProto request) throws IOException {
+    NodeStatus nodeStatus = null;
+    try {
+      DatanodeDetails nodeByUuid = scm.getScmNodeManager().getNodeByUuid(request.getDatanodeUUID());
+      if (nodeByUuid != null) {
+        nodeStatus = scm.getScmNodeManager().getNodeStatus(nodeByUuid);
+      }
+    } catch (NodeNotFoundException e) {
+      LOG.warn("Node not found for UUID: {}", request.getDatanodeUUID());
+    }
+    NodePreviousStateResponseProto.Builder builder = NodePreviousStateResponseProto.newBuilder();
+    if (nodeStatus != null) {
+      builder.setPreviousState(nodeStatus.getHealth());
+    }
+    return builder.build();
   }
 
   @VisibleForTesting

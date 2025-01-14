@@ -255,6 +255,12 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
                 .SCMRegisteredResponseProto.ErrorCode.success).build();
   }
 
+  @Override
+  public StorageContainerDatanodeProtocolProtos.NodePreviousStateResponseProto getNodePreviousState(
+      StorageContainerDatanodeProtocolProtos.NodePreviousStateRequestProto request) throws IOException {
+    return null;
+  }
+
   /**
    * Update nodeReport.
    * @param datanodeDetailsProto
