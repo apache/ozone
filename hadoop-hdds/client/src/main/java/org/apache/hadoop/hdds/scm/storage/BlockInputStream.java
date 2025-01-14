@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import java.io.EOFException;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
@@ -26,12 +27,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
@@ -40,6 +43,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockRe
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.XceiverClientShortCircuit;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi.Validator;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -77,7 +81,10 @@ public class BlockInputStream extends BlockExtendedInputStream {
       new AtomicReference<>();
   private final boolean verifyChecksum;
   private XceiverClientFactory xceiverClientFactory;
-  private XceiverClientSpi xceiverClient;
+  private XceiverClientSpi xceiverClientGrpc;
+  private XceiverClientShortCircuit xceiverClientShortCircuit;
+  private final AtomicBoolean fallbackToGrpc = new AtomicBoolean(false);
+  private FileInputStream blockInputStream;
   private boolean initialized = false;
   // TODO: do we need to change retrypolicy based on exception.
   private final RetryPolicy retryPolicy;
@@ -269,14 +276,75 @@ public class BlockInputStream extends BlockExtendedInputStream {
    * @return BlockData.
    */
   protected BlockData getBlockDataUsingClient() throws IOException {
-    Pipeline pipeline = pipelineRef.get();
+    if (xceiverClientShortCircuit != null) {
+      try {
+        return getBlockDataUsingSCClient();
+      } catch (IOException e) {
+        LOG.warn("Failed to get blockData using short-circuit client", e);
+        // acquire client again if xceiverClientGrpc is not acquired.
+        acquireClient();
+      }
+    }
+    return getBlockDataUsingGRPCClient();
+  }
+
+  @VisibleForTesting
+  protected BlockData getBlockDataUsingSCClient() throws IOException {
+    final Pipeline pipeline = xceiverClientShortCircuit.getPipeline();
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Initializing BlockInputStream for get key to access {}",
+          blockID.getContainerID());
+    }
+
+    DatanodeBlockID.Builder blkIDBuilder =
+        DatanodeBlockID.newBuilder().setContainerID(blockID.getContainerID())
+            .setLocalID(blockID.getLocalID())
+            .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId());
+
+    int replicaIndex = pipeline.getReplicaIndex(xceiverClientShortCircuit.getDn());
+    if (replicaIndex > 0) {
+      blkIDBuilder.setReplicaIndex(replicaIndex);
+    }
+    DatanodeBlockID datanodeBlockID = blkIDBuilder.build();
+    ContainerProtos.GetBlockRequestProto.Builder readBlockRequest =
+        ContainerProtos.GetBlockRequestProto.newBuilder().setBlockID(datanodeBlockID)
+            .setRequestShortCircuitAccess(true);
+    ContainerProtos.ContainerCommandRequestProto.Builder builder =
+        ContainerProtos.ContainerCommandRequestProto.newBuilder()
+            .setCmdType(ContainerProtos.Type.GetBlock)
+            .setContainerID(datanodeBlockID.getContainerID())
+            .setGetBlock(readBlockRequest)
+            .setClientId(xceiverClientShortCircuit.getClientId())
+            .setCallId(xceiverClientShortCircuit.getCallId());
+    if (tokenRef.get() != null) {
+      builder.setEncodedToken(tokenRef.get().encodeToUrlString());
+    }
+    GetBlockResponseProto response = ContainerProtocolCalls.getBlock(xceiverClientShortCircuit,
+        VALIDATORS, builder, xceiverClientShortCircuit.getDn());
+
+    blockInputStream = xceiverClientShortCircuit.getFileInputStream(builder.getCallId(), datanodeBlockID);
+    if (blockInputStream == null) {
+      throw new IOException("Failed to get file InputStream for block " + datanodeBlockID);
+    } else {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Get the FileInputStream of block {}", datanodeBlockID);
+      }
+    }
+    return response.getBlockData();
+  }
+
+  @VisibleForTesting
+  protected BlockData getBlockDataUsingGRPCClient() throws IOException {
+    final Pipeline pipeline = xceiverClientGrpc.getPipeline();
+
     if (LOG.isDebugEnabled()) {
       LOG.debug("Initializing BlockInputStream for get key to access block {}",
           blockID);
     }
 
     GetBlockResponseProto response = ContainerProtocolCalls.getBlock(
-        xceiverClient, VALIDATORS, blockID, tokenRef.get(), pipeline.getReplicaIndexes());
+        xceiverClientGrpc, VALIDATORS, blockID, tokenRef.get(), pipeline.getReplicaIndexes());
     return response.getBlockData();
   }
 
@@ -332,13 +400,35 @@ public class BlockInputStream extends BlockExtendedInputStream {
   }
 
   private void acquireClient() throws IOException {
-    if (xceiverClientFactory != null && xceiverClient == null) {
-      final Pipeline pipeline = pipelineRef.get();
+    final Pipeline pipeline = pipelineRef.get();
+    // xceiverClientGrpc not-null indicates there is fall back to GRPC reads
+    if (xceiverClientFactory != null && xceiverClientFactory.isShortCircuitEnabled() && !fallbackToGrpc.get()
+        && xceiverClientShortCircuit == null) {
       try {
-        xceiverClient = xceiverClientFactory.acquireClientForReadData(pipeline);
+        XceiverClientSpi newClient = xceiverClientFactory.acquireClientForReadData(pipeline, true);
+        if (newClient instanceof XceiverClientShortCircuit) {
+          xceiverClientShortCircuit = (XceiverClientShortCircuit) newClient;
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("acquired short-circuit client {} for block {}", xceiverClientShortCircuit.toString(), blockID);
+          }
+        } else {
+          xceiverClientGrpc = newClient;
+          fallbackToGrpc.set(true);
+        }
+        return;
+      } catch (Exception e) {
+        LOG.warn("Failed to acquire {} client for pipeline {}, block {}. Fallback to Grpc client.",
+            DomainSocketFactory.FEATURE, pipeline, blockID, e);
+        fallbackToGrpc.set(true);
+      }
+    }
+
+    // fall back to acquire GRPC client
+    if (xceiverClientFactory != null && xceiverClientGrpc == null) {
+      try {
+        xceiverClientGrpc = xceiverClientFactory.acquireClientForReadData(pipeline);
       } catch (IOException ioe) {
-        LOG.warn("Failed to acquire client for pipeline {}, block {}",
-            pipeline, blockID);
+        LOG.warn("Failed to acquire client for pipeline {}, block {}", pipeline, blockID);
         throw ioe;
       }
     }
@@ -354,8 +444,13 @@ public class BlockInputStream extends BlockExtendedInputStream {
   }
 
   protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
-    return new ChunkInputStream(chunkInfo, blockID,
-        xceiverClientFactory, pipelineRef::get, verifyChecksum, tokenRef::get);
+    if (blockInputStream != null) {
+      return new ShortCircuitChunkInputStream(chunkInfo, blockID, xceiverClientFactory,
+          pipelineRef::get, verifyChecksum, tokenRef::get, xceiverClientShortCircuit, blockInputStream);
+    } else {
+      return new ChunkInputStream(chunkInfo, blockID,
+          xceiverClientFactory, pipelineRef::get, verifyChecksum, tokenRef::get);
+    }
   }
 
   @Override
@@ -527,12 +622,23 @@ public class BlockInputStream extends BlockExtendedInputStream {
         is.close();
       }
     }
+    if (blockInputStream != null) {
+      try {
+        blockInputStream.close();
+      } catch (IOException e) {
+        LOG.error("Failed to close file InputStream for block " + blockID, e);
+      }
+    }
   }
 
   private void releaseClient() {
-    if (xceiverClientFactory != null && xceiverClient != null) {
-      xceiverClientFactory.releaseClientForReadData(xceiverClient, false);
-      xceiverClient = null;
+    if (xceiverClientFactory != null && xceiverClientGrpc != null) {
+      xceiverClientFactory.releaseClientForReadData(xceiverClientGrpc, false);
+      xceiverClientGrpc = null;
+    }
+    if (xceiverClientFactory != null && xceiverClientShortCircuit != null) {
+      xceiverClientFactory.releaseClientForReadData(xceiverClientShortCircuit, false);
+      xceiverClientShortCircuit = null;
     }
   }
 
@@ -565,6 +671,10 @@ public class BlockInputStream extends BlockExtendedInputStream {
   @VisibleForTesting
   synchronized long getBlockPosition() {
     return blockPosition;
+  }
+
+  public synchronized FileInputStream getBlockInputStream() {
+    return blockInputStream;
   }
 
   @Override

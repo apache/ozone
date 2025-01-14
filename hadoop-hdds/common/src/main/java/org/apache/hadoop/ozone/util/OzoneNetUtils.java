@@ -24,6 +24,9 @@ import org.slf4j.LoggerFactory;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.security.Security;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_JVM_NETWORK_ADDRESS_CACHE_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_JVM_NETWORK_ADDRESS_CACHE_ENABLED_DEFAULT;
@@ -89,15 +92,31 @@ public final class OzoneNetUtils {
   }
 
 
+  private static final Map<String, Boolean> CACHE =
+      Collections.synchronizedMap(new HashMap<String, Boolean>());
   /**
    * Match input address to local address.
-   * Return true if it matches, false otherwsie.
+   * Return true if it matches, false otherwise.
    */
   public static boolean isAddressLocal(InetSocketAddress addr) {
     InetAddress inetAddress = addr.getAddress();
-    return inetAddress != null && NetUtils.isLocalAddress(inetAddress);
+    if (inetAddress == null) {
+      return false;
+    }
+    Boolean cached = CACHE.get(inetAddress.getHostAddress());
+    if (cached != null) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Address {} is {} local", addr, (cached ? "" : "not"));
+      }
+      return cached;
+    }
+    boolean local = NetUtils.isLocalAddress(inetAddress);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Address {} is {} local", addr, (local ? "" : "not"));
+    }
+    CACHE.put(inetAddress.getHostAddress(), local);
+    return local;
   }
-
 
   public static boolean isUnresolved(boolean flexibleFqdnResolutionEnabled,
                                       InetSocketAddress addr) {

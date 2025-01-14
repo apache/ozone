@@ -19,6 +19,8 @@
 package org.apache.hadoop.hdds.scm;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.conf.Config;
@@ -29,6 +31,9 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.storage.DomainSocketFactory;
+import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -38,6 +43,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.apache.hadoop.hdds.DatanodeVersion.SHORT_CIRCUIT_READS;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.NO_REPLICA_FOUND;
@@ -64,8 +70,8 @@ public class XceiverClientManager extends XceiverClientCreator {
 
   private final Cache<String, XceiverClientSpi> clientCache;
   private final CacheMetrics cacheMetrics;
-
   private static XceiverClientMetrics metrics;
+  private final ConcurrentHashMap<String, DatanodeDetails> localDNCache;
 
   /**
    * Creates a new XceiverClientManager for non secured ozone cluster.
@@ -105,6 +111,7 @@ public class XceiverClientManager extends XceiverClientCreator {
           }).build();
 
     cacheMetrics = CacheMetrics.create(clientCache, this);
+    this.localDNCache = new ConcurrentHashMap<>();
   }
 
   @VisibleForTesting
@@ -113,24 +120,50 @@ public class XceiverClientManager extends XceiverClientCreator {
   }
 
   /**
-   * {@inheritDoc}
+   * Acquires a XceiverClientSpi connected to a container for read.
    *
    * If there is already a cached XceiverClientSpi, simply return
    * the cached otherwise create a new one.
+   *
+   * @param pipeline the container pipeline for the client connection
+   * @return XceiverClientSpi connected to a container
+   * @throws IOException if a XceiverClientSpi cannot be acquired
+   */
+  @Override
+  public XceiverClientSpi acquireClientForReadData(Pipeline pipeline, boolean allowShortCircuit)
+      throws IOException {
+    return acquireClient(pipeline, false, allowShortCircuit);
+  }
+
+  /**
+   * Acquires a XceiverClientSpi connected to a container capable of
+   * storing the specified key.
+   *
+   * If there is already a cached XceiverClientSpi, simply return
+   * the cached otherwise create a new one.
+   *
+   * @param pipeline the container pipeline for the client connection
+   * @return XceiverClientSpi connected to a container
+   * @throws IOException if a XceiverClientSpi cannot be acquired
    */
   @Override
   public XceiverClientSpi acquireClient(Pipeline pipeline,
-      boolean topologyAware) throws IOException {
+      boolean topologyAware, boolean allowShortCircuit) throws IOException {
     Preconditions.checkNotNull(pipeline);
     Preconditions.checkArgument(pipeline.getNodes() != null);
     Preconditions.checkArgument(!pipeline.getNodes().isEmpty(),
         NO_REPLICA_FOUND);
 
     synchronized (clientCache) {
-      XceiverClientSpi info = getClient(pipeline, topologyAware);
+      XceiverClientSpi info = getClient(pipeline, topologyAware, allowShortCircuit);
       info.incrementReference();
       return info;
     }
+  }
+
+  @Override
+  public XceiverClientSpi acquireClient(Pipeline pipeline, boolean topologyAware) throws IOException {
+    return acquireClient(pipeline, topologyAware, false);
   }
 
   @Override
@@ -141,7 +174,7 @@ public class XceiverClientManager extends XceiverClientCreator {
       client.decrementReference();
       if (invalidateClient) {
         Pipeline pipeline = client.getPipeline();
-        String key = getPipelineCacheKey(pipeline, topologyAware);
+        String key = getPipelineCacheKey(pipeline, topologyAware, client instanceof XceiverClientShortCircuit);
         XceiverClientSpi cachedClient = clientCache.getIfPresent(key);
         if (cachedClient == client) {
           clientCache.invalidate(key);
@@ -150,24 +183,44 @@ public class XceiverClientManager extends XceiverClientCreator {
     }
   }
 
-  protected XceiverClientSpi getClient(Pipeline pipeline, boolean topologyAware)
+  protected XceiverClientSpi getClient(Pipeline pipeline, boolean topologyAware, boolean allowShortCircuit)
       throws IOException {
     try {
-      // create different client different pipeline node based on
-      // network topology
-      String key = getPipelineCacheKey(pipeline, topologyAware);
-      return clientCache.get(key, () -> newClient(pipeline));
+      // create different client different pipeline node based on network topology
+      String key = getPipelineCacheKey(pipeline, topologyAware, allowShortCircuit);
+      return clientCache.get(key, () -> newClient(pipeline, localDNCache.get(key)));
     } catch (Exception e) {
       throw new IOException(
           "Exception getting XceiverClient: " + e, e);
     }
   }
 
-  private String getPipelineCacheKey(Pipeline pipeline,
-                                     boolean topologyAware) {
-    String key = pipeline.getId().getId().toString() + pipeline.getType();
+  private String getPipelineCacheKey(Pipeline pipeline, boolean topologyAware, boolean allowShortCircuit) {
+    String key = pipeline.getId().getId().toString() + "-" + pipeline.getType();
     boolean isEC = pipeline.getType() == HddsProtos.ReplicationType.EC;
-    if (topologyAware || isEC) {
+    DatanodeDetails localDN = null;
+
+    if ((!isEC) && allowShortCircuit && isShortCircuitEnabled()) {
+      int port = 0;
+      InetSocketAddress localAddr = null;
+      for (DatanodeDetails dn : pipeline.getNodes()) {
+        // read port from the data node, on failure use default configured port.
+        port = dn.getPort(DatanodeDetails.Port.Name.STANDALONE).getValue();
+        InetSocketAddress addr = NetUtils.createSocketAddr(dn.getIpAddress(), port);
+        if (OzoneNetUtils.isAddressLocal(addr) &&
+            dn.getCurrentVersion() >= SHORT_CIRCUIT_READS.toProtoValue()) {
+          localAddr = addr;
+          localDN = dn;
+          break;
+        }
+      }
+      if (localAddr != null) {
+        // Find a local DN and short circuit read is enabled
+        key += "@" + localAddr.getHostName() + ":" + port + "/" + DomainSocketFactory.FEATURE_FLAG;
+      }
+    }
+
+    if (localDN == null && (topologyAware || isEC)) {
       try {
         DatanodeDetails closestNode = pipeline.getClosestNode();
         // Pipeline cache key uses host:port suffix to handle
@@ -196,11 +249,15 @@ public class XceiverClientManager extends XceiverClientCreator {
       // Append user short name to key to prevent a different user
       // from using same instance of xceiverClient.
       try {
-        key += UserGroupInformation.getCurrentUser().getShortUserName();
+        key = UserGroupInformation.getCurrentUser().getShortUserName() + "@" + key;
       } catch (IOException e) {
         LOG.error("Failed to get current user to create pipeline cache key:" +
             e.getMessage());
       }
+    }
+
+    if (localDN != null) {
+      localDNCache.put(key, localDN);
     }
     return key;
   }
@@ -210,12 +267,14 @@ public class XceiverClientManager extends XceiverClientCreator {
    */
   @Override
   public void close() {
+    super.close();
     //closing is done through RemovalListener
     clientCache.invalidateAll();
     clientCache.cleanUp();
     if (LOG.isDebugEnabled()) {
       LOG.debug("XceiverClient cache stats: {}", clientCache.stats());
     }
+    localDNCache.clear();
     cacheMetrics.unregister();
 
     if (metrics != null) {

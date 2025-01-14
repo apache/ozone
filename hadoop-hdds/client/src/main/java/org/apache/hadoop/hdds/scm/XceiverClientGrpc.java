@@ -86,7 +86,7 @@ import static org.apache.hadoop.hdds.HddsUtils.processForDebug;
  * how it works, and how it is integrated with the Ozone client.
  */
 public class XceiverClientGrpc extends XceiverClientSpi {
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(XceiverClientGrpc.class);
   private final Pipeline pipeline;
   private final ConfigurationSource config;
@@ -133,6 +133,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT);
     this.trustManager = trustManager;
     this.getBlockDNcache = new ConcurrentHashMap<>();
+    LOG.info("{} is created for pipeline {}", XceiverClientGrpc.class.getSimpleName(), pipeline);
   }
 
   /**
@@ -244,6 +245,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         Thread.currentThread().interrupt();
       }
     }
+  }
+
+  public boolean isClosed() {
+    return closed;
   }
 
   @Override

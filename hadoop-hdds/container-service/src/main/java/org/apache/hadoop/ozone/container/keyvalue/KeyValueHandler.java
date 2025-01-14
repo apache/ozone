@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -32,6 +33,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 
@@ -90,6 +92,7 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -127,6 +130,7 @@ import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkV
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.DEFAULT_LAYOUT;
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils.getBlockMapKey;
 
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
@@ -151,6 +155,9 @@ public class KeyValueHandler extends Handler {
   // A striped lock that is held during container creation.
   private final Striped<Lock> containerCreationLocks;
   private static FaultInjector injector;
+  // map temporarily carries FileInputStreams for short-circuit read requests
+  private final Map<String, FileInputStream> streamMap = new ConcurrentHashMap<>();
+  private OzoneContainer ozoneContainer;
 
   public KeyValueHandler(ConfigurationSource config,
                          String datanodeId,
@@ -158,7 +165,18 @@ public class KeyValueHandler extends Handler {
                          VolumeSet volSet,
                          ContainerMetrics metrics,
                          IncrementalReportSender<Container> icrSender) {
+    this(config, datanodeId, contSet, volSet, metrics, icrSender, null);
+  }
+
+  public KeyValueHandler(ConfigurationSource config,
+                         String datanodeId,
+                         ContainerSet contSet,
+                         VolumeSet volSet,
+                         ContainerMetrics metrics,
+                         IncrementalReportSender<Container> icrSender,
+                         OzoneContainer ozoneContainer) {
     super(config, datanodeId, contSet, volSet, metrics, icrSender);
+    this.ozoneContainer = ozoneContainer;
     blockManager = new BlockManagerImpl(config);
     validateChunkChecksumData = conf.getObject(
         DatanodeConfiguration.class).isChunkDataValidationCheck();
@@ -691,14 +709,34 @@ public class KeyValueHandler extends Handler {
     }
 
     ContainerProtos.BlockData responseData;
+    boolean shortCircuitGranted = false;
     try {
-      BlockID blockID = BlockID.getFromProtobuf(
-          request.getGetBlock().getBlockID());
+      ContainerProtos.GetBlockRequestProto getBlock = request.getGetBlock();
+      BlockID blockID = BlockID.getFromProtobuf(getBlock.getBlockID());
       BlockUtils.verifyReplicaIdx(kvContainer, blockID);
       responseData = blockManager.getBlock(kvContainer, blockID).getProtoBufMessage();
+      if (getBlock.hasRequestShortCircuitAccess() && getBlock.getRequestShortCircuitAccess()) {
+        if (!VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.SHORT_CIRCUIT_READS)) {
+          throw new StorageContainerException("DataNode has not finalized " +
+              "upgrading to support short-circuit read.", UNSUPPORTED_REQUEST);
+        }
+        boolean domainSocketServerEnabled = ozoneContainer != null
+            && ozoneContainer.getReadDomainSocketChannel() != null
+            && ozoneContainer.getReadDomainSocketChannel().isStarted();
+        if (domainSocketServerEnabled) {
+          FileInputStream fis = chunkManager.getShortCircuitFd(kvContainer, blockID);
+          Preconditions.checkState(fis != null);
+          String mapKey = getBlockMapKey(request);
+          streamMap.put(mapKey, fis);
+          shortCircuitGranted = true;
+        }
+      }
       final long numBytes = responseData.getSerializedSize();
-      metrics.incContainerBytesStats(Type.GetBlock, numBytes);
-
+      if (shortCircuitGranted) {
+        metrics.incContainerLocalBytesStats(Type.GetBlock, numBytes);
+      } else {
+        metrics.incContainerBytesStats(Type.GetBlock, numBytes);
+      }
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     } catch (IOException ex) {
@@ -707,7 +745,20 @@ public class KeyValueHandler extends Handler {
           request);
     }
 
-    return getBlockDataResponse(request, responseData);
+    return getBlockDataResponse(request, responseData, shortCircuitGranted);
+  }
+
+  public FileInputStream getBlockInputStream(ContainerCommandRequestProto request) throws IOException {
+    if (request.getCmdType() != Type.GetBlock) {
+      throw new StorageContainerException("Request type mismatch, expected " +  Type.GetBlock +
+          ", received " + request.getCmdType(), ContainerProtos.Result.MALFORMED_REQUEST);
+    }
+    String mapKey = getBlockMapKey(request);
+    FileInputStream fis = streamMap.remove(mapKey);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("streamMap remove stream for {}", mapKey);
+    }
+    return fis;
   }
 
   /**

@@ -41,7 +41,6 @@ public class OzoneClientConfig {
 
   public static final boolean OZONE_READ_SHORT_CIRCUIT_DEFAULT = false;
   public static final String OZONE_DOMAIN_SOCKET_PATH = "ozone.domain.socket.path";
-  public static final String OZONE_DOMAIN_SOCKET_PATH_DEFAULT = "/var/lib/ozone/dn_socket";
   public static final String SHORT_CIRCUIT_PREFIX = "read.short-circuit.";
   public static final short DATA_TRANSFER_VERSION = 28;
   public static final byte DATA_TRANSFER_MAGIC_CODE = 99;

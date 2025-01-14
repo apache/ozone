@@ -533,9 +533,9 @@ public final class Pipeline {
       b.append(" ReplicaIndex: ").append(this.getReplicaIndex(datanodeDetails));
     }
     b.append(", ReplicationConfig: ").append(replicationConfig);
-    b.append(", State:").append(getPipelineState());
-    b.append(", leaderId:").append(leaderId != null ? leaderId.toString() : "");
-    b.append(", CreationTimestamp").append(getCreationTimestamp()
+    b.append(", State: ").append(getPipelineState());
+    b.append(", leaderId: ").append(leaderId != null ? leaderId.toString() : "");
+    b.append(", CreationTimestamp: ").append(getCreationTimestamp()
         .atZone(ZoneId.systemDefault()));
     b.append("]");
     return b.toString();
