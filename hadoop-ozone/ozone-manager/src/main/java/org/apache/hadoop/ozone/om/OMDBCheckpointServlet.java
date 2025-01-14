@@ -209,7 +209,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         continue;
       }
       Path destPath = Paths.get(metaDirPath.toString(), s);
-      paths.computeIfAbsent(fileName.toString(), (k) -> new HashMap<>());
+      Map<Path, Path> fileMap = paths.computeIfAbsent(fileName.toString(), (k) -> new HashMap<>());
       if (destPath.toString().startsWith(
           sstBackupDir.getOriginalDir().toString())) {
         // The source of the sstBackupDir is a temporary directory and needs
@@ -218,12 +218,12 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
             sstBackupDir.getOriginalDir().toString().length() + 1;
         Path srcPath = Paths.get(sstBackupDir.getTmpDir().toString(),
             truncateFileName(truncateLength, destPath));
-        paths.get(fileName.toString()).put(srcPath, destPath);
+        fileMap.put(srcPath, destPath);
       } else if (!s.startsWith(OM_SNAPSHOT_DIR)) {
         Path fixedPath = Paths.get(checkpointLocation.toString(), s);
-        paths.get(fileName.toString()).put(fixedPath, fixedPath);
+        fileMap.put(fixedPath, fixedPath);
       } else {
-        paths.get(fileName.toString()).put(destPath, destPath);
+        fileMap.put(destPath, destPath);
       }
     }
     return paths;
