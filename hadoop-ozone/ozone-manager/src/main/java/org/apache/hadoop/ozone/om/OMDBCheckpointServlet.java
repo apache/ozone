@@ -174,9 +174,10 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       boolean completed = getFilesForArchive(checkpoint, copyFiles,
           hardLinkFiles, sstFilesToExclude, includeSnapshotData(request),
           excludedList, sstBackupDir, compactionLogDir);
-      writeFilesToArchive(copyFiles.values().stream().flatMap(map -> map.entrySet().stream())
-              .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)),
-          hardLinkFiles, archiveOutputStream, completed, checkpoint.getCheckpointLocation());
+      Map<Path, Path> flatCopyFiles = copyFiles.values().stream().flatMap(map -> map.entrySet().stream())
+          .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+      writeFilesToArchive(flatCopyFiles, hardLinkFiles, archiveOutputStream,
+          completed, checkpoint.getCheckpointLocation());
     } catch (Exception e) {
       LOG.error("got exception writing to archive " + e);
       throw e;
@@ -208,6 +209,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         continue;
       }
       Path destPath = Paths.get(metaDirPath.toString(), s);
+      paths.computeIfAbsent(fileName.toString(), (k) -> new HashMap<>());
       if (destPath.toString().startsWith(
           sstBackupDir.getOriginalDir().toString())) {
         // The source of the sstBackupDir is a temporary directory and needs
@@ -216,12 +218,12 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
             sstBackupDir.getOriginalDir().toString().length() + 1;
         Path srcPath = Paths.get(sstBackupDir.getTmpDir().toString(),
             truncateFileName(truncateLength, destPath));
-        paths.computeIfAbsent(fileName.toString(), (k) -> new HashMap<>()).put(srcPath, destPath);
+        paths.get(fileName.toString()).put(srcPath, destPath);
       } else if (!s.startsWith(OM_SNAPSHOT_DIR)) {
         Path fixedPath = Paths.get(checkpointLocation.toString(), s);
-        paths.computeIfAbsent(fileName.toString(), (k) -> new HashMap<>()).put(fixedPath, fixedPath);
+        paths.get(fileName.toString()).put(fixedPath, fixedPath);
       } else {
-        paths.computeIfAbsent(fileName.toString(), (k) -> new HashMap<>()).put(destPath, destPath);
+        paths.get(fileName.toString()).put(destPath, destPath);
       }
     }
     return paths;
