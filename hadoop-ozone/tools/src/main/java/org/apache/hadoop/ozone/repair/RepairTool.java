@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.repair;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import picocli.CommandLine;
 
-import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.Scanner;
 import java.util.concurrent.Callable;
@@ -85,16 +84,6 @@ public abstract class RepairTool extends AbstractSubcommand implements Callable<
 
   protected void error(String msg, Object... args) {
     err().println(formatMessage(msg, args));
-  }
-
-  private PrintWriter out() {
-    return spec().commandLine()
-        .getOut();
-  }
-
-  private PrintWriter err() {
-    return spec().commandLine()
-        .getErr();
   }
 
   private String formatMessage(String msg, Object[] args) {
