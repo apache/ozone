@@ -899,11 +899,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     final long volumeId = getVolumeId(volume);
     final long bucketId = getBucketId(volume,
             bucket);
-    long parentId =
-            OMFileRequest.getParentID(volumeId, bucketId, key, this);
+    final String nonFSOMultipartKey =
+        getMultipartKey(volume, bucket, key, uploadId);
+    final OmMultipartKeyInfo multipartKeyInfo =
+        getMultipartInfoTable().get(nonFSOMultipartKey);
+    long parentId = multipartKeyInfo.getParentID();
 
     String fileName = OzoneFSUtils.getFileName(key);
-
     return getMultipartKey(volumeId, bucketId, parentId,
             fileName, uploadId);
   }

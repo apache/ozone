@@ -47,7 +47,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
  * 3) Delete unused parts.
  */
 @CleanupTableInfo(cleanupTables = {OPEN_FILE_TABLE, FILE_TABLE, DELETED_TABLE,
-    MULTIPARTINFO_TABLE})
+    MULTIPARTINFO_TABLE, DELETED_TABLE})
 public class S3MultipartUploadCompleteResponseWithFSO
         extends S3MultipartUploadCompleteResponse {
 
