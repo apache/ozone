@@ -135,6 +135,7 @@ public class TestOMDbCheckpointServlet {
   private ServletOutputStream servletOutputStream;
   private MiniOzoneCluster cluster = null;
   private OzoneClient client;
+  private OzoneManager om;
   private OMMetrics omMetrics = null;
   private HttpServletRequest requestMock = null;
   private HttpServletResponse responseMock = null;
@@ -165,7 +166,8 @@ public class TestOMDbCheckpointServlet {
         .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
-    omMetrics = cluster.getOzoneManager().getMetrics();
+    om = cluster.getOzoneManager();
+    omMetrics = om.getMetrics();
   }
 
   private void setupMocks() throws Exception {
@@ -200,7 +202,7 @@ public class TestOMDbCheckpointServlet {
         mock(OMDBCheckpointServlet.class);
 
     BootstrapStateHandler.Lock lock =
-        new OMDBCheckpointServlet.Lock(cluster.getOzoneManager());
+        new OMDBCheckpointServlet.Lock(om);
     doCallRealMethod().when(omDbCheckpointServletMock).init();
     assertNull(
         doCallRealMethod().when(omDbCheckpointServletMock).getDbStore());
@@ -216,7 +218,7 @@ public class TestOMDbCheckpointServlet {
         .thenReturn(servletContextMock);
 
     when(servletContextMock.getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE))
-        .thenReturn(cluster.getOzoneManager());
+        .thenReturn(om);
     when(requestMock.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH))
         .thenReturn("true");
 
@@ -258,7 +260,6 @@ public class TestOMDbCheckpointServlet {
   private void testEndpoint(String method) throws Exception {
     setupMocks();
 
-    final OzoneManager om = cluster.getOzoneManager();
     doCallRealMethod().when(omDbCheckpointServletMock).initialize(
         om.getMetadataManager().getStore(),
         om.getMetrics().getDBCheckpointMetrics(),
@@ -299,8 +300,6 @@ public class TestOMDbCheckpointServlet {
   private void testDoPostWithInvalidContentType() throws Exception {
     setupMocks();
 
-    final OzoneManager om = cluster.getOzoneManager();
-
     doCallRealMethod().when(omDbCheckpointServletMock).initialize(
         om.getMetadataManager().getStore(),
         om.getMetrics().getDBCheckpointMetrics(),
@@ -338,7 +337,6 @@ public class TestOMDbCheckpointServlet {
   private void testSpnegoEnabled(String method) throws Exception {
     setupMocks();
 
-    final OzoneManager om = cluster.getOzoneManager();
     Collection<String> allowedUsers =
             new LinkedHashSet<>(om.getOmAdminUsernames());
     allowedUsers.add("recon");
@@ -394,7 +392,6 @@ public class TestOMDbCheckpointServlet {
         .thenReturn("true");
 
     // Create a "spy" dbstore keep track of the checkpoint.
-    OzoneManager om = cluster.getOzoneManager();
     DBStore dbStore =  om.getMetadataManager().getStore();
     DBStore spyDbStore = spy(dbStore);
 
@@ -724,15 +721,14 @@ public class TestOMDbCheckpointServlet {
     Path currentLink = Paths.get(compactionDirPath.toString(), "CURRENT");
     Files.createLink(currentLink, currentFile);
 
-    dbCheckpoint = cluster.getOzoneManager()
-        .getMetadataManager().getStore()
+    dbCheckpoint = om.getMetadataManager()
+        .getStore()
         .getCheckpoint(true);
 
   }
 
   private String createSnapshot(String vname, String bname)
       throws IOException, InterruptedException, TimeoutException {
-    final OzoneManager om = cluster.getOzoneManager();
     String snapshotName = UUID.randomUUID().toString();
     OzoneManagerProtocol writeClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
@@ -835,16 +831,16 @@ public class TestOMDbCheckpointServlet {
 
   private void testBootstrapLocking() throws Exception {
     // Get the bootstrap state handlers
-    KeyManager keyManager = cluster.getOzoneManager().getKeyManager();
+    KeyManager keyManager = om.getKeyManager();
     BootstrapStateHandler keyDeletingService =
         keyManager.getDeletingService();
     BootstrapStateHandler snapshotDeletingService =
         keyManager.getSnapshotDeletingService();
     BootstrapStateHandler sstFilteringService =
         keyManager.getSnapshotSstFilteringService();
-    BootstrapStateHandler differ =
-        cluster.getOzoneManager().getMetadataManager()
-            .getStore().getRocksDBCheckpointDiffer();
+    BootstrapStateHandler differ = om.getMetadataManager()
+        .getStore()
+        .getRocksDBCheckpointDiffer();
 
     ExecutorService executorService = Executors.newCachedThreadPool();
 
@@ -853,7 +849,7 @@ public class TestOMDbCheckpointServlet {
     OMDBCheckpointServlet spyServlet = spy(omDbCheckpointServlet);
     ServletContext servletContext = mock(ServletContext.class);
     when(servletContext.getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE))
-        .thenReturn(cluster.getOzoneManager());
+        .thenReturn(om);
     doReturn(servletContext).when(spyServlet).getServletContext();
 
     spyServlet.init();
