@@ -12,10 +12,7 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
@@ -25,95 +22,41 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
   <artifactId>hdds</artifactId>
   <version>2.0.0-SNAPSHOT</version>
-  <description>Apache Ozone Distributed Data Store Project</description>
-  <name>Apache Ozone HDDS</name>
   <packaging>pom</packaging>
-
-  <properties>
-    <sort.skip>true</sort.skip>
-  </properties>
+  <name>Apache Ozone HDDS</name>
+  <description>Apache Ozone Distributed Data Store Project</description>
 
   <modules>
     <module>annotations</module>
-    <module>hadoop-dependency-client</module>
-    <module>hadoop-dependency-test</module>
-    <module>hadoop-dependency-server</module>
-    <module>interface-client</module>
-    <module>interface-admin</module>
-    <module>interface-server</module>
     <module>client</module>
     <module>common</module>
+    <module>config</module>
+    <module>container-service</module>
     <module>crypto-api</module>
     <module>crypto-default</module>
-    <module>framework</module>
-    <module>managed-rocksdb</module>
-    <module>rocksdb-checkpoint-differ</module>
-    <module>container-service</module>
-    <module>server-scm</module>
-    <module>tools</module>
     <module>docs</module>
-    <module>config</module>
-    <module>test-utils</module>
     <module>erasurecode</module>
+    <module>framework</module>
+    <module>hadoop-dependency-client</module>
+    <module>hadoop-dependency-server</module>
+    <module>hadoop-dependency-test</module>
+    <module>interface-admin</module>
+    <module>interface-client</module>
+    <module>interface-server</module>
+    <module>managed-rocksdb</module>
     <module>rocks-native</module>
+    <module>rocksdb-checkpoint-differ</module>
+    <module>server-scm</module>
+    <module>test-utils</module>
+    <module>tools</module>
   </modules>
 
   <dependencyManagement>
     <dependencies>
 
-
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-common</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-managed-rocksdb</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-hadoop-dependency-client</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-hadoop-dependency-server</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-hadoop-dependency-test</artifactId>
-        <version>${hdds.version}</version>
-        <scope>test</scope>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-interface-server</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-interface-client</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-interface-admin</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-erasurecode</artifactId>
+        <artifactId>hdds-annotation-processing</artifactId>
         <version>${hdds.version}</version>
       </dependency>
 
@@ -125,25 +68,13 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-tools</artifactId>
+        <artifactId>hdds-common</artifactId>
         <version>${hdds.version}</version>
       </dependency>
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-server-framework</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>rocksdb-checkpoint-differ</artifactId>
-      <version>${hdds.version}</version>
-    </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-server-scm</artifactId>
+        <artifactId>hdds-config</artifactId>
         <version>${hdds.version}</version>
       </dependency>
 
@@ -161,21 +92,74 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-config</artifactId>
+        <artifactId>hdds-erasurecode</artifactId>
         <version>${hdds.version}</version>
       </dependency>
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-annotation-processing</artifactId>
+        <artifactId>hdds-hadoop-dependency-client</artifactId>
         <version>${hdds.version}</version>
       </dependency>
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-test-utils</artifactId>
+        <artifactId>hdds-hadoop-dependency-server</artifactId>
         <version>${hdds.version}</version>
-        <scope>test</scope>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-interface-admin</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-interface-client</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-interface-server</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-managed-rocksdb</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-rocks-native</artifactId>
+        <version>${hdds.rocks.native.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-server-framework</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-server-scm</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-tools</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>rocksdb-checkpoint-differ</artifactId>
+        <version>${hdds.version}</version>
       </dependency>
 
       <dependency>
@@ -196,16 +180,24 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-server-scm</artifactId>
-        <type>test-jar</type>
+        <artifactId>hdds-hadoop-dependency-test</artifactId>
         <version>${hdds.version}</version>
         <scope>test</scope>
       </dependency>
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-rocks-native</artifactId>
-        <version>${hdds.rocks.native.version}</version>
+        <artifactId>hdds-server-scm</artifactId>
+        <version>${hdds.version}</version>
+        <type>test-jar</type>
+        <scope>test</scope>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-test-utils</artifactId>
+        <version>${hdds.version}</version>
+        <scope>test</scope>
       </dependency>
     </dependencies>
   </dependencyManagement>

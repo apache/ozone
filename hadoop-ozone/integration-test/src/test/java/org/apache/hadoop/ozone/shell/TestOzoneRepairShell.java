@@ -38,6 +38,7 @@ import java.util.regex.Pattern;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.ozone.test.IntLambda.withTextFromSystemIn;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -89,7 +90,11 @@ public class TestOzoneRepairShell {
 
     String testTerm = "1111";
     String testIndex = "1111";
-    int exitCode = cmd.execute("ldb", "--db", dbPath, "update-transaction", "--term", testTerm, "--index", testIndex);
+    int exitCode = withTextFromSystemIn("y")
+        .execute(() -> cmd.execute("om", "update-transaction",
+            "--db", dbPath,
+            "--term", testTerm,
+            "--index", testIndex));
     assertEquals(0, exitCode, err);
     assertThat(out.get())
         .contains(
@@ -101,8 +106,11 @@ public class TestOzoneRepairShell {
     String cmdOut2 = scanTransactionInfoTable(dbPath);
     assertThat(cmdOut2).contains(testTerm + "#" + testIndex);
 
-    cmd.execute("ldb", "--db", dbPath, "update-transaction", "--term",
-        originalHighestTermIndex[0], "--index", originalHighestTermIndex[1]);
+    withTextFromSystemIn("y")
+        .execute(() -> cmd.execute("om", "update-transaction",
+            "--db", dbPath,
+            "--term", originalHighestTermIndex[0],
+            "--index", originalHighestTermIndex[1]));
     cluster.getOzoneManager().restart();
     try (OzoneClient ozoneClient = cluster.newClient()) {
       ozoneClient.getObjectStore().createVolume("vol1");
@@ -128,14 +136,17 @@ public class TestOzoneRepairShell {
   public void testQuotaRepair() throws Exception {
     CommandLine cmd = new OzoneRepair().getCmd();
 
-    int exitCode = cmd.execute("quota", "status", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY));
+    int exitCode = cmd.execute("om", "quota", "status", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY));
     assertEquals(0, exitCode, err);
-    exitCode = cmd.execute("quota", "start", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY));
+
+    exitCode = withTextFromSystemIn("y")
+        .execute(() -> cmd.execute("om", "quota", "start", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY)));
     assertEquals(0, exitCode, err);
+
     GenericTestUtils.waitFor(() -> {
       out.reset();
       // verify quota trigger is completed having non-zero lastRunFinishedTime
-      cmd.execute("quota", "status", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY));
+      cmd.execute("om", "quota", "status", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY));
       try {
         return out.get().contains("\"lastRunFinishedTime\":\"\"");
       } catch (Exception ex) {

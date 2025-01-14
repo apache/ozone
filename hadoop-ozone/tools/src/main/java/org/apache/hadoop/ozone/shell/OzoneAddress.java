@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.shell;
 
 import java.io.IOException;
-import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collection;
@@ -452,7 +452,7 @@ public class OzoneAddress {
     return null;
   }
 
-  public void print(PrintStream out) {
+  public void print(PrintWriter out) {
     if (!volumeName.isEmpty()) {
       out.printf("Volume Name : %s%n", volumeName);
     }

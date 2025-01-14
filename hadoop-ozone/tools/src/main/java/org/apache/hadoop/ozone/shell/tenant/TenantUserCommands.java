@@ -18,11 +18,7 @@
 package org.apache.hadoop.ozone.shell.tenant;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.MissingSubcommandException;
-import org.apache.hadoop.ozone.shell.Shell;
 import picocli.CommandLine;
-
-import java.util.concurrent.Callable;
 
 /**
  * Subcommand to group tenant user related operations.
@@ -41,14 +37,6 @@ import java.util.concurrent.Callable;
     },
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class TenantUserCommands implements Callable<Void> {
+public class TenantUserCommands {
 
-  @CommandLine.ParentCommand
-  private Shell shell;
-
-  @Override
-  public Void call() throws Exception {
-    throw new MissingSubcommandException(
-        this.shell.getCmd().getSubcommands().get("user"));
-  }
 }

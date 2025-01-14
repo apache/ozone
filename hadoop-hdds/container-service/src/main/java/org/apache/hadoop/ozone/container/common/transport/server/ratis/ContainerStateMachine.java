@@ -524,21 +524,6 @@ public class ContainerStateMachine extends BaseStateMachine {
     return response;
   }
 
-  private CompletableFuture<ContainerCommandResponseProto> link(
-      ContainerCommandRequestProto requestProto, LogEntryProto entry) {
-    return CompletableFuture.supplyAsync(() -> {
-      final DispatcherContext context = DispatcherContext
-          .newBuilder(DispatcherContext.Op.STREAM_LINK)
-          .setTerm(entry.getTerm())
-          .setLogIndex(entry.getIndex())
-          .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA)
-          .setContainer2BCSIDMap(container2BCSIDMap)
-          .build();
-
-      return dispatchCommand(requestProto, context);
-    }, executor);
-  }
-
   private CompletableFuture<Message> writeStateMachineData(
       ContainerCommandRequestProto requestProto, long entryIndex, long term,
       long startTime) {
@@ -689,29 +674,8 @@ public class ContainerStateMachine extends BaseStateMachine {
 
     final KeyValueStreamDataChannel kvStreamDataChannel =
         (KeyValueStreamDataChannel) dataChannel;
-
-    final ContainerCommandRequestProto request =
-        kvStreamDataChannel.getPutBlockRequest();
-
-    return link(request, entry).whenComplete((response, e) -> {
-      if (e != null) {
-        LOG.warn("Failed to link logEntry {} for request {}",
-            TermIndex.valueOf(entry), request, e);
-      }
-      if (response != null) {
-        final ContainerProtos.Result result = response.getResult();
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("{} to link logEntry {} for request {}, response: {}",
-              result, TermIndex.valueOf(entry), request, response);
-        }
-        if (result == ContainerProtos.Result.SUCCESS) {
-          kvStreamDataChannel.setLinked();
-          return;
-        }
-      }
-      // failed to link, cleanup
-      kvStreamDataChannel.cleanUp();
-    });
+    kvStreamDataChannel.setLinked();
+    return CompletableFuture.completedFuture(null);
   }
 
   private ExecutorService getChunkExecutor(WriteChunkRequestProto req) {

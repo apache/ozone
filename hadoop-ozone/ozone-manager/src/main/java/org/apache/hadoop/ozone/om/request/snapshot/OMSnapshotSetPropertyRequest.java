@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.request.snapshot;
 
 import org.apache.hadoop.ozone.om.OMMetrics;
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -51,7 +51,7 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     OMMetrics omMetrics = ozoneManager.getMetrics();
 
     OMClientResponse omClientResponse;
@@ -98,7 +98,7 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
       // Update Table Cache
       metadataManager.getSnapshotInfoTable().addCacheEntry(
           new CacheKey<>(snapshotKey),
-          CacheValue.get(termIndex.getIndex(), updatedSnapInfo));
+          CacheValue.get(context.getIndex(), updatedSnapInfo));
       omClientResponse = new OMSnapshotSetPropertyResponse(
           omResponse.build(), updatedSnapInfo);
       omMetrics.incNumSnapshotSetProperties();

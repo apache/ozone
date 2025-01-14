@@ -91,9 +91,9 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT_DEFUALT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFUALT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconUtils.convertNumericToSymbolic;
 import static org.apache.ratis.proto.RaftProtos.RaftPeerRole.LEADER;
 
@@ -178,10 +178,10 @@ public class OzoneManagerServiceProviderImpl
         .OZONE_OM_HTTPS_ADDRESS_KEY);
 
     long deltaUpdateLimits = configuration.getLong(RECON_OM_DELTA_UPDATE_LIMIT,
-        RECON_OM_DELTA_UPDATE_LIMIT_DEFUALT);
+        RECON_OM_DELTA_UPDATE_LIMIT_DEFAULT);
     int deltaUpdateLoopLimits = configuration.getInt(
         RECON_OM_DELTA_UPDATE_LOOP_LIMIT,
-        RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFUALT);
+        RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFAULT);
 
     omSnapshotDBParentDir = reconUtils.getReconDbDir(configuration,
         OZONE_RECON_OM_SNAPSHOT_DB_DIR);
@@ -352,10 +352,6 @@ public class OzoneManagerServiceProviderImpl
    */
   @VisibleForTesting
   public String getOzoneManagerSnapshotUrl() throws IOException {
-    if (!configuration.getBoolean(
-        OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, false)) {
-      return omDBSnapshotUrl;
-    }
     String omLeaderUrl = omDBSnapshotUrl;
     List<org.apache.hadoop.ozone.om.helpers.ServiceInfo> serviceList =
         ozoneManagerClient.getServiceList();

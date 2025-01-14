@@ -30,9 +30,10 @@
     <downloadSources>true</downloadSources>
     <docker.ozone.image>apache/ozone</docker.ozone.image>
     <docker.ozone.image.flavor>-rocky</docker.ozone.image.flavor> <!-- suffix appended to Ozone version to get Docker image version -->
-    <docker.ozone-runner.version>20241212-1-jdk21</docker.ozone-runner.version>
+    <docker.ozone-runner.version>20241216-1-jdk21</docker.ozone-runner.version>
     <docker.ozone-testkr5b.image>ghcr.io/apache/ozone-testkrb5:20241129-1</docker.ozone-testkr5b.image>
     <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
+    <sort.skip>true</sort.skip>
   </properties>
 
   <build>

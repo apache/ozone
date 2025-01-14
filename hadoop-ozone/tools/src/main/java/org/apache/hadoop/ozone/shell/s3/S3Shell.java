@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.shell.s3;
 
-import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.shell.Shell;
 
 import picocli.CommandLine.Command;
@@ -34,19 +33,6 @@ import picocli.CommandLine.Command;
     })
 public class S3Shell extends Shell {
 
-  @Override
-  public int execute(String[] argv) {
-    TracingUtil.initTracing("s3shell", createOzoneConfiguration());
-    String spanName = "ozone s3 " + String.join(" ", argv);
-    return TracingUtil.executeInNewSpan(spanName,
-        () -> super.execute(argv));
-  }
-
-  /**
-   * Main for the S3Shell Command handling.
-   *
-   * @param argv - System Args Strings[]
-   */
   public static void main(String[] argv) {
     new S3Shell().run(argv);
   }

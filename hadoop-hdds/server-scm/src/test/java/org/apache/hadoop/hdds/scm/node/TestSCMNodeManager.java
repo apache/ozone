@@ -184,7 +184,6 @@ public class TestSCMNodeManager {
         TimeUnit.MILLISECONDS);
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
     conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
     return conf;
   }
 
@@ -283,7 +282,7 @@ public class TestSCMNodeManager {
         1, TimeUnit.DAYS);
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
-      assertTrue(scm.checkLeader());
+      assertTrue(scm.getScmContext().isLeader());
       // Register 2 nodes correctly.
       // These will be used with a faulty node to test pipeline creation.
       DatanodeDetails goodNode1 = registerWithCapacity(nodeManager);
@@ -402,7 +401,7 @@ public class TestSCMNodeManager {
         1, TimeUnit.DAYS);
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
-      assertTrue(scm.checkLeader());
+      assertTrue(scm.getScmContext().isLeader());
       // Nodes with mismatched SLV cannot join the cluster.
       registerWithCapacity(nodeManager,
           LARGER_SLV_LAYOUT_PROTO, errorNodeNotPermitted);

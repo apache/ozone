@@ -126,29 +126,6 @@ public class TestVirtualHostStyleFilter {
   }
 
   @Test
-  public void testS3SecretEndpoint() throws Exception {
-
-    VirtualHostStyleFilter virtualHostStyleFilter =
-        new VirtualHostStyleFilter();
-    virtualHostStyleFilter.setConfiguration(conf);
-
-    ContainerRequest containerRequest = createContainerRequest("mybucket" +
-        ".localhost:9878", "/secret/generate",
-        null, true);
-    virtualHostStyleFilter.filter(containerRequest);
-    URI expected = new URI("http://" + s3HttpAddr + "/secret/generate");
-    assertEquals(expected, containerRequest.getRequestUri());
-
-    containerRequest = createContainerRequest("mybucket" +
-            ".localhost:9878", "/secret/revoke",
-        null, true);
-    virtualHostStyleFilter.filter(containerRequest);
-    expected = new URI("http://" + s3HttpAddr + "/secret/revoke");
-    assertEquals(expected, containerRequest.getRequestUri());
-
-  }
-
-  @Test
   public void testVirtualHostStyleWithCreateBucketRequest() throws Exception {
 
     VirtualHostStyleFilter virtualHostStyleFilter =

@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.shell;
 
 import java.io.IOException;
-import java.io.PrintStream;
 import java.util.Iterator;
 import java.util.concurrent.Callable;
 
@@ -97,7 +96,7 @@ public abstract class Handler extends AbstractSubcommand implements Callable<Voi
   }
 
   protected void printObjectAsJson(Object o) throws IOException {
-    out().println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(o));
+    System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(o));
   }
 
   /**
@@ -121,14 +120,6 @@ public abstract class Handler extends AbstractSubcommand implements Callable<Voi
 
   protected OzoneConfiguration getConf() {
     return conf;
-  }
-
-  protected PrintStream out() {
-    return System.out;
-  }
-
-  protected PrintStream err() {
-    return System.err;
   }
 
 }
