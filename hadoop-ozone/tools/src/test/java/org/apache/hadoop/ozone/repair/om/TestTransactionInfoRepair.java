@@ -131,7 +131,6 @@ public class TestTransactionInfoRepair {
               "om",
               "update-transaction",
               "--db", DB_PATH,
-              "--repair",
               "--term", String.valueOf(TEST_TERM),
               "--index", String.valueOf(TEST_INDEX)
           ));
