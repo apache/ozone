@@ -69,7 +69,7 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
   public OzoneManagerProtocolProtos.OMRequest preExecute(
       OzoneManager ozoneManager) throws IOException {
     // check Acl
-    String volume = getVolumeName();
+    final String volume = getVolumeName();
     if (ozoneManager.getAclsEnabled()) {
       checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
           OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL, volume,

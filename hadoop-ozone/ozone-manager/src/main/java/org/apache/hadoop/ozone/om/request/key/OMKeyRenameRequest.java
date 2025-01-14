@@ -75,9 +75,9 @@ public class OMKeyRenameRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    OMRequest omRequest = commonKeyRenamePreExecute(ozoneManager);
-    KeyArgs keyArgs = omRequest.getRenameKeyRequest().getKeyArgs();
-    String toKeyName = omRequest.getRenameKeyRequest().getToKeyName();
+    final OMRequest omRequest = commonKeyRenamePreExecute(ozoneManager);
+    final KeyArgs keyArgs = omRequest.getRenameKeyRequest().getKeyArgs();
+    final String toKeyName = omRequest.getRenameKeyRequest().getToKeyName();
     validateKeyName(toKeyName);
     validateKeyName(keyArgs.getKeyName());
     return omRequest;

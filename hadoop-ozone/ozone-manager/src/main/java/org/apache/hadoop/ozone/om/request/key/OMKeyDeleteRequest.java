@@ -251,7 +251,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
   public static OMRequest blockDeleteKeyWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
 
-    final  KeyArgs keyArgs = req.getDeleteKeyRequest().getKeyArgs();
+    final KeyArgs keyArgs = req.getDeleteKeyRequest().getKeyArgs();
 
     OMClientRequestUtils.validateVolumeName(keyArgs.getVolumeName());
     OMClientRequestUtils.validateBucketName(keyArgs.getBucketName());
