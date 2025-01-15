@@ -136,8 +136,28 @@ public class ContainerSizeCountTask extends ReconScmTask {
     incrementContainerSizeCount(currentSize, map);
   }
 
+  @Override
+  protected void runTask() {
+    final List<ContainerInfo> containers = containerManager.getContainers();
+    if (processedContainers.isEmpty()) {
+      try {
+        int execute =
+            dslContext.truncate(CONTAINER_COUNT_BY_SIZE).execute();
+        LOG.debug("Deleted {} records from {}", execute,
+            CONTAINER_COUNT_BY_SIZE);
+      } catch (Exception e) {
+        LOG.error("An error occurred while truncating the table {}: {}",
+            CONTAINER_COUNT_BY_SIZE, e.getMessage(), e);
+        // Rethrow exception to be caught in parent throwable and update table
+        // with run status as -1.
+        throw e;
+      }
+    }
+    processContainers(containers);
+  }
+
   /**
-   * The process() function is responsible for updating the counts of
+   * The processContainers() function is responsible for updating the counts of
    * containers being tracked in a containerSizeCountMap based on the
    * ContainerInfo objects in the list containers. It then iterates through
    * the list of containers and does the following for each container:
@@ -161,24 +181,6 @@ public class ContainerSizeCountTask extends ReconScmTask {
    * size counts. Finally, the counts in the containerSizeCountMap are written
    * to the database using the writeCountsToDB() function.
    */
-  @Override
-  protected void runTask() {
-    final List<ContainerInfo> containers = containerManager.getContainers();
-    if (processedContainers.isEmpty()) {
-      try {
-        int execute =
-            dslContext.truncate(CONTAINER_COUNT_BY_SIZE).execute();
-        LOG.debug("Deleted {} records from {}", execute,
-            CONTAINER_COUNT_BY_SIZE);
-      } catch (Exception e) {
-        LOG.error("An error occurred while truncating the table {}: {}",
-            CONTAINER_COUNT_BY_SIZE, e.getMessage(), e);
-        return;
-      }
-    }
-    processContainers(containers);
-  }
-
   @VisibleForTesting
   public void processContainers(List<ContainerInfo> containers) {
     lock.writeLock().lock();
