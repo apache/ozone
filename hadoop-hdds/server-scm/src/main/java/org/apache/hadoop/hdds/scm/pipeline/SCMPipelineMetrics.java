@@ -27,11 +27,12 @@ import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 
 /**
  * This class maintains Pipeline related metrics.
@@ -73,7 +74,7 @@ public final class SCMPipelineMetrics implements MetricsSource {
     if (instance != null) {
       return instance;
     }
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    MetricsSystem ms = OzoneMetricsSystem.instance();
     instance = ms.register(SOURCE_NAME, "SCM PipelineManager Metrics",
         new SCMPipelineMetrics());
     return instance;
@@ -84,7 +85,7 @@ public final class SCMPipelineMetrics implements MetricsSource {
    */
   public static synchronized void unRegister() {
     instance = null;
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    MetricsSystem ms = OzoneMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }
 

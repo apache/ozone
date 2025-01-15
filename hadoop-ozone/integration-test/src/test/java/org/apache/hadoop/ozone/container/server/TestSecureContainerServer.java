@@ -79,7 +79,6 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.client.SecretKeyTestClient;
@@ -98,6 +97,7 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.util.ExitUtils;
@@ -124,7 +124,7 @@ public class TestSecureContainerServer {
 
   @BeforeAll
   public static void setup() throws Exception {
-    DefaultMetricsSystem.setMiniClusterMode(true);
+    OzoneMetricsSystem.setMiniClusterMode(true);
     ExitUtils.disableSystemExit();
     CONF.set(HddsConfigKeys.HDDS_METADATA_DIR_NAME, testDir.toString());
     CONF.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);

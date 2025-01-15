@@ -48,7 +48,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
@@ -75,6 +75,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 
 /**
  * Test Containers.
@@ -89,7 +90,7 @@ public class TestContainerServer {
 
   @BeforeAll
   public static void setup() {
-    DefaultMetricsSystem.setMiniClusterMode(true);
+    OzoneMetricsSystem.setMiniClusterMode(true);
     CONF.set(HddsConfigKeys.HDDS_METADATA_DIR_NAME, testDir.toString());
     CONF.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, false);
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();

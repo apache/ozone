@@ -26,11 +26,11 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.hadoop.metrics2.lib.MutableQuantiles;
-import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.metrics.MutableQuantiles;
+import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.OzoneMutableRate;
 import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
@@ -60,7 +60,7 @@ public class ContainerMetrics implements Closeable {
 
   private final EnumMap<ContainerProtos.Type, MutableCounterLong> numOpsArray;
   private final EnumMap<ContainerProtos.Type, MutableCounterLong> opsBytesArray;
-  private final EnumMap<ContainerProtos.Type, MutableRate> opsLatency;
+  private final EnumMap<ContainerProtos.Type, OzoneMutableRate> opsLatency;
   private final EnumMap<ContainerProtos.Type, MutableQuantiles[]> opsLatQuantiles;
   private MetricsRegistry registry = null;
 
@@ -78,20 +78,23 @@ public class ContainerMetrics implements Closeable {
           "num" + type, "number of " + type + " ops", (long) 0));
       opsBytesArray.put(type, registry.newCounter(
           "bytes" + type, "bytes used by " + type + "op", (long) 0));
-      opsLatency.put(type, registry.newRate("latencyNs" + type, type + " op"));
+      opsLatency.put(
+          type,
+          OzoneMetricsSystem.registerNewMutableRate(registry, "latencyNs" + type, type + " op")
+      );
 
       for (int j = 0; j < len; j++) {
         int interval = intervals[j];
         String quantileName = type + "Nanos" + interval + "s";
-        latQuantiles[j] = registry.newQuantiles(quantileName,
-            "latency of Container ops", "ops", "latencyNs", interval);
+        latQuantiles[j] = OzoneMetricsSystem.registerNewMutableQuantiles(registry,
+            quantileName, "latency of Container ops", "ops", "latencyNs", interval);
       }
       opsLatQuantiles.put(type, latQuantiles);
     }
   }
 
   public static ContainerMetrics create(ConfigurationSource conf) {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    MetricsSystem ms = OzoneMetricsSystem.instance();
     // Percentile measurement is off by default, by watching no intervals
     int[] intervals =
         conf.getInts(HddsConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY);
@@ -101,7 +104,7 @@ public class ContainerMetrics implements Closeable {
   }
 
   public static void remove() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    MetricsSystem ms = OzoneMetricsSystem.instance();
     ms.unregisterSource(STORAGE_CONTAINER_METRICS);
   }
 

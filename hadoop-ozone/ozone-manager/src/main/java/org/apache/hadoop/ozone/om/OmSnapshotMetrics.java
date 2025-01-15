@@ -22,8 +22,8 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 import org.apache.ratis.util.MemoizedSupplier;
 
 /**
@@ -40,7 +40,7 @@ public final class OmSnapshotMetrics implements OmMetadataReaderMetrics {
 
   private static final Supplier<OmSnapshotMetrics> SUPPLIER =
       MemoizedSupplier.valueOf(() -> {
-        MetricsSystem ms = DefaultMetricsSystem.instance();
+        MetricsSystem ms = OzoneMetricsSystem.instance();
         return ms.register(SOURCE_NAME,
             "Snapshot Manager Metrics",
             new OmSnapshotMetrics());

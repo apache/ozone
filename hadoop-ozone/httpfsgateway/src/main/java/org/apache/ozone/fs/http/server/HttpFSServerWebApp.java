@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 import org.apache.hadoop.util.JvmPauseMonitor;
 import org.apache.ozone.fs.http.server.metrics.HttpFSServerMetrics;
 import org.apache.ozone.lib.server.ServerException;
@@ -113,7 +113,7 @@ public class HttpFSServerWebApp extends ServerWebApp {
     pauseMonitor.start();
     METRICS.get().getJvmMetrics().setPauseMonitor(pauseMonitor);
     FSOperations.setBufferSize(config);
-    DefaultMetricsSystem.initialize("HttpFSServer");
+    OzoneMetricsSystem.initialize("HttpFSServer");
   }
   /**
    * Returns HttpFSServer server singleton, configuration and services are

@@ -50,7 +50,6 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.SecretKeyTestClient;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
@@ -68,6 +67,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 
 /**
  * Tests ozone containers via secure grpc/netty.
@@ -99,7 +99,7 @@ class TestSecureOzoneContainer {
 
   @BeforeAll
   static void init() {
-    DefaultMetricsSystem.setMiniClusterMode(true);
+    OzoneMetricsSystem.setMiniClusterMode(true);
     ExitUtils.disableSystemExit();
   }
 

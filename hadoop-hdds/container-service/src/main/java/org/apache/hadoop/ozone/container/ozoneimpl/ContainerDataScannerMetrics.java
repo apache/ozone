@@ -22,8 +22,8 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.metrics.OzoneMutableRate;
+import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 
 /**
  * This class captures the container data scanner metrics on the data-node.
@@ -34,7 +34,7 @@ public final class ContainerDataScannerMetrics
     extends AbstractContainerScannerMetrics {
 
   @Metric("disk bandwidth used by the container data scanner per volume")
-  private MutableRate numBytesScanned;
+  private OzoneMutableRate numBytesScanned;
 
   private String storageDirectory;
 
@@ -60,7 +60,7 @@ public final class ContainerDataScannerMetrics
 
   @SuppressWarnings("java:S2245") // no need for secure random
   public static ContainerDataScannerMetrics create(final String volumeName) {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    MetricsSystem ms = OzoneMetricsSystem.instance();
     String name = "ContainerDataScannerMetrics-" + (volumeName.isEmpty()
         ? "UndefinedDataNodeVolume" + ThreadLocalRandom.current().nextInt()
         : volumeName.replace(':', '-'));

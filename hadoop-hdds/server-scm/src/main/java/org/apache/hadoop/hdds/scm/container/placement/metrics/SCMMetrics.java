@@ -21,9 +21,10 @@ import org.apache.hadoop.hdds.utils.DBCheckpointMetrics;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
+import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 
 /**
  * This class is for maintaining StorageContainerManager statistics.
@@ -64,7 +65,7 @@ public class SCMMetrics {
   }
 
   public static SCMMetrics create() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    MetricsSystem ms = OzoneMetricsSystem.instance();
     return ms.register(SOURCE_NAME, "Storage Container Manager Metrics",
         new SCMMetrics());
   }
@@ -156,7 +157,7 @@ public class SCMMetrics {
   }
 
   public void unRegister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    MetricsSystem ms = OzoneMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }
 }
