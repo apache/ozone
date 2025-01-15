@@ -22,9 +22,10 @@ import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 
 /**
  * SCM HA metrics.
@@ -78,7 +79,7 @@ public final class SCMHAMetrics implements MetricsSource {
    */
   public static SCMHAMetrics create(String nodeId, String leaderId) {
     SCMHAMetrics metrics = new SCMHAMetrics(nodeId, leaderId);
-    return DefaultMetricsSystem.instance()
+    return OzoneMetricsSystem.instance()
         .register(SOURCE_NAME, "SCM HA metrics", metrics);
   }
 
@@ -86,7 +87,7 @@ public final class SCMHAMetrics implements MetricsSource {
    * Unregisters the metrics instance.
    */
   public static void unRegister() {
-    DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
+    OzoneMetricsSystem.instance().unregisterSource(SOURCE_NAME);
   }
 
   @Override

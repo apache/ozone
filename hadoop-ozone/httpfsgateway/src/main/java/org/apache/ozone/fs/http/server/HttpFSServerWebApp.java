@@ -20,12 +20,13 @@ package org.apache.ozone.fs.http.server;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 import org.apache.ozone.fs.http.server.metrics.HttpFSServerMetrics;
 import org.apache.ozone.lib.server.ServerException;
 import org.apache.ozone.lib.service.FileSystemAccess;
 import org.apache.ozone.lib.servlet.ServerWebApp;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+
 import org.apache.hadoop.util.JvmPauseMonitor;
 
 import org.slf4j.Logger;
@@ -130,7 +131,7 @@ public class HttpFSServerWebApp extends ServerWebApp {
     pauseMonitor.start();
     metrics.getJvmMetrics().setPauseMonitor(pauseMonitor);
     FSOperations.setBufferSize(config);
-    DefaultMetricsSystem.initialize("HttpFSServer");
+    OzoneMetricsSystem.initialize("HttpFSServer");
   }
   /**
    * Returns HttpFSServer server singleton, configuration and services are

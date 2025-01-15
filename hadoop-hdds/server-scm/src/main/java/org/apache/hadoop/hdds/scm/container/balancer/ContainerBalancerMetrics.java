@@ -22,8 +22,9 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 
 /**
  * Metrics related to Container Balancer running in SCM.
@@ -99,7 +100,7 @@ public final class ContainerBalancerMetrics {
    * @return {@link ContainerBalancerMetrics}
    */
   public static ContainerBalancerMetrics create() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    MetricsSystem ms = OzoneMetricsSystem.instance();
     return ms.register(NAME, "Container Balancer Metrics",
         new ContainerBalancerMetrics(ms));
   }

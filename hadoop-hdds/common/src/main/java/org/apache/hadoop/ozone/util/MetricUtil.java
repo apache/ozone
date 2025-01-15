@@ -18,8 +18,9 @@
 package org.apache.hadoop.ozone.util;
 
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
-import org.apache.hadoop.metrics2.lib.MutableQuantiles;
-import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.metrics.MutableQuantiles;
+import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.OzoneMutableRate;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.function.CheckedRunnable;
 import org.apache.ratis.util.function.CheckedSupplier;
@@ -39,7 +40,7 @@ public final class MetricUtil {
   }
 
   public static <T, E extends Exception> T captureLatencyNs(
-      MutableRate metric,
+      OzoneMutableRate metric,
       CheckedSupplier<T, E> block) throws E {
     long start = Time.monotonicNowNanos();
     try {
@@ -50,7 +51,7 @@ public final class MetricUtil {
   }
 
   public static <E extends IOException> void captureLatencyNs(
-      MutableRate metric,
+      OzoneMutableRate metric,
       CheckedRunnable<E> block) throws IOException {
     long start = Time.monotonicNowNanos();
     try {
@@ -94,8 +95,8 @@ public final class MetricUtil {
    * @return A list of created MutableQuantiles instances.
    */
   public static List<MutableQuantiles> createQuantiles(MetricsRegistry registry,
-      String name, String description, String sampleName, String valueName,
-      int... intervals) {
+                                                       String name, String description, String sampleName,
+                                                       String valueName, int... intervals) {
     if (intervals == null) {
       throw new IllegalArgumentException(
           "At least one interval should be provided.");
@@ -106,8 +107,8 @@ public final class MetricUtil {
 
     return Arrays.stream(intervals).mapToObj(interval -> {
       String quantileName = name + interval + "s";
-      return registry.newQuantiles(quantileName, description,
-          sampleName, valueName, interval);
+      return OzoneMetricsSystem.registerNewMutableQuantiles(
+          registry, quantileName, description, sampleName, valueName, interval);
     }).collect(Collectors.toList());
   }
 

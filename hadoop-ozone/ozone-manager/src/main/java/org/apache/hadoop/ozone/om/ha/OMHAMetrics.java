@@ -22,10 +22,10 @@ import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 
 /**
  * Class to maintain metrics and info related to OM HA.
@@ -92,7 +92,7 @@ public final class OMHAMetrics implements MetricsSource {
   public static OMHAMetrics create(
       String nodeId, String leaderId) {
     OMHAMetrics metrics = new OMHAMetrics(nodeId, leaderId);
-    return DefaultMetricsSystem.instance()
+    return OzoneMetricsSystem.instance()
         .register(SOURCE_NAME, "Metrics for OM HA", metrics);
   }
 
@@ -100,7 +100,7 @@ public final class OMHAMetrics implements MetricsSource {
    * Unregister the metrics instance.
    */
   public static void unRegister() {
-    DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
+    OzoneMetricsSystem.instance().unregisterSource(SOURCE_NAME);
   }
 
   @Override
