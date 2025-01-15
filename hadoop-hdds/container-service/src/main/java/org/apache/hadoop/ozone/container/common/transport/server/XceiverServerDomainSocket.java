@@ -134,7 +134,7 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
   /**
    * Returns the Replication type supported by this end-point.
    *
-   * @return enum -- {Stand_Alone, Ratis, Grpc, Chained}
+   * @return enum STAND_ALONE
    */
   @Override
   public HddsProtos.ReplicationType getServerType() {

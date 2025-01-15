@@ -84,7 +84,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
   private XceiverClientSpi xceiverClientGrpc;
   private XceiverClientShortCircuit xceiverClientShortCircuit;
   private final AtomicBoolean fallbackToGrpc = new AtomicBoolean(false);
-  private FileInputStream blockInputStream;
+  private volatile FileInputStream blockFileInputStream;
   private boolean initialized = false;
   // TODO: do we need to change retrypolicy based on exception.
   private final RetryPolicy retryPolicy;
@@ -323,8 +323,8 @@ public class BlockInputStream extends BlockExtendedInputStream {
     GetBlockResponseProto response = ContainerProtocolCalls.getBlock(xceiverClientShortCircuit,
         VALIDATORS, builder, xceiverClientShortCircuit.getDn());
 
-    blockInputStream = xceiverClientShortCircuit.getFileInputStream(builder.getCallId(), datanodeBlockID);
-    if (blockInputStream == null) {
+    blockFileInputStream = xceiverClientShortCircuit.getFileInputStream(builder.getCallId(), datanodeBlockID);
+    if (blockFileInputStream == null) {
       throw new IOException("Failed to get file InputStream for block " + datanodeBlockID);
     } else {
       if (LOG.isDebugEnabled()) {
@@ -444,9 +444,10 @@ public class BlockInputStream extends BlockExtendedInputStream {
   }
 
   protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
-    if (blockInputStream != null) {
-      return new ShortCircuitChunkInputStream(chunkInfo, blockID, xceiverClientFactory,
-          pipelineRef::get, verifyChecksum, tokenRef::get, xceiverClientShortCircuit, blockInputStream);
+    if (blockFileInputStream != null) {
+      // a non-empty blockFileInputStream means we have a direct local block replica to read from
+      return new LocalChunkInputStream(chunkInfo, blockID, xceiverClientFactory,
+          pipelineRef::get, verifyChecksum, tokenRef::get, xceiverClientShortCircuit, blockFileInputStream);
     } else {
       return new ChunkInputStream(chunkInfo, blockID,
           xceiverClientFactory, pipelineRef::get, verifyChecksum, tokenRef::get);
@@ -622,9 +623,9 @@ public class BlockInputStream extends BlockExtendedInputStream {
         is.close();
       }
     }
-    if (blockInputStream != null) {
+    if (blockFileInputStream != null) {
       try {
-        blockInputStream.close();
+        blockFileInputStream.close();
       } catch (IOException e) {
         LOG.error("Failed to close file InputStream for block " + blockID, e);
       }
@@ -673,8 +674,8 @@ public class BlockInputStream extends BlockExtendedInputStream {
     return blockPosition;
   }
 
-  public synchronized FileInputStream getBlockInputStream() {
-    return blockInputStream;
+  public FileInputStream getBlockFileInputStream() {
+    return blockFileInputStream;
   }
 
   @Override

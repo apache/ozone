@@ -145,7 +145,7 @@ public class XceiverClientCreator implements XceiverClientFactory {
 
   @Override
   public void close() {
-    // clients are not tracked, closing each client is the responsibility of users of this classclass
+    // clients are not tracked, closing each client is the responsibility of users of this class
     if (domainSocketFactory != null) {
       domainSocketFactory.close();
     }

@@ -25,7 +25,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientShortCircuit;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.DomainSocketFactory;
-import org.apache.hadoop.hdds.scm.storage.ShortCircuitChunkInputStream;
+import org.apache.hadoop.hdds.scm.storage.LocalChunkInputStream;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
@@ -51,7 +51,7 @@ import java.io.File;
 import java.io.IOException;
 
 /**
- * Tests {@link ShortCircuitChunkInputStream}.
+ * Tests {@link LocalChunkInputStream}.
  */
 public class TestShortCircuitChunkInputStream extends TestChunkInputStream {
 
@@ -72,7 +72,7 @@ public class TestShortCircuitChunkInputStream extends TestChunkInputStream {
         new File(dir, "ozone-socket").getAbsolutePath());
     GenericTestUtils.setLogLevel(XceiverClientShortCircuit.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(XceiverClientGrpc.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(ShortCircuitChunkInputStream.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(LocalChunkInputStream.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(BlockInputStream.LOG, Level.DEBUG);
   }
 
@@ -97,7 +97,7 @@ public class TestShortCircuitChunkInputStream extends TestChunkInputStream {
       try (OzoneClient client = cluster.newClient()) {
         TestBucket bucket = TestBucket.newBuilder(client).build();
         GenericTestUtils.LogCapturer logCapturer1 =
-            GenericTestUtils.LogCapturer.captureLogs(ShortCircuitChunkInputStream.LOG);
+            GenericTestUtils.LogCapturer.captureLogs(LocalChunkInputStream.LOG);
         GenericTestUtils.LogCapturer logCapturer2 =
             GenericTestUtils.LogCapturer.captureLogs(XceiverClientShortCircuit.LOG);
         GenericTestUtils.LogCapturer logCapturer3 =
@@ -137,7 +137,7 @@ public class TestShortCircuitChunkInputStream extends TestChunkInputStream {
           BlockInputStream block0Stream =
               (BlockInputStream)keyInputStream.getPartStreams().get(0);
           block0Stream.initialize();
-          assertNotNull(block0Stream.getBlockInputStream());
+          assertNotNull(block0Stream.getBlockFileInputStream());
           assertTrue(logCapturer1.getOutput().contains("XceiverClientShortCircuit is created"));
           // stop XceiverServerDomainSocket
           XceiverServerSpi server = cluster.getHddsDatanodes().get(0)

@@ -126,6 +126,7 @@ public class XceiverClientManager extends XceiverClientCreator {
    * the cached otherwise create a new one.
    *
    * @param pipeline the container pipeline for the client connection
+   * @param allowShortCircuit create a short-circuit read client or not if applicable
    * @return XceiverClientSpi connected to a container
    * @throws IOException if a XceiverClientSpi cannot be acquired
    */

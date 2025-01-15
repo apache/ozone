@@ -46,11 +46,11 @@ import java.util.List;
 import java.util.function.Supplier;
 
 /**
- * An {@link InputStream} called from BlockInputStream to read a chunk from the
- * container. Each chunk may contain multiple underlying {@link ByteBuffer}
+ * An {@link InputStream} called from BlockInputStream to read a chunk from the local
+ * block replica directly. Each chunk may contain multiple underlying {@link ByteBuffer}
  * instances.
  */
-public class ShortCircuitChunkInputStream extends ChunkInputStream
+public class LocalChunkInputStream extends ChunkInputStream
     implements Seekable, CanUnbuffer, ByteBufferReadable {
 
   private final ChunkInfo chunkInfo;
@@ -60,10 +60,10 @@ public class ShortCircuitChunkInputStream extends ChunkInputStream
   private final XceiverClientShortCircuit xceiverClientShortCircuit;
   private final boolean verifyChecksum;
   public static final Logger LOG =
-      LoggerFactory.getLogger(ShortCircuitChunkInputStream.class);
+      LoggerFactory.getLogger(LocalChunkInputStream.class);
 
   @SuppressWarnings("checkstyle:parameternumber")
-  ShortCircuitChunkInputStream(ChunkInfo chunkInfo, BlockID blockId, XceiverClientFactory xceiverClientFactory,
+  LocalChunkInputStream(ChunkInfo chunkInfo, BlockID blockId, XceiverClientFactory xceiverClientFactory,
       Supplier<Pipeline> pipelineSupplier, boolean verifyChecksum, Supplier<Token<?>> tokenSupplier,
       XceiverClientShortCircuit xceiverClientShortCircuit, FileInputStream blockInputStream) {
     super(chunkInfo, blockId, xceiverClientFactory, pipelineSupplier, verifyChecksum, tokenSupplier);
@@ -74,12 +74,12 @@ public class ShortCircuitChunkInputStream extends ChunkInputStream
     this.validator = this::validateChunk;
     this.verifyChecksum = verifyChecksum;
     if (LOG.isDebugEnabled()) {
-      LOG.debug("{} is created for {}", ShortCircuitChunkInputStream.class.getSimpleName(), blockId);
+      LOG.debug("{} is created for {}", LocalChunkInputStream.class.getSimpleName(), blockId);
     }
   }
 
   /**
-   * Send RPC call to get the chunk from the container.
+   * Get the chunk from the local block replica.
    */
   @VisibleForTesting
   @Override
@@ -111,7 +111,6 @@ public class ShortCircuitChunkInputStream extends ChunkInputStream
       Checksum.verifyChecksum(bufferList, checksumData, startIndex);
     }
   }
-
 
   /**
    * Acquire short-circuit local read client.
