@@ -211,7 +211,7 @@ public class TestKeyStorage {
 
     @Test
     @DisplayName("an attempt to overwrite an internal key throws FileAlreadyExists exception.")
-    public void testExternalKeysAreNotOverWritable() throws Exception {
+    public void testInternalKeysAreNotOverWritable() throws Exception {
       KeyStorage storage = new KeyStorage(config, COMPONENT);
       storage.storePublicKey(keys.getPublic());
       storage.storePrivateKey(keys.getPrivate());
