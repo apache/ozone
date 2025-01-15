@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.debug.ldb;
 
+import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCheckpoint;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
@@ -24,7 +25,6 @@ import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import picocli.CommandLine;
 
-import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -36,7 +36,7 @@ import java.util.concurrent.Callable;
     name = "checkpoint",
     description = "Create checkpoint for specified db"
 )
-public class Checkpoint implements Callable<Void> {
+public class Checkpoint extends AbstractSubcommand implements Callable<Void> {
   @CommandLine.Option(names = {"--output"},
       required = true,
       description = "Path to output directory for the checkpoint.")
@@ -44,9 +44,6 @@ public class Checkpoint implements Callable<Void> {
 
   @CommandLine.ParentCommand
   private RDBParser parent;
-
-  @CommandLine.Spec
-  private static CommandLine.Model.CommandSpec spec;
 
   @Override
   public Void call() throws Exception {
@@ -59,13 +56,8 @@ public class Checkpoint implements Callable<Void> {
         parent.getDbPath(), cfDescList, cfHandleList)) {
       ManagedCheckpoint cp = ManagedCheckpoint.create(db);
       cp.get().createCheckpoint(outputPath);
-      out().println("Created checkpoint at " + outputPath);
+      spec().commandLine().getOut().println("Created checkpoint at " + outputPath);
     }
     return null;
   }
-
-  private static PrintWriter out() {
-    return spec.commandLine().getOut();
-  }
-
 }
