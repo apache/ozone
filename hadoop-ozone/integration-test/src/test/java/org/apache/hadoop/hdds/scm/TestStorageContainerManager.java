@@ -131,7 +131,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
@@ -186,31 +185,23 @@ public class TestStorageContainerManager {
 
   @Test
   public void testRpcPermission() throws Exception {
-    // Test with default configuration
-    OzoneConfiguration defaultConf = new OzoneConfiguration();
-    testRpcPermissionWithConf(defaultConf, any -> false, "unknownUser");
-
-    // Test with ozone.administrators defined in configuration
-    String admins = "adminUser1, adminUser2";
-    OzoneConfiguration ozoneConf = new OzoneConfiguration();
-    ozoneConf.setStrings(OzoneConfigKeys.OZONE_ADMINISTRATORS, admins);
-    // Non-admin user will get permission denied.
-    // Admin user will pass the permission check.
-    testRpcPermissionWithConf(ozoneConf, admins::contains,
-        "unknownUser", "adminUser2");
-  }
-
-  private void testRpcPermissionWithConf(
-      OzoneConfiguration ozoneConf,
-      Predicate<String> isAdmin,
-      String... usernames) throws Exception {
-    try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(ozoneConf).build()) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf).build()) {
       cluster.waitForClusterToBeReady();
-      for (String username : usernames) {
-        testRpcPermission(cluster, username,
-            !isAdmin.test(username));
-      }
-    } // The cluster is automatically closed here
+
+      // Test with default configuration
+      testRpcPermission(cluster, "anyUser", true);
+
+      // Update ozone.administrators in configuration
+      cluster.getStorageContainerManager()
+          .getReconfigurationHandler()
+          .reconfigureProperty(OzoneConfigKeys.OZONE_ADMINISTRATORS, "adminUser1, adminUser2");
+
+      // Non-admin user will get permission denied.
+      testRpcPermission(cluster, "unknownUser", true);
+      // Admin user will pass the permission check.
+      testRpcPermission(cluster, "adminUser2", false);
+    }
   }
 
   private void testRpcPermission(MiniOzoneCluster cluster,
