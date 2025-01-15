@@ -188,7 +188,7 @@ SCM HA uses Apache Ratis to replicate state between the members of the SCM HA qu
 
 This replication process is a simpler version of OM HA replication process as it doesn't use any double buffer (as the overall db thourghput of SCM requests are lower)
 
-Datanodes are sending all the reports (Container reports, Pipeline reports...) to *all* the Datanodes parallel. Only the leader node can assign/create new containers, and only the leader node sends command back to the Datanodes.
+Datanodes are sending all the reports (Container reports, Pipeline reports...) to *all* the Datanodes in parallel. Only the leader node can assign/create new containers, and only the leader node sends commands back to the Datanodes.
 
 ## Verify SCM HA setup
 
