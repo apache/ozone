@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.util;
 
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
-import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.metrics2.lib.MutableStat;
+import org.apache.hadoop.ozone.metrics.MutableQuantiles;
 
 import java.io.Closeable;
 import java.util.List;

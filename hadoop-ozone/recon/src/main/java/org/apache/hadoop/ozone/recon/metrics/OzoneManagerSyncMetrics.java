@@ -22,12 +22,12 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeFloat;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
-import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.OzoneMutableRate;
 
 /**
  * Class for tracking metrics related to Ozone manager sync operations.
@@ -43,14 +43,14 @@ public final class OzoneManagerSyncMetrics {
   }
 
   public static OzoneManagerSyncMetrics create() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    MetricsSystem ms = OzoneMetricsSystem.instance();
     return ms.register(SOURCE_NAME,
         "Recon Ozone Manager Sync Metrics",
         new OzoneManagerSyncMetrics());
   }
 
   public void unRegister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    MetricsSystem ms = OzoneMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }
 
@@ -61,7 +61,7 @@ public final class OzoneManagerSyncMetrics {
   private MutableCounterLong numSnapshotRequestsFailed;
 
   @Metric(about = "OM snapshot request latency")
-  private MutableRate snapshotRequestLatency;
+  private OzoneMutableRate snapshotRequestLatency;
 
   @Metric(about = "Number of OM delta requests made by Recon that had " +
       "at least 1 update in the response.")
@@ -115,7 +115,7 @@ public final class OzoneManagerSyncMetrics {
     return numSnapshotRequestsFailed.value();
   }
 
-  MutableRate getSnapshotRequestLatency() {
+  OzoneMutableRate getSnapshotRequestLatency() {
     return snapshotRequestLatency;
   }
 

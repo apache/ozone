@@ -24,9 +24,9 @@ import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 
 /**
  * Expose the next JMX metrics.
@@ -47,8 +47,8 @@ public class CpuMetrics implements MetricsSource {
   }
 
   public static void create() {
-    if (DefaultMetricsSystem.instance().getSource(SOURCE) == null) {
-      DefaultMetricsSystem.instance().register(SOURCE,
+    if (OzoneMetricsSystem.instance().getSource(SOURCE) == null) {
+      OzoneMetricsSystem.register(SOURCE,
           "CPU Metrics",
           new CpuMetrics());
     }

@@ -27,7 +27,6 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.metrics2.MetricsSystem;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.lease.LeaseAlreadyExistException;
 import org.apache.hadoop.ozone.lease.LeaseExpiredException;
 import org.apache.hadoop.ozone.lease.LeaseManager;
@@ -35,6 +34,7 @@ import org.apache.hadoop.ozone.lease.LeaseNotFoundException;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -110,7 +110,7 @@ public abstract class EventWatcher<TIMEOUT_PAYLOAD extends
       }
     });
 
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    MetricsSystem ms = OzoneMetricsSystem.instance();
     ms.register(name, "EventWatcher metrics", metrics);
   }
 

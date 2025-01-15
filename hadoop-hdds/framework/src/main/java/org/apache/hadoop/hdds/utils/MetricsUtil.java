@@ -22,7 +22,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Map;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,7 +53,7 @@ public final class MetricsUtil {
   public static <T> void registerDynamic(
       T source, String name, String desc, String context) {
     updateAnnotation(source.getClass(), name, desc, context);
-    DefaultMetricsSystem.instance().register(name, desc, source);
+    OzoneMetricsSystem.register(name, desc, source);
   }
   
   private static void updateAnnotation(

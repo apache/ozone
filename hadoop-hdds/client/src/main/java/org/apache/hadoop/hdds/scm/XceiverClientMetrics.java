@@ -28,11 +28,11 @@ import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.util.PerformanceMetrics;
+import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 
 import java.util.EnumMap;
 
@@ -79,9 +79,8 @@ public class XceiverClientMetrics implements MetricsSource {
   }
 
   public static XceiverClientMetrics create() {
-    DefaultMetricsSystem.initialize(SOURCE_NAME);
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME, "Storage Container Client Metrics",
+    OzoneMetricsSystem.initialize(SOURCE_NAME);
+    return OzoneMetricsSystem.register(SOURCE_NAME, "Storage Container Client Metrics",
         new XceiverClientMetrics());
   }
 
@@ -131,7 +130,7 @@ public class XceiverClientMetrics implements MetricsSource {
 
   public void unRegister() {
     IOUtils.closeQuietly(containerOpsLatency.values());
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    MetricsSystem ms = OzoneMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }
 

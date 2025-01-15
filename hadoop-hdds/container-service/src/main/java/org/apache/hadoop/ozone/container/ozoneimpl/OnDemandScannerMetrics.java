@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 
 /**
  * This class captures the on-demand container data scanner metrics.
@@ -35,7 +35,7 @@ public final class OnDemandScannerMetrics
   }
 
   public static OnDemandScannerMetrics create() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    MetricsSystem ms = OzoneMetricsSystem.instance();
     String name = "On-demand container scanner metrics";
     return ms.register(name, null, new OnDemandScannerMetrics(name, ms));
   }

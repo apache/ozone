@@ -25,9 +25,9 @@ import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,7 +83,7 @@ public final class DatanodeQueueMetrics implements MetricsSource {
     if (instance != null) {
       return instance;
     }
-    instance = DefaultMetricsSystem.instance().register(METRICS_SOURCE_NAME,
+    instance = OzoneMetricsSystem.instance().register(METRICS_SOURCE_NAME,
         "Queue metrics in Datanode",
         new DatanodeQueueMetrics(datanodeStateMachine));
     return instance;
@@ -153,7 +153,7 @@ public final class DatanodeQueueMetrics implements MetricsSource {
 
   public static synchronized void unRegister() {
     instance = null;
-    DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
+    OzoneMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
   }
 
   public void addEndpoint(InetSocketAddress endpoint) {
