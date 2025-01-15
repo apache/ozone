@@ -68,6 +68,9 @@ public class TransactionInfoRepair extends RepairTool {
 
   @Override
   public void execute() throws Exception {
+    if (checkIfServiceIsRunning("OM")) {
+      return;
+    }
     List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
     List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(
         dbPath);

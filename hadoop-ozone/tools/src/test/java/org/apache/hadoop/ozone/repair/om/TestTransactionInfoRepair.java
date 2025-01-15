@@ -33,6 +33,7 @@ import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import picocli.CommandLine;
 
+import static org.apache.ozone.test.IntLambda.withTextFromSystemIn;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_TABLE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -125,12 +126,14 @@ public class TestTransactionInfoRepair {
           .thenReturn(transactionInfo2);
 
       CommandLine cli = new OzoneRepair().getCmd();
-      cli.execute(
-          "om",
-          "update-transaction",
-          "--db", DB_PATH,
-          "--term", String.valueOf(TEST_TERM),
-          "--index", String.valueOf(TEST_INDEX));
+      withTextFromSystemIn("y")
+          .execute(() -> cli.execute(
+              "om",
+              "update-transaction",
+              "--db", DB_PATH,
+              "--term", String.valueOf(TEST_TERM),
+              "--index", String.valueOf(TEST_INDEX)
+          ));
     }
   }
 

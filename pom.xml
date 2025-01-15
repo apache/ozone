@@ -34,7 +34,7 @@
     <apache-rat-plugin.version>0.16.1</apache-rat-plugin.version>
     <aspectj-plugin.version>1.14</aspectj-plugin.version>
     <aspectj.version>1.9.7</aspectj.version>
-    <assertj.version>3.27.1</assertj.version>
+    <assertj.version>3.27.2</assertj.version>
     <aws-java-sdk.version>1.12.661</aws-java-sdk.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.79</bouncycastle.version>
@@ -126,7 +126,7 @@
     <jcip-annotations.version>1.0-1</jcip-annotations.version>
     <jersey.version>1.19.4</jersey.version>
     <jersey2.version>2.46</jersey2.version>
-    <jetty.version>9.4.56.v20240826</jetty.version>
+    <jetty.version>9.4.57.v20241219</jetty.version>
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
     <jline.version>3.28.0</jline.version>
@@ -156,7 +156,7 @@
     <maven-jar-plugin.version>3.4.2</maven-jar-plugin.version>
     <maven-javadoc-plugin.version>3.11.1</maven-javadoc-plugin.version>
     <maven-pdf-plugin.version>1.6.1</maven-pdf-plugin.version>
-    <maven-remote-resources-plugin.version>1.7.0</maven-remote-resources-plugin.version>
+    <maven-remote-resources-plugin.version>3.3.0</maven-remote-resources-plugin.version>
     <maven-resources-plugin.version>3.3.0</maven-resources-plugin.version>
     <maven-shade-plugin.version>3.6.0</maven-shade-plugin.version>
     <maven-site-plugin.version>3.21.0</maven-site-plugin.version>

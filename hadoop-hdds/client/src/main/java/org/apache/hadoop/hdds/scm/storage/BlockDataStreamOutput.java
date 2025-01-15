@@ -410,6 +410,10 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     waitFuturesComplete();
     final BlockData blockData = containerBlockData.build();
     if (close) {
+      // HDDS-12007 changed datanodes to ignore the following PutBlock request.
+      // However, clients still have to send it for maintaining compatibility.
+      // Otherwise, new clients won't send a PutBlock.
+      // Then, old datanodes will fail since they expect a PutBlock.
       final ContainerCommandRequestProto putBlockRequest
           = ContainerProtocolCalls.getPutBlockRequest(
               xceiverClient.getPipeline(), blockData, true, tokenString);
@@ -504,6 +508,22 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     if (xceiverClientFactory != null && xceiverClient != null
         && !config.isStreamBufferFlushDelay()) {
       waitFuturesComplete();
+    }
+  }
+
+  @Override
+  public void hflush() throws IOException {
+    hsync();
+  }
+
+  @Override
+  public void hsync() throws IOException {
+    try {
+      if (!isClosed()) {
+        handleFlush(false);
+      }
+    } catch (Exception e) {
+
     }
   }
 

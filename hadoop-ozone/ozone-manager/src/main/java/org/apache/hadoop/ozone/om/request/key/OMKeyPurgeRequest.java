@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -93,9 +94,14 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
 
     List<String> keysToBePurgedList = new ArrayList<>();
 
+    int numKeysDeleted = 0;
     for (DeletedKeys bucketWithDeleteKeys : bucketDeletedKeysList) {
-      keysToBePurgedList.addAll(bucketWithDeleteKeys.getKeysList());
+      List<String> keysList = bucketWithDeleteKeys.getKeysList();
+      keysToBePurgedList.addAll(keysList);
+      numKeysDeleted = numKeysDeleted + keysList.size();
     }
+    DeletingServiceMetrics deletingServiceMetrics = ozoneManager.getDeletionMetrics();
+    deletingServiceMetrics.incrNumKeysPurged(numKeysDeleted);
 
     if (keysToBePurgedList.isEmpty()) {
       return new OMKeyPurgeResponse(createErrorOMResponse(omResponse,
