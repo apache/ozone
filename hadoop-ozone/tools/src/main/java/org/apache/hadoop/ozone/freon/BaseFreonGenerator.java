@@ -73,8 +73,9 @@ import picocli.CommandLine.ParentCommand;
 /**
  * Base class for simplified performance tests.
  */
+@CommandLine.Command
 @SuppressWarnings("java:S2245") // no need for secure random
-public class BaseFreonGenerator {
+public class BaseFreonGenerator implements FreonSubcommand {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(BaseFreonGenerator.class);
@@ -572,7 +573,7 @@ public class BaseFreonGenerator {
   }
 
   public OzoneConfiguration createOzoneConfiguration() {
-    return freonCommand.createOzoneConfiguration();
+    return freonCommand.getOzoneConf();
   }
 
   /**

@@ -139,14 +139,23 @@ public abstract class BaseHttpServer {
 
       builder.configureXFrame(xFrameEnabled).setXFrameOption(xFrameOptionValue);
 
-      httpServer = builder.build();
-      httpServer.addServlet("conf", "/conf", HddsConfServlet.class);
+      boolean addDefaultApps = shouldAddDefaultApps();
+      if (!addDefaultApps) {
+        builder.withoutDefaultApps();
+      }
 
-      httpServer.addServlet("logstream", "/logstream", LogStreamServlet.class);
-      prometheusSupport =
+      httpServer = builder.build();
+
+      // TODO move these to HttpServer2.addDefaultApps
+      if (addDefaultApps) {
+        httpServer.addServlet("conf", "/conf", HddsConfServlet.class);
+        httpServer.addServlet("logstream", "/logstream", LogStreamServlet.class);
+      }
+
+      prometheusSupport = addDefaultApps &&
           conf.getBoolean(HddsConfigKeys.HDDS_PROMETHEUS_ENABLED, true);
 
-      profilerSupport =
+      profilerSupport = addDefaultApps &&
           conf.getBoolean(HddsConfigKeys.HDDS_PROFILER_ENABLED, false);
 
       if (prometheusSupport) {
@@ -476,5 +485,10 @@ public abstract class BaseHttpServer {
   protected abstract String getHttpAuthType();
 
   protected abstract String getHttpAuthConfigPrefix();
+
+  /** Override to disable the default servlets. */
+  protected boolean shouldAddDefaultApps() {
+    return true;
+  }
 
 }

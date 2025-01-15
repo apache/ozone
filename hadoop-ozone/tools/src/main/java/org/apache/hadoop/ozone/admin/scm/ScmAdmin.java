@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.admin.scm;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.OzoneAdmin;
+import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.hdds.cli.AdminSubcommand;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;

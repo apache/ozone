@@ -580,7 +580,7 @@ execute_debug_tests() {
 
   # get block locations for key
   local chunkinfo="${key}-blocks-${prefix}"
-  docker-compose exec -T ${SCM} bash -c "ozone debug chunkinfo ${volume}/${bucket}/${key}" > "$chunkinfo"
+  docker-compose exec -T ${SCM} bash -c "ozone debug replicas chunk-info ${volume}/${bucket}/${key}" > "$chunkinfo"
   local host="$(jq -r '.KeyLocations[0][0]["Datanode-HostName"]' ${chunkinfo})"
   local container="${host%%.*}"
 

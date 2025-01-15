@@ -31,6 +31,7 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <properties>
     <classpath.skip>false</classpath.skip>
     <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
+    <sort.skip>true</sort.skip>
   </properties>
 
   <dependencies>
