@@ -56,7 +56,7 @@ public class Checkpoint extends AbstractSubcommand implements Callable<Void> {
         parent.getDbPath(), cfDescList, cfHandleList)) {
       ManagedCheckpoint cp = ManagedCheckpoint.create(db);
       cp.get().createCheckpoint(outputPath);
-      spec().commandLine().getOut().println("Created checkpoint at " + outputPath);
+      out().println("Created checkpoint at " + outputPath);
     }
     return null;
   }
