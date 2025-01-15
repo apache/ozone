@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.cli;
 
+import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine;
 
@@ -26,7 +27,7 @@ import java.util.concurrent.Callable;
 /**
  * Base class for admin commands that connect via SCM client.
  */
-public abstract class ScmSubcommand implements Callable<Void> {
+public abstract class ScmSubcommand extends AbstractSubcommand implements Callable<Void> {
 
   @CommandLine.Mixin
   private ScmOption scmOption;

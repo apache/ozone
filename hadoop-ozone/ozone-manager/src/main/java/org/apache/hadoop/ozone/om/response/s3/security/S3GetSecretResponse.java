@@ -59,12 +59,9 @@ public class S3GetSecretResponse extends OMClientResponse {
         = getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK;
     if (s3SecretValue != null && isOk) {
       if (s3SecretManager.isBatchSupported()) {
-        s3SecretManager.batcher().addWithBatch(batchOperation,
-            s3SecretValue.getKerberosID(), s3SecretValue);
-      } else {
-        s3SecretManager.storeSecret(s3SecretValue.getKerberosID(),
-            s3SecretValue);
-      }
+        s3SecretManager.batcher()
+            .addWithBatch(batchOperation, s3SecretValue.getKerberosID(), s3SecretValue);
+      } // else - the secret has already been stored in S3GetSecretRequest.
     }
   }
 

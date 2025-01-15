@@ -20,14 +20,20 @@ package org.apache.hadoop.ozone.repair;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import picocli.CommandLine;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.util.List;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Arrays.asList;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests the ozone repair command.
@@ -67,9 +73,9 @@ public class TestOzoneRepair {
     OzoneRepair ozoneRepair = new OzoneRepair();
     System.setIn(new ByteArrayInputStream("N".getBytes(DEFAULT_ENCODING)));
 
-    int res = ozoneRepair.execute(new String[]{});
-    assertEquals(1, res);
-    assertThat(out.toString(DEFAULT_ENCODING)).contains("Aborting command.");
+    int res = ozoneRepair.execute(new String[]{"om", "fso-tree", "--db", "/dev/null"});
+    assertThat(res).isNotEqualTo(CommandLine.ExitCode.OK);
+    assertThat(err.toString(DEFAULT_ENCODING)).contains("Aborting command.");
     // prompt should contain the current user name as well
     assertThat(err.toString(DEFAULT_ENCODING)).contains("ATTENTION: Running as user " + OZONE_USER);
   }
@@ -79,10 +85,31 @@ public class TestOzoneRepair {
     OzoneRepair ozoneRepair = new OzoneRepair();
     System.setIn(new ByteArrayInputStream("y".getBytes(DEFAULT_ENCODING)));
 
-    ozoneRepair.execute(new String[]{});
+    ozoneRepair.execute(new String[]{"om", "fso-tree", "--db", "/dev/null"});
     assertThat(out.toString(DEFAULT_ENCODING)).contains("Run as user: " + OZONE_USER);
     // prompt should contain the current user name as well
     assertThat(err.toString(DEFAULT_ENCODING)).contains("ATTENTION: Running as user " + OZONE_USER);
+  }
+
+  /** Arguments for which confirmation prompt should not be displayed. */
+  static List<List<String>> skipPromptParams() {
+    return asList(
+        emptyList(),
+        singletonList("om"),
+        asList("om", "fso-tree"),
+        asList("om", "fso-tree", "-h"),
+        asList("om", "fso-tree", "--help")
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("skipPromptParams")
+  void testSkipsPrompt(List<String> args) throws Exception {
+    OzoneRepair ozoneRepair = new OzoneRepair();
+
+    ozoneRepair.execute(args.toArray(new String[0]));
+
+    assertThat(err.toString(DEFAULT_ENCODING)).doesNotContain("ATTENTION: Running as user " + OZONE_USER);
   }
 
 }

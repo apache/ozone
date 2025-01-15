@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
@@ -61,7 +61,7 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
 
   @Override
   @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
         ozoneManager.getMetadataManager();
     SnapshotChainManager snapshotChainManager =
@@ -91,13 +91,13 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
       List<String> movedDirs = moveDeletedKeysRequest.getDeletedDirsToMoveList();
 
       // Update lastTransactionInfo for fromSnapshot and the nextSnapshot.
-      fromSnapshot.setLastTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());
+      fromSnapshot.setLastTransactionInfo(TransactionInfo.valueOf(context.getTermIndex()).toByteString());
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(fromSnapshot.getTableKey()),
-          CacheValue.get(termIndex.getIndex(), fromSnapshot));
+          CacheValue.get(context.getIndex(), fromSnapshot));
       if (nextSnapshot != null) {
-        nextSnapshot.setLastTransactionInfo(TransactionInfo.valueOf(termIndex).toByteString());
+        nextSnapshot.setLastTransactionInfo(TransactionInfo.valueOf(context.getTermIndex()).toByteString());
         omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(nextSnapshot.getTableKey()),
-            CacheValue.get(termIndex.getIndex(), nextSnapshot));
+            CacheValue.get(context.getIndex(), nextSnapshot));
       }
       omClientResponse = new OMSnapshotMoveDeletedKeysResponse(
           omResponse.build(), fromSnapshot, nextSnapshot,

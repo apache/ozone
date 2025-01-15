@@ -136,7 +136,7 @@ public class TestSCMSafeModeManager {
     ContainerManager containerManager = mock(ContainerManager.class);
     when(containerManager.getContainers()).thenReturn(containers);
     scmSafeModeManager = new SCMSafeModeManager(
-        config, containers, containerManager, null, queue,
+        config, containerManager, null, queue,
         serviceManager, scmContext);
 
     assertTrue(scmSafeModeManager.getInSafeMode());
@@ -175,7 +175,7 @@ public class TestSCMSafeModeManager {
     ContainerManager containerManager = mock(ContainerManager.class);
     when(containerManager.getContainers()).thenReturn(containers);
     scmSafeModeManager = new SCMSafeModeManager(
-        config, containers, containerManager, null, queue,
+        config, containerManager, null, queue,
         serviceManager, scmContext);
 
     long cutOff = (long) Math.ceil(numContainers * config.getDouble(
@@ -244,7 +244,7 @@ public class TestSCMSafeModeManager {
     ContainerManager containerManager = mock(ContainerManager.class);
     when(containerManager.getContainers()).thenReturn(containers);
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-        () -> new SCMSafeModeManager(conf, containers, containerManager,
+        () -> new SCMSafeModeManager(conf, containerManager,
             pipelineManager, queue, serviceManager, scmContext));
     assertThat(exception).hasMessageEndingWith("value should be >= 0.0 and <= 1.0");
   }
@@ -311,7 +311,7 @@ public class TestSCMSafeModeManager {
     when(containerManager.getContainers()).thenReturn(containers);
 
     scmSafeModeManager = new SCMSafeModeManager(
-        conf, containers, containerManager, pipelineManager, queue, serviceManager,
+        conf, containerManager, pipelineManager, queue, serviceManager,
         scmContext);
 
     assertTrue(scmSafeModeManager.getInSafeMode());
@@ -447,7 +447,7 @@ public class TestSCMSafeModeManager {
     ContainerManager containerManager = mock(ContainerManager.class);
     when(containerManager.getContainers()).thenReturn(containers);
     scmSafeModeManager = new SCMSafeModeManager(
-        conf, containers, containerManager, pipelineManager, queue, serviceManager,
+        conf, containerManager, pipelineManager, queue, serviceManager,
         scmContext);
     assertFalse(scmSafeModeManager.getInSafeMode());
   }
@@ -489,7 +489,7 @@ public class TestSCMSafeModeManager {
     when(containerManager.getContainers()).thenReturn(containers);
 
     scmSafeModeManager = new SCMSafeModeManager(
-        config, containers, containerManager, null, queue, serviceManager, scmContext);
+        config, containerManager, null, queue, serviceManager, scmContext);
 
     assertTrue(scmSafeModeManager.getInSafeMode());
 
@@ -565,7 +565,7 @@ public class TestSCMSafeModeManager {
         new ContainerReplicaPendingOps(Clock.system(ZoneId.systemDefault())));
 
     scmSafeModeManager = new SCMSafeModeManager(
-        config, containers, containerManager, pipelineManager, queue, serviceManager, scmContext);
+        config, containerManager, pipelineManager, queue, serviceManager, scmContext);
     assertTrue(scmSafeModeManager.getInSafeMode());
 
     // Only 20 containers are involved in the calculation,
@@ -588,7 +588,7 @@ public class TestSCMSafeModeManager {
     ContainerManager containerManager = mock(ContainerManager.class);
     when(containerManager.getContainers()).thenReturn(containers);
     scmSafeModeManager = new SCMSafeModeManager(
-        conf, containers, containerManager, null, queue,
+        conf, containerManager, null, queue,
         serviceManager, scmContext);
 
     // Assert SCM is in Safe mode.
@@ -702,7 +702,7 @@ public class TestSCMSafeModeManager {
       when(containerManager.getContainers()).thenReturn(containers);
 
       scmSafeModeManager = new SCMSafeModeManager(
-          config, containers, containerManager, pipelineManager, queue, serviceManager,
+          config, containerManager, pipelineManager, queue, serviceManager,
           scmContext);
 
       SCMDatanodeProtocolServer.NodeRegistrationContainerReport nodeRegistrationContainerReport =
@@ -757,7 +757,7 @@ public class TestSCMSafeModeManager {
     when(containerManager.getContainers()).thenReturn(containers);
 
     scmSafeModeManager = new SCMSafeModeManager(
-        config, containers, containerManager, pipelineManager, queue, serviceManager,
+        config, containerManager, pipelineManager, queue, serviceManager,
         scmContext);
 
     // Assert SCM is in Safe mode.

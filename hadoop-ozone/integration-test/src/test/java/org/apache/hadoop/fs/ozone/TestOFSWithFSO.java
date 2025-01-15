@@ -22,6 +22,6 @@ import org.junit.jupiter.api.TestInstance;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TestOFSWithFSO extends AbstractRootedOzoneFileSystemTestWithFSO {
   TestOFSWithFSO() {
-    super(false, false, false);
+    super(false);
   }
 }

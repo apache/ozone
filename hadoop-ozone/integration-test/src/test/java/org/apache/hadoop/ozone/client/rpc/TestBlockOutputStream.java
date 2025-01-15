@@ -84,6 +84,11 @@ class TestBlockOutputStream {
 
   static MiniOzoneCluster createCluster() throws IOException,
       InterruptedException, TimeoutException {
+    return createCluster(5);
+  }
+
+  static MiniOzoneCluster createCluster(int datanodes) throws IOException,
+      InterruptedException, TimeoutException {
     OzoneConfiguration conf = new OzoneConfiguration();
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumType(ChecksumType.NONE);
@@ -126,7 +131,7 @@ class TestBlockOutputStream {
         .applyTo(conf);
 
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(5)
+        .setNumDatanodes(datanodes)
         .build();
     cluster.waitForClusterToBeReady();
 

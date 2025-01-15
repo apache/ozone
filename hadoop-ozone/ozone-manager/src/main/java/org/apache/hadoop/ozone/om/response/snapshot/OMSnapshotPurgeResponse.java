@@ -18,6 +18,7 @@
  */
 package org.apache.hadoop.ozone.om.response.snapshot;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -137,5 +138,10 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
             snapshotInfo.getBucketName(), snapshotInfo.getName());
       }
     }
+  }
+
+  @VisibleForTesting
+  public Map<String, SnapshotInfo> getUpdatedSnapInfos() {
+    return updatedSnapInfos;
   }
 }
