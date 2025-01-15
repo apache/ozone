@@ -24,11 +24,15 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.OzoneMutableRate;
 import org.apache.ratis.protocol.RaftGroupId;
+
+import java.util.EnumMap;
+
+import static org.apache.hadoop.ozone.metrics.OzoneMetricsSystem.registerNewMutableRate;
 
 /**
  * This class is for maintaining Container State Machine statistics.
@@ -40,6 +44,7 @@ public class CSMMetrics {
       CSMMetrics.class.getSimpleName();
   private RaftGroupId gid;
 
+  private final MetricsRegistry registry;
   // ratis op metrics metrics
   private @Metric MutableCounterLong numWriteStateMachineOps;
   private @Metric MutableCounterLong numQueryStateMachineOps;
@@ -48,10 +53,9 @@ public class CSMMetrics {
   private @Metric MutableCounterLong numBytesWrittenCount;
   private @Metric MutableCounterLong numBytesCommittedCount;
 
-  private @Metric MutableRate transactionLatencyMs;
-  private final EnumMap<Type, MutableRate> opsLatencyMs;
-  private final EnumMap<Type, MutableRate> opsQueueingDelay;
-  private MetricsRegistry registry = null;
+  private @Metric OzoneMutableRate transactionLatencyMs;
+  private final EnumMap<Type, OzoneMutableRate> opsLatencyMs;
+  private final EnumMap<Type, OzoneMutableRate> opsQueueingDelay;
 
   // Failure Metrics
   private @Metric MutableCounterLong numWriteStateMachineFails;
@@ -67,11 +71,11 @@ public class CSMMetrics {
   private @Metric MutableCounterLong numEvictedCacheCount;
   private @Metric MutableCounterLong pendingApplyTransactions;
 
-  private @Metric MutableRate applyTransactionNs;
-  private @Metric MutableRate writeStateMachineDataNs;
-  private @Metric MutableRate writeStateMachineQueueingLatencyNs;
-  private @Metric MutableRate untilApplyTransactionNs;
-  private @Metric MutableRate startTransactionCompleteNs;
+  private @Metric OzoneMutableRate applyTransactionNs;
+  private @Metric OzoneMutableRate writeStateMachineDataNs;
+  private @Metric OzoneMutableRate writeStateMachineQueueingLatencyNs;
+  private @Metric OzoneMutableRate untilApplyTransactionNs;
+  private @Metric OzoneMutableRate startTransactionCompleteNs;
 
   public CSMMetrics(RaftGroupId gid) {
     this.gid = gid;
@@ -79,13 +83,16 @@ public class CSMMetrics {
     this.opsQueueingDelay = new EnumMap<>(ContainerProtos.Type.class);
     this.registry = new MetricsRegistry(CSMMetrics.class.getSimpleName());
     for (ContainerProtos.Type type : ContainerProtos.Type.values()) {
-      opsLatencyMs.put(type, registry.newRate(type.toString() + "Ms", type + " op"));
-      opsQueueingDelay.put(type, registry.newRate("queueingDelay" + type.toString() + "Ns", type + " op"));
+      opsLatencyMs.put(type, registerNewMutableRate(registry, type.toString() + "Ms", type + " op"));
+      opsQueueingDelay.put(
+          type,
+          registerNewMutableRate(registry, "queueingDelay" + type.toString() + "Ns", type + " op")
+      );
     }
   }
 
   public static CSMMetrics create(RaftGroupId gid) {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    MetricsSystem ms = OzoneMetricsSystem.instance();
     return ms.register(SOURCE_NAME + gid.toString(),
         "Container State Machine",
         new CSMMetrics(gid));
@@ -192,7 +199,7 @@ public class CSMMetrics {
     return numBytesCommittedCount.value();
   }
 
-  MutableRate getApplyTransactionLatencyNs() {
+  OzoneMutableRate getApplyTransactionLatencyNs() {
     return applyTransactionNs;
   }
 
@@ -256,7 +263,7 @@ public class CSMMetrics {
   }
 
   public void unRegister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    MetricsSystem ms = OzoneMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME + gid.toString());
   }
 }

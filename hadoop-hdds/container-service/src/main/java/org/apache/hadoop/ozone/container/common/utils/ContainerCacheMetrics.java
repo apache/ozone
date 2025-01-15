@@ -19,9 +19,9 @@ package org.apache.hadoop.ozone.container.common.utils;
 
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.metrics.OzoneMutableRate;
+import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 
 /**
  * Metrics for the usage of ContainerDB.
@@ -32,10 +32,10 @@ public final class ContainerCacheMetrics {
   private final MetricsSystem ms;
 
   @Metric("Rate to measure the db open latency")
-  private MutableRate dbOpenLatency;
+  private OzoneMutableRate dbOpenLatency;
 
   @Metric("Rate to measure the db close latency")
-  private MutableRate dbCloseLatency;
+  private OzoneMutableRate dbCloseLatency;
 
   @Metric("Number of Container Cache Hits")
   private MutableCounterLong numCacheHits;
@@ -58,7 +58,7 @@ public final class ContainerCacheMetrics {
   }
 
   public static ContainerCacheMetrics create() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    MetricsSystem ms = OzoneMetricsSystem.instance();
     String name = "ContainerCacheMetrics";
 
     return ms.register(name, "null", new ContainerCacheMetrics(name, ms));

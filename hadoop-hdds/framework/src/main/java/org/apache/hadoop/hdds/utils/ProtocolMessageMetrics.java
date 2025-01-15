@@ -26,8 +26,8 @@ import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsTag;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
+import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /**
@@ -78,12 +78,12 @@ public class ProtocolMessageMetrics<KEY> implements MetricsSource {
   }
 
   public void register() {
-    DefaultMetricsSystem.instance()
+    OzoneMetricsSystem.instance()
         .register(name, description, this);
   }
 
   public void unregister() {
-    DefaultMetricsSystem.instance().unregisterSource(name);
+    OzoneMetricsSystem.instance().unregisterSource(name);
   }
 
   @Override
