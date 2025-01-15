@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.chunk;
+package org.apache.hadoop.ozone.debug.replicas.chunk;
 
 import java.io.File;
 import java.io.IOException;
@@ -27,7 +27,6 @@ import java.util.HashSet;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -42,15 +41,12 @@ import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
-import org.apache.hadoop.ozone.debug.OzoneDebug;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.keys.KeyHandler;
-import org.kohsuke.MetaInfServices;
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
@@ -58,15 +54,9 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 /**
  * Class that gives chunk location given a specific key.
  */
-@Command(name = "chunkinfo",
-        description = "returns chunk location"
-                + " information about an existing key")
-@MetaInfServices(DebugSubcommand.class)
-public class ChunkKeyHandler extends KeyHandler implements
-    DebugSubcommand {
-
-  @CommandLine.ParentCommand
-  private OzoneDebug parent;
+@Command(name = "chunk-info",
+        description = "Returns chunk location information about an existing key")
+public class ChunkKeyHandler extends KeyHandler {
 
   private String getChunkLocationPath(String containerLocation) {
     return containerLocation + File.separator + OzoneConsts.STORAGE_DIR_CHUNKS;
@@ -75,7 +65,7 @@ public class ChunkKeyHandler extends KeyHandler implements
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
           throws IOException {
-    try (ContainerOperationClient containerOperationClient = new ContainerOperationClient(parent.getOzoneConf());
+    try (ContainerOperationClient containerOperationClient = new ContainerOperationClient(getOzoneConf());
         XceiverClientManager xceiverClientManager = containerOperationClient.getXceiverClientManager()) {
       OzoneManagerProtocol ozoneManagerClient = client.getObjectStore().getClientProxy().getOzoneManagerClient();
       address.ensureKeyAddress();

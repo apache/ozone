@@ -14,7 +14,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package org.apache.hadoop.ozone.debug.chunk;
+package org.apache.hadoop.ozone.debug.replicas.chunk;
 
 /**
  * The type of chunks of an Erasure Coded key.
