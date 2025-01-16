@@ -478,6 +478,11 @@ public class OzoneManagerServiceProviderImpl
       inLoopStartSequenceNumber = inLoopLatestSequenceNumber;
       loopCount++;
     }
+    // We might reach loop count limit and so not all updates from RocksDB might be applied.
+    // Say we have: 1000 updates, each loop we get only 100 updates, loop limit is 5.
+    // So this will effectively only apply 500 events, even if we are having total 1000 updates/events;
+    // All subsequent tasks will effectively process only 500 events, till next sync takes place.
+    omdbUpdatesHandler.setLatestSequenceNumber(getCurrentOMDBSequenceNumber());
     LOG.info("Delta updates received from OM : {} loops, {} records", loopCount,
         getCurrentOMDBSequenceNumber() - fromSequenceNumber
     );
@@ -519,8 +524,6 @@ public class OzoneManagerServiceProviderImpl
               rdbBatchOperation.commit(rocksDB, wOpts);
             }
           }
-          // Since data is not committed, set the sequence number for the latest update
-          omdbUpdatesHandler.setLatestSequenceNumber(dbUpdates.getLatestSequenceNumber());
         }
       }
     }

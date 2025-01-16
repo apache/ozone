@@ -116,11 +116,8 @@ Validate Sequence number is updated after sync
     Should Be Equal As Integers    ${list_length}    1
 
     ${om_delta_task} =              Get From List    ${om_delta_task_list}    0
-    Log To Console                  Getting Delta tasks sequence number
     ${om_delta_task_seq_num} =      Evaluate      int(${om_delta_task["lastUpdatedSeqNumber"]})
-    Log To Console                  Getting OM tasks sequence names
     ${om_task_names} =              Evaluate      ["NSSummaryTask", "ContainerKeyMapperTask", "FileSizeCountTask", "OmTableInsightTask"]
-    Log To Console                  Getting OM tasks list
     ${om_tasks} =                   Evaluate      [task for task in ${tasks} if task["taskName"] in ${om_task_names}]
 
     FOR    ${task}    IN    @{om_tasks}
