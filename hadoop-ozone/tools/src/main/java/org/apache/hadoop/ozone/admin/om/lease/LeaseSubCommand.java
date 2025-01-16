@@ -16,35 +16,20 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.container;
+package org.apache.hadoop.ozone.admin.om.lease;
 
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import picocli.CommandLine;
-import picocli.CommandLine.Command;
-
-import java.util.concurrent.Callable;
-
-import static org.apache.hadoop.ozone.debug.container.ContainerCommands.outputContainer;
 
 /**
- * Handles {@code ozone debug container list} command.
+ * Handler of ozone admin om lease command.
  */
-@Command(
-    name = "list",
-    description = "Show container info of all container replicas on datanode")
-public class ListSubcommand implements Callable<Void> {
-
-  @CommandLine.ParentCommand
-  private ContainerCommands parent;
-
-  @Override
-  public Void call() throws Exception {
-    parent.loadContainersFromVolumes();
-
-    for (Container<?> container : parent.getController().getContainers()) {
-      outputContainer(container.getContainerData());
+@CommandLine.Command(
+    name = "lease",
+    description = "Command for all lease related queries.",
+    subcommands = {
+        LeaseRecoverer.class
     }
+)
+public class LeaseSubCommand {
 
-    return null;
-  }
 }

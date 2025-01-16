@@ -16,11 +16,11 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.container;
+package org.apache.hadoop.ozone.debug.datanode.container;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -42,12 +42,9 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerReader;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
-import org.apache.hadoop.ozone.debug.OzoneDebug;
-import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.ParentCommand;
 
 import java.io.File;
 import java.io.IOException;
@@ -77,25 +74,17 @@ import java.util.stream.Stream;
         ExportSubcommand.class,
         InspectSubcommand.class
     })
-@MetaInfServices(DebugSubcommand.class)
-public class ContainerCommands implements DebugSubcommand {
+public class ContainerCommands extends AbstractSubcommand {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerCommands.class);
-
-  @ParentCommand
-  private OzoneDebug parent;
 
   private MutableVolumeSet volumeSet;
 
   private ContainerController controller;
 
-  OzoneConfiguration getOzoneConf() {
-    return parent.getOzoneConf();
-  }
-
   public void loadContainersFromVolumes() throws IOException {
-    OzoneConfiguration conf = parent.getOzoneConf();
+    OzoneConfiguration conf = getOzoneConf();
 
     ContainerSet containerSet = new ContainerSet(null, 1000, true);
 

@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.container;
+package org.apache.hadoop.ozone.debug.datanode.container;
 
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import picocli.CommandLine;
@@ -24,10 +24,10 @@ import picocli.CommandLine.Command;
 
 import java.util.concurrent.Callable;
 
-import static org.apache.hadoop.ozone.debug.container.ContainerCommands.outputContainer;
+import static org.apache.hadoop.ozone.debug.datanode.container.ContainerCommands.outputContainer;
 
 /**
- * Handles {@code ozone debug container info} command.
+ * Handles {@code ozone debug datanode container info} command.
  */
 @Command(
     name = "info",

@@ -17,6 +17,6 @@
  */
 
 /**
- * Command to debug chunk information.
+ * Command to debug replicas chunk information.
  */
-package org.apache.hadoop.ozone.debug.chunk;
+package org.apache.hadoop.ozone.debug.replicas.chunk;

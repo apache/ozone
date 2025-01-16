@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug;
+package org.apache.hadoop.ozone.admin.om.lease;
 
 import java.net.URI;
 import java.util.concurrent.Callable;
@@ -24,24 +24,21 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.LeaseRecoverable;
-import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
-import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
 
 /**
- * Tool that recover the lease of a specified file.
+ * CLI to recover the lease of a specified file.
  */
 @CommandLine.Command(
     name = "recover",
-    customSynopsis = "ozone debug recover --path=<path>",
-    description = "recover the lease of a specified file. Make sure to specify "
+    customSynopsis = "ozone admin om lease recover --path=<path>",
+    description = "Recover the lease of a specified file. Make sure to specify "
         + "file system scheme if ofs:// is not the default.")
-@MetaInfServices(DebugSubcommand.class)
-public class LeaseRecoverer implements Callable<Void>, DebugSubcommand {
+public class LeaseRecoverer implements Callable<Void> {
 
   @Spec
   private CommandSpec spec;

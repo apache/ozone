@@ -44,7 +44,7 @@ function getUsagePercentages(
     ozoneUsedPercentage: Math.floor(used / capacity * 100),
     nonOzoneUsedPercentage: Math.floor((capacity - remaining - used) / capacity * 100),
     committedPercentage: Math.floor(committed / capacity * 100),
-    usagePercentage: Math.floor((capacity - remaining) / capacity * 100)
+    usagePercentage: Math.round((capacity - remaining) / capacity * 100)
   }
 }
 

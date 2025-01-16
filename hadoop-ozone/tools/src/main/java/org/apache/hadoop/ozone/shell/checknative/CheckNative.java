@@ -57,10 +57,10 @@ public class CheckNative extends GenericCli implements Callable<Void> {
         isalLoaded = true;
       }
     }
-    System.out.println("Native library checking:");
-    System.out.printf("hadoop:  %b %s%n", nativeHadoopLoaded,
+    out().println("Native library checking:");
+    out().printf("hadoop:  %b %s%n", nativeHadoopLoaded,
         hadoopLibraryName);
-    System.out.printf("ISA-L:   %b %s%n", isalLoaded, isalDetail);
+    out().printf("ISA-L:   %b %s%n", isalLoaded, isalDetail);
 
     // Attempt to load the rocks-tools lib
     boolean nativeRocksToolsLoaded = NativeLibraryLoader.getInstance().loadLibrary(
@@ -70,7 +70,7 @@ public class CheckNative extends GenericCli implements Callable<Void> {
     if (nativeRocksToolsLoaded) {
       rocksToolsDetail = NativeLibraryLoader.getJniLibraryFileName();
     }
-    System.out.printf("rocks-tools: %b %s%n", nativeRocksToolsLoaded, rocksToolsDetail);
+    out().printf("rocks-tools: %b %s%n", nativeRocksToolsLoaded, rocksToolsDetail);
     return null;
   }
 }

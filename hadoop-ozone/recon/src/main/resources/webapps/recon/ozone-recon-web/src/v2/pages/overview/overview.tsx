@@ -530,7 +530,7 @@ const Overview: React.FC<{}> = () => {
           </Col>
         </Row>
         <span style={{ paddingLeft: '8px' }}>
-          <span style={{ color: '#6E6E6E' }}>OM ID:&nbsp;</span>
+          <span style={{ color: '#6E6E6E' }}>Ozone Service ID:&nbsp;</span>
           {omServiceId}
         </span>
         <span style={{ marginLeft: '12px', marginRight: '12px' }}> | </span>

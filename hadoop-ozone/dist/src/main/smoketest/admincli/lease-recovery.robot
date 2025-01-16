@@ -18,7 +18,6 @@ Documentation       Test lease recovery of ozone filesystem
 Library             OperatingSystem
 Resource            ../lib/os.robot
 Resource            ../lib/fs.robot
-Resource            ozone-debug.robot
 Test Timeout        5 minute
 Suite Setup         Create volume bucket and put key
 
@@ -35,8 +34,13 @@ Create volume bucket and put key
     Create File             ${TEMP_DIR}/${TESTFILE}
     Execute                 ozone sh key put /${VOLUME}/${BUCKET}/${TESTFILE} ${TEMP_DIR}/${TESTFILE}
 
+Execute Lease recovery cli
+    [Arguments]             ${KEY_PATH}
+    ${result} =             Execute And Ignore Error      ozone admin om lease recover --path=${KEY_PATH}
+    [Return]                ${result}
+
 *** Test Cases ***
-Test ozone debug recover for o3fs
+Test ozone admin om lease recover for o3fs
     ${o3fs_path} =     Format FS URL         o3fs    ${VOLUME}    ${BUCKET}    ${TESTFILE}
     ${result} =        Execute Lease recovery cli    ${o3fs_path}
                        Should Contain    ${result}   Lease recovery SUCCEEDED
@@ -44,7 +48,7 @@ Test ozone debug recover for o3fs
     ${result} =        Execute Lease recovery cli    ${o3fs_path}
                        Should Contain    ${result}    not found
 
-Test ozone debug recover for ofs
+Test ozone admin om lease recover for ofs
     ${ofs_path} =      Format FS URL         ofs     ${VOLUME}    ${BUCKET}    ${TESTFILE}
     ${result} =        Execute Lease recovery cli    ${ofs_path}
                        Should Contain    ${result}   Lease recovery SUCCEEDED

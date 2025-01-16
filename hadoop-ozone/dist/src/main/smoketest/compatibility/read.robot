@@ -154,4 +154,4 @@ HSync Lease Recover Can Be Used
     Pass Execution If    '${DATA_VERSION}' < '${FSO_VERSION}'      Skipped write test case
     Pass Execution If    '${CLIENT_VERSION}' < '${HSYNC_VERSION}'    Client does not support HSYNC
     Pass Execution If    '${CLUSTER_VERSION}' < '${HSYNC_VERSION}'   Cluster does not support HSYNC
-    Execute    ozone debug recover --path=ofs://om/vol1/fso-bucket-${DATA_VERSION}/dir/subdir/file
+    Execute    ozone admin om lease recover --path=ofs://om/vol1/fso-bucket-${DATA_VERSION}/dir/subdir/file

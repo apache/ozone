@@ -16,39 +16,28 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.chunk;
-
+package org.apache.hadoop.ozone.debug.replicas.chunk;
 /**
- * Class that gives chunkDetails.
+ * Class that gives datanode details on which the chunk is present.
  */
-public class ChunkDetails {
-  private String chunkName;
-  private long chunkOffset;
+public class ChunkDataNodeDetails {
+  private String ipAddress;
+  private String hostName;
 
-  public String getChunkName() {
-    return chunkName;
-  }
-
-  public void setChunkName(String chunkName) {
-    this.chunkName = chunkName;
+  public ChunkDataNodeDetails(String ipAddress, String hostName) {
+    this.ipAddress = ipAddress;
+    this.hostName = hostName;
   }
 
   @Override
     public String toString() {
     return "{"
-            + "chunkName='"
-            + chunkName
+            + "ipAddress='"
+            + ipAddress
             + '\''
-            + ", chunkOffset="
-            + chunkOffset
+            + ", hostName='"
+            + hostName
+            + '\''
             + '}';
-  }
-
-  public long getChunkOffset() {
-    return chunkOffset;
-  }
-
-  public void setChunkOffset(long chunkOffset) {
-    this.chunkOffset = chunkOffset;
   }
 }
