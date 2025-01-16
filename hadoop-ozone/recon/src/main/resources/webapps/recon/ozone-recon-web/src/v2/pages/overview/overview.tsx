@@ -20,9 +20,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import moment from 'moment';
 import filesize from 'filesize';
 import axios, { CanceledError } from 'axios';
-import { Row, Col, Button } from 'antd';
+import { Row, Col, Button, Popover } from 'antd';
 import {
   CheckCircleFilled,
+  CloseCircleFilled,
   WarningFilled
 } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
@@ -36,12 +37,21 @@ import { AutoReloadHelper } from '@/utils/autoReloadHelper';
 import { showDataFetchError } from '@/utils/common';
 import { AxiosGetHelper, cancelRequests, PromiseAllSettledGetHelper } from '@/utils/axiosRequestHelper';
 
-import { ClusterStateResponse, OverviewState, StorageReport } from '@/v2/types/overview.types';
+import { ClusterStateResponse, OverviewState, StorageReport, TaskStatus, TaskStatusResponse } from '@/v2/types/overview.types';
 
 import './overview.less';
+import TaskAlertDropdown from '@/v2/components/alertDropdown/taskAlertDropdown';
 
 
 const size = filesize.partial({ round: 1 });
+
+const HeaderActionSectionStyles: React.CSSProperties = {
+  display: 'flex',
+  float: 'right',
+  gap: '10px',
+  justifyContent: 'space-between',
+  alignItems: 'center'
+}
 
 const getHealthIcon = (value: string): React.ReactElement => {
   const values = value.split('/');
@@ -103,6 +113,26 @@ const getSummaryTableValue = (
   return size(value as number)
 }
 
+const getTaskFailuresCount = (tasks: TaskStatusResponse) => {
+  let failedTasks = 0;
+  let notStartedTasks = 0;
+
+  tasks.forEach(task => {
+    if (task.lastTaskSuccessful === null) {
+      notStartedTasks++;
+      return;
+    }
+    if (!task.lastTaskSuccessful) {
+      failedTasks++;
+      return;
+    }
+  });
+  return {
+    failedTasks: failedTasks,
+    notStartedTasks: notStartedTasks
+  };
+}
+
 const Overview: React.FC<{}> = () => {
 
   const cancelOverviewSignal = useRef<AbortController>();
@@ -137,7 +167,13 @@ const Overview: React.FC<{}> = () => {
     used: 0,
     remaining: 0,
     committed: 0
-  })
+  });
+  const [taskStatus, setTaskStatus] = useState<TaskStatusResponse>([{
+    taskName: 'N/A',
+    lastUpdatedSeqNumber: 0,
+    lastUpdatedTimestamp: 0,
+    lastTaskSuccessful: null
+  }]);
 
   // Component mounted, fetch initial data
   useEffect(() => {
@@ -208,15 +244,30 @@ const Overview: React.FC<{}> = () => {
         scmServiceId: 'N/A',
         omServiceId: 'N/A',
       };
-      const taskStatus = taskstatusResponse.value?.data ?? [{
+      const taskStatus: TaskStatusResponse = taskstatusResponse.value?.data ?? [{
         taskName: 'N/A',
         lastUpdatedTimestamp: 0,
-        lastUpdatedSeqNumber: 0
+        lastUpdatedSeqNumber: 0,
+        lastTaskSuccessful: null
       }];
-      const missingContainersCount = clusterState.missingContainers;
-      const omDBDeltaObject = taskStatus && taskStatus.find((item: any) => item.taskName === 'OmDeltaRequest');
-      const omDBFullObject = taskStatus && taskStatus.find((item: any) => item.taskName === 'OmSnapshotRequest');
 
+      const missingContainersCount = clusterState.missingContainers;
+      const omDBDeltaObject = taskStatus?.find((item: any) => item.taskName === 'OmDeltaRequest')
+        ?? {
+        taskName: '',
+        lastTaskSuccessful: null,
+        lastUpdatedSeqNumber: 0,
+        lastUpdatedTimestamp: 0
+      };
+      const omDBFullObject = taskStatus?.find((item: any) => item.taskName === 'OmSnapshotRequest')
+        ?? {
+        taskName: '',
+        lastTaskSuccessful: null,
+        lastUpdatedSeqNumber: 0,
+        lastUpdatedTimestamp: 0
+      };
+
+      setTaskStatus(taskStatus);
       setState({
         ...state,
         loading: false,
@@ -230,8 +281,8 @@ const Overview: React.FC<{}> = () => {
         openContainers: clusterState.openContainers,
         deletedContainers: clusterState.deletedContainers,
         lastRefreshed: Number(moment()),
-        lastUpdatedOMDBDelta: omDBDeltaObject?.lastUpdatedTimestamp,
-        lastUpdatedOMDBFull: omDBFullObject?.lastUpdatedTimestamp,
+        lastUpdatedOMDBDelta: omDBDeltaObject.lastUpdatedTimestamp,
+        lastUpdatedOMDBFull: omDBFullObject.lastUpdatedTimestamp,
         openSummarytotalUnrepSize: openResponse?.value?.data?.totalUnreplicatedDataSize,
         openSummarytotalRepSize: openResponse?.value?.data?.totalReplicatedDataSize,
         openSummarytotalOpenKeys: openResponse?.value?.data?.totalOpenKeys,
@@ -334,9 +385,12 @@ const Overview: React.FC<{}> = () => {
     <>
       <div className='page-header-v2'>
         Overview
-        <AutoReloadPanel isLoading={loading} lastRefreshed={lastRefreshed}
-          lastUpdatedOMDBDelta={lastUpdatedOMDBDelta} lastUpdatedOMDBFull={lastUpdatedOMDBFull}
-          togglePolling={autoReloadHelper.handleAutoReloadToggle} onReload={loadOverviewPageData} omSyncLoad={syncOmData} omStatus={omStatus} />
+        <div style={HeaderActionSectionStyles}>
+          <AutoReloadPanel isLoading={loading} lastRefreshed={lastRefreshed}
+            lastUpdatedOMDBDelta={lastUpdatedOMDBDelta} lastUpdatedOMDBFull={lastUpdatedOMDBFull}
+            togglePolling={autoReloadHelper.handleAutoReloadToggle} onReload={loadOverviewPageData} omSyncLoad={syncOmData} omStatus={omStatus} />
+          <TaskAlertDropdown data={taskStatus} {...getTaskFailuresCount(taskStatus)}/>
+        </div>
       </div>
       <div className='data-container'>
         <Row
@@ -486,7 +540,7 @@ const Overview: React.FC<{}> = () => {
                 }
               ]}
               linkToUrl='/Om'
-              state={{activeTab: '2'}} />
+              state={{ activeTab: '2' }} />
           </Col>
           <Col xs={24} sm={24} md={24} lg={12} xl={12}>
             <OverviewSummaryCard
@@ -526,7 +580,7 @@ const Overview: React.FC<{}> = () => {
                 }
               ]}
               linkToUrl='/Om'
-              state={{activeTab: '3'}} />
+              state={{ activeTab: '3' }} />
           </Col>
         </Row>
         <span style={{ paddingLeft: '8px' }}>
