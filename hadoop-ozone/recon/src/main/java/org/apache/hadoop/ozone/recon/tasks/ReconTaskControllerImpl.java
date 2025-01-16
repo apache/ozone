@@ -233,8 +233,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
    * For a given list of {@link Callable} tasks process them and add any failed task to the provided list.
    * The tasks are executed in parallel, but will wait for the tasks to complete i.e. the longest
    * time taken by this method will be the time taken by the longest task in the list.
-   * @param tasks A list of tasks to execute.
-   * @param events A batch of {@link OMUpdateEventBatch} events to fetch sequence number of last event in batch.
+   * @param tasks       A list of tasks to execute.
+   * @param events      A batch of {@link OMUpdateEventBatch} events to fetch sequence number of last event in batch.
    * @param failedTasks Reference of the list to which we want to add the failed tasks for retry/reprocessing
    */
   private void processTasks(Collection<NamedCallableTask<Pair<String, Boolean>>> tasks,

@@ -38,13 +38,15 @@ ${KEYPATH}           ${VOLUME}/${BUCKET}/testkey
 Kinit as ozone admin
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
 
+Sync OM Data
+  Log To Console          Sending CURL request to ${TRIGGER_SYNC_ENDPOINT}
+  ${result} =             Execute       curl --negotiate -u : -LSs ${TRIGGER_SYNC_ENDPOINT}
+  Should contain          ${result}     true    # Sync should return true if successful
 
 Fetch Task Status
   Log To Console          Sending CURL request to ${TASK_STATUS_ENDPOINT}
   ${result} =             Execute     curl -H "Accepts: application/json" --negotiate -u : -LSs ${TASK_STATUS_ENDPOINT}
-  Log To Console          Loading data into json
   ${parsed_response} =    Evaluate    json.loads('''${result}''')
-  Log To Console          Data: ${parsed_response}
   ${tasks} =              Evaluate    [task for task in ${parsed_response}]
   [return]  ${tasks}
 
@@ -56,8 +58,7 @@ Prepopulate Data and Trigger OM DB Sync
     Kinit as ozone admin
     Freon DFSG        n=1000        path=${KEYPATH}
 
-    ${result} =       Execute       curl --negotiate -u : -LSs ${TRIGGER_SYNC_ENDPOINT}
-    Should contain    ${result}     true    # Sync should return true if successful
+    Sync OM Data
 
 Validate Task Status After Sync
     [Documentation]  Validate that task status is updated after triggering the OM DB sync.
@@ -73,7 +74,7 @@ Validate Task Status After Sync
         Dictionary Should Contain Key    ${task}    lastTaskRunStatus
     END
 
-Validate Counters for Specific Task
+Validate Stats for Specific Task
     [Documentation]  Validate response for a specific task after OM DB sync.
 
     ${tasks} =    Fetch Task Status
@@ -99,4 +100,31 @@ Validate All Tasks Updated After Sync
     FOR    ${task}    IN    @{tasks}
         Should Be True      ${task["lastUpdatedTimestamp"]}!=${None}
         Should Be True      ${task["lastUpdatedSeqNumber"]}!=${None}
+    END
+
+Validate Sequence number is updated after sync
+    Log To Console          Generating Freon Data
+    Kinit as ozone admin
+    Freon DFSG        n=100        path=${VOLUME}/${BUCKET}/seqValidationKey
+    Sync OM Data
+
+    ${tasks} =        Fetch Task Status
+    Should Not Be Empty    ${tasks}
+
+    ${om_delta_task_list} =        Evaluate       [task for task in ${tasks} if task["taskName"] == "OmDeltaRequest"]
+    ${list_length} =               Get Length     ${om_delta_task_list}
+    Should Be Equal As Integers    ${list_length}    1
+
+    ${om_delta_task} =              Get From List    ${om_delta_task_list}    0
+    Log To Console                  Getting Delta tasks sequence number
+    ${om_delta_task_seq_num} =      Evaluate      int(${om_delta_task["lastUpdatedSeqNumber"]})
+    Log To Console                  Getting OM tasks sequence names
+    ${om_task_names} =              Evaluate      ["NSSummaryTask", "ContainerKeyMapperTask", "FileSizeCountTask", "OmTableInsightTask"]
+    Log To Console                  Getting OM tasks list
+    ${om_tasks} =                   Evaluate      [task for task in ${tasks} if task["taskName"] in ${om_task_names}]
+
+    FOR    ${task}    IN    @{om_tasks}
+        IF    ${task["isCurrentTaskRunning"]} == 0
+          Should Be Equal As Integers       ${task["lastUpdatedSeqNumber"]}    ${om_delta_task_seq_num}
+        END
     END

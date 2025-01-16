@@ -195,7 +195,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         .build();
 
     OMUpdateEventBatch omUpdateEventBatch =
-        new OMUpdateEventBatch(Arrays.asList(event, event2));
+        new OMUpdateEventBatch(Arrays.asList(event, event2), 0L);
     fileSizeCountTask.process(omUpdateEventBatch);
 
     // Verify 2 keys are in correct bins.
@@ -250,7 +250,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         .build();
 
     omUpdateEventBatch = new OMUpdateEventBatch(
-        Arrays.asList(updateEvent, putEvent, deleteEvent));
+        Arrays.asList(updateEvent, putEvent, deleteEvent), 0L);
     fileSizeCountTask.process(omUpdateEventBatch);
 
     assertEquals(4, fileCountBySizeDao.count());
@@ -388,7 +388,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     }
 
     OMUpdateEventBatch omUpdateEventBatch =
-        new OMUpdateEventBatch(omDbEventList);
+        new OMUpdateEventBatch(omDbEventList, 0L);
     fileSizeCountTask.process(omUpdateEventBatch);
 
     // Verify 2 keys are in correct bins.
@@ -464,7 +464,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
       }
     }
 
-    omUpdateEventBatch = new OMUpdateEventBatch(omDbEventList);
+    omUpdateEventBatch = new OMUpdateEventBatch(omDbEventList, 0L);
     fileSizeCountTask.process(omUpdateEventBatch);
 
     assertEquals(10000, fileCountBySizeDao.count());

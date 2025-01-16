@@ -267,7 +267,7 @@ public final class TestNSSummaryTask {
           .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
           .build();
 
-      return new OMUpdateEventBatch(Arrays.asList(keyEvent1, keyEvent2));
+      return new OMUpdateEventBatch(Arrays.asList(keyEvent1, keyEvent2), 0L);
     }
 
     @Test

@@ -432,7 +432,7 @@ public final class TestNSSummaryTaskWithLegacy {
       return new OMUpdateEventBatch(Arrays.asList(
           keyEvent1, keyEvent2, keyEvent3, keyEvent4, keyEvent5,
           keyEvent6, keyEvent7
-      ));
+      ), 0L);
     }
 
     @Test

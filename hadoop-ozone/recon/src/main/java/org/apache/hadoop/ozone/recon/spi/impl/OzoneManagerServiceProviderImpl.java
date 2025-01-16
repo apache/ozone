@@ -519,6 +519,8 @@ public class OzoneManagerServiceProviderImpl
               rdbBatchOperation.commit(rocksDB, wOpts);
             }
           }
+          // Since data is not committed, set the sequence number for the latest update
+          omdbUpdatesHandler.setLatestSequenceNumber(dbUpdates.getLatestSequenceNumber());
         }
       }
     }
@@ -582,7 +584,7 @@ public class OzoneManagerServiceProviderImpl
             reconTaskUpdater.recordRunCompletion();
             // Pass on DB update events to tasks that are listening.
             reconTaskController.consumeOMEvents(new OMUpdateEventBatch(
-                omdbUpdatesHandler.getEvents()), omMetadataManager);
+                omdbUpdatesHandler.getEvents(), omdbUpdatesHandler.getLatestSequenceNumber()), omMetadataManager);
           } catch (InterruptedException intEx) {
             LOG.error("OM DB Delta update sync thread was interrupted.");
             // We are updating the table even if it didn't run i.e. got interrupted beforehand

@@ -127,7 +127,7 @@ public class ContainerHealthTask extends ReconScmTask {
   }
 
   @Override
-  protected void runTask() {
+  protected void runTask() throws Exception {
     lock.writeLock().lock();
     // Map contains all UNHEALTHY STATES as keys and value is another map
     // with 3 keys (CONTAINER_COUNT, TOTAL_KEYS, TOTAL_USED_BYTES) and value

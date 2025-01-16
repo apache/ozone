@@ -137,21 +137,11 @@ public class ContainerSizeCountTask extends ReconScmTask {
   }
 
   @Override
-  protected void runTask() {
+  protected void runTask() throws Exception {
     final List<ContainerInfo> containers = containerManager.getContainers();
     if (processedContainers.isEmpty()) {
-      try {
-        int execute =
-            dslContext.truncate(CONTAINER_COUNT_BY_SIZE).execute();
-        LOG.debug("Deleted {} records from {}", execute,
-            CONTAINER_COUNT_BY_SIZE);
-      } catch (Exception e) {
-        LOG.error("An error occurred while truncating the table {}: {}",
-            CONTAINER_COUNT_BY_SIZE, e.getMessage(), e);
-        // Rethrow exception to be caught in parent throwable and update table
-        // with run status as -1.
-        throw e;
-      }
+      int execute = dslContext.truncate(CONTAINER_COUNT_BY_SIZE).execute();
+      LOG.debug("Deleted {} records from {}", execute, CONTAINER_COUNT_BY_SIZE);
     }
     processContainers(containers);
   }
