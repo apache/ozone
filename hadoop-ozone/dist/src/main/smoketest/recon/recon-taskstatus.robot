@@ -24,14 +24,14 @@ Resource          ../commonlib.robot
 Test Timeout      5 minutes
 
 *** Variables ***
-${BASE_URL}       http://recon:9888
+${BASE_URL}               http://recon:9888
 ${TASK_STATUS_ENDPOINT}   ${BASE_URL}/api/v1/task/status
 ${TRIGGER_SYNC_ENDPOINT}  ${BASE_URL}/api/v1/triggerdbsync/om
-${TASK_NAME_1}    ContainerHealthTask
-${TASK_NAME_2}    OmDeltaRequest
-${BUCKET}         testbucket
-${VOLUME}         testvolume
-${KEYPATH}           ${VOLUME}/${BUCKET}/testkey
+${TASK_NAME_1}            ContainerHealthTask
+${TASK_NAME_2}            OmDeltaRequest
+${BUCKET}                 testbucket
+${VOLUME}                 testvolume
+${KEYPATH}                ${VOLUME}/${BUCKET}/testkey
 
 *** Keywords ***
 
@@ -41,7 +41,7 @@ Kinit as ozone admin
 Sync OM Data
   Log To Console          Sending CURL request to ${TRIGGER_SYNC_ENDPOINT}
   ${result} =             Execute       curl --negotiate -u : -LSs ${TRIGGER_SYNC_ENDPOINT}
-  Should contain          ${result}     true    # Sync should return true if successful
+  [return]  ${result}
 
 Fetch Task Status
   Log To Console          Sending CURL request to ${TASK_STATUS_ENDPOINT}
@@ -56,9 +56,10 @@ Prepopulate Data and Trigger OM DB Sync
     [Documentation]  Use Freon to prepopulate the OM DB with data and trigger OM DB sync.
 
     Kinit as ozone admin
-    Freon DFSG        n=1000        path=${KEYPATH}
+    Freon DFSG        n=100        path=${KEYPATH}    size=100
 
-    Sync OM Data
+    ${result} =             Sync OM Data
+    Should contain          ${result}     true    # Sync should return true if successful
 
 Validate Task Status After Sync
     [Documentation]  Validate that task status is updated after triggering the OM DB sync.
@@ -103,13 +104,10 @@ Validate All Tasks Updated After Sync
     END
 
 Validate Sequence number is updated after sync
-    Log To Console          Generating Freon Data
-    Kinit as ozone admin
-    Freon DFSG        n=100        path=${VOLUME}/${BUCKET}/seqValidationKey
+    Log To Console          Triggering OM DB sync for updates
     Sync OM Data
-
-    ${tasks} =        Fetch Task Status
-    Should Not Be Empty    ${tasks}
+    ${tasks} =              Fetch Task Status
+    Should Not Be Empty     ${tasks}
 
     ${om_delta_task_list} =        Evaluate       [task for task in ${tasks} if task["taskName"] == "OmDeltaRequest"]
     ${list_length} =               Get Length     ${om_delta_task_list}

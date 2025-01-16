@@ -478,10 +478,7 @@ public class OzoneManagerServiceProviderImpl
       inLoopStartSequenceNumber = inLoopLatestSequenceNumber;
       loopCount++;
     }
-    // We might reach loop count limit and so not all updates from RocksDB might be applied.
-    // Say we have: 1000 updates, each loop we get only 100 updates, loop limit is 5.
-    // So this will effectively only apply 500 events, even if we are having total 1000 updates/events;
-    // All subsequent tasks will effectively process only 500 events, till next sync takes place.
+
     omdbUpdatesHandler.setLatestSequenceNumber(getCurrentOMDBSequenceNumber());
     LOG.info("Delta updates received from OM : {} loops, {} records", loopCount,
         getCurrentOMDBSequenceNumber() - fromSequenceNumber
@@ -544,8 +541,8 @@ public class OzoneManagerServiceProviderImpl
    *   <li>Initially it will fetch a snapshot of OM DB.</li>
    *   <li>If we already have data synced it will try to fetch delta updates.</li>
    *   <li>If the sync is completed successfully it will trigger other OM tasks to process events</li>
-   *   <li>If there is any exception while trying to fetch delta updates, it will fall back to snapshot update</li>
-   *   <li>If there is any exception in snapshot sync it will do nothing.</li>
+   *   <li>If there is any exception while trying to fetch delta updates, it will fall back to full snapshot update</li>
+   *   <li>If there is any exception in full snapshot update it will do nothing, and return true.</li>
    *   <li>In case of an interrupt signal (irrespective of delta or snapshot sync),
    *       it will catch and mark the task as interrupted, and return false i.e. sync failed status.</li>
    * </ul>
