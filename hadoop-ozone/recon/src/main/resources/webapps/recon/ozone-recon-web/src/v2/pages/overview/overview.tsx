@@ -485,7 +485,8 @@ const Overview: React.FC<{}> = () => {
                   )
                 }
               ]}
-              linkToUrl='/Om' />
+              linkToUrl='/Om'
+              state={{activeTab: '2'}} />
           </Col>
           <Col xs={24} sm={24} md={24} lg={12} xl={12}>
             <OverviewSummaryCard
@@ -524,11 +525,12 @@ const Overview: React.FC<{}> = () => {
                   )
                 }
               ]}
-              linkToUrl='/Om' />
+              linkToUrl='/Om'
+              state={{activeTab: '3'}} />
           </Col>
         </Row>
         <span style={{ paddingLeft: '8px' }}>
-          <span style={{ color: '#6E6E6E' }}>OM ID:&nbsp;</span>
+          <span style={{ color: '#6E6E6E' }}>Ozone Service ID:&nbsp;</span>
           {omServiceId}
         </span>
         <span style={{ marginLeft: '12px', marginRight: '12px' }}> | </span>

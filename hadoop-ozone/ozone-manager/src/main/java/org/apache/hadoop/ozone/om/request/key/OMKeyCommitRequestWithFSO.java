@@ -23,9 +23,9 @@ import java.util.HashMap;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.request.util.OmKeyHSyncUtil;
 import org.apache.hadoop.util.Time;
-import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -76,8 +76,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long trxnLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long trxnLogIndex = context.getIndex();
 
     CommitKeyRequest commitKeyRequest = getOmRequest().getCommitKeyRequest();
 

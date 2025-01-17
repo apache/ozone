@@ -19,9 +19,11 @@
 package org.apache.hadoop.hdds.scm.container.balancer;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Info about balancer status.
@@ -50,5 +52,22 @@ public class ContainerBalancerStatusInfo {
 
   public List<ContainerBalancerTaskIterationStatusInfo> getIterationsStatusInfo() {
     return iterationsStatusInfo;
+  }
+
+  /**
+   * Converts an instance into a protobuf-compatible object.
+   * @return proto representation
+   */
+  public StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoProto toProto() {
+    return StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoProto
+        .newBuilder()
+        .setStartedAt(getStartedAt().toEpochSecond())
+        .setConfiguration(getConfiguration())
+        .addAllIterationsStatusInfo(
+            getIterationsStatusInfo()
+                .stream()
+                .map(ContainerBalancerTaskIterationStatusInfo::toProto)
+                .collect(Collectors.toList())
+        ).build();
   }
 }

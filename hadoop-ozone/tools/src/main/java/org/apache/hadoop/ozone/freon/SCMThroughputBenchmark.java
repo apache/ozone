@@ -59,6 +59,7 @@ import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.HttpClientBuilder;
+import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -108,8 +109,9 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcRetryInterval
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 @SuppressWarnings("java:S2245") // no need for secure random
-public final class SCMThroughputBenchmark implements Callable<Void> {
+public final class SCMThroughputBenchmark implements Callable<Void>, FreonSubcommand {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(SCMThroughputBenchmark.class);
@@ -185,12 +187,9 @@ public final class SCMThroughputBenchmark implements Callable<Void> {
 
   private ScmBlockLocationProtocol scmBlockClient;
 
-  private SCMThroughputBenchmark() {
-  }
-
   @Override
   public Void call() throws Exception {
-    conf = freon.createOzoneConfiguration();
+    conf = freon.getOzoneConf();
 
     ThroughputBenchmark benchmark = createBenchmark();
     initCluster(benchmark);
@@ -867,12 +866,9 @@ public final class SCMThroughputBenchmark implements Callable<Void> {
         RANDOM.nextInt(256) + "." + RANDOM.nextInt(256) + "." + RANDOM
             .nextInt(256) + "." + RANDOM.nextInt(256);
 
-    DatanodeDetails.Port containerPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.STANDALONE, 0);
-    DatanodeDetails.Port ratisPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.RATIS, 0);
-    DatanodeDetails.Port restPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.REST, 0);
+    DatanodeDetails.Port containerPort = DatanodeDetails.newStandalonePort(0);
+    DatanodeDetails.Port ratisPort = DatanodeDetails.newRatisPort(0);
+    DatanodeDetails.Port restPort = DatanodeDetails.newRestPort(0);
     DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
     builder.setUuid(uuid).setHostName("localhost")
         .setIpAddress(ipAddress)

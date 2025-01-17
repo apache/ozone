@@ -17,13 +17,8 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
  * limitations under the License.
  */
 
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
-import org.kohsuke.MetaInfServices;
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import java.util.concurrent.Callable;
 
 /**
  * View status of one or more datanodes.
@@ -37,20 +32,6 @@ import java.util.concurrent.Callable;
         DecommissionStatusSubCommand.class
     })
 
-@MetaInfServices(SubcommandWithParent.class)
-public class StatusSubCommand implements Callable<Void>, SubcommandWithParent {
+public class StatusSubCommand {
 
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
-
-  @Override
-  public Void call() throws Exception {
-    GenericCli.missingSubcommand(spec);
-    return null;
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return DatanodeCommands.class;
-  }
 }

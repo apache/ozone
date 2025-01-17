@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.shell;
 
+import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.ratis.shell.cli.sh.RatisShell;
@@ -30,24 +31,15 @@ import picocli.CommandLine;
         description = "Shell for running Ratis commands",
         versionProvider = HddsVersionProvider.class,
         mixinStandardHelpOptions = true)
-public class OzoneRatis extends Shell {
+public class OzoneRatis extends GenericCli {
 
-  public OzoneRatis() {
-    super(OzoneRatis.class);
-  }
-
-  /**
-   * Main for the OzoneRatis Command handling.
-   *
-   * @param argv - System Args Strings[]
-   */
   public static void main(String[] argv) throws Exception {
     new OzoneRatis().run(argv);
   }
 
   @Override
   public int execute(String[] argv) {
-    TracingUtil.initTracing("shell", createOzoneConfiguration());
+    TracingUtil.initTracing("shell", getOzoneConf());
     String spanName = "ozone ratis" + String.join(" ", argv);
     return TracingUtil.executeInNewSpan(spanName, () -> {
       // TODO: When Ozone has RATIS-2155, update this line to use the RatisShell.Builder

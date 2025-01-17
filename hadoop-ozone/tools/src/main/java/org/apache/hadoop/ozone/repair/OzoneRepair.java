@@ -18,77 +18,28 @@
 
 package org.apache.hadoop.ozone.repair;
 
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.cli.ExtensibleParentCommand;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.cli.RepairSubcommand;
 import picocli.CommandLine;
-
-import java.nio.charset.StandardCharsets;
-import java.util.Scanner;
 
 /**
  * Ozone Repair Command line tool.
  */
 @CommandLine.Command(name = "ozone repair",
-    description = "Operational tool to repair Ozone",
+    description = "Advanced tool to repair Ozone. The nodes being repaired " +
+        "must be stopped before the tool is run.",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
-public class OzoneRepair extends GenericCli {
+public class OzoneRepair extends GenericCli implements ExtensibleParentCommand {
 
-  public static final String WARNING_SYS_USER_MESSAGE =
-      "ATTENTION: Running as user %s. Make sure this is the same user used to run the Ozone process." +
-          " Are you sure you want to continue (y/N)? ";
-
-
-  private OzoneConfiguration ozoneConf;
-
-  public OzoneRepair() {
-    super(OzoneRepair.class);
-  }
-
-  @VisibleForTesting
-  public OzoneRepair(OzoneConfiguration configuration) {
-    super(OzoneRepair.class);
-    this.ozoneConf = configuration;
-  }
-
-  public OzoneConfiguration getOzoneConf() {
-    if (ozoneConf == null) {
-      ozoneConf = createOzoneConfiguration();
-    }
-    return ozoneConf;
-  }
-
-  /**
-   * Main for the Ozone Repair shell Command handling.
-   *
-   * @param argv - System Args Strings[]
-   * @throws Exception
-   */
-  public static void main(String[] argv) throws Exception {
+  public static void main(String[] argv) {
     new OzoneRepair().run(argv);
   }
 
   @Override
-  public int execute(String[] argv) {
-    String currentUser = getSystemUserName();
-    if (!("y".equalsIgnoreCase(getConsoleReadLineWithFormat(currentUser)))) {
-      System.out.println("Aborting command.");
-      return 1;
-    }
-    System.out.println("Run as user: " + currentUser);
-
-    return super.execute(argv);
+  public Class<?> subcommandType() {
+    return RepairSubcommand.class;
   }
-
-  public  String getSystemUserName() {
-    return System.getProperty("user.name");
-  }
-
-  public  String getConsoleReadLineWithFormat(String currentUser) {
-    System.err.printf(WARNING_SYS_USER_MESSAGE, currentUser);
-    return (new Scanner(System.in, StandardCharsets.UTF_8.name())).nextLine().trim();
-  }
-
 }

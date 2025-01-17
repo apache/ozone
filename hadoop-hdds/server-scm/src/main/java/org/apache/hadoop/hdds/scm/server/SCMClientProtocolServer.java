@@ -37,10 +37,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransaction
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto.Builder;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.NodeTransferInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolPB;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslatorPB;
@@ -1215,48 +1213,7 @@ public class SCMClientProtocolServer implements
       return ContainerBalancerStatusInfoResponseProto
           .newBuilder()
           .setIsRunning(true)
-          .setContainerBalancerStatusInfo(StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfo
-              .newBuilder()
-              .setStartedAt(balancerStatusInfo.getStartedAt().toEpochSecond())
-              .setConfiguration(balancerStatusInfo.getConfiguration())
-              .addAllIterationsStatusInfo(
-                  balancerStatusInfo.getIterationsStatusInfo()
-                      .stream()
-                      .map(
-                          info -> ContainerBalancerTaskIterationStatusInfo.newBuilder()
-                              .setIterationNumber(info.getIterationNumber())
-                              .setIterationResult(Optional.ofNullable(info.getIterationResult()).orElse(""))
-                              .setSizeScheduledForMoveGB(info.getSizeScheduledForMoveGB())
-                              .setDataSizeMovedGB(info.getDataSizeMovedGB())
-                              .setContainerMovesScheduled(info.getContainerMovesScheduled())
-                              .setContainerMovesCompleted(info.getContainerMovesCompleted())
-                              .setContainerMovesFailed(info.getContainerMovesFailed())
-                              .setContainerMovesTimeout(info.getContainerMovesTimeout())
-                              .addAllSizeEnteringNodesGB(
-                                  info.getSizeEnteringNodesGB().entrySet()
-                                      .stream()
-                                      .map(entry -> NodeTransferInfo.newBuilder()
-                                          .setUuid(entry.getKey().toString())
-                                          .setDataVolumeGB(entry.getValue())
-                                          .build()
-                                      )
-                                      .collect(Collectors.toList())
-                              )
-                              .addAllSizeLeavingNodesGB(
-                                  info.getSizeLeavingNodesGB().entrySet()
-                                      .stream()
-                                      .map(entry -> NodeTransferInfo.newBuilder()
-                                          .setUuid(entry.getKey().toString())
-                                          .setDataVolumeGB(entry.getValue())
-                                          .build()
-                                      )
-                                      .collect(Collectors.toList())
-                              )
-                              .build()
-                      )
-                      .collect(Collectors.toList())
-              )
-          )
+          .setContainerBalancerStatusInfo(balancerStatusInfo.toProto())
           .build();
     }
   }

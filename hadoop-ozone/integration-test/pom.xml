@@ -28,6 +28,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <name>Apache Ozone Integration Tests</name>
   <packaging>jar</packaging>
 
+  <properties>
+    <sort.skip>true</sort.skip>
+  </properties>
+
   <dependencies>
 
     <dependency>
@@ -262,6 +266,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>jul-to-slf4j</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <version>${assertj.version}</version>
     </dependency>
   </dependencies>
 

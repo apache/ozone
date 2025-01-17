@@ -103,7 +103,7 @@ class OverviewCardWrapper extends React.Component<IOverviewCardWrapperProps> {
         active: '3'
       }
     }
-    else if (title === 'OM Service') {
+    else if (title === 'Ozone Service ID') {
       return {
         active: '4'
       }
@@ -154,7 +154,12 @@ class OverviewCard extends React.Component<IOverviewCardProps> {
         <div className='ant-card-percentage'>
           {meta}
           <div className='storage-bar'>
-            <StorageBar total={storageReport.capacity} used={storageReport.used} remaining={storageReport.remaining} showMeta={false} />
+            <StorageBar
+              total={storageReport.capacity}
+              used={storageReport.used}
+              remaining={storageReport.remaining}
+              committed={storageReport.committed}
+              showMeta={false} />
           </div>
         </div>
       );

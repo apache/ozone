@@ -24,8 +24,11 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.function.BiPredicate;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.jooq.exception.DataAccessException;
 import org.jooq.impl.DSL;
@@ -95,4 +98,23 @@ public final class SqlDbUtils {
         LOG.info("{} table already exists, skipping creation.", tableName);
         return true;
       };
+
+  /**
+   * Utility method to list all user-defined tables in the database.
+   *
+   * @param connection The database connection to use.
+   * @return A list of table names (user-defined tables only).
+   * @throws SQLException If there is an issue accessing the database metadata.
+   */
+  public static List<String> listAllTables(Connection connection) throws SQLException {
+    List<String> tableNames = new ArrayList<>();
+    try (ResultSet resultSet = connection.getMetaData().getTables(null, null, null, new String[]{"TABLE"})) {
+      while (resultSet.next()) {
+        String tableName = resultSet.getString("TABLE_NAME");
+        tableNames.add(tableName);
+      }
+    }
+    LOG.debug("Found {} user-defined tables in the database: {}", tableNames.size(), tableNames);
+    return tableNames;
+  }
 }

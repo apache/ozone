@@ -330,7 +330,11 @@ public final class Pipeline {
   }
 
   void reportDatanode(DatanodeDetails dn) throws IOException {
-    if (nodeStatus.get(dn) == null) {
+    //This is a workaround for the case a datanode restarted with reinitializing it's dnId but it still reports the
+    // same set of pipelines it was part of. The pipeline report should be accepted for this anomalous condition.
+    //  We rely on StaleNodeHandler in closing this pipeline eventually.
+    if (dn == null || (nodeStatus.get(dn) == null
+        && nodeStatus.keySet().stream().noneMatch(node -> node.compareNodeValues(dn)))) {
       throw new IOException(
           String.format("Datanode=%s not part of pipeline=%s", dn, id));
     }
@@ -362,12 +366,17 @@ public final class Pipeline {
 
   public HddsProtos.Pipeline getProtobufMessage(int clientVersion)
       throws UnknownPipelineStateException {
+    return getProtobufMessage(clientVersion, Collections.emptySet());
+  }
+
+  public HddsProtos.Pipeline getProtobufMessage(int clientVersion, Set<DatanodeDetails.Port.Name> filterPorts)
+      throws UnknownPipelineStateException {
 
     List<HddsProtos.DatanodeDetailsProto> members = new ArrayList<>();
     List<Integer> memberReplicaIndexes = new ArrayList<>();
 
     for (DatanodeDetails dn : nodeStatus.keySet()) {
-      members.add(dn.toProto(clientVersion));
+      members.add(dn.toProto(clientVersion, filterPorts));
       memberReplicaIndexes.add(replicaIndexes.getOrDefault(dn, 0));
     }
 

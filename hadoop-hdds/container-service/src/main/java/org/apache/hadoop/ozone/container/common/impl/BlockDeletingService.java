@@ -137,8 +137,7 @@ public class BlockDeletingService extends BackgroundService {
           chooseContainerForBlockDeletion(getBlockLimitPerInterval(),
               containerDeletionPolicy);
 
-      BackgroundTask
-          containerBlockInfos = null;
+      BackgroundTask containerBlockInfos = null;
       long totalBlocks = 0;
       for (ContainerBlockInfo containerBlockInfo : containers) {
         BlockDeletingTaskBuilder builder =
@@ -149,13 +148,11 @@ public class BlockDeletingService extends BackgroundService {
         containerBlockInfos = builder.build();
         queue.add(containerBlockInfos);
         totalBlocks += containerBlockInfo.getNumBlocksToDelete();
+        LOG.debug("Queued- Container: {}, deleted blocks: {}",
+            containerBlockInfo.getContainerData().getContainerID(), containerBlockInfo.getNumBlocksToDelete());
       }
       metrics.incrTotalBlockChosenCount(totalBlocks);
       metrics.incrTotalContainerChosenCount(containers.size());
-      if (containers.size() > 0) {
-        LOG.debug("Queued {} blocks from {} containers for deletion",
-            totalBlocks, containers.size());
-      }
     } catch (StorageContainerException e) {
       LOG.warn("Failed to initiate block deleting tasks, "
           + "caused by unable to get containers info. "

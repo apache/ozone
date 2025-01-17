@@ -157,13 +157,11 @@ abstract class AbstractRootedOzoneFileSystemTest {
   private OzoneClient client;
 
   AbstractRootedOzoneFileSystemTest(BucketLayout bucketLayout, boolean setDefaultFs,
-      boolean enableOMRatis, boolean isAclEnabled, boolean noFlush) {
+      boolean isAclEnabled) {
     // Initialize the cluster before EACH set of parameters
     this.bucketLayout = bucketLayout;
     enabledFileSystemPaths = setDefaultFs;
-    omRatisEnabled = enableOMRatis;
     enableAcl = isAclEnabled;
-    useOnlyCache = noFlush;
     isBucketFSOptimized = bucketLayout.isFileSystemOptimized();
   }
 
@@ -202,11 +200,8 @@ abstract class AbstractRootedOzoneFileSystemTest {
   }
 
   private final boolean enabledFileSystemPaths;
-  private final boolean omRatisEnabled;
   private final boolean isBucketFSOptimized;
   private final boolean enableAcl;
-
-  private final boolean useOnlyCache;
 
   private OzoneConfiguration conf;
   private MiniOzoneCluster cluster;
@@ -236,7 +231,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
     conf.setFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
     conf.setFloat(FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
     conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, TRASH_INTERVAL / 2);
-    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
     conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
@@ -282,10 +276,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
     userOfs = UGI_USER1.doAs(
         (PrivilegedExceptionAction<RootedOzoneFileSystem>)()
             -> (RootedOzoneFileSystem) FileSystem.get(conf));
-
-    if (useOnlyCache) {
-      cluster.getOzoneManager().getOmServerProtocol().setShouldFlushCache(omRatisEnabled);
-    }
   }
 
   protected OMMetrics getOMMetrics() {
@@ -1071,7 +1061,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
   private List<FileStatus> callAdapterListStatus(String pathStr,
       boolean recursive, String startPath, long numEntries) throws IOException {
     return adapter.listStatus(pathStr, recursive, startPath, numEntries,
-        ofs.getUri(), ofs.getWorkingDirectory(), ofs.getUsername())
+        ofs.getUri(), ofs.getWorkingDirectory(), ofs.getUsername(), false)
         .stream().map(ofs::convertFileStatus).collect(Collectors.toList());
   }
 
@@ -1207,7 +1197,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     ClientProtocol proxy = objectStore.getClientProxy();
     // Get default acl rights for user
     OzoneAclConfig aclConfig = conf.getObject(OzoneAclConfig.class);
-    ACLType userRights = aclConfig.getUserDefaultRights();
+    ACLType[] userRights = aclConfig.getUserDefaultRights();
     // Construct ACL for world access
     // ACL admin owner, world read+write
     EnumSet<ACLType> aclRights = EnumSet.of(READ, WRITE);
@@ -1310,7 +1300,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     ClientProtocol proxy = objectStore.getClientProxy();
     // Get default acl rights for user
     OzoneAclConfig aclConfig = conf.getObject(OzoneAclConfig.class);
-    ACLType userRights = aclConfig.getUserDefaultRights();
+    ACLType[] userRights = aclConfig.getUserDefaultRights();
     // Construct ACL for world access
     OzoneAcl aclWorldAccess = new OzoneAcl(ACLIdentityType.WORLD, "",
         ACCESS, userRights);
@@ -2311,7 +2301,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
     // Get default acl rights for user
     OzoneAclConfig aclConfig = conf.getObject(OzoneAclConfig.class);
-    ACLType userRights = aclConfig.getUserDefaultRights();
+    ACLType[] userRights = aclConfig.getUserDefaultRights();
     // Construct ACL for world access
     OzoneAcl aclWorldAccess = new OzoneAcl(ACLIdentityType.WORLD, "",
         ACCESS, userRights);
@@ -2364,9 +2354,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
   @Test
   void testSnapshotRead() throws Exception {
-    if (useOnlyCache) {
-      return;
-    }
     // Init data
     OzoneBucket bucket1 =
         TestDataUtil.createVolumeAndBucket(client, bucketLayout);
@@ -2413,9 +2400,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
   @Test
   void testSnapshotDiff() throws Exception {
-    if (useOnlyCache) {
-      return;
-    }
     OzoneBucket bucket1 =
         TestDataUtil.createVolumeAndBucket(client, bucketLayout);
     Path volumePath1 = new Path(OZONE_URI_DELIMITER, bucket1.getVolumeName());

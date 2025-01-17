@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 
 import com.codahale.metrics.Timer;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
@@ -45,6 +46,7 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 public class OzoneClientKeyGenerator extends BaseFreonGenerator
     implements Callable<Void> {
 

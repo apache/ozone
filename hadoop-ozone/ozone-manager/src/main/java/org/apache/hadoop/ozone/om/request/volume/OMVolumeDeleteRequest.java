@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 
 import com.google.common.base.Preconditions;
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 import org.slf4j.Logger;
@@ -65,8 +65,8 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long transactionLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long transactionLogIndex = context.getIndex();
 
     DeleteVolumeRequest deleteVolumeRequest =
         getOmRequest().getDeleteVolumeRequest();

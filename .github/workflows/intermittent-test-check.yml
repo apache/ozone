@@ -115,7 +115,7 @@ jobs:
           java-version: 8
       - name: Build (most) of Ozone
         run: |
-          args="-Dskip.npx -Dskip.installnpx -DskipShade -Dmaven.javadoc.skip=true"
+          args="-DskipRecon -DskipShade -Dmaven.javadoc.skip=true"
           if [[ "${{ github.event.inputs.ratis-ref }}" != "" ]]; then
             args="$args -Dratis.version=${{ needs.ratis.outputs.ratis-version }}"
             args="$args -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }}"
@@ -183,7 +183,7 @@ jobs:
             export OZONE_REPO_CACHED=true
           fi
 
-          args="-DexcludedGroups=native|slow|unhealthy"
+          args="-DexcludedGroups=native|slow|unhealthy -DskipShade"
           if [[ "${{ github.event.inputs.ratis-ref }}" != "" ]]; then
             args="$args -Dratis.version=${{ needs.ratis.outputs.ratis-version }}"
             args="$args -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }}"
@@ -203,7 +203,7 @@ jobs:
           fi
         continue-on-error: true
         env:
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
       - name: Summary of failures
         run: hadoop-ozone/dev-support/checks/_summary.sh target/unit/summary.txt
         if: ${{ !cancelled() }}

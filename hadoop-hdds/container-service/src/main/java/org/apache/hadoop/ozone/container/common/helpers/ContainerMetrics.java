@@ -30,7 +30,9 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
+import java.io.Closeable;
 import java.util.EnumMap;
 
 /**
@@ -47,7 +49,7 @@ import java.util.EnumMap;
  */
 @InterfaceAudience.Private
 @Metrics(about = "Storage Container DataNode Metrics", context = "dfs")
-public class ContainerMetrics {
+public class ContainerMetrics implements Closeable {
   public static final String STORAGE_CONTAINER_METRICS =
       "StorageContainerMetrics";
   @Metric private MutableCounterLong numOps;
@@ -103,6 +105,11 @@ public class ContainerMetrics {
   public static void remove() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(STORAGE_CONTAINER_METRICS);
+  }
+
+  @Override
+  public void close() {
+    opsLatQuantiles.values().forEach(MetricUtil::stop);
   }
 
   public void incContainerOpsMetrics(ContainerProtos.Type type) {
