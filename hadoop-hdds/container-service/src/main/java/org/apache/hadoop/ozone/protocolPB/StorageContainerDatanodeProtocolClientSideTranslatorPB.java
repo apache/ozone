@@ -21,10 +21,9 @@ import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos
     .ExtendedDatanodeDetailsProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodePreviousStateRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodePreviousStateResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeStateRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeStateResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
@@ -184,17 +183,17 @@ public class StorageContainerDatanodeProtocolClientSideTranslatorPB
         .getRegisterResponse();
   }
 
-  public HddsProtos.NodeState getNodePreviousState(UUID datanodeUuid) throws IOException {
-    NodePreviousStateRequestProto request = NodePreviousStateRequestProto.newBuilder()
+  public HddsProtos.NodeState getNodeState(UUID datanodeUuid) throws IOException {
+    NodeStateRequestProto request = NodeStateRequestProto.newBuilder()
         .setDatanodeUUID(datanodeUuid.toString())
         .build();
-    return getNodePreviousState(request).getPreviousState();
+    return getNodeState(request).getNodeState();
 
   }
 
   @Override
-  public NodePreviousStateResponseProto getNodePreviousState(NodePreviousStateRequestProto request) throws IOException {
-    return submitRequest(Type.NodePreviousState, builder -> builder.setNodePreviousStateRequest(request))
-        .getNodePreviousStateResponse();
+  public NodeStateResponseProto getNodeState(NodeStateRequestProto request) throws IOException {
+    return submitRequest(Type.NodePreviousState, builder -> builder.setNodeStateRequest(request))
+        .getNodeStateResponse();
   }
 }

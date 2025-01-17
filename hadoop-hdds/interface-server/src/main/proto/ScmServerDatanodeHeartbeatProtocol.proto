@@ -44,7 +44,7 @@ message SCMDatanodeRequest {
   optional SCMVersionRequestProto getVersionRequest = 3;
   optional SCMRegisterRequestProto registerRequest = 4;
   optional SCMHeartbeatRequestProto sendHeartbeatRequest = 5;
-  optional NodePreviousStateRequestProto nodePreviousStateRequest = 6;
+  optional NodeStateRequestProto nodeStateRequest = 6;
 }
 
 message SCMDatanodeResponse {
@@ -61,7 +61,7 @@ message SCMDatanodeResponse {
   optional SCMVersionResponseProto getVersionResponse = 6;
   optional SCMRegisteredResponseProto registerResponse = 7;
   optional SCMHeartbeatResponseProto sendHeartbeatResponse = 8;
-  optional NodePreviousStateResponseProto nodePreviousStateResponse = 9;
+  optional NodeStateResponseProto nodeStateResponse = 9;
 
 }
 
@@ -127,7 +127,7 @@ message SCMRegisteredResponseProto {
   optional string networkLocation = 8;
 }
 
-message NodePreviousStateRequestProto {
+message NodeStateRequestProto {
   required string datanodeUUID = 1;
 }
 
@@ -164,8 +164,8 @@ message SCMHeartbeatResponseProto {
   optional int64 term = 3;
 }
 
-message NodePreviousStateResponseProto {
-  optional NodeState previousState = 1;
+message NodeStateResponseProto {
+  optional NodeState nodeState = 1;
 }
 
 

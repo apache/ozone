@@ -122,8 +122,8 @@ public class StorageContainerDatanodeProtocolServerSideTranslatorPB
         return SCMDatanodeResponse.newBuilder()
             .setCmdType(cmdType)
             .setStatus(Status.OK)
-            .setNodePreviousStateResponse(
-                impl.getNodePreviousState(request.getNodePreviousStateRequest()))
+            .setNodeStateResponse(
+                impl.getNodeState(request.getNodeStateRequest()))
             .build();
       default:
         throw new ServiceException("Unknown command type: " + cmdType);

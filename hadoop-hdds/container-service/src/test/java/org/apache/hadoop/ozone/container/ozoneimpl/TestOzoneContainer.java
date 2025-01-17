@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -37,6 +38,10 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
@@ -46,13 +51,22 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
@@ -63,7 +77,17 @@ import java.util.ArrayList;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DISK_OUT_OF_SPACE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.when;
 
 /**
  * This class is used to test OzoneContainer.
@@ -251,6 +275,67 @@ public class TestOzoneContainer {
     assertEquals(DISK_OUT_OF_SPACE, e.getResult());
   }
 
+  @Test
+  public void testCleanUpMetadataDirInCaseOfDeadNodeState() throws Exception {
+    // given
+    doReturn("7292dd16-71bf-4e43-bd96-c68c3cef9bb7").when(datanodeDetails).getUuidString();
+    initTest(ContainerTestVersionInfo.getLayoutList().get(0));
+
+    // metadata directory bellow contains the following 4 pipelines
+    List<String> pipelinesShouldBeDeleted = new ArrayList<String>(4) {{
+        add("1d076d52-0072-4adc-938c-8de43cb2f606");
+        add("1ebaa8d2-4a76-4662-8fbf-08d851b2e261");
+        add("2b762e18-1ca5-4da8-bb78-d45121efbebe");
+        add("2d79a291-3b23-4af4-a632-8e265eba5735");
+      }};
+
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, folder.resolve("MetadataDir").toString());
+    conf.set(ScmConfigKeys.OZONE_SCM_NAMES, "localhost");
+
+    // copy the metadata directory mentioned above to the tmp directory
+    FileUtils.copyDirectory(new File(Objects.requireNonNull(getClass().getClassLoader().getResource("metadata"))
+            .toURI()), new File(folder.toFile().getAbsolutePath() + "/MetadataDir"));
+
+    DatanodeStateMachine datanodeStateMachine = mock(DatanodeStateMachine.class);
+    when(datanodeStateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
+    StateContext context = mock(StateContext.class);
+    when(context.getParent()).thenReturn(datanodeStateMachine);
+    SCMConnectionManager scmConnectionManager = spy(new SCMConnectionManager(conf));
+
+    doAnswer(invocation -> {
+      Collection<EndpointStateMachine> addresses = (Collection<EndpointStateMachine>) invocation.callRealMethod();
+      EndpointStateMachine rpcEndpoint = spy((EndpointStateMachine) addresses.toArray()[0]);
+      StorageContainerDatanodeProtocolClientSideTranslatorPB scmDatanodeProtocol =
+          mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+      doReturn(scmDatanodeProtocol).when(rpcEndpoint).getEndPoint();
+      doReturn(HddsProtos.NodeState.DEAD).when(scmDatanodeProtocol)
+          .getNodeState(any(UUID.class));
+      return Collections.singletonList(rpcEndpoint);
+    }).when(scmConnectionManager).getValues();
+
+    try (MockedStatic<FileUtils> fileUtilsMock = Mockito.mockStatic(FileUtils.class, CALLS_REAL_METHODS)) {
+      // when
+      new OzoneContainer(null, datanodeDetails, conf, context, null, null, scmConnectionManager);
+      ArgumentCaptor<File> fileCaptor = ArgumentCaptor.forClass(File.class);
+
+      // then
+      List<File> files = Arrays.asList(Objects.requireNonNull(new File(folder.toFile().getAbsolutePath()
+          + "/MetadataDir/ratis").listFiles()));
+      assertEquals(2, files.size());
+      files.forEach(file -> assertTrue(file.getName().equals("tmp") || file.getName().equals("scmUsed")));
+
+
+      // and then
+      fileUtilsMock.verify(() -> FileUtils.deleteDirectory(fileCaptor.capture()), times(4));
+      fileCaptor.getAllValues().forEach(pipelineDirectory -> {
+        String remove = pipelinesShouldBeDeleted.remove(pipelinesShouldBeDeleted.indexOf(pipelineDirectory.getName()));
+        assertNotNull(remove);
+      });
+      assertEquals(0, pipelinesShouldBeDeleted.size());
+    }
+
+  }
+
   //verify committed space on each volume
   private void verifyCommittedSpace(OzoneContainer oc) {
     List<HddsVolume> volumes = StorageVolumeUtil.getHddsVolumesList(
@@ -328,6 +413,6 @@ public class TestOzoneContainer {
         .addPort(containerPort)
         .addPort(ratisPort)
         .addPort(restPort);
-    return builder.build();
+    return spy(builder.build());
   }
 }

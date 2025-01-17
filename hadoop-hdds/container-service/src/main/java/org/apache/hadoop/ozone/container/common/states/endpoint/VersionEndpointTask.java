@@ -16,16 +16,11 @@
  */
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.BindException;
-import java.util.Arrays;
-import java.util.Objects;
 import java.util.concurrent.Callable;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
@@ -98,20 +93,6 @@ public class VersionEndpointTask implements
               = new DatanodeLayoutStorage(configuration);
           layoutStorage.setClusterId(clusterId);
           layoutStorage.persistCurrentState();
-
-          HddsProtos.NodeState nodePreviousState = rpcEndPoint.getEndPoint()
-              .getNodePreviousState(ozoneContainer.getDatanodeDetails().getUuid());
-
-          if (nodePreviousState != null && nodePreviousState.equals(HddsProtos.NodeState.DEAD)) {
-            ozoneContainer.getMetaVolumeSet().getVolumeMap().forEach((key, value) ->
-                Arrays.asList(Objects.requireNonNull(value.getStorageDir().listFiles())).stream().filter(File::isDirectory).forEach(f -> {
-                  try {
-                    FileUtils.deleteDirectory(f);
-                  } catch (IOException e) {
-                    LOG.warn("Failed to delete directory {}", f.getAbsolutePath(), e);
-                  }
-                }));
-          }
 
           // Start the container services after getting the version information
           ozoneContainer.start(clusterId);

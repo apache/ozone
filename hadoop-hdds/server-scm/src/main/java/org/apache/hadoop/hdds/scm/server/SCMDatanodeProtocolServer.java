@@ -37,9 +37,9 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodePreviousStateRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodePreviousStateResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeStateRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeStateResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconstructECContainersCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReregisterCommandProto;
@@ -279,7 +279,7 @@ public class SCMDatanodeProtocolServer implements
   }
 
   @Override
-  public NodePreviousStateResponseProto getNodePreviousState(NodePreviousStateRequestProto request) throws IOException {
+  public NodeStateResponseProto getNodeState(NodeStateRequestProto request) throws IOException {
     NodeStatus nodeStatus = null;
     try {
       DatanodeDetails nodeByUuid = scm.getScmNodeManager().getNodeByUuid(request.getDatanodeUUID());
@@ -289,9 +289,9 @@ public class SCMDatanodeProtocolServer implements
     } catch (NodeNotFoundException e) {
       LOG.warn("Node not found for UUID: {}", request.getDatanodeUUID());
     }
-    NodePreviousStateResponseProto.Builder builder = NodePreviousStateResponseProto.newBuilder();
+    NodeStateResponseProto.Builder builder = NodeStateResponseProto.newBuilder();
     if (nodeStatus != null) {
-      builder.setPreviousState(nodeStatus.getHealth());
+      builder.setNodeState(nodeStatus.getHealth());
     }
     return builder.build();
   }
