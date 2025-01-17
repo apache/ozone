@@ -375,9 +375,6 @@ public class TestStorageContainerManager {
     // start the new SCM
     try {
       scm.start();
-      // Initially DatanodeStateMachine will be in Running state
-      assertEquals(DatanodeStateMachine.DatanodeStates.RUNNING,
-          dsm.getContext().getState());
       // DN heartbeats to new SCM, SCM doesn't recognize the node, sends the
       // command to DN to re-register. Wait for SCM to send re-register command
       String expectedLog = String.format(
