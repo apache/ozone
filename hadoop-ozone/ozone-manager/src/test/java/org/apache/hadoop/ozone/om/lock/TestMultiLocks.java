@@ -22,7 +22,10 @@ package org.apache.hadoop.ozone.om.lock;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -41,6 +44,7 @@ import static org.mockito.Mockito.when;
 /**
  * Class to test class MultiLocks.
  */
+@ExtendWith(MockitoExtension.class)
 public class TestMultiLocks {
   @Mock
   private IOzoneManagerLock mockLock;
@@ -68,7 +72,7 @@ public class TestMultiLocks {
     OMLockDetails result = multiLocks.acquireLock(objects);
 
     assertEquals(mockLockDetails, result);
-    verify(mockLock, times(2)).acquireWriteLock(mockResource, anyString());
+    verify(mockLock, times(2)).acquireWriteLock(ArgumentMatchers.eq(mockResource), anyString());
   }
 
   @Test
