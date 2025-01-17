@@ -19,13 +19,27 @@ package org.apache.hadoop.ozone.om.lock;
  *
  */
 
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
- * Class to test class MultiLocks
+ * Class to test class MultiLocks.
  */
 public class TestMultiLocks {
   @Mock
@@ -105,12 +119,7 @@ public class TestMultiLocks {
     multiLocks.acquireLock(objects);
 
     // Try acquiring locks again without releasing
-    OMException exception = assertThrows(OMException.class, new Executable() {
-      @Override
-      public void execute() throws Throwable {
-        multiLocks.acquireLock(objects);
-      }
-    });
+    OMException exception = assertThrows(OMException.class, () -> multiLocks.acquireLock(objects));
 
     assertEquals("More locks cannot be acquired when locks have been already acquired. Locks acquired : [obj1]",
         exception.getMessage());
