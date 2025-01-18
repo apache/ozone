@@ -21,14 +21,8 @@ set -u -o pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "${DIR}/../../.." || exit 1
 
-: ${BATS_VERSION:="1.2.1"}
-
 source "${DIR}/_lib.sh"
-
-install_bats
-
-git clone https://github.com/bats-core/bats-assert dev-support/ci/bats-assert
-git clone https://github.com/bats-core/bats-support dev-support/ci/bats-support
+source "${DIR}/install/bats.sh"
 
 REPORT_DIR=${OUTPUT_DIR:-"${DIR}/../../../target/bats"}
 mkdir -p "${REPORT_DIR}"

@@ -19,21 +19,37 @@ set -u -o pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
-: ${FLEKSZIBLE_VERSION:="2.3.0"}
-: ${K3S_VERSION:="v1.21.2+k3s1"}
-: ${KUBECONFIG:=/etc/rancher/k3s/k3s.yaml}
-
 export KUBECONFIG
 
 source "${DIR}/_lib.sh"
+source "${DIR}/install/flekszible.sh"
 
-install_flekszible
+# TODO these functions will be removed in HDDS-12099
+install_virtualenv() {
+  _install_tool virtualenv
+}
+
+_install_virtualenv() {
+  sudo pip3 install virtualenv
+}
+
+install_robot() {
+  _install_tool robot venv/bin
+}
+
+_install_robot() {
+  virtualenv venv
+  source venv/bin/activate
+  pip install robotframework
+}
+
 install_virtualenv
 install_robot
+
 if [[ "$(uname -s)" = "Darwin" ]]; then
   echo "Skip installing k3s, not supported on Mac.  Make sure a working Kubernetes cluster is available." >&2
 else
-  install_k3s
+  source "${DIR}/install/k3s.sh"
 fi
 
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/kubernetes"}

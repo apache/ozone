@@ -14,24 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#checks:basic
+# This script installs Flekszible.
+# Requires _install_tool from _lib.sh.  Use `source` for both scripts, because it modifies $PATH.
 
-set -u -o pipefail
+: ${FLEKSZIBLE_VERSION:="2.3.0"}
 
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-cd "${DIR}/../../.." || exit 1
+_install_flekszible() {
+  mkdir bin
 
-source "${DIR}/_lib.sh"
-source "${DIR}/install/hugo.sh"
+  local os=$(uname -s)
+  local arch=$(uname -m)
 
-REPORT_DIR=${OUTPUT_DIR:-"${DIR}/../../../target/docs"}
-mkdir -p "${REPORT_DIR}"
-REPORT_FILE="${REPORT_DIR}/summary.txt"
+  curl -LSs "https://github.com/elek/flekszible/releases/download/v${FLEKSZIBLE_VERSION}/flekszible_${FLEKSZIBLE_VERSION}_${os}_${arch}.tar.gz" | tar -xz -f - -C bin
 
-hadoop-hdds/docs/dev-support/bin/generate-site.sh | tee "${REPORT_DIR}/output.log"
-rc=$?
+  chmod +x bin/flekszible
+}
 
-grep -o 'ERROR.*' "${REPORT_DIR}/output.log" > "${REPORT_FILE}"
-
-ERROR_PATTERN=""
-source "${DIR}/_post_process.sh"
+_install_tool flekszible bin

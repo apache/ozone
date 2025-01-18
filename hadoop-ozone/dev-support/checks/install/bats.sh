@@ -14,24 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#checks:basic
+# This script installs bats.
+# Requires _install_tool from _lib.sh.  Use `source` for both scripts, because it modifies $PATH.
 
-set -u -o pipefail
+: ${BATS_VERSION:="1.2.1"}
 
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-cd "${DIR}/../../.." || exit 1
+_install_bats() {
+  curl -LSs "https://github.com/bats-core/bats-core/archive/v${BATS_VERSION}.tar.gz" | tar -xz -f -
+}
 
-source "${DIR}/_lib.sh"
-source "${DIR}/install/hugo.sh"
+_install_tool bats "bats-core-${BATS_VERSION}/bin"
 
-REPORT_DIR=${OUTPUT_DIR:-"${DIR}/../../../target/docs"}
-mkdir -p "${REPORT_DIR}"
-REPORT_FILE="${REPORT_DIR}/summary.txt"
-
-hadoop-hdds/docs/dev-support/bin/generate-site.sh | tee "${REPORT_DIR}/output.log"
-rc=$?
-
-grep -o 'ERROR.*' "${REPORT_DIR}/output.log" > "${REPORT_FILE}"
-
-ERROR_PATTERN=""
-source "${DIR}/_post_process.sh"
+git clone https://github.com/bats-core/bats-assert dev-support/ci/bats-assert
+git clone https://github.com/bats-core/bats-support dev-support/ci/bats-support

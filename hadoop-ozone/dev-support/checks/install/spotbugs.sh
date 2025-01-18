@@ -14,24 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#checks:basic
+# This script installs SpotBugs.
+# Requires _install_tool from _lib.sh.  Use `source` for both scripts, because it modifies $PATH.
 
-set -u -o pipefail
+: ${SPOTBUGS_VERSION:=3.1.12}
 
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-cd "${DIR}/../../.." || exit 1
+_install_spotbugs() {
+  curl -LSs "https://repo.maven.apache.org/maven2/com/github/spotbugs/spotbugs/${SPOTBUGS_VERSION}/spotbugs-${SPOTBUGS_VERSION}.tgz" | tar -xz -f -
+}
 
-source "${DIR}/_lib.sh"
-source "${DIR}/install/hugo.sh"
-
-REPORT_DIR=${OUTPUT_DIR:-"${DIR}/../../../target/docs"}
-mkdir -p "${REPORT_DIR}"
-REPORT_FILE="${REPORT_DIR}/summary.txt"
-
-hadoop-hdds/docs/dev-support/bin/generate-site.sh | tee "${REPORT_DIR}/output.log"
-rc=$?
-
-grep -o 'ERROR.*' "${REPORT_DIR}/output.log" > "${REPORT_FILE}"
-
-ERROR_PATTERN=""
-source "${DIR}/_post_process.sh"
+_install_tool spotbugs "spotbugs-${SPOTBUGS_VERSION}/bin"

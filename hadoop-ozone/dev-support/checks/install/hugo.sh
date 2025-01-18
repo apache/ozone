@@ -14,24 +14,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#checks:basic
+# This script installs Hugo.
+# Requires _install_tool from _lib.sh.  Use `source` for both scripts, because it modifies $PATH.
 
-set -u -o pipefail
+: ${HUGO_VERSION:=0.83.1}
 
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-cd "${DIR}/../../.." || exit 1
+_install_hugo() {
+  local os=$(uname -s)
+  local arch=$(uname -m)
 
-source "${DIR}/_lib.sh"
-source "${DIR}/install/hugo.sh"
+  mkdir bin
 
-REPORT_DIR=${OUTPUT_DIR:-"${DIR}/../../../target/docs"}
-mkdir -p "${REPORT_DIR}"
-REPORT_FILE="${REPORT_DIR}/summary.txt"
+  case "${os}" in
+    Darwin)
+      os=macOS
+      ;;
+  esac
 
-hadoop-hdds/docs/dev-support/bin/generate-site.sh | tee "${REPORT_DIR}/output.log"
-rc=$?
+  case "${arch}" in
+    x86_64)
+      arch=64bit
+      ;;
+  esac
 
-grep -o 'ERROR.*' "${REPORT_DIR}/output.log" > "${REPORT_FILE}"
+  curl -LSs "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_${HUGO_VERSION}_${os}-${arch}.tar.gz" | tar -xz -f - -C bin hugo
+  chmod +x bin/hugo
+}
 
-ERROR_PATTERN=""
-source "${DIR}/_post_process.sh"
+_install_tool hugo bin
