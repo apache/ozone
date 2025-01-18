@@ -21,6 +21,8 @@ set -u -o pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "${DIR}/../../.." || exit 1
 
+: ${BATS_VERSION:="1.2.1"}
+
 source "${DIR}/_lib.sh"
 
 install_bats

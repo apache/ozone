@@ -65,11 +65,11 @@ _install_tool() {
 }
 
 install_bats() {
-  _install_tool bats bats-core-1.2.1/bin
+  _install_tool bats "bats-core-${BATS_VERSION}/bin"
 }
 
 _install_bats() {
-  curl -LSs https://github.com/bats-core/bats-core/archive/v1.2.1.tar.gz | tar -xz -f -
+  curl -LSs "https://github.com/bats-core/bats-core/archive/v${BATS_VERSION}.tar.gz" | tar -xz -f -
 }
 
 install_k3s() {
@@ -77,7 +77,7 @@ install_k3s() {
 }
 
 _install_k3s() {
-  curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="v1.21.2+k3s1" sh -
+  curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="${K3S_VERSION}" sh -
   sudo chmod a+r $KUBECONFIG
 }
 
@@ -91,7 +91,7 @@ _install_flekszible() {
   local os=$(uname -s)
   local arch=$(uname -m)
 
-  curl -LSs https://github.com/elek/flekszible/releases/download/v2.3.0/flekszible_2.3.0_${os}_${arch}.tar.gz | tar -xz -f - -C bin
+  curl -LSs "https://github.com/elek/flekszible/releases/download/v${FLEKSZIBLE_VERSION}/flekszible_${FLEKSZIBLE_VERSION}_${os}_${arch}.tar.gz" | tar -xz -f - -C bin
 
   chmod +x bin/flekszible
 }
@@ -101,8 +101,6 @@ install_hugo() {
 }
 
 _install_hugo() {
-  : ${HUGO_VERSION:=0.83.1}
-
   local os=$(uname -s)
   local arch=$(uname -m)
 
@@ -143,11 +141,11 @@ _install_robot() {
 }
 
 install_spotbugs() {
-  _install_tool spotbugs spotbugs-3.1.12/bin
+  _install_tool spotbugs "spotbugs-${SPOTBUGS_VERSION}/bin"
 }
 
 _install_spotbugs() {
-  curl -LSs https://repo.maven.apache.org/maven2/com/github/spotbugs/spotbugs/3.1.12/spotbugs-3.1.12.tgz | tar -xz -f -
+  curl -LSs "https://repo.maven.apache.org/maven2/com/github/spotbugs/spotbugs/${SPOTBUGS_VERSION}/spotbugs-${SPOTBUGS_VERSION}.tgz" | tar -xz -f -
 }
 
 download_hadoop_aws() {

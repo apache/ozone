@@ -19,6 +19,8 @@ set -u -o pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
+: ${FLEKSZIBLE_VERSION:="2.3.0"}
+: ${K3S_VERSION:="v1.21.2+k3s1"}
 : ${KUBECONFIG:=/etc/rancher/k3s/k3s.yaml}
 
 export KUBECONFIG
