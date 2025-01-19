@@ -51,10 +51,19 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
   private Map<String, Map<Object, OMDBUpdateEvent>> omdbLatestUpdateEvents = new HashMap<>();
   private final OMDBDefinition omdbDefinition = OMDBDefinition.get();
   private final OmUpdateEventValidator omUpdateEventValidator = new OmUpdateEventValidator(omdbDefinition);
+  private long batchSequenceNumber; // Store the current sequence number for the batch
 
   public OMDBUpdatesHandler(OMMetadataManager metadataManager) {
     omMetadataManager = metadataManager;
     tablesNames = metadataManager.getStore().getTableNames();
+  }
+
+  public void setLatestSequenceNumber(long sequenceNumber) {
+    this.batchSequenceNumber = sequenceNumber;
+  }
+
+  public long getLatestSequenceNumber() {
+    return this.batchSequenceNumber;
   }
 
   @Override

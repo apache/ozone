@@ -321,7 +321,7 @@ public final class TestNSSummaryTaskWithOBS implements Serializable {
           .build();
 
       return new OMUpdateEventBatch(
-          Arrays.asList(keyEvent1, keyEvent2, keyEvent3, keyEvent4));
+          Arrays.asList(keyEvent1, keyEvent2, keyEvent3, keyEvent4), 0L);
     }
 
     @Test

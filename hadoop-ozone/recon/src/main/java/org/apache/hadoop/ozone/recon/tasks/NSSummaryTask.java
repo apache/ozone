@@ -100,6 +100,7 @@ public class NSSummaryTask implements ReconOmTask {
 
   @Override
   public Pair<String, Boolean> process(OMUpdateEventBatch events) {
+    long startTime = System.currentTimeMillis();
     boolean success = nsSummaryTaskWithFSO.processWithFSO(events);
     if (!success) {
       LOG.error("processWithFSO failed.");
@@ -112,6 +113,8 @@ public class NSSummaryTask implements ReconOmTask {
     if (!success) {
       LOG.error("processWithOBS failed.");
     }
+    LOG.debug("{} successfully processed in {} milliseconds",
+        getTaskName(), (System.currentTimeMillis() - startTime));
     return new ImmutablePair<>(getTaskName(), success);
   }
 

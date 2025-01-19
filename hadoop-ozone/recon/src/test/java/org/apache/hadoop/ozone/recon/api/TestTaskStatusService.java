@@ -18,20 +18,22 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.google.inject.AbstractModule;
 import com.google.inject.Injector;
-
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import javax.ws.rs.core.Response;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 
 /**
  * Test for Task Status Service.
@@ -44,7 +46,7 @@ public class TestTaskStatusService extends AbstractReconSqlDBTest {
   }
 
   @BeforeEach
-  public void setUp() {
+  public void setUp() throws Exception {
     Injector parentInjector = getInjector();
     parentInjector.createChildInjector(new AbstractModule() {
       @Override
@@ -55,18 +57,19 @@ public class TestTaskStatusService extends AbstractReconSqlDBTest {
     });
   }
 
-  @Test
-  public void testGetTaskTimes() {
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, -1})
+  public void testTaskTableValues(int lastTaskRunStatus) {
     ReconTaskStatusDao reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
 
     ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
-        "Dummy_Task", System.currentTimeMillis(), 0L);
+        "Dummy_Task", System.currentTimeMillis(), 0L, lastTaskRunStatus, 0);
     reconTaskStatusDao.insert(reconTaskStatusRecord);
 
     List<ReconTaskStatus> resultList = new ArrayList<>();
     resultList.add(reconTaskStatusRecord);
 
-    Response response = taskStatusService.getTaskTimes();
+    Response response = taskStatusService.getTaskStats();
 
     List<ReconTaskStatus> responseList = (List<ReconTaskStatus>)
         response.getEntity();
@@ -76,6 +79,8 @@ public class TestTaskStatusService extends AbstractReconSqlDBTest {
       assertEquals(reconTaskStatusRecord.getTaskName(), r.getTaskName());
       assertEquals(reconTaskStatusRecord.getLastUpdatedTimestamp(),
           r.getLastUpdatedTimestamp());
+      assertEquals(reconTaskStatusRecord.getLastTaskRunStatus(), r.getLastTaskRunStatus());
+      assertEquals(reconTaskStatusRecord.getIsCurrentTaskRunning(), r.getIsCurrentTaskRunning());
     }
   }
 }
