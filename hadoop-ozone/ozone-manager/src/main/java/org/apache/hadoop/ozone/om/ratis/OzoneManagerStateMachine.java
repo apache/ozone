@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.execution.IndexGenerator;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
@@ -100,6 +101,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private volatile TermIndex lastNotifiedTermIndex = TermIndex.valueOf(0, RaftLog.INVALID_LOG_INDEX);
   /** The last index skipped by {@link #notifyTermIndexUpdated(long, long)}. */
   private volatile long lastSkippedIndex = RaftLog.INVALID_LOG_INDEX;
+  private final IndexGenerator indexGenerator;
 
   private final NettyMetrics nettyMetrics;
 
@@ -107,6 +109,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       boolean isTracingEnabled) throws IOException {
     this.isTracingEnabled = isTracingEnabled;
     this.ozoneManager = ratisServer.getOzoneManager();
+    this.indexGenerator = new IndexGenerator(ozoneManager);
 
     loadSnapshotInfoFromDB();
     this.threadPrefix = ozoneManager.getThreadNamePrefix();
@@ -137,6 +140,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       storage.init(raftStorage);
       LOG.info("{}: initialize {} with {}", getId(), id, getLastAppliedTermIndex());
     });
+    indexGenerator.initialize();
   }
 
   @Override
@@ -147,6 +151,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       unpause(lastApplied.getIndex(), lastApplied.getTerm());
       LOG.info("{}: reinitialize {} with {}", getId(), getGroupId(), lastApplied);
     }
+    indexGenerator.initialize();
   }
 
   @Override
@@ -162,6 +167,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     // Initialize OMHAMetrics
     ozoneManager.omHAMetricsInit(newLeaderId.toString());
     LOG.info("{}: leader changed to {}", groupMemberId, newLeaderId);
+    // if the node is leader (can be ready or not ready, need update index)
+    if (ozoneManager.getOmRatisServer().checkLeaderStatus() != OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER) {
+      indexGenerator.changeLeader();
+    }
   }
 
   /** Notified by Ratis for non-StateMachine term-index update. */
@@ -459,6 +468,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     return OzoneManagerDoubleBuffer.newBuilder()
         .setOmMetadataManager(ozoneManager.getMetadataManager())
         .setUpdateLastAppliedIndex(this::updateLastAppliedTermIndex)
+        .setUpdateOmCommitIndex(indexGenerator::saveIndex)
         .setMaxUnFlushedTransactionCount(maxUnFlushedTransactionCount)
         .setThreadPrefix(threadPrefix)
         .setS3SecretManager(ozoneManager.getS3SecretManager())
@@ -553,8 +563,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @return response from OM
    */
   private OMResponse runCommand(OMRequest request, TermIndex termIndex) {
+    ExecutionContext context = ExecutionContext.of(indexGenerator.nextIndex(), termIndex);
     try {
-      ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
       final OMClientResponse omClientResponse = handler.handleWriteRequest(
           request, context, ozoneManagerDoubleBuffer);
       OMLockDetails omLockDetails = omClientResponse.getOmLockDetails();
@@ -567,7 +577,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       }
     } catch (IOException e) {
       LOG.warn("Failed to write, Exception occurred ", e);
-      return createErrorResponse(request, e, termIndex);
+      return createErrorResponse(request, e, context);
     } catch (Throwable e) {
       // For any Runtime exceptions, terminate OM.
       String errorMessage = "Request " + request + " failed with exception";
@@ -577,7 +587,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   private OMResponse createErrorResponse(
-      OMRequest omRequest, IOException exception, TermIndex termIndex) {
+      OMRequest omRequest, IOException exception, ExecutionContext context) {
     OMResponse.Builder omResponseBuilder = OMResponse.newBuilder()
         .setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(exception))
         .setCmdType(omRequest.getCmdType())
@@ -588,7 +598,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     }
     OMResponse omResponse = omResponseBuilder.build();
     OMClientResponse omClientResponse = new DummyOMClientResponse(omResponse);
-    ozoneManagerDoubleBuffer.add(omClientResponse, termIndex);
+    ozoneManagerDoubleBuffer.add(omClientResponse, context.getTermIndex(), context.getIndex());
     return omResponse;
   }
 
