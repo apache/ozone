@@ -290,7 +290,7 @@
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcprov-jdk18on</artifactId>
     </dependency>
-    <!-- Overrider ranger-intg jackson version -->
+    <!-- Override ranger-intg jackson version -->
     <dependency>
       <groupId>org.codehaus.jackson</groupId>
       <artifactId>jackson-core-asl</artifactId>
