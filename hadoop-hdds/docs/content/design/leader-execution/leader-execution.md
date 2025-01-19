@@ -25,17 +25,17 @@ author: Sumit Agrawal
 Here is the summary of the challenges:
 
 - The current implementation depends on consensus on the order of requests received and not on consensus on the processing of the requests.
-- The double buffer implementation currently is meant to optimize the rate at which writes get flushed to RocksDB but the effective batching achieved is 1.2 at best. It is also a source of continuous bugs and added complexity for new features.
+- The double buffer implementation currently is meant to optimize the rate at which writes get flushed to RocksDB but the effective batching achieved is 1.2 request (on average) at best. It is also a source of continuous bugs and added complexity for new features.
 - The number of transactions that can be pushed through Ratis currently caps out around 25k.
-- The Current performance envelope for OM is around 12k transactions per second. The early testing pushes this to 40k transactions per second.
+- The Current performance envelope for OM is around 12k transactions per second. The early testing with prototype for this feature pushes this to 40k transactions per second.
 
 ## Execution at leader node needs deal with below cases
-1. Parallel execution: ratis serialize all the execution in order. With control, it is possible to execute the request in parallel which are independent.
-2. Optimized locking: Locks are taken at bucket level for both read and write flow. Here, focus to remove lock between read and write flow, and have more granular locking.
-3. Cache Optimization: Cache are maintained for write operation and read also make use of same for consistency. This creates complexity for read to provide accurate result with parallel operation.
-4. Double buffer code complexity: Double buffer provides batching for db update. This is done with ratis state machine and induces issues managing ratis state machine, cache and db updates.
-5. Request execution flow optimization: Optimize request execution flow, removing un-necessary operation and improve testability.
-6. Performance and resource Optimization: Currently, same execution is repeated at all nodes, and have more failure points. With leader side execution and parallelism, need improve performance and resource utilization.
+1. Parallel execution: Currently, ratis serialize all the execution in order. With this new feature, it is possible to execute the request in parallel which are independent.
+2. Optimized locking: Currently, Locks are taken at bucket level for both read and write flow. With this new feature, focus to remove lock between read and write flow, and have more granular locking.
+3. Cache Optimization: Currently, Cache are maintained for write operation and read also make use of same for consistency. This creates complexity for read to provide accurate result with parallel operation. With this new feature, its planned to remove this Cache.
+4. Double buffer code complexity: Currently, Double buffer provides batching for db update. This is done with ratis state machine and induces issues managing ratis state machine, cache and db updates. With this new feature, its planned to remove Double Buffer.
+5. Request execution flow optimization: With new feature, its planned to optimize request execution flow, removing un-necessary operation and improve testability.
+6. Performance and resource Optimization: Currently, same execution is repeated at all nodes, and have more failure points. With this new feature, its going to add parallelism in execution, and will improve performance and resource utilization.
 
 ### Object ID generation
 Currently, the Object ID is tied to Ratis transaction metadata. This has multiple challenges in the long run.
@@ -71,20 +71,35 @@ Gatekeeper act as entry point for request execution. Its function is:
 3. execution of request
 4. validate om state like upgrade
 5. update metrics and return response
-6. handle client replay of request
+6. handle client retry / replay of request
 7. managed index generation (remove dependency with ratis index for objectId)
 
 ### Executor
 This prepares context for execution, process the request, communicate to all nodes for db changes via ratis and clearing up any cache.
 
 ### Batching (Ratis request)
-All request as executed parallel are batched and send as single request to other nodes. This helps improve performance over network with batching.
+All requests executed in parallel are batched and send as single request to other nodes. This helps improve performance over network with batching.
+
+Batching of Request:
+- Request 1..n are executed and db changes are identified and added to queue (and request will be waiting for update via ratis over Future waiting)
+- Batcher will retrieve Request 1..n and db changes, merge those request to single Ratis Request message
+- Send Merged Request message to all nodes via ratis and receive reply
+- Batcher will reply to each request 1..n with db update success notifying future object of each request.
+
+There are multiple batchers waiting over queue,
+- As soon as queue have entry, and the batcher is available, it will pick all request from queue for processing
+- batcher will be un-available when its processing the batch, i.e. merge request and send to ratis and then waiting for reply
+
+As performance Test result, Number of batcher with "5->8" performed the best. 
+- Higher number of batcher reduces the effective batching, and performance reduces
+- Lower number of batcher reduces throughput as more request will be waiting for ratis response
 
 ### Apply Transaction (via ratis at all nodes)
 With new flow as change,
 - all nodes during ratis apply transaction will just only update the DB for changes.
 - there will not be any double buffer and all changes will be flushed to db immediately.
-- there will be few specific action like snapshot creation of db, upgrade handling which will be done at node. 
+- there will be few specific action like snapshot creation of db, upgrade handling which will be done at node.
+- And response to client will be returned after the apply transaction is success to the nodes in quorum.
 
 ## Description
 
@@ -98,28 +113,67 @@ Index initialization / update:
 - On restart (leader): last preserved index + 1
 - On Switch over: last index + 1
 - Request execution: index + 1
-- Upgrade: Last Ratis index + 1
+- Upgrade: Last Ratis index + 1  (This is only for existing cluster during upgrade)
 
+Om is going to maintain `IndexGenerator` which will maintain,
+- index: Atomic long, which will generate new index using incrementAndGet()
+- commitIndex: This is saved index in DB at follower and leader. This will be used to update `index` when a follower becomes Leader on ratis's notifyLeaderChanged.
+
+**ChangeToLeader:**
+`index = Max(index, commitIndex)`
+
+**Scenarios:**
+
+Let node status as below, NodeId(Leader/Follower, index, commitIndex)
+
+`Node1(F, 70, 80), Node2(F, 100, 80), Node3(L, 80, 80)`
+
+```
+Case1: 
+  Node1 becomes Leader, So,
+    Index: Max(70, 80) => 80
+    CommitIndex: 80
+  Node2 and Node3 remain at same state.
+  Request execution and sync to other node will update to index like "81" as next index.
+```
+
+```
+Case2: 
+  Node2 becomes Leader, Here index is higer because it may be previously leader and request is not applied to all nodes. So when become leader again,
+    Index: Max(100, 80) => 100  
+    CommitIndex: 80
+  Node2 and Node3 remain at same state.
+  Request execution and sync to other node will update to index like "101" as next index.
+```
+
+So multiple switchover will not have any impact if index is higher at any node than that of commitIndex, as it will continue with higher index and intermediate index will remain unused.
 
 #### Index Persistence:
 
 Index Preserved in TransactionInfo Table with new KEY: "#KEYINDEX"
+```
 Format: <timestamp>#<index>
 Time stamp: This will be used to identify last saved transaction executed
 Index: index identifier of the request
+```
 
 Sync the Index to other nodes:
 Special request body having metadata: [Execution Control Message](leader-execution.md#control-request).
 
+#### Upgrade impact for prepare and cancel
+
+When upgrade prepare and new OM started, it should not update TransactionInfo table with "#KEYINDEX", so that its not required to be removed on cancel.
+Once upgrade finalized, the index can be saved to DB with the "#KEYINDEX" key.
 
 #### Step-by-step incremental changes for existing flow
 
 1. for increment changes, need remove dependency with ratis index. For this, need to use om managed index in both old and new flow.
 2. objectId generation: need follow old logic of index to objectId mapping.
+3. UpdateId will make use of same index as existing logic. Its just index provider is changed from Ratis to Om Managed index.
 
 ### No-Cache for write operation
 
-In old flow, a key creation / updation is added to PartialTableCache, and cleanup happens when DoubleBuffer flushes DB changes.
+In old flow, a key creation / update is added to PartialTableCache, and cleanup happens when DoubleBuffer flushes DB changes.
 Since DB changes is done in batches, so a cache is maintained till flush of DB is completed. Cache is maintained so that OM can serve further request till flush is completed.
 
 This adds complexity during read for the keys, as it needs ensure to have the latest data from cache or DB.
@@ -232,7 +286,7 @@ This is additional information send with request send to other nodes via ratis. 
 
 Example:
 1. DBPersisRequest; This will hold information about data changes to be persisted to db directly, like table, key, value for add
-2. Control Request: This will provide additional information such as index, client request info for replay handling
+2. Control Request: This will provide additional information such as index, client request info for retry / replay handling
 
 ```
 message ExecutionControlRequest {
@@ -311,30 +365,30 @@ message DBTableRecord {
 }
 ```
 
-### Replay of client request handling
+### Retry / Replay of client request handling
 
-In old flow, request is submitted to ratis directly with ClientId and CallId (From HadoopRPC callback), and same used by ratis to handle request replay (or retry).
+In old flow, request is submitted to ratis directly with ClientId and CallId (From HadoopRPC callback), and same used by ratis to handle request retry / replay.
 If ratis finds the another request with same ClientId and CallId, it returns response of last request itself matching.
 Additionally, mapping of ClientId and CallId is present in memory and gets flushed out on restart, so it does not have consistent behaviour for handling same.
 
-For new flow, since only db changes are added to ratis, so this mechanism can not be used. To handle this, need to have similar mechanism, and improve over persistence for replay.
+For new flow, since only db changes are added to ratis, so this mechanism can not be used. To handle this, need to have similar mechanism, and improve over persistence for retry.
 
 `Client Request --> Gatekeeper --> check for request exist in cache for ClientId and CallId
 --> If exist, return cached response
---> Else continue request handling`
+--> Else continue request handling
 
-#### Client request replay at leader node
-- When request is received at leader node, it will cache the request in replayCache immediately
-- When request is received again with same ClientId and CallId, it will check replayCache and if entry exist,
-    - If response in cache is not available (request handling in progess), wait for availability and timeout - 60 sec
+#### Client request retry at leader node
+- When request is received at leader node, it will cache the request in retryCache immediately
+- When request is received again with same ClientId and CallId, it will check retryCache and if entry exist,
+    - If response in cache is not available (request handling in progress), wait for availability and timeout - 60 sec
     - If response available, return immediately
 - If entry does not exist, it will process handling request normally
 
 
-#### Replay cache distribution to other nodes
+#### Retry cache distribution to other nodes
 Request - response will be cached to other node via ratis distribution
 - It will be added to memory cache with expiry handling
-- Also will be added to DB for persistence for restart handing
+- Also, it will be added to DB for persistence for restart handing
 
 Below information will be sync to all nodes via ratis:
 ```
@@ -419,4 +473,5 @@ And old flow can be removed with achieving quality, performance and compatibilit
 1. With Leader side execution, metrics and its capturing information can change.
    - Certain metrics may not be valid
    - New metrics needs to be added
-   - Metrics will be updated at leader side now like for key create. At follower node, its just db update, so value will not be udpated.
+   - Metrics will be updated at leader side now like for key create. At follower node, its just db update, so value will not be updated.
+2. Write Audit log will be generated only at leader node with this change. Follower node will not have this similar audit. But index and other available information needs to be audited for operation getting commit on all nodes to track changes.
