@@ -30,7 +30,6 @@
   </properties>
 
   <dependencies>
-
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-annotations</artifactId>
@@ -51,7 +50,6 @@
       <groupId>com.sun.jersey</groupId>
       <artifactId>jersey-client</artifactId>
     </dependency>
-
     <dependency>
       <groupId>commons-codec</groupId>
       <artifactId>commons-codec</artifactId>
@@ -106,7 +104,6 @@
       <groupId>javax.servlet</groupId>
       <artifactId>javax.servlet-api</artifactId>
     </dependency>
-
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-compress</artifactId>
@@ -139,7 +136,6 @@
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-hadoop-dependency-server</artifactId>
     </dependency>
-
     <!-- hdds.proto and generated files are required from there -->
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -157,17 +153,14 @@
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-rocks-native</artifactId>
     </dependency>
-
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-server-framework</artifactId>
     </dependency>
-
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-client</artifactId>
     </dependency>
-
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-common</artifactId>
@@ -176,7 +169,6 @@
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-interface-client</artifactId>
     </dependency>
-
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-interface-storage</artifactId>
@@ -190,7 +182,6 @@
       <artifactId>ranger-intg</artifactId>
       <version>${ranger.version}</version>
     </dependency>
-
     <dependency>
       <groupId>org.apache.ranger</groupId>
       <artifactId>ranger-plugins-common</artifactId>
@@ -285,25 +276,21 @@
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-thirdparty-misc</artifactId>
     </dependency>
-
     <dependency>
       <groupId>org.aspectj</groupId>
       <artifactId>aspectjrt</artifactId>
       <version>${aspectj.version}</version>
     </dependency>
-
     <dependency>
       <groupId>org.aspectj</groupId>
       <artifactId>aspectjweaver</artifactId>
       <version>${aspectj.version}</version>
     </dependency>
-
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcprov-jdk18on</artifactId>
     </dependency>
-
-    <!-- Overrider ranger-intg jackson version -->
+    <!-- Override ranger-intg jackson version -->
     <dependency>
       <groupId>org.codehaus.jackson</groupId>
       <artifactId>jackson-core-asl</artifactId>
@@ -337,7 +324,6 @@
       <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-webapp</artifactId>
     </dependency>
-
     <dependency>
       <groupId>org.reflections</groupId>
       <artifactId>reflections</artifactId>
@@ -350,7 +336,6 @@
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
     </dependency>
-
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-docs</artifactId>

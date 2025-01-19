@@ -26,7 +26,6 @@
   <description>Apache Ozone Common</description>
 
   <dependencies>
-
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-annotations</artifactId>
@@ -47,7 +46,6 @@
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
     </dependency>
-
     <dependency>
       <groupId>io.grpc</groupId>
       <artifactId>grpc-api</artifactId>
@@ -90,7 +88,6 @@
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-compress</artifactId>
     </dependency>
-
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-lang3</artifactId>
