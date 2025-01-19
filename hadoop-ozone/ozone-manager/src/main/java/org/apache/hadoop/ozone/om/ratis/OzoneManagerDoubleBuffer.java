@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -45,6 +46,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
+import org.apache.hadoop.ozone.om.execution.common.BiConsumerX;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -77,10 +79,12 @@ public final class OzoneManagerDoubleBuffer {
   private static class Entry {
     private final TermIndex termIndex;
     private final OMClientResponse response;
+    private final long index;
 
-    Entry(TermIndex termIndex, OMClientResponse response) {
+    Entry(TermIndex termIndex, OMClientResponse response, long index) {
       this.termIndex = termIndex;
       this.response = response;
+      this.index = index;
     }
 
     TermIndex getTermIndex() {
@@ -90,6 +94,10 @@ public final class OzoneManagerDoubleBuffer {
     OMClientResponse getResponse() {
       return response;
     }
+
+    long getIndex() {
+      return index;
+    }
   }
 
   /**
@@ -98,6 +106,7 @@ public final class OzoneManagerDoubleBuffer {
   public static final class Builder {
     private OMMetadataManager omMetadataManager;
     private Consumer<TermIndex> updateLastAppliedIndex = termIndex -> { };
+    private BiConsumerX<BatchOperation, Long> updateOmCommitIndex = (m, n) -> { };
     private boolean isTracingEnabled = false;
     private int maxUnFlushedTransactionCount = 0;
     private FlushNotifier flushNotifier;
@@ -113,6 +122,11 @@ public final class OzoneManagerDoubleBuffer {
 
     Builder setUpdateLastAppliedIndex(Consumer<TermIndex> updateLastAppliedIndex) {
       this.updateLastAppliedIndex = updateLastAppliedIndex;
+      return this;
+    }
+
+    Builder setUpdateOmCommitIndex(BiConsumerX<BatchOperation, Long> updateOmCommitIndex) {
+      this.updateOmCommitIndex = updateOmCommitIndex;
       return this;
     }
 
@@ -177,6 +191,7 @@ public final class OzoneManagerDoubleBuffer {
   private final OMMetadataManager omMetadataManager;
 
   private final Consumer<TermIndex> updateLastAppliedIndex;
+  private final BiConsumerX<BatchOperation, Long> updateOmCommitIndex;
 
   private final S3SecretManager s3SecretManager;
 
@@ -196,6 +211,7 @@ public final class OzoneManagerDoubleBuffer {
     this.omMetadataManager = b.omMetadataManager;
     this.s3SecretManager = b.s3SecretManager;
     this.updateLastAppliedIndex = b.updateLastAppliedIndex;
+    this.updateOmCommitIndex = b.updateOmCommitIndex;
     this.flushNotifier = b.flushNotifier;
     this.unFlushedTransactions = newSemaphore(b.maxUnFlushedTransactionCount);
 
@@ -330,6 +346,8 @@ public final class OzoneManagerDoubleBuffer {
         .map(Entry::getTermIndex)
         .sorted()
         .collect(Collectors.toList());
+    final long index = buffer.stream().max(Comparator.comparing(Entry::getIndex)).orElse(new Entry(null, null, 0))
+        .getIndex();
     final int flushedTransactionsSize = flushedTransactions.size();
     final TermIndex lastTransaction = flushedTransactions.get(flushedTransactionsSize - 1);
 
@@ -346,6 +364,12 @@ public final class OzoneManagerDoubleBuffer {
           lastTransaction.getIndex(),
           () -> omMetadataManager.getTransactionInfoTable().putWithBatch(
               batchOperation, TRANSACTION_INFO_KEY, TransactionInfo.valueOf(lastTransaction)));
+
+      updateOmCommitIndex.accept(batchOperation, index);
+      //addToBatchTransactionInfoWithTrace(lastTraceId,
+      //    lastTransaction.getIndex(),
+      //    () -> omMetadataManager.getTransactionInfoTable().putWithBatch(
+      //        batchOperation, IndexGenerator.OM_INDEX_KEY, TransactionInfo.valueOf(-1, index)));
 
       long startTime = Time.monotonicNow();
       flushBatchWithTrace(lastTraceId, buffer.size(),
@@ -527,7 +551,14 @@ public final class OzoneManagerDoubleBuffer {
    * Add OmResponseBufferEntry to buffer.
    */
   public synchronized void add(OMClientResponse response, TermIndex termIndex) {
-    currentBuffer.add(new Entry(termIndex, response));
+    add(response, termIndex, termIndex.getIndex());
+  }
+
+  /**
+   * Add OmResponseBufferEntry to buffer.
+   */
+  public synchronized void add(OMClientResponse response, TermIndex termIndex, long index) {
+    currentBuffer.add(new Entry(termIndex, response, index));
     notify();
   }
 
