@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ratis.server.protocol.TermIndex;
@@ -116,12 +117,12 @@ public final class OMAuditLogger {
     return omAction;
   }
 
-  public static void log(OMAuditLogger.Builder builder, TermIndex termIndex) {
+  public static void log(OMAuditLogger.Builder builder, ExecutionContext context) {
     if (builder.isLog.get()) {
       if (null == builder.getAuditMap()) {
         builder.setAuditMap(new HashMap<>());
       }
-      builder.getAuditMap().put("Transaction", "" + termIndex.getIndex());
+      builder.getAuditMap().put("Transaction", context.getTermIndex().getIndex() + "::" + context.getIndex());
       builder.getMessageBuilder().withParams(builder.getAuditMap());
       builder.getAuditLogger().logWrite(builder.getMessageBuilder().build());
     }
@@ -135,7 +136,7 @@ public final class OMAuditLogger {
   }
 
   public static void log(OMAuditLogger.Builder builder, OMClientRequest request, OzoneManager om,
-                         TermIndex termIndex, Throwable th) {
+                         ExecutionContext context, Throwable th) {
     if (builder.isLog.get()) {
       builder.getAuditLogger().logWrite(builder.getMessageBuilder().build());
       return;
@@ -151,7 +152,7 @@ public final class OMAuditLogger {
     }
     try {
       builder.getAuditMap().put("Command", request.getOmRequest().getCmdType().name());
-      builder.getAuditMap().put("Transaction", "" + termIndex.getIndex());
+      builder.getAuditMap().put("Transaction", context.getTermIndex().getIndex() + "::" + context.getIndex());
       request.buildAuditMessage(action, builder.getAuditMap(),
           th, request.getUserInfo());
       builder.setLog(true);
