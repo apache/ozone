@@ -85,6 +85,7 @@ import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
@@ -111,10 +112,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_O
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.*;
 import static org.apache.hadoop.ozone.om.service.SnapshotDeletingService.isBlockLocationInfoSame;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotDirExist;
 
@@ -898,11 +897,23 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     final long volumeId = getVolumeId(volume);
     final long bucketId = getBucketId(volume,
             bucket);
-    final String nonFSOMultipartKey =
-        getMultipartKey(volume, bucket, key, uploadId);
-    final OmMultipartKeyInfo multipartKeyInfo =
-        getMultipartInfoTable().get(nonFSOMultipartKey);
-    final long parentId = multipartKeyInfo.getParentID();
+    long parentId;
+    try {
+      parentId = OMFileRequest.getParentID(volumeId, bucketId, key, this);
+    } catch (final Exception e) {
+      // It is possible we miss directories and exception is thrown.
+      // see https://issues.apache.org/jira/browse/HDDS-11784
+      LOG.warn("Got exception when finding parent id for {}/{}/{}. Use another way to get it",
+          volumeId, bucketId, key, e);
+      final String nonFSOMultipartKey =
+          getMultipartKey(volume, bucket, key, uploadId);
+      final OmMultipartKeyInfo multipartKeyInfo =
+          getMultipartInfoTable().get(nonFSOMultipartKey);
+      if (multipartKeyInfo == null) {
+        throw new OMException(MISSING_MULTIPART_KEY_INFO_ERROR);
+      }
+      parentId = multipartKeyInfo.getParentID();
+    }
 
     final String fileName = OzoneFSUtils.getFileName(key);
     return getMultipartKey(volumeId, bucketId, parentId,
