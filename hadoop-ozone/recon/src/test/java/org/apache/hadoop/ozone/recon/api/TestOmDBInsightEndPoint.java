@@ -323,13 +323,13 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     setUpOmData();
     nSSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
         reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconOMMetadataManager, ozoneConfiguration, 10);
     nsSummaryTaskWithOBS  = new NSSummaryTaskWithOBS(
         reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconOMMetadataManager, ozoneConfiguration, 10);
     nsSummaryTaskWithFSO  = new NSSummaryTaskWithFSO(
         reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconOMMetadataManager, ozoneConfiguration, 10);
     reconNamespaceSummaryManager.clearNSSummaryTable();
     nSSummaryTaskWithLegacy.reprocessWithLegacy(reconOMMetadataManager);
     nsSummaryTaskWithOBS.reprocessWithOBS(reconOMMetadataManager);

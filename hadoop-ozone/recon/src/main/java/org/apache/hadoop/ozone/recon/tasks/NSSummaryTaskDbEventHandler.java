@@ -73,15 +73,16 @@ public class NSSummaryTaskDbEventHandler {
   protected void writeNSSummariesToDB(Map<Long, NSSummary> nsSummaryMap)
       throws IOException {
     try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
-      nsSummaryMap.keySet().forEach((Long key) -> {
+      for (Long key : nsSummaryMap.keySet()) {
         try {
           reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation,
               key, nsSummaryMap.get(key));
         } catch (IOException e) {
           LOG.error("Unable to write Namespace Summary data in Recon DB.",
               e);
+          throw e;
         }
-      });
+      }
       reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
     }
   }
@@ -210,15 +211,16 @@ public class NSSummaryTaskDbEventHandler {
   protected boolean flushAndCommitNSToDB(Map<Long, NSSummary> nsSummaryMap) {
     try {
       writeNSSummariesToDB(nsSummaryMap);
-      nsSummaryMap.clear();
     } catch (IOException e) {
       LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
       return false;
+    } finally {
+      nsSummaryMap.clear();
     }
     return true;
   }
 
-  protected boolean checkAndCallFlushToDB(
+/*  protected boolean checkAndCallFlushToDB(
       Map<Long, NSSummary> nsSummaryMap) {
     // if map contains more than entries, flush to DB and clear the map
     if (null != nsSummaryMap && nsSummaryMap.size() >=
@@ -226,5 +228,5 @@ public class NSSummaryTaskDbEventHandler {
       return flushAndCommitNSToDB(nsSummaryMap);
     }
     return true;
-  }
+  }*/
 }

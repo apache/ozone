@@ -40,6 +40,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT;
+
 /**
  * Task to query data from OMDB and write into Recon RocksDB.
  * Reprocess() will take a snapshots on OMDB, and iterate the keyTable,
@@ -70,7 +73,6 @@ public class NSSummaryTask implements ReconOmTask {
   private final NSSummaryTaskWithFSO nsSummaryTaskWithFSO;
   private final NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy;
   private final NSSummaryTaskWithOBS nsSummaryTaskWithOBS;
-  private final OzoneConfiguration ozoneConfiguration;
 
   @Inject
   public NSSummaryTask(ReconNamespaceSummaryManager
@@ -81,16 +83,19 @@ public class NSSummaryTask implements ReconOmTask {
                        ozoneConfiguration) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconOMMetadataManager = reconOMMetadataManager;
-    this.ozoneConfiguration = ozoneConfiguration;
+    long nsSummaryFlushToDBMaxThreshold = ozoneConfiguration.getLong(
+        OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
+        OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
+
     this.nsSummaryTaskWithFSO = new NSSummaryTaskWithFSO(
-        reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconNamespaceSummaryManager, reconOMMetadataManager,
+        ozoneConfiguration, nsSummaryFlushToDBMaxThreshold);
     this.nsSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
-        reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconNamespaceSummaryManager, reconOMMetadataManager,
+        ozoneConfiguration, nsSummaryFlushToDBMaxThreshold);
     this.nsSummaryTaskWithOBS = new NSSummaryTaskWithOBS(
-        reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconNamespaceSummaryManager, reconOMMetadataManager,
+        ozoneConfiguration, nsSummaryFlushToDBMaxThreshold);
   }
 
   @Override
@@ -99,20 +104,24 @@ public class NSSummaryTask implements ReconOmTask {
   }
 
   @Override
-  public Pair<String, Boolean> process(OMUpdateEventBatch events) {
-    boolean success = nsSummaryTaskWithFSO.processWithFSO(events);
-    if (!success) {
+  public Pair<String, Pair<Integer, Boolean>> process(
+      OMUpdateEventBatch events, int seekPosition) {
+    Pair<Integer, Boolean> itrPosStatusPair =
+        nsSummaryTaskWithFSO.processWithFSO(events, seekPosition);
+    if (!itrPosStatusPair.getRight()) {
       LOG.error("processWithFSO failed.");
     }
-    success = nsSummaryTaskWithLegacy.processWithLegacy(events);
-    if (!success) {
+    itrPosStatusPair =
+        nsSummaryTaskWithLegacy.processWithLegacy(events, seekPosition);
+    if (!itrPosStatusPair.getRight()) {
       LOG.error("processWithLegacy failed.");
     }
-    success = nsSummaryTaskWithOBS.processWithOBS(events);
-    if (!success) {
+    itrPosStatusPair =
+        nsSummaryTaskWithOBS.processWithOBS(events, seekPosition);
+    if (!itrPosStatusPair.getRight()) {
       LOG.error("processWithOBS failed.");
     }
-    return new ImmutablePair<>(getTaskName(), success);
+    return new ImmutablePair<>(getTaskName(), itrPosStatusPair);
   }
 
   @Override
@@ -151,11 +160,8 @@ public class NSSummaryTask implements ReconOmTask {
           return new ImmutablePair<>(getTaskName(), false);
         }
       }
-    } catch (InterruptedException ex) {
+    } catch (InterruptedException | ExecutionException ex) {
       LOG.error("Error while reprocessing NSSummary table in Recon DB.", ex);
-      return new ImmutablePair<>(getTaskName(), false);
-    } catch (ExecutionException ex2) {
-      LOG.error("Error while reprocessing NSSummary table in Recon DB.", ex2);
       return new ImmutablePair<>(getTaskName(), false);
     } finally {
       executorService.shutdown();

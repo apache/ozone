@@ -34,10 +34,13 @@ public interface ReconOmTask {
 
   /**
    * Process a set of OM events on tables that the task is listening on.
+   *
    * @param events Set of events to be processed by the task.
-   * @return Pair of task name -&gt; task success.
+   * @param seekPosition position from where to start iterating events of events iterator.
+   * @return Pair of task name -&gt; events iterator position, task success.
    */
-  Pair<String, Boolean> process(OMUpdateEventBatch events);
+  Pair<String, Pair<Integer, Boolean>> process(OMUpdateEventBatch events,
+                                               int seekPosition);
 
   /**
    * Process a  on tables that the task is listening on.

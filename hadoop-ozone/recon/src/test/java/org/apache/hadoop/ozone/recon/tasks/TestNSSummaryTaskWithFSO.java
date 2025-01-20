@@ -51,6 +51,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializ
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -144,9 +145,11 @@ public final class TestNSSummaryTaskWithFSO {
 
     populateOMDB();
 
+    long nsSummaryFlushToDBMaxThreshold = ozoneConfiguration.getLong(
+        OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, 10);
     nSSummaryTaskWithFso = new NSSummaryTaskWithFSO(
         reconNamespaceSummaryManager, reconOMMetadataManager,
-        ozoneConfiguration);
+        ozoneConfiguration, nsSummaryFlushToDBMaxThreshold);
   }
 
   /**
@@ -319,7 +322,7 @@ public final class TestNSSummaryTaskWithFSO {
     @BeforeEach
     public void setUp() throws IOException {
       nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
-      nSSummaryTaskWithFso.processWithFSO(processEventBatch());
+      nSSummaryTaskWithFso.processWithFSO(processEventBatch(), 0);
     }
 
     private OMUpdateEventBatch processEventBatch() throws IOException {

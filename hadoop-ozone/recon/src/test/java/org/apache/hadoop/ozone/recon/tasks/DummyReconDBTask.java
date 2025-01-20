@@ -54,11 +54,12 @@ public class DummyReconDBTask implements ReconOmTask {
   }
 
   @Override
-  public Pair<String, Boolean> process(OMUpdateEventBatch events) {
+  public Pair<String, Pair<Integer, Boolean>> process(
+      OMUpdateEventBatch events, int seekPos) {
     if (++callCtr <= numFailuresAllowed) {
-      return new ImmutablePair<>(getTaskName(), false);
+      return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(0, false));
     } else {
-      return new ImmutablePair<>(getTaskName(), true);
+      return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(0, true));
     }
   }
 

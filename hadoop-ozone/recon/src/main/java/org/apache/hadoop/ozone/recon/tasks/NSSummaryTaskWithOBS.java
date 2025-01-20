@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -50,13 +52,17 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
   private static final Logger LOG =
       LoggerFactory.getLogger(NSSummaryTaskWithOBS.class);
 
+  private final long nsSummaryFlushToDBMaxThreshold;
+
 
   public NSSummaryTaskWithOBS(
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager reconOMMetadataManager,
-      OzoneConfiguration ozoneConfiguration) {
+      OzoneConfiguration ozoneConfiguration,
+      long nsSummaryFlushToDBMaxThreshold) {
     super(reconNamespaceSummaryManager,
         reconOMMetadataManager, ozoneConfiguration);
+    this.nsSummaryFlushToDBMaxThreshold = nsSummaryFlushToDBMaxThreshold;
   }
 
 
@@ -92,14 +98,17 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
           setKeyParentID(keyInfo);
 
           handlePutKeyEvent(keyInfo, nsSummaryMap);
-          if (!checkAndCallFlushToDB(nsSummaryMap)) {
-            return false;
+          if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
+            if (!flushAndCommitNSToDB(nsSummaryMap)) {
+              return false;
+            }
           }
         }
       }
     } catch (IOException ioEx) {
       LOG.error("Unable to reprocess Namespace Summary data in Recon DB. ",
           ioEx);
+      nsSummaryMap.clear();
       return false;
     }
 
@@ -111,14 +120,23 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
     return true;
   }
 
-  public boolean processWithOBS(OMUpdateEventBatch events) {
+  public Pair<Integer, Boolean> processWithOBS(OMUpdateEventBatch events,
+                                               int seekPos) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
+    int itrPos = 0;
+    while (eventIterator.hasNext() && itrPos < seekPos) {
+      eventIterator.next();
+      itrPos++;
+    }
+
+    int eventCounter = 0;
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, ? extends WithParentObjectId> omdbUpdateEvent =
           eventIterator.next();
       OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
+      eventCounter++;
 
       // We only process updates on OM's KeyTable
       String table = omdbUpdateEvent.getTable();
@@ -184,27 +202,27 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
         default:
           LOG.debug("Skipping DB update event: {}", action);
         }
-
-        if (!checkAndCallFlushToDB(nsSummaryMap)) {
-          return false;
+        if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
+          if (!flushAndCommitNSToDB(nsSummaryMap)) {
+            return new ImmutablePair<>(seekPos, false);
+          }
+          seekPos = eventCounter + 1;
         }
       } catch (IOException ioEx) {
         LOG.error("Unable to process Namespace Summary data in Recon DB. ",
             ioEx);
-        return false;
-      }
-      if (!checkAndCallFlushToDB(nsSummaryMap)) {
-        return false;
+        nsSummaryMap.clear();
+        return new ImmutablePair<>(seekPos, false);
       }
     }
 
     // Flush and commit left-out entries at the end
     if (!flushAndCommitNSToDB(nsSummaryMap)) {
-      return false;
+      return new ImmutablePair<>(seekPos, false);
     }
 
     LOG.debug("Completed a process run of NSSummaryTaskWithOBS");
-    return true;
+    return new ImmutablePair<>(seekPos, true);
   }
 
 

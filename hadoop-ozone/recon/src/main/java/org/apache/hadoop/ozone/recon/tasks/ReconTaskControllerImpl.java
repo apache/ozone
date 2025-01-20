@@ -35,6 +35,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -106,26 +107,28 @@ public class ReconTaskControllerImpl implements ReconTaskController {
 
     try {
       if (!events.isEmpty()) {
-        Collection<Callable<Pair<String, Boolean>>> tasks = new ArrayList<>();
+        Collection<Callable<Pair<String, Pair<Integer, Boolean>>>> tasks =
+            new ArrayList<>();
         for (Map.Entry<String, ReconOmTask> taskEntry :
             reconOmTasks.entrySet()) {
           ReconOmTask task = taskEntry.getValue();
           // events passed to process method is no longer filtered
-          tasks.add(() -> task.process(events));
+          tasks.add(() -> task.process(events, 0));
         }
 
-        List<Future<Pair<String, Boolean>>> results =
+        List<Future<Pair<String, Pair<Integer, Boolean>>>> results =
             executorService.invokeAll(tasks);
-        List<String> failedTasks = processTaskResults(results, events);
+        List<Pair<String, Integer>>
+            failedTasks = processTaskResults(results, events);
 
         // Retry
-        List<String> retryFailedTasks = new ArrayList<>();
+        List<Pair<String, Integer>> retryFailedTasks = new ArrayList<>();
         if (!failedTasks.isEmpty()) {
           tasks.clear();
-          for (String taskName : failedTasks) {
-            ReconOmTask task = reconOmTasks.get(taskName);
+          for (Pair<String, Integer> taskPair : failedTasks) {
+            ReconOmTask task = reconOmTasks.get(taskPair.getLeft());
             // events passed to process method is no longer filtered
-            tasks.add(() -> task.process(events));
+            tasks.add(() -> task.process(events, taskPair.getRight()));
           }
           results = executorService.invokeAll(tasks);
           retryFailedTasks = processTaskResults(results, events);
@@ -133,14 +136,16 @@ public class ReconTaskControllerImpl implements ReconTaskController {
 
         // Reprocess the failed tasks.
         if (!retryFailedTasks.isEmpty()) {
-          tasks.clear();
-          for (String taskName : failedTasks) {
-            ReconOmTask task = reconOmTasks.get(taskName);
-            tasks.add(() -> task.reprocess(omMetadataManager));
+          Collection<Callable<Pair<String, Boolean>>> reprocessTasks =
+              new ArrayList<>();
+          for (Pair<String, Integer> taskPair : failedTasks) {
+            ReconOmTask task = reconOmTasks.get(taskPair.getLeft());
+            reprocessTasks.add(() -> task.reprocess(omMetadataManager));
           }
-          results = executorService.invokeAll(tasks);
+          List<Future<Pair<String, Boolean>>> reprocessTaskResults =
+              executorService.invokeAll(reprocessTasks);
           List<String> reprocessFailedTasks =
-              processTaskResults(results, events);
+              processTaskResultsForReprocess(reprocessTaskResults, events);
           ignoreFailedTasks(reprocessFailedTasks);
         }
       }
@@ -235,21 +240,51 @@ public class ReconTaskControllerImpl implements ReconTaskController {
 
   /**
    * Wait on results of all tasks.
+   *
+   * @param results Set of Futures.
+   * @param events  Events.
+   * @return List of failed task names with their seek position
+   * @throws ExecutionException   execution Exception
+   * @throws InterruptedException Interrupted Exception
+   */
+  private List<Pair<String, Integer>> processTaskResults(
+      List<Future<Pair<String, Pair<Integer, Boolean>>>>
+          results,
+      OMUpdateEventBatch events)
+      throws ExecutionException, InterruptedException {
+    List<Pair<String, Integer>> failedTasks = new ArrayList<>();
+    for (Future<Pair<String, Pair<Integer, Boolean>>> f : results) {
+      String taskName = f.get().getLeft();
+      Pair<Integer, Boolean> right = f.get().getRight();
+      if (!right.getRight()) {
+        LOG.info("Failed task : {}", taskName);
+        failedTasks.add(new ImmutablePair<>(taskName, right.getLeft()));
+      } else {
+        taskFailureCounter.get(taskName).set(0);
+        storeLastCompletedTransaction(taskName, events.getLastSequenceNumber());
+      }
+    }
+    return failedTasks;
+  }
+
+  /**
+   * Wait on results of all tasks.
    * @param results Set of Futures.
    * @param events Events.
    * @return List of failed task names
    * @throws ExecutionException execution Exception
    * @throws InterruptedException Interrupted Exception
    */
-  private List<String> processTaskResults(List<Future<Pair<String, Boolean>>>
-                                              results,
-                                          OMUpdateEventBatch events)
+  private List<String> processTaskResultsForReprocess(
+      List<Future<Pair<String, Boolean>>>
+          results,
+      OMUpdateEventBatch events)
       throws ExecutionException, InterruptedException {
     List<String> failedTasks = new ArrayList<>();
     for (Future<Pair<String, Boolean>> f : results) {
       String taskName = f.get().getLeft();
       if (!f.get().getRight()) {
-        LOG.info("Failed task : {}", taskName);
+        LOG.info("Failed reprocessing of task : {}", taskName);
         failedTasks.add(f.get().getLeft());
       } else {
         taskFailureCounter.get(taskName).set(0);

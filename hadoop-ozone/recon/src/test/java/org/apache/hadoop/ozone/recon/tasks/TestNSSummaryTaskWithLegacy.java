@@ -53,6 +53,8 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyT
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProvider;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -145,9 +147,11 @@ public final class TestNSSummaryTaskWithLegacy {
 
     populateOMDB();
 
+    long nsSummaryFlushToDBMaxThreshold = omConfiguration.getLong(
+        OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, 10);
     nSSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
         reconNamespaceSummaryManager,
-        reconOMMetadataManager, omConfiguration);
+        reconOMMetadataManager, omConfiguration, nsSummaryFlushToDBMaxThreshold);
   }
 
   /**
@@ -295,7 +299,7 @@ public final class TestNSSummaryTaskWithLegacy {
     @BeforeEach
     public void setUp() throws IOException {
       nSSummaryTaskWithLegacy.reprocessWithLegacy(reconOMMetadataManager);
-      nSSummaryTaskWithLegacy.processWithLegacy(processEventBatch());
+      nSSummaryTaskWithLegacy.processWithLegacy(processEventBatch(), 0);
 
       nsSummaryForBucket1 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
@@ -694,6 +698,7 @@ public final class TestNSSummaryTaskWithLegacy {
         omDbDir.getAbsolutePath());
     omConfiguration.set(OMConfigKeys
         .OZONE_OM_ENABLE_FILESYSTEM_PATHS, "true");
+    omConfiguration.set(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, "10");
     omMetadataManager = new OmMetadataManagerImpl(
         omConfiguration, null);
 

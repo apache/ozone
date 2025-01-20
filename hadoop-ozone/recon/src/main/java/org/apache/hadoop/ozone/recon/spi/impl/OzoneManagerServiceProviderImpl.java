@@ -529,7 +529,9 @@ public class OzoneManagerServiceProviderImpl
       }
       for (byte[] data : dbUpdates.getData()) {
         try (ManagedWriteBatch writeBatch = new ManagedWriteBatch(data)) {
+          // Events gets populated in events list in OMDBUpdatesHandler with call back for put/delete/update
           writeBatch.iterate(omdbUpdatesHandler);
+          // Commit the OM DB transactions in recon rocks DB and sync here.
           try (RDBBatchOperation rdbBatchOperation =
                    new RDBBatchOperation(writeBatch)) {
             try (ManagedWriteOptions wOpts = new ManagedWriteOptions()) {

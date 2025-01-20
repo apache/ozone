@@ -110,7 +110,7 @@ public class TestNSSummaryDiskUsageOrdering {
     populateOMDB();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
         new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, ozoneConfiguration);
+            reconOMMetadataManager, ozoneConfiguration, 10);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
   }
 

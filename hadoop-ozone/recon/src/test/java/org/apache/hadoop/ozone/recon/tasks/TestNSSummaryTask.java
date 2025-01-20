@@ -223,7 +223,7 @@ public final class TestNSSummaryTask {
     @BeforeEach
     public void setUp() throws IOException {
       nSSummaryTask.reprocess(reconOMMetadataManager);
-      nSSummaryTask.process(processEventBatch());
+      nSSummaryTask.process(processEventBatch(), 0);
 
       nsSummaryForBucket1 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);

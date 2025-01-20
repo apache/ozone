@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.recon.tasks;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -74,8 +75,8 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
   @Test
   public void testConsumeOMEvents() throws Exception {
     ReconOmTask reconOmTaskMock = getMockTask("MockTask");
-    when(reconOmTaskMock.process(any(OMUpdateEventBatch.class)))
-        .thenReturn(new ImmutablePair<>("MockTask", true));
+    when(reconOmTaskMock.process(any(OMUpdateEventBatch.class), anyInt()))
+        .thenReturn(new ImmutablePair<>("MockTask", new ImmutablePair<>(0, true)));
     reconTaskController.registerTask(reconOmTaskMock);
     OMUpdateEventBatch omUpdateEventBatchMock = mock(OMUpdateEventBatch.class);
     when(omUpdateEventBatchMock.getLastSequenceNumber()).thenReturn(100L);
@@ -87,7 +88,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
         mock(OMMetadataManager.class));
 
     verify(reconOmTaskMock, times(1))
-        .process(any());
+        .process(any(), anyInt());
     long endTime = System.currentTimeMillis();
 
     reconTaskStatusDao = getDao(ReconTaskStatusDao.class);

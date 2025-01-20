@@ -52,6 +52,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProviderWithFSO;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -130,9 +132,13 @@ public final class TestNSSummaryTaskWithOBS implements Serializable {
 
     populateOMDB();
 
+    long nsSummaryFlushToDBMaxThreshold = omConfiguration.getLong(
+        OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
+        OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
     nSSummaryTaskWithOBS = new NSSummaryTaskWithOBS(
         reconNamespaceSummaryManager,
-        reconOMMetadataManager, omConfiguration);
+        reconOMMetadataManager, omConfiguration,
+        nsSummaryFlushToDBMaxThreshold);
   }
 
   /**
@@ -238,7 +244,7 @@ public final class TestNSSummaryTaskWithOBS implements Serializable {
       // reinit Recon RocksDB's namespace CF.
       reconNamespaceSummaryManager.clearNSSummaryTable();
       nSSummaryTaskWithOBS.reprocessWithOBS(reconOMMetadataManager);
-      nSSummaryTaskWithOBS.processWithOBS(processEventBatch());
+      nSSummaryTaskWithOBS.processWithOBS(processEventBatch(), 0);
 
       nsSummaryForBucket1 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
@@ -464,6 +470,7 @@ public final class TestNSSummaryTaskWithOBS implements Serializable {
         omDbDir.getAbsolutePath());
     omConfiguration.set(OMConfigKeys
         .OZONE_OM_ENABLE_FILESYSTEM_PATHS, "true");
+    omConfiguration.set(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, "10");
     omMetadataManager = new OmMetadataManagerImpl(
         omConfiguration, null);
 
