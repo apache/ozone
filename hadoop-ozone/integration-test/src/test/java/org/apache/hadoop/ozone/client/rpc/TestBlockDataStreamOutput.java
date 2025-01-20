@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
@@ -77,12 +78,12 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 @Timeout(300)
 public class TestBlockDataStreamOutput {
   private MiniOzoneCluster cluster;
-  private static int chunkSize = 100;
-  private static int flushSize = 2 * chunkSize;
-  private static int maxFlushSize = 2 * flushSize;
-  private static int blockSize = 2 * maxFlushSize;
-  private static String volumeName = "testblockoutputstream";
-  private static String bucketName = volumeName;
+  private static final int CHUNK_SIZE = 100;
+  private static final int FLUSH_SIZE = 2 * CHUNK_SIZE;
+  private static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;
+  private static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;
+  private static final String VOLUME_NAME = "testblockoutputstream";
+  private static final String BUCKET_NAME = VOLUME_NAME;
   private static String keyString = UUID.randomUUID().toString();;
   private static final DatanodeVersion DN_OLD_VERSION = DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE;
 
@@ -123,13 +124,13 @@ public class TestBlockDataStreamOutput {
     conf.setFromObject(ratisClientConfig);
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
-        .setBlockSize(blockSize)
-        .setChunkSize(chunkSize)
-        .setStreamBufferFlushSize(flushSize)
-        .setStreamBufferMaxSize(maxFlushSize)
-        .setDataStreamBufferFlushSize(maxFlushSize)
-        .setDataStreamMinPacketSize(chunkSize)
-        .setDataStreamWindowSize(5 * chunkSize)
+        .setBlockSize(BLOCK_SIZE)
+        .setChunkSize(CHUNK_SIZE)
+        .setStreamBufferFlushSize(FLUSH_SIZE)
+        .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
+        .setDataStreamBufferFlushSize(MAX_FLUSH_SIZE)
+        .setDataStreamMinPacketSize(CHUNK_SIZE)
+        .setDataStreamWindowSize(5 * CHUNK_SIZE)
         .applyTo(conf);
 
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
@@ -138,13 +139,14 @@ public class TestBlockDataStreamOutput {
             .setCurrentVersion(DN_OLD_VERSION)
             .build())
         .build();
-
+    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
+        180000);
     cluster.waitForClusterToBeReady();
 
     try (OzoneClient client = cluster.newClient()) {
       ObjectStore objectStore = client.getObjectStore();
-      objectStore.createVolume(volumeName);
-      objectStore.getVolume(volumeName).createBucket(bucketName);
+      objectStore.createVolume(VOLUME_NAME);
+      objectStore.getVolume(VOLUME_NAME).createBucket(BUCKET_NAME);
     }
 
     return cluster;
@@ -152,28 +154,25 @@ public class TestBlockDataStreamOutput {
 
   private static Stream<Arguments> clientParameters() {
     return Stream.of(
-        Arguments.of(true, true),
-        Arguments.of(true, false),
-        Arguments.of(false, true),
-        Arguments.of(false, false)
+        Arguments.of(true),
+        Arguments.of(false)
     );
   }
 
   private static Stream<Arguments> dataLengthParameters() {
     return Stream.of(
-        Arguments.of(chunkSize / 2),
-        Arguments.of(chunkSize),
-        Arguments.of(chunkSize + 50),
-        Arguments.of(blockSize + 50)
+        Arguments.of(CHUNK_SIZE / 2),
+        Arguments.of(CHUNK_SIZE),
+        Arguments.of(CHUNK_SIZE + 50),
+        Arguments.of(BLOCK_SIZE + 50)
     );
   }
 
   static OzoneClientConfig newClientConfig(ConfigurationSource source,
-                                           boolean flushDelay, boolean enablePiggybacking) {
+                                           boolean flushDelay) {
     OzoneClientConfig clientConfig = source.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumType(ContainerProtos.ChecksumType.NONE);
     clientConfig.setStreamBufferFlushDelay(flushDelay);
-    clientConfig.setEnablePutblockPiggybacking(enablePiggybacking);
     return clientConfig;
   }
 
@@ -184,13 +183,6 @@ public class TestBlockDataStreamOutput {
     return OzoneClientFactory.getRpcClient(copy);
   }
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public void init() throws Exception {
     cluster = createCluster();
@@ -200,9 +192,6 @@ public class TestBlockDataStreamOutput {
     return UUID.randomUUID().toString();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public void shutdown() {
     if (cluster != null) {
@@ -212,8 +201,8 @@ public class TestBlockDataStreamOutput {
 
   @ParameterizedTest
   @MethodSource("dataLengthParameters")
-  public void testHalfChunkWrite(int dataLength) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), false, true);
+  public void testStreamWrite(int dataLength) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), false);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       testWrite(client, dataLength);
       testWriteWithFailure(client, dataLength);
@@ -252,25 +241,21 @@ public class TestBlockDataStreamOutput {
     validateData(client, keyName, dataString.concat(dataString).getBytes(UTF_8));
   }
 
-  static OzoneDataStreamOutput createKey(OzoneClient client, String keyName) throws Exception {
-    return createKey(client, keyName, 0);
-  }
-
   static OzoneDataStreamOutput createKey(OzoneClient client, String keyName,
                                          long size) throws Exception {
     return TestHelper.createStreamKey(keyName, ReplicationType.RATIS, size,
-        client.getObjectStore(), volumeName, bucketName);
+        client.getObjectStore(), VOLUME_NAME, BUCKET_NAME);
   }
 
   static void validateData(OzoneClient client, String keyName, byte[] data) throws Exception {
     TestHelper.validateData(
-        keyName, data, client.getObjectStore(), volumeName, bucketName);
+        keyName, data, client.getObjectStore(), VOLUME_NAME, BUCKET_NAME);
   }
 
   @ParameterizedTest
   @MethodSource("clientParameters")
-  public void testPutBlockAtBoundary(boolean flushDelay, boolean enablePiggybacking) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
+  public void testPutBlockAtBoundary(boolean flushDelay) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       int dataLength = 500;
       XceiverClientMetrics metrics =
@@ -300,8 +285,8 @@ public class TestBlockDataStreamOutput {
 
   @ParameterizedTest
   @MethodSource("clientParameters")
-  public void testMinPacketSize(boolean flushDelay, boolean enablePiggybacking) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
+  public void testMinPacketSize(boolean flushDelay) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       String keyName = getKeyName();
       XceiverClientMetrics metrics =
@@ -310,10 +295,10 @@ public class TestBlockDataStreamOutput {
       long writeChunkCount =
           metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk);
       byte[] data =
-          ContainerTestHelper.getFixedLengthString(keyString, chunkSize / 2)
+          ContainerTestHelper.getFixedLengthString(keyString, CHUNK_SIZE / 2)
               .getBytes(UTF_8);
       key.write(ByteBuffer.wrap(data));
-      // minPacketSize= 100, so first write of 50 wont trigger a writeChunk
+      // minPacketSize= 100, so first write of 50 won't trigger a writeChunk
       assertEquals(writeChunkCount,
           metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
       key.write(ByteBuffer.wrap(data));
@@ -328,8 +313,8 @@ public class TestBlockDataStreamOutput {
 
   @ParameterizedTest
   @MethodSource("clientParameters")
-  public void testTotalAckDataLength(boolean flushDelay, boolean enablePiggybacking) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
+  public void testTotalAckDataLength(boolean flushDelay) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       int dataLength = 400;
       String keyName = getKeyName();
@@ -350,8 +335,8 @@ public class TestBlockDataStreamOutput {
 
   @ParameterizedTest
   @MethodSource("clientParameters")
-  public void testDatanodeVersion(boolean flushDelay, boolean enablePiggybacking) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
+  public void testDatanodeVersion(boolean flushDelay) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       // Verify all DNs internally have versions set correctly
       List<HddsDatanodeService> dns = cluster.getHddsDatanodes();
