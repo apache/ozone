@@ -905,12 +905,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       // see https://issues.apache.org/jira/browse/HDDS-11784
       LOG.warn("Got exception when finding parent id for {}/{}/{}. Use another way to get it",
           volumeId, bucketId, key, e);
-      final String nonFSOMultipartKey =
+      final String multipartKey =
           getMultipartKey(volume, bucket, key, uploadId);
       final OmMultipartKeyInfo multipartKeyInfo =
-          getMultipartInfoTable().get(nonFSOMultipartKey);
+          getMultipartInfoTable().get(multipartKey);
       if (multipartKeyInfo == null) {
-        throw new OMException(MISSING_MULTIPART_KEY_INFO_ERROR);
+        LOG.error("Could not find multipartKeyInfo for {}", multipartKey);
+        throw new OMException(NO_SUCH_MULTIPART_UPLOAD_ERROR);
       }
       parentId = multipartKeyInfo.getParentID();
     }

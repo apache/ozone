@@ -631,6 +631,42 @@ public class TestOzoneClientMultipartUploadWithFSO {
     assertFalse(ozoneMultipartUploadPartListParts.isTruncated());
   }
 
+  @Test
+  public void testAbortMultipartUploadSuccessWithMissingParentDirectories() throws Exception {
+    String parentDir = "parentDirToDelete/";
+    keyName = parentDir + UUID.randomUUID();
+
+    OzoneManager ozoneManager = cluster.getOzoneManager();
+    String buckKey = ozoneManager.getMetadataManager()
+        .getBucketKey(volume.getName(), bucket.getName());
+    OmBucketInfo buckInfo =
+        ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
+    BucketLayout bucketLayout = buckInfo.getBucketLayout();
+
+    String uploadID = initiateMultipartUpload(bucket, keyName, RATIS,
+        ONE);
+
+    OMMetadataManager metadataMgr =
+        cluster.getOzoneManager().getMetadataManager();
+    String multipartOpenKey =
+        metadataMgr.getMultipartKeyFSO(volumeName, bucketName, keyName, uploadID);
+    String multipartKey = metadataMgr.getMultipartKey(volumeName, bucketName,
+        keyName, uploadID);
+
+    // Delete parent directory
+    ozClient.getProxy().deleteKey(volumeName, bucketName, parentDir, false);
+
+    // Abort multipart upload with missing parent directory
+    bucket.abortMultipartUpload(keyName, uploadID);
+
+    OmKeyInfo omKeyInfo =
+        metadataMgr.getOpenKeyTable(bucketLayout).get(multipartOpenKey);
+    OmMultipartKeyInfo omMultipartKeyInfo =
+        metadataMgr.getMultipartInfoTable().get(multipartKey);
+    assertNull(omKeyInfo);
+    assertNull(omMultipartKeyInfo);
+  }
+
   private void verifyPartNamesInDB(Map<Integer, String> partsMap,
                                    OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts,
                                    String uploadID) throws IOException {
