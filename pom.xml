@@ -34,10 +34,10 @@
     <apache-rat-plugin.version>0.16.1</apache-rat-plugin.version>
     <aspectj-plugin.version>1.14</aspectj-plugin.version>
     <aspectj.version>1.9.7</aspectj.version>
-    <assertj.version>3.27.1</assertj.version>
+    <assertj.version>3.27.2</assertj.version>
     <aws-java-sdk.version>1.12.661</aws-java-sdk.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
-    <bouncycastle.version>1.79</bouncycastle.version>
+    <bouncycastle.version>1.80</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.0</build-helper-maven-plugin.version>
     <cdi-api.version>2.0</cdi-api.version>
     <checkstyle.version>9.3</checkstyle.version>
@@ -126,7 +126,7 @@
     <jcip-annotations.version>1.0-1</jcip-annotations.version>
     <jersey.version>1.19.4</jersey.version>
     <jersey2.version>2.46</jersey2.version>
-    <jetty.version>9.4.56.v20240826</jetty.version>
+    <jetty.version>9.4.57.v20241219</jetty.version>
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
     <jline.version>3.28.0</jline.version>
@@ -215,7 +215,7 @@
     <sortpom-maven-plugin.version>3.0.1</sortpom-maven-plugin.version>
     <spotbugs.version>3.1.12.2</spotbugs.version>
     <spring.version>5.3.39</spring.version>
-    <sqlite.version>3.47.2.0</sqlite.version>
+    <sqlite.version>3.48.0.0</sqlite.version>
     <stax2.version>4.2.2</stax2.version>
     <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
     <surefire.fork.timeout>1200</surefire.fork.timeout>
@@ -1456,6 +1456,10 @@
                       <!-- Allow RocksDB constants and static methods to be used. -->
                       <allowedImport>org.rocksdb.RocksDB.*</allowedImport>
                     </allowedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
                     <exclusions>
                       <exclusion>org.apache.hadoop.hdds.utils.db.managed.*</exclusion>
                       <exclusion>org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer</exclusion>
@@ -1480,6 +1484,10 @@
                       <bannedImport>org.apache.hadoop.thirdparty.com.google.common.**</bannedImport>
                       <bannedImport>org.apache.hadoop.util.Preconditions</bannedImport>
                     </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
                   </restrictImports>
                   <restrictImports>
                     <includeTestCode>true</includeTestCode>
@@ -1487,6 +1495,10 @@
                     <bannedImports>
                       <bannedImport>org.junit.jupiter.api.Disabled</bannedImport>
                     </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
                   </restrictImports>
                   <restrictImports>
                     <includeTestCode>true</includeTestCode>
@@ -1498,6 +1510,10 @@
                       <bannedImport>org.apache.hadoop.classification.InterfaceAudience</bannedImport>
                       <bannedImport>org.apache.hadoop.classification.InterfaceStability</bannedImport>
                     </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
                     <exclusions>
                       <exclusion>org.apache.hadoop.fs.contract.*</exclusion>
                       <exclusion>org.apache.hadoop.tools.contract.*</exclusion>
@@ -1510,6 +1526,10 @@
                       <bannedImport>org.apache.hadoop.hdfs.MiniDFSCluster</bannedImport>
                       <bannedImport>org.apache.hadoop.hdfs.DFSConfigKeys</bannedImport>
                     </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
                   </restrictImports>
                   <restrictImports>
                     <includeTestCode>true</includeTestCode>
@@ -1522,6 +1542,10 @@
                       <allowedImport>org.junit.jupiter.**</allowedImport>
                       <allowedImport>org.junit.platform.**</allowedImport>
                     </allowedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
                   </restrictImports>
                   <restrictImports>
                     <includeTestCode>true</includeTestCode>
@@ -1534,6 +1558,10 @@
                       <bannedImport>org.jetbrains.annotations.NotNull</bannedImport>
                       <bannedImport>org.jetbrains.annotations.Nullable</bannedImport>
                     </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
                   </restrictImports>
                   <restrictImports>
                     <includeTestCode>true</includeTestCode>
@@ -1541,6 +1569,10 @@
                     <bannedImports>
                       <bannedImport>org.apache.commons.lang.**</bannedImport>
                     </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
                   </restrictImports>
                 </rules>
               </configuration>
@@ -1562,6 +1594,10 @@
                       <bannedImport>org.apache.hadoop.hdds.scm.metadata.Replicate</bannedImport>
                       <bannedImport>org.kohsuke.MetaInfServices</bannedImport>
                     </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
                   </restrictImports>
                 </rules>
               </configuration>

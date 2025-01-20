@@ -35,7 +35,7 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import picocli.CommandLine;
 
 import java.io.IOException;
-import java.io.PrintStream;
+import java.io.PrintWriter;
 
 import static org.apache.hadoop.hdds.server.JsonUtils.toJsonStringWithDefaultPrettyPrinter;
 
@@ -117,19 +117,19 @@ public class SnapshotDiffHandler extends Handler {
                                String bucketName) throws IOException {
     SnapshotDiffResponse diffResponse = store.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
         token, pageSize, forceFullDiff, diffDisableNativeLibs);
-    try (PrintStream stream = out()) {
+    try (PrintWriter writer = out()) {
       if (json) {
-        stream.println(toJsonStringWithDefaultPrettyPrinter(getJsonObject(diffResponse)));
+        writer.println(toJsonStringWithDefaultPrettyPrinter(getJsonObject(diffResponse)));
       } else {
-        stream.println(diffResponse);
+        writer.println(diffResponse);
       }
     }
   }
 
   private void cancelSnapshotDiff(ObjectStore store, String volumeName,
                                   String bucketName) throws IOException {
-    try (PrintStream stream = out()) {
-      stream.println(store.cancelSnapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot));
+    try (PrintWriter writer = out()) {
+      writer.println(store.cancelSnapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot));
     }
   }
 

@@ -40,9 +40,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT;
-
 /**
  * Task to query data from OMDB and write into Recon RocksDB.
  * Reprocess() will take a snapshots on OMDB, and iterate the keyTable,
@@ -73,6 +70,7 @@ public class NSSummaryTask implements ReconOmTask {
   private final NSSummaryTaskWithFSO nsSummaryTaskWithFSO;
   private final NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy;
   private final NSSummaryTaskWithOBS nsSummaryTaskWithOBS;
+  private final OzoneConfiguration ozoneConfiguration;
 
   @Inject
   public NSSummaryTask(ReconNamespaceSummaryManager
@@ -83,19 +81,16 @@ public class NSSummaryTask implements ReconOmTask {
                        ozoneConfiguration) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconOMMetadataManager = reconOMMetadataManager;
-    long nsSummaryFlushToDBMaxThreshold = ozoneConfiguration.getLong(
-        OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
-        OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
-
+    this.ozoneConfiguration = ozoneConfiguration;
     this.nsSummaryTaskWithFSO = new NSSummaryTaskWithFSO(
-        reconNamespaceSummaryManager, reconOMMetadataManager,
-        ozoneConfiguration, nsSummaryFlushToDBMaxThreshold);
+        reconNamespaceSummaryManager,
+        reconOMMetadataManager, ozoneConfiguration);
     this.nsSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
-        reconNamespaceSummaryManager, reconOMMetadataManager,
-        ozoneConfiguration, nsSummaryFlushToDBMaxThreshold);
+        reconNamespaceSummaryManager,
+        reconOMMetadataManager, ozoneConfiguration);
     this.nsSummaryTaskWithOBS = new NSSummaryTaskWithOBS(
-        reconNamespaceSummaryManager, reconOMMetadataManager,
-        ozoneConfiguration, nsSummaryFlushToDBMaxThreshold);
+        reconNamespaceSummaryManager,
+        reconOMMetadataManager, ozoneConfiguration);
   }
 
   @Override
@@ -104,24 +99,23 @@ public class NSSummaryTask implements ReconOmTask {
   }
 
   @Override
-  public Pair<String, Pair<Integer, Boolean>> process(
-      OMUpdateEventBatch events, int seekPosition) {
-    Pair<Integer, Boolean> itrPosStatusPair =
-        nsSummaryTaskWithFSO.processWithFSO(events, seekPosition);
-    if (!itrPosStatusPair.getRight()) {
+  public Pair<String, Boolean> process(OMUpdateEventBatch events) {
+    long startTime = System.currentTimeMillis();
+    boolean success = nsSummaryTaskWithFSO.processWithFSO(events);
+    if (!success) {
       LOG.error("processWithFSO failed.");
     }
-    itrPosStatusPair =
-        nsSummaryTaskWithLegacy.processWithLegacy(events, seekPosition);
-    if (!itrPosStatusPair.getRight()) {
+    success = nsSummaryTaskWithLegacy.processWithLegacy(events);
+    if (!success) {
       LOG.error("processWithLegacy failed.");
     }
-    itrPosStatusPair =
-        nsSummaryTaskWithOBS.processWithOBS(events, seekPosition);
-    if (!itrPosStatusPair.getRight()) {
+    success = nsSummaryTaskWithOBS.processWithOBS(events);
+    if (!success) {
       LOG.error("processWithOBS failed.");
     }
-    return new ImmutablePair<>(getTaskName(), itrPosStatusPair);
+    LOG.debug("{} successfully processed in {} milliseconds",
+        getTaskName(), (System.currentTimeMillis() - startTime));
+    return new ImmutablePair<>(getTaskName(), success);
   }
 
   @Override
@@ -160,8 +154,11 @@ public class NSSummaryTask implements ReconOmTask {
           return new ImmutablePair<>(getTaskName(), false);
         }
       }
-    } catch (InterruptedException | ExecutionException ex) {
+    } catch (InterruptedException ex) {
       LOG.error("Error while reprocessing NSSummary table in Recon DB.", ex);
+      return new ImmutablePair<>(getTaskName(), false);
+    } catch (ExecutionException ex2) {
+      LOG.error("Error while reprocessing NSSummary table in Recon DB.", ex2);
       return new ImmutablePair<>(getTaskName(), false);
     } finally {
       executorService.shutdown();

@@ -155,8 +155,7 @@ public class OmTableInsightTask implements ReconOmTask {
    * @return Pair
    */
   @Override
-  public Pair<String, Pair<Integer, Boolean>> process(OMUpdateEventBatch events,
-                                                      int seekPos) {
+  public Pair<String, Boolean> process(OMUpdateEventBatch events) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     // Initialize maps to store count and size information
     HashMap<String, Long> objectCountMap = initializeCountMap();
@@ -165,6 +164,7 @@ public class OmTableInsightTask implements ReconOmTask {
     final Collection<String> taskTables = getTaskTables();
 
     // Process each update event
+    long startTime = System.currentTimeMillis();
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, Object> omdbUpdateEvent = eventIterator.next();
       String tableName = omdbUpdateEvent.getTable();
@@ -196,8 +196,7 @@ public class OmTableInsightTask implements ReconOmTask {
         LOG.error(
             "Unexpected exception while processing the table {}, Action: {}",
             tableName, omdbUpdateEvent.getAction(), e);
-        return new ImmutablePair<>(getTaskName(),
-            new ImmutablePair<>(0, false));
+        return new ImmutablePair<>(getTaskName(), false);
       }
     }
     // Write the updated count and size information to the database
@@ -210,8 +209,9 @@ public class OmTableInsightTask implements ReconOmTask {
     if (!replicatedSizeMap.isEmpty()) {
       writeDataToDB(replicatedSizeMap);
     }
-    LOG.debug("Completed a 'process' run of OmTableInsightTask.");
-    return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(0, true));
+    LOG.debug("{} successfully processed in {} milliseconds",
+        getTaskName(), (System.currentTimeMillis() - startTime));
+    return new ImmutablePair<>(getTaskName(), true);
   }
 
   private void handlePutEvent(OMDBUpdateEvent<String, Object> event,

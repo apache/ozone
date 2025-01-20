@@ -195,8 +195,8 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         .build();
 
     OMUpdateEventBatch omUpdateEventBatch =
-        new OMUpdateEventBatch(Arrays.asList(event, event2));
-    fileSizeCountTask.process(omUpdateEventBatch, 0);
+        new OMUpdateEventBatch(Arrays.asList(event, event2), 0L);
+    fileSizeCountTask.process(omUpdateEventBatch);
 
     // Verify 2 keys are in correct bins.
     assertEquals(2, fileCountBySizeDao.count());
@@ -250,8 +250,8 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         .build();
 
     omUpdateEventBatch = new OMUpdateEventBatch(
-        Arrays.asList(updateEvent, putEvent, deleteEvent));
-    fileSizeCountTask.process(omUpdateEventBatch, 0);
+        Arrays.asList(updateEvent, putEvent, deleteEvent), 0L);
+    fileSizeCountTask.process(omUpdateEventBatch);
 
     assertEquals(4, fileCountBySizeDao.count());
     recordToFind.value3(1024L);
@@ -388,8 +388,8 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     }
 
     OMUpdateEventBatch omUpdateEventBatch =
-        new OMUpdateEventBatch(omDbEventList);
-    fileSizeCountTask.process(omUpdateEventBatch, 0);
+        new OMUpdateEventBatch(omDbEventList, 0L);
+    fileSizeCountTask.process(omUpdateEventBatch);
 
     // Verify 2 keys are in correct bins.
     assertEquals(10000, fileCountBySizeDao.count());
@@ -464,8 +464,8 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
       }
     }
 
-    omUpdateEventBatch = new OMUpdateEventBatch(omDbEventList);
-    fileSizeCountTask.process(omUpdateEventBatch, 0);
+    omUpdateEventBatch = new OMUpdateEventBatch(omDbEventList, 0L);
+    fileSizeCountTask.process(omUpdateEventBatch);
 
     assertEquals(10000, fileCountBySizeDao.count());
     recordToFind = dslContext
