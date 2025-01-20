@@ -52,9 +52,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT;
-
 /**
  * This is a background service to delete orphan directories and its
  * sub paths(sub-dirs and sub-files).
@@ -80,10 +77,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   // from parent directory info from deleted directory table concurrently
   // and send deletion requests.
   private final int dirDeletingCorePoolSize;
-  private static final int MIN_ERR_LIMIT_PER_TASK = 1000;
-
-  // Number of items(dirs/files) to be batched in an iteration.
-  private final long pathLimitPerTask;
   private int ratisByteLimit;
   private final AtomicBoolean suspended;
   private AtomicBoolean isRunningOnAOS;
@@ -97,9 +90,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       OzoneConfiguration configuration, int dirDeletingServiceCorePoolSize) {
     super(DirectoryDeletingService.class.getSimpleName(), interval, unit,
         dirDeletingServiceCorePoolSize, serviceTimeout, ozoneManager, null);
-    this.pathLimitPerTask = configuration
-        .getInt(OZONE_PATH_DELETING_LIMIT_PER_TASK,
-            OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT);
     int limit = (int) configuration.getStorageSize(
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
