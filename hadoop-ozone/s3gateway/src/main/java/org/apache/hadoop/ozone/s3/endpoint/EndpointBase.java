@@ -80,6 +80,8 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_NUM_LIMIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_REGEX_PATTERN;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_VALUE_LENGTH_LIMIT;
 
+import org.apache.hadoop.ozone.s3.RequestIdentifier;
+
 /**
  * Basic helpers for all the REST endpoints.
  */
@@ -91,6 +93,8 @@ public abstract class EndpointBase implements Auditor {
   private OzoneClient client;
   @Inject
   private SignatureInfo signatureInfo;
+  @Inject
+  private RequestIdentifier requestIdentifier;
 
   private S3Auth s3Auth;
   @Context
@@ -443,6 +447,10 @@ public abstract class EndpointBase implements Auditor {
 
   private AuditMessage.Builder auditMessageBaseBuilder(AuditAction op,
       Map<String, String> auditMap) {
+    // Add request IDs to audit parameters
+    auditMap.put("x-amz-request-id", requestIdentifier.getRequestId());
+    auditMap.put("x-amz-id-2", requestIdentifier.getAmzId());
+    
     AuditMessage.Builder builder = new AuditMessage.Builder()
         .forOperation(op)
         .withParams(auditMap);
@@ -486,6 +494,11 @@ public abstract class EndpointBase implements Auditor {
   @VisibleForTesting
   public void setClient(OzoneClient ozoneClient) {
     this.client = ozoneClient;
+  }
+
+  @VisibleForTesting
+  public void setRequestIdentifier(RequestIdentifier requestIdentifier) {
+    this.requestIdentifier = requestIdentifier;
   }
 
   public OzoneClient getClient() {
