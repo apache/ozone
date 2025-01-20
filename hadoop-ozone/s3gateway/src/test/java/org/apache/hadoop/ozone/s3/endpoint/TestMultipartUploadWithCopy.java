@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
+import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
@@ -127,6 +128,7 @@ public class TestMultipartUploadWithCopy {
     REST.setHeaders(headers);
     REST.setClient(CLIENT);
     REST.setOzoneConfiguration(new OzoneConfiguration());
+    REST.setRequestIdentifier(new RequestIdentifier());
   }
 
   @Test

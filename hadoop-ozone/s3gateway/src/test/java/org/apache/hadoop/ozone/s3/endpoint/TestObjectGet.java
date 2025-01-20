@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
+import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import org.apache.commons.io.IOUtils;
@@ -92,6 +93,7 @@ public class TestObjectGet {
     rest.setOzoneConfiguration(new OzoneConfiguration());
     headers = mock(HttpHeaders.class);
     rest.setHeaders(headers);
+    rest.setRequestIdentifier(new RequestIdentifier());
 
     ByteArrayInputStream body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     rest.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
