@@ -447,7 +447,6 @@ public abstract class EndpointBase implements Auditor {
 
   private AuditMessage.Builder auditMessageBaseBuilder(AuditAction op,
       Map<String, String> auditMap) {
-    // Add request IDs to audit parameters
     auditMap.put("x-amz-request-id", requestIdentifier.getRequestId());
     auditMap.put("x-amz-id-2", requestIdentifier.getAmzId());
     
