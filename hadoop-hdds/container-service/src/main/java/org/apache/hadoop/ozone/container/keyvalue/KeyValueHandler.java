@@ -27,11 +27,13 @@ import java.nio.ByteBuffer;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 
@@ -146,11 +148,13 @@ public class KeyValueHandler extends Handler {
   private final ChunkManager chunkManager;
   private final VolumeChoosingPolicy volumeChoosingPolicy;
   private final long maxContainerSize;
+  private final long maxDeleteLockWaitMs;
   private final Function<ByteBuffer, ByteString> byteBufferToByteString;
   private final boolean validateChunkChecksumData;
   // A striped lock that is held during container creation.
   private final Striped<Lock> containerCreationLocks;
   private static FaultInjector injector;
+  private final Clock clock;
 
   public KeyValueHandler(ConfigurationSource config,
                          String datanodeId,
@@ -158,7 +162,18 @@ public class KeyValueHandler extends Handler {
                          VolumeSet volSet,
                          ContainerMetrics metrics,
                          IncrementalReportSender<Container> icrSender) {
+    this(config, datanodeId, contSet, volSet, metrics, icrSender, Clock.systemUTC());
+  }
+
+  public KeyValueHandler(ConfigurationSource config,
+                         String datanodeId,
+                         ContainerSet contSet,
+                         VolumeSet volSet,
+                         ContainerMetrics metrics,
+                         IncrementalReportSender<Container> icrSender,
+                         Clock clock) {
     super(config, datanodeId, contSet, volSet, metrics, icrSender);
+    this.clock = clock;
     blockManager = new BlockManagerImpl(config);
     validateChunkChecksumData = conf.getObject(
         DatanodeConfiguration.class).isChunkDataValidationCheck();
@@ -173,6 +188,9 @@ public class KeyValueHandler extends Handler {
     maxContainerSize = (long) config.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+
+    maxDeleteLockWaitMs = config.getTimeDuration(OzoneConfigKeys.OZONE_DELETE_CONTAINER_TIMEOUT,
+        OzoneConfigKeys.OZONE_DELETE_CONTAINER_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
     // this striped handler lock is used for synchronizing createContainer
     // Requests.
     final int threadCountPerDisk = conf.getInt(
@@ -1436,6 +1454,7 @@ public class KeyValueHandler extends Handler {
 
   private void deleteInternal(Container container, boolean force)
       throws StorageContainerException {
+    long startTime = clock.millis();
     container.writeLock();
     try {
       if (container.getContainerData().getVolume().isFailed()) {
@@ -1490,6 +1509,13 @@ public class KeyValueHandler extends Handler {
         // 4. container moved to tmp folder
         // 5. container content deleted from tmp folder
         try {
+          long waitTime = clock.millis() - startTime;
+          if (waitTime > maxDeleteLockWaitMs) {
+            LOG.warn("An attempt to delete container {} took {} ms acquiring locks and pre-checks. " +
+                    "The delete has been skipped and should be retried automatically by SCM.",
+                container.getContainerData().getContainerID(), waitTime);
+            return;
+          }
           container.markContainerForDelete();
           long containerId = container.getContainerData().getContainerID();
           containerSet.removeContainer(containerId);

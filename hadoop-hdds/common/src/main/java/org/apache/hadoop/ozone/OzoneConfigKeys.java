@@ -322,6 +322,11 @@ public final class OzoneConfigKeys {
   public static final String
       OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT = "20m";
 
+  // Specifies how long a delete container command can wait on locks before commencing the
+  // actual delete process. This is to avoid a delete command hanging for an undetermined
+  // amount of time before SCM is informed the delete has been actioned.
+  public static final String OZONE_DELETE_CONTAINER_TIMEOUT = "ozone.delete.container.timeout";
+  public static final String OZONE_DELETE_CONTAINER_TIMEOUT_DEFAULT = "1m";
 
   public static final String OZONE_KEY_PREALLOCATION_BLOCKS_MAX =
       "ozone.key.preallocation.max.blocks";

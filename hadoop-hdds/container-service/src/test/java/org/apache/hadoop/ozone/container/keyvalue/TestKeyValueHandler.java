@@ -22,10 +22,12 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.util.List;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.io.FileUtils;
@@ -39,6 +41,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -451,6 +454,68 @@ public class TestKeyValueHandler {
           "Delete container issued on containerID 2 which is " +
               "in a failed volume";
       assertThat(kvHandlerLogs.getOutput()).contains(expectedLog);
+    } finally {
+      FileUtils.deleteDirectory(new File(testDir));
+    }
+  }
+
+
+  @Test
+  public void testDeleteContainerTimeout() throws IOException, InterruptedException {
+    final String testDir = tempDir.toString();
+    try {
+      final long containerID = 1L;
+      final String clusterId = UUID.randomUUID().toString();
+      final String datanodeId = UUID.randomUUID().toString();
+      final ConfigurationSource conf = new OzoneConfiguration();
+      final ContainerSet containerSet = new ContainerSet(1000);
+      final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+      final Clock clock = mock(Clock.class);
+      long startTime = System.currentTimeMillis();
+      when(clock.millis()).thenReturn(startTime)
+          .thenReturn(startTime + conf.getTimeDuration(OzoneConfigKeys.OZONE_DELETE_CONTAINER_TIMEOUT,
+              OzoneConfigKeys.OZONE_DELETE_CONTAINER_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS) + 1);
+
+      HddsVolume hddsVolume = new HddsVolume.Builder(testDir).conf(conf)
+          .clusterID(clusterId).datanodeUuid(datanodeId)
+          .volumeSet(volumeSet)
+          .build();
+      hddsVolume.format(clusterId);
+      hddsVolume.createWorkingDir(clusterId, null);
+      hddsVolume.createTmpDirs(clusterId);
+
+      when(volumeSet.getVolumesList())
+          .thenReturn(Collections.singletonList(hddsVolume));
+
+      List<HddsVolume> hddsVolumeList = StorageVolumeUtil
+          .getHddsVolumesList(volumeSet.getVolumesList());
+
+      assertEquals(1, hddsVolumeList.size());
+
+      final ContainerMetrics metrics = ContainerMetrics.create(conf);
+
+      final AtomicInteger icrReceived = new AtomicInteger(0);
+
+      final KeyValueHandler kvHandler = new KeyValueHandler(conf,
+          datanodeId, containerSet, volumeSet, metrics,
+          c -> icrReceived.incrementAndGet(), clock);
+      kvHandler.setClusterID(clusterId);
+
+      final ContainerCommandRequestProto createContainer =
+          createContainerRequest(datanodeId, containerID);
+      kvHandler.handleCreateContainer(createContainer, null);
+      assertEquals(1, icrReceived.get());
+      assertNotNull(containerSet.getContainer(containerID));
+
+      // The delete should not have gone through due to the mocked clock
+      kvHandler.deleteContainer(containerSet.getContainer(containerID), true);
+      assertEquals(1, icrReceived.get());
+      assertNotNull(containerSet.getContainer(containerID));
+
+      // Delete the container normally, and it should go through
+      kvHandler.deleteContainer(containerSet.getContainer(containerID), true);
+      assertEquals(2, icrReceived.get());
+      assertNull(containerSet.getContainer(containerID));
     } finally {
       FileUtils.deleteDirectory(new File(testDir));
     }
