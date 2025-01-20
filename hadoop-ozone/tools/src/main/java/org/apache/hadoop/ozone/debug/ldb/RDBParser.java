@@ -41,6 +41,7 @@ public class RDBParser implements DebugSubcommand {
 
   @CommandLine.Option(names = {"--db"},
       required = true,
+      scope = CommandLine.ScopeType.INHERIT,
       description = "Database File Path")
   private String dbPath;
 
