@@ -21,7 +21,6 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.Iterator;
 
 import org.apache.hadoop.ozone.audit.S3GAction;
