@@ -64,11 +64,11 @@ public class DummyReconDBTask implements ReconOmTask {
   }
 
   @Override
-  public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
+  public Pair<String, Pair<Integer, Boolean>> reprocess(OMMetadataManager omMetadataManager) {
     if (++callCtr <= numFailuresAllowed) {
-      return new ImmutablePair<>(getTaskName(), false);
+      return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(0, false));
     } else {
-      return new ImmutablePair<>(getTaskName(), true);
+      return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(0, true));
     }
   }
 

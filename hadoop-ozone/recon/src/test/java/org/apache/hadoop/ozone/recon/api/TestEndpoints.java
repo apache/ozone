@@ -788,9 +788,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     });
 
     // check volume, bucket and key count after running table count task
-    Pair<String, Boolean> result =
+    Pair<String, Pair<Integer, Boolean>> result =
         omTableInsightTask.reprocess(reconOMMetadataManager);
-    assertTrue(result.getRight());
+    assertTrue(result.getRight().getRight());
     response = clusterStateEndpoint.getClusterState();
     clusterStateResponse = (ClusterStateResponse) response.getEntity();
     assertEquals(2, clusterStateResponse.getVolumes());
@@ -867,9 +867,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         .thenReturn(omKeyInfo2)
         .thenReturn(omKeyInfo3);
 
-    Pair<String, Boolean> result =
+    Pair<String, Pair<Integer, Boolean>> result =
         fileSizeCountTask.reprocess(omMetadataManager);
-    assertTrue(result.getRight());
+    assertTrue(result.getRight().getRight());
 
     assertEquals(3, fileCountBySizeDao.count());
     Response response = utilizationEndpoint.getFileCounts(null, null, 0);

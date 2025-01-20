@@ -85,7 +85,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
    * (container, key) -&gt; count to Recon Container DB.
    */
   @Override
-  public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
+  public Pair<String, Pair<Integer, Boolean>> reprocess(OMMetadataManager omMetadataManager) {
     long omKeyCount = 0;
 
     // In-memory maps for fast look up and batch write
@@ -121,7 +121,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
                 containerKeyCountMap);
             if (!checkAndCallFlushToDB(containerKeyMap)) {
               LOG.error("Unable to flush containerKey information to the DB");
-              return new ImmutablePair<>(getTaskName(), false);
+              return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(0, false));
             }
             omKeyCount++;
           }
@@ -134,7 +134,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
           containerKeyCountMap)) {
         LOG.error("Unable to flush Container Key Count and " +
             "remaining Container Key information to the DB");
-        return new ImmutablePair<>(getTaskName(), false);
+        return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(0, false));
       }
 
       LOG.debug("Completed 'reprocess' of ContainerKeyMapperTask.");
@@ -145,9 +145,9 @@ public class ContainerKeyMapperTask implements ReconOmTask {
     } catch (IOException ioEx) {
       LOG.error("Unable to populate Container Key data in Recon DB. ",
           ioEx);
-      return new ImmutablePair<>(getTaskName(), false);
+      return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(0, false));
     }
-    return new ImmutablePair<>(getTaskName(), true);
+    return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(0, true));
   }
 
   private boolean flushAndCommitContainerKeyInfoToDB(
@@ -192,7 +192,8 @@ public class ContainerKeyMapperTask implements ReconOmTask {
   }
 
   @Override
-  public Pair<String, Boolean> process(OMUpdateEventBatch events) {
+  public Pair<String, Pair<Integer, Boolean>> process(OMUpdateEventBatch events,
+                                                      int seekPosition) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     int eventCount = 0;
     final Collection<String> taskTables = getTaskTables();
@@ -249,18 +250,18 @@ public class ContainerKeyMapperTask implements ReconOmTask {
       } catch (IOException e) {
         LOG.error("Unexpected exception while updating key data : {} ",
             updatedKey, e);
-        return new ImmutablePair<>(getTaskName(), false);
+        return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(0, false));
       }
     }
     try {
       writeToTheDB(containerKeyMap, containerKeyCountMap, deletedKeyCountList);
     } catch (IOException e) {
       LOG.error("Unable to write Container Key Prefix data in Recon DB.", e);
-      return new ImmutablePair<>(getTaskName(), false);
+      return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(0, false));
     }
     LOG.debug("{} successfully processed {} OM DB update event(s) in {} milliseconds.",
         getTaskName(), eventCount, (System.currentTimeMillis() - startTime));
-    return new ImmutablePair<>(getTaskName(), true);
+    return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(0, true));
   }
 
   private void writeToTheDB(Map<ContainerKeyPrefix, Integer> containerKeyMap,

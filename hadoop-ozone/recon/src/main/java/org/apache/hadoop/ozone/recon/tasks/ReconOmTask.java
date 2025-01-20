@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 
@@ -40,25 +39,14 @@ public interface ReconOmTask {
    * @param seekPosition position from where to start iterating events of events iterator.
    * @return Pair of task name -&gt; events iterator position, task success.
    */
-  default Pair<String, Pair<Integer, Boolean>> process(
-      OMUpdateEventBatch events,
-      int seekPosition) {
-    return new ImmutablePair<>(getTaskName(), Pair.of(seekPosition, true));
-  }
-
-  /**
-   * Process a set of OM events on tables that the task is listening on.
-   *
-   * @param events Set of events to be processed by the task.
-   * @return Pair of task name -&gt; events iterator position, task success.
-   */
-  Pair<String, Boolean> process(OMUpdateEventBatch events);
+  Pair<String, Pair<Integer, Boolean>> process(OMUpdateEventBatch events,
+                                               int seekPosition);
 
   /**
    * Process a  on tables that the task is listening on.
    * @param omMetadataManager OM Metadata manager instance.
    * @return Pair of task name -&gt; task success.
    */
-  Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager);
+  Pair<String, Pair<Integer, Boolean>> reprocess(OMMetadataManager omMetadataManager);
 
 }
