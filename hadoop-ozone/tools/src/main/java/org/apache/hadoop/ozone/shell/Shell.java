@@ -25,6 +25,8 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import picocli.CommandLine;
 import picocli.shell.jline3.PicocliCommands.PicocliCommandsFactory;
 
+import java.util.List;
+
 /**
  * Ozone user interface commands.
  * <p>
@@ -56,8 +58,16 @@ public abstract class Shell extends GenericCli {
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
 
-  @CommandLine.Option(names = { "--interactive" }, description = "Run in interactive mode")
-  private boolean interactive;
+  @CommandLine.ArgGroup
+  private ExecutionMode executionMode;
+
+  private static class ExecutionMode {
+    @CommandLine.Option(names = {"--interactive"}, description = "Run in interactive mode")
+    private boolean interactive;
+
+    @CommandLine.Option(names = {"--execute"}, description = "Run command as part of batch")
+    private List<String> command;
+  }
 
   public Shell() {
     super(new PicocliCommandsFactory());
@@ -83,9 +93,9 @@ public abstract class Shell extends GenericCli {
       // failure will be reported by regular, non-interactive run
     }
 
-    if (interactive) {
+    if (executionMode != null && (executionMode.interactive || !executionMode.command.isEmpty())) {
       spec.name(""); // use short name (e.g. "token get" instead of "ozone sh token get")
-      new REPL(this, getCmd(), (PicocliCommandsFactory) getCmd().getFactory());
+      new REPL(this, getCmd(), (PicocliCommandsFactory) getCmd().getFactory(), executionMode.command);
     } else {
       TracingUtil.initTracing("shell", getOzoneConf());
       String spanName = spec.name() + " " + String.join(" ", argv);

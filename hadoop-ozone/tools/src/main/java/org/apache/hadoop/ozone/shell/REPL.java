@@ -36,6 +36,7 @@ import picocli.shell.jline3.PicocliCommands.PicocliCommandsFactory;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.function.Supplier;
 
 /**
@@ -44,7 +45,7 @@ import java.util.function.Supplier;
  */
 class REPL {
 
-  REPL(Shell shell, CommandLine cmd, PicocliCommandsFactory factory) {
+  REPL(Shell shell, CommandLine cmd, PicocliCommandsFactory factory, List<String> lines) {
     Parser parser = new DefaultParser();
     Supplier<Path> workDir = () -> Paths.get(System.getProperty("user.dir"));
     TerminalBuilder terminalBuilder = TerminalBuilder.builder()
@@ -65,12 +66,20 @@ class REPL {
           .variable(LineReader.LIST_MAX, 50)
           .build();
 
-      TailTipWidgets widgets = new TailTipWidgets(reader, registry::commandDescription, 5, TipType.COMPLETER);
-      widgets.enable();
+      if (terminal.getType() != Terminal.TYPE_DUMB && terminal.getType() != Terminal.TYPE_DUMB_COLOR) {
+        TailTipWidgets widgets = new TailTipWidgets(reader, registry::commandDescription, 5, TipType.COMPLETER);
+        widgets.enable();
+      }
 
       String prompt = shell.prompt() + "> ";
 
-      while (true) {
+      final int batchSize = lines == null ? 0 : lines.size();
+      if (batchSize > 0) {
+        terminal.echo(true);
+        reader.addCommandsInBuffer(lines);
+      }
+
+      for (int i = 0; batchSize == 0 || i < batchSize; i++) {
         try {
           registry.cleanUp();
           String line = reader.readLine(prompt, null, (MaskingCallback) null, null);
