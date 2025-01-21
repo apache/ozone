@@ -606,11 +606,11 @@ public final class TestNSSummaryTaskWithFSO {
       Mockito.doReturn(true).doReturn(true).doReturn(false).when(taskSpy).flushAndCommitNSToDB(Mockito.anyMap());
 
       // Call the method under test
-      Pair<Integer, Boolean> result = taskSpy.processWithFSO(events, 0);
+      Pair<Integer, Boolean> result1 = taskSpy.processWithFSO(events, 0);
 
       // Assertions
-      Assertions.assertNotNull(result, "Result should not be null");
-      Assertions.assertEquals(0, result.getLeft(), "seekPos should be 4");
+      Assertions.assertNotNull(result1, "Result should not be null");
+      Assertions.assertEquals(0, result1.getLeft(), "seekPos should be 4");
 
       // Verify interactions
       Mockito.verify(mockIterator, Mockito.times(3)).next();
