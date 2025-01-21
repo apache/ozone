@@ -677,7 +677,13 @@ public class OzoneContainer {
   private void cleanUpRatisMetadataDirectory()
       throws IOException {
     if (scmConnectionManager != null) {
-      Collection<InetSocketAddress> scmAddressesForDatanodes = HddsUtils.getSCMAddressForDatanodes(config);
+      Collection<InetSocketAddress> scmAddressesForDatanodes;
+      try {
+        scmAddressesForDatanodes = HddsUtils.getSCMAddressForDatanodes(config);
+      } catch (IllegalArgumentException e) {
+        LOG.error("Failed to get SCM addresses for datanodes: {}", e.getMessage());
+        return;
+      }
       for (InetSocketAddress scmAddress : scmAddressesForDatanodes) {
         scmConnectionManager.addSCMServer(scmAddress, context.getThreadNamePrefix());
         context.addEndpoint(scmAddress);

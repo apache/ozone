@@ -47,6 +47,7 @@ src/test/resources/additionalfields.container
 src/test/resources/incorrect.checksum.container
 src/test/resources/incorrect.container
 src/test/resources/test.db.ini
+src/test/resources/metadata/**
 
 # hadoop-hdds/docs
 **/themes/ozonedoc/**

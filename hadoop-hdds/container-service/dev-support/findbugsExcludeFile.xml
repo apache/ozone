@@ -81,4 +81,16 @@
     <Class name="org.apache.hadoop.ozone.container.ozoneimpl.TestBackgroundContainerMetadataScanner"/>
     <Bug pattern="RU_INVOKE_RUN, RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT" />
   </Match>
+  <Match>
+    <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE">
+      <Class name="org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer"/>
+      <Method name="testCleanUpMetadataDirInCaseOfDeadNodeState"/>
+    </Bug>
+  </Match>
+  <Match>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT">
+      <Class name="org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer"/>
+      <Method name="testCleanUpMetadataDirInCaseOfDeadNodeState"/>
+    </Bug>
+  </Match>
 </FindBugsFilter>
