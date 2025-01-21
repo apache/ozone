@@ -1519,7 +1519,6 @@ public class KeyValueHandler extends Handler {
           container.markContainerForDelete();
           long containerId = container.getContainerData().getContainerID();
           containerSet.removeContainer(containerId);
-          sendICR(container);
           ContainerLogger.logDeleted(container.getContainerData(), force);
           KeyValueContainerUtil.removeContainer(keyValueContainerData, conf);
         } catch (IOException ioe) {
@@ -1548,6 +1547,7 @@ public class KeyValueHandler extends Handler {
       container.writeUnlock();
     }
     // Avoid holding write locks for disk operations
+    sendICR(container);
     container.delete();
   }
 
