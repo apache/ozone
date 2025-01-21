@@ -127,14 +127,23 @@ public class DeletedBlockLogImpl
     lock.lock();
     try {
       final List<DeletedBlocksTransaction> failedTXs = Lists.newArrayList();
-      try (
-          TableIterator<Long, ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
-              deletedBlockLogStateManager.getReadOnlyIterator()) {
-        iter.seek(startTxId);
-        while (iter.hasNext() && failedTXs.size() < count) {
-          DeletedBlocksTransaction delTX = iter.next().getValue();
-          if (delTX.getCount() == -1 && delTX.getTxID() >= startTxId) {
-            failedTXs.add(delTX);
+      try (TableIterator<Long,
+          ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
+          deletedBlockLogStateManager.getReadOnlyIterator()) {
+        if (count == LIST_ALL_FAILED_TRANSACTIONS) {
+          while (iter.hasNext()) {
+            DeletedBlocksTransaction delTX = iter.next().getValue();
+            if (delTX.getCount() == -1) {
+              failedTXs.add(delTX);
+            }
+          }
+        } else {
+          iter.seek(startTxId);
+          while (iter.hasNext() && failedTXs.size() < count) {
+            DeletedBlocksTransaction delTX = iter.next().getValue();
+            if (delTX.getCount() == -1 && delTX.getTxID() >= startTxId) {
+              failedTXs.add(delTX);
+            }
           }
         }
       }
@@ -167,7 +176,7 @@ public class DeletedBlockLogImpl
    */
   @Override
   public int resetCount(List<Long> txIDs) throws IOException {
-    final int batchSize = 100;
+    final int batchSize = 1000;
     int totalProcessed = 0;
     long startTxId = 0;
 

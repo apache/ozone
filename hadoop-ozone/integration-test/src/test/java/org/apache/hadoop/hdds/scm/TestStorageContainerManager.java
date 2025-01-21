@@ -300,18 +300,18 @@ public class TestStorageContainerManager {
 
       // These blocks cannot be found in the container, skip deleting them
       // eventually these TX will success.
-      GenericTestUtils.waitFor(() -> {
-        try {
-          if (SCMHAUtils.isSCMHAEnabled(cluster.getConf())) {
-            cluster.getStorageContainerManager().getScmHAManager()
-                .asSCMHADBTransactionBuffer().flush();
-          }
-          return delLog.getFailedTransactions(Integer.MAX_VALUE, 0).size() == 0;
-        } catch (IOException e) {
-          return false;
+    GenericTestUtils.waitFor(() -> {
+      try {
+        if (SCMHAUtils.isSCMHAEnabled(cluster.getConf())) {
+          cluster.getStorageContainerManager().getScmHAManager()
+              .asSCMHADBTransactionBuffer().flush();
         }
-      }, 1000, 20000);
-    }
+        return delLog.getFailedTransactions(-1, 0).size() == 0;
+      } catch (IOException e) {
+        return false;
+      }
+    }, 1000, 20000);
+  }
 
   private static void configureBlockDeletion(OzoneConfiguration conf) {
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
