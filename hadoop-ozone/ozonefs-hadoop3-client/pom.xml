@@ -32,6 +32,7 @@
   <properties>
     <!-- no tests in this module so far -->
     <maven.test.skip>true</maven.test.skip>
+    <proto.shaded.prefix>org.apache.hadoop.ozone.shaded</proto.shaded.prefix>
   </properties>
   <dependencies>
     <dependency>
@@ -102,7 +103,7 @@
               <relocations>
                 <relocation>
                   <pattern>com.google.protobuf</pattern>
-                  <shadedPattern>org.apache.hadoop.shaded.com.google.protobuf</shadedPattern>
+                  <shadedPattern>${proto.shaded.prefix}.com.google.protobuf</shadedPattern>
                   <includes>
                     <include>com.google.protobuf.*</include>
                   </includes>
