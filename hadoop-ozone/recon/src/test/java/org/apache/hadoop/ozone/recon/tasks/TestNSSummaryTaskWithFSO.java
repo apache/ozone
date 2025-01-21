@@ -325,10 +325,12 @@ public final class TestNSSummaryTaskWithFSO {
     private OMDBUpdateEvent keyEvent6;
     private OMDBUpdateEvent keyEvent7;
 
+    private Pair<Integer, Boolean> result;
+
     @BeforeEach
     public void setUp() throws IOException {
       nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
-      nSSummaryTaskWithFso.processWithFSO(processEventBatch(), 0);
+      result = nSSummaryTaskWithFso.processWithFSO(processEventBatch(), 0);
     }
 
     private OMUpdateEventBatch processEventBatch() throws IOException {
@@ -526,7 +528,6 @@ public final class TestNSSummaryTaskWithFSO {
     @Test
     void testProcessWithFSOFlushAfterThresholdAndSuccess() throws IOException {
       // Call the method under test
-      Pair<Integer, Boolean> result = nSSummaryTaskWithFso.processWithFSO(processEventBatch(), 0);
 
       // Assertions
       Assertions.assertNotNull(result, "Result should not be null");
@@ -541,7 +542,7 @@ public final class TestNSSummaryTaskWithFSO {
 
     @Test
     void testProcessWithFSOFlushAfterThresholdAndFailureOfLastElement()
-        throws IOException, NoSuchFieldException, IllegalAccessException {
+        throws NoSuchFieldException, IllegalAccessException {
       // Assume the NamespaceSummaryTaskWithFSO object is already created
       NSSummaryTaskWithFSO task = mock(NSSummaryTaskWithFSO.class);
 
