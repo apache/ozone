@@ -49,7 +49,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
-import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotTestUtils.StubbedPersistentMap;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage;
@@ -804,10 +803,9 @@ public class TestSnapshotDiffManager {
     String bucketName = "buck";
     String fromSnapName = "fs";
     String toSnapName = "ts";
-    try (MockedStatic<SnapshotDeletingService>
-             mockedSnapshotDeletingService = mockStatic(
-                 SnapshotDeletingService.class)) {
-      mockedSnapshotDeletingService.when(() ->
+    try (MockedStatic<SnapshotUtils>
+             mockedSnapshotUtils = mockStatic(SnapshotUtils.class)) {
+      mockedSnapshotUtils.when(() ->
           SnapshotUtils.isBlockLocationInfoSame(any(OmKeyInfo.class),
               any(OmKeyInfo.class)))
           .thenAnswer(i -> {
