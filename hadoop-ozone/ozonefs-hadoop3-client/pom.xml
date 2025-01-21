@@ -32,7 +32,7 @@
   <properties>
     <!-- no tests in this module so far -->
     <maven.test.skip>true</maven.test.skip>
-    <proto.shaded.prefix>org.apache.hadoop.ozone.shaded</proto.shaded.prefix>
+    <proto.shaded.prefix>org.apache.hadoop.shaded</proto.shaded.prefix>
   </properties>
   <dependencies>
     <dependency>
