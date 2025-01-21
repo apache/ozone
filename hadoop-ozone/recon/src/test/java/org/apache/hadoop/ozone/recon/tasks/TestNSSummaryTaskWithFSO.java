@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -25,6 +26,7 @@ import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
@@ -32,19 +34,26 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProviderWithFSO;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
@@ -53,8 +62,13 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyT
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Test for NSSummaryTaskWithFSO.
@@ -122,7 +136,7 @@ public final class TestNSSummaryTaskWithFSO {
   public static void setUp(@TempDir File tmpDir) throws Exception {
     ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.setLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
-        10);
+        3);
     omMetadataManager = initializeNewOmMetadataManager(new File(tmpDir, "om"));
     OzoneManagerServiceProvider ozoneManagerServiceProvider =
         getMockOzoneManagerServiceProviderWithFSO();
@@ -146,7 +160,7 @@ public final class TestNSSummaryTaskWithFSO {
     populateOMDB();
 
     long nsSummaryFlushToDBMaxThreshold = ozoneConfiguration.getLong(
-        OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, 10);
+        OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, 3);
     nSSummaryTaskWithFso = new NSSummaryTaskWithFSO(
         reconNamespaceSummaryManager, reconOMMetadataManager,
         ozoneConfiguration, nsSummaryFlushToDBMaxThreshold);
@@ -517,6 +531,98 @@ public final class TestNSSummaryTaskWithFSO {
           "DIR_FIVE's parent ID should match BUCKET_TWO_OBJECT_ID.");
     }
 
+    @Test
+    void testProcessWithFSOFlushAfterThresholdAndSuccess() throws IOException {
+      // Call the method under test
+      Pair<Integer, Boolean> result = nSSummaryTaskWithFso.processWithFSO(processEventBatch(), 0);
+
+      // Assertions
+      Assertions.assertNotNull(result, "Result should not be null");
+      // Why seekPos should be 7 ? because we have threshold value for flush is set as 3,
+      // and we have total 7 events, so nsSummaryMap will be flushed in 2 batches and
+      // during second batch flush, eventCounter will be 6, then last event7 alone will
+      // be flushed out of loop as remaining event. At every batch flush based on threshold,
+      // seekPos is set as equal to eventCounter + 1, so  seekPos will be 7.
+      Assertions.assertEquals(7, result.getLeft(), "seekPos should be 7");
+      Assertions.assertTrue(result.getRight(), "The processing should fail due to flush failure");
+    }
+
+    @Test
+    void testProcessWithFSOFlushAfterThresholdAndFailureOfLastElement()
+        throws IOException, NoSuchFieldException, IllegalAccessException {
+      // Assume the NamespaceSummaryTaskWithFSO object is already created
+      NSSummaryTaskWithFSO task = mock(NSSummaryTaskWithFSO.class);
+
+      // Set the value of nsSummaryFlushToDBMaxThreshold to 3 using reflection
+      Field thresholdField = NSSummaryTaskWithFSO.class.getDeclaredField("nsSummaryFlushToDBMaxThreshold");
+      thresholdField.setAccessible(true);
+      thresholdField.set(task, 3);
+
+      ReconNamespaceSummaryManager mockReconNamespaceSummaryManager = Mockito.mock(ReconNamespaceSummaryManager.class);
+      Field managerField = NSSummaryTaskDbEventHandler.class.getDeclaredField("reconNamespaceSummaryManager");
+      managerField.setAccessible(true);
+      managerField.set(task, mockReconNamespaceSummaryManager);
+
+      // Mock the OMUpdateEventBatch and its iterator
+      OMUpdateEventBatch events = Mockito.mock(OMUpdateEventBatch.class);
+      Iterator<OMDBUpdateEvent> mockIterator = Mockito.mock(Iterator.class);
+
+      Mockito.when(events.getIterator()).thenReturn(mockIterator);
+
+      // Mock OMDBUpdateEvent objects and their behavior
+      OMDBUpdateEvent<String, OmKeyInfo> event1 = Mockito.mock(OMDBUpdateEvent.class);
+      OMDBUpdateEvent<String, OmKeyInfo> event2 = Mockito.mock(OMDBUpdateEvent.class);
+      OMDBUpdateEvent<String, OmKeyInfo> event3 = Mockito.mock(OMDBUpdateEvent.class);
+      OMDBUpdateEvent<String, OmKeyInfo> event4 = Mockito.mock(OMDBUpdateEvent.class);
+
+      // Mock getAction() for each event
+      Mockito.when(event1.getAction()).thenReturn(OMDBUpdateEvent.OMDBUpdateAction.PUT);
+      Mockito.when(event2.getAction()).thenReturn(OMDBUpdateEvent.OMDBUpdateAction.PUT);
+      Mockito.when(event3.getAction()).thenReturn(OMDBUpdateEvent.OMDBUpdateAction.PUT);
+      Mockito.when(event4.getAction()).thenReturn(OMDBUpdateEvent.OMDBUpdateAction.PUT);
+
+      OmKeyInfo keyInfo1 = new OmKeyInfo.Builder().setParentObjectID(1).setObjectID(2).setKeyName("key1")
+          .setBucketName("bucket1")
+          .setDataSize(1024).setVolumeName("volume1").build();
+      OmKeyInfo keyInfo2 = new OmKeyInfo.Builder().setParentObjectID(1).setObjectID(3).setKeyName("key2")
+          .setBucketName("bucket1")
+          .setDataSize(1024).setVolumeName("volume1").build();
+      OmKeyInfo keyInfo3 = new OmKeyInfo.Builder().setParentObjectID(1).setObjectID(3).setKeyName("key2")
+          .setBucketName("bucket1")
+          .setDataSize(1024).setVolumeName("volume1").build();
+      OmKeyInfo keyInfo4 = new OmKeyInfo.Builder().setParentObjectID(1).setObjectID(3).setKeyName("key2")
+          .setBucketName("bucket1")
+          .setDataSize(1024).setVolumeName("volume1").build();
+      Mockito.when(event1.getValue()).thenReturn(keyInfo1);
+      Mockito.when(event2.getValue()).thenReturn(keyInfo2);
+      Mockito.when(event3.getValue()).thenReturn(keyInfo3);
+      Mockito.when(event4.getValue()).thenReturn(keyInfo4);
+
+      // Mock getTable() to return valid table name
+      Mockito.when(event1.getTable()).thenReturn(FILE_TABLE);
+      Mockito.when(event2.getTable()).thenReturn(FILE_TABLE);
+      Mockito.when(event3.getTable()).thenReturn(FILE_TABLE);
+      Mockito.when(event4.getTable()).thenReturn(FILE_TABLE);
+
+      // Mock iterator to return the events
+      Mockito.when(mockIterator.hasNext()).thenReturn(true, true, true, true, false);
+      Mockito.when(mockIterator.next()).thenReturn(event1, event2, event3, event4);
+
+      // Mock the flushAndCommitNSToDB method to fail on the last flush
+      NSSummaryTaskWithFSO taskSpy = Mockito.spy(task);
+      Mockito.doReturn(true).doReturn(true).doReturn(false).when(taskSpy).flushAndCommitNSToDB(Mockito.anyMap());
+
+      // Call the method under test
+      Pair<Integer, Boolean> result = taskSpy.processWithFSO(events, 0);
+
+      // Assertions
+      Assertions.assertNotNull(result, "Result should not be null");
+      Assertions.assertEquals(0, result.getLeft(), "seekPos should be 4");
+
+      // Verify interactions
+      Mockito.verify(mockIterator, Mockito.times(3)).next();
+      Mockito.verify(taskSpy, Mockito.times(1)).flushAndCommitNSToDB(Mockito.anyMap());
+    }
   }
 
   /**
