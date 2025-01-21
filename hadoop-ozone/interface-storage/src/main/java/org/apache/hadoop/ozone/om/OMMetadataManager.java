@@ -606,7 +606,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
   String getRenameKey(String volume, String bucket, long objectID);
 
   /**
-   * Given renameKey, return the volume, bucket & objectID from the key.
+   * Given renameKey, return the volume, bucket and objectID from the key.
    */
   String[] splitRenameKey(String renameKey);
 
