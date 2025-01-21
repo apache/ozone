@@ -73,10 +73,10 @@ public class NSSummaryTaskDbEventHandler {
   protected void writeNSSummariesToDB(Map<Long, NSSummary> nsSummaryMap)
       throws IOException {
     try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
-      for (Long key : nsSummaryMap.keySet()) {
+      for (Map.Entry<Long, NSSummary> entry : nsSummaryMap.entrySet()) {
         try {
           reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation,
-              key, nsSummaryMap.get(key));
+              entry.getKey(), entry.getValue());
         } catch (IOException e) {
           LOG.error("Unable to write Namespace Summary data in Recon DB.",
               e);
