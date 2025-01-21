@@ -266,7 +266,7 @@ public final class ReplicationSupervisor {
           skippedCounter.put(task.getMetricName(), new AtomicLong(0));
           queuedCounter.put(task.getMetricName(), new AtomicLong(0));
           opsLatencyMs.put(task.getMetricName(), registry.newRate(
-                  task.getClass().getSimpleName() + "Ms"));
+              task.getClass().getSimpleName() + "Ms"));
           METRICS_MAP.put(task.getMetricName(), task.getMetricDescriptionSegment());
         }
       }

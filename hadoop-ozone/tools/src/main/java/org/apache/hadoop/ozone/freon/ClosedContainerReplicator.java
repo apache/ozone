@@ -26,12 +26,14 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
@@ -44,7 +46,10 @@ import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.container.replication.ReplicationTask;
 import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -88,6 +93,9 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
 
   private List<ReplicationTask> replicationTasks;
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ClosedContainerReplicator.class);
+
   @Override
   public Void call() throws Exception {
     try {
@@ -123,15 +131,8 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
 
     for (ContainerInfo container : containerInfos) {
 
-      final ContainerWithPipeline containerWithPipeline =
-          containerOperationClient
-              .getContainerWithPipeline(container.getContainerID());
-
-      if (container.getState() == LifeCycleState.CLOSED) {
-
-        final List<DatanodeDetails> datanodesWithContainer =
-            containerWithPipeline.getPipeline().getNodes();
-
+        final Pipeline pipeline = containerOperationClient.getPipeline(container.getPipelineID().getProtobuf());
+        final List<DatanodeDetails> datanodesWithContainer = pipeline.getNodes();
         final List<String> datanodeUUIDs =
             datanodesWithContainer
                 .stream().map(DatanodeDetails::getUuidString)
@@ -144,7 +145,6 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
               ReplicateContainerCommand.fromSources(container.getContainerID(),
                   datanodesWithContainer), replicator));
         }
-      }
 
     }
 
@@ -195,6 +195,16 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
 
     MutableVolumeSet volumeSet = new MutableVolumeSet(fakeDatanodeUuid, conf,
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
+
+    if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
+      MutableVolumeSet dbVolumeSet =
+          HddsServerUtil.getDatanodeDbDirs(conf).isEmpty() ? null :
+          new MutableVolumeSet(fakeDatanodeUuid, conf, null,
+              StorageVolume.VolumeType.DB_VOLUME, null);
+      // load rocksDB with readOnly mode, otherwise it will fail.
+      HddsVolumeUtil.loadAllHddsVolumeDbStore(
+          volumeSet, dbVolumeSet, false, LOG);
+    }
 
     Map<ContainerType, Handler> handlers = new HashMap<>();
 
