@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.client.io.KeyDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
@@ -201,6 +202,7 @@ public class TestBlockDataStreamOutput {
 
   @ParameterizedTest
   @MethodSource("dataLengthParameters")
+  @Flaky("HDDS-12027")
   public void testStreamWrite(int dataLength) throws Exception {
     OzoneClientConfig config = newClientConfig(cluster.getConf(), false);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
