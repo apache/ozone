@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.endpoint.S3Tagging.Tag;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,6 +65,7 @@ public class TestObjectTaggingGet {
     rest = new ObjectEndpoint();
     rest.setClient(client);
     rest.setOzoneConfiguration(config);
+    rest.setRequestIdentifier(new RequestIdentifier());
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
     rest.setHeaders(headers);
     ByteArrayInputStream body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));

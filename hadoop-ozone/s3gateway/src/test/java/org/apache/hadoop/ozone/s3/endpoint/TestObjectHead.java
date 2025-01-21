@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
@@ -66,6 +67,7 @@ public class TestObjectHead {
     // Create HeadBucket and setClient to OzoneClientStub
     keyEndpoint = new ObjectEndpoint();
     keyEndpoint.setClient(clientStub);
+    keyEndpoint.setRequestIdentifier(new RequestIdentifier());
     keyEndpoint.setOzoneConfiguration(new OzoneConfiguration());
   }
 

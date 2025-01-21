@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
+import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -81,6 +82,7 @@ public class TestPartUpload {
     REST.setHeaders(headers);
     REST.setClient(client);
     REST.setOzoneConfiguration(new OzoneConfiguration());
+    REST.setRequestIdentifier(new RequestIdentifier());
   }
 
 
@@ -159,6 +161,7 @@ public class TestPartUpload {
     objectEndpoint.setHeaders(headers);
     objectEndpoint.setClient(client);
     objectEndpoint.setOzoneConfiguration(new OzoneConfiguration());
+    objectEndpoint.setRequestIdentifier(new RequestIdentifier());
     String keyName = UUID.randomUUID().toString();
 
     String chunkedContent = "0a;chunk-signature=signature\r\n"
@@ -221,6 +224,7 @@ public class TestPartUpload {
     objectEndpoint.setHeaders(headers);
     objectEndpoint.setClient(clientStub);
     objectEndpoint.setOzoneConfiguration(new OzoneConfiguration());
+    objectEndpoint.setRequestIdentifier(new RequestIdentifier());
 
     Response response = objectEndpoint.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
         OzoneConsts.KEY);

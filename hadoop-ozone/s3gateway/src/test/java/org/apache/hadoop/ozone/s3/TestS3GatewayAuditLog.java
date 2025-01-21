@@ -69,14 +69,15 @@ public class TestS3GatewayAuditLog {
   private ObjectEndpoint keyEndpoint;
   private OzoneBucket bucket;
   private Map<String, String> parametersMap = new HashMap<>();
+  private RequestIdentifier requestIdentifier;
 
   @BeforeEach
   public void setup() throws Exception {
-
     parametersMap.clear();
     clientStub = new OzoneClientStub();
     clientStub.getObjectStore().createS3Bucket(bucketName);
     bucket = clientStub.getObjectStore().getS3Bucket(bucketName);
+    requestIdentifier = new RequestIdentifier();
 
     bucketEndpoint = new BucketEndpoint() {
       @Override
@@ -85,9 +86,10 @@ public class TestS3GatewayAuditLog {
       }
     };
     bucketEndpoint.setClient(clientStub);
-
+    bucketEndpoint.setRequestIdentifier(requestIdentifier);
     rootEndpoint = new RootEndpoint();
     rootEndpoint.setClient(clientStub);
+    rootEndpoint.setRequestIdentifier(requestIdentifier);
 
     keyEndpoint = new ObjectEndpoint() {
       @Override
@@ -97,7 +99,7 @@ public class TestS3GatewayAuditLog {
     };
     keyEndpoint.setClient(clientStub);
     keyEndpoint.setOzoneConfiguration(new OzoneConfiguration());
-
+    keyEndpoint.setRequestIdentifier(requestIdentifier);
   }
 
   @AfterAll
@@ -116,8 +118,11 @@ public class TestS3GatewayAuditLog {
     parametersMap.put("bucket", "[bucket]");
 
     bucketEndpoint.head(bucketName);
+
     String expected = "INFO  | S3GAudit | ? | user=null | ip=null | " +
-        "op=HEAD_BUCKET {bucket=[bucket]} | ret=SUCCESS";
+        "op=HEAD_BUCKET {bucket=[bucket], x-amz-request-id=" + 
+        requestIdentifier.getRequestId() + ", x-amz-id-2=" + 
+        requestIdentifier.getAmzId() + "} | ret=SUCCESS";
     verifyLog(expected);
   }
 
@@ -126,7 +131,9 @@ public class TestS3GatewayAuditLog {
 
     rootEndpoint.get().getEntity();
     String expected = "INFO  | S3GAudit | ? | user=null | ip=null | " +
-        "op=LIST_S3_BUCKETS {} | ret=SUCCESS";
+        "op=LIST_S3_BUCKETS {x-amz-request-id=" + 
+        requestIdentifier.getRequestId() + ", x-amz-id-2=" + 
+        requestIdentifier.getAmzId() + "} | ret=SUCCESS";
     verifyLog(expected);
   }
 
@@ -145,9 +152,10 @@ public class TestS3GatewayAuditLog {
 
     keyEndpoint.head(bucketName, "key1");
     String expected = "INFO  | S3GAudit | ? | user=null | ip=null | " +
-        "op=HEAD_KEY {bucket=[bucket], path=[key1]} | ret=SUCCESS";
+        "op=HEAD_KEY {bucket=[bucket], path=[key1], x-amz-request-id=" + 
+        requestIdentifier.getRequestId() + ", x-amz-id-2=" + 
+        requestIdentifier.getAmzId() + "} | ret=SUCCESS";
     verifyLog(expected);
-
   }
 
   private void verifyLog(String expectedString) throws IOException {

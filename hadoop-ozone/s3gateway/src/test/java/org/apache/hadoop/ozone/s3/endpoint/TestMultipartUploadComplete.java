@@ -42,6 +42,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+
+import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -74,6 +76,7 @@ public class TestMultipartUploadComplete {
     REST.setHeaders(HEADERS);
     REST.setClient(CLIENT);
     REST.setOzoneConfiguration(new OzoneConfiguration());
+    REST.setRequestIdentifier(new RequestIdentifier());
   }
 
   private String initiateMultipartUpload(String key) throws IOException,
