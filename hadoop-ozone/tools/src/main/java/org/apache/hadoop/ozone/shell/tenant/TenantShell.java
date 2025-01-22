@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.ozone.shell.tenant;
 
-import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.shell.Shell;
+
 import picocli.CommandLine.Command;
 
 /**
@@ -35,19 +35,6 @@ import picocli.CommandLine.Command;
     })
 public class TenantShell extends Shell {
 
-  @Override
-  public int execute(String[] argv) {
-    TracingUtil.initTracing("tenant-shell", createOzoneConfiguration());
-    String spanName = "ozone tenant " + String.join(" ", argv);
-    return TracingUtil.executeInNewSpan(spanName,
-        () -> super.execute(argv));
-  }
-
-  /**
-   * Main for the TenantShell Command handling.
-   *
-   * @param argv - System Args Strings[]
-   */
   public static void main(String[] argv) {
     new TenantShell().run(argv);
   }

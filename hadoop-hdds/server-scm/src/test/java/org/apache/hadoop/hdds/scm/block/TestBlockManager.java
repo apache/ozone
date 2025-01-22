@@ -162,8 +162,7 @@ public class TestBlockManager {
             new ContainerReplicaPendingOps(
                 Clock.system(ZoneId.systemDefault())));
     SCMSafeModeManager safeModeManager = new SCMSafeModeManager(conf,
-        containerManager.getContainers(), containerManager,
-        pipelineManager, eventQueue, serviceManager, scmContext) {
+        containerManager, pipelineManager, eventQueue, serviceManager, scmContext) {
       @Override
       public void emitSafeModeStatus() {
         // skip

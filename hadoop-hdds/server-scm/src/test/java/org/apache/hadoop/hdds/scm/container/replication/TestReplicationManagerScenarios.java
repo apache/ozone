@@ -105,7 +105,6 @@ public class TestReplicationManagerScenarios {
 
   private OzoneConfiguration configuration;
   private ReplicationManager replicationManager;
-  private LegacyReplicationManager legacyReplicationManager;
   private ContainerManager containerManager;
   private PlacementPolicy ratisPlacementPolicy;
   private PlacementPolicy ecPlacementPolicy;
@@ -184,7 +183,6 @@ public class TestReplicationManagerScenarios {
       return null;
     }).when(nodeManager).addDatanodeCommand(any(), any());
 
-    legacyReplicationManager = mock(LegacyReplicationManager.class);
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
     containerReplicaPendingOps = new ContainerReplicaPendingOps(clock);
 
@@ -232,7 +230,6 @@ public class TestReplicationManagerScenarios {
         scmContext,
         nodeManager,
         clock,
-        legacyReplicationManager,
         containerReplicaPendingOps) {
       @Override
       protected void startSubServices() {

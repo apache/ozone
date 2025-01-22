@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 
@@ -73,6 +74,7 @@ public class TestBucketAcl {
 
     bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(client);
+    bucketEndpoint.setRequestIdentifier(new RequestIdentifier());
   }
 
   @AfterEach

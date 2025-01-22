@@ -31,7 +31,7 @@ ${TESTFILE}         testfile
 Write keys
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
     Execute             ozone sh volume create ${VOLUME}
-    Execute             ozone sh bucket create ${VOLUME}/${BUCKET} -l OBJECT_STORE
+    Execute             ozone sh bucket create ${VOLUME}/${BUCKET} -l obs
     Execute             dd if=/dev/urandom of=${TEMP_DIR}/${TESTFILE}1 bs=100 count=10
     Execute             ozone sh key put ${VOLUME}/${BUCKET}/${TESTFILE}1 ${TEMP_DIR}/${TESTFILE}1
     Execute             dd if=/dev/urandom of=${TEMP_DIR}/${TESTFILE}2 bs=100 count=15
@@ -144,3 +144,9 @@ Test ozone debug ldb scan with filter option failure
     # test filter option for lesser/greater operator on non-numeric field
     ${output} =         Execute And Ignore Error        ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --filter="keyName:lesser:k1"
                         Should contain                  ${output}           only on numeric values
+
+Test ozone debug ldb checkpoint command
+     ${output} =         Execute                         ozone debug ldb --db=/data/metadata/om.db checkpoint --output=/data/metadata/checkpoint1.db
+                         Should contain                  ${output}           Created checkpoint at
+     ${output} =         Execute                         ls /data/metadata/checkpoint1.db
+                         Should contain                  ${output}           .sst

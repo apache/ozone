@@ -23,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -132,7 +133,13 @@ public class KeyStorage {
   private KeyStorage(SecurityConfig config, String component, Path keyPath) throws IOException {
     if (config.useExternalCACertificate(component)) {
       privateKeyPath = config.getExternalRootCaPrivateKeyPath();
+      if (!Files.isReadable(privateKeyPath)) {
+        throw new UnsupportedEncodingException("External private key path is not readable: " + privateKeyPath);
+      }
       publicKeyPath = config.getExternalRootCaPublicKeyPath();
+      if (!Files.isReadable(publicKeyPath)) {
+        throw new UnsupportedEncodingException("External public key path is not readable: " + publicKeyPath);
+      }
       externalKeysUsed = true;
     } else {
       createOrSanitizeDirectory(keyPath);

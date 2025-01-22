@@ -25,6 +25,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.s3.RequestIdentifier;
+
 import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.Test;
 
@@ -99,6 +101,7 @@ public class TestInitiateMultipartUpload {
     rest.setHeaders(headers);
     rest.setClient(client);
     rest.setOzoneConfiguration(new OzoneConfiguration());
+    rest.setRequestIdentifier(new RequestIdentifier());
     return rest;
   }
 }

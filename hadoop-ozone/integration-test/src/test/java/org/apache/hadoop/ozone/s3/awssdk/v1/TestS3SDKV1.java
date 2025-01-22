@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.s3.awssdk.v1;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Timeout;
@@ -27,7 +26,7 @@ import org.junit.jupiter.api.Timeout;
 import java.io.IOException;
 
 /**
- * Tests the AWS S3 SDK basic operations with OM Ratis disabled.
+ * Tests the AWS S3 SDK basic operations with OM Ratis enabled.
  */
 @Timeout(300)
 public class TestS3SDKV1 extends AbstractS3SDKV1Tests {
@@ -35,7 +34,6 @@ public class TestS3SDKV1 extends AbstractS3SDKV1Tests {
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, false);
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
     startCluster(conf);
   }

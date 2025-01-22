@@ -19,13 +19,11 @@
 package org.apache.hadoop.ozone.shell;
 
 import java.io.IOException;
-import java.io.PrintStream;
 import java.util.Iterator;
 import java.util.concurrent.Callable;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import org.apache.hadoop.hdds.cli.GenericParentCommand;
-import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.JsonUtils;
 
@@ -34,35 +32,16 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import picocli.CommandLine;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.ParentCommand;
 
 /**
  * Base class for shell commands that connect via Ozone client.
  */
-@Command(mixinStandardHelpOptions = true,
-    versionProvider = HddsVersionProvider.class)
 @SuppressWarnings("squid:S106") // CLI
-public abstract class Handler implements Callable<Void> {
+public abstract class Handler extends AbstractSubcommand implements Callable<Void> {
 
   protected static final Logger LOG = LoggerFactory.getLogger(Handler.class);
 
   private OzoneConfiguration conf;
-
-  @ParentCommand
-  private GenericParentCommand parent;
-
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
-
-  public boolean isVerbose() {
-    return parent.isVerbose();
-  }
-
-  public OzoneConfiguration createOzoneConfiguration() {
-    return parent.createOzoneConfiguration();
-  }
 
   protected OzoneAddress getAddress() throws OzoneClientException {
     return new OzoneAddress();
@@ -84,7 +63,7 @@ public abstract class Handler implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    conf = createOzoneConfiguration();
+    conf = getOzoneConf();
 
     if (!isApplicable()) {
       return null;
@@ -111,13 +90,13 @@ public abstract class Handler implements Callable<Void> {
     if (!enabled) {
       err().printf("Error: '%s' operation works only when security is " +
           "enabled. To enable security set ozone.security.enabled to " +
-          "true.%n", spec.qualifiedName().trim());
+          "true.%n", spec().qualifiedName().trim());
     }
     return enabled;
   }
 
   protected void printObjectAsJson(Object o) throws IOException {
-    out().println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(o));
+    System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(o));
   }
 
   /**
@@ -141,14 +120,6 @@ public abstract class Handler implements Callable<Void> {
 
   protected OzoneConfiguration getConf() {
     return conf;
-  }
-
-  protected PrintStream out() {
-    return System.out;
-  }
-
-  protected PrintStream err() {
-    return System.err;
   }
 
 }

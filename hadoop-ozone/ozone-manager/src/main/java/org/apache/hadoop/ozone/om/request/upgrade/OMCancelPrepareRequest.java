@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.om.request.upgrade;
 import java.util.HashMap;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -53,9 +53,9 @@ public class OMCancelPrepareRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
 
-    LOG.info("OM {} Received cancel prepare request with log {}", ozoneManager.getOMNodeId(), termIndex);
+    LOG.info("OM {} Received cancel prepare request with log {}", ozoneManager.getOMNodeId(), context.getTermIndex());
 
     OMRequest omRequest = getOmRequest();
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
@@ -87,7 +87,7 @@ public class OMCancelPrepareRequest extends OMClientRequest {
       ozoneManager.getPrepareState().cancelPrepare();
 
       LOG.info("OM {} prepare state cancelled at log {}. Returning response {}",
-          ozoneManager.getOMNodeId(), termIndex, omResponse);
+          ozoneManager.getOMNodeId(), context.getTermIndex(), omResponse);
     } catch (IOException e) {
       exception = e;
       LOG.error("Cancel Prepare Request apply failed in {}. ",

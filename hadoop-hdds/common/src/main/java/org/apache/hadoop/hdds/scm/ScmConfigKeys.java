@@ -153,6 +153,9 @@ public final class ScmConfigKeys {
       "ozone.chunk.read.mapped.buffer.max.count";
   // this max_count could not be greater than Linux platform max_map_count which by default is 65530.
   public static final int OZONE_CHUNK_READ_MAPPED_BUFFER_MAX_COUNT_DEFAULT = 0;
+  public static final String OZONE_CHUNK_READ_NETTY_CHUNKED_NIO_FILE_KEY =
+      "ozone.chunk.read.netty.ChunkedNioFile";
+  public static final boolean OZONE_CHUNK_READ_NETTY_CHUNKED_NIO_FILE_DEFAULT = false;
 
   public static final String OZONE_SCM_CONTAINER_LAYOUT_KEY =
       "ozone.scm.container.layout";

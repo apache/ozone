@@ -402,6 +402,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private OMHAMetrics omhaMetrics;
   private final ProtocolMessageMetrics<ProtocolMessageEnum>
       omClientProtocolMetrics;
+  private final DeletingServiceMetrics omDeletionMetrics;
   private OzoneManagerHttpServer httpServer;
   private final OMStorage omStorage;
   private ObjectName omInfoBeanName;
@@ -582,12 +583,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OZONE_OM_NAMESPACE_STRICT_S3,
         OZONE_OM_NAMESPACE_STRICT_S3_DEFAULT);
 
-    // TODO: This is a temporary check. Once fully implemented, all OM state
-    //  change should go through Ratis - be it standalone (for non-HA) or
-    //  replicated (for HA).
-    isRatisEnabled = configuration.getBoolean(
-        OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
-        OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
+    isRatisEnabled = true;
 
     // Ratis server comes with JvmPauseMonitor, no need to start another
     jvmPauseMonitor = !isRatisEnabled ? newJvmPauseMonitor(omId) : null;
@@ -689,6 +685,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     metrics = OMMetrics.create();
     perfMetrics = OMPerformanceMetrics.register();
+    omDeletionMetrics = DeletingServiceMetrics.create();
     // Get admin list
     omStarterUser = UserGroupInformation.getCurrentUser().getShortUserName();
     omAdmins = OzoneAdmins.getOzoneAdmins(omStarterUser, conf);
@@ -1657,6 +1654,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public OMPerformanceMetrics getPerfMetrics() {
     return perfMetrics;
   }
+  public DeletingServiceMetrics getDeletionMetrics() {
+    return omDeletionMetrics;
+  }
 
   /**
    * Start service.
@@ -2322,6 +2322,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (omRatisSnapshotProvider != null) {
         omRatisSnapshotProvider.close();
       }
+      DeletingServiceMetrics.unregister();
       OMPerformanceMetrics.unregister();
       RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
       scmClient.close();
@@ -3098,6 +3099,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (null == omRatisServer) {
       return getRatisRolesException("Server is shutting down");
     }
+    String leaderReadiness = omRatisServer.checkLeaderStatus().name();
     final RaftPeerId leaderId = omRatisServer.getLeaderId();
     if (leaderId == null) {
       LOG.error("No leader found");
@@ -3111,7 +3113,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("Failed to getServiceList", e);
       return getRatisRolesException("IO-Exception Occurred, " + e.getMessage());
     }
-    return OmUtils.format(serviceList, port, leaderId.toString());
+    return OmUtils.format(serviceList, port, leaderId.toString(), leaderReadiness);
   }
 
   /**

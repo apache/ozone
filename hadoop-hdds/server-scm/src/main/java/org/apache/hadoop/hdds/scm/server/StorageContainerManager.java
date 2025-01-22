@@ -53,7 +53,6 @@ import org.apache.hadoop.hdds.scm.container.balancer.MoveManager;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMPerformanceMetrics;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.replication.DatanodeCommandCountUpdatedHandler;
-import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceException;
 import org.apache.hadoop.hdds.scm.ha.BackgroundSCMService;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
@@ -824,10 +823,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getReplicationManager() != null) {
       replicationManager = configurator.getReplicationManager();
     }  else {
-      LegacyReplicationManager legacyRM = new LegacyReplicationManager(
-          conf, containerManager, containerPlacementPolicy, eventQueue,
-          scmContext, scmNodeManager, scmHAManager, systemClock,
-          getScmMetadataStore().getMoveTable());
       replicationManager = new ReplicationManager(
           conf,
           containerManager,
@@ -837,7 +832,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmContext,
           scmNodeManager,
           systemClock,
-          legacyRM,
           containerReplicaPendingOps);
       reconfigurationHandler.register(replicationManager.getConfig());
     }
@@ -846,8 +840,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmSafeModeManager = configurator.getScmSafeModeManager();
     } else {
       scmSafeModeManager = new SCMSafeModeManager(conf,
-          containerManager.getContainers(), containerManager,
-          pipelineManager, eventQueue, serviceManager, scmContext);
+          containerManager, pipelineManager, eventQueue,
+          serviceManager, scmContext);
     }
 
     scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager, containerManager,

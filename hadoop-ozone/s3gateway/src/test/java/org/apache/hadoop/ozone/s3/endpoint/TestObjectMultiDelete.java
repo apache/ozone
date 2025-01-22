@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneKey;
+import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.endpoint.MultiDeleteRequest.DeleteObject;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
@@ -51,6 +52,7 @@ public class TestObjectMultiDelete {
 
     BucketEndpoint rest = new BucketEndpoint();
     rest.setClient(client);
+    rest.setRequestIdentifier(new RequestIdentifier());
 
     MultiDeleteRequest mdr = new MultiDeleteRequest();
     mdr.getObjects().add(new DeleteObject("key1"));
@@ -82,6 +84,7 @@ public class TestObjectMultiDelete {
 
     BucketEndpoint rest = new BucketEndpoint();
     rest.setClient(client);
+    rest.setRequestIdentifier(new RequestIdentifier());
 
     MultiDeleteRequest mdr = new MultiDeleteRequest();
     mdr.setQuiet(true);

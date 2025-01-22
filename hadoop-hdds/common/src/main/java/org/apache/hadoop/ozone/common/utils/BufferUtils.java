@@ -26,11 +26,16 @@ import java.nio.channels.GatheringByteChannel;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Utilities for buffers.
  */
 public final class BufferUtils {
+  public static final Logger LOG = LoggerFactory.getLogger(BufferUtils.class);
+
+  private static final ByteBuffer[] EMPTY_BYTE_BUFFER_ARRAY = {};
 
   /** Utility classes should not be constructed. **/
   private BufferUtils() {
@@ -147,10 +152,37 @@ public final class BufferUtils {
     long written = 0;
     while (bb.remaining() > 0) {
       int n = ch.write(bb);
-      if (n <= 0) {
-        throw new IllegalStateException("no bytes written");
+      if (n < 0) {
+        throw new IllegalStateException("GatheringByteChannel.write returns " + n + " < 0 for " + ch);
       }
       written += n;
+    }
+    return written;
+  }
+
+  public static long writeFully(GatheringByteChannel ch, List<ByteBuffer> buffers) throws IOException {
+    return BufferUtils.writeFully(ch, buffers.toArray(EMPTY_BYTE_BUFFER_ARRAY));
+  }
+
+  public static long writeFully(GatheringByteChannel ch, ByteBuffer[] buffers) throws IOException {
+    if (LOG.isDebugEnabled()) {
+      for (int i = 0; i < buffers.length; i++) {
+        LOG.debug("buffer[{}]: remaining={}", i, buffers[i].remaining());
+      }
+    }
+
+    long written = 0;
+    for (int i = 0; i < buffers.length; i++) {
+      while (buffers[i].remaining() > 0) {
+        final long n = ch.write(buffers, i, buffers.length - i);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("buffer[{}]: remaining={}, written={}", i, buffers[i].remaining(), n);
+        }
+        if (n < 0) {
+          throw new IllegalStateException("GatheringByteChannel.write returns " + n + " < 0 for " + ch);
+        }
+        written += n;
+      }
     }
     return written;
   }

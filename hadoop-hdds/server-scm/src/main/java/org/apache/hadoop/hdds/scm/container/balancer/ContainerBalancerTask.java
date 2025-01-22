@@ -988,18 +988,8 @@ public class ContainerBalancerTask implements Runnable {
     CompletableFuture<MoveManager.MoveResult> future;
     try {
       ContainerInfo containerInfo = containerManager.getContainer(containerID);
+      future = moveManager.move(containerID, source, moveSelection.getTargetNode());
 
-      /*
-      If LegacyReplicationManager is enabled, ReplicationManager will
-      redirect to it. Otherwise, use MoveManager.
-       */
-      if (replicationManager.getConfig().isLegacyEnabled()) {
-        future = replicationManager
-            .move(containerID, source, moveSelection.getTargetNode());
-      } else {
-        future = moveManager.move(containerID, source,
-            moveSelection.getTargetNode());
-      }
       metrics.incrementNumContainerMovesScheduledInLatestIteration(1);
 
       future = future.whenComplete((result, ex) -> {
@@ -1038,7 +1028,7 @@ public class ContainerBalancerTask implements Runnable {
       selectionCriteria.addToExcludeDueToFailContainers(moveSelection.getContainerID());
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
       return false;
-    } catch (NodeNotFoundException | TimeoutException e) {
+    } catch (NodeNotFoundException e) {
       LOG.warn("Container move failed for container {}", containerID, e);
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
       return false;

@@ -79,6 +79,7 @@ public class TestReconTasks {
     cluster =  MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1)
         .includeRecon(true).build();
     cluster.waitForClusterToBeReady();
+    cluster.waitForPipelineTobeReady(ONE, 30000);
     GenericTestUtils.setLogLevel(SCMDatanodeHeartbeatDispatcher.LOG,
         Level.DEBUG);
   }

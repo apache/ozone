@@ -33,6 +33,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -138,7 +139,7 @@ public class TestKeyStorage {
     @Test
     @DisplayName("attempt to store a key, fails during I/O operations and throws an IOException.")
     public void testStoreKeyFailToWrite() throws Exception {
-      FileSystemProvider fsp = mock(FileSystemProvider.class);
+      FileSystemProvider fsp = spy(FileSystemProvider.class);
       // this is needed for the file create to throw an exception
       when(fsp.newByteChannel(any(), any(), any())).thenThrow(new IOException(ERROR_MSG));
       // this is needed to avoid that the storage implementation sees the path as existing.
@@ -183,7 +184,7 @@ public class TestKeyStorage {
     @Test
     @DisplayName("attempt to read a key, fails during I/O operations and throws an IOException.")
     public void testReadKeyFailToWrite() throws Exception {
-      FileSystemProvider fsp = mock(FileSystemProvider.class);
+      FileSystemProvider fsp = spy(FileSystemProvider.class);
       // this is needed for the file create to throw an exception
       when(fsp.newByteChannel(any(), any(), any())).thenThrow(new IOException(ERROR_MSG));
       // this is needed to avoid that the storage implementation sees the path as existing.
@@ -209,11 +210,21 @@ public class TestKeyStorage {
     }
 
     @Test
+    @DisplayName("an attempt to overwrite an internal key throws FileAlreadyExists exception.")
+    public void testInternalKeysAreNotOverWritable() throws Exception {
+      KeyStorage storage = new KeyStorage(config, COMPONENT);
+      storage.storePublicKey(keys.getPublic());
+      storage.storePrivateKey(keys.getPrivate());
+      assertThrows(FileAlreadyExistsException.class, () -> storage.storePublicKey(keys.getPublic()));
+      assertThrows(FileAlreadyExistsException.class, () -> storage.storePrivateKey(keys.getPrivate()));
+    }
+
+    @Test
     @DisplayName("storage initialization fails because permissions can not be set.")
     @MockitoSettings(strictness = Strictness.LENIENT)
     public void testInitFailsOnPermissions() {
       // the mock will not return posix file attributes, so setting posix permissions fails.
-      FileSystemProvider fsp = mock(FileSystemProvider.class);
+      FileSystemProvider fsp = spy(FileSystemProvider.class);
 
       FileSystem fs = mock(FileSystem.class);
       when(fs.provider()).thenReturn(fsp);
@@ -232,7 +243,7 @@ public class TestKeyStorage {
     @MockitoSettings(strictness = Strictness.LENIENT)
     public void testInitFailsOnDirCreation() throws Exception {
       // the mock will not return posix file attributes, so setting them fails.
-      FileSystemProvider fsp = mock(FileSystemProvider.class);
+      FileSystemProvider fsp = spy(FileSystemProvider.class);
       // first exception is to make path non-existent, second do nothing to get to the createDirectory call.
       doThrow(IOException.class).doNothing().when(fsp).checkAccess(any(Path.class));
       doThrow(new IOException(ERROR_MSG)).when(fsp).createDirectory(any(), any());
@@ -330,144 +341,4 @@ public class TestKeyStorage {
       assertThrows(UnsupportedOperationException.class, () -> storage.storePrivateKey(keys.getPrivate()));
     }
   }
-
-
-  /*
-  private String component;
-  private String prefix;
-
-  @BeforeEach
-  public void init(@TempDir Path tempDir) throws IOException {
-    OzoneConfiguration configuration = new OzoneConfiguration();
-    prefix = tempDir.toString();
-    configuration.set(HDDS_METADATA_DIR_NAME, prefix);
-    securityConfig = new SecurityConfig(configuration);
-    keyGenerator = new HDDSKeyGenerator(securityConfig);
-    component = "test_component";
-  }
-
-  @Test
-  public void testWriteKey() throws Exception {
-    KeyPair keys = keyGenerator.generateKey();
-    KeyStorage keyStorage = new KeyStorage(securityConfig, component);
-    keyStorage.storeKeyPair(keys);
-
-    // Assert that locations have been created.
-    Path keyLocation = securityConfig.getKeyLocation(component);
-    assertTrue(keyLocation.toFile().exists());
-
-    // Assert that locations are created in the locations that we specified
-    // using the Config.
-    assertTrue(keyLocation.toString().startsWith(prefix));
-    Path privateKeyPath = Paths.get(keyLocation.toString(),
-        securityConfig.getPrivateKeyFileName());
-    assertTrue(privateKeyPath.toFile().exists());
-    Path publicKeyPath = Paths.get(keyLocation.toString(),
-        securityConfig.getPublicKeyFileName());
-    assertTrue(publicKeyPath.toFile().exists());
-
-    // Read the private key and test if the expected String in the PEM file
-    // format exists.
-    byte[] privateKey = Files.readAllBytes(privateKeyPath);
-    String privateKeydata = new String(privateKey, StandardCharsets.UTF_8);
-    assertThat(privateKeydata).contains("PRIVATE KEY");
-
-    // Read the public key and test if the expected String in the PEM file
-    // format exists.
-    byte[] publicKey = Files.readAllBytes(publicKeyPath);
-    String publicKeydata = new String(publicKey, StandardCharsets.UTF_8);
-    assertThat(publicKeydata).contains("PUBLIC KEY");
-
-    // Let us decode the PEM file and parse it back into binary.
-    KeyFactory kf = KeyFactory.getInstance(securityConfig.getKeyAlgo());
-
-    // Replace the PEM Human readable guards.
-    privateKeydata =
-        privateKeydata.replace("-----BEGIN PRIVATE KEY-----\n", "");
-    privateKeydata =
-        privateKeydata.replace("-----END PRIVATE KEY-----", "");
-
-    // Decode the bas64 to binary format and then use an ASN.1 parser to
-    // parse the binary format.
-
-    byte[] keyBytes = Base64.decodeBase64(privateKeydata);
-    PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
-    PrivateKey privateKeyDecoded = kf.generatePrivate(spec);
-    assertNotNull(privateKeyDecoded,
-        "Private Key should not be null");
-
-    // Let us decode the public key and veriy that we can parse it back into
-    // binary.
-    publicKeydata =
-        publicKeydata.replace("-----BEGIN PUBLIC KEY-----\n", "");
-    publicKeydata =
-        publicKeydata.replace("-----END PUBLIC KEY-----", "");
-
-    keyBytes = Base64.decodeBase64(publicKeydata);
-    X509EncodedKeySpec pubKeyspec = new X509EncodedKeySpec(keyBytes);
-    PublicKey publicKeyDecoded = kf.generatePublic(pubKeyspec);
-    assertNotNull(publicKeyDecoded, "Public Key should not be null");
-
-    // Now let us assert the permissions on the Directories and files are as
-    // expected.
-    Set<PosixFilePermission> expectedSet = KeyStorage.FILE_PERMISSIONS;
-    Set<PosixFilePermission> currentSet =
-        Files.getPosixFilePermissions(privateKeyPath);
-    assertEquals(expectedSet.size(), currentSet.size());
-    currentSet.removeAll(expectedSet);
-    assertEquals(0, currentSet.size());
-
-    currentSet =
-        Files.getPosixFilePermissions(publicKeyPath);
-    currentSet.removeAll(expectedSet);
-    assertEquals(0, currentSet.size());
-
-    expectedSet = KeyStorage.DIR_PERMISSIONS;
-    currentSet =
-        Files.getPosixFilePermissions(keyLocation);
-    assertEquals(expectedSet.size(), currentSet.size());
-    currentSet.removeAll(expectedSet);
-    assertEquals(0, currentSet.size());
-  }
-
-  @Test
-  public void testReWriteKey() throws Exception {
-    KeyPair kp = keyGenerator.generateKey();
-    KeyStorage keyStorage = new KeyStorage(this.securityConfig, component);
-    keyStorage.storeKeyPair(kp);
-
-    Path publicKeyPath = securityConfig.getKeyLocation(component).resolve(securityConfig.getPublicKeyFileName());
-    Path privateKeyPath = securityConfig.getKeyLocation(component).resolve(securityConfig.getPrivateKeyFileName());
-
-    // Assert that rewriting of keys throws exception with valid messages.
-    Exception expected;
-    expected = assertThrows(FileAlreadyExistsException.class, () -> keyStorage.storePublicKey(kp.getPublic()));
-    assertThat(expected.getMessage()).contains(publicKeyPath.toString());
-
-    expected = assertThrows(FileAlreadyExistsException.class, () -> keyStorage.storePrivateKey(kp.getPrivate()));
-    assertThat(expected.getMessage()).contains(privateKeyPath.toString());
-
-    expected = assertThrows(FileAlreadyExistsException.class, () -> keyStorage.storeKeyPair(kp));
-    assertThat(expected.getMessage()).contains(publicKeyPath.toString());
-    Files.deleteIfExists(publicKeyPath);
-
-    expected = assertThrows(FileAlreadyExistsException.class, () -> keyStorage.storeKeyPair(kp));
-    assertThat(expected.getMessage()).contains(privateKeyPath.toString());
-    Files.deleteIfExists(publicKeyPath);
-    Files.deleteIfExists(privateKeyPath);
-
-    // Should succeed now as both public and private key are deleted.
-    keyStorage.storeKeyPair(kp);
-  }
-
-  @Test
-  public void testReadWritePublicKeyWithoutArgs() throws Exception {
-    KeyPair kp = keyGenerator.generateKey();
-    KeyStorage keyStorage = new KeyStorage(securityConfig, component);
-    keyStorage.storeKeyPair(kp);
-
-    PublicKey pubKey = keyStorage.readPublicKey();
-    assertNotNull(pubKey);
-  }
-  */
 }

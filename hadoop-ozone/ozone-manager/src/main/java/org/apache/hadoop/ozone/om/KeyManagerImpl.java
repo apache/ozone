@@ -509,6 +509,22 @@ public class KeyManagerImpl implements KeyManager {
     if (args.getLatestVersionLocation()) {
       slimLocationVersion(value);
     }
+    int partNumberParam = args.getMultipartUploadPartNumber();
+    if (partNumberParam > 0) {
+      OmKeyLocationInfoGroup latestLocationVersion = value.getLatestVersionLocations();
+      if (latestLocationVersion != null && latestLocationVersion.isMultipartKey()) {
+        List<OmKeyLocationInfo> currentLocations = latestLocationVersion.getBlocksLatestVersionOnly()
+                .stream()
+                .filter(it -> it.getPartNumber() == partNumberParam)
+                .collect(Collectors.toList());
+
+        value.updateLocationInfoList(currentLocations, true, true);
+
+        value.setDataSize(currentLocations.stream()
+            .mapToLong(BlockLocationInfo::getLength)
+            .sum());
+      }
+    }
     return value;
   }
 

@@ -46,7 +46,7 @@ public class ChecksumCache {
   private static final int BLOCK_CHUNK_SIZE = 4 * 1024 * 1024; // 4 MB
 
   public ChecksumCache(int bytesPerChecksum) {
-    LOG.info("Initializing ChecksumCache with bytesPerChecksum = {}", bytesPerChecksum);
+    LOG.debug("Initializing ChecksumCache with bytesPerChecksum = {}", bytesPerChecksum);
     this.prevChunkLength = 0;
     this.bytesPerChecksum = bytesPerChecksum;
     // Set initialCapacity to avoid costly resizes

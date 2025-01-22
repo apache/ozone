@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
@@ -25,9 +24,9 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Scanner;
+
+import static org.apache.hadoop.hdds.scm.cli.datanode.DecommissionSubCommand.showErrors;
 
 /**
  * Recommission one or more datanodes.
@@ -40,44 +39,15 @@ import java.util.Scanner;
     versionProvider = HddsVersionProvider.class)
 public class RecommissionSubCommand extends ScmSubcommand {
 
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
-
-  @CommandLine.Parameters(description = "One or more host names separated by spaces. " +
-          "To read from stdin, specify '-' and supply the host names " +
-          "separated by newlines.",
-          paramLabel = "<host name>")
-  private List<String> parameters = new ArrayList<>();
+  @CommandLine.Mixin
+  private HostNameParameters hostNameParams;
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    if (parameters.size() > 0) {
-      List<String> hosts;
-      // Whether to read from stdin
-      if (parameters.get(0).equals("-")) {
-        hosts = new ArrayList<>();
-        Scanner scanner = new Scanner(System.in, "UTF-8");
-        while (scanner.hasNextLine()) {
-          hosts.add(scanner.nextLine().trim());
-        }
-      } else {
-        hosts = parameters;
-      }
-      List<DatanodeAdminError> errors = scmClient.recommissionNodes(hosts);
-      System.out.println("Started recommissioning datanode(s):\n" +
-          String.join("\n", hosts));
-      if (errors.size() > 0) {
-        for (DatanodeAdminError error : errors) {
-          System.err.println("Error: " + error.getHostname() + ": "
-              + error.getError());
-        }
-        // Throwing the exception will cause a non-zero exit status for the
-        // command.
-        throw new IOException(
-            "Some nodes could be recommissioned");
-      }
-    } else {
-      GenericCli.missingSubcommand(spec);
-    }
+    List<String> hosts = hostNameParams.getHostNames();
+    List<DatanodeAdminError> errors = scmClient.recommissionNodes(hosts);
+    System.out.println("Started recommissioning datanode(s):\n" +
+        String.join("\n", hosts));
+    showErrors(errors, "Some nodes could be recommissioned");
   }
 }

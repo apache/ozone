@@ -27,9 +27,11 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.S3SecretFunction;
 import org.apache.hadoop.ozone.om.S3SecretLockedManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
+import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.S3SecretManagerImpl;
 import org.apache.hadoop.ozone.om.TenantOp;
 import org.apache.hadoop.ozone.om.S3SecretCache;
@@ -76,10 +78,12 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.framework;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -317,6 +321,30 @@ public class TestS3GetSecretRequest {
     when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
 
     processSuccessSecretRequest(USER_CAROL, 1, true);
+  }
+
+  @Test
+  public void testFailSecretManagerOnGetSecret() throws IOException {
+
+    // This effectively makes alice an S3 admin.
+    when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
+
+    S3SecretManager failingS3Secret = mock(S3SecretManager.class);
+    doThrow(new IOException("Test Exception: Failed to store secret"))
+        .when(failingS3Secret).storeSecret(any(), any());
+    when(failingS3Secret.doUnderLock(any(), any()))
+        .thenAnswer(invocationOnMock -> {
+          S3SecretFunction<Boolean> action =
+              invocationOnMock.getArgument(1, S3SecretFunction.class);
+
+          return action.accept(failingS3Secret);
+        });
+
+    when(ozoneManager.getS3SecretManager()).thenReturn(failingS3Secret);
+
+    assertThrows(Exception.class, () ->
+        processSuccessSecretRequest(USER_ALICE, 1, true)
+    );
   }
 
   @Test

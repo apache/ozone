@@ -438,7 +438,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
           }
           {omServiceId &&
             <Col xs={24} sm={18} md={12} lg={12} xl={6}>
-              <OverviewCard title="OM Service" loading={loading} data={omServiceId} icon='file-text' linkToUrl='/Om' />
+              <OverviewCard title="Ozone Service ID" loading={loading} data={omServiceId} icon='file-text' linkToUrl='/Om' />
             </Col>
           }
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
