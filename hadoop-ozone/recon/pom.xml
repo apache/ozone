@@ -509,10 +509,6 @@
                   <filtering>true</filtering>
                 </resource>
               </resources>
-              <nonFilteredFileExtensions>
-                <nonFilteredFileExtension>woff</nonFilteredFileExtension>
-                <nonFilteredFileExtension>woff2</nonFilteredFileExtension>
-              </nonFilteredFileExtensions>
             </configuration>
           </execution>
         </executions>
