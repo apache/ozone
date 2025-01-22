@@ -656,4 +656,8 @@ public class OzoneContainer {
     }
   }
 
+  @VisibleForTesting
+  public Map<ContainerType, Handler> getHandlers() {
+    return handlers;
+  }
 }
