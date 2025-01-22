@@ -245,12 +245,13 @@ public class TestContainerReplicaPendingOps {
     pendingOps.scheduleDeleteReplica(new ContainerID(1), dn2, 0, deleteCmd, laterExpiry);
     pendingOps.scheduleAddReplica(new ContainerID(1), dn3, 0, addCmd, laterExpiry);
     pendingOps.scheduleDeleteReplica(new ContainerID(2), dn1, 1, deleteCmd, latestExpiry);
+    pendingOps.scheduleAddReplica(new ContainerID(2), dn1, 1, addCmd, latestExpiry);
 
     List<ContainerReplicaOp> ops =
         pendingOps.getPendingOps(new ContainerID(1));
     assertEquals(4, ops.size());
     ops = pendingOps.getPendingOps(new ContainerID(2));
-    assertEquals(1, ops.size());
+    assertEquals(2, ops.size());
 
     // Some entries expire at "start + 1000" some at start + 2000 and
     // start + 3000. Clock is currently at "start"
@@ -262,31 +263,39 @@ public class TestContainerReplicaPendingOps {
 
     clock.fastForward(1000);
     pendingOps.removeExpiredEntries();
-    // Those with deadline + 1000 should be removed.
+    // Those ADD with deadline + 1000 should be removed, but deletes are retained
+    ops = pendingOps.getPendingOps(new ContainerID(1));
+    assertEquals(3, ops.size());
+    // We should lose the entries for DN1
+    assertFalse(isOpPresent(ops, dn1, 0, ADD));
+    assertTrue(isOpPresent(ops, dn1, 0, DELETE));
+    assertTrue(isOpPresent(ops, dn2, 0, DELETE));
+
+    clock.fastForward(1000);
+    pendingOps.removeExpiredEntries();
+
+    // Now should only have entries for container 2 and the deletes for container 1
     ops = pendingOps.getPendingOps(new ContainerID(1));
     assertEquals(2, ops.size());
-    // We should lose the entries for DN1
-    List<DatanodeDetails> dns = ops.stream()
-        .map(ContainerReplicaOp::getTarget)
-        .collect(Collectors.toList());
-    assertThat(dns).doesNotContain(dn1);
-    assertThat(dns).contains(dn2);
-    assertThat(dns).contains(dn3);
 
+    assertTrue(isOpPresent(ops, dn1, 0, DELETE));
+    assertTrue(isOpPresent(ops, dn2, 0, DELETE));
+
+    ops = pendingOps.getPendingOps(new ContainerID(2));
+    assertEquals(2, ops.size());
+
+    // Advance the clock again and all should be removed except deletes
     clock.fastForward(1000);
     pendingOps.removeExpiredEntries();
-
-    // Now should only have entries for container 2
-    ops = pendingOps.getPendingOps(new ContainerID(1));
-    assertEquals(0, ops.size());
     ops = pendingOps.getPendingOps(new ContainerID(2));
+    assertTrue(isOpPresent(ops, dn1, 1, DELETE));
     assertEquals(1, ops.size());
+  }
 
-    // Advance the clock again and all should be removed
-    clock.fastForward(1000);
-    pendingOps.removeExpiredEntries();
-    ops = pendingOps.getPendingOps(new ContainerID(2));
-    assertEquals(0, ops.size());
+  private boolean isOpPresent(List<ContainerReplicaOp> ops, DatanodeDetails dn,
+      int index, ContainerReplicaOp.PendingOpType type) {
+    return ops.stream().anyMatch(op -> op.getTarget().equals(dn) &&
+        op.getReplicaIndex() == index && op.getOpType() == type);
   }
 
   @Test
@@ -326,9 +335,9 @@ public class TestContainerReplicaPendingOps {
     pendingOps.scheduleDeleteReplica(new ContainerID(6), dn3, 0, deleteCmd, expiry);
 
     // InFlight Replication and Deletion. Previous Inflight should be
-    // removed as they were timed out.
+    // removed as they were timed out, but deletes are retained
     assertEquals(3, pendingOps.getPendingOpCount(ADD));
-    assertEquals(3, pendingOps.getPendingOpCount(DELETE));
+    assertEquals(6, pendingOps.getPendingOpCount(DELETE));
 
     pendingOps.completeDeleteReplica(new ContainerID(3), dn1, 2);
     pendingOps.completeAddReplica(new ContainerID(3), dn1, 3);
@@ -347,7 +356,7 @@ public class TestContainerReplicaPendingOps {
 
     // Checking pendingOpCount doesn't go below zero
     assertEquals(0, pendingOps.getPendingOpCount(ADD));
-    assertEquals(0, pendingOps.getPendingOpCount(DELETE));
+    assertEquals(3, pendingOps.getPendingOpCount(DELETE));
   }
 
   /**

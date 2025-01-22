@@ -227,9 +227,13 @@ public class ContainerReplicaPendingOps {
         while (iterator.hasNext()) {
           ContainerReplicaOp op = iterator.next();
           if (clock.millis() > op.getDeadlineEpochMillis()) {
-            iterator.remove();
+            if (op.getOpType() != DELETE) {
+              // For delete ops, we don't remove them from the list as RM must resend them, or they
+              // will be removed via a container report when they are confirmed as deleted.
+              iterator.remove();
+              decrementCounter(op.getOpType(), op.getReplicaIndex());
+            }
             expiredOps.add(op);
-            decrementCounter(op.getOpType(), op.getReplicaIndex());
             updateTimeoutMetrics(op);
           }
         }
