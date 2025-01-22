@@ -26,6 +26,7 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.Collections;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.UUID;
@@ -50,6 +51,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
+import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
+import org.apache.hadoop.ozone.container.checksum.ReconcileContainerTask;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -66,6 +69,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
@@ -93,6 +97,7 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -125,6 +130,8 @@ public class TestReplicationSupervisor {
   private StateContext context;
   private TestClock clock;
   private DatanodeDetails datanode;
+  private DNContainerOperationClient mockClient;
+  private ContainerController mockController;
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -137,6 +144,8 @@ public class TestReplicationSupervisor {
         stateMachine, "");
     context.setTermOfLeaderSCM(CURRENT_TERM);
     datanode = MockDatanodeDetails.randomDatanodeDetails();
+    mockClient = mock(DNContainerOperationClient.class);
+    mockController = mock(ContainerController.class);
     when(stateMachine.getDatanodeDetails()).thenReturn(datanode);
   }
 
@@ -419,9 +428,11 @@ public class TestReplicationSupervisor {
     try {
       //WHEN
       replicationSupervisor.addTask(createTask(1L));
+      replicationSupervisor.addTask(createReconciliationTask(1L));
       ecReconstructionSupervisor.addTask(createECTaskWithCoordinator(2L));
       replicationSupervisor.addTask(createTask(1L));
       replicationSupervisor.addTask(createTask(3L));
+      replicationSupervisor.addTask(createReconciliationTask(3L));
       ecReconstructionSupervisor.addTask(createECTaskWithCoordinator(4L));
 
       SimpleContainerDownloader moc = mock(SimpleContainerDownloader.class);
@@ -442,61 +453,75 @@ public class TestReplicationSupervisor {
 
       ReplicateContainerCommand cmd1 = createCommand(6L);
       cmd1.setDeadline(clock.millis() + 10000);
-      ReplicationTask task1 = new ReplicationTask(cmd1, replicatorRef.get());
+      ReplicationTask replicationTask = new ReplicationTask(cmd1, replicatorRef.get());
+      ReconcileContainerTask reconciliationTask = createReconciliationTask(6L);
       clock.fastForward(15000);
-      replicationSupervisor.addTask(task1);
+      replicationSupervisor.addTask(replicationTask);
+      replicationSupervisor.addTask(reconciliationTask);
+      doThrow(IOException.class).when(mockController).reconcileContainer(any(), anyLong(), any());
+      replicationSupervisor.addTask(createReconciliationTask(7L));
 
       ReconstructECContainersCommand cmd2 = createReconstructionCmd(7L);
       cmd2.setDeadline(clock.millis() + 10000);
-      ECReconstructionCoordinatorTask task2 = new ECReconstructionCoordinatorTask(
+      ECReconstructionCoordinatorTask ecTask = new ECReconstructionCoordinatorTask(
           ecReplicatorRef.get(), new ECReconstructionCommandInfo(cmd2));
       clock.fastForward(15000);
-      ecReconstructionSupervisor.addTask(task2);
+      ecReconstructionSupervisor.addTask(ecTask);
       ecReconstructionSupervisor.addTask(createECTask(8L));
       ecReconstructionSupervisor.addTask(createECTask(9L));
 
       //THEN
-      assertEquals(2, replicationSupervisor.getReplicationSuccessCount());
+      assertEquals(4, replicationSupervisor.getReplicationSuccessCount());
       assertEquals(2, replicationSupervisor.getReplicationSuccessCount(
-          task1.getMetricName()));
-      assertEquals(1, replicationSupervisor.getReplicationFailureCount());
+          replicationTask.getMetricName()));
+      assertEquals(2, replicationSupervisor.getReplicationSuccessCount(
+          reconciliationTask.getMetricName()));
+      assertEquals(2, replicationSupervisor.getReplicationFailureCount());
       assertEquals(1, replicationSupervisor.getReplicationFailureCount(
-          task1.getMetricName()));
+          replicationTask.getMetricName()));
+      assertEquals(1, replicationSupervisor.getReplicationFailureCount(
+          reconciliationTask.getMetricName()));
       assertEquals(1, replicationSupervisor.getReplicationSkippedCount());
       assertEquals(1, replicationSupervisor.getReplicationSkippedCount(
-          task1.getMetricName()));
-      assertEquals(1, replicationSupervisor.getReplicationTimeoutCount());
+          replicationTask.getMetricName()));
+      assertEquals(2, replicationSupervisor.getReplicationTimeoutCount());
       assertEquals(1, replicationSupervisor.getReplicationTimeoutCount(
-          task1.getMetricName()));
-      assertEquals(5, replicationSupervisor.getReplicationRequestCount());
+          replicationTask.getMetricName()));
+      assertEquals(1, replicationSupervisor.getReplicationTimeoutCount(
+          reconciliationTask.getMetricName()));
+      assertEquals(9, replicationSupervisor.getReplicationRequestCount());
       assertEquals(5, replicationSupervisor.getReplicationRequestCount(
-          task1.getMetricName()));
+          replicationTask.getMetricName()));
+      assertEquals(4, replicationSupervisor.getReplicationRequestCount(
+          reconciliationTask.getMetricName()));
       assertEquals(0, replicationSupervisor.getReplicationRequestCount(
-          task2.getMetricName()));
+          ecTask.getMetricName()));
 
       assertEquals(2, ecReconstructionSupervisor.getReplicationSuccessCount());
       assertEquals(2, ecReconstructionSupervisor.getReplicationSuccessCount(
-          task2.getMetricName()));
+          ecTask.getMetricName()));
       assertEquals(1, ecReconstructionSupervisor.getReplicationTimeoutCount());
       assertEquals(1, ecReconstructionSupervisor.getReplicationTimeoutCount(
-          task2.getMetricName()));
+          ecTask.getMetricName()));
       assertEquals(2, ecReconstructionSupervisor.getReplicationFailureCount());
       assertEquals(2, ecReconstructionSupervisor.getReplicationFailureCount(
-          task2.getMetricName()));
+          ecTask.getMetricName()));
       assertEquals(5, ecReconstructionSupervisor.getReplicationRequestCount());
       assertEquals(5, ecReconstructionSupervisor.getReplicationRequestCount(
-          task2.getMetricName()));
+          ecTask.getMetricName()));
       assertEquals(0, ecReconstructionSupervisor.getReplicationRequestCount(
-          task1.getMetricName()));
+          replicationTask.getMetricName()));
 
       assertTrue(replicationSupervisor.getReplicationRequestTotalTime(
-          task1.getMetricName()) > 0);
+          replicationTask.getMetricName()) > 0);
+      assertTrue(replicationSupervisor.getReplicationRequestTotalTime(
+          reconciliationTask.getMetricName()) > 0);
       assertTrue(ecReconstructionSupervisor.getReplicationRequestTotalTime(
-          task2.getMetricName()) > 0);
+          ecTask.getMetricName()) > 0);
       assertTrue(replicationSupervisor.getReplicationRequestAvgTime(
-          task1.getMetricName()) > 0);
+          replicationTask.getMetricName()) > 0);
       assertTrue(ecReconstructionSupervisor.getReplicationRequestAvgTime(
-          task2.getMetricName()) > 0);
+          ecTask.getMetricName()) > 0);
 
       MetricsCollectorImpl replicationMetricsCollector = new MetricsCollectorImpl();
       replicationMetrics.getMetrics(replicationMetricsCollector, true);
@@ -689,6 +714,15 @@ public class TestReplicationSupervisor {
   private ReplicationTask createTask(long containerId) {
     ReplicateContainerCommand cmd = createCommand(containerId);
     return new ReplicationTask(cmd, replicatorRef.get());
+  }
+
+  private ReconcileContainerTask createReconciliationTask(long containerId) {
+    ReconcileContainerCommand reconcileContainerCommand =
+        new ReconcileContainerCommand(containerId, Collections.singleton(datanode));
+    reconcileContainerCommand.setTerm(CURRENT_TERM);
+    reconcileContainerCommand.setDeadline(clock.millis() + 10000);
+    return new ReconcileContainerTask(mockController, mockClient,
+        reconcileContainerCommand);
   }
 
   private ECReconstructionCoordinatorTask createECTask(long containerId) {
