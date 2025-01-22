@@ -74,6 +74,7 @@ public class TestReconcileContainerCommandHandler {
   private OzoneContainer ozoneContainer;
   private StateContext context;
   private ReconcileContainerCommandHandler subject;
+  private ReplicationSupervisor mockSupervisor;
 
   public void init(ContainerLayoutVersion layout, IncrementalReportSender<Container> icrSender)
       throws Exception {
@@ -81,7 +82,8 @@ public class TestReconcileContainerCommandHandler {
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeDetails dnDetails = randomDatanodeDetails();
 
-    ReplicationSupervisor mockSupervisor = mock(ReplicationSupervisor.class);
+    mockSupervisor = mock(ReplicationSupervisor.class);
+
     doAnswer(invocation -> {
       ((ReconcileContainerTask)invocation.getArguments()[0]).runTask();
       return null;
@@ -89,6 +91,7 @@ public class TestReconcileContainerCommandHandler {
 
     subject = new ReconcileContainerCommandHandler(mockSupervisor, mock(DNContainerOperationClient.class));
     context = ContainerTestUtils.getMockContext(dnDetails, conf);
+
 
     containerSet = new ContainerSet(1000);
     for (int id = 1; id <= NUM_CONTAINERS; id++) {
@@ -141,7 +144,8 @@ public class TestReconcileContainerCommandHandler {
    */
   @ContainerLayoutTestInfo.ContainerTest
   public void testReconcileContainerCommandMetrics(ContainerLayoutVersion layout) throws Exception {
-    init(layout, c -> { });
+    init(layout, c -> {
+    });
 
     assertEquals(0, subject.getInvocationCount());
 
@@ -150,7 +154,17 @@ public class TestReconcileContainerCommandHandler {
       ReconcileContainerCommand cmd = new ReconcileContainerCommand(id, Collections.emptySet());
       subject.handle(cmd, ozoneContainer, context, null);
     }
+
+    when(mockSupervisor.getReplicationRequestCount(subject.getMetricsName())).thenReturn(3L);
+    when(mockSupervisor.getReplicationRequestTotalTime(subject.getMetricsName())).thenReturn(10L);
+    when(mockSupervisor.getReplicationRequestAvgTime(subject.getMetricsName())).thenReturn(3L);
+    when(mockSupervisor.getReplicationQueuedCount(subject.getMetricsName())).thenReturn(1L);
+
+    assertEquals(subject.getMetricsName(), "ContainerReconciliations");
     assertEquals(NUM_CONTAINERS, subject.getInvocationCount());
+    assertEquals(subject.getQueuedCount(), 1);
+    assertEquals(subject.getTotalRunTime(), 10);
+    assertEquals(subject.getAverageRunTime(), 3);
   }
 
   private void verifyAllContainerReports(Map<ContainerID, ContainerReplicaProto> reportsSent) {

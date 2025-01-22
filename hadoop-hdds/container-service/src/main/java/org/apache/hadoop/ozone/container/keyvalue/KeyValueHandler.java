@@ -1449,6 +1449,10 @@ public class KeyValueHandler extends Handler {
                                  Set<DatanodeDetails> peers) throws IOException {
     // TODO Just a deterministic placeholder hash for testing until actual implementation is finished.
     ContainerData data = container.getContainerData();
+    if (container.getContainerState() == State.DELETED) {
+      throw new IOException("Container #" + container.getContainerData().getContainerID() +
+          " is deleted, cannot reconcile");
+    }
     long id = data.getContainerID();
     ByteBuffer byteBuffer = ByteBuffer.allocate(Long.BYTES)
         .putLong(id)
@@ -1459,6 +1463,7 @@ public class KeyValueHandler extends Handler {
     long dataChecksum = checksumImpl.getValue();
     LOG.info("Generated data checksum of container {} for testing: {}", id, dataChecksum);
     data.setDataChecksum(dataChecksum);
+    ContainerLogger.logContainerReconciled(container.getContainerData());
     sendICR(container);
   }
 
