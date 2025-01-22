@@ -66,7 +66,7 @@ class REPL {
           .variable(LineReader.LIST_MAX, 50)
           .build();
 
-      if (terminal.getType() != Terminal.TYPE_DUMB && terminal.getType() != Terminal.TYPE_DUMB_COLOR) {
+      if (!Terminal.TYPE_DUMB.equals(terminal.getType()) && !Terminal.TYPE_DUMB_COLOR.equals(terminal.getType())) {
         TailTipWidgets widgets = new TailTipWidgets(reader, registry::commandDescription, 5, TipType.COMPLETER);
         widgets.enable();
       }
