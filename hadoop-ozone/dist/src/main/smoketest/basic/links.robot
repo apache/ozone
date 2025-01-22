@@ -89,8 +89,8 @@ Delete link loop
 
 *** Test Cases ***
 Link to non-existent bucket
-    ${result} =         Ozone Shell Batch           bucket link ${source}/no-such-bucket ${target}/dangling-link
-                        ...                         key list ${target}/dangling-link
+                        Execute                     ozone sh bucket link ${source}/no-such-bucket ${target}/dangling-link
+    ${result} =         Execute And Ignore Error    ozone sh key list ${target}/dangling-link
                         Should Contain              ${result}         BUCKET_NOT_FOUND
 
 Key create passthrough
