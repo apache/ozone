@@ -95,11 +95,26 @@ public abstract class Shell extends GenericCli {
 
     if (executionMode != null && (executionMode.interactive || !executionMode.command.isEmpty())) {
       spec.name(""); // use short name (e.g. "token get" instead of "ozone sh token get")
+      installBatchExceptionHandler();
       new REPL(this, getCmd(), (PicocliCommandsFactory) getCmd().getFactory(), executionMode.command);
     } else {
       TracingUtil.initTracing("shell", getOzoneConf());
       String spanName = spec.name() + " " + String.join(" ", argv);
       TracingUtil.executeInNewSpan(spanName, () -> super.run(argv));
+    }
+  }
+
+  private void installBatchExceptionHandler() {
+    // exit on first error in batch mode
+    if (!executionMode.interactive) {
+      CommandLine.IExecutionExceptionHandler handler = getCmd().getExecutionExceptionHandler();
+      getCmd().setExecutionExceptionHandler((ex, cli, parseResult) -> {
+        try {
+          return handler.handleExecutionException(ex, cli, parseResult);
+        } finally {
+          System.exit(EXECUTION_ERROR_EXIT_CODE);
+        }
+      });
     }
   }
 
