@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.execution;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -32,6 +33,7 @@ public final class IndexGenerator {
   private final AtomicLong index = new AtomicLong();
   private final AtomicLong commitIndex = new AtomicLong();
   private final OzoneManager ozoneManager;
+  private final AtomicBoolean enabled = new AtomicBoolean(true);
 
   public IndexGenerator(OzoneManager ozoneManager) throws IOException {
     this.ozoneManager = ozoneManager;
@@ -52,9 +54,26 @@ public final class IndexGenerator {
     }
     index.set(initIndex);
     commitIndex.set(initIndex);
+    if (ozoneManager.getVersionManager().needsFinalization()) {
+      enabled.set(false);
+    }
+  }
+
+  public void finalizeIndexGeneratorFeature() throws IOException {
+    enabled.set(true);
+    long initIndex = 0;
+    TransactionInfo transactionInfo = TransactionInfo.readTransactionInfo(ozoneManager.getMetadataManager());
+    if (null != transactionInfo) {
+      initIndex = transactionInfo.getTransactionIndex();
+    }
+    index.set(initIndex);
+    commitIndex.set(initIndex);
   }
 
   public long nextIndex() {
+    if (!enabled.get()) {
+      return -1;
+    }
     return index.incrementAndGet();
   }
 
@@ -63,6 +82,9 @@ public final class IndexGenerator {
   }
 
   public synchronized void saveIndex(BatchOperation batchOperation, long idx) throws IOException {
+    if (!enabled.get()) {
+      return;
+    }
     if (idx <= commitIndex.get()) {
       return;
     }
