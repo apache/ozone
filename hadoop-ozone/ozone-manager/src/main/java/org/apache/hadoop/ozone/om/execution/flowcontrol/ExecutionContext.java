@@ -27,10 +27,15 @@ public final class ExecutionContext {
   private final TermIndex termIndex;
 
   private ExecutionContext(long index, TermIndex termIndex) {
-    this.index = index;
     if (null == termIndex) {
       termIndex = TermIndex.valueOf(-1, index);
     }
+    if (index == -1) {
+      // during upgrade case before finalization, make use of termIndex's index
+      // till finalization, index generator will return -1
+      index = termIndex.getIndex();
+    }
+    this.index = index;
     this.termIndex = termIndex;
   }
 
