@@ -506,12 +506,16 @@ public class TestKeyValueHandler {
     assertEquals(1, icrReceived.get());
     assertNotNull(containerSet.getContainer(containerID));
 
-    // The delete should not have gone through due to the mocked clock
+    // The delete should not have gone through due to the mocked clock. The implementation calls the clock twice:
+    // Once at the start of the method prior to taking the lock, when the clock will return the start time of the test.
+    // On the second call to the clock, where the implementation checks if the timeout has expired, the clock will
+    // return start_time + timeout + 1. This will cause the delete to timeout and the container will not be deleted.
     kvHandler.deleteContainer(containerSet.getContainer(containerID), true);
     assertEquals(1, icrReceived.get());
     assertNotNull(containerSet.getContainer(containerID));
 
-    // Delete the container normally, and it should go through
+    // Delete the container normally, and it should go through. At this stage all calls to the clock mock will return
+    // the same value, indicating no delay to the delete operation will succeed.
     kvHandler.deleteContainer(containerSet.getContainer(containerID), true);
     assertEquals(2, icrReceived.get());
     assertNull(containerSet.getContainer(containerID));
