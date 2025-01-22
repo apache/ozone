@@ -25,7 +25,7 @@ import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MANAGED_INDEX;
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
 
 /**
- * Quota repair for usages action to be triggered after upgrade.
+ * initialize om managed index generator to provide index for further request handling.
  */
 @UpgradeActionOm(type = ON_FINALIZE, feature = MANAGED_INDEX)
 public class OmManagedIndexUpgradeAction implements OmUpgradeAction {
