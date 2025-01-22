@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
-import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,28 +30,20 @@ public abstract class ReconScmTask {
 
   private static final Logger LOG = LoggerFactory.getLogger(ReconScmTask.class);
   private Thread taskThread;
-  private ReconTaskStatusDao reconTaskStatusDao;
   private volatile boolean running;
+  private final ReconTaskStatusUpdater taskStatusUpdater;
 
-  protected ReconScmTask(ReconTaskStatusDao reconTaskStatusDao) {
-    this.reconTaskStatusDao = reconTaskStatusDao;
-  }
-
-  private void register() {
-    String taskName = getTaskName();
-    if (!reconTaskStatusDao.existsById(taskName)) {
-      ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
-          taskName, 0L, 0L);
-      reconTaskStatusDao.insert(reconTaskStatusRecord);
-      LOG.info("Registered {} task ", taskName);
-    }
+  protected ReconScmTask(
+      ReconTaskStatusUpdaterManager taskStatusUpdaterManager
+  ) {
+    // In case the task is not already present in the DB, table is updated with initial values for task
+    this.taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(getTaskName());
   }
 
   /**
    * Start underlying start thread.
    */
   public synchronized void start() {
-    register();
     if (!isRunning()) {
       LOG.info("Starting {} Thread.", getTaskName());
       running = true;
@@ -87,11 +79,6 @@ public abstract class ReconScmTask {
     return true;
   }
 
-  protected void recordSingleRunCompletion() {
-    reconTaskStatusDao.update(new ReconTaskStatus(getTaskName(),
-        System.currentTimeMillis(), 0L));
-  }
-
   protected boolean canRun() {
     return running;
   }
@@ -100,5 +87,20 @@ public abstract class ReconScmTask {
     return getClass().getSimpleName();
   }
 
+  public ReconTaskStatusUpdater getTaskStatusUpdater() {
+    return this.taskStatusUpdater;
+  }
+
   protected abstract void run();
+
+  protected void initializeAndRunTask() throws Exception {
+    taskStatusUpdater.recordRunStart();
+    runTask();
+    taskStatusUpdater.recordRunCompletion();
+  }
+
+  /**
+   * Override this method for the actual processing logic in child tasks.
+   */
+  protected abstract void runTask() throws Exception;
 }

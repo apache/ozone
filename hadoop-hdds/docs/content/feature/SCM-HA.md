@@ -177,9 +177,7 @@ signed certificate for sub-CA from root CA.
 primordial SCM is not defined. Bring up other SCM's using **--bootstrap**. 
 
 ### Current SCM HA Security limitation:
-1. When primordial SCM is down, new SCM’s cannot be bootstrapped and join the 
-quorum.
-2. Secure cluster upgrade to ratis-enable secure cluster is not supported.
+* Unsecure HA cluster upgrade to secure HA cluster is not supported.
 
 
 ## Implementation details
@@ -188,7 +186,7 @@ SCM HA uses Apache Ratis to replicate state between the members of the SCM HA qu
 
 This replication process is a simpler version of OM HA replication process as it doesn't use any double buffer (as the overall db thourghput of SCM requests are lower)
 
-Datanodes are sending all the reports (Container reports, Pipeline reports...) to *all* the Datanodes parallel. Only the leader node can assign/create new containers, and only the leader node sends command back to the Datanodes.
+Datanodes are sending all the reports (Container reports, Pipeline reports...) to *all* SCM nodes in parallel. Only the leader node can assign/create new containers, and only the leader node sends commands back to the Datanodes.
 
 ## Verify SCM HA setup
 
@@ -226,6 +224,6 @@ bin/ozone debug ldb --db=/tmp/metadata/scm.db scan --column-family=containers
 
 ## Migrating from Non-HA to HA SCM
 
-You can extend the cluster configuration with multiple nodes and initialize the additional nodes with `scm --bootstrap` command.
-
-Make sure that the `ozone.scm.primordial.node.id` property is pointed to the existing SCM before you run the `bootstrap` command on the newly added SCM nodes.
+Add additional SCM nodes and extend the cluster configuration to reflect the newly added nodes. 
+Bootstrap the newly added SCM nodes with `scm --bootstrap` command and start the SCM service.
+Note: Make sure that the `ozone.scm.primordial.node.id` property is pointed to the existing SCM before you run the `bootstrap` command on the newly added SCM nodes.

@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
+import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -72,6 +73,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     implements BootstrapStateHandler {
 
   private final OzoneManager ozoneManager;
+  private final DeletingServiceMetrics metrics;
   private final ScmBlockLocationProtocol scmClient;
   private final ClientId clientId = ClientId.randomId();
   private final AtomicLong deletedDirsCount;
@@ -92,6 +94,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     this.movedDirsCount = new AtomicLong(0);
     this.movedFilesCount = new AtomicLong(0);
     this.runCount = new AtomicLong(0);
+    this.metrics = ozoneManager.getDeletionMetrics();
   }
 
   protected int processKeyDeletes(List<BlockGroup> keyBlocksList,
@@ -450,8 +453,9 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     }
 
     if (dirNum != 0 || subDirNum != 0 || subFileNum != 0) {
+      long subdirMoved = subDirNum - subdirDelNum;
       deletedDirsCount.addAndGet(dirNum + subdirDelNum);
-      movedDirsCount.addAndGet(subDirNum - subdirDelNum);
+      movedDirsCount.addAndGet(subdirMoved);
       movedFilesCount.addAndGet(subFileNum);
       long timeTakenInIteration = Time.monotonicNow() - startTime;
       LOG.info("Number of dirs deleted: {}, Number of sub-dir " +
@@ -461,6 +465,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
               " totalRunCount: {}",
           dirNum, subdirDelNum, subFileNum, (subDirNum - subdirDelNum), limit,
           timeTakenInIteration, rnCnt);
+      metrics.incrementDirectoryDeletionTotalMetrics(dirNum + subdirDelNum, subDirNum, subFileNum);
     }
     return remainNum;
   }

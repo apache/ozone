@@ -123,6 +123,12 @@ public class OzoneFileSystem extends BasicOzoneFileSystem
   }
 
   @Override
+  protected OzoneFSDataStreamOutput createFSDataStreamOutput(
+      OzoneFSDataStreamOutput outputDataStream) {
+    return new CapableOzoneFSDataStreamOutput(outputDataStream, isHsyncEnabled());
+  }
+
+  @Override
   public boolean hasPathCapability(final Path path, final String capability)
       throws IOException {
     // qualify the path to make sure that it refers to the current FS.

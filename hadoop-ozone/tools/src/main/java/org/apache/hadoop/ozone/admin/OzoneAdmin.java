@@ -19,9 +19,8 @@ package org.apache.hadoop.ozone.admin;
 
 import org.apache.hadoop.hdds.cli.AdminSubcommand;
 import org.apache.hadoop.hdds.cli.ExtensibleParentCommand;
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.ozone.shell.Shell;
 
 import picocli.CommandLine;
 
@@ -33,18 +32,10 @@ import picocli.CommandLine;
     description = "Developer tools for Ozone Admin operations",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
-public class OzoneAdmin extends GenericCli implements ExtensibleParentCommand {
+public class OzoneAdmin extends Shell implements ExtensibleParentCommand {
 
   public static void main(String[] argv) {
     new OzoneAdmin().run(argv);
-  }
-
-  @Override
-  public int execute(String[] argv) {
-    TracingUtil.initTracing("shell", getOzoneConf());
-    String spanName = "ozone admin " + String.join(" ", argv);
-    return TracingUtil.executeInNewSpan(spanName,
-        () -> super.execute(argv));
   }
 
   @Override

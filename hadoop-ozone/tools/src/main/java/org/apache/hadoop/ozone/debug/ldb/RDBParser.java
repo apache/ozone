@@ -33,6 +33,7 @@ import picocli.CommandLine;
             DropTable.class,
             ListTables.class,
             ValueSchema.class,
+            Checkpoint.class,
         },
         description = "Parse rocksdb file content")
 @MetaInfServices(DebugSubcommand.class)
@@ -40,6 +41,7 @@ public class RDBParser implements DebugSubcommand {
 
   @CommandLine.Option(names = {"--db"},
       required = true,
+      scope = CommandLine.ScopeType.INHERIT,
       description = "Database File Path")
   private String dbPath;
 

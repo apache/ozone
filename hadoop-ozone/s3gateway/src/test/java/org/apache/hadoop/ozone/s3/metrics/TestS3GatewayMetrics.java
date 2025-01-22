@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.endpoint.BucketEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.RootEndpoint;
@@ -87,15 +88,20 @@ public class TestS3GatewayMetrics {
     clientStub.getObjectStore().createS3Bucket(bucketName);
     bucket = clientStub.getObjectStore().getS3Bucket(bucketName);
 
+    RequestIdentifier requestIdentifier = new RequestIdentifier();
+
     bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(clientStub);
+    bucketEndpoint.setRequestIdentifier(requestIdentifier);
 
     rootEndpoint = new RootEndpoint();
     rootEndpoint.setClient(clientStub);
+    rootEndpoint.setRequestIdentifier(requestIdentifier);
 
     keyEndpoint = new ObjectEndpoint();
     keyEndpoint.setClient(clientStub);
     keyEndpoint.setOzoneConfiguration(new OzoneConfiguration());
+    keyEndpoint.setRequestIdentifier(requestIdentifier);
 
     headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(

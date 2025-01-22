@@ -50,7 +50,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
-import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -133,7 +132,6 @@ public class TestBlockDeletion {
     GenericTestUtils.setLogLevel(SCMBlockDeletingService.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(ReplicationManager.LOG, Level.DEBUG);
 
-    SCMHAUtils.setRatisEnabled(true);
     conf.set("ozone.replication.allowed-configs",
         "^(RATIS/THREE)|(EC/2-1-256k)$");
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,

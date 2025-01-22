@@ -49,7 +49,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
-import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -190,10 +189,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
   public void waitForSCMToBeReady() throws TimeoutException,
       InterruptedException {
-    if (SCMHAUtils.isSCMHAEnabled(conf)) {
-      GenericTestUtils.waitFor(scm::checkLeader,
-          1000, waitForClusterToBeReadyTimeout);
-    }
+    GenericTestUtils.waitFor(scm::checkLeader,
+        1000, waitForClusterToBeReadyTimeout);
   }
 
   public StorageContainerManager getActiveSCM() {
@@ -750,16 +747,12 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       scmStore.setClusterId(clusterId);
       scmStore.setScmId(scmId);
       scmStore.initialize();
-      //TODO: HDDS-6897
-      //Disabling Ratis for only of MiniOzoneClusterImpl.
-      //MiniOzoneClusterImpl doesn't work with Ratis enabled SCM
-      if (SCMHAUtils.isSCMHAEnabled(conf)) {
-        scmStore.setSCMHAFlag(true);
-        scmStore.persistCurrentState();
-        SCMRatisServerImpl.initialize(clusterId, scmId,
-                SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
-                        .getLocalNodeDetails(), conf);
-      }
+      scmStore.setSCMHAFlag(true);
+      scmStore.persistCurrentState();
+      SCMRatisServerImpl.initialize(clusterId, scmId,
+          SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
+              .getLocalNodeDetails(), conf);
+
     }
 
     void initializeOmStorage(OMStorage omStorage) throws IOException {
@@ -872,6 +865,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           localhostWithFreePort());
       conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
           "3s");
+      conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY, getFreePort());
+      conf.setInt(ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY, getFreePort());
     }
 
     private void configureOM() {

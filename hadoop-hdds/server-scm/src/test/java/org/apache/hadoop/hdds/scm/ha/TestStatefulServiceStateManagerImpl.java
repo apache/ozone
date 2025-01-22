@@ -47,7 +47,6 @@ public class TestStatefulServiceStateManagerImpl {
   @BeforeEach
   void setup(@TempDir File testDir) throws IOException {
     conf = SCMTestUtils.getConf(testDir);
-    SCMHAUtils.setRatisEnabled(true);
     dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     statefulServiceConfig =
         SCMDBDefinition.STATEFUL_SERVICE_CONFIG.getTable(dbStore);

@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -77,6 +78,7 @@ public class TestObjectTaggingDelete {
     rest = new ObjectEndpoint();
     rest.setClient(client);
     rest.setOzoneConfiguration(config);
+    rest.setRequestIdentifier(new RequestIdentifier());
     headers = Mockito.mock(HttpHeaders.class);
     rest.setHeaders(headers);
     body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
@@ -137,7 +139,7 @@ public class TestObjectTaggingDelete {
 
     ObjectEndpoint endpoint = new ObjectEndpoint();
     endpoint.setClient(mockClient);
-
+    endpoint.setRequestIdentifier(new RequestIdentifier());
     doThrow(new OMException("DeleteObjectTagging is not currently supported for FSO directory",
         ResultCodes.NOT_SUPPORTED_OPERATION)).when(mockBucket).deleteObjectTagging("dir/");
 

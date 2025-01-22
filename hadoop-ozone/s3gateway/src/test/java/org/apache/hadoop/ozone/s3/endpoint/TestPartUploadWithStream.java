@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import org.junit.jupiter.api.BeforeAll;
@@ -66,6 +67,7 @@ public class TestPartUploadWithStream {
 
     REST.setHeaders(headers);
     REST.setClient(client);
+    REST.setRequestIdentifier(new RequestIdentifier());
 
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED,

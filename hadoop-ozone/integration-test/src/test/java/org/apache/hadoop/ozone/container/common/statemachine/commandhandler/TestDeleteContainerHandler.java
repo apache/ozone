@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -98,7 +97,6 @@ public class TestDeleteContainerHandler {
   @BeforeAll
   public static void setup() throws Exception {
     conf = new OzoneConfiguration();
-    SCMHAUtils.setRatisEnabled(true);
     conf.set(OZONE_SCM_CONTAINER_SIZE, "1GB");
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         0, StorageUnit.MB);
