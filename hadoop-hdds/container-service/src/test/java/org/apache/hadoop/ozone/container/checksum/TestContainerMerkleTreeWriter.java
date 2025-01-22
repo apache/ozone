@@ -26,9 +26,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.zip.CRC32;
 
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.ozone.common.ChecksumByteBuffer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -218,17 +218,19 @@ class TestContainerMerkleTreeWriter {
   }
 
   private long computeExpectedChecksum(List<Long> checksums) {
-    CRC32 crc32 = new CRC32();
+    // Use the same checksum implementation as the tree writer under test.
+    ChecksumByteBuffer checksumImpl = ContainerMerkleTreeWriter.CHECKSUM_BUFFER_SUPPLIER.get();
     ByteBuffer longBuffer = ByteBuffer.allocate(Long.BYTES * checksums.size());
     checksums.forEach(longBuffer::putLong);
     longBuffer.flip();
-    crc32.update(longBuffer);
-    return crc32.getValue();
+    checksumImpl.update(longBuffer);
+    return checksumImpl.getValue();
   }
 
   private long computeExpectedChunkChecksum(List<ByteString> checksums) {
-    CRC32 crc32 = new CRC32();
-    checksums.forEach(b -> crc32.update(b.asReadOnlyByteBuffer()));
-    return crc32.getValue();
+    // Use the same checksum implementation as the tree writer under test.
+    ChecksumByteBuffer checksumImpl = ContainerMerkleTreeWriter.CHECKSUM_BUFFER_SUPPLIER.get();
+    checksums.forEach(b -> checksumImpl.update(b.asReadOnlyByteBuffer()));
+    return checksumImpl.getValue();
   }
 }

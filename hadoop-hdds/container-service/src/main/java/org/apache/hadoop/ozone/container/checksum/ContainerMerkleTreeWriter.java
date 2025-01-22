@@ -46,7 +46,7 @@ public class ContainerMerkleTreeWriter {
   private final SortedMap<Long, BlockMerkleTreeWriter> id2Block;
   // All merkle tree generation will use CRC32C to aggregate checksums at each level, regardless of the
   // checksum algorithm used on the underlying data.
-  private static final Supplier<ChecksumByteBuffer> CHECKSUM_BUFFER_SUPPLIER = ChecksumByteBufferFactory::crc32CImpl;
+  public static final Supplier<ChecksumByteBuffer> CHECKSUM_BUFFER_SUPPLIER = ChecksumByteBufferFactory::crc32CImpl;
 
   /**
    * Constructs an empty Container merkle tree object.
