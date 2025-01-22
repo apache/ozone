@@ -673,8 +673,7 @@ public class ReplicationManager implements SCMService {
     if (cmd.getType() == Type.deleteContainerCommand) {
       DeleteContainerCommand rcc = (DeleteContainerCommand) cmd;
       containerReplicaPendingOps.scheduleDeleteReplica(
-          containerInfo.containerID(), targetDatanode, rcc.getReplicaIndex(),
-          scmDeadlineEpochMs);
+          containerInfo.containerID(), targetDatanode, rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs);
       if (rcc.getReplicaIndex() > 0) {
         getMetrics().incrEcDeletionCmdsSentTotal();
       } else if (rcc.getReplicaIndex() == 0) {
@@ -687,8 +686,7 @@ public class ReplicationManager implements SCMService {
       final ByteString targetIndexes = rcc.getMissingContainerIndexes();
       for (int i = 0; i < targetIndexes.size(); i++) {
         containerReplicaPendingOps.scheduleAddReplica(
-            containerInfo.containerID(), targets.get(i), targetIndexes.byteAt(i),
-            scmDeadlineEpochMs);
+            containerInfo.containerID(), targets.get(i), targetIndexes.byteAt(i), cmd, scmDeadlineEpochMs);
       }
       getMetrics().incrEcReconstructionCmdsSentTotal();
     } else if (cmd.getType() == Type.replicateContainerCommand) {
@@ -702,7 +700,7 @@ public class ReplicationManager implements SCMService {
          */
         containerReplicaPendingOps.scheduleAddReplica(
             containerInfo.containerID(),
-            targetDatanode, rcc.getReplicaIndex(), scmDeadlineEpochMs);
+            targetDatanode, rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs);
       } else {
         /*
         This means the source will push replica to the target, so the op's
@@ -710,7 +708,7 @@ public class ReplicationManager implements SCMService {
          */
         containerReplicaPendingOps.scheduleAddReplica(
             containerInfo.containerID(),
-            rcc.getTargetDatanode(), rcc.getReplicaIndex(), scmDeadlineEpochMs);
+            rcc.getTargetDatanode(), rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs);
       }
 
       if (rcc.getReplicaIndex() > 0) {

@@ -21,6 +21,10 @@ import com.google.common.util.concurrent.Striped;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.jheaps.annotations.VisibleForTesting;
 
 import java.time.Clock;
 import java.util.ArrayList;
@@ -117,13 +121,14 @@ public class ContainerReplicaPendingOps {
    * @param containerID ContainerID for which to add a replica
    * @param target The target datanode
    * @param replicaIndex The replica index (zero for Ratis, &gt; 0 for EC)
+   * @param command The command to send to the datanode
    * @param deadlineEpochMillis The time by which the replica should have been
    *                            added and reported by the datanode, or it will
    *                            be discarded.
    */
   public void scheduleAddReplica(ContainerID containerID,
-      DatanodeDetails target, int replicaIndex, long deadlineEpochMillis) {
-    addReplica(ADD, containerID, target, replicaIndex, deadlineEpochMillis);
+      DatanodeDetails target, int replicaIndex, SCMCommand<?> command, long deadlineEpochMillis) {
+    addReplica(ADD, containerID, target, replicaIndex, command, deadlineEpochMillis);
   }
 
   /**
@@ -131,13 +136,14 @@ public class ContainerReplicaPendingOps {
    * @param containerID ContainerID for which to delete a replica
    * @param target The target datanode
    * @param replicaIndex The replica index (zero for Ratis, &gt; 0 for EC)
+   * @param command The command to send to the datanode
    * @param deadlineEpochMillis The time by which the replica should have been
    *                            deleted and reported by the datanode, or it will
    *                            be discarded.
    */
   public void scheduleDeleteReplica(ContainerID containerID,
-      DatanodeDetails target, int replicaIndex, long deadlineEpochMillis) {
-    addReplica(DELETE, containerID, target, replicaIndex, deadlineEpochMillis);
+      DatanodeDetails target, int replicaIndex, SCMCommand<?> command, long deadlineEpochMillis) {
+    addReplica(DELETE, containerID, target, replicaIndex, command, deadlineEpochMillis);
   }
 
   /**
@@ -258,7 +264,7 @@ public class ContainerReplicaPendingOps {
   }
 
   private void addReplica(ContainerReplicaOp.PendingOpType opType,
-      ContainerID containerID, DatanodeDetails target, int replicaIndex,
+      ContainerID containerID, DatanodeDetails target, int replicaIndex, SCMCommand<?> command,
       long deadlineEpochMillis) {
     Lock lock = writeLock(containerID);
     lock(lock);
@@ -269,7 +275,7 @@ public class ContainerReplicaPendingOps {
       List<ContainerReplicaOp> ops = pendingOps.computeIfAbsent(
           containerID, s -> new ArrayList<>());
       ops.add(new ContainerReplicaOp(opType,
-          target, replicaIndex, deadlineEpochMillis));
+          target, replicaIndex, command, deadlineEpochMillis));
       incrementCounter(opType, replicaIndex);
     } finally {
       unlock(lock);

@@ -23,6 +23,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,6 +59,8 @@ public class TestContainerReplicaPendingOps {
   private DatanodeDetails dn3;
   private ReplicationManagerMetrics metrics;
   private long deadline;
+  private SCMCommand<?> addCmd;
+  private SCMCommand<?> deleteCmd;
 
   @BeforeEach
   public void setup() {
@@ -73,6 +78,9 @@ public class TestContainerReplicaPendingOps {
     dn1 = MockDatanodeDetails.randomDatanodeDetails();
     dn2 = MockDatanodeDetails.randomDatanodeDetails();
     dn3 = MockDatanodeDetails.randomDatanodeDetails();
+
+    addCmd = ReplicateContainerCommand.toTarget(1, dn3);
+    deleteCmd =  new DeleteContainerCommand(1, false);
   }
 
   @AfterEach
@@ -91,8 +99,8 @@ public class TestContainerReplicaPendingOps {
 
   @Test
   public void testClear() {
-    pendingOps.scheduleAddReplica(new ContainerID(1), dn1, 0, deadline);
-    pendingOps.scheduleDeleteReplica(new ContainerID(2), dn1, 0, deadline);
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn1, 0, addCmd, deadline);
+    pendingOps.scheduleDeleteReplica(new ContainerID(2), dn1, 0, deleteCmd, deadline);
 
     assertEquals(1, pendingOps.getPendingOpCount(ContainerReplicaOp.PendingOpType.ADD));
     assertEquals(1, pendingOps.getPendingOpCount(ContainerReplicaOp.PendingOpType.DELETE));
@@ -108,16 +116,16 @@ public class TestContainerReplicaPendingOps {
 
   @Test
   public void testCanAddReplicasForAdd() {
-    pendingOps.scheduleAddReplica(new ContainerID(1), dn1, 0, deadline);
-    pendingOps.scheduleAddReplica(new ContainerID(1), dn2, 0, deadline);
-    pendingOps.scheduleAddReplica(new ContainerID(1), dn3, 0, deadline);
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn1, 0, addCmd, deadline);
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn2, 0, addCmd, deadline);
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn3, 0, addCmd, deadline);
     // Duplicate for DN2
-    pendingOps.scheduleAddReplica(new ContainerID(1), dn2, 0, deadline + 1);
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn2, 0, addCmd, deadline + 1);
     // Not a duplicate for DN2 as different index. Should not happen in practice as it is not valid to have 2 indexes
     // on the same node.
-    pendingOps.scheduleAddReplica(new ContainerID(1), dn2, 1, deadline);
-    pendingOps.scheduleAddReplica(new ContainerID(2), dn1, 1, deadline);
-    pendingOps.scheduleAddReplica(new ContainerID(2), dn1, 1, deadline + 1);
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn2, 1, addCmd, deadline);
+    pendingOps.scheduleAddReplica(new ContainerID(2), dn1, 1, addCmd, deadline);
+    pendingOps.scheduleAddReplica(new ContainerID(2), dn1, 1, addCmd, deadline + 1);
 
     List<ContainerReplicaOp> ops =
         pendingOps.getPendingOps(new ContainerID(1));
@@ -149,10 +157,10 @@ public class TestContainerReplicaPendingOps {
 
   @Test
   public void testCanAddReplicasForDelete() {
-    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn1, 0, deadline);
-    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn2, 0, deadline);
-    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn3, 0, deadline);
-    pendingOps.scheduleDeleteReplica(new ContainerID(2), dn1, 1, deadline);
+    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn1, 0, deleteCmd, deadline);
+    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn2, 0, deleteCmd, deadline);
+    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn3, 0, deleteCmd, deadline);
+    pendingOps.scheduleDeleteReplica(new ContainerID(2), dn1, 1, deleteCmd, deadline);
 
     List<ContainerReplicaOp> ops =
         pendingOps.getPendingOps(new ContainerID(1));
@@ -176,11 +184,11 @@ public class TestContainerReplicaPendingOps {
 
   @Test
   public void testCompletingOps() {
-    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn1, 0, deadline);
-    pendingOps.scheduleAddReplica(new ContainerID(1), dn1, 0, deadline);
-    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn2, 0, deadline);
-    pendingOps.scheduleAddReplica(new ContainerID(1), dn3, 0, deadline);
-    pendingOps.scheduleDeleteReplica(new ContainerID(2), dn1, 1, deadline);
+    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn1, 0, deleteCmd, deadline);
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn1, 0, addCmd, deadline);
+    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn2, 0, deleteCmd, deadline);
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn3, 0, addCmd, deadline);
+    pendingOps.scheduleDeleteReplica(new ContainerID(2), dn1, 1, deleteCmd, deadline);
 
     List<ContainerReplicaOp> ops =
         pendingOps.getPendingOps(new ContainerID(1));
@@ -209,11 +217,11 @@ public class TestContainerReplicaPendingOps {
 
   @Test
   public void testRemoveSpecificOp() {
-    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn1, 0, deadline);
-    pendingOps.scheduleAddReplica(new ContainerID(1), dn1, 0, deadline);
-    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn2, 0, deadline);
-    pendingOps.scheduleAddReplica(new ContainerID(1), dn3, 0, deadline);
-    pendingOps.scheduleDeleteReplica(new ContainerID(2), dn1, 1, deadline);
+    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn1, 0, deleteCmd, deadline);
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn1, 0, addCmd, deadline);
+    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn2, 0, deleteCmd, deadline);
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn3, 0, addCmd, deadline);
+    pendingOps.scheduleDeleteReplica(new ContainerID(2), dn1, 1, deleteCmd, deadline);
 
     ContainerID cid = new ContainerID(1);
     List<ContainerReplicaOp> ops = pendingOps.getPendingOps(cid);
@@ -232,11 +240,11 @@ public class TestContainerReplicaPendingOps {
     long expiry = clock.millis() + 1000;
     long laterExpiry =  clock.millis() + 2000;
     long latestExpiry = clock.millis() + 3000;
-    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn1, 0, expiry);
-    pendingOps.scheduleAddReplica(new ContainerID(1), dn1, 0, expiry);
-    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn2, 0, laterExpiry);
-    pendingOps.scheduleAddReplica(new ContainerID(1), dn3, 0, laterExpiry);
-    pendingOps.scheduleDeleteReplica(new ContainerID(2), dn1, 1, latestExpiry);
+    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn1, 0, deleteCmd, expiry);
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn1, 0, addCmd, expiry);
+    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn2, 0, deleteCmd, laterExpiry);
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn3, 0, addCmd, laterExpiry);
+    pendingOps.scheduleDeleteReplica(new ContainerID(2), dn1, 1, deleteCmd, latestExpiry);
 
     List<ContainerReplicaOp> ops =
         pendingOps.getPendingOps(new ContainerID(1));
@@ -284,12 +292,12 @@ public class TestContainerReplicaPendingOps {
   @Test
   public void testReplicationMetrics() {
     long expiry = clock.millis() + 1000;
-    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn1, 1, expiry);
-    pendingOps.scheduleAddReplica(new ContainerID(1), dn1, 2, expiry);
-    pendingOps.scheduleDeleteReplica(new ContainerID(2), dn2, 1, expiry);
-    pendingOps.scheduleAddReplica(new ContainerID(2), dn3, 1, expiry);
-    pendingOps.scheduleAddReplica(new ContainerID(3), dn3, 0, expiry);
-    pendingOps.scheduleDeleteReplica(new ContainerID(4), dn3, 0, expiry);
+    pendingOps.scheduleDeleteReplica(new ContainerID(1), dn1, 1, deleteCmd, expiry);
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn1, 2, addCmd, expiry);
+    pendingOps.scheduleDeleteReplica(new ContainerID(2), dn2, 1, deleteCmd, expiry);
+    pendingOps.scheduleAddReplica(new ContainerID(2), dn3, 1, addCmd, expiry);
+    pendingOps.scheduleAddReplica(new ContainerID(3), dn3, 0, addCmd, expiry);
+    pendingOps.scheduleDeleteReplica(new ContainerID(4), dn3, 0, deleteCmd, expiry);
 
     // InFlight Replication and Deletion
     assertEquals(3, pendingOps.getPendingOpCount(ADD));
@@ -310,12 +318,12 @@ public class TestContainerReplicaPendingOps {
     assertEquals(metrics.getReplicaDeleteTimeoutTotal(), 1);
 
     expiry = clock.millis() + 1000;
-    pendingOps.scheduleDeleteReplica(new ContainerID(3), dn1, 2, expiry);
-    pendingOps.scheduleAddReplica(new ContainerID(3), dn1, 3, expiry);
-    pendingOps.scheduleDeleteReplica(new ContainerID(4), dn2, 2, expiry);
-    pendingOps.scheduleAddReplica(new ContainerID(4), dn3, 4, expiry);
-    pendingOps.scheduleAddReplica(new ContainerID(5), dn3, 0, expiry);
-    pendingOps.scheduleDeleteReplica(new ContainerID(6), dn3, 0, expiry);
+    pendingOps.scheduleDeleteReplica(new ContainerID(3), dn1, 2, deleteCmd, expiry);
+    pendingOps.scheduleAddReplica(new ContainerID(3), dn1, 3, addCmd, expiry);
+    pendingOps.scheduleDeleteReplica(new ContainerID(4), dn2, 2, deleteCmd, expiry);
+    pendingOps.scheduleAddReplica(new ContainerID(4), dn3, 4, addCmd, expiry);
+    pendingOps.scheduleAddReplica(new ContainerID(5), dn3, 0, addCmd, expiry);
+    pendingOps.scheduleDeleteReplica(new ContainerID(6), dn3, 0, deleteCmd, expiry);
 
     // InFlight Replication and Deletion. Previous Inflight should be
     // removed as they were timed out.
@@ -358,9 +366,9 @@ public class TestContainerReplicaPendingOps {
 
     // schedule an ADD and a DELETE
     ContainerID containerID = new ContainerID(1);
-    pendingOps.scheduleAddReplica(containerID, dn1, 0, deadline);
+    pendingOps.scheduleAddReplica(containerID, dn1, 0, addCmd, deadline);
     ContainerReplicaOp addOp = pendingOps.getPendingOps(containerID).get(0);
-    pendingOps.scheduleDeleteReplica(containerID, dn1, 0, deadline);
+    pendingOps.scheduleDeleteReplica(containerID, dn1, 0, deleteCmd, deadline);
 
     // complete the ADD and verify that subscribers were notified
     pendingOps.completeAddReplica(containerID, dn1, 0);
@@ -374,8 +382,8 @@ public class TestContainerReplicaPendingOps {
     verify(subscriber2, times(1)).opCompleted(deleteOp, containerID, false);
 
     // now, test notification on expiration
-    pendingOps.scheduleDeleteReplica(containerID, dn1, 0, deadline);
-    pendingOps.scheduleAddReplica(containerID, dn2, 0, deadline);
+    pendingOps.scheduleDeleteReplica(containerID, dn1, 0, deleteCmd, deadline);
+    pendingOps.scheduleAddReplica(containerID, dn2, 0, addCmd, deadline);
     for (ContainerReplicaOp op : pendingOps.getPendingOps(containerID)) {
       if (op.getOpType() == ADD) {
         addOp = op;
@@ -397,8 +405,8 @@ public class TestContainerReplicaPendingOps {
     ContainerID containerID = new ContainerID(1);
 
     // schedule ops
-    pendingOps.scheduleDeleteReplica(containerID, dn1, 0, deadline);
-    pendingOps.scheduleAddReplica(containerID, dn2, 0, deadline);
+    pendingOps.scheduleDeleteReplica(containerID, dn1, 0, deleteCmd, deadline);
+    pendingOps.scheduleAddReplica(containerID, dn2, 0, addCmd, deadline);
 
     // register subscriber
     ContainerReplicaPendingOpsSubscriber subscriber1 = mock(
@@ -417,7 +425,7 @@ public class TestContainerReplicaPendingOps {
     ContainerID containerID = new ContainerID(1);
 
     // schedule ops
-    pendingOps.scheduleAddReplica(containerID, dn2, 0, deadline);
+    pendingOps.scheduleAddReplica(containerID, dn2, 0, addCmd, deadline);
 
     // register subscriber
     ContainerReplicaPendingOpsSubscriber subscriber1 = mock(
@@ -425,7 +433,7 @@ public class TestContainerReplicaPendingOps {
     pendingOps.registerSubscriber(subscriber1);
 
     clock.fastForward(1000);
-    pendingOps.scheduleAddReplica(containerID, dn2, 0, deadline + 1);
+    pendingOps.scheduleAddReplica(containerID, dn2, 0, addCmd, deadline + 1);
     // no entries have expired, so there should be zero interactions with the
     // subscriber
     verifyNoMoreInteractions(subscriber1);

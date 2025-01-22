@@ -224,9 +224,9 @@ public class TestReplicationManager {
   @Test
   public void testPendingOpsClearedWhenStarting() {
     containerReplicaPendingOps.scheduleAddReplica(ContainerID.valueOf(1),
-        MockDatanodeDetails.randomDatanodeDetails(), 1, Integer.MAX_VALUE);
+        MockDatanodeDetails.randomDatanodeDetails(), 1, null, Integer.MAX_VALUE);
     containerReplicaPendingOps.scheduleDeleteReplica(ContainerID.valueOf(2),
-        MockDatanodeDetails.randomDatanodeDetails(), 1, Integer.MAX_VALUE);
+        MockDatanodeDetails.randomDatanodeDetails(), 1, null, Integer.MAX_VALUE);
     assertEquals(1, containerReplicaPendingOps
         .getPendingOpCount(ContainerReplicaOp.PendingOpType.ADD));
     assertEquals(1, containerReplicaPendingOps
@@ -733,7 +733,7 @@ public class TestReplicationManager {
         HddsProtos.LifeCycleState.CLOSED);
     addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
     containerReplicaPendingOps.scheduleAddReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 5,
+        MockDatanodeDetails.randomDatanodeDetails(), 5, null,
         clock.millis() + 10000);
 
     replicationManager.processContainer(
@@ -1024,7 +1024,7 @@ public class TestReplicationManager {
     addReplicas(container, ContainerReplicaProto.State.CLOSED,
         1, 2, 3, 4, 5, 5);
     containerReplicaPendingOps.scheduleDeleteReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 5,
+        MockDatanodeDetails.randomDatanodeDetails(), 5, null,
         clock.millis() + 10000);
     replicationManager.processContainer(
         container, repQueue, repReport);
