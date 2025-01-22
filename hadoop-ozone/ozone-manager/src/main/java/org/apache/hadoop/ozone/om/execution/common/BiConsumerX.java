@@ -19,6 +19,9 @@ package org.apache.hadoop.ozone.om.execution.common;
 
 import java.io.IOException;
 
+/**
+ * interface for BiConsumer with IOException being thrown.
+ */
 @FunctionalInterface
 public interface BiConsumerX<T, U> {
   /**
