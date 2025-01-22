@@ -25,6 +25,7 @@ import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.function.Supplier;
 
 /**
  * This class constructs a Merkle tree that provides one checksum for all data within a container.
@@ -43,6 +44,9 @@ import java.util.TreeMap;
 public class ContainerMerkleTreeWriter {
 
   private final SortedMap<Long, BlockMerkleTreeWriter> id2Block;
+  // All merkle tree generation will use CRC32C to aggregate checksums at each level, regardless of the
+  // checksum algorithm used on the underlying data.
+  private static final Supplier<ChecksumByteBuffer> CHECKSUM_BUFFER_SUPPLIER = ChecksumByteBufferFactory::crc32CImpl;
 
   /**
    * Constructs an empty Container merkle tree object.
@@ -71,7 +75,7 @@ public class ContainerMerkleTreeWriter {
   public ContainerProtos.ContainerMerkleTree toProto() {
     // Compute checksums and return the result.
     ContainerProtos.ContainerMerkleTree.Builder containerTreeBuilder = ContainerProtos.ContainerMerkleTree.newBuilder();
-    ChecksumByteBuffer checksumImpl = ChecksumByteBufferFactory.crc32Impl();
+    ChecksumByteBuffer checksumImpl = CHECKSUM_BUFFER_SUPPLIER.get();
     ByteBuffer containerChecksumBuffer = ByteBuffer.allocate(Long.BYTES * id2Block.size());
 
     for (BlockMerkleTreeWriter blockTree: id2Block.values()) {
@@ -122,7 +126,7 @@ public class ContainerMerkleTreeWriter {
      */
     public ContainerProtos.BlockMerkleTree toProto() {
       ContainerProtos.BlockMerkleTree.Builder blockTreeBuilder = ContainerProtos.BlockMerkleTree.newBuilder();
-      ChecksumByteBuffer checksumImpl = ChecksumByteBufferFactory.crc32Impl();
+      ChecksumByteBuffer checksumImpl = CHECKSUM_BUFFER_SUPPLIER.get();
       ByteBuffer blockChecksumBuffer = ByteBuffer.allocate(Long.BYTES * offset2Chunk.size());
 
       for (ChunkMerkleTreeWriter chunkTree: offset2Chunk.values()) {
@@ -160,7 +164,7 @@ public class ContainerMerkleTreeWriter {
       length = chunk.getLen();
       offset = chunk.getOffset();
       isHealthy = true;
-      ChecksumByteBuffer checksumImpl = ChecksumByteBufferFactory.crc32Impl();
+      ChecksumByteBuffer checksumImpl = CHECKSUM_BUFFER_SUPPLIER.get();
       for (ByteString checksum: chunk.getChecksumData().getChecksumsList()) {
         checksumImpl.update(checksum.asReadOnlyByteBuffer());
       }

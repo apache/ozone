@@ -1454,7 +1454,7 @@ public class KeyValueHandler extends Handler {
         .putLong(id)
         .asReadOnlyBuffer();
     byteBuffer.rewind();
-    ChecksumByteBuffer checksumImpl = ChecksumByteBufferFactory.crc32Impl();
+    ChecksumByteBuffer checksumImpl = ChecksumByteBufferFactory.crc32CImpl();
     checksumImpl.update(byteBuffer);
     long dataChecksum = checksumImpl.getValue();
     LOG.info("Generated data checksum of container {} for testing: {}", id, dataChecksum);
