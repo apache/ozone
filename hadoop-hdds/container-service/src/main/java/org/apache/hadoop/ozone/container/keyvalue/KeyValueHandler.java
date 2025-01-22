@@ -33,7 +33,6 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 
@@ -189,8 +188,8 @@ public class KeyValueHandler extends Handler {
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
 
-    maxDeleteLockWaitMs = config.getTimeDuration(OzoneConfigKeys.OZONE_DELETE_CONTAINER_TIMEOUT,
-        OzoneConfigKeys.OZONE_DELETE_CONTAINER_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    maxDeleteLockWaitMs = dnConf.getDeleteContainerTimeoutMs();
     // this striped handler lock is used for synchronizing createContainer
     // Requests.
     final int threadCountPerDisk = conf.getInt(

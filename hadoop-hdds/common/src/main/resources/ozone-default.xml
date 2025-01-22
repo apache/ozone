@@ -4597,14 +4597,4 @@
       Configuration property to configure the max server side response size for list calls on om.
     </description>
   </property>
-  <property>
-    <name>ozone.delete.container.timeout</name>
-    <value>1m</value>
-    <tag>OZONE, DATANODE</tag>
-    <description>
-      If a delete container request spends more than this time waiting on the container lock or performing
-      pre checks, the command will be skipped and SCM will resend it automatically. This avoids commands
-      running for a very long time without SCM being informed of the progress.
-    </description>
-  </property>
 </configuration>

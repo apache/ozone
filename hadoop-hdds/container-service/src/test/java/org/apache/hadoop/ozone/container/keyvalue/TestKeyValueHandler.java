@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.io.FileUtils;
@@ -41,7 +40,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -49,6 +47,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -471,9 +470,11 @@ public class TestKeyValueHandler {
     final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
     final Clock clock = mock(Clock.class);
     long startTime = System.currentTimeMillis();
-    when(clock.millis()).thenReturn(startTime)
-        .thenReturn(startTime + conf.getTimeDuration(OzoneConfigKeys.OZONE_DELETE_CONTAINER_TIMEOUT,
-            OzoneConfigKeys.OZONE_DELETE_CONTAINER_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS) + 1);
+
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    when(clock.millis())
+        .thenReturn(startTime)
+        .thenReturn(startTime + dnConf.getDeleteContainerTimeoutMs() + 1);
 
     HddsVolume hddsVolume = new HddsVolume.Builder(testDir).conf(conf)
         .clusterID(clusterId).datanodeUuid(datanodeId)
