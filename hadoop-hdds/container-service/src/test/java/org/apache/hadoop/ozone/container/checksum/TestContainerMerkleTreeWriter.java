@@ -26,9 +26,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.zip.CRC32;
 
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.ozone.common.ChecksumByteBuffer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,7 +38,7 @@ import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTest
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
-class TestContainerMerkleTree {
+class TestContainerMerkleTreeWriter {
   private ConfigurationSource config;
   private long chunkSize;
 
@@ -51,7 +51,7 @@ class TestContainerMerkleTree {
 
   @Test
   public void testBuildEmptyTree() {
-    ContainerMerkleTree tree = new ContainerMerkleTree();
+    ContainerMerkleTreeWriter tree = new ContainerMerkleTreeWriter();
     ContainerProtos.ContainerMerkleTree treeProto = tree.toProto();
     assertEquals(0, treeProto.getDataChecksum());
     assertEquals(0, treeProto.getBlockMerkleTreeCount());
@@ -70,7 +70,7 @@ class TestContainerMerkleTree {
     ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(Collections.singletonList(blockTree));
 
     // Use the ContainerMerkleTree to build the same tree.
-    ContainerMerkleTree actualTree = new ContainerMerkleTree();
+    ContainerMerkleTreeWriter actualTree = new ContainerMerkleTreeWriter();
     actualTree.addChunks(blockID, Collections.singletonList(chunk));
 
     // Ensure the trees match.
@@ -84,12 +84,12 @@ class TestContainerMerkleTree {
     ContainerProtos.BlockMerkleTree actualBlockTree = actualTreeProto.getBlockMerkleTree(0);
     assertEquals(1, actualBlockTree.getBlockID());
     assertEquals(1, actualBlockTree.getChunkMerkleTreeCount());
-    assertNotEquals(0, actualBlockTree.getBlockChecksum());
+    assertNotEquals(0, actualBlockTree.getDataChecksum());
 
     ContainerProtos.ChunkMerkleTree actualChunkTree = actualBlockTree.getChunkMerkleTree(0);
     assertEquals(0, actualChunkTree.getOffset());
     assertEquals(chunkSize, actualChunkTree.getLength());
-    assertNotEquals(0, actualChunkTree.getChunkChecksum());
+    assertNotEquals(0, actualChunkTree.getDataChecksum());
   }
 
   @Test
@@ -106,7 +106,7 @@ class TestContainerMerkleTree {
     ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(Collections.singletonList(blockTree));
 
     // Use the ContainerMerkleTree to build the same tree.
-    ContainerMerkleTree actualTree = new ContainerMerkleTree();
+    ContainerMerkleTreeWriter actualTree = new ContainerMerkleTreeWriter();
     actualTree.addChunks(blockID, Arrays.asList(chunk1, chunk3));
 
     // Ensure the trees match.
@@ -137,7 +137,7 @@ class TestContainerMerkleTree {
 
     // Use the ContainerMerkleTree to build the same tree.
     // Add blocks and chunks out of order to test sorting.
-    ContainerMerkleTree actualTree = new ContainerMerkleTree();
+    ContainerMerkleTreeWriter actualTree = new ContainerMerkleTreeWriter();
     actualTree.addChunks(blockID3, Arrays.asList(b3c2, b3c1));
     actualTree.addChunks(blockID1, Arrays.asList(b1c1, b1c2));
 
@@ -172,7 +172,7 @@ class TestContainerMerkleTree {
 
     // Use the ContainerMerkleTree to build the same tree.
     // Test building by adding chunks to the blocks individually and out of order.
-    ContainerMerkleTree actualTree = new ContainerMerkleTree();
+    ContainerMerkleTreeWriter actualTree = new ContainerMerkleTreeWriter();
     // Add all of block 2 first.
     actualTree.addChunks(blockID2, Arrays.asList(b2c1, b2c2));
     // Then add block 1 in multiple steps wth chunks out of order.
@@ -192,7 +192,7 @@ class TestContainerMerkleTree {
         .addAllBlockMerkleTree(blocks)
         .setDataChecksum(computeExpectedChecksum(
             blocks.stream()
-                .map(ContainerProtos.BlockMerkleTree::getBlockChecksum)
+                .map(ContainerProtos.BlockMerkleTree::getDataChecksum)
                 .collect(Collectors.toList())))
         .build();
   }
@@ -201,9 +201,9 @@ class TestContainerMerkleTree {
       List<ContainerProtos.ChunkMerkleTree> chunks) {
     return ContainerProtos.BlockMerkleTree.newBuilder()
         .setBlockID(blockID)
-        .setBlockChecksum(computeExpectedChecksum(
+        .setDataChecksum(computeExpectedChecksum(
             chunks.stream()
-                .map(ContainerProtos.ChunkMerkleTree::getChunkChecksum)
+                .map(ContainerProtos.ChunkMerkleTree::getDataChecksum)
                 .collect(Collectors.toList())))
         .addAllChunkMerkleTree(chunks)
         .build();
@@ -213,22 +213,24 @@ class TestContainerMerkleTree {
     return ContainerProtos.ChunkMerkleTree.newBuilder()
         .setOffset(chunk.getOffset())
         .setLength(chunk.getLen())
-        .setChunkChecksum(computeExpectedChunkChecksum(chunk.getChecksumData().getChecksumsList()))
+        .setDataChecksum(computeExpectedChunkChecksum(chunk.getChecksumData().getChecksumsList()))
         .build();
   }
 
   private long computeExpectedChecksum(List<Long> checksums) {
-    CRC32 crc32 = new CRC32();
+    // Use the same checksum implementation as the tree writer under test.
+    ChecksumByteBuffer checksumImpl = ContainerMerkleTreeWriter.CHECKSUM_BUFFER_SUPPLIER.get();
     ByteBuffer longBuffer = ByteBuffer.allocate(Long.BYTES * checksums.size());
     checksums.forEach(longBuffer::putLong);
     longBuffer.flip();
-    crc32.update(longBuffer);
-    return crc32.getValue();
+    checksumImpl.update(longBuffer);
+    return checksumImpl.getValue();
   }
 
   private long computeExpectedChunkChecksum(List<ByteString> checksums) {
-    CRC32 crc32 = new CRC32();
-    checksums.forEach(b -> crc32.update(b.asReadOnlyByteBuffer()));
-    return crc32.getValue();
+    // Use the same checksum implementation as the tree writer under test.
+    ChecksumByteBuffer checksumImpl = ContainerMerkleTreeWriter.CHECKSUM_BUFFER_SUPPLIER.get();
+    checksums.forEach(b -> checksumImpl.update(b.asReadOnlyByteBuffer()));
+    return checksumImpl.getValue();
   }
 }

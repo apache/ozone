@@ -74,7 +74,7 @@ public final class ContainerMerkleTreeTestUtils {
       prevBlockID = currentBlockID;
 
       assertEquals(expectedBlockTree.getBlockID(), actualBlockTree.getBlockID());
-      assertEquals(expectedBlockTree.getBlockChecksum(), actualBlockTree.getBlockChecksum());
+      assertEquals(expectedBlockTree.getDataChecksum(), actualBlockTree.getDataChecksum());
 
       long prevChunkOffset = -1;
       for (int chunkIndex = 0; chunkIndex < expectedBlockTree.getChunkMerkleTreeCount(); chunkIndex++) {
@@ -88,7 +88,7 @@ public final class ContainerMerkleTreeTestUtils {
 
         assertEquals(expectedChunkTree.getOffset(), actualChunkTree.getOffset());
         assertEquals(expectedChunkTree.getLength(), actualChunkTree.getLength());
-        assertEquals(expectedChunkTree.getChunkChecksum(), actualChunkTree.getChunkChecksum());
+        assertEquals(expectedChunkTree.getDataChecksum(), actualChunkTree.getDataChecksum());
       }
     }
   }
@@ -138,15 +138,15 @@ public final class ContainerMerkleTreeTestUtils {
   }
 
   /**
-   * Builds a {@link ContainerMerkleTree} representing arbitrary data. This can be used to test that the same
+   * Builds a {@link ContainerMerkleTreeWriter} representing arbitrary data. This can be used to test that the same
    * structure is preserved throughout serialization, deserialization, and API calls.
    */
-  public static ContainerMerkleTree buildTestTree(ConfigurationSource conf) {
+  public static ContainerMerkleTreeWriter buildTestTree(ConfigurationSource conf) {
     return buildTestTree(conf, 5);
   }
 
-  public static ContainerMerkleTree buildTestTree(ConfigurationSource conf, int numBlocks) {
-    ContainerMerkleTree tree = new ContainerMerkleTree();
+  public static ContainerMerkleTreeWriter buildTestTree(ConfigurationSource conf, int numBlocks) {
+    ContainerMerkleTreeWriter tree = new ContainerMerkleTreeWriter();
     byte byteValue = 1;
     for (int blockIndex = 1; blockIndex <= numBlocks; blockIndex++) {
       List<ContainerProtos.ChunkInfo> chunks = new ArrayList<>();
@@ -162,7 +162,7 @@ public final class ContainerMerkleTreeTestUtils {
    * Returns a Pair of merkle tree and the expected container diff for that merkle tree.
    */
   public static Pair<ContainerProtos.ContainerMerkleTree, ContainerDiffReport>
-      buildTestTreeWithMismatches(ContainerMerkleTree originalTree, int numMissingBlocks, int numMissingChunks,
+      buildTestTreeWithMismatches(ContainerMerkleTreeWriter originalTree, int numMissingBlocks, int numMissingChunks,
                                   int numCorruptChunks) {
 
     ContainerProtos.ContainerMerkleTree.Builder treeBuilder = originalTree.toProto().toBuilder();
@@ -215,7 +215,7 @@ public final class ContainerMerkleTreeTestUtils {
         ContainerProtos.ChunkMerkleTree chunkMerkleTree = blockBuilder.getChunkMerkleTree(randomChunkIndex);
         diff.addMissingChunk(blockBuilder.getBlockID(), chunkMerkleTree);
         blockBuilder.removeChunkMerkleTree(randomChunkIndex);
-        blockBuilder.setBlockChecksum(random.nextLong());
+        blockBuilder.setDataChecksum(random.nextLong());
         treeBuilder.setDataChecksum(random.nextLong());
       }
     }
@@ -248,9 +248,9 @@ public final class ContainerMerkleTreeTestUtils {
         // Corrupt the selected chunk
         ContainerProtos.ChunkMerkleTree.Builder chunkBuilder = blockBuilder.getChunkMerkleTreeBuilder(randomChunkIndex);
         diff.addCorruptChunk(blockBuilder.getBlockID(), chunkBuilder.build());
-        chunkBuilder.setChunkChecksum(chunkBuilder.getChunkChecksum() + random.nextInt(1000) + 1);
+        chunkBuilder.setDataChecksum(chunkBuilder.getDataChecksum() + random.nextInt(1000) + 1);
         chunkBuilder.setIsHealthy(false);
-        blockBuilder.setBlockChecksum(random.nextLong());
+        blockBuilder.setDataChecksum(random.nextLong());
         treeBuilder.setDataChecksum(random.nextLong());
       }
     }
@@ -277,7 +277,7 @@ public final class ContainerMerkleTreeTestUtils {
       assertEquals(expectedBlockMerkleTree.getBlockID(), actualBlockMerkleTree.getBlockID());
       assertEquals(expectedBlockMerkleTree.getChunkMerkleTreeCount(),
           actualBlockMerkleTree.getChunkMerkleTreeCount());
-      assertEquals(expectedBlockMerkleTree.getBlockChecksum(), actualBlockMerkleTree.getBlockChecksum());
+      assertEquals(expectedBlockMerkleTree.getDataChecksum(), actualBlockMerkleTree.getDataChecksum());
       assertEqualsChunkMerkleTree(expectedBlockMerkleTree.getChunkMerkleTreeList(),
           actualBlockMerkleTree.getChunkMerkleTreeList(), expectedBlockMerkleTree.getBlockID());
     }
@@ -326,7 +326,7 @@ public final class ContainerMerkleTreeTestUtils {
       ContainerProtos.ChunkMerkleTree actualChunk = actualChunkMerkleTreeList.get(j);
       assertEquals(expectedChunk.getOffset(), actualChunk.getOffset(), "Mismatch in chunk offset for block "
           + blockId);
-      assertEquals(expectedChunk.getChunkChecksum(), actualChunk.getChunkChecksum(),
+      assertEquals(expectedChunk.getDataChecksum(), actualChunk.getDataChecksum(),
           "Mismatch in chunk checksum for block " + blockId);
     }
   }
