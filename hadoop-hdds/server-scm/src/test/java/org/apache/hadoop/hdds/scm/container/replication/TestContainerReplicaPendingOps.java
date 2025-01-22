@@ -111,14 +111,27 @@ public class TestContainerReplicaPendingOps {
     pendingOps.scheduleAddReplica(new ContainerID(1), dn1, 0, deadline);
     pendingOps.scheduleAddReplica(new ContainerID(1), dn2, 0, deadline);
     pendingOps.scheduleAddReplica(new ContainerID(1), dn3, 0, deadline);
+    // Duplicate for DN2
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn2, 0, deadline + 1);
+    // Not a duplicate for DN2 as different index. Should not happen in practice as it is not valid to have 2 indexes
+    // on the same node.
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn2, 1, deadline);
     pendingOps.scheduleAddReplica(new ContainerID(2), dn1, 1, deadline);
+    pendingOps.scheduleAddReplica(new ContainerID(2), dn1, 1, deadline + 1);
 
     List<ContainerReplicaOp> ops =
         pendingOps.getPendingOps(new ContainerID(1));
-    assertEquals(3, ops.size());
+    assertEquals(4, ops.size());
     for (ContainerReplicaOp op : ops) {
-      assertEquals(0, op.getReplicaIndex());
+      if (!op.getTarget().equals(dn2)) {
+        assertEquals(0, op.getReplicaIndex());
+      }
       assertEquals(ADD, op.getOpType());
+      if (op.getTarget().equals(dn2) && op.getReplicaIndex() == 0) {
+        assertEquals(deadline + 1, op.getDeadlineEpochMillis());
+      } else {
+        assertEquals(deadline, op.getDeadlineEpochMillis());
+      }
     }
     List<DatanodeDetails> allDns = ops.stream()
         .map(ContainerReplicaOp::getTarget).collect(Collectors.toList());
@@ -131,6 +144,7 @@ public class TestContainerReplicaPendingOps {
     assertEquals(1, ops.get(0).getReplicaIndex());
     assertEquals(ADD, ops.get(0).getOpType());
     assertEquals(dn1, ops.get(0).getTarget());
+    assertEquals(deadline + 1, ops.get(0).getDeadlineEpochMillis());
   }
 
   @Test
@@ -397,4 +411,25 @@ public class TestContainerReplicaPendingOps {
     // subscriber
     verifyNoMoreInteractions(subscriber1);
   }
+
+  @Test
+  public void subscribersShouldNotBeNotifiedWhenReplacingAnOpWithDuplicate() {
+    ContainerID containerID = new ContainerID(1);
+
+    // schedule ops
+    pendingOps.scheduleAddReplica(containerID, dn2, 0, deadline);
+
+    // register subscriber
+    ContainerReplicaPendingOpsSubscriber subscriber1 = mock(
+        ContainerReplicaPendingOpsSubscriber.class);
+    pendingOps.registerSubscriber(subscriber1);
+
+    clock.fastForward(1000);
+    pendingOps.scheduleAddReplica(containerID, dn2, 0, deadline + 1);
+    // no entries have expired, so there should be zero interactions with the
+    // subscriber
+    verifyNoMoreInteractions(subscriber1);
+  }
+
+
 }

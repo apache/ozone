@@ -150,7 +150,7 @@ public class ContainerReplicaPendingOps {
    */
   public boolean completeAddReplica(ContainerID containerID,
       DatanodeDetails target, int replicaIndex) {
-    boolean completed = completeOp(ADD, containerID, target, replicaIndex);
+    boolean completed = completeOp(ADD, containerID, target, replicaIndex, true);
     if (isMetricsNotNull() && completed) {
       if (isEC(replicaIndex)) {
         replicationMetrics.incrEcReplicasCreatedTotal();
@@ -172,7 +172,7 @@ public class ContainerReplicaPendingOps {
    */
   public boolean completeDeleteReplica(ContainerID containerID,
       DatanodeDetails target, int replicaIndex) {
-    boolean completed = completeOp(DELETE, containerID, target, replicaIndex);
+    boolean completed = completeOp(DELETE, containerID, target, replicaIndex, true);
     if (isMetricsNotNull() && completed) {
       if (isEC(replicaIndex)) {
         replicationMetrics.incrEcReplicasDeletedTotal();
@@ -192,7 +192,7 @@ public class ContainerReplicaPendingOps {
   public boolean removeOp(ContainerID containerID,
       ContainerReplicaOp op) {
     return completeOp(op.getOpType(), containerID, op.getTarget(),
-        op.getReplicaIndex());
+        op.getReplicaIndex(), true);
   }
 
   /**
@@ -263,6 +263,9 @@ public class ContainerReplicaPendingOps {
     Lock lock = writeLock(containerID);
     lock(lock);
     try {
+      // Remove any existing duplicate op for the same target and replicaIndex before adding
+      // the new one. Especially for delete ops, they could be getting resent after expiry.
+      completeOp(opType, containerID, target, replicaIndex, false);
       List<ContainerReplicaOp> ops = pendingOps.computeIfAbsent(
           containerID, s -> new ArrayList<>());
       ops.add(new ContainerReplicaOp(opType,
@@ -274,7 +277,7 @@ public class ContainerReplicaPendingOps {
   }
 
   private boolean completeOp(ContainerReplicaOp.PendingOpType opType,
-      ContainerID containerID, DatanodeDetails target, int replicaIndex) {
+      ContainerID containerID, DatanodeDetails target, int replicaIndex, boolean notifySubsribers) {
     boolean found = false;
     // List of completed ops that subscribers will be notified about
     List<ContainerReplicaOp> completedOps = new ArrayList<>();
@@ -303,7 +306,7 @@ public class ContainerReplicaPendingOps {
       unlock(lock);
     }
 
-    if (found) {
+    if (found && notifySubsribers) {
       notifySubscribers(completedOps, containerID, false);
     }
     return found;
