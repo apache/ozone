@@ -461,64 +461,60 @@ public class TestKeyValueHandler {
 
 
   @Test
-  public void testDeleteContainerTimeout() throws IOException, InterruptedException {
+  public void testDeleteContainerTimeout() throws IOException {
     final String testDir = tempDir.toString();
-    try {
-      final long containerID = 1L;
-      final String clusterId = UUID.randomUUID().toString();
-      final String datanodeId = UUID.randomUUID().toString();
-      final ConfigurationSource conf = new OzoneConfiguration();
-      final ContainerSet containerSet = new ContainerSet(1000);
-      final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
-      final Clock clock = mock(Clock.class);
-      long startTime = System.currentTimeMillis();
-      when(clock.millis()).thenReturn(startTime)
-          .thenReturn(startTime + conf.getTimeDuration(OzoneConfigKeys.OZONE_DELETE_CONTAINER_TIMEOUT,
-              OzoneConfigKeys.OZONE_DELETE_CONTAINER_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS) + 1);
+    final long containerID = 1L;
+    final String clusterId = UUID.randomUUID().toString();
+    final String datanodeId = UUID.randomUUID().toString();
+    final ConfigurationSource conf = new OzoneConfiguration();
+    final ContainerSet containerSet = new ContainerSet(1000);
+    final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+    final Clock clock = mock(Clock.class);
+    long startTime = System.currentTimeMillis();
+    when(clock.millis()).thenReturn(startTime)
+        .thenReturn(startTime + conf.getTimeDuration(OzoneConfigKeys.OZONE_DELETE_CONTAINER_TIMEOUT,
+            OzoneConfigKeys.OZONE_DELETE_CONTAINER_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS) + 1);
 
-      HddsVolume hddsVolume = new HddsVolume.Builder(testDir).conf(conf)
-          .clusterID(clusterId).datanodeUuid(datanodeId)
-          .volumeSet(volumeSet)
-          .build();
-      hddsVolume.format(clusterId);
-      hddsVolume.createWorkingDir(clusterId, null);
-      hddsVolume.createTmpDirs(clusterId);
+    HddsVolume hddsVolume = new HddsVolume.Builder(testDir).conf(conf)
+        .clusterID(clusterId).datanodeUuid(datanodeId)
+        .volumeSet(volumeSet)
+        .build();
+    hddsVolume.format(clusterId);
+    hddsVolume.createWorkingDir(clusterId, null);
+    hddsVolume.createTmpDirs(clusterId);
 
-      when(volumeSet.getVolumesList())
-          .thenReturn(Collections.singletonList(hddsVolume));
+    when(volumeSet.getVolumesList())
+        .thenReturn(Collections.singletonList(hddsVolume));
 
-      List<HddsVolume> hddsVolumeList = StorageVolumeUtil
-          .getHddsVolumesList(volumeSet.getVolumesList());
+    List<HddsVolume> hddsVolumeList = StorageVolumeUtil
+        .getHddsVolumesList(volumeSet.getVolumesList());
 
-      assertEquals(1, hddsVolumeList.size());
+    assertEquals(1, hddsVolumeList.size());
 
-      final ContainerMetrics metrics = ContainerMetrics.create(conf);
+    final ContainerMetrics metrics = ContainerMetrics.create(conf);
 
-      final AtomicInteger icrReceived = new AtomicInteger(0);
+    final AtomicInteger icrReceived = new AtomicInteger(0);
 
-      final KeyValueHandler kvHandler = new KeyValueHandler(conf,
-          datanodeId, containerSet, volumeSet, metrics,
-          c -> icrReceived.incrementAndGet(), clock);
-      kvHandler.setClusterID(clusterId);
+    final KeyValueHandler kvHandler = new KeyValueHandler(conf,
+        datanodeId, containerSet, volumeSet, metrics,
+        c -> icrReceived.incrementAndGet(), clock);
+    kvHandler.setClusterID(clusterId);
 
-      final ContainerCommandRequestProto createContainer =
-          createContainerRequest(datanodeId, containerID);
-      kvHandler.handleCreateContainer(createContainer, null);
-      assertEquals(1, icrReceived.get());
-      assertNotNull(containerSet.getContainer(containerID));
+    final ContainerCommandRequestProto createContainer =
+        createContainerRequest(datanodeId, containerID);
+    kvHandler.handleCreateContainer(createContainer, null);
+    assertEquals(1, icrReceived.get());
+    assertNotNull(containerSet.getContainer(containerID));
 
-      // The delete should not have gone through due to the mocked clock
-      kvHandler.deleteContainer(containerSet.getContainer(containerID), true);
-      assertEquals(1, icrReceived.get());
-      assertNotNull(containerSet.getContainer(containerID));
+    // The delete should not have gone through due to the mocked clock
+    kvHandler.deleteContainer(containerSet.getContainer(containerID), true);
+    assertEquals(1, icrReceived.get());
+    assertNotNull(containerSet.getContainer(containerID));
 
-      // Delete the container normally, and it should go through
-      kvHandler.deleteContainer(containerSet.getContainer(containerID), true);
-      assertEquals(2, icrReceived.get());
-      assertNull(containerSet.getContainer(containerID));
-    } finally {
-      FileUtils.deleteDirectory(new File(testDir));
-    }
+    // Delete the container normally, and it should go through
+    kvHandler.deleteContainer(containerSet.getContainer(containerID), true);
+    assertEquals(2, icrReceived.get());
+    assertNull(containerSet.getContainer(containerID));
   }
 
   private static ContainerCommandRequestProto createContainerRequest(
