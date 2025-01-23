@@ -107,7 +107,7 @@ public class TestSnapshotChainRepair {
 
     // Mock column family descriptors
     List<ColumnFamilyDescriptor> cfDescList = new ArrayList<>();
-    cfDescList.add(new ColumnFamilyDescriptor(SNAPSHOT_INFO_TABLE.getBytes()));
+    cfDescList.add(new ColumnFamilyDescriptor(new byte[] {1}));
 
     mockedUtils.when(() -> RocksDBUtils.getColumnFamilyDescriptors(eq(DB_PATH)))
         .thenReturn(cfDescList);
