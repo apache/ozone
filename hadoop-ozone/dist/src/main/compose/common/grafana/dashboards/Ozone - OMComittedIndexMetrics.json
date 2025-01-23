@@ -140,12 +140,12 @@
           "exemplar": false,
           "expr": "ratis_server_peerCommitIndex{instance=~\".*:9874\"}",
           "instant": false,
-          "legendFormat": "{{instance}}",
+          "legendFormat": "Hostname = {{instance}}, Source OM ID = {{exported_instance}}, Follower OM ID = {{follower}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Om CommitIndex",
+      "title": "Om Commit Index",
       "type": "timeseries"
     }
   ],
@@ -160,8 +160,7 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "OM CommitIndex",
-  "uid": "deaevenwa48w0b",
+  "title": "OM Commit Index",
   "version": 2,
   "weekStart": ""
 }
