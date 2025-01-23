@@ -92,6 +92,7 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -1737,6 +1738,35 @@ public class TestReplicationManager {
         (int) Math.ceil(healthyNodes
             * config.getDatanodeReplicationLimit() * 0.75),
         rm.getReplicationInFlightLimit());
+  }
+
+  @Test
+  public void testPendingOpExpiry() throws ContainerNotFoundException {
+    when(containerManager.getContainer(any()))
+        .thenReturn(ReplicationTestUtil.createContainerInfo(repConfig, 1,
+            HddsProtos.LifeCycleState.CLOSED, 10, 20));
+    // This is just some arbitrary epoch time in the past
+    long commandDeadline = 1000;
+    SCMCommand<?> command = new DeleteContainerCommand(1L, true);
+
+    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
+
+    ContainerReplicaOp addOp = ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD, dn1, 1);
+    ContainerReplicaOp delOp = new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.DELETE, dn2, 1, command, commandDeadline);
+
+    replicationManager.opCompleted(addOp, new ContainerID(1L), false);
+    replicationManager.opCompleted(delOp, new ContainerID(1L), false);
+    // No commands should be sent for either of the above ops.
+    assertEquals(0, commandsSent.size());
+
+    replicationManager.opCompleted(delOp, new ContainerID(1L), true);
+    assertEquals(1, commandsSent.size());
+    Pair<UUID, SCMCommand<?>> sentCommand = commandsSent.iterator().next();
+    // The target should be DN2 and the deadline should have been updated from the value set in commandDeadline above
+    assertEquals(dn2.getUuid(), sentCommand.getLeft());
+    assertNotEquals(commandDeadline, sentCommand.getRight().getDeadline());
   }
 
   @SafeVarargs

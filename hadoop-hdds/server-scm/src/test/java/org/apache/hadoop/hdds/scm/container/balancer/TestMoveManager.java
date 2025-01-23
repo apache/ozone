@@ -374,7 +374,7 @@ public class TestMoveManager {
         anyLong());
 
     ContainerReplicaOp op = new ContainerReplicaOp(
-        ADD, tgt, srcReplica.getReplicaIndex(), null,clock.millis() + 1000);
+        ADD, tgt, srcReplica.getReplicaIndex(), null, clock.millis() + 1000);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     verify(replicationManager).sendDeleteCommand(

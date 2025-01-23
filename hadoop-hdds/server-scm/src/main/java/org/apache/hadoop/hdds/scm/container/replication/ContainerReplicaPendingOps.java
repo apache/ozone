@@ -21,10 +21,7 @@ import com.google.common.util.concurrent.Striped;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.jheaps.annotations.VisibleForTesting;
 
 import java.time.Clock;
 import java.util.ArrayList;
