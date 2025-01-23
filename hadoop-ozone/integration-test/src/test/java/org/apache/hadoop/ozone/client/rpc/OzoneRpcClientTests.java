@@ -2837,8 +2837,20 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
           .startsWith("key-b-" + i + "-"));
     }
     assertFalse(volABucketBIter.hasNext());
+  }
 
+  @Test
+  public void testListKeyDirectoriesAreNotFiles()
+      throws IOException {
     // Test that directories in multilevel keys are not marked as files
+
+    String volumeA = "vol-a-" + RandomStringUtils.randomNumeric(5);
+    String bucketA = "buc-a-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volumeA);
+    OzoneVolume volA = store.getVolume(volumeA);
+    volA.createBucket(bucketA);
+    OzoneBucket volAbucketA = volA.getBucket(bucketA);
+
     String keyBaseC = "key-c/";
     for (int i = 0; i < 10; i++) {
       byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
@@ -2848,24 +2860,6 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
           new HashMap<>());
       one.write(value);
       one.close();
-      OzoneOutputStream two = volAbucketB.createKey(
-          keyBaseC + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, RATIS, ONE,
-          new HashMap<>());
-      two.write(value);
-      two.close();
-      OzoneOutputStream three = volBbucketA.createKey(
-          keyBaseC + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, RATIS, ONE,
-          new HashMap<>());
-      three.write(value);
-      three.close();
-      OzoneOutputStream four = volBbucketB.createKey(
-          keyBaseC + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, RATIS, ONE,
-          new HashMap<>());
-      four.write(value);
-      four.close();
     }
 
     Iterator<? extends OzoneKey> volABucketAIter1 = volAbucketA.listKeys(null);
