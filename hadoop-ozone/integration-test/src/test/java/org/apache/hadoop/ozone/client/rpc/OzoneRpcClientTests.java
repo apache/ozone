@@ -2837,6 +2837,52 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
           .startsWith("key-b-" + i + "-"));
     }
     assertFalse(volABucketBIter.hasNext());
+
+    // Test that directories in multilevel keys are not marked as files
+    String keyBaseC = "key-c/";
+    for (int i = 0; i < 10; i++) {
+      byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
+      OzoneOutputStream one = volAbucketA.createKey(
+          keyBaseC + i + "-" + RandomStringUtils.randomNumeric(5),
+          value.length, RATIS, ONE,
+          new HashMap<>());
+      one.write(value);
+      one.close();
+      OzoneOutputStream two = volAbucketB.createKey(
+          keyBaseC + i + "-" + RandomStringUtils.randomNumeric(5),
+          value.length, RATIS, ONE,
+          new HashMap<>());
+      two.write(value);
+      two.close();
+      OzoneOutputStream three = volBbucketA.createKey(
+          keyBaseC + i + "-" + RandomStringUtils.randomNumeric(5),
+          value.length, RATIS, ONE,
+          new HashMap<>());
+      three.write(value);
+      three.close();
+      OzoneOutputStream four = volBbucketB.createKey(
+          keyBaseC + i + "-" + RandomStringUtils.randomNumeric(5),
+          value.length, RATIS, ONE,
+          new HashMap<>());
+      four.write(value);
+      four.close();
+    }
+
+    Iterator<? extends OzoneKey> volABucketAIter1 = volAbucketA.listKeys(null);
+    while (volABucketAIter1.hasNext()) {
+      OzoneKey key = volABucketAIter1.next();
+      if (key.getName().endsWith("/")) {
+        assertFalse(key.isFile(), "Key '" + key.getName() + "' is not a file");
+      }
+    }
+
+    Iterator<? extends OzoneKey> volABucketAIter2 = volAbucketA.listKeys("key-");
+    while (volABucketAIter2.hasNext()) {
+      OzoneKey key = volABucketAIter2.next();
+      if (key.getName().endsWith("/")) {
+        assertFalse(key.isFile(), "Key '" + key.getName() + "' is not a file");
+      }
+    }
   }
 
   @Test
