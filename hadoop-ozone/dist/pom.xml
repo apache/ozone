@@ -12,9 +12,7 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
@@ -22,19 +20,83 @@
     <version>2.0.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone-dist</artifactId>
-  <name>Apache Ozone Distribution</name>
-  <packaging>jar</packaging>
   <version>2.0.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+  <name>Apache Ozone Distribution</name>
   <properties>
-    <file.encoding>UTF-8</file.encoding>
-    <downloadSources>true</downloadSources>
-    <docker.ozone.image>apache/ozone</docker.ozone.image>
-    <docker.ozone.image.flavor>-rocky</docker.ozone.image.flavor> <!-- suffix appended to Ozone version to get Docker image version -->
+    <!-- suffix appended to Ozone version to get Docker image version -->
     <docker.ozone-runner.version>20241216-1-jdk21</docker.ozone-runner.version>
     <docker.ozone-testkr5b.image>ghcr.io/apache/ozone-testkrb5:20241129-1</docker.ozone-testkr5b.image>
-    <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
-    <sort.skip>true</sort.skip>
+    <docker.ozone.image>apache/ozone</docker.ozone.image>
+    <docker.ozone.image.flavor>-rocky</docker.ozone.image.flavor>
+    <downloadSources>true</downloadSources>
+    <file.encoding>UTF-8</file.encoding>
+    <!-- no tests in this module so far -->
+    <maven.test.skip>true</maven.test.skip>
   </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-container-service</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-docs</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-rocks-native</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-server-scm</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-tools</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-csi</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-datanode</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-httpfsgateway</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-insight</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-manager</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-recon</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-s3-secret-store</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-s3gateway</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-tools</artifactId>
+    </dependency>
+  </dependencies>
 
   <build>
     <plugins>
@@ -51,17 +113,15 @@
         <executions>
           <execution>
             <id>dist</id>
-            <phase>prepare-package</phase>
             <goals>
               <goal>exec</goal>
             </goals>
+            <phase>prepare-package</phase>
             <configuration>
               <executable>${shell-executable}</executable>
               <workingDirectory>${project.build.directory}</workingDirectory>
               <arguments>
-                <argument>
-                  ${basedir}/dev-support/bin/dist-layout-stitching
-                </argument>
+                <argument>${basedir}/dev-support/bin/dist-layout-stitching</argument>
                 <argument>${project.build.directory}</argument>
                 <argument>${hdds.version}</argument>
               </arguments>
@@ -75,10 +135,10 @@
         <executions>
           <execution>
             <id>copy-omitted-jars</id>
-            <phase>prepare-package</phase>
             <goals>
               <goal>copy-dependencies</goal>
             </goals>
+            <phase>prepare-package</phase>
             <configuration>
               <outputDirectory>target/ozone-${ozone.version}/share/ozone/lib</outputDirectory>
               <includeScope>runtime</includeScope>
@@ -91,10 +151,10 @@
         <executions>
           <execution>
             <id>copy-compose-files</id>
-            <phase>compile</phase>
             <goals>
               <goal>copy-resources</goal>
             </goals>
+            <phase>compile</phase>
             <configuration>
               <outputDirectory>${basedir}/target/compose</outputDirectory>
               <resources>
@@ -107,10 +167,10 @@
           </execution>
           <execution>
             <id>copy-and-filter-dockerfile</id>
-            <phase>compile</phase>
             <goals>
               <goal>copy-resources</goal>
             </goals>
+            <phase>compile</phase>
             <configuration>
               <outputDirectory>${project.build.directory}</outputDirectory>
               <resources>
@@ -123,10 +183,10 @@
           </execution>
           <execution>
             <id>copy-k8s</id>
-            <phase>compile</phase>
             <goals>
               <goal>copy-resources</goal>
             </goals>
+            <phase>compile</phase>
             <configuration>
               <outputDirectory>${basedir}/target/k8s</outputDirectory>
               <resources>
@@ -147,75 +207,12 @@
         <executions>
           <execution>
             <id>depcheck</id>
-            <phase></phase>
+            <phase />
           </execution>
         </executions>
       </plugin>
     </plugins>
   </build>
-
-  <dependencies>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-tools</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-server-scm</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-container-service</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-recon</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-s3gateway</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-csi</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-manager</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-tools</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-common</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-datanode</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-docs</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-insight</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-httpfsgateway</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-rocks-native</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-s3-secret-store</artifactId>
-    </dependency>
-  </dependencies>
   <profiles>
     <profile>
       <id>build-with-ozonefs</id>
@@ -251,14 +248,12 @@
             <executions>
               <execution>
                 <id>copy-jacoco-files</id>
-                <phase>prepare-package</phase>
                 <goals>
                   <goal>copy</goal>
                 </goals>
+                <phase>prepare-package</phase>
                 <configuration>
-                  <outputDirectory>
-                    target/ozone-${ozone.version}/share/coverage
-                  </outputDirectory>
+                  <outputDirectory>target/ozone-${ozone.version}/share/coverage</outputDirectory>
                   <artifactItems>
                     <artifactItem>
                       <groupId>org.jacoco</groupId>
@@ -283,8 +278,8 @@
                     <artifactItem>
                       <groupId>org.apache.ozone</groupId>
                       <artifactId>hdds-test-utils</artifactId>
-                     </artifactItem>
-                    </artifactItems>
+                    </artifactItem>
+                  </artifactItems>
                 </configuration>
               </execution>
             </executions>
@@ -307,10 +302,10 @@
             <executions>
               <execution>
                 <id>src-dist</id>
-                <phase>package</phase>
                 <goals>
                   <goal>single</goal>
                 </goals>
+                <phase>package</phase>
                 <configuration>
                   <archiveBaseDirectory>../..</archiveBaseDirectory>
                   <appendAssemblyId>false</appendAssemblyId>
@@ -339,6 +334,16 @@
           <plugin>
             <groupId>io.fabric8</groupId>
             <artifactId>docker-maven-plugin</artifactId>
+            <configuration>
+              <images>
+                <image>
+                  <name>${docker.image}</name>
+                  <build>
+                    <dockerFileDir>${project.build.directory}/ozone-${project.version}</dockerFileDir>
+                  </build>
+                </image>
+              </images>
+            </configuration>
             <executions>
               <execution>
                 <goals>
@@ -347,18 +352,6 @@
                 <phase>package</phase>
               </execution>
             </executions>
-            <configuration>
-              <images>
-                <image>
-                  <name>${docker.image}</name>
-                  <build>
-                    <dockerFileDir>
-                      ${project.build.directory}/ozone-${project.version}
-                    </dockerFileDir>
-                  </build>
-                </image>
-              </images>
-            </configuration>
           </plugin>
         </plugins>
       </build>
@@ -392,17 +385,15 @@
             <executions>
               <execution>
                 <id>tar-ozone</id>
-                <phase>package</phase>
                 <goals>
                   <goal>exec</goal>
                 </goals>
+                <phase>package</phase>
                 <configuration>
                   <executable>${shell-executable}</executable>
-                  <workingDirectory>${project.build.directory}
-                  </workingDirectory>
+                  <workingDirectory>${project.build.directory}</workingDirectory>
                   <arguments>
-                    <argument>${basedir}/dev-support/bin/dist-tar-stitching
-                    </argument>
+                    <argument>${basedir}/dev-support/bin/dist-tar-stitching</argument>
                     <argument>${hdds.version}</argument>
                     <argument>${project.build.directory}</argument>
                   </arguments>

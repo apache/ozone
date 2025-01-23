@@ -33,7 +33,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
-import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
+import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
@@ -60,6 +60,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_KEY_DIR_NAME_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PRIVATE_KEY_FILE_NAME_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PUBLIC_KEY_FILE_NAME_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.OM;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
@@ -80,8 +83,11 @@ public class TestDefaultCAServer {
   private SecurityConfig securityConfig;
   private MockCAStore caStore;
 
+  @TempDir
+  private Path tempDir;
+
   @BeforeEach
-  public void init(@TempDir Path tempDir) throws IOException {
+  public void init() throws IOException {
     conf = new OzoneConfiguration();
     conf.set(OZONE_METADATA_DIRS, tempDir.toString());
     securityConfig = new SecurityConfig(conf);
@@ -105,12 +111,13 @@ public class TestDefaultCAServer {
   }
 
   @Test
-  public void testMissingCertificate() {
+  public void testMissingCertificate() throws Exception {
     CertificateServer testCA = new DefaultCAServer("testCA",
         RandomStringUtils.randomAlphabetic(4),
         RandomStringUtils.randomAlphabetic(4), caStore,
         new DefaultProfile(),
         Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
+    testCA.init(securityConfig, CAType.ROOT);
     Consumer<SecurityConfig> caInitializer =
         ((DefaultCAServer) testCA).processVerificationStatus(
             DefaultCAServer.VerificationStatus.MISSING_CERTIFICATE,
@@ -281,19 +288,18 @@ public class TestDefaultCAServer {
   }
 
   @Test
-  public void testExternalRootCA(@TempDir Path tempDir) throws Exception {
+  public void testExternalRootCA() throws Exception {
     //Given an external certificate
     String externalCaCertFileName = "CaCert.pem";
-    setExternalPathsInConfig(tempDir, externalCaCertFileName);
+
+    setExternalPathsInConfig(externalCaCertFileName);
 
     try (SCMCertificateClient scmCertificateClient =
         new SCMCertificateClient(securityConfig, null, null)) {
-
       KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
-      KeyCodec keyPEMWriter = new KeyCodec(securityConfig,
-          scmCertificateClient.getComponentName());
+      KeyStorage keyStorage = new KeyStorage(securityConfig, "");
+      keyStorage.storeKeyPair(keyPair);
 
-      keyPEMWriter.writeKey(tempDir, keyPair, true);
       X509Certificate externalCert = generateExternalCert(keyPair);
 
       CertificateCodec certificateCodec = new CertificateCodec(securityConfig,
@@ -314,28 +320,21 @@ public class TestDefaultCAServer {
     }
   }
 
-  private void setExternalPathsInConfig(Path tempDir,
-      String externalCaCertFileName) {
-    String externalCaCertPart = Paths.get(tempDir.toString(),
-        externalCaCertFileName).toString();
-    String privateKeyPath = Paths.get(tempDir.toString(),
-        HddsConfigKeys.HDDS_PRIVATE_KEY_FILE_NAME_DEFAULT).toString();
-    String publicKeyPath = Paths.get(tempDir.toString(),
-        HddsConfigKeys.HDDS_PUBLIC_KEY_FILE_NAME_DEFAULT).toString();
+  private void setExternalPathsInConfig(String externalCaCertFileName) {
+    String externalCaCertPath = tempDir.resolve(externalCaCertFileName).toString();
+    String privKey = tempDir.resolve(HDDS_KEY_DIR_NAME_DEFAULT).resolve(HDDS_PRIVATE_KEY_FILE_NAME_DEFAULT).toString();
+    String pubKey = tempDir.resolve(HDDS_KEY_DIR_NAME_DEFAULT).resolve(HDDS_PUBLIC_KEY_FILE_NAME_DEFAULT).toString();
 
-    conf.set(HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_FILE,
-        externalCaCertPart);
-    conf.set(HddsConfigKeys.HDDS_X509_ROOTCA_PRIVATE_KEY_FILE,
-        privateKeyPath);
-    conf.set(HddsConfigKeys.HDDS_X509_ROOTCA_PUBLIC_KEY_FILE,
-        publicKeyPath);
+    conf.set(HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_FILE, externalCaCertPath);
+    conf.set(HddsConfigKeys.HDDS_X509_ROOTCA_PRIVATE_KEY_FILE, privKey);
+    conf.set(HddsConfigKeys.HDDS_X509_ROOTCA_PUBLIC_KEY_FILE, pubKey);
     securityConfig = new SecurityConfig(conf);
   }
 
   @Test
-  public void testInitWithCertChain(@TempDir Path tempDir) throws Exception {
+  public void testInitWithCertChain() throws Exception {
     String externalCaCertFileName = "CaCert.pem";
-    setExternalPathsInConfig(tempDir, externalCaCertFileName);
+    setExternalPathsInConfig(externalCaCertFileName);
     CertificateApprover approver = new DefaultApprover(new DefaultCAProfile(),
         securityConfig);
     try (SCMCertificateClient scmCertificateClient =
@@ -343,10 +342,8 @@ public class TestDefaultCAServer {
       String scmId = RandomStringUtils.randomAlphabetic(4);
       String clusterId = RandomStringUtils.randomAlphabetic(4);
       KeyPair keyPair = new HDDSKeyGenerator(securityConfig).generateKey();
-      KeyCodec keyPEMWriter = new KeyCodec(securityConfig,
-          scmCertificateClient.getComponentName());
-
-      keyPEMWriter.writeKey(tempDir, keyPair, true);
+      KeyStorage keyStorage = new KeyStorage(securityConfig, "");
+      keyStorage.storeKeyPair(keyPair);
       LocalDate beginDate = LocalDate.now().atStartOfDay().toLocalDate();
       LocalDate endDate =
           LocalDate.from(LocalDate.now().atStartOfDay().plusDays(10));

@@ -24,6 +24,7 @@ package org.apache.hadoop.ozone.repair.om.quota;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.repair.ReadOnlyCommand;
 import picocli.CommandLine;
 
 /**
@@ -35,7 +36,7 @@ import picocli.CommandLine;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
-public class QuotaStatus implements Callable<Void> {
+public class QuotaStatus implements Callable<Void>, ReadOnlyCommand {
 
   @CommandLine.Option(
       names = {"--service-id", "--om-service-id"},
@@ -57,9 +58,9 @@ public class QuotaStatus implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    OzoneManagerProtocol ozoneManagerClient =
-        parent.createOmClient(omServiceId, omHost, false);
-    System.out.println(ozoneManagerClient.getQuotaRepairStatus());
+    try (OzoneManagerProtocol omClient = parent.createOmClient(omServiceId, omHost, false)) {
+      System.out.println(omClient.getQuotaRepairStatus());
+    }
     return null;
   }
 }

@@ -19,8 +19,10 @@
 
 package org.apache.hadoop.hdds.security;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.NoSuchAlgorithmException;
 import java.security.Provider;
 import java.security.Security;
 import java.time.Duration;
@@ -32,6 +34,8 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslProvider;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.slf4j.Logger;
@@ -125,8 +129,8 @@ public class SecurityConfig {
   private final Duration renewalGracePeriod;
   private final boolean isSecurityEnabled;
   private final boolean grpcTlsUseTestCert;
-  private final String externalRootCaPublicKeyPath;
-  private final String externalRootCaPrivateKeyPath;
+  private final Path externalRootCaPublicKeyPath;
+  private final Path externalRootCaPrivateKeyPath;
   private final String externalRootCaCert;
   private final Duration caCheckInterval;
   private final String caRotationTimeOfDay;
@@ -253,12 +257,12 @@ public class SecurityConfig {
     this.externalRootCaCert = configuration.get(
         HDDS_X509_ROOTCA_CERTIFICATE_FILE,
         HDDS_X509_ROOTCA_CERTIFICATE_FILE_DEFAULT);
-    this.externalRootCaPublicKeyPath = configuration.get(
+    this.externalRootCaPublicKeyPath = Paths.get(configuration.get(
         HDDS_X509_ROOTCA_PUBLIC_KEY_FILE,
-        HDDS_X509_ROOTCA_PUBLIC_KEY_FILE_DEFAULT);
-    this.externalRootCaPrivateKeyPath = configuration.get(
+        HDDS_X509_ROOTCA_PUBLIC_KEY_FILE_DEFAULT));
+    this.externalRootCaPrivateKeyPath = Paths.get(configuration.get(
         HDDS_X509_ROOTCA_PRIVATE_KEY_FILE,
-        HDDS_X509_ROOTCA_PRIVATE_KEY_FILE_DEFAULT);
+        HDDS_X509_ROOTCA_PRIVATE_KEY_FILE_DEFAULT));
 
     this.grpcSSLProvider = SslProvider.valueOf(
         configuration.get(HDDS_GRPC_TLS_PROVIDER,
@@ -487,6 +491,14 @@ public class SecurityConfig {
     return keyAlgo;
   }
 
+  public KeyCodec keyCodec() throws IOException {
+    try {
+      return new KeyCodec(keyAlgo);
+    } catch (NoSuchAlgorithmException e) {
+      throw new IOException(e);
+    }
+  }
+
   /**
    * Returns the X.509 Signature Algorithm used. This can be changed by setting
    * "hdds.x509.signature.algorithm" to the new name. The default algorithm is
@@ -548,11 +560,16 @@ public class SecurityConfig {
     return grpcSSLProvider;
   }
 
-  public String getExternalRootCaPrivateKeyPath() {
+  public boolean useExternalCACertificate(String component) {
+    return component.equals(OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME) &&
+        !externalRootCaCert.isEmpty() && externalRootCaPrivateKeyPath.getNameCount() != 0;
+  }
+
+  public Path getExternalRootCaPrivateKeyPath() {
     return externalRootCaPrivateKeyPath;
   }
 
-  public String getExternalRootCaPublicKeyPath() {
+  public Path getExternalRootCaPublicKeyPath() {
     return externalRootCaPublicKeyPath;
   }
 

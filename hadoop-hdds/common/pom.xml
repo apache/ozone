@@ -77,7 +77,6 @@
       <groupId>info.picocli</groupId>
       <artifactId>picocli</artifactId>
     </dependency>
-
     <dependency>
       <groupId>io.dropwizard.metrics</groupId>
       <artifactId>metrics-core</artifactId>
@@ -118,7 +117,6 @@
       <groupId>jakarta.xml.bind</groupId>
       <artifactId>jakarta.xml.bind-api</artifactId>
     </dependency>
-
     <dependency>
       <groupId>javax.annotation</groupId>
       <artifactId>javax.annotation-api</artifactId>
@@ -151,7 +149,6 @@
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-client</artifactId>
     </dependency>
-
     <dependency>
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-common</artifactId>
@@ -178,7 +175,6 @@
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-proto</artifactId>
     </dependency>
-
     <dependency>
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-server-api</artifactId>
@@ -187,7 +183,6 @@
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-thirdparty-misc</artifactId>
     </dependency>
-
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcpkix-jdk18on</artifactId>

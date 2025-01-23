@@ -51,6 +51,7 @@ public class TestOzoneRepairShell {
   private GenericTestUtils.PrintStreamCapturer err;
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf = null;
+  private static String om;
 
   private static final String TRANSACTION_INFO_TABLE_TERM_INDEX_PATTERN = "([0-9]+#[0-9]+)";
 
@@ -59,6 +60,7 @@ public class TestOzoneRepairShell {
     conf = new OzoneConfiguration();
     cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
+    om = conf.get(OZONE_OM_ADDRESS_KEY);
   }
 
   @BeforeEach
@@ -136,17 +138,21 @@ public class TestOzoneRepairShell {
   public void testQuotaRepair() throws Exception {
     CommandLine cmd = new OzoneRepair().getCmd();
 
-    int exitCode = cmd.execute("om", "quota", "status", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY));
+    int exitCode = cmd.execute("om", "quota", "status", "--service-host", om);
     assertEquals(0, exitCode, err);
 
+    cmd.execute("om", "quota", "start", "--dry-run", "--service-host", om);
+    cmd.execute("om", "quota", "status", "--service-host", om);
+    assertThat(out.get()).doesNotContain("lastRun");
+
     exitCode = withTextFromSystemIn("y")
-        .execute(() -> cmd.execute("om", "quota", "start", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY)));
+        .execute(() -> cmd.execute("om", "quota", "start", "--service-host", om));
     assertEquals(0, exitCode, err);
 
     GenericTestUtils.waitFor(() -> {
       out.reset();
       // verify quota trigger is completed having non-zero lastRunFinishedTime
-      cmd.execute("om", "quota", "status", "--service-host", conf.get(OZONE_OM_ADDRESS_KEY));
+      cmd.execute("om", "quota", "status", "--service-host", om);
       try {
         return out.get().contains("\"lastRunFinishedTime\":\"\"");
       } catch (Exception ex) {
