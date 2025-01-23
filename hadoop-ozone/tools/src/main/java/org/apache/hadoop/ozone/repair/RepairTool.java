@@ -25,6 +25,7 @@ import java.util.Scanner;
 import java.util.concurrent.Callable;
 
 /** Parent class for all actionable repair commands. */
+@CommandLine.Command
 public abstract class RepairTool extends AbstractSubcommand implements Callable<Void> {
 
   private static final String WARNING_SYS_USER_MESSAGE =
@@ -35,12 +36,20 @@ public abstract class RepairTool extends AbstractSubcommand implements Callable<
       description = "Use this flag if you want to bypass the check in false-positive cases.")
   private boolean force;
 
+  @CommandLine.Option(names = {"--dry-run"},
+      defaultValue = "false",
+      fallbackValue = "true",
+      description = "Simulate repair, but do not make any changes")
+  private boolean dryRun;
+
   /** Hook method for subclasses for performing actual repair task. */
   protected abstract void execute() throws Exception;
 
   @Override
   public final Void call() throws Exception {
-    confirmUser();
+    if (!dryRun) {
+      confirmUser();
+    }
     execute();
     return null;
   }
@@ -65,6 +74,10 @@ public abstract class RepairTool extends AbstractSubcommand implements Callable<
     return false;
   }
 
+  protected boolean isDryRun() {
+    return dryRun;
+  }
+
   protected void info(String msg, Object... args) {
     out().println(formatMessage(msg, args));
   }
@@ -76,6 +89,9 @@ public abstract class RepairTool extends AbstractSubcommand implements Callable<
   private String formatMessage(String msg, Object[] args) {
     if (args != null && args.length > 0) {
       msg = String.format(msg, args);
+    }
+    if (isDryRun()) {
+      msg = "[dry run] " + msg;
     }
     return msg;
   }
