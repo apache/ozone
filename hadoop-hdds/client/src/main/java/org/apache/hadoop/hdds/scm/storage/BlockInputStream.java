@@ -290,7 +290,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   @VisibleForTesting
   protected BlockData getBlockDataUsingSCClient() throws IOException {
-    final Pipeline pipeline = xceiverClientShortCircuit.getPipeline();
+    final Pipeline pipeline = pipelineRef.get();
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Initializing BlockInputStream for get key to access {}",
@@ -336,7 +336,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   @VisibleForTesting
   protected BlockData getBlockDataUsingGRPCClient() throws IOException {
-    final Pipeline pipeline = xceiverClientGrpc.getPipeline();
+    final Pipeline pipeline = pipelineRef.get();
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Initializing BlockInputStream for get key to access block {}",
