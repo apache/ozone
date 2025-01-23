@@ -160,27 +160,7 @@ public class SCMHANodeDetails {
     boolean scmHAEnableDefault = state == Storage.StorageState.INITIALIZED
         ? scmStorageConfig.isSCMHAEnabled()
         : SCMHAUtils.isSCMHAEnabled(conf);
-    boolean scmHAEnabled = SCMHAUtils.isSCMHAEnabled(conf);
-
-    if (Storage.StorageState.INITIALIZED.equals(state) &&
-            scmHAEnabled != scmHAEnableDefault) {
-      String errorMessage = String.format("Current State of SCM: %s",
-              scmHAEnableDefault ? "SCM is running with Ratis. "
-              : "SCM is running without Ratis. ")
-              + "Ratis SCM -> Non Ratis SCM is not supported.";
-      if (!scmHAEnabled) {
-        throw new ConfigurationException(String.format("Invalid Ratis Config " +
-                "Provided ConfigValue: false, Expected Config Value: true. %s",
-            errorMessage));
-      } else {
-        LOG.warn("Default/Configured value Ratis config conflicts with " +
-                "the expected value. " +
-                "Default/Configured: {}. " +
-                "Expected: {}. " +
-                "Falling back to the expected value. {}",
-            scmHAEnabled, scmHAEnableDefault, errorMessage);
-      }
-    }
+    // If we have an initialized cluster, use the value from VERSION file.
     SCMHAUtils.setRatisEnabled(scmHAEnableDefault);
   }
 
