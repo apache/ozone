@@ -59,12 +59,8 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.ozone.test.OzoneTestBase;
 import org.apache.ratis.util.ExitUtils;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.TestInstance;
+import org.checkerframework.common.util.report.qual.ReportCreation;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
@@ -100,9 +96,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
-
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test Key Deleting Service.
@@ -693,12 +686,14 @@ class TestKeyDeletingService extends OzoneTestBase {
 
     @Test
     void checkIfDeleteServiceWithFailingSCM() throws Exception {
+      keyManager.getDeletingService().suspend();
+      keyManager.getDeletingService().getDeletedKeySupplier().reInitItr();
       final int initialCount = countKeysPendingDeletion();
       final long initialRunCount = getRunCount();
       final int keyCount = 100;
 
       createAndDeleteKeys(keyCount, 1);
-      keyManager.getDeletingService().suspend();
+
 
       GenericTestUtils.waitFor(
           () -> countKeysPendingDeletion() == initialCount + keyCount,
@@ -727,18 +722,17 @@ class TestKeyDeletingService extends OzoneTestBase {
 
       // the pre-allocated blocks are not committed, hence they will be deleted.
       GenericTestUtils.waitFor(
-          () -> countKeysPendingDeletion() == initialCount + keyCount,
-          100, 2000);
+          () -> countKeysPendingDeletion() == initialCount + keyCount, 100,
+          2000);
       keyManager.getDeletingService().resume();
       // Make sure that we have run the background thread 2 times or more
-      GenericTestUtils.waitFor(
-          () -> getRunCount() >= initialRunCount + 2,
-          100, 1000);
+      GenericTestUtils.waitFor(() -> getRunCount() >= initialRunCount + 2, 100,
+          1000);
       // the blockClient is set to fail the deletion of key blocks, hence no keys
       // will be deleted
       keyManager.getDeletingService().suspend();
       assertEquals(0, getDeletedKeyCount());
-      keyManager.getDeletingService().resume();
+
     }
 
     @Test
