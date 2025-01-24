@@ -158,6 +158,7 @@ enum Result {
   EXPORT_CONTAINER_METADATA_FAILED = 45;
   IMPORT_CONTAINER_METADATA_FAILED = 46;
   BLOCK_ALREADY_FINALIZED = 47;
+  GET_SHORT_CIRCUIT_FD_FAILED = 48;
 }
 
 /**
@@ -217,6 +218,10 @@ message ContainerCommandRequestProto {
 
   optional   FinalizeBlockRequestProto finalizeBlock = 25;
   optional   EchoRequestProto echo = 26;
+
+  // clientId and callId are used to distinguish different requests from different local clients for shortCircuitRead
+  optional   bytes clientId = 27;
+  optional   uint64 callId = 28;
 }
 
 message ContainerCommandResponseProto {
@@ -250,6 +255,10 @@ message ContainerCommandResponseProto {
 
   optional   FinalizeBlockResponseProto finalizeBlock = 22;
   optional   EchoResponseProto echo = 23;
+
+  // clientId and callId are used to distinguish different requests from different local clients for shortCircuitRead
+  optional   bytes clientId = 24;
+  optional   uint64 callId = 25;
 }
 
 message ContainerDataProto {
@@ -360,10 +369,12 @@ message  FinalizeBlockResponseProto  {
 
 message  GetBlockRequestProto  {
   required DatanodeBlockID blockID = 1;
+  optional bool requestShortCircuitAccess = 2 [default = false];
 }
 
 message  GetBlockResponseProto  {
   required BlockData blockData = 1;
+  optional bool shortCircuitAccessGranted = 2 [default = false];
 }
 
 

@@ -367,6 +367,20 @@ public class Checksum {
     return checksumData.verifyChecksumDataMatches(computed, startIndex);
   }
 
+  public static boolean verifyChecksum(List<ByteBuffer> bufferList, ChecksumData checksumData,
+      int startIndex) throws OzoneChecksumException {
+    ChecksumType checksumType = checksumData.getChecksumType();
+    if (checksumType == ChecksumType.NONE) {
+      // Checksum is set to NONE. No further verification is required.
+      return true;
+    }
+    int bytesPerChecksum = checksumData.getBytesPerChecksum();
+    Checksum checksum = new Checksum(checksumType, bytesPerChecksum);
+    final ChecksumData computed = checksum.computeChecksum(
+        ChunkBuffer.wrap(bufferList));
+    return checksumData.verifyChecksumDataMatches(computed, startIndex);
+  }
+
   /**
    * Returns a ChecksumData with type NONE for testing.
    */

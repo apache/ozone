@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -28,6 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -49,6 +51,15 @@ public abstract class XceiverClientSpi implements Closeable {
           ContainerCommandResponseProto, IOException> {
     // just a shortcut to avoid having to repeat long list of generic parameters
   }
+
+  /**
+   * Validator for container read chunk through short-circuit local reads.
+   */
+  public interface ShortCircuitValidator extends
+      CheckedBiConsumer<List<ByteBuffer>, ContainerProtos.ChunkInfo, IOException> {
+    // just a shortcut to avoid having to repeat long list of generic parameters
+  }
+
 
   private final AtomicInteger referenceCount;
   private boolean isEvicted;
@@ -93,6 +104,10 @@ public abstract class XceiverClientSpi implements Closeable {
 
   @Override
   public abstract void close();
+
+  public boolean isClosed() {
+    return false;
+  }
 
   /**
    * Returns the pipeline of machines that host the container used by this

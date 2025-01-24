@@ -2045,7 +2045,16 @@
     <value>30s</value>
     <tag>OZONE, CLIENT, MANAGEMENT</tag>
     <description>
-      Timeout for ozone grpc client during read.
+      Timeout for ozone grpc and short-circuit client during read.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.write.timeout</name>
+    <value>30s</value>
+    <tag>OZONE, CLIENT, MANAGEMENT</tag>
+    <description>
+      Timeout for ozone short-circuit client during write.
     </description>
   </property>
 

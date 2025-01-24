@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.common.interfaces;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -38,6 +39,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.Dispatche
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ratis.statemachine.StateMachine;
 
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
@@ -74,11 +76,19 @@ public abstract class Handler {
       final String datanodeId, final ContainerSet contSet,
       final VolumeSet volumeSet, final ContainerMetrics metrics,
       IncrementalReportSender<Container> icrSender) {
+    return getHandlerForContainerType(containerType, config, datanodeId, contSet, volumeSet, metrics, icrSender, null);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  public static Handler getHandlerForContainerType(
+      final ContainerType containerType, final ConfigurationSource config,
+      final String datanodeId, final ContainerSet contSet,
+      final VolumeSet volumeSet, final ContainerMetrics metrics,
+      IncrementalReportSender<Container> icrSender, OzoneContainer ozoneContainer) {
     switch (containerType) {
     case KeyValueContainer:
-      return new KeyValueHandler(config,
-          datanodeId, contSet, volumeSet, metrics,
-          icrSender);
+      return new KeyValueHandler(config, datanodeId, contSet, volumeSet, metrics,
+          icrSender, ozoneContainer);
     default:
       throw new IllegalArgumentException("Handler for ContainerType: " +
           containerType + "doesn't exist.");
@@ -223,4 +233,6 @@ public abstract class Handler {
     this.clusterId = clusterID;
   }
 
+  public abstract FileInputStream getBlockInputStream(ContainerCommandRequestProto request)
+      throws IOException;
 }

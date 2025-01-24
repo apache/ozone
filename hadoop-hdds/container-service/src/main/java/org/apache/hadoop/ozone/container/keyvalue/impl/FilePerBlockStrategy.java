@@ -27,6 +27,8 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.io.nativeio.NativeIO;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -47,6 +49,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -56,6 +59,7 @@ import java.nio.channels.FileChannel;
 import java.time.Duration;
 import java.util.concurrent.ExecutionException;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.GET_SHORT_CIRCUIT_FD_FAILED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage.COMMIT_DATA;
@@ -215,6 +219,22 @@ public class FilePerBlockStrategy implements ChunkManager {
     }
     return ChunkUtils.readData(len, bufferCapacity, chunkFile, offset, volume,
         readMappedBufferThreshold, readMappedBufferMaxCount > 0, mappedBufferManager);
+  }
+
+  @Override
+  public FileInputStream getShortCircuitFd(Container container, BlockID blockID) throws StorageContainerException {
+    checkLayoutVersion(container);
+    final File chunkFile = getChunkFile(container, blockID);
+    FileInputStream fis = null;
+    try {
+      fis = new FileInputStream(NativeIO.getShareDeleteFileDescriptor(chunkFile, 0));
+      return fis;
+    } catch (Exception e) {
+      IOUtils.closeQuietly(fis);
+      LOG.warn("getShortCircuitFds failed", e);
+      throw new StorageContainerException("getShortCircuitFds " +
+          "for short-circuit local reads failed", GET_SHORT_CIRCUIT_FD_FAILED);
+    }
   }
 
   @Override
@@ -383,5 +403,4 @@ public class FilePerBlockStrategy implements ChunkManager {
       }
     }
   }
-
 }

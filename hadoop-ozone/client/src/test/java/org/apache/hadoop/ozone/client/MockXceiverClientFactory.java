@@ -93,7 +93,7 @@ public class MockXceiverClientFactory
   }
 
   @Override
-  public XceiverClientSpi acquireClientForReadData(Pipeline pipeline)
+  public XceiverClientSpi acquireClientForReadData(Pipeline pipeline, boolean allowShortCircuit)
       throws IOException {
     return new MockXceiverClientSpi(pipeline, storage
         .computeIfAbsent(pipeline.getFirstNode(),
@@ -107,8 +107,13 @@ public class MockXceiverClientFactory
   }
 
   @Override
+  public XceiverClientSpi acquireClient(Pipeline pipeline, boolean topologyAware) throws IOException {
+    return acquireClient(pipeline, topologyAware, false);
+  }
+
+  @Override
   public XceiverClientSpi acquireClient(Pipeline pipeline,
-      boolean topologyAware) throws IOException {
+      boolean topologyAware, boolean allowShortCircuit) throws IOException {
     MockXceiverClientSpi mockXceiverClientSpi =
         new MockXceiverClientSpi(pipeline, storage
             .computeIfAbsent(topologyAware ? pipeline.getClosestNode() :
