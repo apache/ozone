@@ -190,6 +190,7 @@ public final class BasicOmKeyInfo {
         .setDataSize(dataSize)
         .setCreationTime(creationTime)
         .setModificationTime(modificationTime)
+        .setIsFile(isFile)
         .setType(replicationConfig.getReplicationType());
     if (ownerName != null) {
       builder.setOwnerName(ownerName);
