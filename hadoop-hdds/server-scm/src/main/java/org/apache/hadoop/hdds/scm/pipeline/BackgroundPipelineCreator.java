@@ -231,8 +231,8 @@ public class BackgroundPipelineCreator implements SCMService {
         continue;
       }
       if (skipCreation(replicationConfig, autoCreateFactorOne)) {
-          // Skip this iteration for creating pipeline
-          continue;
+        // Skip this iteration for creating pipeline
+        continue;
       }
       list.add(replicationConfig);
     }
