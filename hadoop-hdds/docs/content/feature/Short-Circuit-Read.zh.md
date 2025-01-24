@@ -67,13 +67,22 @@ Datanode 需要能创建该路径. 同时，除了启动 Ozone 服务的用户�
 
 如果将 `ozone.domain.socket.path` 值设置成比如 `/dir1/dir2/ozone_dn_socket`，请确保 `dir1` 和 `dir2` 是已存在的目录，并且 `dir2` 下还没有 `ozone_dn_socket` 文件。 `ozone_dn_socket` 将在 Datanode 启动的时候由 Datanode 创建。
 
+### 参考配置
+可参考如下配置，启用短路读功能。
+
+```XML
+<property>
+   <name>ozone.client.read.short-circuit</name>
+   <value>false</value>
+</property>
+<property>
+   <name>ozone.domain.socket.path</name>
+   <value>/var/run/ozone_dn_socket</value>
+</property>
+```
 
 ### 安全考量 
 
-为了确保数据的安全和完整性，Ozone 在 `ozone.domain.socket.path` 路径的权限检查上，将遵守和 Hadoop [Socket路径安全](https://wiki.apache.org/hadoop/SocketPathSecurity) 一样的规则。
-
-如果 `ozone.domain.socket.path` 路径权限检查失败，该功能将自动关闭。
-
-检查失败返回的信息包含修复问题的指引，例如
+为了确保数据的安全和完整性，Ozone 在 `ozone.domain.socket.path` 路径的权限检查上，将遵守和 Hadoop [Socket路径安全](https://wiki.apache.org/hadoop/SocketPathSecurity) 一样的规则。 如果 `ozone.domain.socket.path` 路径权限检查失败，该功能将自动关闭。 检查失败返回的信息包含修复问题的指引，例如
 
 `The path component: '/etc/hadoop' in '/etc/hadoop/ozone_dn_socket' has permissions 0777 uid 0 and gid 0. It is not protected because it is world-writable. This might help: 'chmod o-w /etc/hadoop'. For more information: https://wiki.apache.org/hadoop/SocketPathSecurity`
