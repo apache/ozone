@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
 
@@ -86,8 +85,9 @@ abstract class TestInputStreamBase {
     return UUID.randomUUID().toString();
   }
 
-  protected static void updateConfig(MiniOzoneCluster cluster, ContainerLayoutVersion layout) {
+  protected void updateConfig(ContainerLayoutVersion layout) {
     cluster.getHddsDatanodes().forEach(dn -> dn.getConf().setEnum(OZONE_SCM_CONTAINER_LAYOUT_KEY, layout));
+    closeContainers();
   }
 
   private MiniOzoneCluster cluster;
@@ -107,8 +107,7 @@ abstract class TestInputStreamBase {
     IOUtils.closeQuietly(cluster);
   }
 
-  @AfterEach
-  void closeContainers() {
+  private void closeContainers() {
     StorageContainerManager scm = cluster.getStorageContainerManager();
     scm.getContainerManager().getContainers().forEach(container -> {
       if (container.isOpen()) {

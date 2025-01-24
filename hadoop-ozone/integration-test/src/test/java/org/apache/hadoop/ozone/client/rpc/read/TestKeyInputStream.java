@@ -126,7 +126,7 @@ class TestKeyInputStream extends TestInputStreamBase {
   @ContainerLayoutTestInfo.ContainerTest
   void testNonReplicationReads(ContainerLayoutVersion layout) throws Exception {
     try (OzoneClient client = getCluster().newClient()) {
-      updateConfig(getCluster(), layout);
+      updateConfig(layout);
 
       TestBucket bucket = TestBucket.newBuilder(client).build();
 

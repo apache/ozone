@@ -47,7 +47,7 @@ class TestChunkInputStream extends TestInputStreamBase {
   @ContainerLayoutTestInfo.ContainerTest
   void testAll(ContainerLayoutVersion layout) throws Exception {
     try (OzoneClient client = getCluster().newClient()) {
-      updateConfig(getCluster(), layout);
+      updateConfig(layout);
 
       TestBucket bucket = TestBucket.newBuilder(client).build();
 
