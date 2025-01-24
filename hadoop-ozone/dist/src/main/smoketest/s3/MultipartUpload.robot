@@ -58,6 +58,12 @@ Test Multipart Upload With Adjusted Length
     Perform Multipart Upload    ${BUCKET}    multipart/adjusted_length_${PREFIX}    /tmp/part1    /tmp/part2
     Verify Multipart Upload     ${BUCKET}    multipart/adjusted_length_${PREFIX}    /tmp/part1    /tmp/part2
 
+Overwrite Empty File
+    Execute                     touch ${TEMP_DIR}/empty
+    Execute AWSS3Cli            cp ${TEMP_DIR}/empty s3://${BUCKET}/empty_file_${PREFIX}
+    Perform Multipart Upload    ${BUCKET}    empty_file_${PREFIX}    /tmp/part1    /tmp/part2
+    Verify Multipart Upload     ${BUCKET}    empty_file_${PREFIX}    /tmp/part1    /tmp/part2
+
 Test Multipart Upload
     ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey
     ${uploadID} =       Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0

@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
@@ -132,6 +133,7 @@ public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
     return omKeyInfo;
   }
 
+  @Nullable
   protected OmBucketInfo getOmBucketInfo() {
     return omBucketInfo;
   }
