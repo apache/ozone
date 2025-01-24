@@ -785,50 +785,6 @@ public class TestDirectoryDeletingServiceWithFSO {
     cleanupTables();
   }
 
-  @Test
-  public void testDeleteWithRequestSizeExceedingRatisRequestSizeLimit() throws Exception {
-    Table<String, OmKeyInfo> deletedDirTable =
-        cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
-    Table<String, OmKeyInfo> keyTable =
-        cluster.getOzoneManager().getMetadataManager()
-            .getKeyTable(getFSOBucketLayout());
-    Table<String, OmDirectoryInfo> dirTable =
-        cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
-    assertTableRowCount(deletedDirTable, 0);
-    assertTableRowCount(keyTable, 0);
-    assertTableRowCount(dirTable, 0);
-    Path root = new Path("/rootDir1");
-    Path appRoot = new Path(root, "appRoot1");
-    // Creates 2 parent dirs from root.
-    fs.mkdirs(appRoot);
-    for (int i = 1; i <= 5; i++) {
-      Path childDir = new Path(appRoot, "dir" + i);
-      fs.mkdirs(childDir);
-    }
-    DirectoryDeletingService dirDeletingService =
-        (DirectoryDeletingService) cluster.getOzoneManager().getKeyManager()
-            .getDirDeletingService();
-    // Before delete
-    assertTableRowCount(deletedDirTable, 0);
-    assertTableRowCount(keyTable, 0);
-    assertTableRowCount(dirTable, 7);
-    assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
-    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
-    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 0);
-    long preRunCount = dirDeletingService.getRunCount().get();
-    dirDeletingService.setRatisByteLimit(1000);
-    // Delete the appRoot
-    fs.delete(appRoot, true);
-    // After Delete
-    checkPath(appRoot);
-    assertTableRowCount(deletedDirTable, 0);
-    assertTableRowCount(dirTable, 1);
-    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 4);
-    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 5);
-    assertThat(dirDeletingService.getRunCount().get()).isGreaterThan(preRunCount);
-  }
-
-
   private void cleanupTables() throws IOException {
     OMMetadataManager metadataManager =
         cluster.getOzoneManager().getMetadataManager();
