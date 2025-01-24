@@ -568,41 +568,6 @@ prepare_for_runner_image() {
   export OZONE_TEST_IMAGE="$(get_runner_image_spec "$@")"
 }
 
-## @description Executing the Ozone Debug CLI related robot tests
-execute_debug_tests() {
-  local prefix=${RANDOM}
-
-  local volume="cli-debug-volume${prefix}"
-  local bucket="cli-debug-bucket"
-  local key="testfile"
-
-  execute_robot_test ${SCM} -v "PREFIX:${prefix}" debug/ozone-debug-tests.robot
-
-  # get block locations for key
-  local chunkinfo="${key}-blocks-${prefix}"
-  docker-compose exec -T ${SCM} bash -c "ozone debug replicas chunk-info ${volume}/${bucket}/${key}" > "$chunkinfo"
-  local host="$(jq -r '.KeyLocations[0][0]["Datanode-HostName"]' ${chunkinfo})"
-  local container="${host%%.*}"
-
-  # corrupt the first block of key on one of the datanodes
-  local datafile="$(jq -r '.KeyLocations[0][0].Locations.files[0]' ${chunkinfo})"
-  docker exec "${container}" sed -i -e '1s/^/a/' "${datafile}"
-
-  execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "CORRUPT_DATANODE:${host}" debug/ozone-debug-corrupt-block.robot
-
-  docker stop "${container}"
-
-  wait_for_datanode "${container}" STALE 60
-  execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "STALE_DATANODE:${host}" debug/ozone-debug-stale-datanode.robot
-
-  wait_for_datanode "${container}" DEAD 60
-  execute_robot_test ${SCM} -v "PREFIX:${prefix}" debug/ozone-debug-dead-datanode.robot
-
-  docker start "${container}"
-
-  wait_for_datanode "${container}" HEALTHY 60
-}
-
 ## @description  Wait for datanode state
 ## @param        Datanode name, eg datanode_1 datanode_2
 ## @param        State to check for
