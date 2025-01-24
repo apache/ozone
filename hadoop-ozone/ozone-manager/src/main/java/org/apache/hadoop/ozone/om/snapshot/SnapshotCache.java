@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -38,6 +39,7 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Supplier;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 
@@ -71,7 +73,7 @@ public class SnapshotCache implements ReferenceCountedCallback<OmSnapshot>, Auto
   private final Condition dbClosed;
   private final long lockTimeout;
   private final Map<Long, Map<UUID, Long>> snapshotRefThreadIds;
-  private AtomicBoolean closed;
+  private final AtomicBoolean closed;
 
   public SnapshotCache(CacheLoader<UUID, OmSnapshot> cacheLoader, int cacheSizeLimit, OMMetrics omMetrics,
                        long cleanupInterval, long lockTimeout) {
@@ -88,6 +90,7 @@ public class SnapshotCache implements ReferenceCountedCallback<OmSnapshot>, Auto
     this.lockCnt = 0;
     this.lockReleased = this.readLock.newCondition();
     this.dbClosed = this.writeLock.newCondition();
+    this.closed = new AtomicBoolean(false);
     if (cleanupInterval > 0) {
       this.scheduler = new Scheduler(SNAPSHOT_CACHE_CLEANUP_SERVICE,
           true, 1);
@@ -162,16 +165,26 @@ public class SnapshotCache implements ReferenceCountedCallback<OmSnapshot>, Auto
   /**
    * Decreases the lock count. When the count reaches zero all new threads would be able to get a handle of snapshot.
    */
-  private void decrementLockCount() {
+  private Runnable decrementLockCount() {
     lockCnt -= 1;
     if (lockCnt <= 0) {
       LOG.warn("Invalid negative lock count : {}. Setting it to 0", lockCnt);
       lockCnt = 0;
     }
+
     if (lockCnt == 0) {
-      lockReleased.signalAll();
       snapshotRefThreadIds.clear();
     }
+    return () -> {
+      readLock.lock();
+      try {
+        if (lockCnt == 0) {
+          lockReleased.signalAll();
+        }
+      } finally {
+        readLock.unlock();
+      }
+    };
   }
 
   /**
@@ -179,11 +192,13 @@ public class SnapshotCache implements ReferenceCountedCallback<OmSnapshot>, Auto
    */
   public void releaseLock() {
     writeLock.lock();
+    Runnable callback = decrementLockCount();
     try {
       decrementLockCount();
     } finally {
       writeLock.unlock();
     }
+    callback.run();
   }
 
   /**
@@ -199,6 +214,7 @@ public class SnapshotCache implements ReferenceCountedCallback<OmSnapshot>, Auto
       timeout = Long.MAX_VALUE;
     }
     if (writeLock.tryLock(timeout, TimeUnit.MILLISECONDS)) {
+      Runnable rollbackCallback = null;
       try {
         lockCnt += 1;
         if (lockCnt == 1) {
@@ -213,13 +229,17 @@ public class SnapshotCache implements ReferenceCountedCallback<OmSnapshot>, Auto
           long currentTime = System.currentTimeMillis();
           if (currentTime >= endTime) {
             // If and release acquired lock
-            decrementLockCount();
-            return false;
+            rollbackCallback = decrementLockCount();
+            break;
           }
           dbClosed.await(Math.min(endTime - currentTime, lockTimeout), TimeUnit.MILLISECONDS);
         }
       } finally {
         writeLock.unlock();
+      }
+      if (rollbackCallback != null) {
+        rollbackCallback.run();
+        return false;
       }
       invalidateAll();
       return true;
