@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.Set;
 import java.util.Map;
-import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
@@ -129,7 +128,7 @@ public class DeletedBlockLogImpl
       final List<DeletedBlocksTransaction> failedTXs = Lists.newArrayList();
       try (TableIterator<Long,
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
-          deletedBlockLogStateManager.getReadOnlyIterator()) {
+               deletedBlockLogStateManager.getReadOnlyIterator()) {
         if (count == LIST_ALL_FAILED_TRANSACTIONS) {
           while (iter.hasNext()) {
             DeletedBlocksTransaction delTX = iter.next().getValue();
@@ -176,53 +175,40 @@ public class DeletedBlockLogImpl
    */
   @Override
   public int resetCount(List<Long> txIDs) throws IOException {
+
+    if (txIDs != null) {
+      try {
+        lock.lock();
+        transactionStatusManager.resetRetryCount(txIDs);
+        return deletedBlockLogStateManager.resetRetryCountOfTransactionInDB(
+            new ArrayList<>(txIDs));
+      } catch (Exception e) {
+        throw new IOException("Error during transaction reset", e);
+      } finally {
+        lock.unlock();
+      }
+    }
+
     final int batchSize = 1000;
     int totalProcessed = 0;
     long startTxId = 0;
 
     try {
       // If txIDs are not provided, fetch all failed transactions in batches
-      if (txIDs == null || txIDs.isEmpty()) {
-        List<DeletedBlocksTransaction> batch;
-        do {
-          // Fetch the batch of failed transactions
-          batch = getFailedTransactions(batchSize, startTxId);
+      List<DeletedBlocksTransaction> batch;
+      do {
+        // Fetch the batch of failed transactions
+        batch = getFailedTransactions(batchSize, startTxId);
+        List<Long> batchTxIDs = batch.stream().map(DeletedBlocksTransaction::getTxID).collect(Collectors.toList());
+        totalProcessed += resetCount(batchTxIDs);
 
-          // If the batch is empty, skip further processing
-          if (!batch.isEmpty()) {
-            List<Long> batchTxIDs = batch.stream()
-                .map(DeletedBlocksTransaction::getTxID)
-                .collect(Collectors.toList());
-
-            lock.lock();
-            try {
-              transactionStatusManager.resetRetryCount(batchTxIDs);
-              int batchProcessed = deletedBlockLogStateManager.resetRetryCountOfTransactionInDB(
-                  new ArrayList<>(batchTxIDs));
-
-              totalProcessed += batchProcessed;
-            } finally {
-              lock.unlock();
-            }
-
-            // Update startTxId to continue from the last processed transaction in the next iteration
-            startTxId = batch.get(batch.size() - 1).getTxID() + 1;
-          }
-        } while (!batch.isEmpty());
-      } else {
-        lock.lock();
-        try {
-          transactionStatusManager.resetRetryCount(txIDs);
-          return deletedBlockLogStateManager.resetRetryCountOfTransactionInDB(
-              new ArrayList<>(new HashSet<>(txIDs)));
-        } finally {
-          lock.unlock();
-        }
-      }
-      return totalProcessed;
-    } catch (Exception e) {
-      throw new IOException("Error during transaction reset", e);
+        // Update startTxId to continue from the last processed transaction in the next iteration
+        startTxId = batch.get(batch.size() - 1).getTxID() + 1;
+      } while (!batch.isEmpty());
+    } catch (IOException ex) {
+      throw new IOException("Unable to get the failed transactions", ex);
     }
+    return totalProcessed;
   }
 
   private DeletedBlocksTransaction constructNewTransaction(

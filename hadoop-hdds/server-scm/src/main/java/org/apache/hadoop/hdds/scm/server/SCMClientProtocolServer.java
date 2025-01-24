@@ -912,8 +912,10 @@ public class SCMClientProtocolServer implements
           SCMAction.GET_FAILED_DELETED_BLOCKS_TRANSACTION, auditMap));
       return result;
     } catch (IOException ex) {
-      AUDIT.logReadFailure(buildAuditMessageForFailure(
-          SCMAction.GET_FAILED_DELETED_BLOCKS_TRANSACTION, auditMap, ex));
+      AUDIT.logReadFailure(
+          buildAuditMessageForFailure(
+              SCMAction.GET_FAILED_DELETED_BLOCKS_TRANSACTION, auditMap, ex)
+      );
       throw ex;
     }
   }
