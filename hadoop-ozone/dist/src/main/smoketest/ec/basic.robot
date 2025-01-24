@@ -64,7 +64,11 @@ Test Bucket Creation
                     Should not contain  ${result}       Failed
     ${result} =     Execute             ozone sh bucket create /${VOLUME}/default
                     Should not contain  ${result}       Failed
-                    Verify Bucket Empty Replication Config      /${VOLUME}/default
+                    IF  '${OZONE_CLIENT_REPLICATION_TYPE}' == 'EC'
+                        Verify Bucket EC Replication Config    /${VOLUME}/default    RS    3    2    1048576
+                    ELSE
+                        Verify Bucket Empty Replication Config      /${VOLUME}/default
+                    END
     ${result} =     Execute             ozone sh bucket create --replication 3 --type RATIS /${VOLUME}/ratis
                     Should not contain  ${result}       Failed
                     Verify Bucket Replica Replication Config    /${VOLUME}/ratis   RATIS   THREE
@@ -91,8 +95,16 @@ Create Key in Default Bucket
     ${file} =    Set Variable    /tmp/${size}
     Create Key    ${key}    ${file}
     Key Should Match Local File    ${key}      ${file}
-    Verify Key Replica Replication Config   ${key}     RATIS    THREE
-    Verify Key Replica Replication Config   ${dir}     RATIS    THREE
+    IF  '${OZONE_CLIENT_REPLICATION_TYPE}' == 'EC'
+        Verify Key EC Replication Config    ${key}    RS    3    2    1048576
+    ELSE
+        Verify Key Replica Replication Config   ${key}     RATIS    THREE
+    END
+    IF  '${OZONE_CLIENT_REPLICATION_TYPE}' == 'EC'
+        Verify Key EC Replication Config    ${dir}    RS    3    2    1048576
+    ELSE
+        Verify Key Replica Replication Config   ${dir}     RATIS    THREE
+    END
 
 Create Key in Ratis Bucket
     ${size} =    Set Variable    1mb
