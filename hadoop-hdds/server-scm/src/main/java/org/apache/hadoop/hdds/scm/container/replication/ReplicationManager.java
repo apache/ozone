@@ -42,7 +42,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
-import org.apache.hadoop.hdds.scm.container.balancer.MoveManager;
 import org.apache.hadoop.hdds.scm.container.replication.health.ECMisReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.MismatchedReplicasHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosedWithUnhealthyReplicasHandler;
@@ -85,10 +84,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -155,13 +152,6 @@ public class ReplicationManager implements SCMService {
    */
   private ReplicationManagerMetrics metrics;
 
-
-  /**
-   * Legacy RM will hopefully be removed after completing refactor
-   * for now, it is used to process non-EC container.
-   */
-  private final LegacyReplicationManager legacyReplicationManager;
-
   /**
    * Set of nodes which have been excluded for replication commands due to the
    * number of commands queued on a datanode. This can be used when generating
@@ -214,7 +204,6 @@ public class ReplicationManager implements SCMService {
    * @param scmContext The SCMContext instance
    * @param nodeManager The nodeManager instance
    * @param clock Clock object used to get the current time
-   * @param legacyReplicationManager The legacy ReplicationManager instance
    * @param replicaPendingOps The pendingOps instance
    */
   @SuppressWarnings("parameternumber")
@@ -226,7 +215,6 @@ public class ReplicationManager implements SCMService {
              final SCMContext scmContext,
              final NodeManager nodeManager,
              final Clock clock,
-             final LegacyReplicationManager legacyReplicationManager,
              final ContainerReplicaPendingOps replicaPendingOps)
              throws IOException {
     this.containerManager = containerManager;
@@ -243,7 +231,6 @@ public class ReplicationManager implements SCMService {
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
         TimeUnit.MILLISECONDS);
     this.containerReplicaPendingOps = replicaPendingOps;
-    this.legacyReplicationManager = legacyReplicationManager;
     this.ecReplicationCheckHandler = new ECReplicationCheckHandler();
     this.ecMisReplicationCheckHandler =
         new ECMisReplicationCheckHandler(ecContainerPlacement);
@@ -296,9 +283,6 @@ public class ReplicationManager implements SCMService {
       LOG.info("Starting Replication Monitor Thread.");
       running = true;
       metrics = ReplicationManagerMetrics.create(this);
-      if (rmConf.isLegacyEnabled()) {
-        legacyReplicationManager.setMetrics(metrics);
-      }
       containerReplicaPendingOps.setReplicationMetrics(metrics);
       startSubServices();
     } else {
@@ -330,9 +314,6 @@ public class ReplicationManager implements SCMService {
       underReplicatedProcessorThread.interrupt();
       overReplicatedProcessorThread.interrupt();
       running = false;
-      if (rmConf.isLegacyEnabled()) {
-        legacyReplicationManager.clearInflightActions();
-      }
       metrics.unRegister();
       replicationMonitor.interrupt();
     } else {
@@ -385,10 +366,6 @@ public class ReplicationManager implements SCMService {
         break;
       }
       report.increment(c.getState());
-      if (rmConf.isLegacyEnabled() && !isEC(c.getReplicationConfig())) {
-        legacyReplicationManager.processContainer(c, report);
-        continue;
-      }
       try {
         processContainer(c, newRepQueue, report);
         // TODO - send any commands contained in the health result
@@ -955,12 +932,8 @@ public class ReplicationManager implements SCMService {
       throws ContainerNotFoundException {
     ContainerInfo container = containerManager.getContainer(containerID);
     final boolean isEC = isEC(container.getReplicationConfig());
+    return getContainerReplicaCount(container, isEC);
 
-    if (!isEC && rmConf.isLegacyEnabled()) {
-      return legacyReplicationManager.getContainerReplicaCount(container);
-    } else {
-      return getContainerReplicaCount(container, isEC);
-    }
   }
 
   /**
@@ -1076,28 +1049,6 @@ public class ReplicationManager implements SCMService {
   @ConfigGroup(prefix = "hdds.scm.replication")
   public static class ReplicationManagerConfiguration
       extends ReconfigurableConfig {
-    /**
-     * True if LegacyReplicationManager should be used for RATIS containers.
-     */
-    @Config(key = "enable.legacy",
-        type = ConfigType.BOOLEAN,
-        defaultValue = "false",
-        tags = {SCM, OZONE},
-        description =
-            "If true, LegacyReplicationManager will handle RATIS containers " +
-            "while ReplicationManager will handle EC containers. If false, " +
-            "ReplicationManager will handle both RATIS and EC."
-    )
-    private boolean enableLegacy;
-
-    public boolean isLegacyEnabled() {
-      return enableLegacy;
-    }
-
-    public void setEnableLegacy(boolean enableLegacy) {
-      this.enableLegacy = enableLegacy;
-    }
-
     /**
      * The frequency in which ReplicationMonitor thread should run.
      */
@@ -1414,11 +1365,6 @@ public class ReplicationManager implements SCMService {
           containerReplicaPendingOps.clear();
           serviceStatus = ServiceStatus.RUNNING;
         }
-        if (rmConf.isLegacyEnabled()) {
-          //now, as the current scm is leader and it`s state is up-to-date,
-          //we need to take some action about replicated inflight move options.
-          legacyReplicationManager.notifyStatusChanged();
-        }
       } else {
         serviceStatus = ServiceStatus.PAUSING;
       }
@@ -1456,46 +1402,8 @@ public class ReplicationManager implements SCMService {
     return clock;
   }
 
-  /**
-  * following functions will be refactored in a separate jira.
-  */
-  public CompletableFuture<MoveManager.MoveResult> move(
-      ContainerID cid, DatanodeDetails src, DatanodeDetails tgt)
-      throws NodeNotFoundException, ContainerNotFoundException,
-      TimeoutException {
-    CompletableFuture<MoveManager.MoveResult> ret =
-        new CompletableFuture<>();
-    if (!isRunning()) {
-      ret.complete(MoveManager.MoveResult.FAIL_UNEXPECTED_ERROR);
-      LOG.warn("Failing move because Replication Monitor thread's " +
-          "running state is {}", isRunning());
-      return ret;
-    }
-
-    return legacyReplicationManager.move(cid, src, tgt);
-  }
-
-  public Map<ContainerID, CompletableFuture<MoveManager.MoveResult>>
-      getInflightMove() {
-    return legacyReplicationManager.getInflightMove();
-  }
-
-  public LegacyReplicationManager.MoveScheduler getMoveScheduler() {
-    return legacyReplicationManager.getMoveScheduler();
-  }
-
-  @VisibleForTesting
-  public LegacyReplicationManager getLegacyReplicationManager() {
-    return legacyReplicationManager;
-  }
-
   public boolean isContainerReplicatingOrDeleting(ContainerID containerID) {
-    if (rmConf.isLegacyEnabled()) {
-      return legacyReplicationManager
-          .isContainerReplicatingOrDeleting(containerID);
-    } else {
-      return !getPendingReplicationOps(containerID).isEmpty();
-    }
+    return !getPendingReplicationOps(containerID).isEmpty();
   }
 
   private ContainerReplicaCount getContainerReplicaCount(

@@ -58,9 +58,9 @@ public class CodecBuffer implements UncheckedAutoCloseable {
   private static class Factory {
     private static volatile BiFunction<ByteBuf, Object, CodecBuffer> constructor
         = CodecBuffer::new;
-    static void set(BiFunction<ByteBuf, Object, CodecBuffer> f) {
+    static void set(BiFunction<ByteBuf, Object, CodecBuffer> f, String name) {
       constructor = f;
-      LOG.info("Successfully set constructor to " + f);
+      LOG.info("Successfully set constructor to {}: {}", name, f);
     }
 
     static CodecBuffer newCodecBuffer(ByteBuf buf) {
@@ -89,7 +89,7 @@ public class CodecBuffer implements UncheckedAutoCloseable {
    * Note that there is a severe performance penalty for leak detection.
    */
   public static void enableLeakDetection() {
-    Factory.set(LeakDetector::newCodecBuffer);
+    Factory.set(LeakDetector::newCodecBuffer, "LeakDetector::newCodecBuffer");
   }
 
   /** The size of a buffer. */

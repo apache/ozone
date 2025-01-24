@@ -31,7 +31,8 @@ public final class S3SecretValue {
   private static final Codec<S3SecretValue> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(S3Secret.getDefaultInstance()),
       S3SecretValue::fromProtobuf,
-      S3SecretValue::getProtobuf);
+      S3SecretValue::getProtobuf,
+      S3SecretValue.class);
 
   public static Codec<S3SecretValue> getCodec() {
     return CODEC;

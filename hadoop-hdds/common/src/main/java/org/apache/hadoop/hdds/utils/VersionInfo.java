@@ -65,18 +65,6 @@ public class VersionInfo {
     return info.getProperty("revision", "Unknown");
   }
 
-  public String getBranch() {
-    return info.getProperty("branch", "Unknown");
-  }
-
-  public String getDate() {
-    return info.getProperty("date", "Unknown");
-  }
-
-  public String getUser() {
-    return info.getProperty("user", "Unknown");
-  }
-
   public String getUrl() {
     return info.getProperty("url", "Unknown");
   }
@@ -108,7 +96,6 @@ public class VersionInfo {
   public String getBuildVersion() {
     return getVersion() +
         " from " + getRevision() +
-        " by " + getUser() +
         " source checksum " + getSrcChecksum();
   }
 }

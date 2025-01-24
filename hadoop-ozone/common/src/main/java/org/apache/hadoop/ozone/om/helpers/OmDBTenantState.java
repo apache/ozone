@@ -34,6 +34,7 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
       Proto2Codec.get(TenantState.getDefaultInstance()),
       OmDBTenantState::getFromProtobuf,
       OmDBTenantState::getProtobuf,
+      OmDBTenantState.class,
       DelegatedCodec.CopyType.SHALLOW);
 
   public static Codec<OmDBTenantState> getCodec() {
@@ -167,7 +168,6 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
   /**
    * Builder for OmDBTenantState.
    */
-  @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
     private String tenantId;
     private String bucketNamespaceName;

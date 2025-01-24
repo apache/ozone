@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.common;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 import java.io.IOException;
@@ -279,7 +280,7 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
 
   @Override
   public long writeTo(GatheringByteChannel channel) throws IOException {
-    return channel.write(buffers.toArray(new ByteBuffer[0]));
+    return BufferUtils.writeFully(channel, buffers);
   }
 
   @Override

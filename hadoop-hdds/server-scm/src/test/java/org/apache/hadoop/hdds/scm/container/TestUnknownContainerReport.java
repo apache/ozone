@@ -78,8 +78,7 @@ public class TestUnknownContainerReport {
     final OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
     this.nodeManager = new MockNodeManager(true, 10);
     this.containerManager = mock(ContainerManager.class);
-    dbStore = DBStoreBuilder.createDBStore(
-        conf, new SCMDBDefinition());
+    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     scmhaManager = SCMHAManagerStub.getInstance(true);
     pipelineManager =
         new MockPipelineManager(dbStore, scmhaManager, nodeManager);

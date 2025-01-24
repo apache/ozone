@@ -59,6 +59,11 @@ abstract class StringCodecBase implements Codec<String> {
     this.fixedLength = max == encoder.averageBytesPerChar();
   }
 
+  @Override
+  public final Class<String> getTypeClass() {
+    return String.class;
+  }
+
   CharsetEncoder newEncoder() {
     return charset.newEncoder()
         .onMalformedInput(CodingErrorAction.REPORT)

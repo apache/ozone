@@ -120,7 +120,7 @@ const Pipelines: React.FC<{}> = () => {
           togglePolling={autoReloadHelper.handleAutoReloadToggle}
           onReload={loadData} />
       </div>
-      <div style={{ padding: '24px' }}>
+      <div className='data-container'>
         <div className='content-div'>
           <div className='table-header-section'>
             <div className='table-filter-section'>

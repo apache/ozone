@@ -62,7 +62,9 @@ import static org.apache.hadoop.hdds.DatanodeVersion.COMBINED_PUTBLOCK_WRITECHUN
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.writeChunkAsync;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
+import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -231,8 +233,7 @@ public class BlockOutputStream extends OutputStream {
     writtenDataLength = 0;
     failedServers = new ArrayList<>(0);
     ioException = new AtomicReference<>(null);
-    checksum = new Checksum(config.getChecksumType(),
-        config.getBytesPerChecksum());
+    this.checksum = new Checksum(config.getChecksumType(), config.getBytesPerChecksum(), true);
     this.clientMetrics = clientMetrics;
     this.streamBufferArgs = streamBufferArgs;
     this.allowPutBlockPiggybacking = canEnablePutblockPiggybacking();
@@ -360,6 +361,7 @@ public class BlockOutputStream extends OutputStream {
   private void writeChunkIfNeeded() throws IOException {
     if (currentBufferRemaining == 0) {
       LOG.debug("WriteChunk from write(), buffer = {}", currentBuffer);
+      clientMetrics.getWriteChunksDuringWrite().incr();
       writeChunk(currentBuffer);
       updateWriteChunkLength();
     }
@@ -404,6 +406,7 @@ public class BlockOutputStream extends OutputStream {
         updatePutBlockLength();
         CompletableFuture<PutBlockResult> putBlockFuture = executePutBlock(false, false);
         recordWatchForCommitAsync(putBlockFuture);
+        clientMetrics.getFlushesDuringWrite().incr();
       }
 
       if (bufferPool.isAtCapacity()) {
@@ -532,12 +535,16 @@ public class BlockOutputStream extends OutputStream {
     }
 
     LOG.debug("Entering watchForCommit commitIndex = {}", commitIndex);
+    final long start = Time.monotonicNowNanos();
     return sendWatchForCommit(commitIndex)
         .thenAccept(this::checkReply)
         .exceptionally(e -> {
           throw new FlushRuntimeException(setIoException(e));
         })
-        .whenComplete((r, e) -> LOG.debug("Leaving watchForCommit commitIndex = {}", commitIndex));
+        .whenComplete((r, e) -> {
+          LOG.debug("Leaving watchForCommit commitIndex = {}", commitIndex);
+          clientMetrics.getHsyncWatchForCommitNs().add(Time.monotonicNowNanos() - start);
+        });
   }
 
   private void checkReply(XceiverClientReply reply) {
@@ -579,6 +586,7 @@ public class BlockOutputStream extends OutputStream {
     final CompletableFuture<ContainerCommandResponseProto> flushFuture;
     final XceiverClientReply asyncReply;
     try {
+      // Note: checksum was previously appended to containerBlockData by WriteChunk
       BlockData blockData = containerBlockData.build();
       LOG.debug("sending PutBlock {} flushPos {}", blockData, flushPos);
 
@@ -693,12 +701,15 @@ public class BlockOutputStream extends OutputStream {
       throws IOException, InterruptedException, ExecutionException {
     checkOpen();
     LOG.debug("Start handleFlushInternal close={}", close);
-    CompletableFuture<Void> toWaitFor = handleFlushInternalSynchronized(close);
+    CompletableFuture<Void> toWaitFor = captureLatencyNs(clientMetrics.getHsyncSynchronizedWorkNs(),
+        () -> handleFlushInternalSynchronized(close));
 
     if (toWaitFor != null) {
       LOG.debug("Waiting for flush");
       try {
+        long startWaiting = Time.monotonicNowNanos();
         toWaitFor.get();
+        clientMetrics.getHsyncWaitForFlushNs().add(Time.monotonicNowNanos() - startWaiting);
       } catch (ExecutionException ex) {
         if (ex.getCause() instanceof FlushRuntimeException) {
           throw ((FlushRuntimeException) ex.getCause()).cause;
@@ -727,6 +738,7 @@ public class BlockOutputStream extends OutputStream {
   }
 
   private synchronized CompletableFuture<Void> handleFlushInternalSynchronized(boolean close) throws IOException {
+    long start = Time.monotonicNowNanos();
     CompletableFuture<PutBlockResult> putBlockResultFuture = null;
     // flush the last chunk data residing on the currentBuffer
     if (totalWriteChunkLength < writtenDataLength) {
@@ -768,6 +780,7 @@ public class BlockOutputStream extends OutputStream {
     if (putBlockResultFuture != null) {
       recordWatchForCommitAsync(putBlockResultFuture);
     }
+    clientMetrics.getHsyncSendWriteChunkNs().add(Time.monotonicNowNanos() - start);
     return lastFlushFuture;
   }
 
@@ -841,6 +854,8 @@ public class BlockOutputStream extends OutputStream {
     if (lastChunkBuffer != null) {
       DIRECT_BUFFER_POOL.returnBuffer(lastChunkBuffer);
       lastChunkBuffer = null;
+      // Clear checksum cache
+      checksum.clearChecksumCache();
     }
   }
 
@@ -890,7 +905,10 @@ public class BlockOutputStream extends OutputStream {
     final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
     final ByteString data = chunk.toByteString(
         bufferPool.byteStringConversion());
-    ChecksumData checksumData = checksum.computeChecksum(chunk);
+    // chunk is incremental, don't cache its checksum
+    ChecksumData checksumData = checksum.computeChecksum(chunk, false);
+    // side note: checksum object is shared with PutBlock's (blockData) checksum calc,
+    // current impl does not support caching both
     ChunkInfo chunkInfo = ChunkInfo.newBuilder()
         .setChunkName(blockID.get().getLocalID() + "_chunk_" + ++chunkIndex)
         .setOffset(offset)
@@ -1040,6 +1058,7 @@ public class BlockOutputStream extends OutputStream {
           lastChunkBuffer.capacity() - lastChunkBuffer.position();
       appendLastChunkBuffer(chunk, 0, remainingBufferSize);
       updateBlockDataWithLastChunkBuffer();
+      // TODO: Optional refactoring: Can attach ChecksumCache to lastChunkBuffer rather than Checksum
       appendLastChunkBuffer(chunk, remainingBufferSize,
           chunk.remaining() - remainingBufferSize);
     }
@@ -1056,10 +1075,13 @@ public class BlockOutputStream extends OutputStream {
     LOG.debug("lastChunkInfo = {}", lastChunkInfo);
     long lastChunkSize = lastChunkInfo.getLen();
     addToBlockData(lastChunkInfo);
-
+    // Set ByteBuffer limit to capacity, pos to 0. Does not erase data
     lastChunkBuffer.clear();
+
     if (lastChunkSize == config.getStreamBufferSize()) {
       lastChunkOffset += config.getStreamBufferSize();
+      // Reached stream buffer size (chunk size), starting new chunk, need to clear checksum cache
+      checksum.clearChecksumCache();
     } else {
       lastChunkBuffer.position((int) lastChunkSize);
     }
@@ -1123,8 +1145,9 @@ public class BlockOutputStream extends OutputStream {
     lastChunkBuffer.flip();
     int revisedChunkSize = lastChunkBuffer.remaining();
     // create the chunk info to be sent in PutBlock.
-    ChecksumData revisedChecksumData =
-        checksum.computeChecksum(lastChunkBuffer);
+    // checksum cache is utilized for this computation
+    // this checksum is stored in blockData and later transferred in PutBlock
+    ChecksumData revisedChecksumData = checksum.computeChecksum(lastChunkBuffer, true);
 
     long chunkID = lastPartialChunkOffset / config.getStreamBufferSize();
     ChunkInfo.Builder revisedChunkInfo = ChunkInfo.newBuilder()

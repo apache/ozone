@@ -26,11 +26,13 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.container.report.ContainerReportValidator;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
     .ContainerReportFromDatanode;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
@@ -199,6 +201,11 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
         // list
         processMissingReplicas(datanodeDetails, expectedContainersInDatanode);
         containerManager.notifyContainerReportProcessing(true, true);
+        if (reportFromDatanode.isRegister()) {
+          publisher.fireEvent(SCMEvents.CONTAINER_REGISTRATION_REPORT,
+              new SCMDatanodeProtocolServer.NodeRegistrationContainerReport(datanodeDetails,
+              reportFromDatanode.getReport()));
+        }
       }
     } catch (NodeNotFoundException ex) {
       containerManager.notifyContainerReportProcessing(true, false);

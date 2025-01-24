@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateBlockResponse;
@@ -216,7 +217,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     for (AllocatedBlock block : allocatedBlocks) {
       builder.addBlocks(AllocateBlockResponse.newBuilder()
           .setContainerBlockID(block.getBlockID().getProtobuf())
-          .setPipeline(block.getPipeline().getProtobufMessage(clientVersion)));
+          .setPipeline(block.getPipeline().getProtobufMessage(clientVersion, Name.IO_PORTS)));
     }
 
     return builder.build();

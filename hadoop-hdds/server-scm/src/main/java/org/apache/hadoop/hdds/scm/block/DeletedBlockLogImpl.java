@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto.DeleteBlockTransactionResult;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.command.CommandStatusReportHandler.DeleteBlockStatus;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -94,6 +93,7 @@ public class DeletedBlockLogImpl
   private long scmCommandTimeoutMs = Duration.ofSeconds(300).toMillis();
 
   private static final int LIST_ALL_FAILED_TRANSACTIONS = -1;
+  private long lastProcessedTransactionId = -1;
 
   public DeletedBlockLogImpl(ConfigurationSource conf,
       StorageContainerManager scm,
@@ -138,6 +138,7 @@ public class DeletedBlockLogImpl
             }
           }
         } else {
+          iter.seek(startTxId);
           while (iter.hasNext() && failedTXs.size() < count) {
             DeletedBlocksTransaction delTX = iter.next().getValue();
             if (delTX.getCount() == -1 && delTX.getTxID() >= startTxId) {
@@ -198,20 +199,6 @@ public class DeletedBlockLogImpl
         .addAllLocalID(blocks)
         .setCount(0)
         .build();
-  }
-
-  private boolean isTransactionFailed(DeleteBlockTransactionResult result) {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(
-          "Got block deletion ACK from datanode, TXIDs={}, " + "success={}",
-          result.getTxID(), result.getSuccess());
-    }
-    if (!result.getSuccess()) {
-      LOG.warn("Got failed ACK for TXID={}, prepare to resend the "
-          + "TX in next interval", result.getTxID());
-      return true;
-    }
-    return false;
   }
 
   @Override
@@ -300,26 +287,46 @@ public class DeletedBlockLogImpl
             .setCount(transactionStatusManager.getOrDefaultRetryCount(
               tx.getTxID(), 0))
             .build();
+
     for (ContainerReplica replica : replicas) {
       DatanodeDetails details = replica.getDatanodeDetails();
-      if (!dnList.contains(details)) {
-        continue;
-      }
       if (!transactionStatusManager.isDuplication(
           details, updatedTxn.getTxID(), commandStatus)) {
         transactions.addTransactionToDN(details.getUuid(), updatedTxn);
+        metrics.incrProcessedTransaction();
       }
     }
   }
 
   private Boolean checkInadequateReplica(Set<ContainerReplica> replicas,
-      DeletedBlocksTransaction txn) throws ContainerNotFoundException {
+      DeletedBlocksTransaction txn,
+      Set<DatanodeDetails> dnList) throws ContainerNotFoundException {
     ContainerInfo containerInfo = containerManager
         .getContainer(ContainerID.valueOf(txn.getContainerID()));
     ReplicationManager replicationManager =
         scmContext.getScm().getReplicationManager();
     ContainerHealthResult result = replicationManager
         .getContainerReplicationHealth(containerInfo, replicas);
+
+    // We have made an improvement here, and we expect that all replicas
+    // of the Container being sent will be included in the dnList.
+    // This change benefits ACK confirmation and improves deletion speed.
+    // The principle behind it is that
+    // DN can receive the command to delete a certain Container at the same time and provide
+    // feedback to SCM at roughly the same time.
+    // This avoids the issue of deletion blocking,
+    // where some replicas of a Container are deleted while others do not receive the delete command.
+    long containerId = txn.getContainerID();
+    for (ContainerReplica replica : replicas) {
+      DatanodeDetails datanodeDetails = replica.getDatanodeDetails();
+      if (!dnList.contains(datanodeDetails)) {
+        DatanodeDetails dnDetail = replica.getDatanodeDetails();
+        LOG.debug("Skip Container = {}, because DN = {} is not in dnList.",
+            containerId, dnDetail.getUuid());
+        return true;
+      }
+    }
+
     return result.getHealthState() != ContainerHealthResult.HealthState.HEALTHY;
   }
 
@@ -338,6 +345,34 @@ public class DeletedBlockLogImpl
       try (TableIterator<Long,
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
                deletedBlockLogStateManager.getReadOnlyIterator()) {
+        if (lastProcessedTransactionId != -1) {
+          iter.seek(lastProcessedTransactionId);
+          /*
+           * We should start from (lastProcessedTransactionId + 1) transaction.
+           * Now the iterator (iter.next call) is pointing at
+           * lastProcessedTransactionId, read the current value to move
+           * the cursor.
+           */
+          if (iter.hasNext()) {
+            /*
+             * There is a possibility that the lastProcessedTransactionId got
+             * deleted from the table, in that case we have to set
+             * lastProcessedTransactionId to next available transaction in the table.
+             *
+             * By doing this there is a chance that we will skip processing the new
+             * lastProcessedTransactionId, that should be ok. We can get to it in the
+             * next run.
+             */
+            lastProcessedTransactionId = iter.next().getKey();
+          }
+
+          // If we have reached the end, go to beginning.
+          if (!iter.hasNext()) {
+            iter.seekToFirst();
+            lastProcessedTransactionId = -1;
+          }
+        }
+
         // Get the CmdStatus status of the aggregation, so that the current
         // status of the specified transaction can be found faster
         Map<UUID, Map<Long, CmdStatus>> commandStatus =
@@ -345,39 +380,60 @@ public class DeletedBlockLogImpl
                 .getCommandStatusByTxId(dnList.stream().
                 map(DatanodeDetails::getUuid).collect(Collectors.toSet()));
         ArrayList<Long> txIDs = new ArrayList<>();
+        metrics.setNumBlockDeletionTransactionDataNodes(dnList.size());
+        Table.KeyValue<Long, DeletedBlocksTransaction> keyValue = null;
         // Here takes block replica count as the threshold to avoid the case
         // that part of replicas committed the TXN and recorded in the
         // SCMDeletedBlockTransactionStatusManager, while they are counted
         // in the threshold.
         while (iter.hasNext() &&
             transactions.getBlocksDeleted() < blockDeletionLimit) {
-          Table.KeyValue<Long, DeletedBlocksTransaction> keyValue = iter.next();
+          keyValue = iter.next();
           DeletedBlocksTransaction txn = keyValue.getValue();
           final ContainerID id = ContainerID.valueOf(txn.getContainerID());
           try {
             // HDDS-7126. When container is under replicated, it is possible
             // that container is deleted, but transactions are not deleted.
             if (containerManager.getContainer(id).isDeleted()) {
-              LOG.warn("Container: " + id + " was deleted for the " +
-                  "transaction: " + txn);
+              LOG.warn("Container: {} was deleted for the " +
+                  "transaction: {}.", id, txn);
               txIDs.add(txn.getTxID());
             } else if (txn.getCount() > -1 && txn.getCount() <= maxRetry
                 && !containerManager.getContainer(id).isOpen()) {
               Set<ContainerReplica> replicas = containerManager
                   .getContainerReplicas(
                       ContainerID.valueOf(txn.getContainerID()));
-              if (checkInadequateReplica(replicas, txn)) {
+              if (checkInadequateReplica(replicas, txn, dnList)) {
+                metrics.incrSkippedTransaction();
                 continue;
               }
               getTransaction(
                   txn, transactions, dnList, replicas, commandStatus);
+            } else if (txn.getCount() >= maxRetry || containerManager.getContainer(id).isOpen()) {
+              metrics.incrSkippedTransaction();
             }
           } catch (ContainerNotFoundException ex) {
-            LOG.warn("Container: " + id + " was not found for the transaction: "
-                + txn);
+            LOG.warn("Container: {} was not found for the transaction: {}.", id, txn);
             txIDs.add(txn.getTxID());
           }
+
+          if (lastProcessedTransactionId == keyValue.getKey()) {
+            // We have circled back to the last transaction.
+            break;
+          }
+
+          if (!iter.hasNext() && lastProcessedTransactionId != -1) {
+            /*
+             * We started from in-between and reached end of the table,
+             * now we should go to the start of the table and process
+             * the transactions.
+             */
+            iter.seekToFirst();
+          }
         }
+
+        lastProcessedTransactionId = keyValue != null ? keyValue.getKey() : -1;
+
         if (!txIDs.isEmpty()) {
           deletedBlockLogStateManager.removeTransactionsFromDB(txIDs);
           metrics.incrBlockDeletionTransactionCompleted(txIDs.size());
@@ -436,8 +492,10 @@ public class DeletedBlockLogImpl
           getSCMDeletedBlockTransactionStatusManager()
               .commitTransactions(ackProto.getResultsList(), dnId);
           metrics.incrBlockDeletionCommandSuccess();
+          metrics.incrDNCommandsSuccess(dnId, 1);
         } else if (status == CommandStatus.Status.FAILED) {
           metrics.incrBlockDeletionCommandFailure();
+          metrics.incrDNCommandsFailure(dnId, 1);
         } else {
           LOG.debug("Delete Block Command {} is not executed on the Datanode" +
               " {}.", commandStatus.getCmdId(), dnId);

@@ -17,14 +17,13 @@
 
 package org.apache.hadoop.ozone.debug;
 
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -61,8 +60,8 @@ import static java.util.Collections.emptyMap;
 @CommandLine.Command(name = "read-replicas",
     description = "Reads every replica for all the blocks associated with a " +
         "given key.")
-@MetaInfServices(SubcommandWithParent.class)
-public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
+@MetaInfServices(DebugSubcommand.class)
+public class ReadReplicas extends KeyHandler implements DebugSubcommand {
 
   @CommandLine.Option(names = {"--outputDir", "-o", "--output-dir"},
       description = "Destination where the directory will be created" +
@@ -84,13 +83,8 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
   private static final String JSON_PROPERTY_REPLICA_EXCEPTION = "exception";
 
   @Override
-  public Class<?> getParentType() {
-    return OzoneDebug.class;
-  }
-
-  @Override
   protected void execute(OzoneClient client, OzoneAddress address)
-      throws IOException, OzoneClientException {
+      throws IOException {
 
     address.ensureKeyAddress();
 

@@ -39,7 +39,8 @@ public final class CertInfo implements Comparable<CertInfo>, Serializable {
   private static final Codec<CertInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(CertInfoProto.getDefaultInstance()),
       CertInfo::fromProtobuf,
-      CertInfo::getProtobuf);
+      CertInfo::getProtobuf,
+      CertInfo.class);
 
   public static Codec<CertInfo> getCodec() {
     return CODEC;
@@ -133,7 +134,6 @@ public final class CertInfo implements Comparable<CertInfo>, Serializable {
   /**
    * Builder class for CertInfo.
    */
-  @SuppressWarnings("checkstyle:hiddenfield")
   public static class Builder {
     private X509Certificate x509Certificate;
     private long timestamp;

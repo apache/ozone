@@ -109,8 +109,7 @@ public class OmKeyGenerator extends BaseFreonGenerator
         .setKeyName(generateObjectName(counter))
         .setReplicationConfig(replicationConfig)
         .setLocationInfoList(new ArrayList<>())
-        .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
-            ALL, ALL))
+        .setAcls(OzoneAclUtil.getAclList(ugi, ALL, ALL))
         .setOwnerName(ownerName)
         .build();
 

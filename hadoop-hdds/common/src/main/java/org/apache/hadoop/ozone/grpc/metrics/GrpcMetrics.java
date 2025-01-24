@@ -33,6 +33,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,6 +101,8 @@ public class GrpcMetrics implements MetricsSource {
    */
   public void unRegister() {
     DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
+    MetricUtil.stop(grpcProcessingTimeMillisQuantiles);
+    MetricUtil.stop(grpcQueueTimeMillisQuantiles);
   }
 
   @Override

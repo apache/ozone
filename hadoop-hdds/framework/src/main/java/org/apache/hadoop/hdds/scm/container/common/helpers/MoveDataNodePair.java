@@ -36,6 +36,7 @@ public class MoveDataNodePair {
       Proto2Codec.get(MoveDataNodePairProto.getDefaultInstance()),
       MoveDataNodePair::getFromProtobuf,
       pair -> pair.getProtobufMessage(ClientVersion.CURRENT_VERSION),
+      MoveDataNodePair.class,
       DelegatedCodec.CopyType.SHALLOW);
 
   public static Codec<MoveDataNodePair> getCodec() {

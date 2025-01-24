@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm.container.common.helpers;
 import java.util.Comparator;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -61,7 +62,7 @@ public class ContainerWithPipeline implements Comparator<ContainerWithPipeline>,
     HddsProtos.ContainerWithPipeline.Builder builder =
         HddsProtos.ContainerWithPipeline.newBuilder();
     builder.setContainerInfo(getContainerInfo().getProtobuf())
-        .setPipeline(getPipeline().getProtobufMessage(clientVersion));
+        .setPipeline(getPipeline().getProtobufMessage(clientVersion, Name.IO_PORTS));
 
     return builder.build();
   }

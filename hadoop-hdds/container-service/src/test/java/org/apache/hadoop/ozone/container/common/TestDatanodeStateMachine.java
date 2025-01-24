@@ -198,8 +198,7 @@ public class TestDatanodeStateMachine {
         OzoneConsts.OZONE_SCM_DATANODE_ID_FILE_DEFAULT);
     idPath.delete();
     DatanodeDetails datanodeDetails = getNewDatanodeDetails();
-    DatanodeDetails.Port port = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.STANDALONE,
+    DatanodeDetails.Port port = DatanodeDetails.newStandalonePort(
         OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
     datanodeDetails.setPort(port);
     ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, idPath, conf);
@@ -325,8 +324,7 @@ public class TestDatanodeStateMachine {
         OzoneConsts.OZONE_SCM_DATANODE_ID_FILE_DEFAULT);
     idPath.delete();
     DatanodeDetails datanodeDetails = getNewDatanodeDetails();
-    DatanodeDetails.Port port = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.STANDALONE,
+    DatanodeDetails.Port port = DatanodeDetails.newStandalonePort(
         OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
     datanodeDetails.setPort(port);
 
@@ -408,12 +406,9 @@ public class TestDatanodeStateMachine {
   }
 
   private DatanodeDetails getNewDatanodeDetails() {
-    DatanodeDetails.Port containerPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.STANDALONE, 0);
-    DatanodeDetails.Port ratisPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.RATIS, 0);
-    DatanodeDetails.Port restPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.REST, 0);
+    DatanodeDetails.Port containerPort = DatanodeDetails.newStandalonePort(0);
+    DatanodeDetails.Port ratisPort = DatanodeDetails.newRatisPort(0);
+    DatanodeDetails.Port restPort = DatanodeDetails.newRestPort(0);
     DatanodeDetails.Port streamPort = DatanodeDetails.newPort(
         DatanodeDetails.Port.Name.RATIS_DATASTREAM, 0);
     return DatanodeDetails.newBuilder()

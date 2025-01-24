@@ -77,8 +77,7 @@ public class TestContainerManagerImpl {
   @BeforeEach
   void setUp() throws Exception {
     final OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
-    dbStore = DBStoreBuilder.createDBStore(
-        conf, new SCMDBDefinition());
+    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     scmhaManager = SCMHAManagerStub.getInstance(true);
     nodeManager = new MockNodeManager(true, 10);
     sequenceIdGen = new SequenceIdGenerator(

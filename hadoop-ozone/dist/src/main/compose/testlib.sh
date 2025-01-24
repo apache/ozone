@@ -30,7 +30,28 @@ fi
 
 source ${_testlib_dir}/compose_v2_compatibility.sh
 
+: ${OZONE_COMPOSE_RUNNING:=false}
 : ${SCM:=scm}
+
+# create temp directory for test data; only once, even if testlib.sh is sourced again
+if [[ -z "${TEST_DATA_DIR:-}" ]] && [[ "${KEEP_RUNNING:-false}" == "false" ]]; then
+  export TEST_DATA_DIR="$(mktemp -d "${TMPDIR:-/tmp}"/robot-data-XXXXXX)"
+  chmod go+rx "${TEST_DATA_DIR}"
+  _compose_delete_test_data() {
+    rm -frv "${TEST_DATA_DIR}"
+  }
+
+  trap _compose_cleanup EXIT HUP INT TERM
+fi
+
+_compose_cleanup() {
+  if [[ "${OZONE_COMPOSE_RUNNING}" == "true" ]]; then
+    stop_docker_env || true
+  fi
+  if [[ "$(type -t _compose_delete_test_data || true)" == "function" ]]; then
+    _compose_delete_test_data
+  fi
+}
 
 ## @description create results directory, purging any prior data
 create_results_dir() {
@@ -138,15 +159,15 @@ start_docker_env(){
   create_results_dir
   export OZONE_SAFEMODE_MIN_DATANODES="${datanode_count}"
 
-  docker-compose --ansi never down
-
-  trap stop_docker_env EXIT HUP INT TERM
+  docker-compose --ansi never down --remove-orphans
 
   opts=""
   if has_scalable_datanode; then
     opts="--scale datanode=${datanode_count}"
   fi
 
+  OZONE_COMPOSE_RUNNING=true
+  trap _compose_cleanup EXIT HUP INT TERM
   docker-compose --ansi never up -d $opts
 
   wait_for_safemode_exit
@@ -184,11 +205,11 @@ execute_robot_test(){
   local output_name=$(get_output_name)
 
   # find unique filename
-  declare -i i=0
-  OUTPUT_FILE="robot-${output_name}1.xml"
-  while [[ -f $RESULT_DIR/$OUTPUT_FILE ]]; do
-    let ++i
-    OUTPUT_FILE="robot-${output_name}${i}.xml"
+  for ((i=1; i<1000; i++)); do
+    OUTPUT_FILE="robot-${output_name}$(printf "%03d" ${i}).xml"
+    if [[ ! -f $RESULT_DIR/$OUTPUT_FILE ]]; then
+      break;
+    fi
   done
 
   SMOKETEST_DIR_INSIDE="${OZONE_DIR:-/opt/hadoop}/smoketest"
@@ -200,7 +221,7 @@ execute_robot_test(){
   # shellcheck disable=SC2068
   docker-compose exec -T "$CONTAINER" mkdir -p "$RESULT_DIR_INSIDE" \
     && docker-compose exec -T "$CONTAINER" robot \
-      -v KEY_NAME:"${OZONE_BUCKET_KEY_NAME}" \
+      -v ENCRYPTION_KEY:"${OZONE_BUCKET_KEY_NAME}" \
       -v OM_HA_PARAM:"${OM_HA_PARAM}" \
       -v OM_SERVICE_ID:"${OM_SERVICE_ID:-om}" \
       -v OZONE_DIR:"${OZONE_DIR}" \
@@ -367,7 +388,8 @@ stop_docker_env(){
     down_repeats=3
     for i in $(seq 1 $down_repeats)
     do
-      if docker-compose --ansi never down; then
+      if docker-compose --ansi never --profile "*" down --remove-orphans; then
+        OZONE_COMPOSE_RUNNING=false
         return
       fi
       if [[ ${i} -eq 1 ]]; then
@@ -398,7 +420,7 @@ run_rebot() {
 
   shift 2
 
-  local tempdir="$(mktemp -d --suffix rebot -p "${output_dir}")"
+  local tempdir="$(mktemp -d "${output_dir}"/rebot-XXXXXX)"
   #Should be writeable from the docker containers where user is different.
   chmod a+wx "${tempdir}"
   if docker run --rm -v "${input_dir}":/rebot-input -v "${tempdir}":/rebot-output -w /rebot-input \
@@ -517,9 +539,13 @@ fix_data_dir_permissions() {
 ## @param `ozone` image version
 prepare_for_binary_image() {
   local v=$1
+  local default_image="${docker.ozone.image}" # set at build-time from Maven property
+  local default_flavor="${docker.ozone.image.flavor}" # set at build-time from Maven property
+  local image="${OZONE_IMAGE:-${default_image}}" # may be specified by user running the test
+  local flavor="${OZONE_IMAGE_FLAVOR:-${default_flavor}}" # may be specified by user running the test
 
   export OZONE_DIR=/opt/ozone
-  export OZONE_IMAGE="apache/ozone:${v}"
+  export OZONE_TEST_IMAGE="${image}:${v}${flavor}"
 }
 
 ## @description Define variables required for using `ozone-runner` docker image
@@ -539,7 +565,7 @@ get_runner_image_spec() {
 ## @param `ozone-runner` image version (optional)
 prepare_for_runner_image() {
   export OZONE_DIR=/opt/hadoop
-  export OZONE_IMAGE="$(get_runner_image_spec "$@")"
+  export OZONE_TEST_IMAGE="$(get_runner_image_spec "$@")"
 }
 
 ## @description Executing the Ozone Debug CLI related robot tests

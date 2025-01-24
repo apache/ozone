@@ -47,6 +47,7 @@ public class SnapshotDiffReportOzone
       Proto2Codec.get(DiffReportEntryProto.getDefaultInstance()),
       SnapshotDiffReportOzone::fromProtobufDiffReportEntry,
       SnapshotDiffReportOzone::toProtobufDiffReportEntry,
+      DiffReportEntry.class,
       DelegatedCodec.CopyType.SHALLOW);
 
   public static Codec<DiffReportEntry> getDiffReportEntryCodec() {

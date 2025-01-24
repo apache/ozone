@@ -30,6 +30,7 @@ public final class ScmInfo {
   private final String clusterId;
   private final String scmId;
   private final List<String> peerRoles;
+  private final boolean scmRatisEnabled;
 
   /**
    * Builder for ScmInfo.
@@ -38,6 +39,7 @@ public final class ScmInfo {
     private String clusterId;
     private String scmId;
     private final List<String> peerRoles;
+    private boolean scmRatisEnabled;
 
     public Builder() {
       peerRoles = new ArrayList<>();
@@ -73,15 +75,28 @@ public final class ScmInfo {
       return this;
     }
 
+    /**
+     * Set whether SCM enables Ratis.
+     *
+     * @param ratisEnabled If it is true, it means that the Ratis mode is turned on.
+     * If it is false, it means that the Ratis mode is not turned on.
+     * @return Builder for scmInfo
+     */
+    public Builder setScmRatisEnabled(boolean ratisEnabled) {
+      scmRatisEnabled = ratisEnabled;
+      return this;
+    }
+
     public ScmInfo build() {
-      return new ScmInfo(clusterId, scmId, peerRoles);
+      return new ScmInfo(clusterId, scmId, peerRoles, scmRatisEnabled);
     }
   }
 
-  private ScmInfo(String clusterId, String scmId, List<String> peerRoles) {
+  private ScmInfo(String clusterId, String scmId, List<String> peerRoles, boolean ratisEnabled) {
     this.clusterId = clusterId;
     this.scmId = scmId;
     this.peerRoles = Collections.unmodifiableList(peerRoles);
+    this.scmRatisEnabled = ratisEnabled;
   }
 
   /**
@@ -106,5 +121,9 @@ public final class ScmInfo {
    */
   public List<String> getRatisPeerRoles() {
     return peerRoles;
+  }
+
+  public boolean getScmRatisEnabled() {
+    return scmRatisEnabled;
   }
 }

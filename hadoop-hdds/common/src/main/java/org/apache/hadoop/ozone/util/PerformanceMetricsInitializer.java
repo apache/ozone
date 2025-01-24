@@ -21,6 +21,8 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 
 import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Utility class for initializing PerformanceMetrics in a MetricsSource.
@@ -36,11 +38,13 @@ public final class PerformanceMetricsInitializer {
    * @param sampleName sample name
    * @param valueName value name
    * @param intervals intervals for quantiles
+   * @return {@link PerformanceMetrics} instances created, mapped by field name
    * @throws IllegalAccessException if unable to access the field
    */
-  public static <T> void initialize(T source, MetricsRegistry registry,
+  public static <T> Map<String, PerformanceMetrics> initialize(T source, MetricsRegistry registry,
       String sampleName, String valueName, int[] intervals)
       throws IllegalAccessException {
+    Map<String, PerformanceMetrics> instances = new HashMap<>();
     Field[] fields = source.getClass().getDeclaredFields();
 
     for (Field field : fields) {
@@ -54,8 +58,11 @@ public final class PerformanceMetricsInitializer {
                   sampleName, valueName, intervals);
           field.setAccessible(true);
           field.set(source, performanceMetrics);
+          instances.put(name, performanceMetrics);
         }
       }
     }
+
+    return instances;
   }
 }

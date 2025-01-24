@@ -39,6 +39,11 @@ public final class BigIntegerCodec implements Codec<BigInteger> {
   }
 
   @Override
+  public Class<BigInteger> getTypeClass() {
+    return BigInteger.class;
+  }
+
+  @Override
   public byte[] toPersistedFormat(BigInteger object) throws IOException {
     return object.toByteArray();
   }

@@ -22,7 +22,6 @@ import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -49,7 +48,7 @@ public class ChecksumKeyHandler extends KeyHandler {
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
-      throws IOException, OzoneClientException {
+      throws IOException {
 
     ChecksumInfo checksumInfo = new ChecksumInfo(address, client, mode);
     printObjectAsJson(checksumInfo);

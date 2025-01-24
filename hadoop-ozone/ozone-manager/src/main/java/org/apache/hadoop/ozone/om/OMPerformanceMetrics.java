@@ -144,6 +144,12 @@ public class OMPerformanceMetrics {
   @Metric(about = "readFromRockDb latency in listKeys")
   private MutableRate listKeysReadFromRocksDbLatencyNs;
 
+  @Metric(about = "resolveBucketLink latency in getObjectTagging")
+  private MutableRate getObjectTaggingResolveBucketLatencyNs;
+
+  @Metric(about = "ACLs check in getObjectTagging")
+  private MutableRate getObjectTaggingAclCheckLatencyNs;
+
   public void addLookupLatency(long latencyInNs) {
     lookupLatencyNs.add(latencyInNs);
   }
@@ -248,7 +254,7 @@ public class OMPerformanceMetrics {
   public void setListKeysOpsPerSec(float opsPerSec) {
     listKeysOpsPerSec.set(opsPerSec);
   }
-  
+
   MutableRate getListKeysAclCheckLatencyNs() {
     return listKeysAclCheckLatencyNs;
   }
@@ -279,5 +285,17 @@ public class OMPerformanceMetrics {
     
   public void addListKeysReadFromRocksDbLatencyNs(long latencyInNs) {
     listKeysReadFromRocksDbLatencyNs.add(latencyInNs);
+  }
+
+  public MutableRate getGetObjectTaggingResolveBucketLatencyNs() {
+    return getObjectTaggingResolveBucketLatencyNs;
+  }
+
+  public MutableRate getGetObjectTaggingAclCheckLatencyNs() {
+    return getObjectTaggingAclCheckLatencyNs;
+  }
+
+  public void addGetObjectTaggingLatencyNs(long latencyInNs) {
+    getObjectTaggingAclCheckLatencyNs.add(latencyInNs);
   }
 }

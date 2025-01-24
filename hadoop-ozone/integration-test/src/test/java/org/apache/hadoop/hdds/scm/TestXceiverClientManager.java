@@ -29,16 +29,16 @@ import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolCli
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
-import java.util.UUID;
+import java.nio.file.Path;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
@@ -82,12 +82,10 @@ public class TestXceiverClientManager {
 
   @ParameterizedTest(name = "Ozone security enabled: {0}")
   @ValueSource(booleans = {false, true})
-  public void testCaching(boolean securityEnabled) throws IOException {
+  public void testCaching(boolean securityEnabled, @TempDir Path metaDir) throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, securityEnabled);
-    String metaDir = GenericTestUtils.getTempPath(
-        TestXceiverClientManager.class.getName() + UUID.randomUUID());
-    conf.set(HDDS_METADATA_DIR_NAME, metaDir);
+    conf.set(HDDS_METADATA_DIR_NAME, metaDir.toString());
 
     ClientTrustManager trustManager = mock(ClientTrustManager.class);
     try (XceiverClientManager clientManager = new XceiverClientManager(conf,
@@ -124,13 +122,11 @@ public class TestXceiverClientManager {
   }
 
   @Test
-  public void testFreeByReference() throws IOException {
+  public void testFreeByReference(@TempDir Path metaDir) throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     ScmClientConfig clientConfig = conf.getObject(ScmClientConfig.class);
     clientConfig.setMaxSize(1);
-    String metaDir = GenericTestUtils.getTempPath(
-        TestXceiverClientManager.class.getName() + UUID.randomUUID());
-    conf.set(HDDS_METADATA_DIR_NAME, metaDir);
+    conf.set(HDDS_METADATA_DIR_NAME, metaDir.toString());
     try (XceiverClientManager clientManager =
         new XceiverClientManager(conf, clientConfig, null)) {
       Cache<String, XceiverClientSpi> cache =
@@ -181,13 +177,11 @@ public class TestXceiverClientManager {
   }
 
   @Test
-  public void testFreeByEviction() throws IOException {
+  public void testFreeByEviction(@TempDir Path metaDir) throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     ScmClientConfig clientConfig = conf.getObject(ScmClientConfig.class);
     clientConfig.setMaxSize(1);
-    String metaDir = GenericTestUtils.getTempPath(
-        TestXceiverClientManager.class.getName() + UUID.randomUUID());
-    conf.set(HDDS_METADATA_DIR_NAME, metaDir);
+    conf.set(HDDS_METADATA_DIR_NAME, metaDir.toString());
     try (XceiverClientManager clientManager =
         new XceiverClientManager(conf, clientConfig, null)) {
       Cache<String, XceiverClientSpi> cache =

@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.client.SecretKeyTestClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
@@ -201,6 +202,7 @@ public class TestOzoneManagerListVolumesSecure {
     om.setScmTopologyClient(new ScmTopologyClient(
         new ScmBlockLocationTestingClient(null, null, 0)));
     om.setCertClient(new CertificateClientTestImpl(conf));
+    om.setSecretKeyClient(new SecretKeyTestClient());
     om.start();
 
     // Get OM client

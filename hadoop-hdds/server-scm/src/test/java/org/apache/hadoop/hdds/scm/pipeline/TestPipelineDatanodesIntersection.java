@@ -66,8 +66,7 @@ public class TestPipelineDatanodesIntersection {
   public void initialize() throws IOException {
     conf = SCMTestUtils.getConf(testDir);
     end = false;
-    dbStore = DBStoreBuilder.createDBStore(
-        conf, new SCMDBDefinition());
+    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
   }
 
   @AfterEach

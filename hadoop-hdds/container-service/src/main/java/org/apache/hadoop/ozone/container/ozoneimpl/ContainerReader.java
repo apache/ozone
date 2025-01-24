@@ -320,8 +320,7 @@ public class ContainerReader implements Runnable {
 
   private void swapAndRemoveContainer(KeyValueContainer existing,
       KeyValueContainer toAdd) throws IOException {
-    containerSet.removeContainer(
-        existing.getContainerData().getContainerID());
+    containerSet.removeContainerOnlyFromMemory(existing.getContainerData().getContainerID());
     containerSet.addContainer(toAdd);
     KeyValueContainerUtil.removeContainer(existing.getContainerData(),
         hddsVolume.getConf());

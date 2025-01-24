@@ -61,12 +61,13 @@ final class ObjectEndpointStreaming {
       OzoneBucket bucket, String keyPath,
       long length, ReplicationConfig replicationConfig,
       int chunkSize, Map<String, String> keyMetadata,
+      Map<String, String> tags,
       DigestInputStream body, PerformanceStringBuilder perf)
       throws IOException, OS3Exception {
 
     try {
       return putKeyWithStream(bucket, keyPath,
-          length, chunkSize, replicationConfig, keyMetadata, body, perf);
+          length, chunkSize, replicationConfig, keyMetadata, tags, body, perf);
     } catch (IOException ex) {
       LOG.error("Exception occurred in PutObject", ex);
       if (ex instanceof OMException) {
@@ -97,13 +98,14 @@ final class ObjectEndpointStreaming {
       int bufferSize,
       ReplicationConfig replicationConfig,
       Map<String, String> keyMetadata,
+      Map<String, String> tags,
       DigestInputStream body, PerformanceStringBuilder perf)
       throws IOException {
     long startNanos = Time.monotonicNowNanos();
     long writeLen;
     String eTag;
     try (OzoneDataStreamOutput streamOutput = bucket.createStreamKey(keyPath,
-        length, replicationConfig, keyMetadata)) {
+        length, replicationConfig, keyMetadata, tags)) {
       long metadataLatencyNs = METRICS.updatePutKeyMetadataStats(startNanos);
       writeLen = writeToStreamOutput(streamOutput, body, bufferSize, length);
       eTag = DatatypeConverter.printHexBinary(body.getMessageDigest().digest())

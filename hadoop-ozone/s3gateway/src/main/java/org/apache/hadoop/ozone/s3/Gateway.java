@@ -18,7 +18,9 @@
 package org.apache.hadoop.ozone.s3;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -57,7 +59,6 @@ public class Gateway extends GenericCli {
 
   private S3GatewayHttpServer httpServer;
   private S3GatewayMetrics metrics;
-  private OzoneConfiguration ozoneConfiguration;
 
   private final JvmPauseMonitor jvmPauseMonitor = newJvmPauseMonitor("S3G");
 
@@ -71,14 +72,14 @@ public class Gateway extends GenericCli {
 
   @Override
   public Void call() throws Exception {
-    ozoneConfiguration = createOzoneConfiguration();
-    TracingUtil.initTracing("S3gateway", ozoneConfiguration);
+    OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
     OzoneConfigurationHolder.setConfiguration(ozoneConfiguration);
-    UserGroupInformation.setConfiguration(ozoneConfiguration);
-    loginS3GUser(ozoneConfiguration);
-    setHttpBaseDir(ozoneConfiguration);
-    httpServer = new S3GatewayHttpServer(ozoneConfiguration, "s3gateway");
-    metrics = S3GatewayMetrics.create(ozoneConfiguration);
+    TracingUtil.initTracing("S3gateway", OzoneConfigurationHolder.configuration());
+    UserGroupInformation.setConfiguration(OzoneConfigurationHolder.configuration());
+    loginS3GUser(OzoneConfigurationHolder.configuration());
+    setHttpBaseDir(OzoneConfigurationHolder.configuration());
+    httpServer = new S3GatewayHttpServer(OzoneConfigurationHolder.configuration(), "s3gateway");
+    metrics = S3GatewayMetrics.create(OzoneConfigurationHolder.configuration());
     start();
 
     ShutdownHookManager.get().addShutdownHook(() -> {
@@ -95,10 +96,10 @@ public class Gateway extends GenericCli {
     String[] originalArgs = getCmd().getParseResult().originalArgs()
         .toArray(new String[0]);
     HddsServerUtil.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
-        Gateway.class, originalArgs, LOG, ozoneConfiguration);
+        Gateway.class, originalArgs, LOG, OzoneConfigurationHolder.configuration());
 
     LOG.info("Starting Ozone S3 gateway");
-    HddsServerUtil.initializeMetrics(ozoneConfiguration, "S3Gateway");
+    HddsServerUtil.initializeMetrics(OzoneConfigurationHolder.configuration(), "S3Gateway");
     jvmPauseMonitor.start();
     httpServer.start();
   }
@@ -131,6 +132,16 @@ public class Gateway extends GenericCli {
       }
       LOG.info("S3Gateway login successful.");
     }
+  }
+
+  @VisibleForTesting
+  public InetSocketAddress getHttpAddress() {
+    return this.httpServer.getHttpAddress();
+  }
+
+  @VisibleForTesting
+  public InetSocketAddress getHttpsAddress() {
+    return this.httpServer.getHttpsAddress();
   }
 
 }

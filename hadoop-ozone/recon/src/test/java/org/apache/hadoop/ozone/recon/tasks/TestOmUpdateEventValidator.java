@@ -53,7 +53,7 @@ import static org.mockito.Mockito.times;
 public class TestOmUpdateEventValidator {
 
   private OmUpdateEventValidator eventValidator;
-  private OMDBDefinition omdbDefinition;
+  private final OMDBDefinition omdbDefinition = OMDBDefinition.get();
   private OMMetadataManager omMetadataManager;
   private Logger logger;
   @TempDir
@@ -63,11 +63,10 @@ public class TestOmUpdateEventValidator {
   public void setUp() throws IOException {
     omMetadataManager = initializeNewOmMetadataManager(
         temporaryFolder.toFile());
-    omdbDefinition = new OMDBDefinition();
     eventValidator = new OmUpdateEventValidator(omdbDefinition);
     // Create a mock logger
     logger = mock(Logger.class);
-    eventValidator.setLogger(logger);
+    OmUpdateEventValidator.setLogger(logger);
   }
 
   @Test

@@ -21,7 +21,6 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.ShellReplicationOptions;
 import picocli.CommandLine;
@@ -40,7 +39,7 @@ public class SetReplicationConfigHandler extends BucketHandler {
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
-      throws IOException, OzoneClientException {
+      throws IOException {
     ReplicationConfig replicationConfig = replication.fromParams(getConf())
         .orElseThrow(() -> new OzoneIllegalArgumentException(
             "Replication type and config must be specified."));

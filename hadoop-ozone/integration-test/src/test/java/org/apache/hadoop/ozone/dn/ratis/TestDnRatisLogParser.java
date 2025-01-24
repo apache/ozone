@@ -26,7 +26,7 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.segmentparser.DatanodeRatisLogParser;
+import org.apache.hadoop.ozone.debug.segmentparser.DatanodeRatisLogParser;
 
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;

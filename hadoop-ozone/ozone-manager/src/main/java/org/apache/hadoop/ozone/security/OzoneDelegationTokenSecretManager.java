@@ -25,13 +25,19 @@ import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.OzoneSecretManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.io.Text;
@@ -41,6 +47,7 @@ import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.security.OzoneSecretStore.OzoneManagerSecretState;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier.TokenInfo;
 import org.apache.hadoop.security.AccessControlException;
@@ -64,7 +71,7 @@ import org.slf4j.LoggerFactory;
 public class OzoneDelegationTokenSecretManager
     extends OzoneSecretManager<OzoneTokenIdentifier> {
 
-  private static final Logger LOG = LoggerFactory
+  public static final Logger LOG = LoggerFactory
       .getLogger(OzoneDelegationTokenSecretManager.class);
   private final Map<OzoneTokenIdentifier, TokenInfo> currentTokens;
   private final OzoneSecretStore store;
@@ -73,6 +80,7 @@ public class OzoneDelegationTokenSecretManager
   private final long tokenRemoverScanInterval;
   private final String omServiceId;
   private final OzoneManager ozoneManager;
+  private SecretKeyClient secretKeyClient;
 
   /**
    * If the delegation token update thread holds this lock, it will not get
@@ -100,8 +108,8 @@ public class OzoneDelegationTokenSecretManager
     isRatisEnabled = b.ozoneConf.getBoolean(
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
+    this.secretKeyClient = b.secretKeyClient;
     loadTokenSecretState(store.loadState());
-
   }
 
   /**
@@ -117,6 +125,7 @@ public class OzoneDelegationTokenSecretManager
     private CertificateClient certClient;
     private String omServiceId;
     private OzoneManager ozoneManager;
+    private SecretKeyClient secretKeyClient;
 
     public OzoneDelegationTokenSecretManager build() throws IOException {
       return new OzoneDelegationTokenSecretManager(this);
@@ -154,6 +163,11 @@ public class OzoneDelegationTokenSecretManager
 
     public Builder setCertificateClient(CertificateClient certificateClient) {
       this.certClient = certificateClient;
+      return this;
+    }
+
+    public Builder setSecretKeyClient(SecretKeyClient client) {
+      this.secretKeyClient = client;
       return this;
     }
 
@@ -195,9 +209,15 @@ public class OzoneDelegationTokenSecretManager
     OzoneTokenIdentifier identifier = createIdentifier(owner, renewer,
         realUser);
     updateIdentifierDetails(identifier);
-
-    byte[] password = createPassword(identifier.getBytes(),
-        getCurrentKey().getPrivateKey());
+    byte[] password;
+    if (ozoneManager.getVersionManager().isAllowed(OMLayoutFeature.DELEGATION_TOKEN_SYMMETRIC_SIGN)) {
+      ManagedSecretKey currentSecretKey = secretKeyClient.getCurrentSecretKey();
+      identifier.setSecretKeyId(currentSecretKey.getId().toString());
+      password = currentSecretKey.sign(identifier.getBytes());
+    } else {
+      identifier.setOmCertSerialId(getCertSerialId());
+      password = createPassword(identifier.getBytes(), getCurrentKey().getPrivateKey());
+    }
     long expiryTime = identifier.getIssueDate() + getTokenRenewInterval();
 
     // For HA ratis will take care of updating.
@@ -252,7 +272,6 @@ public class OzoneDelegationTokenSecretManager
     identifier.setMasterKeyId(getCurrentKey().getKeyId());
     identifier.setSequenceNumber(sequenceNum);
     identifier.setMaxDate(now + getTokenMaxLifetime());
-    identifier.setOmCertSerialId(getCertSerialId());
     identifier.setOmServiceId(getOmServiceId());
   }
 
@@ -433,9 +452,29 @@ public class OzoneDelegationTokenSecretManager
 
   /**
    * Validates if given hash is valid.
+   * HDDS-8829 changes the delegation token from sign by OM's RSA private key to secret key supported by SCM.
+   * The default delegation token lifetime is 7 days.
+   * In the 7 days period after OM is upgraded from version without HDDS-8829 to version with HDDS-8829, tokens
+   * signed by RSA private key, and tokens signed by secret key will coexist. After 7 days, there will be only
+   * tokens signed by secrete key still valid. Following logic will handle both types of tokens.
    */
   public boolean verifySignature(OzoneTokenIdentifier identifier,
       byte[] password) {
+    String secretKeyId = identifier.getSecretKeyId();
+    if (StringUtils.isNotEmpty(secretKeyId)) {
+      try {
+        ManagedSecretKey verifyKey = secretKeyClient.getSecretKey(UUID.fromString(secretKeyId));
+        return verifyKey.isValidSignature(identifier.getBytes(), password);
+      } catch (SCMSecurityException e) {
+        LOG.error("verifySignature for identifier {} failed", identifier, e);
+        return false;
+      }
+    }
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Verify an asymmetric key signed Token {}", identifier);
+    }
+
     X509Certificate signerCert;
     try {
       signerCert = getCertClient().getCertificate(
@@ -511,6 +550,14 @@ public class OzoneDelegationTokenSecretManager
 
   }
 
+  /**
+   * Load delegation tokens from DB into memory.
+   * HDDS-8829 changes the delegation token from sign by OM's RSA private key to secret key supported by SCM.
+   * The default delegation token lifetime is 7 days. After OM is upgraded from version without HDDS-8829 to
+   * version with HDDS-8829 and restarts, tokens signed by RSA private key will be loaded from DB into memory.
+   * Next OM restarts, if after 7 days, there will be only tokens signed by secret key loaded into memory.
+   * Both types of token loading should be supported.
+   */
   private void loadTokenSecretState(
       OzoneManagerSecretState<OzoneTokenIdentifier> state) throws IOException {
     LOG.info("Loading token state into token manager.");
@@ -528,8 +575,17 @@ public class OzoneDelegationTokenSecretManager
           "Can't add persisted delegation token to a running SecretManager.");
     }
 
-    byte[] password = createPassword(identifier.getBytes(),
-        getCertClient().getPrivateKey());
+    byte[] password;
+    if (StringUtils.isNotEmpty(identifier.getSecretKeyId())) {
+      ManagedSecretKey signKey = secretKeyClient.getSecretKey(UUID.fromString(identifier.getSecretKeyId()));
+      password = signKey.sign(identifier.getBytes());
+    } else {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Load an asymmetric key signed Token {}", identifier);
+      }
+      password = createPassword(identifier.getBytes(), getCertClient().getPrivateKey());
+    }
+
     if (identifier.getSequenceNumber() > getDelegationTokenSeqNum()) {
       setDelegationTokenSeqNum(identifier.getSequenceNumber());
     }
@@ -586,6 +642,11 @@ public class OzoneDelegationTokenSecretManager
     if (this.store != null) {
       this.store.close();
     }
+  }
+
+  @VisibleForTesting
+  public void setSecretKeyClient(SecretKeyClient client) {
+    this.secretKeyClient = client;
   }
 
   /**

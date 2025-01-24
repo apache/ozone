@@ -19,9 +19,9 @@ package org.apache.ozone.erasurecode;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.ozone.erasurecode.rawcoder.RawErasureCoderFactory;
 import org.apache.ozone.erasurecode.rawcoder.NativeRSRawErasureCoderFactory;
 import org.apache.ozone.erasurecode.rawcoder.NativeXORRawErasureCoderFactory;
+import org.apache.ozone.erasurecode.rawcoder.RawErasureCoderFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * This class registers all coder implementations.
@@ -108,8 +107,8 @@ public final class CodecRegistry {
       String codecName = entry.getKey();
       List<RawErasureCoderFactory> coders = entry.getValue();
       coderNameMap.put(codecName, coders.stream().
-          map(RawErasureCoderFactory::getCoderName).
-          collect(Collectors.toList()).toArray(new String[0]));
+          map(RawErasureCoderFactory::getCoderName)
+          .toArray(String[]::new));
     }
   }
 

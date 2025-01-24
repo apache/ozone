@@ -34,8 +34,8 @@ public final class KeyValueUtil {
   /**
    * Parse Key,Value map data from protobuf representation.
    */
-  public static Map<String, String> getFromProtobuf(List<KeyValue> metadata) {
-    return metadata.stream()
+  public static Map<String, String> getFromProtobuf(List<KeyValue> keyValueList) {
+    return keyValueList.stream()
         .collect(Collectors.toMap(KeyValue::getKey,
             KeyValue::getValue));
   }

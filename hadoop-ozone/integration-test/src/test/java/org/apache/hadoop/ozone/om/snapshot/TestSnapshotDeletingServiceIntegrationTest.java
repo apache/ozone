@@ -480,22 +480,22 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
   private DirectoryDeletingService getMockedDirectoryDeletingService(AtomicBoolean dirDeletionWaitStarted,
                                                                      AtomicBoolean dirDeletionStarted)
-      throws InterruptedException, TimeoutException {
+      throws InterruptedException, TimeoutException, IOException {
     OzoneManager ozoneManager = Mockito.spy(om);
     om.getKeyManager().getDirDeletingService().shutdown();
     GenericTestUtils.waitFor(() -> om.getKeyManager().getDirDeletingService().getThreadCount() == 0, 1000,
         100000);
     DirectoryDeletingService directoryDeletingService = Mockito.spy(new DirectoryDeletingService(10000,
-        TimeUnit.MILLISECONDS, 100000, ozoneManager, cluster.getConf()));
+        TimeUnit.MILLISECONDS, 100000, ozoneManager, cluster.getConf(), 1));
     directoryDeletingService.shutdown();
     GenericTestUtils.waitFor(() -> directoryDeletingService.getThreadCount() == 0, 1000,
         100000);
-    when(ozoneManager.getMetadataManager()).thenAnswer(i -> {
+    doAnswer(i -> {
       // Wait for SDS to reach DDS wait block before processing any deleted directories.
       GenericTestUtils.waitFor(dirDeletionWaitStarted::get, 1000, 100000);
       dirDeletionStarted.set(true);
       return i.callRealMethod();
-    });
+    }).when(directoryDeletingService).getPendingDeletedDirInfo();
     return directoryDeletingService;
   }
 
@@ -601,6 +601,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
   @Test
   @Order(4)
+  @Flaky("HDDS-11847")
   public void testParallelExcecutionOfKeyDeletionAndSnapshotDeletion() throws Exception {
     AtomicBoolean keyDeletionWaitStarted = new AtomicBoolean(false);
     AtomicBoolean dirDeletionWaitStarted = new AtomicBoolean(false);

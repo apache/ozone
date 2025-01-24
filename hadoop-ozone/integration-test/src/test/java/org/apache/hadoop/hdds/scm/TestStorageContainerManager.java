@@ -58,7 +58,6 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Incremen
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventExecutor;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
@@ -155,7 +154,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.argThat;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
@@ -788,10 +786,6 @@ public class TestStorageContainerManager {
       NodeManager nodeManager = mock(NodeManager.class);
       setInternalState(rm, "nodeManager", nodeManager);
 
-      EventPublisher publisher = mock(EventPublisher.class);
-      setInternalState(rm.getLegacyReplicationManager(),
-          "eventPublisher", publisher);
-
       UUID dnUuid = cluster.getHddsDatanodes().iterator().next()
           .getDatanodeDetails().getUuid();
 
@@ -811,15 +805,7 @@ public class TestStorageContainerManager {
       cluster.getStorageContainerManager()
           .getReplicationManager().processAll();
       Thread.sleep(5000);
-
-      if (rm.getConfig().isLegacyEnabled()) {
-        CommandForDatanode commandForDatanode = new CommandForDatanode(
-            dnUuid, closeContainerCommand);
-        verify(publisher).fireEvent(eq(SCMEvents.DATANODE_COMMAND), argThat(new
-            CloseContainerCommandMatcher(dnUuid, commandForDatanode)));
-      } else {
-        verify(nodeManager).addDatanodeCommand(dnUuid, closeContainerCommand);
-      }
+      verify(nodeManager).addDatanodeCommand(dnUuid, closeContainerCommand);
     }
   }
 

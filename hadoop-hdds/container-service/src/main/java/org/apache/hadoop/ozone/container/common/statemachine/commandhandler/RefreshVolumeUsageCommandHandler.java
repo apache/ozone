@@ -18,6 +18,8 @@ package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -27,7 +29,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Command handler to refresh usage info of all volumes.
@@ -38,9 +39,12 @@ public class RefreshVolumeUsageCommandHandler implements CommandHandler {
       LoggerFactory.getLogger(RefreshVolumeUsageCommandHandler.class);
 
   private final AtomicInteger invocationCount = new AtomicInteger(0);
-  private final AtomicLong totalTime = new AtomicLong(0);
+  private final MutableRate opsLatencyMs;
 
   public RefreshVolumeUsageCommandHandler() {
+    MetricsRegistry registry = new MetricsRegistry(
+        RefreshVolumeUsageCommandHandler.class.getSimpleName());
+    this.opsLatencyMs = registry.newRate(Type.refreshVolumeUsageInfo + "Ms");
   }
 
   @Override
@@ -50,7 +54,7 @@ public class RefreshVolumeUsageCommandHandler implements CommandHandler {
     invocationCount.incrementAndGet();
     final long startTime = Time.monotonicNow();
     container.getVolumeSet().refreshAllVolumeUsage();
-    totalTime.getAndAdd(Time.monotonicNow() - startTime);
+    this.opsLatencyMs.add(Time.monotonicNow() - startTime);
   }
 
   @Override
@@ -66,14 +70,12 @@ public class RefreshVolumeUsageCommandHandler implements CommandHandler {
 
   @Override
   public long getAverageRunTime() {
-    final int invocations = invocationCount.get();
-    return invocations == 0 ?
-        0 : totalTime.get() / invocations;
+    return (long) this.opsLatencyMs.lastStat().mean();
   }
 
   @Override
   public long getTotalRunTime() {
-    return totalTime.get();
+    return (long) this.opsLatencyMs.lastStat().total();
   }
 
   @Override

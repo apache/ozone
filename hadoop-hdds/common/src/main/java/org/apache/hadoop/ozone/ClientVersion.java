@@ -42,10 +42,6 @@ public enum ClientVersion implements ComponentVersion {
       "This client version has support for Object Store and File " +
           "System Optimized Bucket Layouts."),
 
-  EC_REPLICA_INDEX_REQUIRED_IN_BLOCK_REQUEST(4,
-      "This client version enforces replica index is set for fixing read corruption that could occur when " +
-          "replicaIndex parameter is not validated before EC block reads."),
-
   FUTURE_VERSION(-1, "Used internally when the server side is older and an"
       + " unknown client version has arrived from the client.");
 

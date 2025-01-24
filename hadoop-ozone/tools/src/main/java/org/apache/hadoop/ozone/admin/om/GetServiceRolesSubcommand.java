@@ -18,17 +18,19 @@
 
 package org.apache.hadoop.ozone.admin.om;
 
+import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.JsonUtils;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
+import org.apache.hadoop.ozone.utils.FormattingCLIUtils;
 import picocli.CommandLine;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,7 +59,17 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
       description = "Format output as JSON")
   private boolean json;
 
+  @CommandLine.Option(names = { "--table" },
+       defaultValue = "false",
+       description = "Format output as Table")
+  private boolean table;
+
   private OzoneManagerProtocol ozoneManagerClient;
+
+  private static final String OM_ROLES_TITLE = "Ozone Manager Roles";
+
+  private static final List<String> OM_ROLES_HEADER = Arrays.asList(
+      "Host Name", "Node ID", "Role");
 
   @Override
   public Void call() throws Exception {
@@ -65,11 +77,22 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
       ozoneManagerClient =  parent.createOmClient(omServiceId);
       if (json) {
         printOmServerRolesAsJson(ozoneManagerClient.getServiceList());
+      } else if (table) {
+        FormattingCLIUtils formattingCLIUtils = new FormattingCLIUtils(OM_ROLES_TITLE)
+            .addHeaders(OM_ROLES_HEADER);
+        List<ServiceInfo> serviceList = ozoneManagerClient.getServiceList();
+        for (ServiceInfo serviceInfo : serviceList) {
+          OMRoleInfo omRoleInfo = serviceInfo.getOmRoleInfo();
+          if (omRoleInfo != null &&
+               serviceInfo.getNodeType() == HddsProtos.NodeType.OM) {
+            formattingCLIUtils.addLine(new String[]{serviceInfo.getHostname(),
+                omRoleInfo.getNodeId(), omRoleInfo.getServerRole()});
+          }
+        }
+        System.out.println(formattingCLIUtils.render());
       } else {
         printOmServerRoles(ozoneManagerClient.getServiceList());
       }
-    } catch (OzoneClientException ex) {
-      System.out.printf("Error: %s", ex.getMessage());
     } finally {
       if (ozoneManagerClient != null) {
         ozoneManagerClient.close();
@@ -109,5 +132,15 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
     }
     System.out.print(
         JsonUtils.toJsonStringWithDefaultPrettyPrinter(omServiceList));
+  }
+
+  @VisibleForTesting
+  public void setOzoneManagerClient(OzoneManagerProtocol ozoneManagerClient) {
+    this.ozoneManagerClient = ozoneManagerClient;
+  }
+
+  @VisibleForTesting
+  public void setParent(OMAdmin parent) {
+    this.parent = parent;
   }
 }

@@ -167,7 +167,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     }
     // read port from the data node, on failure use default configured
     // port.
-    int port = dn.getPort(DatanodeDetails.Port.Name.STANDALONE).getValue();
+    int port = dn.getStandalonePort().getValue();
     if (port == 0) {
       port = config.getInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
           OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);

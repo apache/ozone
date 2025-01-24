@@ -37,6 +37,8 @@ public final class ContainerDataScannerMetrics
   @Metric("disk bandwidth used by the container data scanner per volume")
   private MutableRate numBytesScanned;
 
+  private String storageDirectory;
+
   public double getNumBytesScannedMean() {
     return numBytesScanned.lastStat().mean();
   }
@@ -65,5 +67,14 @@ public final class ContainerDataScannerMetrics
         : volumeName.replace(':', '-'));
 
     return ms.register(name, null, new ContainerDataScannerMetrics(name, ms));
+  }
+
+  @Metric("Returns the Directory name for the volume")
+  public String getStorageDirectory() {
+    return storageDirectory;
+  }
+
+  public void setStorageDirectory(final String volumeName) {
+    this.storageDirectory = volumeName;
   }
 }

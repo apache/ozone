@@ -36,6 +36,7 @@ public class ChunkInfoList {
       Proto3Codec.get(ContainerProtos.ChunkInfoList.getDefaultInstance()),
       ChunkInfoList::getFromProtoBuf,
       ChunkInfoList::getProtoBufMessage,
+      ChunkInfoList.class,
       DelegatedCodec.CopyType.SHALLOW);
 
   public static Codec<ChunkInfoList> getCodec() {

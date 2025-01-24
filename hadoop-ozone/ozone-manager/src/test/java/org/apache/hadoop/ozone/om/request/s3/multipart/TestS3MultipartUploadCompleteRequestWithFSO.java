@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.security.UserGroupInformation;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -113,23 +114,29 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
 
   @Override
   protected S3MultipartUploadCompleteRequest getS3MultipartUploadCompleteReq(
-          OMRequest omRequest) {
-    return new S3MultipartUploadCompleteRequestWithFSO(omRequest,
+          OMRequest omRequest) throws IOException {
+    S3MultipartUploadCompleteRequest request = new S3MultipartUploadCompleteRequestWithFSO(omRequest,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    request.setUGI(UserGroupInformation.getCurrentUser());
+    return request;
   }
 
   @Override
   protected S3MultipartUploadCommitPartRequest getS3MultipartUploadCommitReq(
-      OMRequest omRequest) {
-    return new S3MultipartUploadCommitPartRequestWithFSO(omRequest,
+      OMRequest omRequest) throws IOException {
+    S3MultipartUploadCommitPartRequest request = new S3MultipartUploadCommitPartRequestWithFSO(omRequest,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    request.setUGI(UserGroupInformation.getCurrentUser());
+    return request;
   }
 
   @Override
   protected S3InitiateMultipartUploadRequest getS3InitiateMultipartUploadReq(
-      OMRequest initiateMPURequest) {
-    return new S3InitiateMultipartUploadRequestWithFSO(initiateMPURequest,
+      OMRequest initiateMPURequest) throws IOException {
+    S3InitiateMultipartUploadRequest request = new S3InitiateMultipartUploadRequestWithFSO(initiateMPURequest,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    request.setUGI(UserGroupInformation.getCurrentUser());
+    return request;
   }
 
   @Override

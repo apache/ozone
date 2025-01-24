@@ -16,6 +16,8 @@
 
 #checks:basic
 
+set -u -o pipefail
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
@@ -25,19 +27,19 @@ source "${DIR}/_lib.sh"
 
 install_spotbugs
 
-MAVEN_OPTIONS='-B -fae -Dskip.npx -Dskip.installnpx --no-transfer-progress'
+REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/findbugs"}
+mkdir -p "$REPORT_DIR"
+REPORT_FILE="$REPORT_DIR/summary.txt"
+
+MAVEN_OPTIONS='-B -fae -DskipRecon --no-transfer-progress'
 
 if [[ "${OZONE_WITH_COVERAGE}" != "true" ]]; then
   MAVEN_OPTIONS="${MAVEN_OPTIONS} -Djacoco.skip"
 fi
 
 #shellcheck disable=SC2086
-mvn ${MAVEN_OPTIONS} test-compile spotbugs:spotbugs "$@"
+mvn ${MAVEN_OPTIONS} test-compile spotbugs:spotbugs "$@" | tee "${REPORT_DIR}/output.log"
 rc=$?
-
-REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/findbugs"}
-mkdir -p "$REPORT_DIR"
-REPORT_FILE="$REPORT_DIR/summary.txt"
 
 touch "$REPORT_FILE"
 
@@ -45,10 +47,5 @@ find hadoop-hdds hadoop-ozone -name spotbugsXml.xml -print0 | xargs -0 unionBugs
 convertXmlToText "${REPORT_DIR}"/summary.xml | tee -a "${REPORT_FILE}"
 convertXmlToText -html:fancy-hist.xsl "${REPORT_DIR}"/summary.xml "${REPORT_DIR}"/summary.html
 
-wc -l "$REPORT_FILE" | awk '{print $1}'> "$REPORT_DIR/failures"
-
-if [[ -s "${REPORT_FILE}" ]]; then
-   exit 1
-fi
-
-exit ${rc}
+ERROR_PATTERN="\[ERROR\]"
+source "${DIR}/_post_process.sh"

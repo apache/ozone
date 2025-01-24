@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
-import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.HashMap;
@@ -60,7 +59,6 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.ozone.test.GenericTestUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
@@ -91,7 +89,6 @@ public class TestDeleteWithInAdequateDN {
   private static ObjectStore objectStore;
   private static String volumeName;
   private static String bucketName;
-  private static String path;
   private static XceiverClientManager xceiverClientManager;
   private static final int FACTOR_THREE_PIPELINE_COUNT = 1;
 
@@ -105,10 +102,6 @@ public class TestDeleteWithInAdequateDN {
     final int numOfDatanodes = 3;
 
     conf = new OzoneConfiguration();
-    path = GenericTestUtils
-        .getTempPath(TestContainerStateMachineFailures.class.getSimpleName());
-    File baseDir = new File(path);
-    baseDir.mkdirs();
 
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 100,
         TimeUnit.MILLISECONDS);

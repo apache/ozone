@@ -17,11 +17,7 @@
  */
 package org.apache.hadoop.hdds.cli;
 
-import com.google.common.annotations.VisibleForTesting;
-import java.io.IOException;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.security.UserGroupInformation;
 
 import picocli.CommandLine;
 
@@ -33,41 +29,8 @@ import picocli.CommandLine;
     description = "Developer tools for Ozone Admin operations",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
-public class OzoneAdmin extends GenericCli {
+public class OzoneAdmin extends GenericCli implements ExtensibleParentCommand {
 
-  private OzoneConfiguration ozoneConf;
-
-  private UserGroupInformation user;
-
-  public OzoneAdmin() {
-    super(OzoneAdmin.class);
-  }
-
-  @VisibleForTesting
-  public OzoneAdmin(OzoneConfiguration conf) {
-    super(OzoneAdmin.class);
-    ozoneConf = conf;
-  }
-
-  public OzoneConfiguration getOzoneConf() {
-    if (ozoneConf == null) {
-      ozoneConf = createOzoneConfiguration();
-    }
-    return ozoneConf;
-  }
-
-  public UserGroupInformation getUser() throws IOException {
-    if (user == null) {
-      user = UserGroupInformation.getCurrentUser();
-    }
-    return user;
-  }
-
-  /**
-   * Main for the Ozone Admin shell Command handling.
-   *
-   * @param argv - System Args Strings[]
-   */
   public static void main(String[] argv) {
     new OzoneAdmin().run(argv);
   }
@@ -78,5 +41,10 @@ public class OzoneAdmin extends GenericCli {
     String spanName = "ozone admin " + String.join(" ", argv);
     return TracingUtil.executeInNewSpan(spanName,
         () -> super.execute(argv));
+  }
+
+  @Override
+  public Class<? extends AdminSubcommand> subcommandType() {
+    return AdminSubcommand.class;
   }
 }

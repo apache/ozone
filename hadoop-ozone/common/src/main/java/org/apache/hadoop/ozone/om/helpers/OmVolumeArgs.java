@@ -46,7 +46,8 @@ public final class OmVolumeArgs extends WithObjectID
   private static final Codec<OmVolumeArgs> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(VolumeInfo.getDefaultInstance()),
       OmVolumeArgs::getFromProtobuf,
-      OmVolumeArgs::getProtobuf);
+      OmVolumeArgs::getProtobuf,
+      OmVolumeArgs.class);
 
   public static Codec<OmVolumeArgs> getCodec() {
     return CODEC;

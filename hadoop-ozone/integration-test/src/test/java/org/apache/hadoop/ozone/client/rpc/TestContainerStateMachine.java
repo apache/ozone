@@ -47,7 +47,6 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.Container
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.RatisServerConfiguration;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.ozone.test.GenericTestUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
@@ -78,7 +77,6 @@ public class TestContainerStateMachine {
   private ObjectStore objectStore;
   private String volumeName;
   private String bucketName;
-  private String path;
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -87,10 +85,6 @@ public class TestContainerStateMachine {
    */
   @BeforeEach
   public void setup() throws Exception {
-    path = GenericTestUtils
-        .getTempPath(TestContainerStateMachine.class.getSimpleName());
-    File baseDir = new File(path);
-    baseDir.mkdirs();
 
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 200, TimeUnit.MILLISECONDS);

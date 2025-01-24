@@ -51,6 +51,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
@@ -99,7 +100,7 @@ public class TestPartUpload {
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
     response = REST.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
-        content.length(), 1, uploadID, body);
+        content.length(), 1, uploadID, null, null, body);
 
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
@@ -121,7 +122,7 @@ public class TestPartUpload {
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
     response = REST.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
-        content.length(), 1, uploadID, body);
+        content.length(), 1, uploadID, null, null, body);
 
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
@@ -130,7 +131,7 @@ public class TestPartUpload {
     // Upload part again with same part Number, the ETag should be changed.
     content = "Multipart Upload Changed";
     response = REST.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
-        content.length(), 1, uploadID, body);
+        content.length(), 1, uploadID, null, null, body);
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
     assertNotEquals(eTag, response.getHeaderString(OzoneConsts.ETAG));
 
@@ -144,7 +145,7 @@ public class TestPartUpload {
       ByteArrayInputStream body =
           new ByteArrayInputStream(content.getBytes(UTF_8));
       REST.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, content.length(), 1,
-          "random", body);
+          "random", null, null, body);
     });
     assertEquals("NoSuchUpload", ex.getCode());
     assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
@@ -178,7 +179,7 @@ public class TestPartUpload {
     long contentLength = chunkedContent.length();
 
     objectEndpoint.put(OzoneConsts.S3_BUCKET, keyName, contentLength, 1,
-        uploadID, new ByteArrayInputStream(chunkedContent.getBytes(UTF_8)));
+        uploadID, null, null, new ByteArrayInputStream(chunkedContent.getBytes(UTF_8)));
     assertContentLength(uploadID, keyName, 15);
   }
 
@@ -201,7 +202,7 @@ public class TestPartUpload {
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
     REST.put(OzoneConsts.S3_BUCKET, keyName,
-        contentLength, 1, uploadID, body);
+        contentLength, 1, uploadID, null, null, body);
     assertContentLength(uploadID, keyName, content.length());
   }
 
@@ -234,7 +235,7 @@ public class TestPartUpload {
     try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class)) {
       // Add the mocked methods only during the copy request
       when(objectEndpoint.getMessageDigestInstance()).thenReturn(messageDigest);
-      mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class)))
+      mocked.when(() -> IOUtils.copy(any(InputStream.class), any(OutputStream.class), anyInt()))
           .thenThrow(IOException.class);
 
       String content = "Multipart Upload";
@@ -242,7 +243,7 @@ public class TestPartUpload {
           new ByteArrayInputStream(content.getBytes(UTF_8));
       try {
         objectEndpoint.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
-            content.length(), 1, uploadID, body);
+            content.length(), 1, uploadID, null, null, body);
         fail("Should throw IOException");
       } catch (IOException ignored) {
         // Verify that the message digest is reset so that the instance can be reused for the

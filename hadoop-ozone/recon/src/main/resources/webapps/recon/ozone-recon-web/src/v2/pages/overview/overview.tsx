@@ -238,8 +238,8 @@ const Overview: React.FC<{}> = () => {
         deletePendingSummarytotalUnrepSize: deletePendingResponse?.value?.data?.totalUnreplicatedDataSize,
         deletePendingSummarytotalRepSize: deletePendingResponse?.value?.data?.totalReplicatedDataSize,
         deletePendingSummarytotalDeletedKeys: deletePendingResponse?.value?.data?.totalDeletedKeys,
-        scmServiceId: clusterState?.scmServiceId,
-        omServiceId: clusterState?.omServiceId
+        scmServiceId: clusterState?.scmServiceId ?? 'N/A',
+        omServiceId: clusterState?.omServiceId ?? 'N/A'
       });
       setStorageReport({
         ...storageReport,
@@ -322,20 +322,13 @@ const Overview: React.FC<{}> = () => {
     </Button>
   )
 
-  const containersLink = (missingContainersCount > 0)
-    ? (
-      <Button
-        type='link'
-        size='small'>
-        <Link to='/MissingContainers'> View More</Link>
-      </Button>
-    ) : (
-      <Button
-        type='link'
-        size='small'>
-        <Link to='/Containers'> View More</Link>
-      </Button>
-    )
+  const containersLink = (
+    <Button
+      type='link'
+      size='small'>
+      <Link to='/Containers'> View More</Link>
+    </Button>
+  )
 
   return (
     <>
@@ -345,7 +338,7 @@ const Overview: React.FC<{}> = () => {
           lastUpdatedOMDBDelta={lastUpdatedOMDBDelta} lastUpdatedOMDBFull={lastUpdatedOMDBFull}
           togglePolling={autoReloadHelper.handleAutoReloadToggle} onReload={loadOverviewPageData} omSyncLoad={syncOmData} omStatus={omStatus} />
       </div>
-      <div style={{ padding: '24px' }}>
+      <div className='data-container'>
         <Row
           align='stretch'
           gutter={[
@@ -492,7 +485,8 @@ const Overview: React.FC<{}> = () => {
                   )
                 }
               ]}
-              linkToUrl='/Om' />
+              linkToUrl='/Om'
+              state={{activeTab: '2'}} />
           </Col>
           <Col xs={24} sm={24} md={24} lg={12} xl={12}>
             <OverviewSummaryCard
@@ -531,9 +525,19 @@ const Overview: React.FC<{}> = () => {
                   )
                 }
               ]}
-              linkToUrl='/Om' />
+              linkToUrl='/Om'
+              state={{activeTab: '3'}} />
           </Col>
         </Row>
+        <span style={{ paddingLeft: '8px' }}>
+          <span style={{ color: '#6E6E6E' }}>OM ID:&nbsp;</span>
+          {omServiceId}
+        </span>
+        <span style={{ marginLeft: '12px', marginRight: '12px' }}> | </span>
+        <span>
+          <span style={{ color: '#6E6E6E' }}>SCM ID:&nbsp;</span>
+          {scmServiceId}
+        </span>
       </div>
     </>
   );

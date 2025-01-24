@@ -67,7 +67,7 @@ public class ReplicationSupervisorMetrics implements MetricsSource {
             supervisor.getTotalInFlightReplications())
         .addGauge(Interns.info("numQueuedReplications",
             "Number of replications in queue"),
-            supervisor.getQueueSize())
+            supervisor.getReplicationQueuedCount())
         .addGauge(Interns.info("numRequestedReplications",
             "Number of requested replications"),
             supervisor.getReplicationRequestCount())
@@ -107,7 +107,10 @@ public class ReplicationSupervisorMetrics implements MetricsSource {
               .addGauge(Interns.info("numSkipped" + metricsName,
                   "Number of " + descriptionSegment + " skipped as the container is "
                   + "already present"),
-                  supervisor.getReplicationSkippedCount(metricsName));
+                  supervisor.getReplicationSkippedCount(metricsName))
+              .addGauge(Interns.info("numQueued" + metricsName,
+                  "Number of " + descriptionSegment + " in queue"),
+                  supervisor.getReplicationQueuedCount(metricsName));
         }
       });
     }

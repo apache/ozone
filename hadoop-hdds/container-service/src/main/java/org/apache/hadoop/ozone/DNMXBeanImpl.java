@@ -25,8 +25,53 @@ import org.apache.hadoop.hdds.utils.VersionInfo;
  * This is the JMX management class for DN information.
  */
 public class DNMXBeanImpl extends ServiceRuntimeInfoImpl implements DNMXBean {
-  public DNMXBeanImpl(
-      VersionInfo versionInfo) {
+
+  private String hostName;
+  private String clientRpcPort;
+  private String httpPort;
+  private String httpsPort;
+
+  public DNMXBeanImpl(VersionInfo versionInfo) {
     super(versionInfo);
+  }
+
+  @Override
+  public String getHostname() {
+    return hostName;
+  }
+
+  @Override
+  public String getClientRpcPort() {
+    return clientRpcPort;
+  }
+
+  @Override
+  public String getHttpPort() {
+    return httpPort;
+  }
+
+  @Override
+  public String getHttpsPort() {
+    return httpsPort;
+  }
+
+  public void setHttpPort(String httpPort) {
+    this.httpPort = httpPort;
+  }
+
+  public void setHostName(String hostName) {
+    this.hostName = hostName;
+  }
+
+  public void setClientRpcPort(String rpcPort) {
+    this.clientRpcPort = rpcPort;
+  }
+
+  public String getHostName() {
+    return hostName;
+  }
+
+  public void setHttpsPort(String httpsPort) {
+    this.httpsPort = httpsPort;
   }
 }

@@ -17,6 +17,6 @@
  */
 
 /**
- * Ozone Repair tools.
+ * Ozone Quota Repair tools.
  */
 package org.apache.hadoop.ozone.repair.quota;

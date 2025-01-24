@@ -59,7 +59,7 @@ public class GeneratorScm extends BaseGenerator {
 
     ConfigurationSource config = createOzoneConfiguration();
 
-    scmDb = DBStoreBuilder.createDBStore(config, new SCMDBDefinition());
+    scmDb = DBStoreBuilder.createDBStore(config, SCMDBDefinition.get());
 
     containerStore = CONTAINERS.getTable(scmDb);
 

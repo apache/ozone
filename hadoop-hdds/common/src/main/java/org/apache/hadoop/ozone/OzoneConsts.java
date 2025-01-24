@@ -122,6 +122,7 @@ public final class OzoneConsts {
   public static final String OM_DB_BACKUP_PREFIX = "om.db.backup.";
   public static final String SCM_DB_BACKUP_PREFIX = "scm.db.backup.";
   public static final String CONTAINER_DB_NAME = "container.db";
+  public static final String WITNESSED_CONTAINER_DB_NAME = "witnessed_container.db";
 
   public static final String STORAGE_DIR_CHUNKS = "chunks";
   public static final String OZONE_DB_CHECKPOINT_REQUEST_FLUSH =
@@ -387,10 +388,7 @@ public final class OzoneConsts {
   // should remain prepared even after a restart.
   public static final String PREPARE_MARKER = "prepareMarker";
 
-  // TODO : rename this to OZONE_RATIS_SNAPSHOT_DIR and use it in both
-  // SCM and OM
-  public static final String OM_RATIS_SNAPSHOT_DIR = "snapshot";
-  public static final String SCM_RATIS_SNAPSHOT_DIR = "snapshot";
+  public static final String OZONE_RATIS_SNAPSHOT_DIR = "snapshot";
 
   public static final long DEFAULT_OM_UPDATE_ID = -1L;
 

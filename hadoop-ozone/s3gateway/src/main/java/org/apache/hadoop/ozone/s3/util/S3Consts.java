@@ -74,6 +74,7 @@ public final class S3Consts {
   public static final String TAG_HEADER = "x-amz-tagging";
   public static final String TAG_DIRECTIVE_HEADER = "x-amz-tagging-directive";
   public static final String TAG_COUNT_HEADER = "x-amz-tagging-count";
+  public static final String AWS_TAG_PREFIX = "aws:";
 
   public static final int TAG_NUM_LIMIT = 10;
   public static final int TAG_KEY_LENGTH_LIMIT = 128;

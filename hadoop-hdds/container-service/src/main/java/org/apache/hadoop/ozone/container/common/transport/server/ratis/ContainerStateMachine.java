@@ -41,8 +41,9 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -64,26 +65,25 @@ import org.apache.hadoop.hdds.utils.ResourceCache;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.util.Time;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import org.apache.ratis.proto.RaftProtos;
-import org.apache.ratis.proto.RaftProtos.StateMachineEntryProto;
 import org.apache.ratis.proto.RaftProtos.LogEntryProto;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.proto.RaftProtos.RoleInfoProto;
+import org.apache.ratis.proto.RaftProtos.StateMachineEntryProto;
 import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientRequest;
+import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
-import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
@@ -98,10 +98,10 @@ import org.apache.ratis.statemachine.impl.SingleFileSnapshotInfo;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
+import org.apache.ratis.util.JavaUtils;
 import org.apache.ratis.util.LifeCycle;
 import org.apache.ratis.util.TaskQueue;
 import org.apache.ratis.util.function.CheckedSupplier;
-import org.apache.ratis.util.JavaUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -185,7 +185,6 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   private final SimpleStateMachineStorage storage =
       new SimpleStateMachineStorage();
-  private final RaftGroupId gid;
   private final ContainerDispatcher dispatcher;
   private final ContainerController containerController;
   private final XceiverServerRatis ratisServer;
@@ -205,6 +204,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   private final boolean waitOnBothFollowers;
   private final HddsDatanodeService datanodeService;
   private static Semaphore semaphore = new Semaphore(1);
+  private final AtomicBoolean peersValidated;
 
   /**
    * CSM metrics.
@@ -220,7 +220,6 @@ public class ContainerStateMachine extends BaseStateMachine {
       ConfigurationSource conf,
       String threadNamePrefix) {
     this.datanodeService = hddsDatanodeService;
-    this.gid = gid;
     this.dispatcher = dispatcher;
     this.containerController = containerController;
     this.ratisServer = ratisServer;
@@ -256,6 +255,7 @@ public class ContainerStateMachine extends BaseStateMachine {
             HDDS_CONTAINER_RATIS_STATEMACHINE_MAX_PENDING_APPLY_TXNS_DEFAULT);
     applyTransactionSemaphore = new Semaphore(maxPendingApplyTransactions);
     stateMachineHealthy = new AtomicBoolean(true);
+    this.peersValidated = new AtomicBoolean(false);
 
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
         .setNameFormat(
@@ -267,6 +267,19 @@ public class ContainerStateMachine extends BaseStateMachine {
     this.waitOnBothFollowers = conf.getObject(
         DatanodeConfiguration.class).waitOnAllFollowers();
 
+  }
+
+  private void validatePeers() throws IOException {
+    if (this.peersValidated.get()) {
+      return;
+    }
+    final RaftGroup group = ratisServer.getServerDivision(getGroupId()).getGroup();
+    final RaftPeerId selfId = ratisServer.getServer().getId();
+    if (group.getPeer(selfId) == null) {
+      throw new StorageContainerException("Current datanode " + selfId + " is not a member of " + group,
+          ContainerProtos.Result.INVALID_CONFIG);
+    }
+    peersValidated.set(true);
   }
 
   @Override
@@ -284,8 +297,9 @@ public class ContainerStateMachine extends BaseStateMachine {
       throws IOException {
     super.initialize(server, id, raftStorage);
     storage.init(raftStorage);
-    ratisServer.notifyGroupAdd(gid);
+    ratisServer.notifyGroupAdd(id);
 
+    LOG.info("{}: initialize {}", server.getId(), id);
     loadSnapshot(storage.getLatestSnapshot());
   }
 
@@ -294,7 +308,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     if (snapshot == null) {
       TermIndex empty = TermIndex.valueOf(0, RaftLog.INVALID_LOG_INDEX);
       LOG.info("{}: The snapshot info is null. Setting the last applied index " +
-              "to:{}", gid, empty);
+              "to:{}", getGroupId(), empty);
       setLastAppliedTermIndex(empty);
       return empty.getIndex();
     }
@@ -302,7 +316,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     final File snapshotFile = snapshot.getFile().getPath().toFile();
     final TermIndex last =
         SimpleStateMachineStorage.getTermIndexFromSnapshotFile(snapshotFile);
-    LOG.info("{}: Setting the last applied index to {}", gid, last);
+    LOG.info("{}: Setting the last applied index to {}", getGroupId(), last);
     setLastAppliedTermIndex(last);
 
     // initialize the dispatcher with snapshot so that it build the missing
@@ -352,7 +366,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     long startTime = Time.monotonicNow();
     if (!isStateMachineHealthy()) {
       String msg =
-          "Failed to take snapshot " + " for " + gid + " as the stateMachine"
+          "Failed to take snapshot " + " for " + getGroupId() + " as the stateMachine"
               + " is unhealthy. The last applied index is at " + ti;
       StateMachineException sme = new StateMachineException(msg);
       LOG.error(msg);
@@ -361,19 +375,19 @@ public class ContainerStateMachine extends BaseStateMachine {
     if (ti != null && ti.getIndex() != RaftLog.INVALID_LOG_INDEX) {
       final File snapshotFile =
           storage.getSnapshotFile(ti.getTerm(), ti.getIndex());
-      LOG.info("{}: Taking a snapshot at:{} file {}", gid, ti, snapshotFile);
+      LOG.info("{}: Taking a snapshot at:{} file {}", getGroupId(), ti, snapshotFile);
       try (FileOutputStream fos = new FileOutputStream(snapshotFile)) {
         persistContainerSet(fos);
         fos.flush();
         // make sure the snapshot file is synced
         fos.getFD().sync();
       } catch (IOException ioe) {
-        LOG.error("{}: Failed to write snapshot at:{} file {}", gid, ti,
+        LOG.error("{}: Failed to write snapshot at:{} file {}", getGroupId(), ti,
             snapshotFile);
         throw ioe;
       }
       LOG.info("{}: Finished taking a snapshot at:{} file:{} took: {} ms",
-          gid, ti, snapshotFile, (Time.monotonicNow() - startTime));
+              getGroupId(), ti, snapshotFile, (Time.monotonicNow() - startTime));
       return ti.getIndex();
     }
     return -1;
@@ -387,7 +401,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     final StateMachineLogEntryProto stateMachineLogEntry = entry.getStateMachineLogEntry();
     final ContainerCommandRequestProto logProto;
     try {
-      logProto = getContainerCommandRequestProto(gid, stateMachineLogEntry.getLogData());
+      logProto = getContainerCommandRequestProto(getGroupId(), stateMachineLogEntry.getLogData());
     } catch (InvalidProtocolBufferException e) {
       trx.setException(e);
       return trx;
@@ -414,7 +428,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     long startTime = Time.monotonicNowNanos();
     final ContainerCommandRequestProto proto =
         message2ContainerCommandRequestProto(request.getMessage());
-    Preconditions.checkArgument(request.getRaftGroupId().equals(gid));
+    Preconditions.checkArgument(request.getRaftGroupId().equals(getGroupId()));
 
     final TransactionContext.Builder builder = TransactionContext.newBuilder()
         .setClientRequest(request)
@@ -450,7 +464,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         final WriteChunkRequestProto.Builder commitWriteChunkProto = WriteChunkRequestProto.newBuilder(write)
             .clearData();
         protoBuilder.setWriteChunk(commitWriteChunkProto)
-            .setPipelineID(gid.getUuid().toString())
+            .setPipelineID(getGroupId().getUuid().toString())
             .setTraceID(proto.getTraceID());
 
         builder.setStateMachineData(write.getData());
@@ -492,20 +506,20 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   private ContainerCommandRequestProto message2ContainerCommandRequestProto(
       Message message) throws InvalidProtocolBufferException {
-    return ContainerCommandRequestMessage.toProto(message.getContent(), gid);
+    return ContainerCommandRequestMessage.toProto(message.getContent(), getGroupId());
   }
 
   private ContainerCommandResponseProto dispatchCommand(
       ContainerCommandRequestProto requestProto, DispatcherContext context) {
     if (LOG.isTraceEnabled()) {
-      LOG.trace("{}: dispatch {} containerID={} pipelineID={} traceID={}", gid,
+      LOG.trace("{}: dispatch {} containerID={} pipelineID={} traceID={}", getGroupId(),
           requestProto.getCmdType(), requestProto.getContainerID(),
           requestProto.getPipelineID(), requestProto.getTraceID());
     }
     ContainerCommandResponseProto response =
         dispatcher.dispatch(requestProto, context);
     if (LOG.isTraceEnabled()) {
-      LOG.trace("{}: response {}", gid, response);
+      LOG.trace("{}: response {}", getGroupId(), response);
     }
     return response;
   }
@@ -532,7 +546,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     RaftServer server = ratisServer.getServer();
     Preconditions.checkArgument(!write.getData().isEmpty());
     try {
-      if (server.getDivision(gid).getInfo().isLeader()) {
+      if (server.getDivision(getGroupId()).getInfo().isLeader()) {
         stateMachineDataCache.put(entryIndex, write.getData());
       }
     } catch (InterruptedException ioe) {
@@ -560,7 +574,7 @@ public class ContainerStateMachine extends BaseStateMachine {
             return dispatchCommand(requestProto, context);
           } catch (Exception e) {
             LOG.error("{}: writeChunk writeStateMachineData failed: blockId" +
-                "{} logIndex {} chunkName {}", gid, write.getBlockID(),
+                "{} logIndex {} chunkName {}", getGroupId(), write.getBlockID(),
                 entryIndex, write.getChunkData().getChunkName(), e);
             metrics.incNumWriteDataFails();
             // write chunks go in parallel. It's possible that one write chunk
@@ -574,7 +588,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     writeChunkFutureMap.put(entryIndex, writeChunkFuture);
     if (LOG.isDebugEnabled()) {
       LOG.debug("{}: writeChunk writeStateMachineData : blockId" +
-              "{} logIndex {} chunkName {}", gid, write.getBlockID(),
+              "{} logIndex {} chunkName {}", getGroupId(), write.getBlockID(),
           entryIndex, write.getChunkData().getChunkName());
     }
     // Remove the future once it finishes execution from the
@@ -588,7 +602,7 @@ public class ContainerStateMachine extends BaseStateMachine {
           && r.getResult() != ContainerProtos.Result.CHUNK_FILE_INCONSISTENCY) {
         StorageContainerException sce =
             new StorageContainerException(r.getMessage(), r.getResult());
-        LOG.error(gid + ": writeChunk writeStateMachineData failed: blockId" +
+        LOG.error(getGroupId() + ": writeChunk writeStateMachineData failed: blockId" +
             write.getBlockID() + " logIndex " + entryIndex + " chunkName " +
             write.getChunkData().getChunkName() + " Error message: " +
             r.getMessage() + " Container Result: " + r.getResult());
@@ -602,7 +616,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         metrics.incNumBytesWrittenCount(
             requestProto.getWriteChunk().getChunkData().getLen());
         if (LOG.isDebugEnabled()) {
-          LOG.debug(gid +
+          LOG.debug(getGroupId() +
               ": writeChunk writeStateMachineData  completed: blockId" +
               write.getBlockID() + " logIndex " + entryIndex + " chunkName " +
               write.getChunkData().getChunkName());
@@ -623,7 +637,7 @@ public class ContainerStateMachine extends BaseStateMachine {
           DispatcherContext context) throws StorageContainerException {
     if (LOG.isDebugEnabled()) {
       LOG.debug("{}: getStreamDataChannel {} containerID={} pipelineID={} " +
-                      "traceID={}", gid, requestProto.getCmdType(),
+                      "traceID={}", getGroupId(), requestProto.getCmdType(),
               requestProto.getContainerID(), requestProto.getPipelineID(),
               requestProto.getTraceID());
     }
@@ -782,7 +796,7 @@ public class ContainerStateMachine extends BaseStateMachine {
           new StorageContainerException(response.getMessage(),
               response.getResult());
       LOG.error("gid {} : ReadStateMachine failed. cmd {} logIndex {} msg : "
-              + "{} Container Result: {}", gid, response.getCmdType(), index,
+              + "{} Container Result: {}", getGroupId(), response.getCmdType(), index,
           response.getMessage(), response.getResult());
       stateMachineHealthy.set(false);
       throw sce;
@@ -818,11 +832,9 @@ public class ContainerStateMachine extends BaseStateMachine {
    */
   @Override
   public CompletableFuture<Void> flush(long index) {
-    List<CompletableFuture<ContainerCommandResponseProto>> futureList =
-        writeChunkFutureMap.entrySet().stream().filter(x -> x.getKey() <= index)
-            .map(Map.Entry::getValue).collect(Collectors.toList());
     return CompletableFuture.allOf(
-        futureList.toArray(new CompletableFuture[futureList.size()]));
+        writeChunkFutureMap.entrySet().stream().filter(x -> x.getKey() <= index)
+            .map(Map.Entry::getValue).toArray(CompletableFuture[]::new));
   }
 
   /**
@@ -859,7 +871,7 @@ public class ContainerStateMachine extends BaseStateMachine {
           .map(TransactionContext::getStateMachineContext)
           .orElse(null);
       final ContainerCommandRequestProto requestProto = context != null ? context.getLogProto()
-          : getContainerCommandRequestProto(gid, entry.getStateMachineLogEntry().getLogData());
+          : getContainerCommandRequestProto(getGroupId(), entry.getStateMachineLogEntry().getLogData());
 
       if (requestProto.getCmdType() != Type.WriteChunk) {
         throw new IllegalStateException("Cmd type:" + requestProto.getCmdType()
@@ -877,7 +889,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       return future;
     } catch (Exception e) {
       metrics.incNumReadStateMachineFails();
-      LOG.error("{} unable to read stateMachineData:", gid, e);
+      LOG.error("{} unable to read stateMachineData:", getGroupId(), e);
       return completeExceptionally(e);
     }
   }
@@ -923,7 +935,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     // from `HddsDatanodeService.stop()`, otherwise, it indicates this `close` originates from ratis.
     if (allServer) {
       if (datanodeService != null && !datanodeService.isStopped()) {
-        LOG.info("{} is closed by ratis", gid);
+        LOG.info("{} is closed by ratis", getGroupId());
         if (semaphore.tryAcquire()) {
           // run with a different thread, so this raft group can be closed
           Runnable runnable = () -> {
@@ -955,7 +967,7 @@ public class ContainerStateMachine extends BaseStateMachine {
           CompletableFuture.runAsync(runnable);
         }
       } else {
-        LOG.info("{} is closed by HddsDatanodeService", gid);
+        LOG.info("{} is closed by HddsDatanodeService", getGroupId());
       }
     }
   }
@@ -967,6 +979,11 @@ public class ContainerStateMachine extends BaseStateMachine {
     final CheckedSupplier<ContainerCommandResponseProto, Exception> task
         = () -> {
           try {
+            try {
+              this.validatePeers();
+            } catch (StorageContainerException e) {
+              return ContainerUtils.logAndReturnError(LOG, e, request);
+            }
             long timeNow = Time.monotonicNowNanos();
             long queueingDelay = timeNow - context.getStartTime();
             metrics.recordQueueingDelay(request.getCmdType(), queueingDelay);
@@ -986,14 +1003,17 @@ public class ContainerStateMachine extends BaseStateMachine {
   private void removeStateMachineDataIfNeeded(long index) {
     if (waitOnBothFollowers) {
       try {
-        RaftServer.Division division = ratisServer.getServer().getDivision(gid);
+        RaftServer.Division division = ratisServer.getServer().getDivision(getGroupId());
         if (division.getInfo().isLeader()) {
-          long minIndex = Arrays.stream(division.getInfo()
-              .getFollowerNextIndices()).min().getAsLong();
-          LOG.debug("Removing data corresponding to log index {} min index {} "
-                  + "from cache", index, minIndex);
-          removeCacheDataUpTo(Math.min(minIndex, index));
+          Arrays.stream(division.getInfo()
+              .getFollowerNextIndices()).min().ifPresent(minIndex -> {
+                removeCacheDataUpTo(Math.min(minIndex, index));
+                LOG.debug("Removing data corresponding to log index {} min index {} "
+                    + "from cache", index, minIndex);
+              });
         }
+      } catch (RuntimeException e) {
+        throw e;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -1044,7 +1064,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       CompletableFuture<Message> applyTransactionFuture =
           new CompletableFuture<>();
       final Consumer<Throwable> exceptionHandler = e -> {
-        LOG.error(gid + ": failed to applyTransaction at logIndex " + index
+        LOG.error(getGroupId() + ": failed to applyTransaction at logIndex " + index
             + " for " + requestProto.getCmdType(), e);
         stateMachineHealthy.compareAndSet(true, false);
         metrics.incNumApplyTransactionsFails();
@@ -1072,7 +1092,7 @@ public class ContainerStateMachine extends BaseStateMachine {
               new StorageContainerException(r.getMessage(), r.getResult());
           LOG.error(
               "gid {} : ApplyTransaction failed. cmd {} logIndex {} msg : "
-                  + "{} Container Result: {}", gid, r.getCmdType(), index,
+                  + "{} Container Result: {}", getGroupId(), r.getCmdType(), index,
               r.getMessage(), r.getResult());
           metrics.incNumApplyTransactionsFails();
           // Since the applyTransaction now is completed exceptionally,
@@ -1081,12 +1101,12 @@ public class ContainerStateMachine extends BaseStateMachine {
           // shutdown.
           applyTransactionFuture.completeExceptionally(sce);
           stateMachineHealthy.compareAndSet(true, false);
-          ratisServer.handleApplyTransactionFailure(gid, trx.getServerRole());
+          ratisServer.handleApplyTransactionFailure(getGroupId(), trx.getServerRole());
         } else {
           if (LOG.isDebugEnabled()) {
             LOG.debug(
                 "gid {} : ApplyTransaction completed. cmd {} logIndex {} msg : "
-                    + "{} Container Result: {}", gid, r.getCmdType(), index,
+                    + "{} Container Result: {}", getGroupId(), r.getCmdType(), index,
                 r.getMessage(), r.getResult());
           }
           if (cmdType == Type.WriteChunk || cmdType == Type.PutSmallFile) {
@@ -1164,25 +1184,25 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   @Override
   public void notifyFollowerSlowness(RoleInfoProto roleInfoProto, RaftPeer follower) {
-    ratisServer.handleFollowerSlowness(gid, roleInfoProto, follower);
+    ratisServer.handleFollowerSlowness(getGroupId(), roleInfoProto, follower);
   }
 
   @Override
   public void notifyExtendedNoLeader(RoleInfoProto roleInfoProto) {
-    ratisServer.handleNoLeader(gid, roleInfoProto);
+    ratisServer.handleNoLeader(getGroupId(), roleInfoProto);
   }
 
   @Override
   public void notifyLogFailed(Throwable t, LogEntryProto failedEntry) {
-    LOG.error("{}: {} {}", gid, TermIndex.valueOf(failedEntry),
+    LOG.error("{}: {} {}", getGroupId(), TermIndex.valueOf(failedEntry),
         toStateMachineLogEntryString(failedEntry.getStateMachineLogEntry()), t);
-    ratisServer.handleNodeLogFailure(gid, t);
+    ratisServer.handleNodeLogFailure(getGroupId(), t);
   }
 
   @Override
   public CompletableFuture<TermIndex> notifyInstallSnapshotFromLeader(
       RoleInfoProto roleInfoProto, TermIndex firstTermIndexInLog) {
-    ratisServer.handleInstallSnapshotFromLeader(gid, roleInfoProto,
+    ratisServer.handleInstallSnapshotFromLeader(getGroupId(), roleInfoProto,
         firstTermIndexInLog);
     final CompletableFuture<TermIndex> future = new CompletableFuture<>();
     future.complete(firstTermIndexInLog);
@@ -1191,7 +1211,7 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   @Override
   public void notifyGroupRemove() {
-    ratisServer.notifyGroupRemove(gid);
+    ratisServer.notifyGroupRemove(getGroupId());
     // Make best effort to quasi-close all the containers on group removal.
     // Containers already in terminal state like CLOSED or UNHEALTHY will not
     // be affected.
@@ -1199,7 +1219,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       try {
         containerController.markContainerForClose(cid);
         containerController.quasiCloseContainer(cid,
-            "Ratis group removed. Group id: " + gid);
+            "Ratis group removed. Group id: " + getGroupId());
       } catch (IOException e) {
         LOG.debug("Failed to quasi-close container {}", cid);
       }
@@ -1221,7 +1241,7 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   @Override
   public String toStateMachineLogEntryString(StateMachineLogEntryProto proto) {
-    return smProtoToString(gid, containerController, proto);
+    return smProtoToString(getGroupId(), containerController, proto);
   }
 
   public static String smProtoToString(RaftGroupId gid,

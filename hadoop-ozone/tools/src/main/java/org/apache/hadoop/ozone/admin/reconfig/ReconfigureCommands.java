@@ -17,10 +17,10 @@
  */
 package org.apache.hadoop.ozone.admin.reconfig;
 
+import org.apache.hadoop.hdds.cli.AdminSubcommand;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
@@ -47,9 +47,8 @@ import java.util.concurrent.Callable;
         ReconfigureStatusSubcommand.class,
         ReconfigurePropertiesSubcommand.class
     })
-@MetaInfServices(SubcommandWithParent.class)
-public class ReconfigureCommands implements Callable<Void>,
-    SubcommandWithParent {
+@MetaInfServices(AdminSubcommand.class)
+public class ReconfigureCommands implements Callable<Void>, AdminSubcommand {
 
   @CommandLine.ParentCommand
   private OzoneAdmin parent;
@@ -85,11 +84,6 @@ public class ReconfigureCommands implements Callable<Void>,
 
   public HddsProtos.NodeType getService() {
     return HddsProtos.NodeType.valueOf(service);
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return OzoneAdmin.class;
   }
 
   public boolean isBatchReconfigDatanodes() {

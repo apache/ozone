@@ -272,8 +272,7 @@ public class OmMetadataGenerator extends BaseFreonGenerator
         .setVolumeName(volumeName)
         .setReplicationConfig(replicationConfig)
         .setLocationInfoList(new ArrayList<>())
-        .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
-            ALL, ALL));
+        .setAcls(OzoneAclUtil.getAclList(ugi, ALL, ALL));
   }
 
   private String getPath(long counter) {

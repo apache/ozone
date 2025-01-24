@@ -306,7 +306,7 @@ public final class RocksDatabase implements Closeable {
         ByteBuffer value) throws IOException {
       if (LOG.isDebugEnabled()) {
         LOG.debug("batchPut buffer key {}", bytes2String(key.duplicate()));
-        LOG.debug("batchPut buffer value {}", bytes2String(value.duplicate()));
+        LOG.debug("batchPut buffer value size {}", value.remaining());
       }
 
       try (UncheckedAutoCloseable ignored = acquire()) {

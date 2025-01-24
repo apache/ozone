@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.admin.scm;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -27,6 +28,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.hadoop.ozone.utils.FormattingCLIUtils;
 import picocli.CommandLine;
 
 import static java.lang.System.err;
@@ -50,13 +52,44 @@ public class GetScmRatisRolesSubcommand extends ScmSubcommand {
       description = "Format output as JSON")
   private boolean json;
 
+  @CommandLine.Option(names = { "--table" },
+       defaultValue = "false",
+       description = "Format output as Table")
+  private boolean table;
+
+  private static final String SCM_ROLES_TITLE = "Storage Container Manager Roles";
+
+  private static final List<String> RATIS_SCM_ROLES_HEADER = Arrays.asList(
+      "Host Name", "Ratis Port", "Role",  "Node ID", "Host Address");
+
+  private static final List<String> STANDALONE_SCM_ROLES_HEADER = Arrays.asList("Host Name", "Port");
+
   @Override
-  protected void execute(ScmClient scmClient) throws IOException {
+  public void execute(ScmClient scmClient) throws IOException {
     List<String> ratisRoles = scmClient.getScmRatisRoles();
+    boolean isRatisEnabled = scmClient.isScmRatisEnable();
     if (json) {
       Map<String, Map<String, String>> scmRoles = parseScmRoles(ratisRoles);
       System.out.print(
           JsonUtils.toJsonStringWithDefaultPrettyPrinter(scmRoles));
+    } else if (table) {
+      FormattingCLIUtils formattingCLIUtils = new FormattingCLIUtils(SCM_ROLES_TITLE);
+
+      // Determine which header to use based on whether Ratis is enabled or not.
+      if (isRatisEnabled) {
+        formattingCLIUtils.addHeaders(RATIS_SCM_ROLES_HEADER);
+      } else {
+        formattingCLIUtils.addHeaders(STANDALONE_SCM_ROLES_HEADER);
+      }
+
+      for (String role : ratisRoles) {
+        String[] roleItems = role.split(":");
+        if (roleItems.length < 2) {
+          err.println("Invalid response received for ScmRatisRoles.");
+        }
+        formattingCLIUtils.addLine(roleItems);
+      }
+      System.out.println(formattingCLIUtils.render());
     } else {
       for (String role: ratisRoles) {
         System.out.println(role);

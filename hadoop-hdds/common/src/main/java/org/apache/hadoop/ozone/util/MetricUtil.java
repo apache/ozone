@@ -110,4 +110,20 @@ public final class MetricUtil {
           sampleName, valueName, interval);
     }).collect(Collectors.toList());
   }
+
+  public static void stop(MutableQuantiles... quantiles) {
+    if (quantiles != null) {
+      stop(Arrays.asList(quantiles));
+    }
+  }
+
+  public static void stop(Iterable<MutableQuantiles> quantiles) {
+    if (quantiles != null) {
+      for (MutableQuantiles q : quantiles) {
+        if (q != null) {
+          q.stop();
+        }
+      }
+    }
+  }
 }

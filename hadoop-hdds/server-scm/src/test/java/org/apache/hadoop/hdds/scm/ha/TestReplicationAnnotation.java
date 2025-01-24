@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
 import org.apache.ratis.grpc.GrpcTlsConfig;
+import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.server.RaftServer;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +32,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.lang.reflect.Proxy;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -110,6 +112,11 @@ public class TestReplicationAnnotation {
       @Override
       public GrpcTlsConfig getGrpcTlsConfig() {
         return null;
+      }
+
+      @Override
+      public RaftPeerId getLeaderId() {
+        return RaftPeerId.valueOf(UUID.randomUUID().toString());
       }
     };
   }

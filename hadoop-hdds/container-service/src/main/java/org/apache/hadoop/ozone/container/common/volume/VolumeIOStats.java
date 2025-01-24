@@ -21,7 +21,10 @@ package org.apache.hadoop.ozone.container.common.volume;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableQuantiles;
+import org.apache.hadoop.metrics2.lib.MutableRate;
 
 /**
  * This class is used to track Volume IO stats for each HDDS Volume.
@@ -29,12 +32,23 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 public class VolumeIOStats {
   private String metricsSourceName = VolumeIOStats.class.getSimpleName();
   private String storageDirectory;
-  private @Metric MutableCounterLong readBytes;
-  private @Metric MutableCounterLong readOpCount;
-  private @Metric MutableCounterLong writeBytes;
-  private @Metric MutableCounterLong writeOpCount;
-  private @Metric MutableCounterLong readTime;
-  private @Metric MutableCounterLong writeTime;
+  private final MetricsRegistry registry = new MetricsRegistry("VolumeIOStats");
+  @Metric
+  private MutableCounterLong readBytes;
+  @Metric
+  private MutableCounterLong readOpCount;
+  @Metric
+  private MutableCounterLong writeBytes;
+  @Metric
+  private MutableCounterLong writeOpCount;
+  @Metric
+  private MutableRate readTime;
+  @Metric
+  private MutableQuantiles[] readLatencyQuantiles;
+  @Metric
+  private MutableRate writeTime;
+  @Metric
+  private MutableQuantiles[] writeLatencyQuantiles;
 
   @Deprecated
   public VolumeIOStats() {
@@ -44,9 +58,24 @@ public class VolumeIOStats {
   /**
    * @param identifier Typically, path to volume root. e.g. /data/hdds
    */
-  public VolumeIOStats(String identifier, String storageDirectory) {
+  public VolumeIOStats(String identifier, String storageDirectory, int[] intervals) {
     this.metricsSourceName += '-' + identifier;
     this.storageDirectory = storageDirectory;
+
+    // Try initializing `readLatencyQuantiles` and `writeLatencyQuantiles`
+    if (intervals != null && intervals.length > 0) {
+      final int length = intervals.length;
+      readLatencyQuantiles = new MutableQuantiles[intervals.length];
+      writeLatencyQuantiles = new MutableQuantiles[intervals.length];
+      for (int i = 0; i < length; i++) {
+        readLatencyQuantiles[i] = registry.newQuantiles(
+            "readLatency" + intervals[i] + "s",
+            "Read Data File Io Latency in ms", "ops", "latency", intervals[i]);
+        writeLatencyQuantiles[i] = registry.newQuantiles(
+            "writeLatency" + intervals[i] + "s",
+            "Write Data File Io Latency in ms", "ops", "latency", intervals[i]);
+      }
+    }
     init();
   }
 
@@ -99,7 +128,10 @@ public class VolumeIOStats {
    * @param time
    */
   public void incReadTime(long time) {
-    readTime.incr(time);
+    readTime.add(time);
+    for (MutableQuantiles q : readLatencyQuantiles) {
+      q.add(time);
+    }
   }
 
   /**
@@ -107,7 +139,10 @@ public class VolumeIOStats {
    * @param time
    */
   public void incWriteTime(long time) {
-    writeTime.incr(time);
+    writeTime.add(time);
+    for (MutableQuantiles q : writeLatencyQuantiles) {
+      q.add(time);
+    }
   }
 
   /**
@@ -147,7 +182,7 @@ public class VolumeIOStats {
    * @return long
    */
   public long getReadTime() {
-    return readTime.value();
+    return (long) readTime.lastStat().total();
   }
 
   /**
@@ -155,7 +190,7 @@ public class VolumeIOStats {
    * @return long
    */
   public long getWriteTime() {
-    return writeTime.value();
+    return (long) writeTime.lastStat().total();
   }
 
   @Metric

@@ -51,7 +51,7 @@ public class TestObjectDelete {
     rest.setOzoneConfiguration(new OzoneConfiguration());
 
     //WHEN
-    rest.delete("b1", "key1", null);
+    rest.delete("b1", "key1", null, null);
 
     //THEN
     assertFalse(bucket.listKeys("").hasNext(),

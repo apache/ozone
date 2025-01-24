@@ -153,9 +153,8 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
           omMetadataManager.getBucketKey(volumeName, bucketName));
       // add all missing parents to dir table
 
-      missingParentInfos =
-          OMDirectoryCreateRequestWithFSO.getAllMissingParentDirInfo(
-              ozoneManager, keyArgs, bucketInfo, pathInfoFSO, trxnLogIndex);
+      missingParentInfos = getAllMissingParentDirInfo(
+          ozoneManager, keyArgs, bucketInfo, pathInfoFSO, trxnLogIndex);
 
       // total number of keys created.
       numKeysCreated = missingParentInfos.size();
@@ -171,7 +170,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
               getFileEncryptionInfo(keyArgs), ozoneManager.getPrefixManager(),
               bucketInfo, pathInfoFSO, trxnLogIndex,
               pathInfoFSO.getLeafNodeObjectId(),
-              ozoneManager.isRatisEnabled(), repConfig);
+              ozoneManager.isRatisEnabled(), repConfig, ozoneManager.getConfiguration());
       validateEncryptionKeyInfo(bucketInfo, keyArgs);
 
       long openVersion = omFileInfo.getLatestVersionLocations().getVersion();

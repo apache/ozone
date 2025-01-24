@@ -71,6 +71,7 @@ import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.netty.NettyConfigKeys;
 import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.protocol.ClientInvocationId;
 import org.apache.ratis.protocol.SetConfigurationRequest;
 import org.apache.ratis.protocol.exceptions.LeaderNotReadyException;
 import org.apache.ratis.protocol.exceptions.LeaderSteppingDownException;
@@ -87,6 +88,7 @@ import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
+import org.apache.ratis.server.RetryCache;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.storage.RaftStorage;
 import org.apache.ratis.util.LifeCycle;
@@ -460,21 +462,49 @@ public final class OzoneManagerRatisServer {
    * ratis server.
    */
   private RaftClientRequest createRaftRequestImpl(OMRequest omRequest) {
-    if (!ozoneManager.isTestSecureOmFlag()) {
-      Preconditions.checkArgument(Server.getClientId() != DUMMY_CLIENT_ID);
-      Preconditions.checkArgument(Server.getCallId() != INVALID_CALL_ID);
-    }
     return RaftClientRequest.newBuilder()
-        .setClientId(
-            ClientId.valueOf(UUID.nameUUIDFromBytes(Server.getClientId())))
+        .setClientId(getClientId())
         .setServerId(server.getId())
         .setGroupId(raftGroupId)
-        .setCallId(Server.getCallId())
+        .setCallId(getCallId())
         .setMessage(
             Message.valueOf(
                 OMRatisHelper.convertRequestToByteString(omRequest)))
         .setType(RaftClientRequest.writeRequestType())
         .build();
+  }
+
+  private ClientId getClientId() {
+    final byte[] clientIdBytes = Server.getClientId();
+    if (!ozoneManager.isTestSecureOmFlag()) {
+      Preconditions.checkArgument(clientIdBytes != DUMMY_CLIENT_ID);
+    }
+    return ClientId.valueOf(UUID.nameUUIDFromBytes(clientIdBytes));
+  }
+
+  private long getCallId() {
+    final long callId = Server.getCallId();
+    if (!ozoneManager.isTestSecureOmFlag()) {
+      Preconditions.checkArgument(callId != INVALID_CALL_ID);
+    }
+    return callId;
+  }
+
+  public OMResponse checkRetryCache() throws ServiceException {
+    final ClientInvocationId invocationId = ClientInvocationId.valueOf(getClientId(), getCallId());
+    final RetryCache.Entry cacheEntry = getServerDivision().getRetryCache().getIfPresent(invocationId);
+    if (cacheEntry == null) {
+      return null;  //cache miss
+    }
+    //cache hit
+    try {
+      return getOMResponse(cacheEntry.getReplyFuture().get());
+    } catch (ExecutionException ex) {
+      throw new ServiceException(ex.getMessage(), ex);
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+      throw new ServiceException(ex.getMessage(), ex);
+    }
   }
 
   /**
@@ -538,6 +568,10 @@ public final class OzoneManagerRatisServer {
       }
     }
 
+    return getOMResponse(reply);
+  }
+
+  private OMResponse getOMResponse(RaftClientReply reply) throws ServiceException {
     try {
       return OMRatisHelper.getOMResponseFromRaftClientReply(reply);
     } catch (IOException ex) {
@@ -547,9 +581,6 @@ public final class OzoneManagerRatisServer {
         throw new ServiceException(ex);
       }
     }
-
-    // TODO: Still need to handle RaftRetry failure exception and
-    //  NotReplicated exception.
   }
 
   /**

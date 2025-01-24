@@ -136,7 +136,7 @@ public class TestPipelineManagerImpl {
     // placement policy (Rack Scatter), so just use the random one.
     conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_KEY,
         SCMContainerPlacementRandom.class.getName());
-    dbStore = DBStoreBuilder.createDBStore(conf, new SCMDBDefinition());
+    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     nodeManager = new MockNodeManager(true, 20);
     maxPipelineCount = nodeManager.getNodeCount(
         HddsProtos.NodeOperationalState.IN_SERVICE,
@@ -358,7 +358,8 @@ public class TestPipelineManagerImpl {
   public void testPipelineReport() throws Exception {
     try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
       SCMSafeModeManager scmSafeModeManager =
-          new SCMSafeModeManager(conf, new ArrayList<>(), null, pipelineManager,
+          new SCMSafeModeManager(conf, new ArrayList<>(),
+              mock(ContainerManager.class), pipelineManager,
               new EventQueue(), serviceManager, scmContext);
       Pipeline pipeline = pipelineManager
           .createPipeline(RatisReplicationConfig
@@ -469,7 +470,7 @@ public class TestPipelineManagerImpl {
 
     SCMSafeModeManager scmSafeModeManager =
         new SCMSafeModeManager(new OzoneConfiguration(), new ArrayList<>(),
-            null, pipelineManager, new EventQueue(),
+            mock(ContainerManager.class), pipelineManager, new EventQueue(),
             serviceManager, scmContext);
     PipelineReportHandler pipelineReportHandler =
         new PipelineReportHandler(scmSafeModeManager, pipelineManager,

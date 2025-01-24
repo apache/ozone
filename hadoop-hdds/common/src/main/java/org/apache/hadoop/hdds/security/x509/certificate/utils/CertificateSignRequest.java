@@ -27,13 +27,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
-
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.bouncycastle.asn1.ASN1EncodableVector;
 import org.bouncycastle.asn1.ASN1Object;
@@ -390,7 +389,7 @@ public final class CertificateSignRequest {
       if (altNames != null) {
         return Optional.of(new Extension(Extension.subjectAlternativeName,
             false, new DEROctetString(new GeneralNames(
-            altNames.toArray(new GeneralName[altNames.size()])))));
+            altNames.toArray(new GeneralName[0])))));
       }
       return Optional.empty();
     }
@@ -414,12 +413,10 @@ public final class CertificateSignRequest {
 
       // Add subject alternate name extension
       Optional<Extension> san = getSubjectAltNameExtension();
-      if (san.isPresent()) {
-        extensions.add(san.get());
-      }
+      san.ifPresent(extensions::add);
 
       return new Extensions(
-          extensions.toArray(new Extension[extensions.size()]));
+          extensions.toArray(new Extension[0]));
     }
 
     public CertificateSignRequest build() throws SCMSecurityException {

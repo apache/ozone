@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -166,9 +167,11 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
 
   @Override
   protected S3InitiateMultipartUploadRequest getS3InitiateMultipartUploadReq(
-      OMRequest initiateMPURequest) {
-    return new S3InitiateMultipartUploadRequestWithFSO(initiateMPURequest,
+      OMRequest initiateMPURequest) throws IOException {
+    S3InitiateMultipartUploadRequest request = new S3InitiateMultipartUploadRequestWithFSO(initiateMPURequest,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    request.setUGI(UserGroupInformation.getLoginUser());
+    return request;
   }
 
   @Test
@@ -256,7 +259,7 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
       List<OzoneAcl> omDirAcls = omDirInfo.getAcls();
 
       System.out.println("  subdir acls : " + omDirInfo + " ==> " + omDirAcls);
-      assertEquals(expectedInheritAcls, omDirAcls,
+      assertTrue(omDirAcls.containsAll(expectedInheritAcls),
           "Failed to inherit parent DEFAULT acls!");
 
       parentID = omDirInfo.getObjectID();

@@ -47,6 +47,7 @@ import java.util.Optional;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_CACHE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVER_LIST_MAX_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
@@ -81,6 +82,7 @@ public class TestListKeysWithFSO {
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 3);
     conf.setInt(OZONE_CLIENT_LIST_CACHE_SIZE, 3);
+    conf.setInt(OZONE_OM_SERVER_LIST_MAX_SIZE, 2);
     cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();

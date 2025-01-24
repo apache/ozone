@@ -73,7 +73,6 @@ public final class AclMetadata {
   /**
    * Builder for AclMetadata.
    */
-  @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
     private String type;
     private String name;
@@ -84,23 +83,23 @@ public final class AclMetadata {
 
     }
 
-    public Builder withType(String type) {
+    public Builder setType(String type) {
       this.type = type;
       return this;
     }
 
-    public Builder withName(String name) {
+    public Builder setName(String name) {
       this.name = name;
       return this;
     }
 
-    public Builder withScope(String scope) {
+    public Builder setScope(String scope) {
       this.scope = scope;
       return this;
 
     }
 
-    public Builder withAclList(List<String> aclList) {
+    public Builder setAclList(List<String> aclList) {
       this.aclList = aclList;
       return this;
     }
@@ -127,10 +126,10 @@ public final class AclMetadata {
 
     AclMetadata.Builder builder = AclMetadata.newBuilder();
 
-    return builder.withType(ozoneAcl.getType().toString().toUpperCase())
-        .withName(ozoneAcl.getName())
-        .withScope(ozoneAcl.getAclScope().toString().toUpperCase())
-        .withAclList(ozoneAcl.getAclStringList())
+    return builder.setType(ozoneAcl.getType().toString().toUpperCase())
+        .setName(ozoneAcl.getName())
+        .setScope(ozoneAcl.getAclScope().toString().toUpperCase())
+        .setAclList(ozoneAcl.getAclStringList())
         .build();
   }
 }

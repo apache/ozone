@@ -117,6 +117,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ResetDeletedBlockRetryCountResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -865,21 +866,21 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     } else if (request.hasFactor()) {
       factor = request.getFactor();
     }
-    List<ContainerInfo> containerList;
+    ContainerListResult containerListAndTotalCount;
     if (factor != null) {
       // Call from a legacy client
-      containerList =
+      containerListAndTotalCount =
           impl.listContainer(startContainerID, count, state, factor);
     } else {
-      containerList =
-          impl.listContainer(startContainerID, count, state, replicationType,
-              repConfig);
+      containerListAndTotalCount =
+          impl.listContainer(startContainerID, count, state, replicationType, repConfig);
     }
     SCMListContainerResponseProto.Builder builder =
         SCMListContainerResponseProto.newBuilder();
-    for (ContainerInfo container : containerList) {
+    for (ContainerInfo container : containerListAndTotalCount.getContainerInfoList()) {
       builder.addContainers(container.getProtobuf());
     }
+    builder.setContainerCount(containerListAndTotalCount.getTotalCount());
     return builder.build();
   }
 
@@ -1009,6 +1010,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .setClusterId(scmInfo.getClusterId())
         .setScmId(scmInfo.getScmId())
         .addAllPeerRoles(scmInfo.getRatisPeerRoles())
+        .setScmRatisEnabled(scmInfo.getScmRatisEnabled())
         .build();
   }
 

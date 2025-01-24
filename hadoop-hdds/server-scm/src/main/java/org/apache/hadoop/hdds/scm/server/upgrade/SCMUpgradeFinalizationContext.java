@@ -80,7 +80,6 @@ public final class SCMUpgradeFinalizationContext {
   /**
    * Builds an {@link SCMUpgradeFinalizationContext}.
    */
-  @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
     private PipelineManager pipelineManager;
     private NodeManager nodeManager;
@@ -120,13 +119,13 @@ public final class SCMUpgradeFinalizationContext {
     }
 
     public Builder setLayoutVersionManager(
-        HDDSLayoutVersionManager versionManager) {
-      this.versionManager = versionManager;
+        HDDSLayoutVersionManager layoutVersionManager) {
+      this.versionManager = layoutVersionManager;
       return this;
     }
 
-    public Builder setConfiguration(OzoneConfiguration conf) {
-      this.conf = conf;
+    public Builder setConfiguration(OzoneConfiguration configuration) {
+      this.conf = configuration;
       return this;
     }
 

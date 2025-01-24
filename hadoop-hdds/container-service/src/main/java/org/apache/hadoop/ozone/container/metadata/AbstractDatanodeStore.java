@@ -17,27 +17,22 @@
  */
 package org.apache.hadoop.ozone.container.metadata;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
-import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
-import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
-import org.rocksdb.InfoLogLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,14 +40,11 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.NoSuchElementException;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
-import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE;
-
 /**
  * Implementation of the {@link DatanodeStore} interface that contains
  * functionality common to all more derived datanode store implementations.
  */
-public abstract class AbstractDatanodeStore implements DatanodeStore {
+public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDefinition> implements DatanodeStore {
 
   private Table<String, Long> metadataTable;
 
@@ -68,12 +60,6 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(AbstractDatanodeStore.class);
-  private volatile DBStore store;
-  private final AbstractDatanodeDBDefinition dbDef;
-  private final ManagedColumnFamilyOptions cfOptions;
-
-  private static DatanodeDBProfile dbProfile;
-  private final boolean openReadOnly;
 
   /**
    * Constructs the metadata store and starts the DB services.
@@ -84,114 +70,64 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   protected AbstractDatanodeStore(ConfigurationSource config,
       AbstractDatanodeDBDefinition dbDef, boolean openReadOnly)
       throws IOException {
-
-    dbProfile = DatanodeDBProfile
-        .getProfile(config.getEnum(HDDS_DB_PROFILE, HDDS_DEFAULT_DB_PROFILE));
-
-    // The same config instance is used on each datanode, so we can share the
-    // corresponding column family options, providing a single shared cache
-    // for all containers on a datanode.
-    cfOptions = dbProfile.getColumnFamilyOptions(config);
-
-    this.dbDef = dbDef;
-    this.openReadOnly = openReadOnly;
-    start(config);
+    super(dbDef, config, openReadOnly);
   }
 
   @Override
-  public void start(ConfigurationSource config)
+  protected DBStore initDBStore(DBStoreBuilder dbStoreBuilder, ManagedDBOptions options, ConfigurationSource config)
       throws IOException {
-    if (this.store == null) {
-      ManagedDBOptions options = dbProfile.getDBOptions();
-      options.setCreateIfMissing(true);
-      options.setCreateMissingColumnFamilies(true);
-
-      if (this.dbDef instanceof DatanodeSchemaOneDBDefinition ||
-          this.dbDef instanceof DatanodeSchemaTwoDBDefinition) {
-        long maxWalSize = DBProfile.toLong(StorageUnit.MB.toBytes(2));
-        options.setMaxTotalWalSize(maxWalSize);
-      }
-
-      DatanodeConfiguration dc =
-          config.getObject(DatanodeConfiguration.class);
-      // Config user log files
-      InfoLogLevel level = InfoLogLevel.valueOf(
-          dc.getRocksdbLogLevel() + "_LEVEL");
-      options.setInfoLogLevel(level);
-      options.setMaxLogFileSize(dc.getRocksdbLogMaxFileSize());
-      options.setKeepLogFileNum(dc.getRocksdbLogMaxFileNum());
-      
-      if (this.dbDef instanceof DatanodeSchemaThreeDBDefinition) {
-        options.setDeleteObsoleteFilesPeriodMicros(
-            dc.getRocksdbDeleteObsoleteFilesPeriod());
-
-        // For V3, all Rocksdb dir has the same "container.db" name. So use
-        // parentDirName(storage UUID)-dbDirName as db metrics name
-        this.store = DBStoreBuilder.newBuilder(config, dbDef)
-            .setDBOptions(options)
-            .setDefaultCFOptions(cfOptions)
-            .setOpenReadOnly(openReadOnly)
-            .setDBJmxBeanNameName(dbDef.getDBLocation(config).getName() + "-" +
-                dbDef.getName())
-            .build();
-      } else {
-        this.store = DBStoreBuilder.newBuilder(config, dbDef)
-            .setDBOptions(options)
-            .setDefaultCFOptions(cfOptions)
-            .setOpenReadOnly(openReadOnly)
-            .build();
-      }
-
-      // Use the DatanodeTable wrapper to disable the table iterator on
-      // existing Table implementations retrieved from the DBDefinition.
-      // See the DatanodeTable's Javadoc for an explanation of why this is
-      // necessary.
-      metadataTable = new DatanodeTable<>(
-              dbDef.getMetadataColumnFamily().getTable(this.store));
-      checkTableStatus(metadataTable, metadataTable.getName());
-
-      // The block iterator this class returns will need to use the table
-      // iterator internally, so construct a block data table instance
-      // that does not have the iterator disabled by DatanodeTable.
-      blockDataTableWithIterator =
-              dbDef.getBlockDataColumnFamily().getTable(this.store);
-
-      blockDataTable = new DatanodeTable<>(blockDataTableWithIterator);
-      checkTableStatus(blockDataTable, blockDataTable.getName());
-
-      if (dbDef.getFinalizeBlocksColumnFamily() != null) {
-        finalizeBlocksTableWithIterator =
-            dbDef.getFinalizeBlocksColumnFamily().getTable(this.store);
-
-        finalizeBlocksTable = new DatanodeTable<>(
-            finalizeBlocksTableWithIterator);
-        checkTableStatus(finalizeBlocksTable, finalizeBlocksTable.getName());
-      }
-
-      if (dbDef.getLastChunkInfoColumnFamily() != null) {
-        lastChunkInfoTable = new DatanodeTable<>(
-            dbDef.getLastChunkInfoColumnFamily().getTable(this.store));
-        checkTableStatus(lastChunkInfoTable, lastChunkInfoTable.getName());
-      }
+    AbstractDatanodeDBDefinition dbDefinition = this.getDbDef();
+    if (dbDefinition instanceof DatanodeSchemaOneDBDefinition ||
+        dbDefinition instanceof DatanodeSchemaTwoDBDefinition) {
+      long maxWalSize = DBProfile.toLong(StorageUnit.MB.toBytes(2));
+      options.setMaxTotalWalSize(maxWalSize);
     }
-  }
+    DatanodeConfiguration dc =
+        config.getObject(DatanodeConfiguration.class);
 
-  @Override
-  public synchronized void stop() throws Exception {
-    if (store != null) {
-      store.close();
-      store = null;
+    if (dbDefinition instanceof DatanodeSchemaThreeDBDefinition) {
+      options.setDeleteObsoleteFilesPeriodMicros(
+          dc.getRocksdbDeleteObsoleteFilesPeriod());
+
+      // For V3, all Rocksdb dir has the same "container.db" name. So use
+      // parentDirName(storage UUID)-dbDirName as db metrics name
+      dbStoreBuilder.setDBJmxBeanNameName(dbDefinition.getDBLocation(config).getName() + "-" +
+              dbDefinition.getName());
     }
-  }
+    DBStore dbStore = dbStoreBuilder.setDBOptions(options).build();
 
-  @Override
-  public DBStore getStore() {
-    return this.store;
-  }
+    // Use the DatanodeTable wrapper to disable the table iterator on
+    // existing Table implementations retrieved from the DBDefinition.
+    // See the DatanodeTable's Javadoc for an explanation of why this is
+    // necessary.
+    metadataTable = new DatanodeTable<>(
+        dbDefinition.getMetadataColumnFamily().getTable(dbStore));
+    checkTableStatus(metadataTable, metadataTable.getName());
 
-  @Override
-  public BatchOperationHandler getBatchHandler() {
-    return this.store;
+    // The block iterator this class returns will need to use the table
+    // iterator internally, so construct a block data table instance
+    // that does not have the iterator disabled by DatanodeTable.
+    blockDataTableWithIterator =
+        dbDefinition.getBlockDataColumnFamily().getTable(dbStore);
+
+    blockDataTable = new DatanodeTable<>(blockDataTableWithIterator);
+    checkTableStatus(blockDataTable, blockDataTable.getName());
+
+    if (dbDefinition.getFinalizeBlocksColumnFamily() != null) {
+      finalizeBlocksTableWithIterator =
+          dbDefinition.getFinalizeBlocksColumnFamily().getTable(dbStore);
+
+      finalizeBlocksTable = new DatanodeTable<>(
+          finalizeBlocksTableWithIterator);
+      checkTableStatus(finalizeBlocksTable, finalizeBlocksTable.getName());
+    }
+
+    if (dbDefinition.getLastChunkInfoColumnFamily() != null) {
+      lastChunkInfoTable = new DatanodeTable<>(
+          dbDefinition.getLastChunkInfoColumnFamily().getTable(dbStore));
+      checkTableStatus(lastChunkInfoTable, lastChunkInfoTable.getName());
+    }
+    return dbStore;
   }
 
   @Override
@@ -238,44 +174,6 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       KeyPrefixFilter filter) throws IOException {
     return new KeyValueBlockLocalIdIterator(containerID,
         finalizeBlocksTableWithIterator.iterator(), filter);
-  }
-
-  @Override
-  public synchronized boolean isClosed() {
-    if (this.store == null) {
-      return true;
-    }
-    return this.store.isClosed();
-  }
-
-  @Override
-  public void close() throws IOException {
-    this.store.close();
-    this.cfOptions.close();
-  }
-
-  @Override
-  public void flushDB() throws IOException {
-    store.flushDB();
-  }
-
-  @Override
-  public void flushLog(boolean sync) throws IOException {
-    store.flushLog(sync);
-  }
-
-  @Override
-  public void compactDB() throws IOException {
-    store.compactDB();
-  }
-
-  @VisibleForTesting
-  public DatanodeDBProfile getDbProfile() {
-    return dbProfile;
-  }
-
-  protected AbstractDatanodeDBDefinition getDbDef() {
-    return this.dbDef;
   }
 
   protected Table<String, BlockData> getBlockDataTableWithIterator() {

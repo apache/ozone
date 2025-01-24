@@ -112,8 +112,7 @@ public class TestPipelinePlacementPolicy {
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         10, StorageUnit.MB);
     nodeManager.setNumPipelinePerDatanode(PIPELINE_LOAD_LIMIT);
-    dbStore = DBStoreBuilder.createDBStore(
-        conf, new SCMDBDefinition());
+    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     scmhaManager = SCMHAManagerStub.getInstance(true);
     stateManager = PipelineStateManagerImpl.newBuilder()
         .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))
@@ -398,9 +397,9 @@ public class TestPipelinePlacementPolicy {
         .setUuid(datanode.getUuid())
         .setHostName(datanode.getHostName())
         .setIpAddress(datanode.getIpAddress())
-        .addPort(datanode.getPort(DatanodeDetails.Port.Name.STANDALONE))
-        .addPort(datanode.getPort(DatanodeDetails.Port.Name.RATIS))
-        .addPort(datanode.getPort(DatanodeDetails.Port.Name.REST))
+        .addPort(datanode.getStandalonePort())
+        .addPort(datanode.getRatisPort())
+        .addPort(datanode.getRestPort())
         .setNetworkLocation(node.getNetworkLocation()).build();
     return result;
   }

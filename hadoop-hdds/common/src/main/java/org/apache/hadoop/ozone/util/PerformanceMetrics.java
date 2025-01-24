@@ -22,7 +22,9 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.metrics2.lib.MutableStat;
 
+import java.io.Closeable;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The {@code PerformanceMetrics} class encapsulates a collection of related
@@ -30,7 +32,7 @@ import java.util.List;
  * This class provides methods to update these metrics and to
  * snapshot their values for reporting.
  */
-public class PerformanceMetrics {
+public class PerformanceMetrics implements Closeable {
   private final MutableStat stat;
   private final List<MutableQuantiles> quantiles;
   private final MutableMinMax minMax;
@@ -43,12 +45,13 @@ public class PerformanceMetrics {
    * @param intervals the intervals for quantiles computation. Note, each
    *        interval in 'intervals' increases memory usage, as it corresponds
    *        to a separate quantile calculator.
+   * @return {@link PerformanceMetrics} instances created, mapped by field name
    */
-  public static synchronized <T> void initializeMetrics(T source,
+  public static synchronized <T> Map<String, PerformanceMetrics> initializeMetrics(T source,
       MetricsRegistry registry, String sampleName, String valueName,
       int[] intervals) {
     try {
-      PerformanceMetricsInitializer.initialize(
+      return PerformanceMetricsInitializer.initialize(
           source, registry, sampleName, valueName, intervals);
     } catch (IllegalAccessException e) {
       throw new RuntimeException("Failed to initialize PerformanceMetrics", e);
@@ -73,6 +76,11 @@ public class PerformanceMetrics {
     minMax = new MutableMinMax(registry, name, description, valueName);
   }
 
+  @Override
+  public void close() {
+    MetricUtil.stop(quantiles);
+  }
+
   /**
    * Adds a value to all the aggregated metrics.
    *
@@ -95,6 +103,5 @@ public class PerformanceMetrics {
     this.quantiles.forEach(quantile -> quantile.snapshot(recordBuilder, all));
     this.minMax.snapshot(recordBuilder, all);
   }
-
 }
 

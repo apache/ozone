@@ -144,7 +144,7 @@ const NavBar: React.FC<NavBarProps> = ({
       <span>Heatmap</span>
       <Link to={{
         pathname: '/Heatmap',
-        state: { isHeatmapEnabled: true }
+        state: { isHeatmapEnabled: isHeatmapEnabled }
       }}
       />
     </Menu.Item>

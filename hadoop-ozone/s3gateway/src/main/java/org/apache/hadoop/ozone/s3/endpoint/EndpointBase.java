@@ -72,6 +72,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.KB;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_TAG;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_TAG_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_KEY_LENGTH_LIMIT;
@@ -363,59 +364,70 @@ public abstract class EndpointBase implements Auditor {
 
     List<NameValuePair> tagPairs = URLEncodedUtils.parse(tagString, UTF_8);
 
-    if (tagPairs.isEmpty()) {
-      return Collections.emptyMap();
-    }
+    return validateAndGetTagging(tagPairs, NameValuePair::getName, NameValuePair::getValue);
+  }
 
-    Map<String, String> tags = new HashMap<>();
-    // Tag restrictions: https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_S3Tag.html
-    for (NameValuePair tagPair: tagPairs) {
-      if (StringUtils.isEmpty(tagPair.getName())) {
-        OS3Exception ex = newError(INVALID_TAG, TAG_HEADER);
-        ex.setErrorMessage("Some tag keys are empty, please specify the non-empty tag keys");
+  protected static <KV> Map<String, String> validateAndGetTagging(
+      List<KV> tagList,
+      Function<KV, String> getTagKey,
+      Function<KV, String> getTagValue
+  ) throws OS3Exception {
+    final Map<String, String> tags = new HashMap<>();
+    for (KV tagPair : tagList) {
+      final String tagKey = getTagKey.apply(tagPair);
+      final String tagValue = getTagValue.apply(tagPair);
+      // Tag restrictions: https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_S3Tag.html
+      if (StringUtils.isEmpty(tagKey)) {
+        OS3Exception ex = S3ErrorTable.newError(INVALID_TAG, TAG_HEADER);
+        ex.setErrorMessage("Some tag keys are empty, please only specify non-empty tag keys");
         throw ex;
       }
 
-      if (tagPair.getValue() == null) {
+      if (StringUtils.startsWith(tagKey, AWS_TAG_PREFIX)) {
+        OS3Exception ex = S3ErrorTable.newError(INVALID_TAG, tagKey);
+        ex.setErrorMessage("Tag key cannot start with \"aws:\" prefix");
+        throw ex;
+      }
+
+      if (tagValue == null) {
         // For example for query parameter with only value (e.g. "tag1")
-        OS3Exception ex = newError(INVALID_TAG, tagPair.getName());
+        OS3Exception ex = S3ErrorTable.newError(INVALID_TAG, tagKey);
         ex.setErrorMessage("Some tag values are not specified, please specify the tag values");
         throw ex;
       }
 
-      if (tags.containsKey(tagPair.getName())) {
-        // Tags that are associated with an object must have unique tag keys
-        // Reject request if the same key is used twice on the same resource
-        OS3Exception ex = newError(INVALID_TAG, tagPair.getName());
-        ex.setErrorMessage("There are tags with duplicate tag keys, tag keys should be unique");
-        throw ex;
-      }
-
-      if (tagPair.getName().length() > TAG_KEY_LENGTH_LIMIT) {
-        OS3Exception ex = newError(INVALID_TAG, tagPair.getName());
+      if (tagKey.length() > TAG_KEY_LENGTH_LIMIT) {
+        OS3Exception ex = S3ErrorTable.newError(INVALID_TAG, tagKey);
         ex.setErrorMessage("The tag key exceeds the maximum length of " + TAG_KEY_LENGTH_LIMIT);
         throw ex;
       }
 
-      if (tagPair.getValue().length() > TAG_VALUE_LENGTH_LIMIT) {
-        OS3Exception ex = newError(INVALID_TAG, tagPair.getValue());
+      if (tagValue.length() > TAG_VALUE_LENGTH_LIMIT) {
+        OS3Exception ex = S3ErrorTable.newError(INVALID_TAG, tagValue);
         ex.setErrorMessage("The tag value exceeds the maximum length of " + TAG_VALUE_LENGTH_LIMIT);
         throw ex;
       }
 
-      if (!TAG_REGEX_PATTERN.matcher(tagPair.getName()).matches()) {
-        OS3Exception ex = newError(INVALID_TAG, tagPair.getName());
+      if (!TAG_REGEX_PATTERN.matcher(tagKey).matches()) {
+        OS3Exception ex = S3ErrorTable.newError(INVALID_TAG, tagKey);
         ex.setErrorMessage("The tag key does not have a valid pattern");
         throw ex;
       }
 
-      if (!TAG_REGEX_PATTERN.matcher(tagPair.getValue()).matches()) {
-        OS3Exception ex = newError(INVALID_TAG, tagPair.getValue());
+      if (!TAG_REGEX_PATTERN.matcher(tagValue).matches()) {
+        OS3Exception ex = S3ErrorTable.newError(INVALID_TAG, tagValue);
         ex.setErrorMessage("The tag value does not have a valid pattern");
         throw ex;
       }
 
-      tags.put(tagPair.getName(), tagPair.getValue());
+      final String previous = tags.put(tagKey, tagValue);
+      if (previous != null) {
+        // Tags that are associated with an object must have unique tag keys
+        // Reject request if the same key is used twice on the same resource
+        OS3Exception ex = S3ErrorTable.newError(INVALID_TAG, tagKey);
+        ex.setErrorMessage("There are tags with duplicate tag keys, tag keys should be unique");
+        throw ex;
+      }
     }
 
     if (tags.size() > TAG_NUM_LIMIT) {
@@ -426,7 +438,7 @@ public abstract class EndpointBase implements Auditor {
       throw ex;
     }
 
-    return tags;
+    return Collections.unmodifiableMap(tags);
   }
 
   private AuditMessage.Builder auditMessageBaseBuilder(AuditAction op,

@@ -101,6 +101,18 @@ Report containers as JSON
                          Should contain   ${output}   stats
                          Should contain   ${output}   samples
 
+List all containers
+    ${output} =         Execute          ozone admin container list --all
+                        Should contain   ${output}   OPEN
+
+List all containers according to count (batchSize)
+    ${output} =         Execute          ozone admin container list --all --count 10
+                        Should contain   ${output}   OPEN
+
+List all containers from a particular container ID
+    ${output} =         Execute          ozone admin container list --all --start 1
+                        Should contain   ${output}   OPEN
+
 #List containers on unknown host
 #    ${output} =         Execute And Ignore Error     ozone admin --verbose container list --scm unknown-host
 #                        Should contain   ${output}   Invalid host name

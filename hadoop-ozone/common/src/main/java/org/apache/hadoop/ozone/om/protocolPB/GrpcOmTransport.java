@@ -121,6 +121,7 @@ public class GrpcOmTransport implements OmTransport {
 
     omFailoverProxyProvider = new GrpcOMFailoverProxyProvider(
         conf,
+        ugi,
         omServiceId,
         OzoneManagerProtocolPB.class);
 

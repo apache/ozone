@@ -96,7 +96,7 @@ Second and third nodes should be *bootstrapped* instead of init. These clusters 
 ozone scm --bootstrap
 ```
 
-Note: both commands perform one-time initialization.  SCM still needs to be started by running `ozone scm --daemon start`.
+Note: both commands perform one-time initialization.  SCM still needs to be started by running `ozone --daemon start scm`.
 
 ## Auto-bootstrap
 
@@ -121,7 +121,7 @@ Note: SCM still needs to be started after the init/bootstrap process.
 ```
 ozone scm --init
 ozone scm --bootstrap
-ozone scm --daemon start
+ozone --daemon start scm
 ```
 
 For Docker/Kubernetes, use `ozone scm` to start it in the foreground.

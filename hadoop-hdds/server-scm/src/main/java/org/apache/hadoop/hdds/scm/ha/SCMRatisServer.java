@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.ratis.grpc.GrpcTlsConfig;
+import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.server.RaftServer;
 
@@ -67,5 +68,7 @@ public interface SCMRatisServer {
   SCMStateMachine getSCMStateMachine();
 
   GrpcTlsConfig getGrpcTlsConfig();
+
+  RaftPeerId getLeaderId();
 
 }

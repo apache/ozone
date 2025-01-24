@@ -38,7 +38,6 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.ReadChunk;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
@@ -92,7 +91,7 @@ public class TestContainerUtils {
   public void testDatanodeIDPersistent(@TempDir File tempDir) throws Exception {
     // Generate IDs for testing
     DatanodeDetails id1 = randomDatanodeDetails();
-    id1.setPort(DatanodeDetails.newPort(Port.Name.STANDALONE, 1));
+    id1.setPort(DatanodeDetails.newStandalonePort(1));
     assertWriteRead(tempDir, id1);
 
     // Add certificate serial  id.

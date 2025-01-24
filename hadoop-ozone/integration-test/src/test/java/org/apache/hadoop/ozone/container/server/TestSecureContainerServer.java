@@ -70,7 +70,6 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.security.token.Token;
-import org.apache.ozone.test.GenericTestUtils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
@@ -98,7 +97,6 @@ import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.CheckedBiConsumer;
 import org.apache.ratis.util.function.CheckedBiFunction;
 
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -117,8 +115,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 public class TestSecureContainerServer {
   @TempDir
   private Path tempDir;
-  private static final String TEST_DIR
-      = GenericTestUtils.getTestDir("dfs").getAbsolutePath() + File.separator;
+  @TempDir
+  private static Path testDir;
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
   private static CertificateClientTestImpl caClient;
   private static SecretKeyClient secretKeyClient;
@@ -129,7 +127,7 @@ public class TestSecureContainerServer {
   public static void setup() throws Exception {
     DefaultMetricsSystem.setMiniClusterMode(true);
     ExitUtils.disableSystemExit();
-    CONF.set(HddsConfigKeys.HDDS_METADATA_DIR_NAME, TEST_DIR);
+    CONF.set(HddsConfigKeys.HDDS_METADATA_DIR_NAME, testDir.toString());
     CONF.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
     CONF.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
     caClient = new CertificateClientTestImpl(CONF);
@@ -142,11 +140,6 @@ public class TestSecureContainerServer {
 
     containerTokenSecretManager = new ContainerTokenSecretManager(
         tokenLifetime, secretKeyClient);
-  }
-
-  @AfterAll
-  public static void deleteTestDir() {
-    FileUtils.deleteQuietly(new File(TEST_DIR));
   }
 
   @AfterEach
@@ -162,7 +155,7 @@ public class TestSecureContainerServer {
     runTestClientServer(1, (pipeline, conf) -> conf
             .setInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
                 pipeline.getFirstNode()
-                    .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue()),
+                    .getStandalonePort().getValue()),
         XceiverClientGrpc::new,
         (dn, conf) -> new XceiverServerGrpc(dd, conf,
             hddsDispatcher, caClient), (dn, p) -> {  }, (p) -> { });
@@ -172,9 +165,9 @@ public class TestSecureContainerServer {
       OzoneConfiguration conf) throws IOException {
     ContainerSet containerSet = new ContainerSet(1000);
     conf.set(HDDS_DATANODE_DIR_KEY,
-        Paths.get(TEST_DIR, "dfs", "data", "hdds",
+        Paths.get(testDir.toString(), "dfs", "data", "hdds",
             RandomStringUtils.randomAlphabetic(4)).toString());
-    conf.set(OZONE_METADATA_DIRS, TEST_DIR);
+    conf.set(OZONE_METADATA_DIRS, testDir.toString());
     VolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
@@ -195,12 +188,12 @@ public class TestSecureContainerServer {
   XceiverServerRatis newXceiverServerRatis(
       DatanodeDetails dn, OzoneConfiguration conf) throws IOException {
     conf.setInt(OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT,
-        dn.getPort(DatanodeDetails.Port.Name.RATIS).getValue());
+        dn.getRatisPort().getValue());
     conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED,
         true);
     conf.setBoolean(
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
-    final String dir = TEST_DIR + dn.getUuid();
+    final String dir = testDir.resolve(dn.getUuidString()).toString();
     conf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
     final ContainerDispatcher dispatcher = createDispatcher(dn,
         UUID.randomUUID(), conf);

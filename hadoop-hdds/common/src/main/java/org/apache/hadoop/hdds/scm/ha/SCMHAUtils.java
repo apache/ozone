@@ -54,7 +54,7 @@ import java.util.Collection;
 import java.util.List;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.ozone.OzoneConsts.SCM_RATIS_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 
@@ -159,7 +159,7 @@ public final class SCMHAUtils {
           OZONE_METADATA_DIRS);
       File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
       snapshotDir =
-          Paths.get(metaDirPath.getPath(), SCM_RATIS_SNAPSHOT_DIR).toString();
+          Paths.get(metaDirPath.getPath(), OZONE_RATIS_SNAPSHOT_DIR).toString();
     }
     return snapshotDir;
   }

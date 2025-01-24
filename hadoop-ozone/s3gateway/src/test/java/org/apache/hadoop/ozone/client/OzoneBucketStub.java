@@ -596,6 +596,37 @@ public final class OzoneBucketStub extends OzoneBucket {
     return aclList.addAll(acls);
   }
 
+  @Override
+  public Map<String, String> getObjectTagging(String keyName) throws IOException {
+    if (keyDetails.containsKey(keyName)) {
+      OzoneKeyDetails ozoneKeyDetails = keyDetails.get(keyName);
+      return ozoneKeyDetails.getTags();
+    } else {
+      throw new OMException(ResultCodes.KEY_NOT_FOUND);
+    }
+  }
+
+  @Override
+  public void putObjectTagging(String keyName, Map<String, String> tags) throws IOException {
+    if (keyDetails.containsKey(keyName)) {
+      OzoneKeyDetails ozoneKeyDetails = keyDetails.get(keyName);
+      ozoneKeyDetails.getTags().clear();
+      ozoneKeyDetails.getTags().putAll(tags);
+    } else {
+      throw new OMException(ResultCodes.KEY_NOT_FOUND);
+    }
+  }
+
+  @Override
+  public void deleteObjectTagging(String keyName) throws IOException {
+    if (keyDetails.containsKey(keyName)) {
+      OzoneKeyDetails ozoneKeyDetails = keyDetails.get(keyName);
+      ozoneKeyDetails.getTags().clear();
+    } else {
+      throw new OMException(ResultCodes.KEY_NOT_FOUND);
+    }
+  }
+
   /**
    * Class used to hold part information in a upload part request.
    */

@@ -117,7 +117,7 @@ public class TestOzoneClient {
 
   @Test
   public void testCreateVolumeWithMetadata()
-      throws IOException, OzoneClientException {
+      throws IOException {
     String volumeName = UUID.randomUUID().toString();
     VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .addMetadata("key1", "val1")

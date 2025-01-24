@@ -133,7 +133,8 @@ public class DeletedBlockLogStateManagerImpl
 
       @Override
       public void seekToFirst() {
-        throw new UnsupportedOperationException("seekToFirst");
+        iter.seekToFirst();
+        findNext();
       }
 
       @Override
@@ -144,7 +145,9 @@ public class DeletedBlockLogStateManagerImpl
       @Override
       public TypedTable.KeyValue<Long, DeletedBlocksTransaction> seek(
           Long key) throws IOException {
-        throw new UnsupportedOperationException("seek");
+        iter.seek(key);
+        findNext();
+        return nextTx;
       }
 
       @Override

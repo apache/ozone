@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.TestHelper;
 
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
@@ -274,6 +275,7 @@ class TestBlockOutputStream {
 
   @ParameterizedTest
   @MethodSource("clientParameters")
+  @Flaky("HDDS-11564")
   void testWriteExactlyFlushSize(boolean flushDelay, boolean enablePiggybacking) throws Exception {
     OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
@@ -481,6 +483,7 @@ class TestBlockOutputStream {
 
   @ParameterizedTest
   @MethodSource("clientParameters")
+  @Flaky("HDDS-11564")
   void testWriteMoreThanFlushSize(boolean flushDelay, boolean enablePiggybacking) throws Exception {
     OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
@@ -571,6 +574,7 @@ class TestBlockOutputStream {
 
   @ParameterizedTest
   @MethodSource("clientParameters")
+  @Flaky("HDDS-11564")
   void testWriteExactlyMaxFlushSize(boolean flushDelay, boolean enablePiggybacking) throws Exception {
     OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
@@ -665,6 +669,7 @@ class TestBlockOutputStream {
 
   @ParameterizedTest
   @MethodSource("clientParameters")
+  @Flaky("HDDS-11564")
   void testWriteMoreThanMaxFlushSize(boolean flushDelay, boolean enablePiggybacking) throws Exception {
     OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {

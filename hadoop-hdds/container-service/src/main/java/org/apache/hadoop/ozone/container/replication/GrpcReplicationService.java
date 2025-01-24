@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.HashSet;
 import java.util.Set;
@@ -59,37 +58,24 @@ public class GrpcReplicationService extends
   private final ContainerReplicationSource source;
   private final ContainerImporter importer;
 
-  private final boolean zeroCopyEnabled;
-
   private final ZeroCopyMessageMarshaller<SendContainerRequest>
       sendContainerZeroCopyMessageMarshaller;
 
   private final ZeroCopyMessageMarshaller<CopyContainerRequestProto>
       copyContainerZeroCopyMessageMarshaller;
 
-  public GrpcReplicationService(ContainerReplicationSource source,
-      ContainerImporter importer, boolean zeroCopyEnabled) {
+  public GrpcReplicationService(ContainerReplicationSource source, ContainerImporter importer) {
     this.source = source;
     this.importer = importer;
-    this.zeroCopyEnabled = zeroCopyEnabled;
 
-    if (zeroCopyEnabled) {
-      sendContainerZeroCopyMessageMarshaller = new ZeroCopyMessageMarshaller<>(
-          SendContainerRequest.getDefaultInstance());
-      copyContainerZeroCopyMessageMarshaller = new ZeroCopyMessageMarshaller<>(
-          CopyContainerRequestProto.getDefaultInstance());
-    } else {
-      sendContainerZeroCopyMessageMarshaller = null;
-      copyContainerZeroCopyMessageMarshaller = null;
-    }
+    sendContainerZeroCopyMessageMarshaller = new ZeroCopyMessageMarshaller<>(
+            SendContainerRequest.getDefaultInstance());
+    copyContainerZeroCopyMessageMarshaller = new ZeroCopyMessageMarshaller<>(
+            CopyContainerRequestProto.getDefaultInstance());
   }
 
   public ServerServiceDefinition bindServiceWithZeroCopy() {
     ServerServiceDefinition orig = super.bindService();
-    if (!zeroCopyEnabled) {
-      LOG.info("Zerocopy is not enabled.");
-      return orig;
-    }
 
     Set<String> methodNames = new HashSet<>();
     ServerServiceDefinition.Builder builder =
@@ -155,14 +141,7 @@ public class GrpcReplicationService extends
     } finally {
       // output may have already been closed, ignore such errors
       IOUtils.cleanupWithLogger(LOG, outputStream);
-
-      if (copyContainerZeroCopyMessageMarshaller != null) {
-        InputStream popStream =
-            copyContainerZeroCopyMessageMarshaller.popStream(request);
-        if (popStream != null) {
-          IOUtils.cleanupWithLogger(LOG, popStream);
-        }
-      }
+      copyContainerZeroCopyMessageMarshaller.release(request);
     }
   }
 

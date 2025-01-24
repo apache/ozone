@@ -21,8 +21,10 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SetNodeOperationalStateCommandProto;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -39,7 +41,6 @@ import org.apache.hadoop.hdds.protocol.proto.
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 
@@ -54,7 +55,7 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
   private final ConfigurationSource conf;
   private final Consumer<HddsProtos.NodeOperationalState> replicationSupervisor;
   private final AtomicInteger invocationCount = new AtomicInteger(0);
-  private final AtomicLong totalTime = new AtomicLong(0);
+  private final MutableRate opsLatencyMs;
 
   /**
    * Set Node State command handler.
@@ -65,6 +66,9 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
       Consumer<HddsProtos.NodeOperationalState> replicationSupervisor) {
     this.conf = conf;
     this.replicationSupervisor = replicationSupervisor;
+    MetricsRegistry registry = new MetricsRegistry(
+        SetNodeOperationalStateCommandHandler.class.getSimpleName());
+    this.opsLatencyMs = registry.newRate(Type.setNodeOperationalStateCommand + "Ms");
   }
 
   /**
@@ -80,9 +84,6 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
       StateContext context, SCMConnectionManager connectionManager) {
     long startTime = Time.monotonicNow();
     invocationCount.incrementAndGet();
-    StorageContainerDatanodeProtocolProtos.SetNodeOperationalStateCommandProto
-        setNodeCmdProto = null;
-
     if (command.getType() != Type.setNodeOperationalStateCommand) {
       LOG.warn("Skipping handling command, expected command "
               + "type {} but found {}",
@@ -91,7 +92,7 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
     }
     SetNodeOperationalStateCommand setNodeCmd =
         (SetNodeOperationalStateCommand) command;
-    setNodeCmdProto = setNodeCmd.getProto();
+    SetNodeOperationalStateCommandProto setNodeCmdProto = setNodeCmd.getProto();
     DatanodeDetails dni = context.getParent().getDatanodeDetails();
     HddsProtos.NodeOperationalState state =
         setNodeCmdProto.getNodeOperationalState();
@@ -106,7 +107,7 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
       //      handler interface.
     }
     replicationSupervisor.accept(state);
-    totalTime.addAndGet(Time.monotonicNow() - startTime);
+    this.opsLatencyMs.add(Time.monotonicNow() - startTime);
   }
 
   // TODO - this duplicates code in HddsDatanodeService and InitDatanodeState
@@ -125,8 +126,7 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
    * @return Type
    */
   @Override
-  public StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type
-      getCommandType() {
+  public Type getCommandType() {
     return Type.setNodeOperationalStateCommand;
   }
 
@@ -147,14 +147,12 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
    */
   @Override
   public long getAverageRunTime() {
-    final int invocations = invocationCount.get();
-    return invocations == 0 ?
-        0 : totalTime.get() / invocations;
+    return (long) this.opsLatencyMs.lastStat().mean();
   }
 
   @Override
   public long getTotalRunTime() {
-    return totalTime.get();
+    return (long) this.opsLatencyMs.lastStat().total();
   }
 
   @Override

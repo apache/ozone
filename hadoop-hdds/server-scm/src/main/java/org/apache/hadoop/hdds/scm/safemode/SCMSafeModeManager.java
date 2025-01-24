@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -90,7 +91,7 @@ public class SCMSafeModeManager implements SafeModeManager {
   private AtomicBoolean preCheckComplete = new AtomicBoolean(false);
   private AtomicBoolean forceExitSafeMode = new AtomicBoolean(false);
 
-  private Map<String, SafeModeExitRule> exitRules = new HashMap(1);
+  private Map<String, SafeModeExitRule> exitRules = new HashMap<>(1);
   private Set<String> preCheckRules = new HashSet<>(1);
   private ConfigurationSource config;
   private static final String CONT_EXIT_RULE = "ContainerSafeModeRule";
@@ -110,6 +111,8 @@ public class SCMSafeModeManager implements SafeModeManager {
 
   private final SafeModeMetrics safeModeMetrics;
 
+
+  // TODO: Remove allContainers argument. (HDDS-11795)
   public SCMSafeModeManager(ConfigurationSource conf,
              List<ContainerInfo> allContainers,
              ContainerManager containerManager, PipelineManager pipelineManager,
@@ -126,30 +129,17 @@ public class SCMSafeModeManager implements SafeModeManager {
 
     if (isSafeModeEnabled) {
       this.safeModeMetrics = SafeModeMetrics.create();
-      ContainerSafeModeRule containerSafeModeRule =
-          new ContainerSafeModeRule(CONT_EXIT_RULE, eventQueue, config,
-              allContainers,  containerManager, this);
-      DataNodeSafeModeRule dataNodeSafeModeRule =
-          new DataNodeSafeModeRule(DN_EXIT_RULE, eventQueue, config, this);
-      exitRules.put(CONT_EXIT_RULE, containerSafeModeRule);
-      exitRules.put(DN_EXIT_RULE, dataNodeSafeModeRule);
-      preCheckRules.add(DN_EXIT_RULE);
-      if (conf.getBoolean(
-          HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,
-          HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK_DEFAULT)
-          && pipelineManager != null) {
-        HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =
-            new HealthyPipelineSafeModeRule(HEALTHY_PIPELINE_EXIT_RULE,
-                eventQueue, pipelineManager,
-                this, config, scmContext);
-        OneReplicaPipelineSafeModeRule oneReplicaPipelineSafeModeRule =
-            new OneReplicaPipelineSafeModeRule(
-                ATLEAST_ONE_DATANODE_REPORTED_PIPELINE_EXIT_RULE, eventQueue,
-                pipelineManager, this, conf);
-        exitRules.put(HEALTHY_PIPELINE_EXIT_RULE, healthyPipelineSafeModeRule);
-        exitRules.put(ATLEAST_ONE_DATANODE_REPORTED_PIPELINE_EXIT_RULE,
-            oneReplicaPipelineSafeModeRule);
-      }
+
+      // TODO: Remove the cyclic ("this") dependency (HDDS-11797)
+      SafeModeRuleFactory.initialize(config, scmContext, eventQueue,
+          this, pipelineManager, containerManager);
+      SafeModeRuleFactory factory = SafeModeRuleFactory.getInstance();
+
+      exitRules = factory.getSafeModeRules().stream().collect(
+          Collectors.toMap(SafeModeExitRule::getRuleName, rule -> rule));
+
+      preCheckRules = factory.getPreCheckRules().stream()
+          .map(SafeModeExitRule::getRuleName).collect(Collectors.toSet());
     } else {
       this.safeModeMetrics = null;
       exitSafeMode(eventQueue, true);
@@ -339,6 +329,17 @@ public class SCMSafeModeManager implements SafeModeManager {
   public double getCurrentContainerThreshold() {
     return ((ContainerSafeModeRule) exitRules.get(CONT_EXIT_RULE))
         .getCurrentContainerThreshold();
+  }
+
+  @VisibleForTesting
+  public double getCurrentECContainerThreshold() {
+    return ((ContainerSafeModeRule) exitRules.get(CONT_EXIT_RULE))
+        .getCurrentECContainerThreshold();
+  }
+
+  @VisibleForTesting
+  public ContainerSafeModeRule getContainerSafeModeRule() {
+    return (ContainerSafeModeRule) exitRules.get(CONT_EXIT_RULE);
   }
 
   @VisibleForTesting
