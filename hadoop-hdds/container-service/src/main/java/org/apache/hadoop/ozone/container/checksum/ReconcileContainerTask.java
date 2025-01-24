@@ -70,12 +70,12 @@ public class ReconcileContainerTask extends AbstractReplicationTask {
   }
 
   @Override
-  protected String getMetricName() {
+  public String getMetricName() {
     return "ContainerReconciliations";
   }
 
   @Override
-  protected String getMetricDescriptionSegment() {
+  public String getMetricDescriptionSegment() {
     return "Container Reconciliations";
   }
 

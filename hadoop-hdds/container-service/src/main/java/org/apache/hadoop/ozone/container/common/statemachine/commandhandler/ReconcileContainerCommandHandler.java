@@ -28,28 +28,28 @@ import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
-import java.util.concurrent.atomic.AtomicLong;
-
 /**
  * Handles commands from SCM to reconcile a container replica on this datanode with the replicas on its peers.
  */
 public class ReconcileContainerCommandHandler implements CommandHandler {
   private final ReplicationSupervisor supervisor;
-  private final AtomicLong invocationCount;
   private final DNContainerOperationClient dnClient;
+  private String metricsName;
 
   public ReconcileContainerCommandHandler(ReplicationSupervisor supervisor, DNContainerOperationClient dnClient) {
     this.supervisor = supervisor;
     this.dnClient = dnClient;
-    this.invocationCount = new AtomicLong(0);
   }
 
   @Override
   public void handle(SCMCommand command, OzoneContainer container, StateContext context,
       SCMConnectionManager connectionManager) {
-    invocationCount.incrementAndGet();
     ReconcileContainerCommand reconcileCommand = (ReconcileContainerCommand) command;
-    supervisor.addTask(new ReconcileContainerTask(container.getController(), dnClient, reconcileCommand));
+    ReconcileContainerTask task = new ReconcileContainerTask(container.getController(), dnClient, reconcileCommand);
+    if (metricsName == null) {
+      metricsName = task.getMetricName();
+    }
+    supervisor.addTask(task);
   }
 
   @Override
@@ -58,24 +58,30 @@ public class ReconcileContainerCommandHandler implements CommandHandler {
   }
 
   @Override
-  public int getInvocationCount() {
-    return (int)invocationCount.get();
+  public int getQueuedCount() {
+    return this.metricsName == null ? 0 : (int) this.supervisor
+        .getReplicationQueuedCount(metricsName);
   }
 
-  // Uses ReplicationSupervisor for these metrics.
+  @Override
+  public int getInvocationCount() {
+    return this.metricsName == null ? 0 : (int) this.supervisor
+        .getReplicationRequestCount(metricsName);
+  }
 
   @Override
   public long getAverageRunTime() {
-    return 0;
+    return this.metricsName == null ? 0 : (int) this.supervisor
+        .getReplicationRequestAvgTime(metricsName);
   }
 
   @Override
   public long getTotalRunTime() {
-    return 0;
+    return this.metricsName == null ? 0 : this.supervisor
+        .getReplicationRequestTotalTime(metricsName);
   }
 
-  @Override
-  public int getQueuedCount() {
-    return 0;
+  public String getMetricsName() {
+    return this.metricsName;
   }
 }
