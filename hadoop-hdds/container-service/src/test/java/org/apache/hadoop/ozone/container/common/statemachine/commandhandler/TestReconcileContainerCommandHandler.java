@@ -83,7 +83,6 @@ public class TestReconcileContainerCommandHandler {
     DatanodeDetails dnDetails = randomDatanodeDetails();
 
     mockSupervisor = mock(ReplicationSupervisor.class);
-
     doAnswer(invocation -> {
       ((ReconcileContainerTask)invocation.getArguments()[0]).runTask();
       return null;
@@ -91,7 +90,6 @@ public class TestReconcileContainerCommandHandler {
 
     subject = new ReconcileContainerCommandHandler(mockSupervisor, mock(DNContainerOperationClient.class));
     context = ContainerTestUtils.getMockContext(dnDetails, conf);
-
 
     containerSet = new ContainerSet(1000);
     for (int id = 1; id <= NUM_CONTAINERS; id++) {
@@ -148,7 +146,6 @@ public class TestReconcileContainerCommandHandler {
 
     assertEquals(0, subject.getInvocationCount());
 
-    // All commands submitted will be blocked until the latch is counted down.
     for (int id = 1; id <= NUM_CONTAINERS; id++) {
       ReconcileContainerCommand cmd = new ReconcileContainerCommand(id, Collections.emptySet());
       subject.handle(cmd, ozoneContainer, context, null);
