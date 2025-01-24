@@ -23,15 +23,21 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientException;
+import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
-import org.apache.hadoop.ozone.shell.keys.KeyHandler;
+import org.apache.hadoop.ozone.shell.Shell;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.annotation.Nonnull;
@@ -48,6 +54,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.Map;
 
 import static java.util.Collections.emptyMap;
@@ -57,11 +64,12 @@ import static java.util.Collections.emptyMap;
  * given key. It also generates a manifest file with information about the
  * downloaded replicas.
  */
-@CommandLine.Command(name = "read-replicas",
+@CommandLine.Command(name = "checksums",
     description = "Reads every replica for all the blocks associated with a " +
-        "given key.")
+        "given key.",
+    aliases = {"read-replicas"})
 @MetaInfServices(DebugSubcommand.class)
-public class ReadReplicas extends KeyHandler implements DebugSubcommand {
+public class ReadReplicas extends Handler implements DebugSubcommand {
 
   @CommandLine.Option(names = {"--outputDir", "-o", "--output-dir"},
       description = "Destination where the directory will be created" +
@@ -82,70 +90,20 @@ public class ReadReplicas extends KeyHandler implements DebugSubcommand {
   private static final String JSON_PROPERTY_REPLICA_UUID = "uuid";
   private static final String JSON_PROPERTY_REPLICA_EXCEPTION = "exception";
 
+  @CommandLine.Parameters(arity = "1",
+      description = Shell.OZONE_URI_DESCRIPTION)
+  private String uri;
+
+  @Override
+  protected OzoneAddress getAddress() throws OzoneClientException {
+    return new OzoneAddress(uri);
+  }
+
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
 
-    address.ensureKeyAddress();
-
-    boolean isChecksumVerifyEnabled
-        = getConf().getBoolean("ozone.client.verify.checksum", true);
-    OzoneConfiguration configuration = new OzoneConfiguration(getConf());
-    configuration.setBoolean("ozone.client.verify.checksum",
-        !isChecksumVerifyEnabled);
-
-    RpcClient newClient = new RpcClient(configuration, null);
-    try {
-      ClientProtocol noChecksumClient;
-      ClientProtocol checksumClient;
-      if (isChecksumVerifyEnabled) {
-        checksumClient = client.getObjectStore().getClientProxy();
-        noChecksumClient = newClient;
-      } else {
-        checksumClient = newClient;
-        noChecksumClient = client.getObjectStore().getClientProxy();
-      }
-
-      String volumeName = address.getVolumeName();
-      String bucketName = address.getBucketName();
-      String keyName = address.getKeyName();
-      // Multilevel keys will have a '/' in their names. This interferes with
-      // directory and file creation process. Flatten the keys to fix this.
-      String sanitizedKeyName = address.getKeyName().replace("/", "_");
-
-      File dir = createDirectory(volumeName, bucketName, sanitizedKeyName);
-
-      OzoneKeyDetails keyInfoDetails
-          = checksumClient.getKeyDetails(volumeName, bucketName, keyName);
-
-      Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> replicas =
-          checksumClient.getKeysEveryReplicas(volumeName, bucketName, keyName);
-
-      Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
-          replicasWithoutChecksum = noChecksumClient
-          .getKeysEveryReplicas(volumeName, bucketName, keyName);
-
-      ObjectNode result = JsonUtils.createObjectNode(null);
-      result.put(JSON_PROPERTY_FILE_NAME,
-          volumeName + "/" + bucketName + "/" + keyName);
-      result.put(JSON_PROPERTY_FILE_SIZE, keyInfoDetails.getDataSize());
-
-      ArrayNode blocks = JsonUtils.createArrayNode();
-      downloadReplicasAndCreateManifest(sanitizedKeyName, replicas,
-          replicasWithoutChecksum, dir, blocks);
-      result.set(JSON_PROPERTY_FILE_BLOCKS, blocks);
-
-      String prettyJson = JsonUtils.toJsonStringWithDefaultPrettyPrinter(result);
-
-      String manifestFileName = sanitizedKeyName + "_manifest";
-      System.out.println("Writing manifest file : " + manifestFileName);
-      File manifestFile
-          = new File(dir, manifestFileName);
-      Files.write(manifestFile.toPath(),
-          prettyJson.getBytes(StandardCharsets.UTF_8));
-    } finally {
-      newClient.close();
-    }
+    findCandidateKeys(client, address);
   }
 
   private void downloadReplicasAndCreateManifest(
@@ -245,5 +203,92 @@ public class ReadReplicas extends KeyHandler implements DebugSubcommand {
       }
     }
     return dir;
+  }
+
+  private void findCandidateKeys(OzoneClient ozoneClient, OzoneAddress address) throws IOException {
+    ObjectStore objectStore = ozoneClient.getObjectStore();
+    String volumeName = address.getVolumeName();
+    String bucketName = address.getBucketName();
+    String keyName = address.getKeyName();
+    if (!keyName.isEmpty()) {
+      processKey(ozoneClient, volumeName, bucketName, keyName);
+    } else if (!bucketName.isEmpty()) {
+      OzoneVolume volume = objectStore.getVolume(volumeName);
+      OzoneBucket bucket = volume.getBucket(bucketName);
+      checkBucket(bucket, ozoneClient);
+    } else if (!volumeName.isEmpty()) {
+      OzoneVolume volume = objectStore.getVolume(volumeName);
+      checkVolume(volume, ozoneClient);
+    } else {
+      for (Iterator<? extends OzoneVolume> it = objectStore.listVolumes(null); it.hasNext();) {
+        checkVolume(it.next(), ozoneClient);
+      }
+    }
+  }
+
+  private void checkVolume(OzoneVolume volume, OzoneClient ozoneClient) throws IOException {
+    for (Iterator<? extends OzoneBucket> it = volume.listBuckets(null); it.hasNext();) {
+      OzoneBucket bucket = it.next();
+      checkBucket(bucket, ozoneClient);
+    }
+  }
+
+  private void checkBucket(OzoneBucket bucket, OzoneClient ozoneClient) throws IOException {
+    String volumeName = bucket.getVolumeName();
+    String bucketName = bucket.getName();
+    for (Iterator<? extends OzoneKey> it = bucket.listKeys(null); it.hasNext();) {
+      OzoneKey key = it.next();
+//    TODO: Remove this check once HDDS-12094 is fixed
+      if (key.getName().endsWith("/")) {
+        continue;
+      }
+      processKey(ozoneClient, volumeName, bucketName, key.getName());
+    }
+  }
+
+  private void processKey(OzoneClient client, String volumeName, String bucketName, String keyName) throws IOException {
+    System.out.println("Processing key : " + volumeName + "/" + bucketName + "/" + keyName);
+    boolean isChecksumVerifyEnabled
+        = getConf().getBoolean("ozone.client.verify.checksum", true);
+    OzoneConfiguration configuration = new OzoneConfiguration(getConf());
+    configuration.setBoolean("ozone.client.verify.checksum",
+        !isChecksumVerifyEnabled);
+    RpcClient newClient = new RpcClient(configuration, null);
+
+    try {
+      ClientProtocol noChecksumClient;
+      ClientProtocol checksumClient;
+      if (isChecksumVerifyEnabled) {
+        checksumClient = client.getObjectStore().getClientProxy();
+        noChecksumClient = newClient;
+      } else {
+        checksumClient = newClient;
+        noChecksumClient = client.getObjectStore().getClientProxy();
+      }
+
+      File dir = createDirectory(volumeName, bucketName, keyName);
+      OzoneKeyDetails keyInfoDetails = checksumClient.getKeyDetails(volumeName, bucketName, keyName);
+      Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> replicas =
+          checksumClient.getKeysEveryReplicas(volumeName, bucketName, keyName);
+      Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> replicasWithoutChecksum =
+          noChecksumClient.getKeysEveryReplicas(volumeName, bucketName, keyName);
+
+      ObjectNode result = JsonUtils.createObjectNode(null);
+      result.put(JSON_PROPERTY_FILE_NAME, volumeName + "/" + bucketName + "/" + keyName);
+      result.put(JSON_PROPERTY_FILE_SIZE, keyInfoDetails.getDataSize());
+
+      ArrayNode blocks = JsonUtils.createArrayNode();
+      downloadReplicasAndCreateManifest(keyName, replicas, replicasWithoutChecksum, dir, blocks);
+      result.set(JSON_PROPERTY_FILE_BLOCKS, blocks);
+
+      String prettyJson = JsonUtils.toJsonStringWithDefaultPrettyPrinter(result);
+
+      String manifestFileName = keyName + "_manifest";
+      System.out.println("Writing manifest file : " + manifestFileName);
+      File manifestFile = new File(dir, manifestFileName);
+      Files.write(manifestFile.toPath(), prettyJson.getBytes(StandardCharsets.UTF_8));
+    } finally {
+      newClient.close();
+    }
   }
 }
