@@ -823,7 +823,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     checkPath(appRoot);
     assertTableRowCount(deletedDirTable, 0);
     assertTableRowCount(dirTable, 1);
-    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 4);
+    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 5);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 5);
     assertThat(dirDeletingService.getRunCount().get()).isGreaterThan(preRunCount);
   }
