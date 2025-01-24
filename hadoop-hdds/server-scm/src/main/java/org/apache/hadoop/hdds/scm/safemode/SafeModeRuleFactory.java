@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.scm.safemode;
 
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -86,19 +85,12 @@ public final class SafeModeRuleFactory {
     safeModeRules.add(dnRule);
     preCheckRules.add(dnRule);
 
-    // TODO: Move isRuleEnabled check to the Rule implementation. (HDDS-11799)
-    if (config.getBoolean(
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK_DEFAULT)
-        && pipelineManager != null) {
 
-      safeModeRules.add(new HealthyPipelineSafeModeRule(HEALTHY_PIPELINE_EXIT_RULE,
-          eventQueue, pipelineManager, safeModeManager, config, scmContext));
-      safeModeRules.add(new OneReplicaPipelineSafeModeRule(
-          ATLEAST_ONE_DATANODE_REPORTED_PIPELINE_EXIT_RULE, eventQueue,
-          pipelineManager, safeModeManager, config));
-    }
-
+    safeModeRules.add(new HealthyPipelineSafeModeRule(HEALTHY_PIPELINE_EXIT_RULE,
+        eventQueue, pipelineManager, safeModeManager, config, scmContext));
+    safeModeRules.add(new OneReplicaPipelineSafeModeRule(
+        ATLEAST_ONE_DATANODE_REPORTED_PIPELINE_EXIT_RULE, eventQueue,
+        pipelineManager, safeModeManager, config));
   }
 
   public static synchronized SafeModeRuleFactory getInstance() {
