@@ -122,7 +122,7 @@ public enum ContainerLayoutTestInfo {
   }
 
   /**
-   * Composite annotation for tests parameterized with {@link  ContainerLayoutTestInfo}.
+   * Composite annotation for tests parameterized with {@link ContainerLayoutVersion}.
    */
   @Target(ElementType.METHOD)
   @Retention(RetentionPolicy.RUNTIME)
