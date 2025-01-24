@@ -297,6 +297,7 @@ public class TestStorageContainerManager {
 
     // Verify a few TX gets created in the TX log.
     assertThat(delLog.getNumOfValidTransactions()).isGreaterThan(0);
+    
     // These blocks cannot be found in the container, skip deleting them
     // eventually these TX will success.
     GenericTestUtils.waitFor(() -> {
