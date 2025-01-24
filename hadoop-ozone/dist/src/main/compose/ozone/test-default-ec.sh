@@ -30,5 +30,7 @@ source "$COMPOSE_DIR/../testlib.sh"
 export COMPOSE_FILE=docker-compose.yaml:ec.yaml
 export OZONE_CLIENT_REPLICATION_TYPE=EC
 
-start_docker_env 5
+docker-compose up -d --no-recreate --scale datanode=5
+wait_for_safemode_exit
 execute_robot_test scm -v PREFIX:${prefix} -v OZONE_CLIENT_REPLICATION_TYPE:"${OZONE_CLIENT_REPLICATION_TYPE}" ec/basic.robot
+docker-compose --ansi never down
