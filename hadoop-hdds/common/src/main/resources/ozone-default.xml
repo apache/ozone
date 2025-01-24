@@ -4495,6 +4495,16 @@
   </property>
 
   <property>
+    <name>ozone.om.snapshot.cache.lock.timeout</name>
+    <value>5s</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Wait Timeout for snapshot cache lock.
+      Uses milliseconds by default when no time unit is specified.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.snapshot.load.native.lib</name>
     <value>true</value>
     <tag>OZONE, OM</tag>

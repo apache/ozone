@@ -599,6 +599,12 @@ public final class OMConfigKeys {
   public static final long
       OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT
       = TimeUnit.MINUTES.toMillis(1);
+  public static final String
+      OZONE_OM_SNAPSHOT_CACHE_LOCK_TIMEOUT
+      = "ozone.om.snapshot.cache.lock.timeout";
+  public static final long
+      OZONE_OM_SNAPSHOT_CACHE_LOCK_TIMEOUT_DEFAULT
+      = TimeUnit.SECONDS.toMillis(5);
   public static final long
       OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT
       = TimeUnit.MINUTES.toMillis(1);

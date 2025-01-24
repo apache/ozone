@@ -20,6 +20,6 @@ package org.apache.hadoop.ozone.om.snapshot;
 /**
  * Callback interface for ReferenceCounted.
  */
-public interface ReferenceCountedCallback {
-  void callback(ReferenceCounted referenceCounted);
+public interface ReferenceCountedCallback<T> {
+  void callback(ReferenceCounted<T> referenceCounted);
 }

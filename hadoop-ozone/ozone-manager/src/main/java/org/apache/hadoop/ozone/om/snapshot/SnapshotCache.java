@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheLoader;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -27,17 +28,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 
 /**
  * Thread-safe custom unbounded LRU cache to manage open snapshot DB instances.
  */
-public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
+public class SnapshotCache implements ReferenceCountedCallback<OmSnapshot>, AutoCloseable {
 
   static final Logger LOG = LoggerFactory.getLogger(SnapshotCache.class);
 
@@ -46,9 +53,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   // Value: OmSnapshot instance, each holds a DB instance handle inside
   // TODO: [SNAPSHOT] Consider wrapping SoftReference<> around IOmMetadataReader
   private final ConcurrentHashMap<UUID, ReferenceCounted<OmSnapshot>> dbMap;
-
   private final CacheLoader<UUID, OmSnapshot> cacheLoader;
-
   // Soft-limit of the total number of snapshot DB instances allowed to be
   // opened on the OM.
   private final int cacheSizeLimit;
@@ -58,14 +63,31 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
       "SnapshotCacheCleanupService";
 
   private final OMMetrics omMetrics;
+  private final ReadWriteLock lock;
+  private final Lock readLock;
+  private final Lock writeLock;
+  private int lockCnt;
+  private final Condition lockReleased;
+  private final Condition dbClosed;
+  private final long lockTimeout;
+  private final Map<Long, Map<UUID, Long>> snapshotRefThreadIds;
+  private AtomicBoolean closed;
 
   public SnapshotCache(CacheLoader<UUID, OmSnapshot> cacheLoader, int cacheSizeLimit, OMMetrics omMetrics,
-                       long cleanupInterval) {
+                       long cleanupInterval, long lockTimeout) {
     this.dbMap = new ConcurrentHashMap<>();
     this.cacheLoader = cacheLoader;
     this.cacheSizeLimit = cacheSizeLimit;
     this.omMetrics = omMetrics;
     this.pendingEvictionQueue = ConcurrentHashMap.newKeySet();
+    this.lock = new ReentrantReadWriteLock();
+    this.readLock = lock.readLock();
+    this.writeLock = lock.writeLock();
+    this.snapshotRefThreadIds = new ConcurrentHashMap<>();
+    this.lockTimeout = lockTimeout;
+    this.lockCnt = 0;
+    this.lockReleased = this.readLock.newCondition();
+    this.dbClosed = this.writeLock.newCondition();
     if (cleanupInterval > 0) {
       this.scheduler = new Scheduler(SNAPSHOT_CACHE_CLEANUP_SERVICE,
           true, 1);
@@ -97,10 +119,21 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
       if (v == null) {
         LOG.warn("SnapshotId: '{}' does not exist in snapshot cache.", k);
       } else {
+        readLock.lock();
         try {
+          if (lockCnt > 0) {
+            for (Long tid : snapshotRefThreadIds.keySet()) {
+              snapshotRefThreadIds.computeIfPresent(tid, (threadId, map) -> {
+                map.computeIfPresent(key, (uuid, val) -> null);
+                return map.isEmpty() ? null : map;
+              });
+            }
+          }
           v.get().close();
         } catch (IOException e) {
           throw new IllegalStateException("Failed to close snapshotId: " + key, e);
+        } finally {
+          readLock.unlock();
         }
         omMetrics.decNumSnapshotCacheSize();
       }
@@ -119,9 +152,116 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
 
   @Override
   public void close() {
+    closed.set(true);
     invalidateAll();
     if (this.scheduler != null) {
       this.scheduler.close();
+    }
+  }
+
+  /**
+   * Decreases the lock count. When the count reaches zero all new threads would be able to get a handle of snapshot.
+   */
+  private void decrementLockCount() {
+    lockCnt -= 1;
+    if (lockCnt <= 0) {
+      LOG.warn("Invalid negative lock count : {}. Setting it to 0", lockCnt);
+      lockCnt = 0;
+    }
+    if (lockCnt == 0) {
+      lockReleased.signalAll();
+      snapshotRefThreadIds.clear();
+    }
+  }
+
+  /**
+   * Releases a lock on the cache.
+   */
+  public void releaseLock() {
+    writeLock.lock();
+    try {
+      decrementLockCount();
+    } finally {
+      writeLock.unlock();
+    }
+  }
+
+  /**
+   * Acquires lock on the cache within max amount time.
+   * @param timeout Max time to wait to acquire lock.
+   * @return true if lock is acquired otherwise false.
+   * @throws InterruptedException
+   */
+  public boolean tryAcquire(long timeout) throws InterruptedException {
+    long endTime = System.currentTimeMillis() + timeout;
+    if (timeout <= 0) {
+      endTime = Long.MAX_VALUE;
+      timeout = Long.MAX_VALUE;
+    }
+    if (writeLock.tryLock(timeout, TimeUnit.MILLISECONDS)) {
+      try {
+        lockCnt += 1;
+        if (lockCnt == 1) {
+          snapshotRefThreadIds.clear();
+          dbMap.values().stream()
+              .flatMap(referenceCounted ->
+                  referenceCounted.getThreadCntMap().entrySet().stream().map(entry -> Pair.of(entry, referenceCounted)))
+              .forEach(entry -> updateThreadCnt(entry.getKey().getKey(), entry.getValue().get().getSnapshotID(),
+                  entry.getKey().getValue()));
+        }
+        while (!snapshotRefThreadIds.isEmpty()) {
+          long currentTime = System.currentTimeMillis();
+          if (currentTime >= endTime) {
+            // If and release acquired lock
+            decrementLockCount();
+            return false;
+          }
+          dbClosed.await(Math.min(endTime - currentTime, lockTimeout), TimeUnit.MILLISECONDS);
+        }
+      } finally {
+        writeLock.unlock();
+      }
+      invalidateAll();
+      return true;
+    }
+    return false;
+  }
+
+  private void updateThreadCnt(long threadId, UUID key, long cnt) {
+    snapshotRefThreadIds.compute(threadId, (tid, countMap) -> {
+      if (countMap == null) {
+        if (cnt <= 0) {
+          return null;
+        }
+        countMap = new ConcurrentHashMap<>();
+      }
+      countMap.compute(key, (snapId, count) -> {
+        if (count == null) {
+          count = 0L;
+        }
+        count += cnt;
+        return count > 0 ? count : null;
+      });
+      return countMap.isEmpty() ? null : countMap;
+    });
+  }
+
+  /**
+   * Waits for lock to be released. This function doesn't wait for the lock if the thread already has a few snapshots
+   * open. It only waits if the thread is reading it's first snapshot.
+   * @param threadId
+   * @throws InterruptedException
+   */
+  private void waitForLock(long threadId) throws IOException {
+    if (snapshotRefThreadIds.computeIfPresent(threadId, (k, v) -> v) != null) {
+      while (lockCnt > 0) {
+        try {
+          lockReleased.await(lockTimeout, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+          throw new IOException("Error while waiting for locks to be released.", e);
+        }
+
+      }
     }
   }
 
@@ -150,33 +290,50 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
     }
     // Atomic operation to initialize the OmSnapshot instance (once) if the key
     // does not exist, and increment the reference count on the instance.
-    ReferenceCounted<OmSnapshot> rcOmSnapshot =
-        dbMap.compute(key, (k, v) -> {
-          if (v == null) {
-            LOG.info("Loading SnapshotId: '{}'", k);
-            try {
-              v = new ReferenceCounted<>(cacheLoader.load(key), false, this);
-            } catch (OMException omEx) {
-              // Return null if the snapshot is no longer active
-              if (!omEx.getResult().equals(FILE_NOT_FOUND)) {
-                throw new IllegalStateException(omEx);
+    ReferenceCounted<OmSnapshot> rcOmSnapshot;
+    readLock.lock();
+    try {
+      long threadId = Thread.currentThread().getId();
+      waitForLock(threadId);
+      rcOmSnapshot =
+          dbMap.compute(key, (k, v) -> {
+            if (v == null) {
+              if (closed.get()) {
+                return v;
               }
-            } catch (IOException ioEx) {
-              // Failed to load snapshot DB
-              throw new IllegalStateException(ioEx);
-            } catch (Exception ex) {
-              // Unexpected and unknown exception thrown from CacheLoader#load
-              throw new IllegalStateException(ex);
+              LOG.info("Loading SnapshotId: '{}'", k);
+              try {
+                v = new ReferenceCounted<>(cacheLoader.load(key), false, this);
+              } catch (OMException omEx) {
+                // Return null if the snapshot is no longer active
+                if (!omEx.getResult().equals(FILE_NOT_FOUND)) {
+                  throw new IllegalStateException(omEx);
+                }
+              } catch (IOException ioEx) {
+                // Failed to load snapshot DB
+                throw new IllegalStateException(ioEx);
+              } catch (Exception ex) {
+                // Unexpected and unknown exception thrown from CacheLoader#load
+                throw new IllegalStateException(ex);
+              }
+              omMetrics.incNumSnapshotCacheSize();
             }
-            omMetrics.incNumSnapshotCacheSize();
-          }
-          if (v != null) {
-            // When RC OmSnapshot is successfully loaded
-            v.incrementRefCount();
-          }
-          return v;
-        });
+            if (v != null) {
+              // When RC OmSnapshot is successfully loaded
+              v.incrementRefCount();
+              if (lockCnt > 0) {
+                updateThreadCnt(threadId, key, 1);
+              }
+            }
+            return v;
+          });
+    } finally {
+      readLock.unlock();
+    }
     if (rcOmSnapshot == null) {
+      if (closed.get()) {
+        throw new IOException("Unable to open snapshot with SnapshotId: '" + key + "' since snapshot cache is closed.");
+      }
       // The only exception that would fall through the loader logic above
       // is OMException with FILE_NOT_FOUND.
       throw new OMException("SnapshotId: '" + key + "' not found, or the snapshot is no longer active.",
@@ -239,11 +396,23 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
    * @param referenceCounted ReferenceCounted object
    */
   @Override
-  public void callback(ReferenceCounted referenceCounted) {
+  public void callback(ReferenceCounted<OmSnapshot> referenceCounted) {
+    long threadId = Thread.currentThread().getId();
+    UUID snapshotId = referenceCounted.get().getSnapshotID();
+    // Remove snapshotRef from the thread count map.
+    writeLock.lock();
+    try {
+      if (lockCnt > 0) {
+        updateThreadCnt(threadId, snapshotId, -1);
+      }
+      dbClosed.signal();
+    } finally {
+      writeLock.unlock();
+    }
+
     if (referenceCounted.getTotalRefCount() == 0L) {
       // Reference count reaches zero, add to pendingEvictionList
-      pendingEvictionQueue.add(((OmSnapshot) referenceCounted.get())
-          .getSnapshotID());
+      pendingEvictionQueue.add(snapshotId);
     }
   }
 }

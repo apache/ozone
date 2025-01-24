@@ -18,7 +18,9 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -51,10 +53,10 @@ public class ReferenceCounted<T>
   /**
    * Parent instance whose callback will be triggered upon this RC closure.
    */
-  private final ReferenceCountedCallback parentWithCallback;
+  private final ReferenceCountedCallback<T> parentWithCallback;
 
   public ReferenceCounted(T obj, boolean disableCounter,
-      ReferenceCountedCallback parentWithCallback) {
+      ReferenceCountedCallback<T> parentWithCallback) {
     // A param to allow disabling ref counting to reduce active DB
     //  access penalties due to AtomicLong operations.
     this.obj = obj;
@@ -126,9 +128,7 @@ public class ReferenceCounted<T>
       Preconditions.checkState(newValTotal >= 0L,
           "Total reference count underflow");
     }
-    if (refCount.get() == 0) {
-      this.parentWithCallback.callback(this);
-    }
+    this.parentWithCallback.callback(this);
     return refCount.get();
   }
 
@@ -160,5 +160,9 @@ public class ReferenceCounted<T>
     // Decrease ref count by 1 when close() is called on this object
     // so it is eligible to be used with try-with-resources.
     decrementRefCount();
+  }
+
+  public Map<Long, Long> getThreadCntMap() {
+    return ImmutableMap.copyOf(threadMap);
   }
 }
