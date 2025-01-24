@@ -146,15 +146,6 @@ public final class ContainerLogger {
     LOG.info(getMessage(containerData));
   }
 
-  /**
-   * Logged when a container is reconciled.
-   *
-   * @param containerData The container that was reconciled on this datanode.
-   */
-  public static void logContainerReconciled(ContainerData containerData) {
-    LOG.info(getMessage(containerData, "Container reconciled"));
-  }
-
   private static String getMessage(ContainerData containerData,
                                    String message) {
     return String.join(FIELD_SEPARATOR, getMessage(containerData), message);

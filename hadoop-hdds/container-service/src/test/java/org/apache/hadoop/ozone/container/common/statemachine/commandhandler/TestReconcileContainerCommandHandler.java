@@ -144,8 +144,7 @@ public class TestReconcileContainerCommandHandler {
    */
   @ContainerLayoutTestInfo.ContainerTest
   public void testReconcileContainerCommandMetrics(ContainerLayoutVersion layout) throws Exception {
-    init(layout, c -> {
-    });
+    init(layout, c -> { });
 
     assertEquals(0, subject.getInvocationCount());
 
