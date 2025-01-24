@@ -2844,18 +2844,18 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       throws IOException {
     // Test that directories in multilevel keys are not marked as files
 
-    String volumeA = "vol-a-" + RandomStringUtils.randomNumeric(5);
-    String bucketA = "buc-a-" + RandomStringUtils.randomNumeric(5);
+    String volumeA = "volume-a-" + RandomStringUtils.randomNumeric(5);
+    String bucketA = "bucket-a-" + RandomStringUtils.randomNumeric(5);
     store.createVolume(volumeA);
     OzoneVolume volA = store.getVolume(volumeA);
     volA.createBucket(bucketA);
     OzoneBucket volAbucketA = volA.getBucket(bucketA);
 
-    String keyBaseC = "key-c/";
+    String keyBaseA = "key-a/";
     for (int i = 0; i < 10; i++) {
       byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
       OzoneOutputStream one = volAbucketA.createKey(
-          keyBaseC + i + "-" + RandomStringUtils.randomNumeric(5),
+          keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
           value.length, RATIS, ONE,
           new HashMap<>());
       one.write(value);
