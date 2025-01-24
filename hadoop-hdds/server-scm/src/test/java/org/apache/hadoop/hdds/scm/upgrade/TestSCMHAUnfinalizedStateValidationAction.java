@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.upgrade;
 
-import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
@@ -26,19 +25,16 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 
 import java.nio.file.Path;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -62,20 +58,12 @@ public class TestSCMHAUnfinalizedStateValidationAction {
     ExitUtils.disableSystemExit();
   }
 
-  @ParameterizedTest
-  @CsvSource({
-      "true, true",
-      "true, false",
-      "false, true",
-      "false, false",
-  })
-  public void testUpgrade(boolean haEnabledBefore,
-      boolean haEnabledPreFinalized, @TempDir Path dataPath) throws Exception {
+  @Test
+  public void testUpgrade(@TempDir Path dataPath) throws Exception {
     // Write version file for original version.
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION,
         HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, haEnabledBefore);
     conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS, dataPath.toString());
     conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, dataPath.toString());
     // This init should always succeed, since SCM is not pre-finalized yet.
@@ -83,43 +71,17 @@ public class TestSCMHAUnfinalizedStateValidationAction {
     boolean initResult1 = StorageContainerManager.scmInit(conf, CLUSTER_ID);
     assertTrue(initResult1);
 
-    // Set up new pre-finalized SCM.
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
-        haEnabledPreFinalized);
-    /* Clusters from Ratis SCM -> Non Ratis SCM
-       Ratis SCM -> Non Ratis SCM not supported
-     */
-    if (haEnabledPreFinalized != haEnabledBefore) {
-      if (haEnabledBefore) {
-        assertThrows(ConfigurationException.class,
-            () -> StorageContainerManager.scmInit(conf, CLUSTER_ID));
-      } else {
-        assertThrows(UpgradeException.class,
-            () -> StorageContainerManager.scmInit(conf, CLUSTER_ID));
-      }
-      return;
-    }
     StorageContainerManager scm = HddsTestUtils.getScm(conf);
 
     assertEquals(UpgradeFinalizer.Status.FINALIZATION_REQUIRED,
         scm.getFinalizationManager().getUpgradeFinalizer().getStatus());
 
-    final boolean shouldFail = !haEnabledBefore && haEnabledPreFinalized;
-    DefaultConfigManager.clearDefaultConfigs();
-    if (shouldFail) {
-      // Start on its own should fail.
-      assertThrows(UpgradeException.class, scm::start);
 
-      // Init followed by start should both fail.
-      // Init is not necessary here, but is allowed to be run.
-      assertThrows(UpgradeException.class,
-          () -> StorageContainerManager.scmInit(conf, CLUSTER_ID));
-      assertThrows(UpgradeException.class, scm::start);
-    } else {
-      boolean initResult2 = StorageContainerManager.scmInit(conf, CLUSTER_ID);
-      assertTrue(initResult2);
-      scm.start();
-      scm.stop();
-    }
+    DefaultConfigManager.clearDefaultConfigs();
+    boolean initResult2 = StorageContainerManager.scmInit(conf, CLUSTER_ID);
+    assertTrue(initResult2);
+    scm.start();
+    scm.stop();
+
   }
 }

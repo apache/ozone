@@ -19,6 +19,8 @@
 package org.apache.hadoop.ozone.repair.om;
 
 import org.apache.hadoop.hdds.cli.RepairSubcommand;
+import org.apache.hadoop.ozone.repair.TransactionInfoRepair;
+import org.apache.hadoop.ozone.repair.om.quota.QuotaRepair;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
@@ -27,9 +29,10 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(name = "om",
     subcommands = {
-        FSORepairCLI.class,
+        FSORepairTool.class,
         SnapshotRepair.class,
-        TransactionInfoRepair.class
+        TransactionInfoRepair.class,
+        QuotaRepair.class
     },
     description = "Operational tool to repair OM.")
 @MetaInfServices(RepairSubcommand.class)

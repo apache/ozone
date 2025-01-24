@@ -12,10 +12,7 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
@@ -23,12 +20,13 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <version>2.0.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone-network-tests</artifactId>
-  <description>Apache Ozone Network Tests</description>
-  <name>Apache Ozone Network Tests</name>
   <packaging>jar</packaging>
+  <name>Apache Ozone Network Tests</name>
+  <description>Apache Ozone Network Tests</description>
 
   <properties>
-    <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
+    <!-- no tests in this module so far -->
+    <maven.test.skip>true</maven.test.skip>
   </properties>
 
   <build>
@@ -45,10 +43,10 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
         <executions>
           <execution>
             <id>copy-resources</id>
-            <phase>process-resources</phase>
             <goals>
               <goal>copy-resources</goal>
             </goals>
+            <phase>process-resources</phase>
             <configuration>
               <outputDirectory>${project.build.directory}</outputDirectory>
               <resources>
@@ -81,10 +79,10 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
             <artifactId>exec-maven-plugin</artifactId>
             <executions>
               <execution>
-                <phase>integration-test</phase>
                 <goals>
                   <goal>exec</goal>
                 </goals>
+                <phase>integration-test</phase>
                 <configuration>
                   <executable>python</executable>
                   <arguments>
@@ -94,12 +92,8 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <argument>${basedir}/src/test/blockade/</argument>
                   </arguments>
                   <environmentVariables>
-                    <OZONE_HOME>
-                      ${ozone.home}
-                    </OZONE_HOME>
-                    <MAVEN_TEST>
-                      ${project.build.directory}
-                    </MAVEN_TEST>
+                    <OZONE_HOME>${ozone.home}</OZONE_HOME>
+                    <MAVEN_TEST>${project.build.directory}</MAVEN_TEST>
                   </environmentVariables>
                 </configuration>
               </execution>

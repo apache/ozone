@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import org.junit.jupiter.api.Test;
@@ -48,6 +49,7 @@ public class TestObjectDelete {
 
     ObjectEndpoint rest = new ObjectEndpoint();
     rest.setClient(client);
+    rest.setRequestIdentifier(new RequestIdentifier());
     rest.setOzoneConfiguration(new OzoneConfiguration());
 
     //WHEN

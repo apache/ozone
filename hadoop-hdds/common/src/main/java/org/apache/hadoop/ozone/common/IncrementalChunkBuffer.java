@@ -82,7 +82,7 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
   }
 
   private void assertInt(int expected, int computed, String name, int i) {
-    ChunkBuffer.assertInt(expected, computed,
+    ChunkBufferToByteString.assertInt(expected, computed,
         () -> this + ": Unexpected " + name + " at index " + i);
   }
 
@@ -182,7 +182,7 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
       }
     }
     final int j = i;
-    ChunkBuffer.assertInt(buffers.size(), i,
+    ChunkBufferToByteString.assertInt(buffers.size(), i,
         () -> "i = " + j + " != buffers.size() = " + buffers.size());
     return true;
   }

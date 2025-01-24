@@ -257,8 +257,10 @@ function check_running_ozone_services
   for service in "${services[@]}"; do
     for pid_file in ${OZONE_PID_DIR}/ozone-*-${service}.pid; do
       if [[ -f "${pid_file}" ]]; then
-        if kill -0 "$(cat "${pid_file}")" 2>/dev/null; then
+        pid=$(cat "${pid_file}")
+        if kill -0 "${pid}" 2>/dev/null; then
           export "OZONE_${service^^}_RUNNING=true"
+          export "OZONE_${service^^}_PID=${pid}"
         fi
       fi
     done

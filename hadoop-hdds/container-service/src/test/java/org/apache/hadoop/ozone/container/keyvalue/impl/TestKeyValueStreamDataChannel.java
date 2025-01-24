@@ -22,10 +22,14 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel.WriteMethod;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.client.api.DataStreamOutput;
 import org.apache.ratis.io.FilePositionCount;
 import org.apache.ratis.io.StandardWriteOption;
@@ -58,9 +62,8 @@ import java.util.concurrent.ThreadLocalRandom;
 import static org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput.PUT_BLOCK_REQUEST_LENGTH_MAX;
 import static org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput.executePutBlockClose;
 import static org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput.getProtoLength;
-import static org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel.closeBuffers;
-import static org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel.readPutBlockRequest;
 import static org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel.writeBuffers;
+import static org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel.writeFully;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -104,6 +107,49 @@ public class TestKeyValueStreamDataChannel {
 
     final ContainerCommandRequestProto proto = readPutBlockRequest(buf);
     assertEquals(PUT_BLOCK_PROTO, proto);
+  }
+
+  static ContainerCommandRequestProto readPutBlockRequest(ByteBuf b) throws IOException {
+    //   readerIndex   protoIndex   lengthIndex    readerIndex+readableBytes
+    //         V            V             V                              V
+    // format: |--- data ---|--- proto ---|--- proto length (4 bytes) ---|
+    final int readerIndex = b.readerIndex();
+    final int lengthIndex = readerIndex + b.readableBytes() - 4;
+    final int protoLength = KeyValueStreamDataChannel.readProtoLength(b.duplicate(), lengthIndex);
+    final int protoIndex = lengthIndex - protoLength;
+
+    final ContainerCommandRequestProto proto;
+    try {
+      proto = readPutBlockRequest(b.slice(protoIndex, protoLength).nioBuffer());
+    } catch (Throwable t) {
+      RatisHelper.debug(b, "catch", LOG);
+      throw new IOException("Failed to readPutBlockRequest from " + b
+          + ": readerIndex=" + readerIndex
+          + ", protoIndex=" + protoIndex
+          + ", protoLength=" + protoLength
+          + ", lengthIndex=" + lengthIndex, t);
+    }
+
+    // set index for reading data
+    b.writerIndex(protoIndex);
+
+    return proto;
+  }
+
+  private static ContainerCommandRequestProto readPutBlockRequest(ByteBuffer b)
+      throws IOException {
+    RatisHelper.debug(b, "readPutBlockRequest", LOG);
+    final ByteString byteString = ByteString.copyFrom(b);
+
+    final ContainerCommandRequestProto request =
+        ContainerCommandRequestMessage.toProto(byteString, null);
+
+    if (!request.hasPutBlock()) {
+      throw new StorageContainerException(
+          "Malformed PutBlock request. trace ID: " + request.getTraceID(),
+          Result.MALFORMED_REQUEST);
+    }
+    return request;
   }
 
   @Test
@@ -228,6 +274,21 @@ public class TestKeyValueStreamDataChannel {
       }
       return CompletableFuture.completedFuture(
           new Reply(true, 0, putBlockRequest));
+    }
+
+    static ContainerCommandRequestProto closeBuffers(
+        Buffers buffers, WriteMethod writeMethod) throws IOException {
+      final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll();
+      final ByteBuf buf = ref.retain();
+      final ContainerCommandRequestProto putBlockRequest;
+      try {
+        putBlockRequest = readPutBlockRequest(buf);
+        // write the remaining data
+        writeFully(buf.nioBuffer(), writeMethod);
+      } finally {
+        ref.release();
+      }
+      return putBlockRequest;
     }
 
     @Override
