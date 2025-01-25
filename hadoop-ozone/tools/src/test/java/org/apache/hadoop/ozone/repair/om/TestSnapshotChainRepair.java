@@ -53,6 +53,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -183,18 +184,11 @@ public class TestSnapshotChainRepair {
     String output = out.getOutput();
     assertThat(output).contains("Updating SnapshotInfo to");
 
-    if (dryRun) {
-      // Verify DB update was NOT called in dry run mode
-      verify(rocksDB, never()).put(
-          eq(columnFamilyHandle),
-          eq(StringCodec.get().toPersistedFormat(snapshotInfo.getTableKey())),
-          eq(SnapshotInfo.getCodec().toPersistedFormat(snapshotInfo)));
-    } else {
-      // Verify DB update was called with correct parameters
-      verify(rocksDB).put(
-          eq(columnFamilyHandle),
-          eq(StringCodec.get().toPersistedFormat(snapshotInfo.getTableKey())),
-          eq(SnapshotInfo.getCodec().toPersistedFormat(snapshotInfo)));
+    verify(rocksDB, times(dryRun ? 0 : 1)).put(
+        eq(columnFamilyHandle),
+        eq(StringCodec.get().toPersistedFormat(snapshotInfo.getTableKey())),
+        eq(SnapshotInfo.getCodec().toPersistedFormat(snapshotInfo)));
+    if (!dryRun) {
       assertThat(output).contains("Snapshot Info is updated");
     }
   }
