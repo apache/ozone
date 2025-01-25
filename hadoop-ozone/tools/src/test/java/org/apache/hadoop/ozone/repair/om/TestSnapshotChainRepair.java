@@ -182,8 +182,7 @@ public class TestSnapshotChainRepair {
     withTextFromSystemIn("y")
         .execute(() -> cli.execute(argsList.toArray(new String[0])));
 
-    String output = out.getOutput();
-    assertThat(output).contains("Updating SnapshotInfo to");
+    assertThat(out.getOutput()).contains("Updating SnapshotInfo to");
 
     verifyDbWrite(snapshotInfo, !dryRun);
   }
@@ -222,8 +221,7 @@ public class TestSnapshotChainRepair {
     withTextFromSystemIn("y")
         .execute(() -> cli.execute(args));
 
-    String errorOutput = err.getOutput();
-    assertThat(errorOutput).contains("globalPreviousSnapshotId: '" + snapshotInfo.getSnapshotId() +
+    assertThat(err.getOutput()).contains("globalPreviousSnapshotId: '" + snapshotInfo.getSnapshotId() +
         "' is equal to given snapshot's ID");
     verifyDbWrite(snapshotInfo, false);
   }
@@ -252,8 +250,7 @@ public class TestSnapshotChainRepair {
     withTextFromSystemIn("y")
         .execute(() -> cli.execute(args));
 
-    String errorOutput = err.getOutput();
-    assertThat(errorOutput).contains("pathPreviousSnapshotId: '" + snapshotInfo.getSnapshotId() +
+    assertThat(err.getOutput()).contains("pathPreviousSnapshotId: '" + snapshotInfo.getSnapshotId() +
         "' is equal to given snapshot's ID");
     verifyDbWrite(snapshotInfo, false);
   }
@@ -283,8 +280,7 @@ public class TestSnapshotChainRepair {
     withTextFromSystemIn("y")
         .execute(() -> cli.execute(args));
 
-    String errorOutput = err.getOutput();
-    assertThat(errorOutput).contains("globalPreviousSnapshotId: '" + globalPrevSnapshotId +
+    assertThat(err.getOutput()).contains("globalPreviousSnapshotId: '" + globalPrevSnapshotId +
         "' does not exist in snapshotInfoTable");
     verifyDbWrite(snapshotInfo, false);
   }
@@ -314,8 +310,7 @@ public class TestSnapshotChainRepair {
     withTextFromSystemIn("y")
         .execute(() -> cli.execute(args));
 
-    String errorOutput = err.getOutput();
-    assertThat(errorOutput).contains("pathPreviousSnapshotId: '" + pathPrevSnapshotId +
+    assertThat(err.getOutput()).contains("pathPreviousSnapshotId: '" + pathPrevSnapshotId +
         "' does not exist in snapshotInfoTable");
     verifyDbWrite(snapshotInfo, false);
   }
