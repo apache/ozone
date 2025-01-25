@@ -94,7 +94,7 @@ public class TestSnapshotChainRepair {
   }
 
   private void setupMockDB(SnapshotInfo snapshotInfo,
-      List<SnapshotInfo> iteratorSnapshots) throws Exception {
+      SnapshotInfo... snapshots) throws Exception {
 
     managedRocksDB = mock(ManagedRocksDB.class);
     rocksDB = mock(RocksDB.class);
@@ -131,10 +131,10 @@ public class TestSnapshotChainRepair {
     when(rocksDB.newIterator(columnFamilyHandle)).thenReturn(rocksIterator);
 
     // Setup iterator behavior based on provided snapshots
-    if (iteratorSnapshots.isEmpty()) {
+    if (snapshots.length == 0) {
       when(rocksIterator.isValid()).thenReturn(false);
     } else {
-      Boolean[] remainingValidResponses = new Boolean[iteratorSnapshots.size()];
+      Boolean[] remainingValidResponses = new Boolean[snapshots.length];
       Arrays.fill(remainingValidResponses, true);
       remainingValidResponses[remainingValidResponses.length - 1] = false;
 
@@ -142,7 +142,7 @@ public class TestSnapshotChainRepair {
           .thenReturn(true, remainingValidResponses);
 
       ArrayList<byte[]> valueResponses = new ArrayList<>();
-      for (SnapshotInfo snap : iteratorSnapshots) {
+      for (SnapshotInfo snap : snapshots) {
         valueResponses.add(SnapshotInfo.getCodec().toPersistedFormat(snap));
       }
       byte[] firstValue = valueResponses.get(0);
@@ -159,9 +159,6 @@ public class TestSnapshotChainRepair {
     SnapshotInfo globalPrevSnapshot = newSnapshot();
     SnapshotInfo pathPrevSnapshot = newSnapshot();
 
-    List<SnapshotInfo> iteratorSnapshots = Arrays.asList(
-        snapshotInfo, globalPrevSnapshot, pathPrevSnapshot);
-
     List<String> argsList = new ArrayList<>(Arrays.asList(
         "om", "snapshot", "chain",
         VOLUME_NAME + "/" + BUCKET_NAME,
@@ -174,7 +171,7 @@ public class TestSnapshotChainRepair {
       argsList.add("--dry-run");
     }
 
-    setupMockDB(snapshotInfo, iteratorSnapshots);
+    setupMockDB(snapshotInfo, snapshotInfo, globalPrevSnapshot, pathPrevSnapshot);
 
     CommandLine cli = new OzoneRepair().getCmd();
     withTextFromSystemIn("y")
@@ -200,9 +197,6 @@ public class TestSnapshotChainRepair {
     SnapshotInfo snapshotInfo = newSnapshot();
     SnapshotInfo pathPrevSnapshot = newSnapshot();
 
-    List<SnapshotInfo> iteratorSnapshots = Arrays.asList(
-        snapshotInfo, pathPrevSnapshot);
-
     String[] args = new String[] {
         "om", "snapshot", "chain",
         VOLUME_NAME + "/" + BUCKET_NAME,
@@ -213,7 +207,7 @@ public class TestSnapshotChainRepair {
         "--path-previous", pathPrevSnapshot.getSnapshotId().toString(),
     };
 
-    setupMockDB(snapshotInfo, iteratorSnapshots);
+    setupMockDB(snapshotInfo, snapshotInfo, pathPrevSnapshot);
 
     CommandLine cli = new OzoneRepair().getCmd();
     withTextFromSystemIn("y")
@@ -229,9 +223,6 @@ public class TestSnapshotChainRepair {
     SnapshotInfo snapshotInfo = newSnapshot();
     SnapshotInfo globalPrevSnapshot = newSnapshot();
 
-    List<SnapshotInfo> iteratorSnapshots = Arrays.asList(
-        snapshotInfo, globalPrevSnapshot);
-
     String[] args = new String[] {
         "om", "snapshot", "chain",
         VOLUME_NAME + "/" + BUCKET_NAME,
@@ -242,7 +233,7 @@ public class TestSnapshotChainRepair {
         "--path-previous", snapshotInfo.getSnapshotId().toString(),
     };
 
-    setupMockDB(snapshotInfo, iteratorSnapshots);
+    setupMockDB(snapshotInfo, snapshotInfo, globalPrevSnapshot);
 
     CommandLine cli = new OzoneRepair().getCmd();
     withTextFromSystemIn("y")
@@ -260,9 +251,6 @@ public class TestSnapshotChainRepair {
     SnapshotInfo snapshotInfo = newSnapshot();
     SnapshotInfo pathPrevSnapshot = newSnapshot();
 
-    List<SnapshotInfo> iteratorSnapshots = Arrays.asList(
-        snapshotInfo, pathPrevSnapshot);
-
     String[] args = new String[] {
         "om", "snapshot", "chain",
         VOLUME_NAME + "/" + BUCKET_NAME,
@@ -272,7 +260,7 @@ public class TestSnapshotChainRepair {
         "--path-previous", pathPrevSnapshot.getSnapshotId().toString(),
     };
 
-    setupMockDB(snapshotInfo, iteratorSnapshots);
+    setupMockDB(snapshotInfo, snapshotInfo, pathPrevSnapshot);
 
     CommandLine cli = new OzoneRepair().getCmd();
     withTextFromSystemIn("y")
@@ -290,9 +278,6 @@ public class TestSnapshotChainRepair {
     SnapshotInfo snapshotInfo = newSnapshot();
     SnapshotInfo globalPrevSnapshot = newSnapshot();
 
-    List<SnapshotInfo> iteratorSnapshots = Arrays.asList(
-        snapshotInfo, globalPrevSnapshot);
-
     String[] args = new String[] {
         "om", "snapshot", "chain",
         VOLUME_NAME + "/" + BUCKET_NAME,
@@ -302,7 +287,7 @@ public class TestSnapshotChainRepair {
         "--path-previous", pathPrevSnapshotId.toString(),
     };
 
-    setupMockDB(snapshotInfo, iteratorSnapshots);
+    setupMockDB(snapshotInfo, snapshotInfo, globalPrevSnapshot);
 
     CommandLine cli = new OzoneRepair().getCmd();
     withTextFromSystemIn("y")
