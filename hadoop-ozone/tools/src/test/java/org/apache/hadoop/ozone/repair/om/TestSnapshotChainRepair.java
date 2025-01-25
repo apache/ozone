@@ -62,6 +62,9 @@ import static org.mockito.Mockito.when;
  */
 public class TestSnapshotChainRepair {
 
+  private static final String VOLUME_NAME = "vol1";
+  private static final String BUCKET_NAME = "bucket1";
+
   private ManagedRocksDB managedRocksDB;
   private RocksDB rocksDB;
   private ColumnFamilyHandle columnFamilyHandle;
@@ -157,8 +160,6 @@ public class TestSnapshotChainRepair {
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   public void testSuccessfulRepair(boolean dryRun) throws Exception {
-    String volumeName = "vol1";
-    String bucketName = "bucket1";
     String snapshotName = "snap1";
     String globalPrevSnapshotName = "global-prev-snap1";
     String pathPrevSnapshotName = "path-prev-snap1";
@@ -167,10 +168,10 @@ public class TestSnapshotChainRepair {
     UUID globalPrevSnapshotId = UUID.randomUUID();
     UUID pathPrevSnapshotId = UUID.randomUUID();
 
-    SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName, bucketName, snapshotName, snapshotId, 0);
-    SnapshotInfo globalPrevSnapshot = SnapshotInfo.newInstance(volumeName, bucketName, globalPrevSnapshotName,
+    SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME, snapshotName, snapshotId, 0);
+    SnapshotInfo globalPrevSnapshot = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME, globalPrevSnapshotName,
         globalPrevSnapshotId, 0);
-    SnapshotInfo pathPrevSnapshot = SnapshotInfo.newInstance(volumeName, bucketName, pathPrevSnapshotName,
+    SnapshotInfo pathPrevSnapshot = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME, pathPrevSnapshotName,
         pathPrevSnapshotId, 0);
 
     List<SnapshotInfo> iteratorSnapshots = Arrays.asList(
@@ -178,7 +179,7 @@ public class TestSnapshotChainRepair {
 
     List<String> argsList = new ArrayList<>(Arrays.asList(
         "om", "snapshot", "chain",
-        volumeName + "/" + bucketName,
+        VOLUME_NAME + "/" + BUCKET_NAME,
         snapshotName,
         "--db", DB_PATH,
         "--global-previous", globalPrevSnapshotId.toString(),
@@ -215,8 +216,6 @@ public class TestSnapshotChainRepair {
 
   @Test
   public void testGlobalPreviousMatchesSnapshotId() throws Exception {
-    String volumeName = "vol1";
-    String bucketName = "bucket1";
     String snapshotName = "snap1";
 
     UUID snapshotId = UUID.randomUUID();
@@ -224,9 +223,9 @@ public class TestSnapshotChainRepair {
     UUID globalPrevSnapshotId = snapshotId;
     UUID pathPrevSnapshotId = UUID.randomUUID();
 
-    SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName, bucketName,
+    SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME,
         snapshotName, snapshotId, 0);
-    SnapshotInfo pathPrevSnapshot = SnapshotInfo.newInstance(volumeName, bucketName,
+    SnapshotInfo pathPrevSnapshot = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME,
         "path-prev", pathPrevSnapshotId, 0);
 
     List<SnapshotInfo> iteratorSnapshots = Arrays.asList(
@@ -234,7 +233,7 @@ public class TestSnapshotChainRepair {
 
     String[] args = new String[] {
         "om", "snapshot", "chain",
-        volumeName + "/" + bucketName,
+        VOLUME_NAME + "/" + BUCKET_NAME,
         snapshotName,
         "--db", DB_PATH,
         "--global-previous", globalPrevSnapshotId.toString(),
@@ -254,8 +253,6 @@ public class TestSnapshotChainRepair {
 
   @Test
   public void testPathPreviousMatchesSnapshotId() throws Exception {
-    String volumeName = "vol1";
-    String bucketName = "bucket1";
     String snapshotName = "snap1";
 
     UUID snapshotId = UUID.randomUUID();
@@ -263,9 +260,9 @@ public class TestSnapshotChainRepair {
     // Use same ID for path previous to trigger error
     UUID pathPrevSnapshotId = snapshotId;
 
-    SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName, bucketName,
+    SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME,
         snapshotName, snapshotId, 0);
-    SnapshotInfo globalPrevSnapshot = SnapshotInfo.newInstance(volumeName, bucketName,
+    SnapshotInfo globalPrevSnapshot = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME,
         "global-prev", globalPrevSnapshotId, 0);
 
     List<SnapshotInfo> iteratorSnapshots = Arrays.asList(
@@ -273,7 +270,7 @@ public class TestSnapshotChainRepair {
 
     String[] args = new String[] {
         "om", "snapshot", "chain",
-        volumeName + "/" + bucketName,
+        VOLUME_NAME + "/" + BUCKET_NAME,
         snapshotName,
         "--db", DB_PATH,
         "--global-previous", globalPrevSnapshotId.toString(),
@@ -293,17 +290,15 @@ public class TestSnapshotChainRepair {
 
   @Test
   public void testGlobalPreviousDoesNotExist() throws Exception {
-    String volumeName = "vol1";
-    String bucketName = "bucket1";
     String snapshotName = "snap1";
 
     UUID snapshotId = UUID.randomUUID();
     UUID globalPrevSnapshotId = UUID.randomUUID();
     UUID pathPrevSnapshotId = UUID.randomUUID();
 
-    SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName, bucketName,
+    SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME,
         snapshotName, snapshotId, 0);
-    SnapshotInfo pathPrevSnapshot = SnapshotInfo.newInstance(volumeName, bucketName,
+    SnapshotInfo pathPrevSnapshot = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME,
         "path-prev", pathPrevSnapshotId, 0);
 
     List<SnapshotInfo> iteratorSnapshots = Arrays.asList(
@@ -311,7 +306,7 @@ public class TestSnapshotChainRepair {
 
     String[] args = new String[] {
         "om", "snapshot", "chain",
-        volumeName + "/" + bucketName,
+        VOLUME_NAME + "/" + BUCKET_NAME,
         snapshotName,
         "--db", DB_PATH,
         "--global-previous", globalPrevSnapshotId.toString(),
@@ -331,17 +326,15 @@ public class TestSnapshotChainRepair {
 
   @Test
   public void testPathPreviousDoesNotExist() throws Exception {
-    String volumeName = "vol1";
-    String bucketName = "bucket1";
     String snapshotName = "snap1";
 
     UUID snapshotId = UUID.randomUUID();
     UUID globalPrevSnapshotId = UUID.randomUUID();
     UUID pathPrevSnapshotId = UUID.randomUUID();
 
-    SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName, bucketName,
+    SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME,
         snapshotName, snapshotId, 0);
-    SnapshotInfo globalPrevSnapshot = SnapshotInfo.newInstance(volumeName, bucketName,
+    SnapshotInfo globalPrevSnapshot = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME,
         "global-prev", globalPrevSnapshotId, 0);
 
     List<SnapshotInfo> iteratorSnapshots = Arrays.asList(
@@ -349,7 +342,7 @@ public class TestSnapshotChainRepair {
 
     String[] args = new String[] {
         "om", "snapshot", "chain",
-        volumeName + "/" + bucketName,
+        VOLUME_NAME + "/" + BUCKET_NAME,
         snapshotName,
         "--db", DB_PATH,
         "--global-previous", globalPrevSnapshotId.toString(),
