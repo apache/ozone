@@ -160,7 +160,6 @@ public class TestSnapshotChainRepair {
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   public void testSuccessfulRepair(boolean dryRun) throws Exception {
-    String snapshotName = "snap1";
     String globalPrevSnapshotName = "global-prev-snap1";
     String pathPrevSnapshotName = "path-prev-snap1";
 
@@ -168,7 +167,7 @@ public class TestSnapshotChainRepair {
     UUID globalPrevSnapshotId = UUID.randomUUID();
     UUID pathPrevSnapshotId = UUID.randomUUID();
 
-    SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME, snapshotName, snapshotId, 0);
+    SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME, "snap1", snapshotId, 0);
     SnapshotInfo globalPrevSnapshot = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME, globalPrevSnapshotName,
         globalPrevSnapshotId, 0);
     SnapshotInfo pathPrevSnapshot = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME, pathPrevSnapshotName,
@@ -180,7 +179,7 @@ public class TestSnapshotChainRepair {
     List<String> argsList = new ArrayList<>(Arrays.asList(
         "om", "snapshot", "chain",
         VOLUME_NAME + "/" + BUCKET_NAME,
-        snapshotName,
+        snapshotInfo.getName(),
         "--db", DB_PATH,
         "--global-previous", globalPrevSnapshotId.toString(),
         "--path-previous", pathPrevSnapshotId.toString()));
@@ -216,15 +215,13 @@ public class TestSnapshotChainRepair {
 
   @Test
   public void testGlobalPreviousMatchesSnapshotId() throws Exception {
-    String snapshotName = "snap1";
-
     UUID snapshotId = UUID.randomUUID();
     // Use same ID for global previous to trigger error
     UUID globalPrevSnapshotId = snapshotId;
     UUID pathPrevSnapshotId = UUID.randomUUID();
 
     SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME,
-        snapshotName, snapshotId, 0);
+        "snap1", snapshotId, 0);
     SnapshotInfo pathPrevSnapshot = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME,
         "path-prev", pathPrevSnapshotId, 0);
 
@@ -234,7 +231,7 @@ public class TestSnapshotChainRepair {
     String[] args = new String[] {
         "om", "snapshot", "chain",
         VOLUME_NAME + "/" + BUCKET_NAME,
-        snapshotName,
+        snapshotInfo.getName(),
         "--db", DB_PATH,
         "--global-previous", globalPrevSnapshotId.toString(),
         "--path-previous", pathPrevSnapshotId.toString(),
@@ -253,15 +250,13 @@ public class TestSnapshotChainRepair {
 
   @Test
   public void testPathPreviousMatchesSnapshotId() throws Exception {
-    String snapshotName = "snap1";
-
     UUID snapshotId = UUID.randomUUID();
     UUID globalPrevSnapshotId = UUID.randomUUID();
     // Use same ID for path previous to trigger error
     UUID pathPrevSnapshotId = snapshotId;
 
     SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME,
-        snapshotName, snapshotId, 0);
+        "snap1", snapshotId, 0);
     SnapshotInfo globalPrevSnapshot = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME,
         "global-prev", globalPrevSnapshotId, 0);
 
@@ -271,7 +266,7 @@ public class TestSnapshotChainRepair {
     String[] args = new String[] {
         "om", "snapshot", "chain",
         VOLUME_NAME + "/" + BUCKET_NAME,
-        snapshotName,
+        snapshotInfo.getName(),
         "--db", DB_PATH,
         "--global-previous", globalPrevSnapshotId.toString(),
         "--path-previous", pathPrevSnapshotId.toString(),
@@ -290,14 +285,12 @@ public class TestSnapshotChainRepair {
 
   @Test
   public void testGlobalPreviousDoesNotExist() throws Exception {
-    String snapshotName = "snap1";
-
     UUID snapshotId = UUID.randomUUID();
     UUID globalPrevSnapshotId = UUID.randomUUID();
     UUID pathPrevSnapshotId = UUID.randomUUID();
 
     SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME,
-        snapshotName, snapshotId, 0);
+        "snap1", snapshotId, 0);
     SnapshotInfo pathPrevSnapshot = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME,
         "path-prev", pathPrevSnapshotId, 0);
 
@@ -307,7 +300,7 @@ public class TestSnapshotChainRepair {
     String[] args = new String[] {
         "om", "snapshot", "chain",
         VOLUME_NAME + "/" + BUCKET_NAME,
-        snapshotName,
+        snapshotInfo.getName(),
         "--db", DB_PATH,
         "--global-previous", globalPrevSnapshotId.toString(),
         "--path-previous", pathPrevSnapshotId.toString(),
@@ -326,14 +319,12 @@ public class TestSnapshotChainRepair {
 
   @Test
   public void testPathPreviousDoesNotExist() throws Exception {
-    String snapshotName = "snap1";
-
     UUID snapshotId = UUID.randomUUID();
     UUID globalPrevSnapshotId = UUID.randomUUID();
     UUID pathPrevSnapshotId = UUID.randomUUID();
 
     SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME,
-        snapshotName, snapshotId, 0);
+        "snap1", snapshotId, 0);
     SnapshotInfo globalPrevSnapshot = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME,
         "global-prev", globalPrevSnapshotId, 0);
 
@@ -343,7 +334,7 @@ public class TestSnapshotChainRepair {
     String[] args = new String[] {
         "om", "snapshot", "chain",
         VOLUME_NAME + "/" + BUCKET_NAME,
-        snapshotName,
+        snapshotInfo.getName(),
         "--db", DB_PATH,
         "--global-previous", globalPrevSnapshotId.toString(),
         "--path-previous", pathPrevSnapshotId.toString(),
