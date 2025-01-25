@@ -20,6 +20,9 @@
 ## @param output directory where report should be placed
 ## @param rebot options and arguments
 
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source "${SCRIPT_DIR}/../compose/testlib.sh"
+
 run_rebot() {
   local input_dir="$(realpath "$1")"
   local output_dir="$(realpath "$2")"
