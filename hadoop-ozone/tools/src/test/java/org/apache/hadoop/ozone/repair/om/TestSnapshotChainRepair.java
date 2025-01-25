@@ -34,11 +34,13 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDB;
+import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
 import org.rocksdb.ColumnFamilyDescriptor;
 
 import picocli.CommandLine;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -52,7 +54,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -184,12 +185,16 @@ public class TestSnapshotChainRepair {
     String output = out.getOutput();
     assertThat(output).contains("Updating SnapshotInfo to");
 
-    verify(rocksDB, times(dryRun ? 0 : 1)).put(
+    verifyDbWrite(snapshotInfo, !dryRun);
+  }
+
+  private void verifyDbWrite(SnapshotInfo snapshotInfo, boolean updateExpected) throws RocksDBException, IOException {
+    verify(rocksDB, times(updateExpected ? 1 : 0)).put(
         eq(columnFamilyHandle),
         eq(StringCodec.get().toPersistedFormat(snapshotInfo.getTableKey())),
         eq(SnapshotInfo.getCodec().toPersistedFormat(snapshotInfo)));
-    if (!dryRun) {
-      assertThat(output).contains("Snapshot Info is updated");
+    if (updateExpected) {
+      assertThat(out.get()).contains("Snapshot Info is updated");
     }
   }
 
