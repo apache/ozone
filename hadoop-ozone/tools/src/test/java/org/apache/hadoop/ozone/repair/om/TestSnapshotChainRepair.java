@@ -225,6 +225,7 @@ public class TestSnapshotChainRepair {
     String errorOutput = err.getOutput();
     assertThat(errorOutput).contains("globalPreviousSnapshotId: '" + snapshotInfo.getSnapshotId() +
         "' is equal to given snapshot's ID");
+    verifyDbWrite(snapshotInfo, false);
   }
 
   @Test
@@ -254,6 +255,7 @@ public class TestSnapshotChainRepair {
     String errorOutput = err.getOutput();
     assertThat(errorOutput).contains("pathPreviousSnapshotId: '" + snapshotInfo.getSnapshotId() +
         "' is equal to given snapshot's ID");
+    verifyDbWrite(snapshotInfo, false);
   }
 
   @Test
@@ -284,6 +286,7 @@ public class TestSnapshotChainRepair {
     String errorOutput = err.getOutput();
     assertThat(errorOutput).contains("globalPreviousSnapshotId: '" + globalPrevSnapshotId +
         "' does not exist in snapshotInfoTable");
+    verifyDbWrite(snapshotInfo, false);
   }
 
   @Test
@@ -314,6 +317,7 @@ public class TestSnapshotChainRepair {
     String errorOutput = err.getOutput();
     assertThat(errorOutput).contains("pathPreviousSnapshotId: '" + pathPrevSnapshotId +
         "' does not exist in snapshotInfoTable");
+    verifyDbWrite(snapshotInfo, false);
   }
 
   private static SnapshotInfo newSnapshot() {
