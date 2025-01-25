@@ -44,8 +44,11 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -127,6 +130,9 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   @Mock
   private Table<Long, NSSummary> nsSummaryTable;
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestOmTableInsightTask.class);
+
   public TestOmTableInsightTask() {
     super();
   }
@@ -154,6 +160,27 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
         reconNamespaceSummaryManager, reconOMMetadataManager,
         ozoneConfiguration);
     dslContext = getDslContext();
+
+    try {
+      Field tableField = OmTableInsightTask.class.getDeclaredField("tables");
+      tableField.setAccessible(true);
+      tableField.set(omTableInsightTask, omTableInsightTask.getTaskTables());
+
+      Field objectCountMapField = OmTableInsightTask.class.getDeclaredField("objectCountMap");
+      objectCountMapField.setAccessible(true);
+      objectCountMapField.set(omTableInsightTask, omTableInsightTask.initializeCountMap());
+
+      Field unReplicatedSizeMapField = OmTableInsightTask.class.getDeclaredField("unReplicatedSizeMap");
+      unReplicatedSizeMapField.setAccessible(true);
+      unReplicatedSizeMapField.set(omTableInsightTask, omTableInsightTask.initializeSizeMap(false));
+
+      Field replicatedSizeMapField = OmTableInsightTask.class.getDeclaredField("replicatedSizeMap");
+      replicatedSizeMapField.setAccessible(true);
+      replicatedSizeMapField.set(omTableInsightTask, omTableInsightTask.initializeSizeMap(true));
+
+    } catch (NoSuchFieldException | IllegalAccessException e) {
+      LOG.error("Failed to initialize OmTableInsightTask", e);
+    }
   }
 
   @BeforeEach

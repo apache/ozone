@@ -296,7 +296,7 @@ public class OmTableInsightTask implements ReconOmTask {
    *
    * @return The count map containing the counts for each table.
    */
-  private HashMap<String, Long> initializeCountMap() {
+  public HashMap<String, Long> initializeCountMap() {
     HashMap<String, Long> objCountMap = new HashMap<>(tables.size());
     for (String tableName : tables) {
       String key = getTableCountKeyFromTable(tableName);
@@ -311,7 +311,7 @@ public class OmTableInsightTask implements ReconOmTask {
    *
    * @return The size map containing the size counts for each table.
    */
-  private HashMap<String, Long> initializeSizeMap(boolean replicated) {
+  public HashMap<String, Long> initializeSizeMap(boolean replicated) {
     String tableName;
     OmTableHandler tableHandler;
     HashMap<String, Long> sizeCountMap = new HashMap<>();
