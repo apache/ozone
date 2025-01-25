@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.repair.om;
 
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
@@ -160,17 +161,12 @@ public class TestSnapshotChainRepair {
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   public void testSuccessfulRepair(boolean dryRun) throws Exception {
-    String globalPrevSnapshotName = "global-prev-snap1";
-    String pathPrevSnapshotName = "path-prev-snap1";
-
     UUID globalPrevSnapshotId = UUID.randomUUID();
     UUID pathPrevSnapshotId = UUID.randomUUID();
 
     SnapshotInfo snapshotInfo = newSnapshot();
-    SnapshotInfo globalPrevSnapshot = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME, globalPrevSnapshotName,
-        globalPrevSnapshotId, 0);
-    SnapshotInfo pathPrevSnapshot = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME, pathPrevSnapshotName,
-        pathPrevSnapshotId, 0);
+    SnapshotInfo globalPrevSnapshot = newSnapshot(globalPrevSnapshotId);
+    SnapshotInfo pathPrevSnapshot = newSnapshot(pathPrevSnapshotId);
 
     List<SnapshotInfo> iteratorSnapshots = Arrays.asList(
         snapshotInfo, globalPrevSnapshot, pathPrevSnapshot);
@@ -220,8 +216,7 @@ public class TestSnapshotChainRepair {
     UUID pathPrevSnapshotId = UUID.randomUUID();
 
     SnapshotInfo snapshotInfo = newSnapshot(snapshotId);
-    SnapshotInfo pathPrevSnapshot = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME,
-        "path-prev", pathPrevSnapshotId, 0);
+    SnapshotInfo pathPrevSnapshot = newSnapshot(pathPrevSnapshotId);
 
     List<SnapshotInfo> iteratorSnapshots = Arrays.asList(
         snapshotInfo, pathPrevSnapshot);
@@ -254,8 +249,7 @@ public class TestSnapshotChainRepair {
     UUID pathPrevSnapshotId = snapshotId;
 
     SnapshotInfo snapshotInfo = newSnapshot(snapshotId);
-    SnapshotInfo globalPrevSnapshot = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME,
-        "global-prev", globalPrevSnapshotId, 0);
+    SnapshotInfo globalPrevSnapshot = newSnapshot(globalPrevSnapshotId);
 
     List<SnapshotInfo> iteratorSnapshots = Arrays.asList(
         snapshotInfo, globalPrevSnapshot);
@@ -286,8 +280,7 @@ public class TestSnapshotChainRepair {
     UUID pathPrevSnapshotId = UUID.randomUUID();
 
     SnapshotInfo snapshotInfo = newSnapshot();
-    SnapshotInfo pathPrevSnapshot = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME,
-        "path-prev", pathPrevSnapshotId, 0);
+    SnapshotInfo pathPrevSnapshot = newSnapshot(pathPrevSnapshotId);
 
     List<SnapshotInfo> iteratorSnapshots = Arrays.asList(
         snapshotInfo, pathPrevSnapshot);
@@ -318,8 +311,7 @@ public class TestSnapshotChainRepair {
     UUID pathPrevSnapshotId = UUID.randomUUID();
 
     SnapshotInfo snapshotInfo = newSnapshot();
-    SnapshotInfo globalPrevSnapshot = SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME,
-        "global-prev", globalPrevSnapshotId, 0);
+    SnapshotInfo globalPrevSnapshot = newSnapshot(globalPrevSnapshotId);
 
     List<SnapshotInfo> iteratorSnapshots = Arrays.asList(
         snapshotInfo, globalPrevSnapshot);
@@ -349,6 +341,7 @@ public class TestSnapshotChainRepair {
   }
 
   private static SnapshotInfo newSnapshot(UUID snapshotId) {
-    return SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME, "snap1", snapshotId, 0);
+    String name = RandomStringUtils.insecure().nextAlphanumeric(10);
+    return SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME, name, snapshotId, 0);
   }
 }
