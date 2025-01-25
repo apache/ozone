@@ -65,12 +65,11 @@ public class TestSnapshotChainRepair {
 
   private static final String VOLUME_NAME = "vol1";
   private static final String BUCKET_NAME = "bucket1";
+  private static final String DB_PATH = "testDBPath";
 
   private ManagedRocksDB managedRocksDB;
   private RocksDB rocksDB;
   private ColumnFamilyHandle columnFamilyHandle;
-
-  private static final String DB_PATH = "testDBPath";
 
   private MockedStatic<ManagedRocksDB> mockedDB;
   private MockedStatic<RocksDBUtils> mockedUtils;
@@ -182,16 +181,6 @@ public class TestSnapshotChainRepair {
     verifyDbWrite(snapshotInfo, !dryRun);
   }
 
-  private void verifyDbWrite(SnapshotInfo snapshotInfo, boolean updateExpected) throws RocksDBException, IOException {
-    verify(rocksDB, times(updateExpected ? 1 : 0)).put(
-        eq(columnFamilyHandle),
-        eq(StringCodec.get().toPersistedFormat(snapshotInfo.getTableKey())),
-        eq(SnapshotInfo.getCodec().toPersistedFormat(snapshotInfo)));
-    if (updateExpected) {
-      assertThat(out.get()).contains("Snapshot Info is updated");
-    }
-  }
-
   @Test
   public void testGlobalPreviousMatchesSnapshotId() throws Exception {
     SnapshotInfo snapshotInfo = newSnapshot();
@@ -301,5 +290,15 @@ public class TestSnapshotChainRepair {
   private static SnapshotInfo newSnapshot() {
     String name = RandomStringUtils.insecure().nextAlphanumeric(10);
     return SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME, name, UUID.randomUUID(), 0);
+  }
+
+  private void verifyDbWrite(SnapshotInfo snapshotInfo, boolean updateExpected) throws RocksDBException, IOException {
+    verify(rocksDB, times(updateExpected ? 1 : 0)).put(
+        eq(columnFamilyHandle),
+        eq(StringCodec.get().toPersistedFormat(snapshotInfo.getTableKey())),
+        eq(SnapshotInfo.getCodec().toPersistedFormat(snapshotInfo)));
+    if (updateExpected) {
+      assertThat(out.get()).contains("Snapshot Info is updated");
+    }
   }
 }
