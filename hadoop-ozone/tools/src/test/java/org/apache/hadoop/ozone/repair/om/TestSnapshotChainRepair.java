@@ -161,12 +161,9 @@ public class TestSnapshotChainRepair {
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   public void testSuccessfulRepair(boolean dryRun) throws Exception {
-    UUID globalPrevSnapshotId = UUID.randomUUID();
-    UUID pathPrevSnapshotId = UUID.randomUUID();
-
     SnapshotInfo snapshotInfo = newSnapshot();
-    SnapshotInfo globalPrevSnapshot = newSnapshot(globalPrevSnapshotId);
-    SnapshotInfo pathPrevSnapshot = newSnapshot(pathPrevSnapshotId);
+    SnapshotInfo globalPrevSnapshot = newSnapshot();
+    SnapshotInfo pathPrevSnapshot = newSnapshot();
 
     List<SnapshotInfo> iteratorSnapshots = Arrays.asList(
         snapshotInfo, globalPrevSnapshot, pathPrevSnapshot);
@@ -176,8 +173,8 @@ public class TestSnapshotChainRepair {
         VOLUME_NAME + "/" + BUCKET_NAME,
         snapshotInfo.getName(),
         "--db", DB_PATH,
-        "--global-previous", globalPrevSnapshotId.toString(),
-        "--path-previous", pathPrevSnapshotId.toString()));
+        "--global-previous", globalPrevSnapshot.getSnapshotId().toString(),
+        "--path-previous", pathPrevSnapshot.getSnapshotId().toString()));
 
     if (dryRun) {
       argsList.add("--dry-run");
@@ -210,13 +207,8 @@ public class TestSnapshotChainRepair {
 
   @Test
   public void testGlobalPreviousMatchesSnapshotId() throws Exception {
-    UUID snapshotId = UUID.randomUUID();
-    // Use same ID for global previous to trigger error
-    UUID globalPrevSnapshotId = snapshotId;
-    UUID pathPrevSnapshotId = UUID.randomUUID();
-
-    SnapshotInfo snapshotInfo = newSnapshot(snapshotId);
-    SnapshotInfo pathPrevSnapshot = newSnapshot(pathPrevSnapshotId);
+    SnapshotInfo snapshotInfo = newSnapshot();
+    SnapshotInfo pathPrevSnapshot = newSnapshot();
 
     List<SnapshotInfo> iteratorSnapshots = Arrays.asList(
         snapshotInfo, pathPrevSnapshot);
@@ -226,8 +218,9 @@ public class TestSnapshotChainRepair {
         VOLUME_NAME + "/" + BUCKET_NAME,
         snapshotInfo.getName(),
         "--db", DB_PATH,
-        "--global-previous", globalPrevSnapshotId.toString(),
-        "--path-previous", pathPrevSnapshotId.toString(),
+        // Use same ID for global previous to trigger error
+        "--global-previous", snapshotInfo.getSnapshotId().toString(),
+        "--path-previous", pathPrevSnapshot.getSnapshotId().toString(),
     };
 
     setupMockDB(snapshotInfo, iteratorSnapshots);
@@ -237,19 +230,14 @@ public class TestSnapshotChainRepair {
         .execute(() -> cli.execute(args));
 
     String errorOutput = err.getOutput();
-    assertTrue(errorOutput.contains("globalPreviousSnapshotId: '" + globalPrevSnapshotId +
+    assertTrue(errorOutput.contains("globalPreviousSnapshotId: '" + snapshotInfo.getSnapshotId() +
         "' is equal to given snapshot's ID"));
   }
 
   @Test
   public void testPathPreviousMatchesSnapshotId() throws Exception {
-    UUID snapshotId = UUID.randomUUID();
-    UUID globalPrevSnapshotId = UUID.randomUUID();
-    // Use same ID for path previous to trigger error
-    UUID pathPrevSnapshotId = snapshotId;
-
-    SnapshotInfo snapshotInfo = newSnapshot(snapshotId);
-    SnapshotInfo globalPrevSnapshot = newSnapshot(globalPrevSnapshotId);
+    SnapshotInfo snapshotInfo = newSnapshot();
+    SnapshotInfo globalPrevSnapshot = newSnapshot();
 
     List<SnapshotInfo> iteratorSnapshots = Arrays.asList(
         snapshotInfo, globalPrevSnapshot);
@@ -259,8 +247,9 @@ public class TestSnapshotChainRepair {
         VOLUME_NAME + "/" + BUCKET_NAME,
         snapshotInfo.getName(),
         "--db", DB_PATH,
-        "--global-previous", globalPrevSnapshotId.toString(),
-        "--path-previous", pathPrevSnapshotId.toString(),
+        "--global-previous", globalPrevSnapshot.getSnapshotId().toString(),
+        // Use same ID for path previous to trigger error
+        "--path-previous", snapshotInfo.getSnapshotId().toString(),
     };
 
     setupMockDB(snapshotInfo, iteratorSnapshots);
@@ -270,17 +259,16 @@ public class TestSnapshotChainRepair {
         .execute(() -> cli.execute(args));
 
     String errorOutput = err.getOutput();
-    assertTrue(errorOutput.contains("pathPreviousSnapshotId: '" + pathPrevSnapshotId +
+    assertTrue(errorOutput.contains("pathPreviousSnapshotId: '" + snapshotInfo.getSnapshotId() +
         "' is equal to given snapshot's ID"));
   }
 
   @Test
   public void testGlobalPreviousDoesNotExist() throws Exception {
     UUID globalPrevSnapshotId = UUID.randomUUID();
-    UUID pathPrevSnapshotId = UUID.randomUUID();
 
     SnapshotInfo snapshotInfo = newSnapshot();
-    SnapshotInfo pathPrevSnapshot = newSnapshot(pathPrevSnapshotId);
+    SnapshotInfo pathPrevSnapshot = newSnapshot();
 
     List<SnapshotInfo> iteratorSnapshots = Arrays.asList(
         snapshotInfo, pathPrevSnapshot);
@@ -291,7 +279,7 @@ public class TestSnapshotChainRepair {
         snapshotInfo.getName(),
         "--db", DB_PATH,
         "--global-previous", globalPrevSnapshotId.toString(),
-        "--path-previous", pathPrevSnapshotId.toString(),
+        "--path-previous", pathPrevSnapshot.getSnapshotId().toString(),
     };
 
     setupMockDB(snapshotInfo, iteratorSnapshots);
@@ -307,11 +295,10 @@ public class TestSnapshotChainRepair {
 
   @Test
   public void testPathPreviousDoesNotExist() throws Exception {
-    UUID globalPrevSnapshotId = UUID.randomUUID();
     UUID pathPrevSnapshotId = UUID.randomUUID();
 
     SnapshotInfo snapshotInfo = newSnapshot();
-    SnapshotInfo globalPrevSnapshot = newSnapshot(globalPrevSnapshotId);
+    SnapshotInfo globalPrevSnapshot = newSnapshot();
 
     List<SnapshotInfo> iteratorSnapshots = Arrays.asList(
         snapshotInfo, globalPrevSnapshot);
@@ -321,7 +308,7 @@ public class TestSnapshotChainRepair {
         VOLUME_NAME + "/" + BUCKET_NAME,
         snapshotInfo.getName(),
         "--db", DB_PATH,
-        "--global-previous", globalPrevSnapshotId.toString(),
+        "--global-previous", globalPrevSnapshot.getSnapshotId().toString(),
         "--path-previous", pathPrevSnapshotId.toString(),
     };
 
@@ -337,11 +324,7 @@ public class TestSnapshotChainRepair {
   }
 
   private static SnapshotInfo newSnapshot() {
-    return newSnapshot(UUID.randomUUID());
-  }
-
-  private static SnapshotInfo newSnapshot(UUID snapshotId) {
     String name = RandomStringUtils.insecure().nextAlphanumeric(10);
-    return SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME, name, snapshotId, 0);
+    return SnapshotInfo.newInstance(VOLUME_NAME, BUCKET_NAME, name, UUID.randomUUID(), 0);
   }
 }
