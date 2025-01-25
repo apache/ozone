@@ -135,10 +135,8 @@ public class TestSnapshotChainRepair {
       when(rocksIterator.isValid()).thenReturn(false);
     } else {
       Boolean[] remainingValidResponses = new Boolean[iteratorSnapshots.size()];
-      for (int i = 0; i < iteratorSnapshots.size() - 1; i++) {
-        remainingValidResponses[i] = true;
-      }
-      remainingValidResponses[iteratorSnapshots.size() - 1] = false;
+      Arrays.fill(remainingValidResponses, true);
+      remainingValidResponses[remainingValidResponses.length - 1] = false;
 
       when(rocksIterator.isValid())
           .thenReturn(true, remainingValidResponses);
