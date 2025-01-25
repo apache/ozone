@@ -755,6 +755,7 @@ public class DatanodeStateMachine implements Closeable {
     return reconfigurationHandler;
   }
 
+  @VisibleForTesting
   public DNContainerOperationClient getDnContainerOperationClientClient() {
     return dnClient;
   }

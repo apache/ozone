@@ -307,6 +307,7 @@ public class TestContainerCommandReconciliation {
       db.getStore().flushDB();
     }
 
+    // TODO: Use On-demand container scanner to build the new container merkle tree.
     Files.deleteIfExists(getContainerChecksumFile(container.getContainerData()).toPath());
     kvHandler.createContainerMerkleTree(container);
     ContainerProtos.ContainerChecksumInfo containerChecksumAfterBlockDelete =

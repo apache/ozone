@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
@@ -593,17 +594,7 @@ public class KeyValueHandler extends Handler {
 
     try {
       KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
-      ContainerMerkleTree merkleTree = new ContainerMerkleTree();
-      try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf);
-           BlockIterator<BlockData> blockIterator = dbHandle.getStore().
-               getBlockIterator(containerData.getContainerID())) {
-        while (blockIterator.hasNext()) {
-          BlockData blockData = blockIterator.nextBlock();
-          List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
-          merkleTree.addChunks(blockData.getLocalID(), chunkInfos);
-        }
-      }
-      checksumManager.writeContainerDataTree(containerData, merkleTree);
+      updateContainerChecksum(containerData);
     } catch (IOException ex) {
       LOG.error("Cannot create container checksum for container {} , Exception: ",
           container.getContainerData().getContainerID(), ex);
@@ -1458,13 +1449,20 @@ public class KeyValueHandler extends Handler {
                                  Set<DatanodeDetails> peers) throws IOException {
     KeyValueContainer kvContainer = (KeyValueContainer) container;
     KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
+    Optional<ContainerProtos.ContainerChecksumInfo> checksumInfo = checksumManager.read(containerData);
+    long oldDataChecksum = 0;
+
+    if (checksumInfo.isPresent()) {
+      oldDataChecksum = checksumInfo.get().getContainerMerkleTree().getDataChecksum();
+    }
 
     for (DatanodeDetails peer : peers) {
       ContainerProtos.ContainerChecksumInfo peerChecksumInfo = dnClient.getContainerChecksumInfo(
           containerData.getContainerID(), peer);
       if (peerChecksumInfo == null) {
-        LOG.warn("Checksum not yet generated for peer: {}", peer);
-        return;
+        LOG.warn("Cannot reconcile container {} with peer {} which has not yet generated a checksum",
+            containerData.getContainerID(), peer);
+        continue;
       }
 
       long scmBlockSize = (long) conf.getStorageSize(OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT,
@@ -1480,14 +1478,17 @@ public class KeyValueHandler extends Handler {
           handleMissingBlock(kvContainer, containerData, tokenHelper, scmBlockSize, xceiverClient, missingBlock);
         }
 
+        // Handling missing chunks and corrupt chunks are done the same way. Separate here to differentiate them.
         // Handle missing chunks
         for (Map.Entry<Long, List<ContainerProtos.ChunkMerkleTree>> entry : diffReport.getMissingChunks().entrySet()) {
-          reconcileChunk(kvContainer, containerData, tokenHelper, scmBlockSize, xceiverClient, entry);
+          reconcileChunk(kvContainer, containerData, tokenHelper, scmBlockSize, xceiverClient,
+              entry.getKey(), entry.getValue());
         }
 
         // Handle corrupt chunks
         for (Map.Entry<Long, List<ContainerProtos.ChunkMerkleTree>> entry : diffReport.getCorruptChunks().entrySet()) {
-          reconcileChunk(kvContainer, containerData, tokenHelper, scmBlockSize, xceiverClient, entry);
+          reconcileChunk(kvContainer, containerData, tokenHelper, scmBlockSize, xceiverClient,
+              entry.getKey(), entry.getValue());
         }
         updateContainerChecksum(containerData);
       } finally {
@@ -1497,7 +1498,7 @@ public class KeyValueHandler extends Handler {
 
     long dataChecksum = updateContainerChecksum(containerData);
     LOG.info("Checksum data for container {} is updated to {}", containerData.getContainerID(), dataChecksum);
-    containerData.setDataChecksum(dataChecksum);
+    ContainerLogger.logReconciled(container.getContainerData(), oldDataChecksum, dataChecksum);
     sendICR(container);
   }
 
@@ -1513,7 +1514,9 @@ public class KeyValueHandler extends Handler {
       }
     }
     checksumManager.writeContainerDataTree(containerData, merkleTree);
-    return merkleTree.toProto().getDataChecksum();
+    long dataChecksum = merkleTree.toProto().getDataChecksum();
+    containerData.setDataChecksum(dataChecksum);
+    return dataChecksum;
   }
 
   private void handleMissingBlock(KeyValueContainer container, ContainerData containerData, TokenHelper tokenHelper,
@@ -1524,9 +1527,11 @@ public class KeyValueHandler extends Handler {
     // TODO: Cache the blockResponse to reuse it again.
     ContainerProtos.GetBlockResponseProto blockResponse = ContainerProtocolCalls.getBlock(xceiverClient, blockID,
         blockToken, new HashMap<>());
-    // TODO: Add BcsId in BlockMerkleTree to avoid this call
     ContainerProtos.GetCommittedBlockLengthResponseProto blockLengthResponse =
         ContainerProtocolCalls.getCommittedBlockLength(xceiverClient, blockID, blockToken);
+    long blockCommitSequenceId = getBlockManager().getBlock(container, blockID).getBlockCommitSequenceId();
+    // Check the local bcsId with the one from the bcsId from the peer datanode.
+    long maxBlockCommitSequenceId = Math.max(blockLengthResponse.getBlockLength(), blockCommitSequenceId);
     List<ContainerProtos.ChunkInfo> chunksList = blockResponse.getBlockData().getChunksList();
 
     for (ContainerProtos.ChunkInfo chunkInfoProto : chunksList) {
@@ -1538,7 +1543,7 @@ public class KeyValueHandler extends Handler {
     }
 
     putBlockForClosedContainer(chunksList, container, BlockData.getFromProtoBuf(blockResponse.getBlockData()),
-        blockLengthResponse.getBlockLength());
+        maxBlockCommitSequenceId);
   }
 
   private ByteString readChunkData(XceiverClientSpi xceiverClient, ContainerProtos.ChunkInfo chunkInfoProto,
@@ -1557,22 +1562,22 @@ public class KeyValueHandler extends Handler {
   }
 
   private void reconcileChunk(KeyValueContainer container, ContainerData containerData, TokenHelper tokenHelper,
-                              long scmBlockSize, XceiverClientSpi xceiverClient,
-                              Map.Entry<Long, List<ContainerProtos.ChunkMerkleTree>> mapEntry) throws IOException {
-    long blockId = mapEntry.getKey();
-    List<ContainerProtos.ChunkMerkleTree> chunkList = mapEntry.getValue();
+                              long scmBlockSize, XceiverClientSpi xceiverClient, long blockId,
+                              List<ContainerProtos.ChunkMerkleTree> chunkList) throws IOException {
     Set<Long> offsets = chunkList.stream().map(ContainerProtos.ChunkMerkleTree::getOffset)
         .collect(Collectors.toSet());
     BlockID blockID = new BlockID(containerData.getContainerID(), blockId);
     Token<OzoneBlockTokenIdentifier> blockToken = tokenHelper.getBlockToken(blockID, scmBlockSize);
     ContainerProtos.GetBlockResponseProto blockResponse = ContainerProtocolCalls.getBlock(xceiverClient, blockID,
         blockToken, new HashMap<>());
-    // TODO: Add BcsId in BlockMerkleTree to avoid this call
     ContainerProtos.GetCommittedBlockLengthResponseProto blockLengthResponse =
         ContainerProtocolCalls.getCommittedBlockLength(xceiverClient, blockID, blockToken);
-    List<ContainerProtos.ChunkInfo> chunksList = blockResponse.getBlockData().getChunksList();
+    long blockCommitSequenceId = getBlockManager().getBlock(container, blockID).getBlockCommitSequenceId();
+    // Check the local bcsId with the one from the bcsId from the peer datanode.
+    long maxBlockCommitSequenceId = Math.max(blockLengthResponse.getBlockLength(), blockCommitSequenceId);
+    List<ContainerProtos.ChunkInfo> chunksListFromPeer = blockResponse.getBlockData().getChunksList();
 
-    for (ContainerProtos.ChunkInfo chunkInfoProto : chunksList) {
+    for (ContainerProtos.ChunkInfo chunkInfoProto : chunksListFromPeer) {
       if (offsets.contains(chunkInfoProto.getOffset())) {
         ByteString chunkData = readChunkData(xceiverClient, chunkInfoProto, blockID, blockToken);
         ChunkBuffer chunkBuffer = ChunkBuffer.wrap(chunkData.asReadOnlyByteBuffer());
@@ -1582,8 +1587,8 @@ public class KeyValueHandler extends Handler {
       }
     }
 
-    putBlockForClosedContainer(chunksList, container, BlockData.getFromProtoBuf(blockResponse.getBlockData()),
-        blockLengthResponse.getBlockLength());
+    putBlockForClosedContainer(chunksListFromPeer, container, BlockData.getFromProtoBuf(blockResponse.getBlockData()),
+        maxBlockCommitSequenceId);
   }
 
   /**

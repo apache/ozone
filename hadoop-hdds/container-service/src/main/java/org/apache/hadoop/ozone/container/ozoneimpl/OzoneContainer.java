@@ -654,10 +654,6 @@ public class OzoneContainer {
     return replicationServer;
   }
 
-  public ContainerChecksumTreeManager getChecksumTreeManager() {
-    return checksumTreeManager;
-  }
-
   public void compactDb() {
     for (StorageVolume volume : volumeSet.getVolumesList()) {
       HddsVolume hddsVolume = (HddsVolume) volume;
