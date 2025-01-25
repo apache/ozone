@@ -46,7 +46,7 @@ import java.util.UUID;
 
 import static org.apache.ozone.test.IntLambda.withTextFromSystemIn;
 import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_INFO_TABLE;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -181,7 +181,7 @@ public class TestSnapshotChainRepair {
         .execute(() -> cli.execute(argsList.toArray(new String[0])));
 
     String output = out.getOutput();
-    assertTrue(output.contains("Updating SnapshotInfo to"));
+    assertThat(output).contains("Updating SnapshotInfo to");
 
     if (dryRun) {
       // Verify DB update was NOT called in dry run mode
@@ -195,7 +195,7 @@ public class TestSnapshotChainRepair {
           eq(columnFamilyHandle),
           eq(StringCodec.get().toPersistedFormat(snapshotInfo.getTableKey())),
           eq(SnapshotInfo.getCodec().toPersistedFormat(snapshotInfo)));
-      assertTrue(output.contains("Snapshot Info is updated"));
+      assertThat(output).contains("Snapshot Info is updated");
     }
   }
 
@@ -224,8 +224,8 @@ public class TestSnapshotChainRepair {
         .execute(() -> cli.execute(args));
 
     String errorOutput = err.getOutput();
-    assertTrue(errorOutput.contains("globalPreviousSnapshotId: '" + snapshotInfo.getSnapshotId() +
-        "' is equal to given snapshot's ID"));
+    assertThat(errorOutput).contains("globalPreviousSnapshotId: '" + snapshotInfo.getSnapshotId() +
+        "' is equal to given snapshot's ID");
   }
 
   @Test
@@ -253,8 +253,8 @@ public class TestSnapshotChainRepair {
         .execute(() -> cli.execute(args));
 
     String errorOutput = err.getOutput();
-    assertTrue(errorOutput.contains("pathPreviousSnapshotId: '" + snapshotInfo.getSnapshotId() +
-        "' is equal to given snapshot's ID"));
+    assertThat(errorOutput).contains("pathPreviousSnapshotId: '" + snapshotInfo.getSnapshotId() +
+        "' is equal to given snapshot's ID");
   }
 
   @Test
@@ -283,8 +283,8 @@ public class TestSnapshotChainRepair {
         .execute(() -> cli.execute(args));
 
     String errorOutput = err.getOutput();
-    assertTrue(errorOutput.contains("globalPreviousSnapshotId: '" + globalPrevSnapshotId +
-        "' does not exist in snapshotInfoTable"));
+    assertThat(errorOutput).contains("globalPreviousSnapshotId: '" + globalPrevSnapshotId +
+        "' does not exist in snapshotInfoTable");
   }
 
   @Test
@@ -313,8 +313,8 @@ public class TestSnapshotChainRepair {
         .execute(() -> cli.execute(args));
 
     String errorOutput = err.getOutput();
-    assertTrue(errorOutput.contains("pathPreviousSnapshotId: '" + pathPrevSnapshotId +
-        "' does not exist in snapshotInfoTable"));
+    assertThat(errorOutput).contains("pathPreviousSnapshotId: '" + pathPrevSnapshotId +
+        "' does not exist in snapshotInfoTable");
   }
 
   private static SnapshotInfo newSnapshot() {
