@@ -86,14 +86,7 @@ public class TestSnapshotChainRepair {
 
   @AfterEach
   public void tearDown() {
-    IOUtils.closeQuietly(out, err);
-
-    if (mockedDB != null) {
-      mockedDB.close();
-    }
-    if (mockedUtils != null) {
-      mockedUtils.close();
-    }
+    IOUtils.closeQuietly(out, err, mockedDB, mockedUtils);
   }
 
   private void setupMockDB(SnapshotInfo snapshotInfo,
