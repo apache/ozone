@@ -60,14 +60,18 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests for {@link RatisOverReplicationHandler}.
@@ -87,12 +91,12 @@ public class TestRatisOverReplicationHandler {
         RATIS_REPLICATION_CONFIG);
 
     policy = Mockito.mock(PlacementPolicy.class);
-    Mockito.when(policy.validateContainerPlacement(
-        Mockito.anyList(), Mockito.anyInt()))
+    when(policy.validateContainerPlacement(
+        anyList(), Mockito.anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
 
     replicationManager = Mockito.mock(ReplicationManager.class);
-    Mockito.when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
+    when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocation -> {
           DatanodeDetails dd = invocation.getArgument(0);
           return new NodeStatus(dd.getPersistedOpState(),
@@ -134,7 +138,7 @@ public class TestRatisOverReplicationHandler {
         ContainerReplicaProto.State.CLOSED, 0, 0, 0, 0);
 
     ContainerReplica stale = replicas.stream().findFirst().get();
-    Mockito.when(replicationManager.getNodeStatus(stale.getDatanodeDetails()))
+    when(replicationManager.getNodeStatus(stale.getDatanodeDetails()))
         .thenAnswer(invocation ->
             NodeStatus.inServiceStale());
 
@@ -206,7 +210,7 @@ public class TestRatisOverReplicationHandler {
             State.UNHEALTHY, container.getNumberOfKeys(),
             container.getUsedBytes(), staleNode,
             unhealthyReplica.getOriginDatanodeId()));
-    Mockito.when(replicationManager.getNodeStatus(eq(staleNode)))
+    when(replicationManager.getNodeStatus(eq(staleNode)))
         .thenAnswer(invocation -> {
           DatanodeDetails dd = invocation.getArgument(0);
           return new NodeStatus(dd.getPersistedOpState(),
@@ -262,12 +266,46 @@ public class TestRatisOverReplicationHandler {
 
     // Ensure a mis-replicated status is returned when 4 or fewer replicas are
     // checked.
-    Mockito.when(policy.validateContainerPlacement(
-        Mockito.argThat(list -> list.size() <= 4), Mockito.anyInt()))
+    when(policy.validateContainerPlacement(
+        argThat(list -> list.size() <= 4), Mockito.anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(1, 2, 3));
 
     testProcessing(replicas, Collections.emptyList(),
         getOverReplicatedHealthResult(), 0);
+  }
+
+  /**
+   * In this test, the container is already mis-replicated, being on 2 racks rather than 3.
+   * Removing a replica does not make it "more" mis-replicated, so the handler should remove
+   * one replica.
+   * @throws IOException
+   */
+  @Test
+  public void testOverReplicatedContainerAlreadyMisReplicated()
+      throws IOException {
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        ContainerReplicaProto.State.CLOSED, 0, 0, 0, 0);
+
+    // Ensure a mis-replicated status is always returned.
+    when(policy.validateContainerPlacement(anyList(), anyInt()))
+        .thenReturn(new ContainerPlacementStatusDefault(2, 3, 3));
+
+    testProcessing(replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1);
+  }
+
+  @Test
+  public void testOverReplicatedContainerBecomesOnSecondRemoval()
+      throws IOException {
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        ContainerReplicaProto.State.CLOSED, 0, 0, 0, 0, 0);
+
+    // Ensure a mis-replicated status is returned when 3 or fewer replicas are
+    // checked.
+    when(policy.validateContainerPlacement(argThat(list -> list.size() <= 3), anyInt()))
+        .thenReturn(new ContainerPlacementStatusDefault(1, 2, 3));
+
+    testProcessing(replicas, Collections.emptyList(),
+        getOverReplicatedHealthResult(), 1);
   }
 
   @Test
@@ -332,8 +370,8 @@ public class TestRatisOverReplicationHandler {
 
     // Ensure a mis-replicated status is returned when 4 or fewer replicas are
     // checked.
-    Mockito.when(policy.validateContainerPlacement(
-            Mockito.argThat(list -> list.size() <= 4), Mockito.anyInt()))
+    when(policy.validateContainerPlacement(
+            argThat(list -> list.size() <= 4), Mockito.anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(1, 2, 3));
 
     Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = testProcessing(
@@ -484,9 +522,13 @@ public class TestRatisOverReplicationHandler {
     RatisOverReplicationHandler handler =
         new RatisOverReplicationHandler(policy, replicationManager);
 
-    handler.processAndSendCommands(closedReplicas, Collections.emptyList(),
-        getOverReplicatedHealthResult(), 2);
-    assertEquals(2, commandsSent.size());
+    // Only 1 command should be sent, as the first call to sendThrottledDelete
+    // throws an overloaded exception. Rather than skip to the next one, the skipped
+    // one should get retried later.
+    assertThrows(CommandTargetOverloadedException.class,
+        () -> handler.processAndSendCommands(closedReplicas, Collections.emptyList(),
+            getOverReplicatedHealthResult(), 2));
+    assertEquals(1, commandsSent.size());
   }
 
   /**
@@ -519,7 +561,7 @@ public class TestRatisOverReplicationHandler {
       getOverReplicatedHealthResult() {
     ContainerHealthResult.OverReplicatedHealthResult healthResult =
         Mockito.mock(ContainerHealthResult.OverReplicatedHealthResult.class);
-    Mockito.when(healthResult.getContainerInfo()).thenReturn(container);
+    when(healthResult.getContainerInfo()).thenReturn(container);
     return healthResult;
   }
 }
