@@ -134,7 +134,7 @@ public class TestSnapshotChainRepair {
     if (snapshots.length == 0) {
       when(rocksIterator.isValid()).thenReturn(false);
     } else {
-      Boolean[] remainingValidResponses = new Boolean[snapshots.length];
+      Boolean[] remainingValidResponses = new Boolean[snapshots.length + 1];
       Arrays.fill(remainingValidResponses, true);
       remainingValidResponses[remainingValidResponses.length - 1] = false;
 
@@ -145,8 +145,8 @@ public class TestSnapshotChainRepair {
       for (SnapshotInfo snap : snapshots) {
         valueResponses.add(SnapshotInfo.getCodec().toPersistedFormat(snap));
       }
-      byte[] firstValue = valueResponses.get(0);
-      byte[][] remainingValueResponses = valueResponses.subList(1, valueResponses.size()).toArray(new byte[0][]);
+      byte[] firstValue = SnapshotInfo.getCodec().toPersistedFormat(snapshotInfo);
+      byte[][] remainingValueResponses = valueResponses.toArray(new byte[0][]);
       when(rocksIterator.value())
           .thenReturn(firstValue, remainingValueResponses);
     }
@@ -171,7 +171,7 @@ public class TestSnapshotChainRepair {
       argsList.add("--dry-run");
     }
 
-    setupMockDB(snapshotInfo, snapshotInfo, globalPrevSnapshot, pathPrevSnapshot);
+    setupMockDB(snapshotInfo, globalPrevSnapshot, pathPrevSnapshot);
 
     CommandLine cli = new OzoneRepair().getCmd();
     withTextFromSystemIn("y")
@@ -207,7 +207,7 @@ public class TestSnapshotChainRepair {
         "--path-previous", pathPrevSnapshot.getSnapshotId().toString(),
     };
 
-    setupMockDB(snapshotInfo, snapshotInfo, pathPrevSnapshot);
+    setupMockDB(snapshotInfo, pathPrevSnapshot);
 
     CommandLine cli = new OzoneRepair().getCmd();
     withTextFromSystemIn("y")
@@ -233,7 +233,7 @@ public class TestSnapshotChainRepair {
         "--path-previous", snapshotInfo.getSnapshotId().toString(),
     };
 
-    setupMockDB(snapshotInfo, snapshotInfo, globalPrevSnapshot);
+    setupMockDB(snapshotInfo, globalPrevSnapshot);
 
     CommandLine cli = new OzoneRepair().getCmd();
     withTextFromSystemIn("y")
@@ -260,7 +260,7 @@ public class TestSnapshotChainRepair {
         "--path-previous", pathPrevSnapshot.getSnapshotId().toString(),
     };
 
-    setupMockDB(snapshotInfo, snapshotInfo, pathPrevSnapshot);
+    setupMockDB(snapshotInfo, pathPrevSnapshot);
 
     CommandLine cli = new OzoneRepair().getCmd();
     withTextFromSystemIn("y")
@@ -287,7 +287,7 @@ public class TestSnapshotChainRepair {
         "--path-previous", pathPrevSnapshotId.toString(),
     };
 
-    setupMockDB(snapshotInfo, snapshotInfo, globalPrevSnapshot);
+    setupMockDB(snapshotInfo, globalPrevSnapshot);
 
     CommandLine cli = new OzoneRepair().getCmd();
     withTextFromSystemIn("y")
