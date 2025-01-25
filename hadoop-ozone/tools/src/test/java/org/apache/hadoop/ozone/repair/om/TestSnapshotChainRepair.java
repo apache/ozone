@@ -235,7 +235,7 @@ public class TestSnapshotChainRepair {
 
   @Test
   public void testGlobalPreviousDoesNotExist() throws Exception {
-    UUID globalPrevSnapshotId = UUID.randomUUID();
+    String nonexistent = UUID.randomUUID().toString();
 
     SnapshotInfo snapshotInfo = newSnapshot();
     SnapshotInfo pathPrevSnapshot = newSnapshot();
@@ -245,7 +245,7 @@ public class TestSnapshotChainRepair {
         VOLUME_NAME + "/" + BUCKET_NAME,
         snapshotInfo.getName(),
         "--db", DB_PATH,
-        "--global-previous", globalPrevSnapshotId.toString(),
+        "--global-previous", nonexistent,
         "--path-previous", pathPrevSnapshot.getSnapshotId().toString(),
     };
 
@@ -255,14 +255,14 @@ public class TestSnapshotChainRepair {
     withTextFromSystemIn("y")
         .execute(() -> cli.execute(args));
 
-    assertThat(err.getOutput()).contains("globalPreviousSnapshotId: '" + globalPrevSnapshotId +
+    assertThat(err.getOutput()).contains("globalPreviousSnapshotId: '" + nonexistent +
         "' does not exist in snapshotInfoTable");
     verifyDbWrite(snapshotInfo, false);
   }
 
   @Test
   public void testPathPreviousDoesNotExist() throws Exception {
-    UUID pathPrevSnapshotId = UUID.randomUUID();
+    String nonexistent = UUID.randomUUID().toString();
 
     SnapshotInfo snapshotInfo = newSnapshot();
     SnapshotInfo globalPrevSnapshot = newSnapshot();
@@ -273,7 +273,7 @@ public class TestSnapshotChainRepair {
         snapshotInfo.getName(),
         "--db", DB_PATH,
         "--global-previous", globalPrevSnapshot.getSnapshotId().toString(),
-        "--path-previous", pathPrevSnapshotId.toString(),
+        "--path-previous", nonexistent,
     };
 
     setupMockDB(snapshotInfo, globalPrevSnapshot);
@@ -282,7 +282,7 @@ public class TestSnapshotChainRepair {
     withTextFromSystemIn("y")
         .execute(() -> cli.execute(args));
 
-    assertThat(err.getOutput()).contains("pathPreviousSnapshotId: '" + pathPrevSnapshotId +
+    assertThat(err.getOutput()).contains("pathPreviousSnapshotId: '" + nonexistent +
         "' does not exist in snapshotInfoTable");
     verifyDbWrite(snapshotInfo, false);
   }
