@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.debug.RocksDBUtils;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.repair.OzoneRepair;
 import org.apache.ozone.test.GenericTestUtils;
-import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,7 +39,6 @@ import org.rocksdb.ColumnFamilyDescriptor;
 
 import picocli.CommandLine;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -145,11 +143,7 @@ public class TestSnapshotChainRepair {
 
       ArrayList<byte[]> valueResponses = new ArrayList<>();
       for (SnapshotInfo snap : iteratorSnapshots) {
-        try {
-          valueResponses.add(SnapshotInfo.getCodec().toPersistedFormat(snap));
-        } catch (IOException e) {
-          Assertions.fail("Failed to serialize snapshot info");
-        }
+        valueResponses.add(SnapshotInfo.getCodec().toPersistedFormat(snap));
       }
       byte[] firstValue = valueResponses.get(0);
       byte[][] remainingValueResponses = valueResponses.subList(1, valueResponses.size()).toArray(new byte[0][]);
