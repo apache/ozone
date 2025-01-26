@@ -47,7 +47,7 @@ public class TestListParts {
 
 
   private ObjectEndpoint rest;
-  private static String uploadID;
+  private String uploadID;
 
   @BeforeEach
   public void setUp() throws Exception {
