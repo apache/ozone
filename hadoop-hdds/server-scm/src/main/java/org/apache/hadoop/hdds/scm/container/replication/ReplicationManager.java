@@ -1142,13 +1142,13 @@ public class ReplicationManager implements SCMService {
      */
     @Config(key = "event.timeout",
         type = ConfigType.TIME,
-        defaultValue = "10m",
+        defaultValue = "12m",
         reconfigurable = true,
         tags = {SCM, OZONE},
         description = "Timeout for the container replication/deletion commands "
             + "sent to datanodes. After this timeout the command will be "
             + "retried.")
-    private long eventTimeout = Duration.ofMinutes(10).toMillis();
+    private long eventTimeout = Duration.ofMinutes(12).toMillis();
     public void setInterval(Duration interval) {
       this.interval = interval;
     }
@@ -1164,7 +1164,7 @@ public class ReplicationManager implements SCMService {
      */
     @Config(key = "event.timeout.datanode.offset",
         type = ConfigType.TIME,
-        defaultValue = "30s",
+        defaultValue = "6m",
         reconfigurable = true,
         tags = {SCM, OZONE},
         description = "The amount of time to subtract from "
@@ -1172,7 +1172,7 @@ public class ReplicationManager implements SCMService {
             + "datanodes which is less than the SCM timeout. This ensures "
             + "the datanodes will not process a command after SCM believes it "
             + "should have expired.")
-    private long datanodeTimeoutOffset = Duration.ofSeconds(30).toMillis();
+    private long datanodeTimeoutOffset = Duration.ofMinutes(6).toMillis();
     public long getDatanodeTimeoutOffset() {
       return datanodeTimeoutOffset;
     }
