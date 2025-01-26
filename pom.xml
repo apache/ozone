@@ -1375,6 +1375,7 @@
               <nonFilteredFileExtension>swp</nonFilteredFileExtension>
               <nonFilteredFileExtension>woff</nonFilteredFileExtension>
               <nonFilteredFileExtension>woff2</nonFilteredFileExtension>
+              <nonFilteredFileExtension>robot</nonFilteredFileExtension>
             </nonFilteredFileExtensions>
           </configuration>
         </plugin>
