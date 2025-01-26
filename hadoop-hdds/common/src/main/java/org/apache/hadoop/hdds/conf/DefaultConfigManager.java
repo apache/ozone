@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.conf;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -53,6 +54,7 @@ public final class DefaultConfigManager {
 
   @VisibleForTesting
   public static void clearDefaultConfigs() {
+    SCMHAUtils.setRatisEnabled(true);
     CONFIG_DEFAULT_MAP.clear();
   }
 }
