@@ -50,7 +50,6 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.http.HttpStatus;
@@ -131,14 +130,16 @@ class TestObjectPut {
     bucket = clientStub.getObjectStore().getS3Bucket(BUCKET_NAME);
     clientStub.getObjectStore().createS3Bucket(DEST_BUCKET_NAME);
 
-    // Create PutObject and setClient to OzoneClientStub
-    objectEndpoint = spy(new ObjectEndpoint());
-    objectEndpoint.setClient(clientStub);
-    objectEndpoint.setOzoneConfiguration(config);
-    objectEndpoint.setRequestIdentifier(new RequestIdentifier());
-
     headers = mock(HttpHeaders.class);
-    objectEndpoint.setHeaders(headers);
+
+    // Create PutObject and setClient to OzoneClientStub
+    objectEndpoint = new ObjectEndpointBuilder()
+        .setClient(clientStub)
+        .setConfig(config)
+        .setHeaders(headers)
+        .build();
+
+    objectEndpoint = spy(objectEndpoint);
 
     String volumeName = config.get(OzoneConfigKeys.OZONE_S3_VOLUME_NAME,
         OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT);

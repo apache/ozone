@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
-import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -75,16 +74,18 @@ public class TestObjectTaggingPut {
     // Create bucket
     clientStub.getObjectStore().createS3Bucket(BUCKET_NAME);
 
-    // Create PutObject and setClient to OzoneClientStub
-    objectEndpoint = new ObjectEndpoint();
-    objectEndpoint.setClient(clientStub);
-    objectEndpoint.setOzoneConfiguration(config);
-    objectEndpoint.setRequestIdentifier(new RequestIdentifier());
-
     HttpHeaders headers = mock(HttpHeaders.class);
+
+    // Create PutObject and setClient to OzoneClientStub
+    objectEndpoint = new ObjectEndpointBuilder()
+        .setClient(clientStub)
+        .setConfig(config)
+        .setHeaders(headers)
+        .build();
+
+    
     ByteArrayInputStream body =
         new ByteArrayInputStream("".getBytes(UTF_8));
-    objectEndpoint.setHeaders(headers);
 
     objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, 1, null, null, null, body);
   }
@@ -169,12 +170,13 @@ public class TestObjectTaggingPut {
     when(mockObjectStore.getS3Volume()).thenReturn(mockVolume);
     when(mockVolume.getBucket("fsoBucket")).thenReturn(mockBucket);
 
-    ObjectEndpoint endpoint = new ObjectEndpoint();
+    ObjectEndpoint endpoint = new ObjectEndpointBuilder()
+        .setClient(mockClient)
+        .build();
     Map<String, String> twoTagsMap = new HashMap<>();
     twoTagsMap.put("tag1", "val1");
     twoTagsMap.put("tag2", "val2");
-    endpoint.setClient(mockClient);
-    endpoint.setRequestIdentifier(new RequestIdentifier());
+
 
     doThrow(new OMException("PutObjectTagging is not currently supported for FSO directory",
         ResultCodes.NOT_SUPPORTED_OPERATION)).when(mockBucket).putObjectTagging("dir/", twoTagsMap);

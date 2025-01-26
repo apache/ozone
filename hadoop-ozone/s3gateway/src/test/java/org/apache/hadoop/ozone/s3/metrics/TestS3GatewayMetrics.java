@@ -19,15 +19,16 @@
  */
 package org.apache.hadoop.ozone.s3.metrics;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.endpoint.BucketEndpoint;
+import org.apache.hadoop.ozone.s3.endpoint.BucketEndpointBuilder;
 import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint;
+import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpointBuilder;
 import org.apache.hadoop.ozone.s3.endpoint.RootEndpoint;
+import org.apache.hadoop.ozone.s3.endpoint.RootEndpointBuilder;
 import org.apache.hadoop.ozone.s3.endpoint.TestBucketAcl;
 import org.apache.hadoop.ozone.s3.endpoint.MultipartUploadInitiateResponse;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest;
@@ -88,20 +89,17 @@ public class TestS3GatewayMetrics {
     clientStub.getObjectStore().createS3Bucket(bucketName);
     bucket = clientStub.getObjectStore().getS3Bucket(bucketName);
 
-    RequestIdentifier requestIdentifier = new RequestIdentifier();
+    bucketEndpoint = new BucketEndpointBuilder()
+        .setClient(clientStub)
+        .build();
 
-    bucketEndpoint = new BucketEndpoint();
-    bucketEndpoint.setClient(clientStub);
-    bucketEndpoint.setRequestIdentifier(requestIdentifier);
+    rootEndpoint = new RootEndpointBuilder()
+        .setClient(clientStub)
+        .build();
 
-    rootEndpoint = new RootEndpoint();
-    rootEndpoint.setClient(clientStub);
-    rootEndpoint.setRequestIdentifier(requestIdentifier);
-
-    keyEndpoint = new ObjectEndpoint();
-    keyEndpoint.setClient(clientStub);
-    keyEndpoint.setOzoneConfiguration(new OzoneConfiguration());
-    keyEndpoint.setRequestIdentifier(requestIdentifier);
+    keyEndpoint = new ObjectEndpointBuilder()
+        .setClient(clientStub)
+        .build();
 
     headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(

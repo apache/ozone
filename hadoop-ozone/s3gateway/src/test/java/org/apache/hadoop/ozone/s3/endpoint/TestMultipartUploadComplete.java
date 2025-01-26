@@ -20,13 +20,12 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import javax.ws.rs.core.HttpHeaders;
@@ -43,7 +42,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -61,22 +59,22 @@ import static org.mockito.Mockito.when;
 
 public class TestMultipartUploadComplete {
 
-  private static final ObjectEndpoint REST = new ObjectEndpoint();
-  private static final HttpHeaders HEADERS = mock(HttpHeaders.class);
-  private static final OzoneClient CLIENT = new OzoneClientStub();
+  private ObjectEndpoint rest;
+  private HttpHeaders headers = mock(HttpHeaders.class);
+  private OzoneClient client = new OzoneClientStub();
 
-  @BeforeAll
-  public static void setUp() throws Exception {
+  @BeforeEach
+  public void setUp() throws Exception {
 
-    CLIENT.getObjectStore().createS3Bucket(OzoneConsts.S3_BUCKET);
+    client.getObjectStore().createS3Bucket(OzoneConsts.S3_BUCKET);
 
-    when(HEADERS.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
+    when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
 
-    REST.setHeaders(HEADERS);
-    REST.setClient(CLIENT);
-    REST.setOzoneConfiguration(new OzoneConfiguration());
-    REST.setRequestIdentifier(new RequestIdentifier());
+    rest = new ObjectEndpointBuilder()
+        .setHeaders(headers)
+        .setClient(client)
+        .build();
   }
 
   private String initiateMultipartUpload(String key) throws IOException,
@@ -93,9 +91,9 @@ public class TestMultipartUploadComplete {
           .add(entry.getValue());
     }
 
-    when(HEADERS.getRequestHeaders()).thenReturn(metadataHeaders);
+    when(headers.getRequestHeaders()).thenReturn(metadataHeaders);
 
-    Response response = REST.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
+    Response response = rest.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
         key);
     MultipartUploadInitiateResponse multipartUploadInitiateResponse =
         (MultipartUploadInitiateResponse) response.getEntity();
@@ -111,7 +109,7 @@ public class TestMultipartUploadComplete {
       content) throws IOException, OS3Exception {
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
-    Response response = REST.put(OzoneConsts.S3_BUCKET, key, content.length(),
+    Response response = rest.put(OzoneConsts.S3_BUCKET, key, content.length(),
         partNumber, uploadID, null, null, body);
     assertEquals(200, response.getStatus());
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
@@ -125,7 +123,7 @@ public class TestMultipartUploadComplete {
   private void completeMultipartUpload(String key,
       CompleteMultipartUploadRequest completeMultipartUploadRequest,
       String uploadID) throws IOException, OS3Exception {
-    Response response = REST.completeMultipartUpload(OzoneConsts.S3_BUCKET, key,
+    Response response = rest.completeMultipartUpload(OzoneConsts.S3_BUCKET, key,
         uploadID, completeMultipartUploadRequest);
 
     assertEquals(200, response.getStatus());
@@ -198,7 +196,7 @@ public class TestMultipartUploadComplete {
 
     completeMultipartUpload(key, completeMultipartUploadRequest, uploadID);
 
-    Response headResponse = REST.head(OzoneConsts.S3_BUCKET, key);
+    Response headResponse = rest.head(OzoneConsts.S3_BUCKET, key);
 
     assertEquals("custom-value1", headResponse.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "custom-key1"));
     assertEquals("custom-value2", headResponse.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "custom-key2"));

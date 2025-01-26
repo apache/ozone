@@ -50,12 +50,11 @@ public class TestBucketList {
   @Test
   public void listRoot() throws OS3Exception, IOException {
 
-    BucketEndpoint getBucket = new BucketEndpoint();
-
     OzoneClient client = createClientWithKeys("file1", "dir1/file2");
 
-    getBucket.setClient(client);
-    getBucket.setRequestIdentifier(new RequestIdentifier());
+    BucketEndpoint getBucket = new BucketEndpointBuilder()
+        .setClient(client)
+        .build();
 
     ListObjectResponse getBucketResponse =
         (ListObjectResponse) getBucket.get("b1", "/", null, null, 100, "",

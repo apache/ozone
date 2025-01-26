@@ -21,11 +21,9 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.s3.RequestIdentifier;
 
 import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.Test;
@@ -97,11 +95,10 @@ public class TestInitiateMultipartUpload {
   @Nonnull
   private ObjectEndpoint getObjectEndpoint(OzoneClient client,
       HttpHeaders headers) {
-    ObjectEndpoint rest = new ObjectEndpoint();
-    rest.setHeaders(headers);
-    rest.setClient(client);
-    rest.setOzoneConfiguration(new OzoneConfiguration());
-    rest.setRequestIdentifier(new RequestIdentifier());
+    ObjectEndpoint rest = new ObjectEndpointBuilder()
+        .setHeaders(headers)
+        .setClient(client)
+        .build();
     return rest;
   }
 }

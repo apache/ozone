@@ -26,7 +26,6 @@ import java.time.LocalDate;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import static java.net.HttpURLConnection.HTTP_CONFLICT;
@@ -57,9 +56,9 @@ public class TestBucketPut {
     clientStub = new OzoneClientStub();
 
     // Create HeadBucket and setClient to OzoneClientStub
-    bucketEndpoint = new BucketEndpoint();
-    bucketEndpoint.setClient(clientStub);
-    bucketEndpoint.setRequestIdentifier(new RequestIdentifier());
+    bucketEndpoint = new BucketEndpointBuilder()
+        .setClient(clientStub)
+        .build();
   }
 
   @Test

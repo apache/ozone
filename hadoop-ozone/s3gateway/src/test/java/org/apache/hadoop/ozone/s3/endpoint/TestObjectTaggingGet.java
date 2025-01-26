@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.endpoint.S3Tagging.Tag;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,12 +61,14 @@ public class TestObjectTaggingGet {
     OzoneClient client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket(BUCKET_NAME);
 
-    rest = new ObjectEndpoint();
-    rest.setClient(client);
-    rest.setOzoneConfiguration(config);
-    rest.setRequestIdentifier(new RequestIdentifier());
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
-    rest.setHeaders(headers);
+
+    rest = new ObjectEndpointBuilder()
+        .setClient(client)
+        .setConfig(config)
+        .setHeaders(headers)
+        .build();
+
     ByteArrayInputStream body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     // Create a key with object tags
     Mockito.when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");

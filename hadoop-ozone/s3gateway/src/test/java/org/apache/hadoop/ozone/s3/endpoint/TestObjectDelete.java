@@ -22,11 +22,9 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import java.io.IOException;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import org.junit.jupiter.api.Test;
@@ -47,10 +45,9 @@ public class TestObjectDelete {
 
     bucket.createKey("key1", 0).close();
 
-    ObjectEndpoint rest = new ObjectEndpoint();
-    rest.setClient(client);
-    rest.setRequestIdentifier(new RequestIdentifier());
-    rest.setOzoneConfiguration(new OzoneConfiguration());
+    ObjectEndpoint rest = new ObjectEndpointBuilder()
+        .setClient(client)
+        .build();
 
     //WHEN
     rest.delete("b1", "key1", null, null);
