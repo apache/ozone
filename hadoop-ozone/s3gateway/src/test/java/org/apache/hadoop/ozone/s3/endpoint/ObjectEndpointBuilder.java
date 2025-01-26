@@ -21,47 +21,23 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.s3.RequestIdentifier;
 
 /**
  * Builder for ObjectEndpoint in tests.
  */
 public class ObjectEndpointBuilder extends
-    EndpointBuilder<ObjectEndpoint, ObjectEndpointBuilder> {
+    EndpointBuilder<ObjectEndpoint> {
 
-  private ObjectEndpoint base;
-
-  public ObjectEndpointBuilder setBase(ObjectEndpoint base) {
-    this.base = base;
-    return this;
+  public ObjectEndpointBuilder() {
+    super(ObjectEndpoint::new);
   }
 
   @Override
   public ObjectEndpoint build() {
-    ObjectEndpoint endpoint = base != null ? base : new ObjectEndpoint();
-
-    if (getClient() != null) {
-      endpoint.setClient(getClient());
-    }
-
-    if (getConfig() == null) {
-      endpoint.setOzoneConfiguration(new OzoneConfiguration());
-    }
-    endpoint.setOzoneConfiguration(getConfig());
-
-    if (getRequestId() == null) {
-      endpoint.setRequestIdentifier(new RequestIdentifier());
-    }
-    endpoint.setRequestIdentifier(getRequestId());
-
-    if (getHeaders() != null) {
-      endpoint.setHeaders(getHeaders());
-    }
-
-    if (getContext() != null) {
-      endpoint.setContext(getContext());
-    }
-
+    ObjectEndpoint endpoint = super.build();
+    final OzoneConfiguration config = getConfig();
+    endpoint.setOzoneConfiguration(config != null ? config : new OzoneConfiguration());
+    endpoint.setHeaders(getHeaders());
     return endpoint;
   }
 }

@@ -24,54 +24,71 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.s3.RequestIdentifier;
 
+import java.util.function.Supplier;
+
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.HttpHeaders;
 
 /**
  * Base builder class for S3 endpoints in tests.
  * @param <T> Type of endpoint being built
- * @param <B> Type of concrete builder (for method chaining)
  */
-public abstract class EndpointBuilder<T, B extends EndpointBuilder<T, B>> {
+public class EndpointBuilder<T extends EndpointBase> {
+
+  private Supplier<T> constructor;
+  private T base;
   private OzoneClient ozoneClient;
   private OzoneConfiguration ozoneConfig;
   private HttpHeaders httpHeaders;
   private ContainerRequestContext requestContext;
   private RequestIdentifier identifier;
 
-  protected EndpointBuilder() {
+  protected EndpointBuilder(Supplier<T> constructor) {
+    this.constructor = constructor;
     this.ozoneConfig = new OzoneConfiguration();
     this.identifier = new RequestIdentifier();
   }
 
-  @SuppressWarnings("unchecked")
-  public B setClient(OzoneClient newClient) {
+  public EndpointBuilder<T> setBase(T base) {
+    this.base = base;
+    return this;
+  }
+
+  public EndpointBuilder<T> setClient(OzoneClient newClient) {
     this.ozoneClient = newClient;
-    return (B) this;
+    return this;
   }
 
-  @SuppressWarnings("unchecked")
-  public B setConfig(OzoneConfiguration newConfig) {
+  public EndpointBuilder<T> setConfig(OzoneConfiguration newConfig) {
     this.ozoneConfig = newConfig;
-    return (B) this;
+    return this;
   }
 
-  @SuppressWarnings("unchecked")
-  public B setHeaders(HttpHeaders newHeaders) {
+  public EndpointBuilder<T> setHeaders(HttpHeaders newHeaders) {
     this.httpHeaders = newHeaders;
-    return (B) this;
+    return this;
   }
 
-  @SuppressWarnings("unchecked")
-  public B setContext(ContainerRequestContext newContext) {
+  public EndpointBuilder<T> setContext(ContainerRequestContext newContext) {
     this.requestContext = newContext;
-    return (B) this;
+    return this;
   }
 
-  @SuppressWarnings("unchecked")
-  public B setRequestId(RequestIdentifier newRequestId) {
+  public EndpointBuilder<T> setRequestId(RequestIdentifier newRequestId) {
     this.identifier = newRequestId;
-    return (B) this;
+    return this;
+  }
+
+  public T build() {
+    T endpoint = base != null ? base : constructor.get();
+
+    if (ozoneClient != null) {
+      endpoint.setClient(ozoneClient);
+    }
+
+    endpoint.setRequestIdentifier(identifier);
+
+    return endpoint;
   }
 
   protected OzoneClient getClient() {
@@ -94,5 +111,15 @@ public abstract class EndpointBuilder<T, B extends EndpointBuilder<T, B>> {
     return identifier;
   }
 
-  public abstract T build();
+  public static EndpointBuilder<RootEndpoint> newRootEndpointBuilder() {
+    return new EndpointBuilder<>(RootEndpoint::new);
+  }
+
+  public static EndpointBuilder<BucketEndpoint> newBucketEndpointBuilder() {
+    return new EndpointBuilder<>(BucketEndpoint::new);
+  }
+
+  public static EndpointBuilder<ObjectEndpoint> newObjectEndpointBuilder() {
+    return new ObjectEndpointBuilder();
+  }
 }
