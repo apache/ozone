@@ -77,7 +77,7 @@ public class TestObjectTaggingPut {
     HttpHeaders headers = mock(HttpHeaders.class);
 
     // Create PutObject and setClient to OzoneClientStub
-    objectEndpoint = new ObjectEndpointBuilder()
+    objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(clientStub)
         .setConfig(config)
         .setHeaders(headers)
@@ -170,7 +170,7 @@ public class TestObjectTaggingPut {
     when(mockObjectStore.getS3Volume()).thenReturn(mockVolume);
     when(mockVolume.getBucket("fsoBucket")).thenReturn(mockBucket);
 
-    ObjectEndpoint endpoint = new ObjectEndpointBuilder()
+    ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(mockClient)
         .build();
     Map<String, String> twoTagsMap = new HashMap<>();

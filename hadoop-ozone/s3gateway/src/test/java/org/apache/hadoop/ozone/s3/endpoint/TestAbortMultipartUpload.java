@@ -53,7 +53,7 @@ public class TestAbortMultipartUpload {
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
 
-    ObjectEndpoint rest = new ObjectEndpointBuilder()
+    ObjectEndpoint rest = EndpointBuilder.newObjectEndpointBuilder()
         .setHeaders(headers)
         .setClient(client)
         .build();

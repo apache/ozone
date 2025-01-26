@@ -69,7 +69,7 @@ public class TestPartUploadWithStream {
     conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED,
         true);
 
-    rest = new ObjectEndpointBuilder()
+    rest = EndpointBuilder.newObjectEndpointBuilder()
         .setHeaders(headers)
         .setClient(client)
         .setConfig(conf)

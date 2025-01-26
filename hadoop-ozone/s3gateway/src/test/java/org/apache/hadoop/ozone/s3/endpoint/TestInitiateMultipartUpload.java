@@ -95,7 +95,7 @@ public class TestInitiateMultipartUpload {
   @Nonnull
   private ObjectEndpoint getObjectEndpoint(OzoneClient client,
       HttpHeaders headers) {
-    ObjectEndpoint rest = new ObjectEndpointBuilder()
+    ObjectEndpoint rest = EndpointBuilder.newObjectEndpointBuilder()
         .setHeaders(headers)
         .setClient(client)
         .build();

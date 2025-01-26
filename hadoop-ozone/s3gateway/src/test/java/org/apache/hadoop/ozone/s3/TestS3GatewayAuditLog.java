@@ -30,11 +30,9 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.s3.endpoint.BucketEndpoint;
-import org.apache.hadoop.ozone.s3.endpoint.BucketEndpointBuilder;
+import org.apache.hadoop.ozone.s3.endpoint.EndpointBuilder;
 import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint;
-import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpointBuilder;
 import org.apache.hadoop.ozone.s3.endpoint.RootEndpoint;
-import org.apache.hadoop.ozone.s3.endpoint.RootEndpointBuilder;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -87,13 +85,13 @@ public class TestS3GatewayAuditLog {
         return parametersMap;
       }
     };
-    bucketEndpoint = new BucketEndpointBuilder()
+    bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setBase(bucketEndpoint)
         .setClient(clientStub)
         .setRequestId(requestIdentifier)
         .build();
 
-    rootEndpoint = new RootEndpointBuilder()
+    rootEndpoint = EndpointBuilder.newRootEndpointBuilder()
         .setClient(clientStub)
         .setRequestId(requestIdentifier)
         .build();
@@ -104,7 +102,7 @@ public class TestS3GatewayAuditLog {
         return parametersMap;
       }
     };
-    keyEndpoint = new ObjectEndpointBuilder()
+    keyEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setBase(keyEndpoint)
         .setClient(clientStub)
         .setRequestId(requestIdentifier)

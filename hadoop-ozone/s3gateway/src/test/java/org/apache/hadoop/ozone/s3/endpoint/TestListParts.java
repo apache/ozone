@@ -59,7 +59,7 @@ public class TestListParts {
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
 
-    rest = new ObjectEndpointBuilder()
+    rest = EndpointBuilder.newObjectEndpointBuilder()
         .setHeaders(headers)
         .setClient(client)
         .build();

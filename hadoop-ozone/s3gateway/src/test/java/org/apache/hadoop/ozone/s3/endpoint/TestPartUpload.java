@@ -77,7 +77,7 @@ public class TestPartUpload {
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
 
-    rest = new ObjectEndpointBuilder()
+    rest = EndpointBuilder.newObjectEndpointBuilder()
         .setHeaders(headers)
         .setClient(client)
         .build();
@@ -155,7 +155,7 @@ public class TestPartUpload {
   public void testPartUploadStreamContentLength()
       throws IOException, OS3Exception {
     HttpHeaders headers = mock(HttpHeaders.class);
-    ObjectEndpoint objectEndpoint = new ObjectEndpointBuilder()
+    ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setHeaders(headers)
         .setClient(client)
         .build();
@@ -216,7 +216,7 @@ public class TestPartUpload {
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
 
-    ObjectEndpoint objectEndpoint = new ObjectEndpointBuilder()
+    ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setHeaders(headers)
         .setClient(clientStub)
         .build();

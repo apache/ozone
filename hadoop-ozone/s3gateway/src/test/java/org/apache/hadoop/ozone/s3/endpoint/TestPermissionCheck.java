@@ -100,7 +100,7 @@ public class TestPermissionCheck {
   @Test
   public void testListS3Buckets() throws IOException {
     doThrow(exception).when(objectStore).getS3Volume();
-    RootEndpoint rootEndpoint = new RootEndpointBuilder()
+    RootEndpoint rootEndpoint = EndpointBuilder.newRootEndpointBuilder()
         .setClient(client)
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () -> rootEndpoint.get());
@@ -113,7 +113,7 @@ public class TestPermissionCheck {
   @Test
   public void testGetBucket() throws IOException {
     doThrow(exception).when(objectStore).getS3Bucket(anyString());
-    BucketEndpoint bucketEndpoint = new BucketEndpointBuilder()
+    BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () ->
@@ -125,7 +125,7 @@ public class TestPermissionCheck {
   public void testCreateBucket() throws IOException {
     when(objectStore.getVolume(anyString())).thenReturn(volume);
     doThrow(exception).when(objectStore).createS3Bucket(anyString());
-    BucketEndpoint bucketEndpoint = new BucketEndpointBuilder()
+    BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () ->
@@ -136,7 +136,7 @@ public class TestPermissionCheck {
   @Test
   public void testDeleteBucket() throws IOException {
     doThrow(exception).when(objectStore).deleteS3Bucket(anyString());
-    BucketEndpoint bucketEndpoint = new BucketEndpointBuilder()
+    BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () ->
@@ -147,7 +147,7 @@ public class TestPermissionCheck {
   public void testListMultiUpload() throws IOException {
     when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket).listMultipartUploads(anyString());
-    BucketEndpoint bucketEndpoint = new BucketEndpointBuilder()
+    BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () ->
@@ -161,7 +161,7 @@ public class TestPermissionCheck {
     when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket).listKeys(anyString(), isNull(),
         anyBoolean());
-    BucketEndpoint bucketEndpoint = new BucketEndpointBuilder()
+    BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
@@ -178,7 +178,7 @@ public class TestPermissionCheck {
     deleteErrors.put("deleteKeyName", new ErrorInfo("ACCESS_DENIED", "ACL check failed"));
     when(bucket.deleteKeys(any(), anyBoolean())).thenReturn(deleteErrors);
 
-    BucketEndpoint bucketEndpoint = new BucketEndpointBuilder()
+    BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
     MultiDeleteRequest request = new MultiDeleteRequest();
@@ -206,7 +206,7 @@ public class TestPermissionCheck {
     when(parameterMap.containsKey("acl")).thenReturn(true);
     when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
-    BucketEndpoint bucketEndpoint = new BucketEndpointBuilder()
+    BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
@@ -228,7 +228,7 @@ public class TestPermissionCheck {
     when(parameterMap.containsKey("acl")).thenReturn(true);
     when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
-    BucketEndpoint bucketEndpoint = new BucketEndpointBuilder()
+    BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
     try {
@@ -247,7 +247,7 @@ public class TestPermissionCheck {
     when(client.getProxy()).thenReturn(clientProtocol);
     doThrow(exception).when(clientProtocol)
         .getS3KeyDetails(anyString(), anyString());
-    ObjectEndpoint objectEndpoint = new ObjectEndpointBuilder()
+    ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
         .setHeaders(headers)
         .setConfig(conf)
@@ -264,7 +264,7 @@ public class TestPermissionCheck {
     when(volume.getBucket("bucketName")).thenReturn(bucket);
     doThrow(exception).when(clientProtocol).createKey(
             anyString(), anyString(), anyString(), anyLong(), any(), anyMap(), anyMap());
-    ObjectEndpoint objectEndpoint = new ObjectEndpointBuilder()
+    ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
         .setHeaders(headers)
         .setConfig(conf)
@@ -281,7 +281,7 @@ public class TestPermissionCheck {
     when(objectStore.getS3Volume()).thenReturn(volume);
     doThrow(exception).when(clientProtocol).deleteKey(anyString(), anyString(),
         anyString(), anyBoolean());
-    ObjectEndpoint objectEndpoint = new ObjectEndpointBuilder()
+    ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
         .setHeaders(headers)
         .setConfig(conf)
@@ -296,7 +296,7 @@ public class TestPermissionCheck {
   public void testMultiUploadKey() throws IOException {
     when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket).initiateMultipartUpload(anyString(), any(), anyMap(), anyMap());
-    ObjectEndpoint objectEndpoint = new ObjectEndpointBuilder()
+    ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
         .setHeaders(headers)
         .setConfig(conf)
@@ -317,7 +317,7 @@ public class TestPermissionCheck {
     doThrow(exception).when(bucket).putObjectTagging(anyString(), anyMap());
     doThrow(exception).when(bucket).deleteObjectTagging(anyString());
 
-    ObjectEndpoint objectEndpoint = new ObjectEndpointBuilder()
+    ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
         .build();
     String xml =

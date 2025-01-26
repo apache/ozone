@@ -49,7 +49,7 @@ public class TestObjectMultiDelete {
     OzoneClient client = new OzoneClientStub();
     OzoneBucket bucket = initTestData(client);
 
-    BucketEndpoint rest = new BucketEndpointBuilder()
+    BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
 
@@ -81,7 +81,7 @@ public class TestObjectMultiDelete {
     OzoneClient client = new OzoneClientStub();
     OzoneBucket bucket = initTestData(client);
 
-    BucketEndpoint rest = new BucketEndpointBuilder()
+    BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
 

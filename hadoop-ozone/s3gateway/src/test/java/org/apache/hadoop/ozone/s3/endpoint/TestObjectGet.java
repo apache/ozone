@@ -89,9 +89,8 @@ public class TestObjectGet {
 
     headers = mock(HttpHeaders.class);
 
-    rest = new ObjectEndpointBuilder()
+    rest = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
-        .setConfig(new OzoneConfiguration())
         .setHeaders(headers)
         .build();
 

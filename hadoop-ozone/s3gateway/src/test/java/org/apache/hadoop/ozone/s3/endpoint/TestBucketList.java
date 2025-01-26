@@ -52,7 +52,7 @@ public class TestBucketList {
 
     OzoneClient client = createClientWithKeys("file1", "dir1/file2");
 
-    BucketEndpoint getBucket = new BucketEndpointBuilder()
+    BucketEndpoint getBucket = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
 

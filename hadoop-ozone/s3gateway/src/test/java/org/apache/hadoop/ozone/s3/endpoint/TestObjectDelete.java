@@ -45,7 +45,7 @@ public class TestObjectDelete {
 
     bucket.createKey("key1", 0).close();
 
-    ObjectEndpoint rest = new ObjectEndpointBuilder()
+    ObjectEndpoint rest = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
         .build();
 

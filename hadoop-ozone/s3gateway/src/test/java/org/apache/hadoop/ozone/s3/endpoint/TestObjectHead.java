@@ -64,7 +64,7 @@ public class TestObjectHead {
     bucket = clientStub.getObjectStore().getS3Bucket(bucketName);
 
     // Create HeadBucket and setClient to OzoneClientStub
-    keyEndpoint = new ObjectEndpointBuilder()
+    keyEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(clientStub)
         .build();
   }

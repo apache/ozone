@@ -43,7 +43,7 @@ public class TestRootList {
     clientStub = new OzoneClientStub();
 
     // Create HeadBucket and setClient to OzoneClientStub
-    rootEndpoint = new RootEndpointBuilder()
+    rootEndpoint = EndpointBuilder.newRootEndpointBuilder()
         .setClient(clientStub)
         .build();
 

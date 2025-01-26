@@ -24,14 +24,12 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.endpoint.BucketEndpoint;
-import org.apache.hadoop.ozone.s3.endpoint.BucketEndpointBuilder;
 import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint;
-import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpointBuilder;
 import org.apache.hadoop.ozone.s3.endpoint.RootEndpoint;
-import org.apache.hadoop.ozone.s3.endpoint.RootEndpointBuilder;
 import org.apache.hadoop.ozone.s3.endpoint.TestBucketAcl;
 import org.apache.hadoop.ozone.s3.endpoint.MultipartUploadInitiateResponse;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest;
+import org.apache.hadoop.ozone.s3.endpoint.EndpointBuilder;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
@@ -89,15 +87,15 @@ public class TestS3GatewayMetrics {
     clientStub.getObjectStore().createS3Bucket(bucketName);
     bucket = clientStub.getObjectStore().getS3Bucket(bucketName);
 
-    bucketEndpoint = new BucketEndpointBuilder()
+    bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(clientStub)
         .build();
 
-    rootEndpoint = new RootEndpointBuilder()
+    rootEndpoint = EndpointBuilder.newRootEndpointBuilder()
         .setClient(clientStub)
         .build();
 
-    keyEndpoint = new ObjectEndpointBuilder()
+    keyEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(clientStub)
         .build();
 

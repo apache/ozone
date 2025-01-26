@@ -63,7 +63,7 @@ public class TestObjectTaggingGet {
 
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
 
-    rest = new ObjectEndpointBuilder()
+    rest = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
         .setConfig(config)
         .setHeaders(headers)

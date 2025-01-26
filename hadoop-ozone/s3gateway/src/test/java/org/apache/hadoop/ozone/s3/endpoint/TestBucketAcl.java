@@ -71,7 +71,7 @@ public class TestBucketAcl {
     headers = mock(HttpHeaders.class);
     when(servletRequest.getParameterMap()).thenReturn(parameterMap);
 
-    bucketEndpoint = new BucketEndpointBuilder()
+    bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
   }

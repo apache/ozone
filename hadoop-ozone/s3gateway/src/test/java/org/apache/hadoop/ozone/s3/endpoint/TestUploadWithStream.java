@@ -86,7 +86,7 @@ public class TestUploadWithStream {
     when(context.getUriInfo().getQueryParameters())
         .thenReturn(new MultivaluedHashMap<>());
 
-    rest = new ObjectEndpointBuilder()
+    rest = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
         .setHeaders(headers)
         .setConfig(conf)

@@ -75,7 +75,7 @@ public class TestObjectTaggingDelete {
     client.getObjectStore().createS3Bucket(BUCKET_NAME);
 
     headers = Mockito.mock(HttpHeaders.class);
-    rest = new ObjectEndpointBuilder()
+    rest = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
         .setConfig(config)
         .setHeaders(headers)
@@ -137,7 +137,7 @@ public class TestObjectTaggingDelete {
     when(mockObjectStore.getS3Volume()).thenReturn(mockVolume);
     when(mockVolume.getBucket("fsoBucket")).thenReturn(mockBucket);
 
-    ObjectEndpoint endpoint = new ObjectEndpointBuilder()
+    ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(mockClient)
         .build();
     doThrow(new OMException("DeleteObjectTagging is not currently supported for FSO directory",

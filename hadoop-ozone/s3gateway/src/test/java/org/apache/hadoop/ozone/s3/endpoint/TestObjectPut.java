@@ -133,7 +133,7 @@ class TestObjectPut {
     headers = mock(HttpHeaders.class);
 
     // Create PutObject and setClient to OzoneClientStub
-    objectEndpoint = new ObjectEndpointBuilder()
+    objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(clientStub)
         .setConfig(config)
         .setHeaders(headers)
