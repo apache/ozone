@@ -26,7 +26,7 @@ import org.apache.hadoop.ozone.s3.RequestIdentifier;
  * Builder for BucketEndpoint.
  */
 public class BucketEndpointBuilder extends
-  EndpointBuilder<BucketEndpoint, BucketEndpointBuilder> {
+    EndpointBuilder<BucketEndpoint, BucketEndpointBuilder> {
 
   private BucketEndpoint base;
 
@@ -38,13 +38,13 @@ public class BucketEndpointBuilder extends
   @Override
   public BucketEndpoint build() {
     BucketEndpoint endpoint = base != null ? base : new BucketEndpoint();
-    if (client != null) {
-      endpoint.setClient(client);
+    if (getClient() != null) {
+      endpoint.setClient(getClient());
     }
-    if (requestId == null) {
-      requestId = new RequestIdentifier();
+    if (getRequestId() == null) {
+      endpoint.setRequestIdentifier(new RequestIdentifier());
     }
-    endpoint.setRequestIdentifier(requestId);
+    endpoint.setRequestIdentifier(getRequestId());
     return endpoint;
   }
 }

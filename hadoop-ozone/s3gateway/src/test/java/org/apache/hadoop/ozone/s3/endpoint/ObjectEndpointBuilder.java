@@ -40,26 +40,26 @@ public class ObjectEndpointBuilder extends
   public ObjectEndpoint build() {
     ObjectEndpoint endpoint = base != null ? base : new ObjectEndpoint();
 
-    if (client != null) {
-      endpoint.setClient(client);
+    if (getClient() != null) {
+      endpoint.setClient(getClient());
     }
 
-    if (config == null) {
-      config = new OzoneConfiguration();
+    if (getConfig() == null) {
+      endpoint.setOzoneConfiguration(new OzoneConfiguration());
     }
-    endpoint.setOzoneConfiguration(config);
+    endpoint.setOzoneConfiguration(getConfig());
 
-    if (requestId == null) {
-      requestId = new RequestIdentifier();
+    if (getRequestId() == null) {
+      endpoint.setRequestIdentifier(new RequestIdentifier());
     }
-    endpoint.setRequestIdentifier(requestId);
+    endpoint.setRequestIdentifier(getRequestId());
 
-    if (headers != null) {
-      endpoint.setHeaders(headers);
+    if (getHeaders() != null) {
+      endpoint.setHeaders(getHeaders());
     }
 
-    if (context != null) {
-      endpoint.setContext(context);
+    if (getContext() != null) {
+      endpoint.setContext(getContext());
     }
 
     return endpoint;

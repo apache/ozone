@@ -32,46 +32,66 @@ import javax.ws.rs.core.HttpHeaders;
  * @param <T> Type of endpoint being built
  * @param <B> Type of concrete builder (for method chaining)
  */
-public abstract class EndpointBuilder<T, B extends EndpointBuilder<T,B>> {
-  protected OzoneClient client;
-  protected OzoneConfiguration config;
-  protected HttpHeaders headers;
-  protected ContainerRequestContext context;
-  protected RequestIdentifier requestId;
+public abstract class EndpointBuilder<T, B extends EndpointBuilder<T, B>> {
+  private OzoneClient ozoneClient;
+  private OzoneConfiguration ozoneConfig;
+  private HttpHeaders httpHeaders;
+  private ContainerRequestContext requestContext;
+  private RequestIdentifier identifier;
 
   protected EndpointBuilder() {
-    this.config = new OzoneConfiguration();
-    this.requestId = new RequestIdentifier();
+    this.ozoneConfig = new OzoneConfiguration();
+    this.identifier = new RequestIdentifier();
   }
 
   @SuppressWarnings("unchecked")
-  public B setClient(OzoneClient client) {
-    this.client = client;
+  public B setClient(OzoneClient newClient) {
+    this.ozoneClient = newClient;
     return (B) this;
   }
 
   @SuppressWarnings("unchecked")
-  public B setConfig(OzoneConfiguration config) {
-    this.config = config;
+  public B setConfig(OzoneConfiguration newConfig) {
+    this.ozoneConfig = newConfig;
     return (B) this;
   }
 
   @SuppressWarnings("unchecked")
-  public B setHeaders(HttpHeaders headers) {
-    this.headers = headers;
+  public B setHeaders(HttpHeaders newHeaders) {
+    this.httpHeaders = newHeaders;
     return (B) this;
   }
 
   @SuppressWarnings("unchecked")
-  public B setContext(ContainerRequestContext context) {
-    this.context = context;
+  public B setContext(ContainerRequestContext newContext) {
+    this.requestContext = newContext;
     return (B) this;
   }
 
   @SuppressWarnings("unchecked")
-  public B setRequestId(RequestIdentifier requestId) {
-    this.requestId = requestId;
+  public B setRequestId(RequestIdentifier newRequestId) {
+    this.identifier = newRequestId;
     return (B) this;
+  }
+
+  protected OzoneClient getClient() {
+    return ozoneClient;
+  }
+
+  protected OzoneConfiguration getConfig() {
+    return ozoneConfig;
+  }
+
+  protected HttpHeaders getHeaders() {
+    return httpHeaders;
+  }
+
+  protected ContainerRequestContext getContext() {
+    return requestContext;
+  }
+
+  protected RequestIdentifier getRequestId() {
+    return identifier;
   }
 
   public abstract T build();

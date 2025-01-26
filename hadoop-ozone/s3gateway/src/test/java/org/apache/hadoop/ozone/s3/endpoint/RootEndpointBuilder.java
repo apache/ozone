@@ -32,14 +32,14 @@ public class RootEndpointBuilder extends
   public RootEndpoint build() {
     RootEndpoint endpoint = new RootEndpoint();
 
-    if (client != null) {
-      endpoint.setClient(client);
+    if (getClient() != null) {
+      endpoint.setClient(getClient());
     }
 
-    if (requestId == null) {
-      requestId = new RequestIdentifier();
+    if (getRequestId() == null) {
+      endpoint.setRequestIdentifier(new RequestIdentifier());
     }
-    endpoint.setRequestIdentifier(requestId);
+    endpoint.setRequestIdentifier(getRequestId());
 
     return endpoint;
   }
