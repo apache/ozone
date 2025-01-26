@@ -166,22 +166,6 @@
             </configuration>
           </execution>
           <execution>
-            <id>copy-smoketest-files</id>
-            <goals>
-              <goal>copy-resources</goal>
-            </goals>
-            <phase>compile</phase>
-            <configuration>
-              <outputDirectory>${basedir}/target/smoketest</outputDirectory>
-              <resources>
-                <resource>
-                  <directory>src/main/smoketest</directory>
-                  <filtering>true</filtering>
-                </resource>
-              </resources>
-            </configuration>
-          </execution>
-          <execution>
             <id>copy-and-filter-dockerfile</id>
             <goals>
               <goal>copy-resources</goal>
