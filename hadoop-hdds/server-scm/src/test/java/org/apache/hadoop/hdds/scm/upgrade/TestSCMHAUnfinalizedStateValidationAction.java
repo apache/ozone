@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.upgrade;
 
-import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -67,7 +66,6 @@ public class TestSCMHAUnfinalizedStateValidationAction {
     conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS, dataPath.toString());
     conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, dataPath.toString());
     // This init should always succeed, since SCM is not pre-finalized yet.
-    DefaultConfigManager.clearDefaultConfigs();
     boolean initResult1 = StorageContainerManager.scmInit(conf, CLUSTER_ID);
     assertTrue(initResult1);
 
@@ -77,7 +75,6 @@ public class TestSCMHAUnfinalizedStateValidationAction {
         scm.getFinalizationManager().getUpgradeFinalizer().getStatus());
 
 
-    DefaultConfigManager.clearDefaultConfigs();
     boolean initResult2 = StorageContainerManager.scmInit(conf, CLUSTER_ID);
     assertTrue(initResult2);
     scm.start();
