@@ -23,9 +23,9 @@ summary: Introduction to Ozone Datanode Short Circuit Local Read Feature
   limitations under the License.
 -->
 
-By default, client reads data over GRPC from the Datanode. When the client asks the Datanode to read a file, the DataNode reads that file off of the disk and sends the data to the client over a GRPC connection.
+By default, client reads data over GRPC from the Datanode. When the client asks the Datanode to read a file, the Datanode reads that file off of the disk and sends the data to the client over a GRPC connection.
 
-This short-circuit local read feature will bypass the DataNode, allowing the client to read the file from local disk directly when the client is co-located with the data on the same server.
+This short-circuit local read feature will bypass the Datanode, allowing the client to read the file from local disk directly when the client is co-located with the data on the same server.
 
 Short-circuit local read can provide a substantial performance boost to many applications by removing the overhead of network communication. 
   
@@ -42,7 +42,7 @@ The `ozone checknative` command can be used to detect whether `libhadoop.so` can
 
 ## Configuration
 
-Short-circuit local reads need to be configured on both the DataNode and the client. By default, it is disabled.
+Short-circuit local reads need to be configured on both the Datanode and the client. By default, it is disabled.
 
 ```XML
 <property>
@@ -59,13 +59,13 @@ It makes use of a UNIX domain socket, a special path in the filesystem. You will
    <name>ozone.domain.socket.path</name>
    <value></value>
    <description> This is a path to a UNIX domain socket that will be used for 
-      communication between the DataNode and local Ozone clients. 
-      If the string "_PORT" is present in this path, it will be replaced by the TCP port of the DataNode.
+      communication between the Datanode and local Ozone clients. 
+      If the string "_PORT" is present in this path, it will be replaced by the TCP port of the Datanode.
    </description>
 </property>
 ```
 
-The DataNode needs to be able to create this path. On the other hand, it should not be possible for any user except the user who launches Ozone service or root to create this path. For this reason, paths under `/var/run` or `/var/lib` are often used.
+The Datanode needs to be able to create this path. On the other hand, it should not be possible for any user except the user who launches Ozone service or root to create this path. For this reason, paths under `/var/run` or `/var/lib` are often used.
 
 If you configure the `ozone.domain.socket.path` to some value, for example `/dir1/dir2/ozone_dn_socket`, please make sure that both `dir1` and `dir2` are existing directories, but the file `ozone_dn_socket` does not exist under `dir2`. `ozone_dn_socket` will be created by Ozone Datanode later during its startup.
 

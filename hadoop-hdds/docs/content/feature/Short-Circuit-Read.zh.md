@@ -57,8 +57,8 @@ Datanode 本地短路读基于 UNIX domain socket。以下变量将配置 domain
    <name>ozone.domain.socket.path</name>
    <value></value>
    <description>This is a path to a UNIX domain socket that will be used for 
-      communication between the DataNode and local Ozone clients. 
-      If the string "_PORT" is present in this path, it will be replaced by the TCP port of the DataNode.
+      communication between the Datanode and local Ozone clients. 
+      If the string "_PORT" is present in this path, it will be replaced by the TCP port of the Datanode.
    </description>
 </property>
 ```
