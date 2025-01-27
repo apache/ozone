@@ -38,6 +38,7 @@ public class ObjectEndpointBuilder extends
     final OzoneConfiguration config = getConfig();
     endpoint.setOzoneConfiguration(config != null ? config : new OzoneConfiguration());
     endpoint.setHeaders(getHeaders());
+    endpoint.setContext(getContext());
     return endpoint;
   }
 }

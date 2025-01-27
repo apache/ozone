@@ -35,7 +35,7 @@ import javax.ws.rs.core.HttpHeaders;
  */
 public class EndpointBuilder<T extends EndpointBase> {
 
-  private Supplier<T> constructor;
+  private final Supplier<T> constructor;
   private T base;
   private OzoneClient ozoneClient;
   private OzoneConfiguration ozoneConfig;
