@@ -155,6 +155,22 @@ const DUMetadata: React.FC<MetadataProps> = ({
       }
     });
 
+    // Source Volume and Source Bucket are present for linked buckets and volumes.
+    // If it is not linked it will be null and should not be shown
+    if (objectInfo?.sourceBucket !== undefined && objectInfo?.sourceBucket !== null) {
+      data.push({
+        key: 'Source Bucket',
+        value: objectInfo.sourceBucket
+      });
+    }
+
+    if(objectInfo?.sourceVolume !== undefined && objectInfo?.sourceVolume !== null) {
+      data.push({
+        key: 'Source Volume',
+        value: objectInfo.sourceVolume
+      });
+    }
+
     if (objectInfo?.creationTime !== undefined && objectInfo?.creationTime !== -1) {
       data.push({
         key: 'Creation Time',
