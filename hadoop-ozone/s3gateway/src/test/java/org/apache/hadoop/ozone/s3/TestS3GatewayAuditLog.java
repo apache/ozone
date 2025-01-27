@@ -24,13 +24,13 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.s3.endpoint.BucketEndpoint;
+import org.apache.hadoop.ozone.s3.endpoint.EndpointBuilder;
 import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.RootEndpoint;
 import org.junit.jupiter.api.Test;
@@ -85,11 +85,16 @@ public class TestS3GatewayAuditLog {
         return parametersMap;
       }
     };
-    bucketEndpoint.setClient(clientStub);
-    bucketEndpoint.setRequestIdentifier(requestIdentifier);
-    rootEndpoint = new RootEndpoint();
-    rootEndpoint.setClient(clientStub);
-    rootEndpoint.setRequestIdentifier(requestIdentifier);
+    bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
+        .setBase(bucketEndpoint)
+        .setClient(clientStub)
+        .setRequestId(requestIdentifier)
+        .build();
+
+    rootEndpoint = EndpointBuilder.newRootEndpointBuilder()
+        .setClient(clientStub)
+        .setRequestId(requestIdentifier)
+        .build();
 
     keyEndpoint = new ObjectEndpoint() {
       @Override
@@ -97,9 +102,11 @@ public class TestS3GatewayAuditLog {
         return parametersMap;
       }
     };
-    keyEndpoint.setClient(clientStub);
-    keyEndpoint.setOzoneConfiguration(new OzoneConfiguration());
-    keyEndpoint.setRequestIdentifier(requestIdentifier);
+    keyEndpoint = EndpointBuilder.newObjectEndpointBuilder()
+        .setBase(keyEndpoint)
+        .setClient(clientStub)
+        .setRequestId(requestIdentifier)
+        .build();
   }
 
   @AfterAll
