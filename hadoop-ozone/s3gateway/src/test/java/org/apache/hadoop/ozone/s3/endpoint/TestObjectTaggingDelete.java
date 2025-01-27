@@ -25,7 +25,6 @@ import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
-import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -75,12 +74,13 @@ public class TestObjectTaggingDelete {
     client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket(BUCKET_NAME);
 
-    rest = new ObjectEndpoint();
-    rest.setClient(client);
-    rest.setOzoneConfiguration(config);
-    rest.setRequestIdentifier(new RequestIdentifier());
     headers = Mockito.mock(HttpHeaders.class);
-    rest.setHeaders(headers);
+    rest = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(client)
+        .setConfig(config)
+        .setHeaders(headers)
+        .build();
+
     body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     // Create a key with object tags
     Mockito.when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
@@ -137,9 +137,9 @@ public class TestObjectTaggingDelete {
     when(mockObjectStore.getS3Volume()).thenReturn(mockVolume);
     when(mockVolume.getBucket("fsoBucket")).thenReturn(mockBucket);
 
-    ObjectEndpoint endpoint = new ObjectEndpoint();
-    endpoint.setClient(mockClient);
-    endpoint.setRequestIdentifier(new RequestIdentifier());
+    ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(mockClient)
+        .build();
     doThrow(new OMException("DeleteObjectTagging is not currently supported for FSO directory",
         ResultCodes.NOT_SUPPORTED_OPERATION)).when(mockBucket).deleteObjectTagging("dir/");
 
