@@ -18,8 +18,12 @@ resources:
 - config-configmap.yaml
 - datanode-service.yaml
 - datanode-statefulset.yaml
+- httpfs-service.yaml
+- httpfs-statefulset.yaml
 - om-service.yaml
 - om-statefulset.yaml
+- recon-service.yaml
+- recon-statefulset.yaml
 - s3g-service.yaml
 - s3g-statefulset.yaml
 - scm-service.yaml
@@ -33,7 +37,9 @@ resources:
 - jaeger-service.yaml
 - jaeger-statefulset.yaml
 - datanode-public-service.yaml
+- httpfs-public-service.yaml
 - om-public-service.yaml
+- recon-public-service.yaml
 - s3g-public-service.yaml
 - scm-public-service.yaml
 - jaeger-public-service.yaml

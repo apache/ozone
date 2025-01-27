@@ -156,7 +156,7 @@ public class OzoneClientConfig {
       description =
           "Indicates the time duration in seconds a client will wait "
               + "before retrying a read key request on encountering "
-              + "a connectivity excepetion from Datanodes . "
+              + "a connectivity exception from Datanodes. "
               + "By default the interval is 1 second",
       tags = ConfigTag.CLIENT)
   private int readRetryInterval = 1;
@@ -485,12 +485,14 @@ public class OzoneClientConfig {
     try {
       return ChecksumCombineMode.valueOf(checksumCombineMode);
     } catch (IllegalArgumentException iae) {
-      LOG.warn("Bad checksum combine mode: {}. Using default {}",
-          checksumCombineMode,
-          ChecksumCombineMode.COMPOSITE_CRC.name());
-      return ChecksumCombineMode.valueOf(
-          ChecksumCombineMode.COMPOSITE_CRC.name());
+      LOG.warn("Bad checksum combine mode: {}.",
+          checksumCombineMode);
+      return null;
     }
+  }
+
+  public void setChecksumCombineMode(String checksumCombineMode) {
+    this.checksumCombineMode = checksumCombineMode;
   }
 
   public void setEcReconstructStripeReadPoolLimit(int poolLimit) {

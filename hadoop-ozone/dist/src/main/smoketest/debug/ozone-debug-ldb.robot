@@ -31,7 +31,7 @@ ${TESTFILE}         testfile
 Write keys
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
     Execute             ozone sh volume create ${VOLUME}
-    Execute             ozone sh bucket create ${VOLUME}/${BUCKET} -l OBJECT_STORE
+    Execute             ozone sh bucket create ${VOLUME}/${BUCKET} -l obs
     Execute             dd if=/dev/urandom of=${TEMP_DIR}/${TESTFILE}1 bs=100 count=10
     Execute             ozone sh key put ${VOLUME}/${BUCKET}/${TESTFILE}1 ${TEMP_DIR}/${TESTFILE}1
     Execute             dd if=/dev/urandom of=${TEMP_DIR}/${TESTFILE}2 bs=100 count=15
@@ -55,6 +55,16 @@ Test ozone debug ldb scan
                         Should contain          ${output}       testfile1
                         Should contain          ${output}       testfile2
                         Should contain          ${output}       testfile3
+    # test key is included with --with-keys
+    ${output1} =        Execute                 ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable | jq '."\/cli-debug-volume\/cli-debug-bucket\/testfile1"'
+    ${output2} =        Execute                 ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --with-keys | jq '."\/cli-debug-volume\/cli-debug-bucket\/testfile1"'
+    ${output3} =        Execute                 ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --with-keys=true | jq '."\/cli-debug-volume\/cli-debug-bucket\/testfile1"'
+                        Should contain          ${output1}      testfile1
+                        Should Be Equal         ${output1}      ${output2}
+                        Should Be Equal         ${output1}      ${output3}
+    # test key is ommitted with --with-keys set to false
+    ${output} =         Execute and Ignore Error                ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --with-keys=false | jq '."\/cli-debug-volume\/cli-debug-bucket\/testfile1"'
+                        Should contain          ${output}       Cannot index array with string
     # test startkey option
     ${output} =         Execute                 ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --startkey="/cli-debug-volume/cli-debug-bucket/testfile2"
                         Should not contain      ${output}       testfile1
@@ -134,3 +144,9 @@ Test ozone debug ldb scan with filter option failure
     # test filter option for lesser/greater operator on non-numeric field
     ${output} =         Execute And Ignore Error        ozone debug ldb --db=/data/metadata/om.db scan --cf=keyTable --filter="keyName:lesser:k1"
                         Should contain                  ${output}           only on numeric values
+
+Test ozone debug ldb checkpoint command
+     ${output} =         Execute                         ozone debug ldb --db=/data/metadata/om.db checkpoint --output=/data/metadata/checkpoint1.db
+                         Should contain                  ${output}           Created checkpoint at
+     ${output} =         Execute                         ls /data/metadata/checkpoint1.db
+                         Should contain                  ${output}           .sst

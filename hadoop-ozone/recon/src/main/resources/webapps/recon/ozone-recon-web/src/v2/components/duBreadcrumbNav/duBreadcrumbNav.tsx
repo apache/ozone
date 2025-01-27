@@ -21,7 +21,7 @@ import React, { useState } from 'react';
 import { DUSubpath } from '@/v2/types/diskUsage.types';
 import { Breadcrumb, Menu, Input } from 'antd';
 import { MenuProps } from 'antd/es/menu';
-import { CaretDownOutlined, CaretRightOutlined, HomeFilled } from '@ant-design/icons';
+import { CaretDownOutlined, HomeFilled } from '@ant-design/icons';
 
 
 type File = {
@@ -106,15 +106,15 @@ const DUBreadcrumbNav: React.FC<File> = ({
     //Push a new input to allow passing a path
     menuItems.push(
       <Menu.Item
-        key={`${lastPath}-search`}>
+        key={`${lastPath}-search`}
+        style={{ width: '100%'}}>
         <Input.Search
           placeholder='Enter Path'
           onSearch={handleSearch}
           onClick={(e) => {
             //Prevent menu close on click
             e.stopPropagation();
-          }}
-          style={{ width: 160}}/>
+          }} />
       </Menu.Item>
     )
     return (
@@ -162,11 +162,13 @@ const DUBreadcrumbNav: React.FC<File> = ({
   }
 
   return (
-    <Breadcrumb
-      separator={<CaretRightOutlined style={{ fontSize: '12px'}}/>}
+    <div id='breadcrumb-container'>
+      <Breadcrumb
+      separator={'/'}
       className='breadcrumb-nav'>
       {generateBreadCrumbs()}
     </Breadcrumb>
+    </div>
   )
 }
 

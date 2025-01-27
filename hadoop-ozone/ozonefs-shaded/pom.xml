@@ -12,9 +12,7 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
@@ -22,27 +20,44 @@
     <version>2.0.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone-filesystem-shaded</artifactId>
-  <name>Apache Ozone FileSystem Shaded</name>
-  <packaging>jar</packaging>
   <version>2.0.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+  <name>Apache Ozone FileSystem Shaded</name>
 
   <properties>
-    <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
+    <!-- no tests in this module so far -->
+    <maven.test.skip>true</maven.test.skip>
     <shaded.prefix>org.apache.hadoop.ozone.shaded</shaded.prefix>
   </properties>
 
   <dependencies>
     <dependency>
+      <groupId>com.google.protobuf</groupId>
+      <artifactId>protobuf-java</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-filesystem-common</artifactId>
       <exclusions>
         <exclusion>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-common</artifactId>
+          <groupId>ch.qos.reload4j</groupId>
+          <artifactId>reload4j</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.google.protobuf</groupId>
+          <artifactId>protobuf-java</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>log4j</groupId>
+          <artifactId>log4j</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-hdfs-client</artifactId>
+          <artifactId>hadoop-annotations</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.hadoop</groupId>
+          <artifactId>hadoop-common</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.apache.hadoop</groupId>
@@ -50,22 +65,10 @@
         </exclusion>
         <exclusion>
           <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-annotations</artifactId>
+          <artifactId>hadoop-hdfs-client</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.apache.hadoop.thirdparty</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>log4j</groupId>
-          <artifactId>log4j</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>ch.qos.reload4j</groupId>
-          <artifactId>reload4j</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.slf4j</groupId>
           <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
@@ -73,8 +76,8 @@
           <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>com.google.protobuf</groupId>
-          <artifactId>protobuf-java</artifactId>
+          <groupId>org.slf4j</groupId>
+          <artifactId>*</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -93,15 +96,14 @@
         <artifactId>maven-shade-plugin</artifactId>
         <executions>
           <execution>
-            <phase>package</phase>
             <goals>
               <goal>shade</goal>
             </goals>
+            <phase>package</phase>
             <configuration>
               <skip>${maven.shade.skip}</skip>
               <transformers>
-                <transformer
-                        implementation="org.apache.maven.plugins.shade.resource.DontIncludeResourceTransformer">
+                <transformer implementation="org.apache.maven.plugins.shade.resource.DontIncludeResourceTransformer">
                   <resources>
                     <resource>META-INF/BC1024KE.DSA</resource>
                     <resource>META-INF/BC2048KE.DSA</resource>
@@ -109,19 +111,15 @@
                     <resource>META-INF/BC2048KE.SF</resource>
                   </resources>
                 </transformer>
-                <transformer
-                        implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
-                <transformer
-                        implementation="org.apache.maven.plugins.shade.resource.XmlAppendingTransformer">
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+                <transformer implementation="org.apache.maven.plugins.shade.resource.XmlAppendingTransformer">
                   <resource>ozone-default-generated.xml</resource>
                 </transformer>
               </transformers>
               <relocations>
                 <relocation>
                   <pattern>org</pattern>
-                  <shadedPattern>
-                    ${shaded.prefix}.org
-                  </shadedPattern>
+                  <shadedPattern>${shaded.prefix}.org</shadedPattern>
                   <includes>
                     <include>org.yaml.**.*</include>
                     <include>org.sqlite.**.*</include>
@@ -144,9 +142,7 @@
                 </relocation>
                 <relocation>
                   <pattern>com</pattern>
-                  <shadedPattern>
-                    ${shaded.prefix}.com
-                  </shadedPattern>
+                  <shadedPattern>${shaded.prefix}.com</shadedPattern>
                   <includes>
                     <include>com.google.common.**.*</include>
                     <include>com.google.gson.**.*</include>
@@ -159,27 +155,19 @@
                 </relocation>
                 <relocation>
                   <pattern>kotlin</pattern>
-                  <shadedPattern>
-                    ${shaded.prefix}.kotlin
-                  </shadedPattern>
+                  <shadedPattern>${shaded.prefix}.kotlin</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>picocli</pattern>
-                  <shadedPattern>
-                    ${shaded.prefix}.picocli
-                  </shadedPattern>
+                  <shadedPattern>${shaded.prefix}.picocli</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>info</pattern>
-                  <shadedPattern>
-                    ${shaded.prefix}.info
-                  </shadedPattern>
+                  <shadedPattern>${shaded.prefix}.info</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>io</pattern>
-                  <shadedPattern>
-                    ${shaded.prefix}.io
-                  </shadedPattern>
+                  <shadedPattern>${shaded.prefix}.io</shadedPattern>
                   <excludes>
                     <exclude>io!netty!*</exclude>
                   </excludes>
@@ -188,15 +176,11 @@
                 <!-- handling some special packages with special names -->
                 <relocation>
                   <pattern>okio</pattern>
-                  <shadedPattern>
-                    ${shaded.prefix}.okio
-                  </shadedPattern>
+                  <shadedPattern>${shaded.prefix}.okio</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>okhttp3</pattern>
-                  <shadedPattern>
-                    ${shaded.prefix}.okhttp3
-                  </shadedPattern>
+                  <shadedPattern>${shaded.prefix}.okhttp3</shadedPattern>
                 </relocation>
               </relocations>
             </configuration>

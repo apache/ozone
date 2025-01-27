@@ -28,9 +28,11 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
@@ -236,9 +238,11 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
   }
 
   @Override
-  protected OMFileCreateRequest getOMFileCreateRequest(OMRequest omRequest) {
-    return new OMFileCreateRequestWithFSO(omRequest,
+  protected OMFileCreateRequest getOMFileCreateRequest(OMRequest omRequest) throws IOException {
+    OMFileCreateRequest request = new OMFileCreateRequestWithFSO(omRequest,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    request.setUGI(UserGroupInformation.getCurrentUser());
+    return request;
   }
 
   @Override

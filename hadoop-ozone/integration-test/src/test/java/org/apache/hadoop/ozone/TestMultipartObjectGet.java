@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadResponse;
 import org.apache.hadoop.ozone.s3.endpoint.MultipartUploadInitiateResponse;
@@ -98,6 +99,7 @@ public class TestMultipartObjectGet {
     REST.setClient(client);
     REST.setOzoneConfiguration(conf);
     REST.setContext(context);
+    REST.setRequestIdentifier(new RequestIdentifier());
     S3GatewayMetrics.create(conf);
   }
 
@@ -139,7 +141,7 @@ public class TestMultipartObjectGet {
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
     Response response = REST.put(BUCKET, KEY, content.length(),
-        partNumber, uploadID, null, body);
+        partNumber, uploadID, null, null, body);
     assertEquals(200, response.getStatus());
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 

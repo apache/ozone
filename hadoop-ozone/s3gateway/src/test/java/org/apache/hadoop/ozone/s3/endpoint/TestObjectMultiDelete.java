@@ -49,8 +49,9 @@ public class TestObjectMultiDelete {
     OzoneClient client = new OzoneClientStub();
     OzoneBucket bucket = initTestData(client);
 
-    BucketEndpoint rest = new BucketEndpoint();
-    rest.setClient(client);
+    BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder()
+        .setClient(client)
+        .build();
 
     MultiDeleteRequest mdr = new MultiDeleteRequest();
     mdr.getObjects().add(new DeleteObject("key1"));
@@ -80,8 +81,9 @@ public class TestObjectMultiDelete {
     OzoneClient client = new OzoneClientStub();
     OzoneBucket bucket = initTestData(client);
 
-    BucketEndpoint rest = new BucketEndpoint();
-    rest.setClient(client);
+    BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder()
+        .setClient(client)
+        .build();
 
     MultiDeleteRequest mdr = new MultiDeleteRequest();
     mdr.setQuiet(true);

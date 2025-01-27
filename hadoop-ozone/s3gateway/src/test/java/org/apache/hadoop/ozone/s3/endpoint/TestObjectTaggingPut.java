@@ -74,23 +74,26 @@ public class TestObjectTaggingPut {
     // Create bucket
     clientStub.getObjectStore().createS3Bucket(BUCKET_NAME);
 
-    // Create PutObject and setClient to OzoneClientStub
-    objectEndpoint = new ObjectEndpoint();
-    objectEndpoint.setClient(clientStub);
-    objectEndpoint.setOzoneConfiguration(config);
-
     HttpHeaders headers = mock(HttpHeaders.class);
+
+    // Create PutObject and setClient to OzoneClientStub
+    objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(clientStub)
+        .setConfig(config)
+        .setHeaders(headers)
+        .build();
+
+    
     ByteArrayInputStream body =
         new ByteArrayInputStream("".getBytes(UTF_8));
-    objectEndpoint.setHeaders(headers);
 
-    objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, 1, null, null, body);
+    objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, 1, null, null, null, body);
   }
 
   @Test
   public void testPutObjectTaggingWithEmptyBody() throws Exception {
     try {
-      objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, 1, null, "",
+      objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, 1, null, "", null,
           null);
       fail();
     } catch (OS3Exception ex) {
@@ -101,8 +104,8 @@ public class TestObjectTaggingPut {
 
   @Test
   public void testPutValidObjectTagging() throws Exception {
-    assertEquals(HTTP_OK, objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, 1,
-        null, "", twoTags()).getStatus());
+    assertEquals(HTTP_OK, objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, 1, null,
+         "", null, twoTags()).getStatus());
     OzoneKeyDetails keyDetails =
         clientStub.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(KEY_NAME);
     assertEquals(2, keyDetails.getTags().size());
@@ -123,7 +126,7 @@ public class TestObjectTaggingPut {
   private void testInvalidObjectTagging(Supplier<InputStream> inputStream,
                                         int expectedHttpCode, String expectedErrorCode) throws Exception {
     try {
-      objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, 1, null, "",
+      objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, 1, null, "", null,
           inputStream.get());
       fail("Expected an OS3Exception to be thrown");
     } catch (OS3Exception ex) {
@@ -136,7 +139,7 @@ public class TestObjectTaggingPut {
   public void testPutObjectTaggingNoKeyFound() throws Exception {
     try {
       objectEndpoint.put(BUCKET_NAME, "nonexistent", 0, 1,
-          null, "", twoTags());
+          null, "", null, twoTags());
       fail("Expected an OS3Exception to be thrown");
     } catch (OS3Exception ex) {
       assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
@@ -148,7 +151,7 @@ public class TestObjectTaggingPut {
   public void testPutObjectTaggingNoBucketFound() throws Exception {
     try {
       objectEndpoint.put("nonexistent", "nonexistent", 0, 1,
-          null, "", twoTags());
+          null, "", null, twoTags());
       fail("Expected an OS3Exception to be thrown");
     } catch (OS3Exception ex) {
       assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
@@ -167,17 +170,20 @@ public class TestObjectTaggingPut {
     when(mockObjectStore.getS3Volume()).thenReturn(mockVolume);
     when(mockVolume.getBucket("fsoBucket")).thenReturn(mockBucket);
 
-    ObjectEndpoint endpoint = new ObjectEndpoint();
+    ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(mockClient)
+        .build();
     Map<String, String> twoTagsMap = new HashMap<>();
     twoTagsMap.put("tag1", "val1");
     twoTagsMap.put("tag2", "val2");
-    endpoint.setClient(mockClient);
+
 
     doThrow(new OMException("PutObjectTagging is not currently supported for FSO directory",
         ResultCodes.NOT_SUPPORTED_OPERATION)).when(mockBucket).putObjectTagging("dir/", twoTagsMap);
 
     try {
-      endpoint.put("fsoBucket", "dir/", 0, 1, null, "", twoTags());
+      endpoint.put("fsoBucket", "dir/", 0, 1, null, "",
+          null, twoTags());
       fail("Expected an OS3Exception to be thrown");
     } catch (OS3Exception ex) {
       assertEquals(HTTP_NOT_IMPLEMENTED, ex.getHttpCode());

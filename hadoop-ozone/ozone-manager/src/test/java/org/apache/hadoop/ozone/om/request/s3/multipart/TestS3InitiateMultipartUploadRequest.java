@@ -250,7 +250,7 @@ public class TestS3InitiateMultipartUploadRequest
 
     // Should inherit parent DEFAULT Acls
     // [user:newUser:rw[DEFAULT], group:newGroup:rwl[DEFAULT]]
-    assertEquals(parentDefaultAcl, keyAcls,
+    assertTrue(keyAcls.containsAll(parentDefaultAcl),
         "Failed to inherit parent DEFAULT acls!");
 
     // Should not inherit parent ACCESS Acls

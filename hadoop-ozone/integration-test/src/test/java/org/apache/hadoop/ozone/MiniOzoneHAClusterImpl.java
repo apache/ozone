@@ -446,8 +446,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     }
 
     protected void initOMRatisConf() {
-      conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
-
       // If test change the following config values we will respect,
       // otherwise we will set lower timeout values.
       long defaultDuration = OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_DEFAULT
@@ -564,7 +562,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             OzoneConfiguration scmConfig = new OzoneConfiguration(conf);
             scmConfig.set(OZONE_METADATA_DIRS, metaDirPath);
             scmConfig.set(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY, nodeId);
-            scmConfig.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
 
             configureSCM();
             if (i == 1) {

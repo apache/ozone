@@ -214,7 +214,7 @@ function ozonecmd_case
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     admin)
-      OZONE_CLASSNAME=org.apache.hadoop.hdds.cli.OzoneAdmin
+      OZONE_CLASSNAME=org.apache.hadoop.ozone.admin.OzoneAdmin
       OZONE_ADMIN_OPTS="${OZONE_ADMIN_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
@@ -224,6 +224,7 @@ function ozonecmd_case
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     repair)
+      check_running_ozone_services
       OZONE_CLASSNAME=org.apache.hadoop.ozone.repair.OzoneRepair
       OZONE_DEBUG_OPTS="${OZONE_DEBUG_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
@@ -243,6 +244,27 @@ function ozonecmd_case
       fi
     ;;
   esac
+}
+
+## @description  Check for running Ozone services using PID files.
+## @audience     public
+function check_running_ozone_services
+{
+  OZONE_PID_DIR="/tmp"
+
+  local services=("om" "scm" "datanode")
+
+  for service in "${services[@]}"; do
+    for pid_file in ${OZONE_PID_DIR}/ozone-*-${service}.pid; do
+      if [[ -f "${pid_file}" ]]; then
+        pid=$(cat "${pid_file}")
+        if kill -0 "${pid}" 2>/dev/null; then
+          export "OZONE_${service^^}_RUNNING=true"
+          export "OZONE_${service^^}_PID=${pid}"
+        fi
+      fi
+    done
+  done
 }
 
 ## @description  turn off logging for CLI by default

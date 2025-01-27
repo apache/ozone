@@ -33,10 +33,9 @@ import java.util.function.BiFunction;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
-import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequestWithFSO;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
-import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -141,8 +140,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long trxnLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long trxnLogIndex = context.getIndex();
     MultipartUploadCompleteRequest multipartUploadCompleteRequest =
         getOmRequest().getCompleteMultiPartUploadRequest();
 
@@ -187,8 +186,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       OMFileRequest.OMPathInfoWithFSO pathInfoFSO = OMFileRequest
           .verifyDirectoryKeysInPath(omMetadataManager, volumeName, bucketName,
               keyName, Paths.get(keyName));
-      missingParentInfos = OMDirectoryCreateRequestWithFSO
-          .getAllMissingParentDirInfo(ozoneManager, keyArgs, omBucketInfo,
+      missingParentInfos = getAllMissingParentDirInfo(ozoneManager, keyArgs, omBucketInfo,
               pathInfoFSO, trxnLogIndex);
 
       if (missingParentInfos != null) {
@@ -236,7 +234,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
               .setOmKeyLocationInfos(Collections.singletonList(
                   new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
               .setAcls(getAclsForKey(keyArgs, omBucketInfo, pathInfoFSO,
-                  ozoneManager.getPrefixManager()))
+                  ozoneManager.getPrefixManager(), ozoneManager.getConfiguration()))
               .setObjectID(pathInfoFSO.getLeafNodeObjectId())
               .setUpdateID(trxnLogIndex)
               .setFileEncryptionInfo(keyArgs.hasFileEncryptionInfo() ?

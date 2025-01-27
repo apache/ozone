@@ -12,10 +12,7 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
@@ -25,17 +22,30 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
   <artifactId>rocksdb-checkpoint-differ</artifactId>
   <version>2.0.0-SNAPSHOT</version>
-  <description>RocksDB Checkpoint Differ</description>
-  <name>RocksDB Checkpoint Differ</name>
   <packaging>jar</packaging>
-
-  <properties>
-  </properties>
+  <name>RocksDB Checkpoint Differ</name>
+  <description>RocksDB Checkpoint Differ</description>
 
   <dependencies>
     <dependency>
-      <groupId>org.rocksdb</groupId>
-      <artifactId>rocksdbjni</artifactId>
+      <groupId>com.github.vlsi.mxgraph</groupId>
+      <artifactId>jgraphx</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.google.protobuf</groupId>
+      <artifactId>protobuf-java</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>commons-collections</groupId>
+      <artifactId>commons-collections</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -57,15 +67,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-rocks-native</artifactId>
     </dependency>
-
-    <dependency>
-      <groupId>com.google.guava</groupId>
-      <artifactId>guava</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-lang3</artifactId>
-    </dependency>
     <dependency>
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-common</artifactId>
@@ -79,26 +80,16 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>jgrapht-ext</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.rocksdb</groupId>
+      <artifactId>rocksdbjni</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-reload4j</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>com.github.vlsi.mxgraph</groupId>
-      <artifactId>jgraphx</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.google.protobuf</groupId>
-      <artifactId>protobuf-java</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>commons-collections</groupId>
-      <artifactId>commons-collections</artifactId>
     </dependency>
 
     <!-- Test dependencies -->
@@ -109,15 +100,15 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-test-utils</artifactId>
+      <artifactId>hdds-rocks-native</artifactId>
+      <version>${project.version}</version>
+      <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-rocks-native</artifactId>
-      <version>${project.version}</version>
+      <artifactId>hdds-test-utils</artifactId>
       <scope>test</scope>
-      <type>test-jar</type>
     </dependency>
   </dependencies>
 
@@ -142,7 +133,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <executions>
           <execution>
             <id>depcheck</id>
-            <phase></phase>
+            <phase />
           </execution>
         </executions>
       </plugin>

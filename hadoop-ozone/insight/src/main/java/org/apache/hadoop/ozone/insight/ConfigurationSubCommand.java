@@ -46,7 +46,7 @@ public class ConfigurationSubCommand extends BaseInsightSubCommand
   @Override
   public Void call() throws Exception {
     InsightPoint insight =
-        getInsight(getInsightCommand().createOzoneConfiguration(), insightName);
+        getInsight(getInsightCommand().getOzoneConf(), insightName);
     System.out.println(
         "Configuration for `" + insightName + "` (" + insight.getDescription()
             + ")");

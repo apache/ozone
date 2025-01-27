@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -53,7 +52,6 @@ import org.apache.hadoop.hdds.scm.container.balancer.MoveManager;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMPerformanceMetrics;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.replication.DatanodeCommandCountUpdatedHandler;
-import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceException;
 import org.apache.hadoop.hdds.scm.ha.BackgroundSCMService;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
@@ -332,6 +330,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private Clock systemClock;
   private DNSToSwitchMapping dnsToSwitchMapping;
 
+  private String scmHostName;
+
   /**
    * Creates a new StorageContainerManager. Configuration will be
    * updated with information on the actual listening addresses used
@@ -456,6 +456,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     // Emit initial safe mode status, as now handlers are registered.
     scmSafeModeManager.emitSafeModeStatus();
+    scmHostName = HddsUtils.getHostName(conf);
 
     registerMXBean();
     registerMetricsSource(this);
@@ -822,10 +823,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getReplicationManager() != null) {
       replicationManager = configurator.getReplicationManager();
     }  else {
-      LegacyReplicationManager legacyRM = new LegacyReplicationManager(
-          conf, containerManager, containerPlacementPolicy, eventQueue,
-          scmContext, scmNodeManager, scmHAManager, systemClock,
-          getScmMetadataStore().getMoveTable());
       replicationManager = new ReplicationManager(
           conf,
           containerManager,
@@ -835,7 +832,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmContext,
           scmNodeManager,
           systemClock,
-          legacyRM,
           containerReplicaPendingOps);
       reconfigurationHandler.register(replicationManager.getConfig());
     }
@@ -844,8 +840,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmSafeModeManager = configurator.getScmSafeModeManager();
     } else {
       scmSafeModeManager = new SCMSafeModeManager(conf,
-          containerManager.getContainers(), containerManager,
-          pipelineManager, eventQueue, serviceManager, scmContext);
+          containerManager, pipelineManager, eventQueue,
+          serviceManager, scmContext);
     }
 
     scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager, containerManager,
@@ -1333,8 +1329,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       // Initialize security if security is enabled later.
       initializeSecurityIfNeeded(conf, scmStorageConfig, selfHostName, true);
 
-      if (conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
-          ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT) && !isSCMHAEnabled) {
+      if (SCMHAUtils.isSCMHAEnabled(conf) && !isSCMHAEnabled) {
         SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
             scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(),
             conf);
@@ -1349,8 +1344,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
          */
 
         try {
-          DefaultConfigManager.forceUpdateConfigValue(
-              ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+          SCMHAUtils.setRatisEnabled(true);
           StorageContainerManager scm = createSCM(conf);
           scm.start();
           scm.getScmHAManager().getRatisServer().triggerSnapshot();
@@ -1595,8 +1589,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     setStartTime();
 
-    // At this point leader is not known
-    scmHAMetricsUpdate(null);
+    RaftPeerId leaderId = SCMHAUtils.isSCMHAEnabled(configuration)
+        ? getScmHAManager().getRatisServer().getLeaderId() : null;
+    scmHAMetricsUpdate(Objects.toString(leaderId, null));
 
     if (scmCertificateClient != null) {
       // In case root CA certificate is rotated during this SCM is offline
@@ -2222,6 +2217,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return String.valueOf(ServerUtils.getScmDbDir(configuration));
   }
 
+  @Override
+  public String getHostname() {
+    return scmHostName;
+  }
+
   public Collection<String> getScmAdminUsernames() {
     return scmAdmins.getAdminUsernames();
   }
@@ -2298,7 +2298,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // unregister, in case metrics already exist
     // so that the metric tags will get updated.
     SCMHAMetrics.unRegister();
-
     scmHAMetrics = SCMHAMetrics.create(getScmId(), leaderId);
   }
 

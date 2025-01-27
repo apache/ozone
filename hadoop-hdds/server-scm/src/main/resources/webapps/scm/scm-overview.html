@@ -387,7 +387,7 @@
     <tbody>
     <tr ng-repeat="typestat in $ctrl.overview.jmx.SafeModeRuleStatus">
         <td>{{typestat.key}}</td>
-        <td>{{typestat.value[0]}}</td>
+        <td ng-bind-html="formatValue(typestat.value[0])"></td>
         <td>{{typestat.value[1]}}</td>
     </tr>
     </tbody>

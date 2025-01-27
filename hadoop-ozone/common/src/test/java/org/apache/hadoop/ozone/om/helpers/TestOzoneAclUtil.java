@@ -186,8 +186,8 @@ public class TestOzoneAclUtil {
     }
 
     OzoneAclConfig aclConfig = newInstanceOf(OzoneAclConfig.class);
-    IAccessAuthorizer.ACLType userRights = aclConfig.getUserDefaultRights();
-    IAccessAuthorizer.ACLType groupRights = aclConfig.getGroupDefaultRights();
+    IAccessAuthorizer.ACLType[] userRights = aclConfig.getUserDefaultRights();
+    IAccessAuthorizer.ACLType[] groupRights = aclConfig.getGroupDefaultRights();
 
     OzoneAclUtil.addAcl(ozoneAcls, new OzoneAcl(USER,
         ugi.getUserName(), ACCESS, userRights));

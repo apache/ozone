@@ -234,4 +234,6 @@ public interface ReplicationConfig {
 
   String configFormat();
 
+  /** Minimum number of nodes, below this data loss happens. */
+  int getMinimumNodes();
 }

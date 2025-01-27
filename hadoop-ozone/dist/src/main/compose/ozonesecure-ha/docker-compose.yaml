@@ -22,7 +22,7 @@ services:
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
-    command: ["krb5kdc","-n"]
+    command: ["/opt/hadoop/compose/common/init-kdc.sh"]
     networks:
       ozone_net:
         ipv4_address: 172.25.0.100

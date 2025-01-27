@@ -293,18 +293,31 @@ public final class ContainerTestHelper {
    */
   public static ContainerCommandRequestProto getCreateContainerRequest(
       long containerID, Pipeline pipeline) throws IOException {
+    return getCreateContainerRequest(containerID, pipeline, ContainerProtos.ContainerDataProto.State.OPEN);
+  }
+
+
+  /**
+   * Returns a create container command for test purposes. There are a bunch of
+   * tests where we need to just send a request and get a reply.
+   *
+   * @return ContainerCommandRequestProto.
+   */
+  public static ContainerCommandRequestProto getCreateContainerRequest(
+      long containerID, Pipeline pipeline, ContainerProtos.ContainerDataProto.State state) throws IOException {
     LOG.trace("addContainer: {}", containerID);
-    return getContainerCommandRequestBuilder(containerID, pipeline).build();
+    return getContainerCommandRequestBuilder(containerID, pipeline, state)
+        .build();
   }
 
   private static Builder getContainerCommandRequestBuilder(long containerID,
-      Pipeline pipeline) throws IOException {
+          Pipeline pipeline, ContainerProtos.ContainerDataProto.State state) throws IOException {
     Builder request =
         ContainerCommandRequestProto.newBuilder();
     request.setCmdType(ContainerProtos.Type.CreateContainer);
     request.setContainerID(containerID);
     request.setCreateContainer(
-        ContainerProtos.CreateContainerRequestProto.getDefaultInstance());
+        ContainerProtos.CreateContainerRequestProto.getDefaultInstance().toBuilder().setState(state).build());
     request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
 
     return request;
@@ -320,7 +333,8 @@ public final class ContainerTestHelper {
       long containerID, Pipeline pipeline, Token<?> token) throws IOException {
     LOG.trace("addContainer: {}", containerID);
 
-    Builder request = getContainerCommandRequestBuilder(containerID, pipeline);
+    Builder request = getContainerCommandRequestBuilder(containerID, pipeline,
+        ContainerProtos.ContainerDataProto.State.OPEN);
     if (token != null) {
       request.setEncodedToken(token.encodeToUrlString());
     }

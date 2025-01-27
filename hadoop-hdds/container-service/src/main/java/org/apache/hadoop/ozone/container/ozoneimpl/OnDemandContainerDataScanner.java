@@ -80,6 +80,9 @@ public final class OnDemandContainerDataScanner {
   }
 
   private static boolean shouldScan(Container<?> container) {
+    if (container == null) {
+      return false;
+    }
     long containerID = container.getContainerData().getContainerID();
     if (instance == null) {
       LOG.debug("Skipping on demand scan for container {} since scanner was " +
