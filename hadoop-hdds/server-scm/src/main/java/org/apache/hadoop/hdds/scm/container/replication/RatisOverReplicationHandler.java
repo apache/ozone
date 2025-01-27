@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.replication;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -288,18 +289,18 @@ public class RatisOverReplicationHandler
      */
     Set<ContainerReplica> replicaSet = new HashSet<>(replicas);
     // iterate through replicas in deterministic order
+    ContainerPlacementStatus originalPlacementStatus = getPlacementStatus(replicaSet,
+        containerInfo.getReplicationFactor().getNumber());
     for (ContainerReplica replica : replicas) {
       if (excess == 0) {
         break;
       }
-
-      if (super.isPlacementStatusActuallyEqualAfterRemove(replicaSet, replica,
+      if (super.isPlacementStatusActuallyEqualAfterRemove(originalPlacementStatus, replicaSet, replica,
           containerInfo.getReplicationFactor().getNumber())) {
         try {
           replicationManager.sendThrottledDeleteCommand(containerInfo,
               replica.getReplicaIndex(), replica.getDatanodeDetails(), true);
           commandsSent++;
-          excess--;
         } catch (CommandTargetOverloadedException e) {
           LOG.debug("Unable to send delete command for container {} to {} as " +
               "it has too many pending delete commands",
@@ -308,6 +309,11 @@ public class RatisOverReplicationHandler
             firstOverloadedException = e;
           }
         }
+        // Even if the command fails to send, we still mark the replica as if the command was sent to ensure a
+        // deterministic selection order. Then we adjust the replicaSet so it appears as if this replica was deleted
+        // to allow subsequent placement checks to be accurate.
+        excess--;
+        replicaSet.remove(replica);
       }
     }
     // If we encountered an overloaded exception, and then did not send as many

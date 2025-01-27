@@ -50,19 +50,21 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(HealthyPipelineSafeModeRule.class);
+
+  private static final String NAME = "HealthyPipelineSafeModeRule";
+
   private int healthyPipelineThresholdCount;
   private int currentHealthyPipelineCount = 0;
   private final double healthyPipelinesPercent;
   private final Set<PipelineID> processedPipelineIDs = new HashSet<>();
   private final PipelineManager pipelineManager;
-  private final int minHealthyPipelines;
   private final SCMContext scmContext;
   private final Set<PipelineID> unProcessedPipelineSet = new HashSet<>();
 
-  HealthyPipelineSafeModeRule(String ruleName, EventQueue eventQueue,
+  HealthyPipelineSafeModeRule(EventQueue eventQueue,
       PipelineManager pipelineManager, SCMSafeModeManager manager,
       ConfigurationSource configuration, SCMContext scmContext) {
-    super(manager, ruleName, eventQueue);
+    super(manager, NAME, eventQueue);
     this.pipelineManager = pipelineManager;
     this.scmContext = scmContext;
     healthyPipelinesPercent =
@@ -71,9 +73,6 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
             HddsConfigKeys.
                 HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT_DEFAULT);
 
-    // We only care about THREE replica pipeline
-    minHealthyPipelines = getMinHealthyPipelines(configuration);
-
     Preconditions.checkArgument(
         (healthyPipelinesPercent >= 0.0 && healthyPipelinesPercent <= 1.0),
         HddsConfigKeys.
@@ -81,16 +80,6 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
             + " value should be >= 0.0 and <= 1.0");
 
     initializeRule(false);
-  }
-
-  private int getMinHealthyPipelines(ConfigurationSource config) {
-    int minDatanodes = config.getInt(
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE_DEFAULT);
-
-    // We only care about THREE replica pipeline
-    return minDatanodes / HddsProtos.ReplicationFactor.THREE_VALUE;
-
   }
 
   @VisibleForTesting
@@ -165,8 +154,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
     int pipelineCount = unProcessedPipelineSet.size();
 
-    healthyPipelineThresholdCount = Math.max(minHealthyPipelines,
-        (int) Math.ceil(healthyPipelinesPercent * pipelineCount));
+    healthyPipelineThresholdCount = (int) Math.ceil(healthyPipelinesPercent * pipelineCount);
 
     if (refresh) {
       LOG.info("Refreshed total pipeline count is {}, healthy pipeline " +

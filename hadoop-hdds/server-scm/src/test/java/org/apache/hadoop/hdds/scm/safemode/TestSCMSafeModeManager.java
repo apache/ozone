@@ -134,10 +134,12 @@ public class TestSCMSafeModeManager {
       container.setState(HddsProtos.LifeCycleState.CLOSED);
       container.setNumberOfKeys(10);
     }
-    ContainerManager containerManager = mock(ContainerManager.class);
+
     PipelineManager pipelineManager = mock(PipelineManager.class);
-    config.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE, 0);
+    config.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT, 0);
     config.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_ONE_NODE_REPORTED_PIPELINE_PCT, 0);
+
+    ContainerManager containerManager = mock(ContainerManager.class);
     when(containerManager.getContainers()).thenReturn(containers);
     scmSafeModeManager = new SCMSafeModeManager(
         config, containerManager, pipelineManager, queue,
@@ -149,6 +151,8 @@ public class TestSCMSafeModeManager {
         HddsTestUtils.createNodeRegistrationContainerReport(containers);
     queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT, nodeRegistrationContainerReport);
     queue.fireEvent(SCMEvents.CONTAINER_REGISTRATION_REPORT, nodeRegistrationContainerReport);
+    queue.fireEvent(SCMEvents.PIPELINE_REPORT, mock(PipelineReportFromDatanode.class));
+    queue.fireEvent(SCMEvents.OPEN_PIPELINE, mock(Pipeline.class));
 
     long cutOff = (long) Math.ceil(numContainers * config.getDouble(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT,
@@ -179,7 +183,7 @@ public class TestSCMSafeModeManager {
     ContainerManager containerManager = mock(ContainerManager.class);
     when(containerManager.getContainers()).thenReturn(containers);
     PipelineManager pipelineManager = mock(PipelineManager.class);
-    config.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE, 0);
+    config.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT, 0);
     config.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_ONE_NODE_REPORTED_PIPELINE_PCT, 0);
     scmSafeModeManager = new SCMSafeModeManager(
         config, containerManager, pipelineManager, queue,
@@ -448,7 +452,7 @@ public class TestSCMSafeModeManager {
     OzoneConfiguration conf = new OzoneConfiguration(config);
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, false);
     PipelineManager pipelineManager = mock(PipelineManager.class);
-    conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE, 0);
+    conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT, 0);
     conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_ONE_NODE_REPORTED_PIPELINE_PCT, 0);
     ContainerManager containerManager = mock(ContainerManager.class);
     when(containerManager.getContainers()).thenReturn(containers);
@@ -495,7 +499,7 @@ public class TestSCMSafeModeManager {
     when(containerManager.getContainers()).thenReturn(containers);
 
     PipelineManager pipelineManager = mock(PipelineManager.class);
-    config.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE, 0);
+    config.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT, 0);
     config.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_ONE_NODE_REPORTED_PIPELINE_PCT, 0);
 
     scmSafeModeManager = new SCMSafeModeManager(
@@ -516,7 +520,7 @@ public class TestSCMSafeModeManager {
     testContainerThreshold(containers.subList(10, 25), 1.0);
 
     GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
-        100, 1000 * 10);
+        100, 1000 * 5);
   }
 
   // We simulate common EC types: EC-2-2-1024K, EC-3-2-1024K, EC-6-3-1024K.
@@ -598,7 +602,7 @@ public class TestSCMSafeModeManager {
     ContainerManager containerManager = mock(ContainerManager.class);
     when(containerManager.getContainers()).thenReturn(containers);
     PipelineManager pipelineManager = mock(PipelineManager.class);
-    conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE, 0);
+    conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT, 0);
     conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_ONE_NODE_REPORTED_PIPELINE_PCT, 0);
     scmSafeModeManager = new SCMSafeModeManager(
         conf, containerManager, pipelineManager, queue,
@@ -616,6 +620,9 @@ public class TestSCMSafeModeManager {
       assertTrue(scmSafeModeManager.getInSafeMode());
       assertEquals(1, scmSafeModeManager.getCurrentContainerThreshold());
     }
+
+    queue.fireEvent(SCMEvents.PIPELINE_REPORT, mock(PipelineReportFromDatanode.class));
+    queue.fireEvent(SCMEvents.OPEN_PIPELINE, mock(Pipeline.class));
 
     if (numOfDns == 0) {
       GenericTestUtils.waitFor(() -> scmSafeModeManager.getInSafeMode(),
@@ -729,7 +736,7 @@ public class TestSCMSafeModeManager {
     firePipelineEvent(pipelineManager, pipeline);
 
     GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
-        100, 1000 * 5);
+        100, 1000 * 10);
     pipelineManager.close();
   }
 
@@ -737,6 +744,7 @@ public class TestSCMSafeModeManager {
   public void testPipelinesNotCreatedUntilPreCheckPasses() throws Exception {
     int numOfDns = 5;
     config.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE, numOfDns);
+    config.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT, 0);
     config.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_ONE_NODE_REPORTED_PIPELINE_PCT, 0);
     config.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
         true);
