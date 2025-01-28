@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
@@ -130,22 +131,22 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     replicationTasks = new ArrayList<>();
 
     for (ContainerInfo container : containerInfos) {
-
+      if (container.getState() == LifeCycleState.CLOSED) {
         final Pipeline pipeline = containerOperationClient.getPipeline(container.getPipelineID().getProtobuf());
         final List<DatanodeDetails> datanodesWithContainer = pipeline.getNodes();
         final List<String> datanodeUUIDs =
-            datanodesWithContainer
-                .stream().map(DatanodeDetails::getUuidString)
-                .collect(Collectors.toList());
+                datanodesWithContainer
+                        .stream().map(DatanodeDetails::getUuidString)
+                        .collect(Collectors.toList());
 
         //if datanode is specified, replicate only container if it has a
         //replica.
         if (datanode.isEmpty() || datanodeUUIDs.contains(datanode)) {
           replicationTasks.add(new ReplicationTask(
-              ReplicateContainerCommand.fromSources(container.getContainerID(),
-                  datanodesWithContainer), replicator));
+                  ReplicateContainerCommand.fromSources(container.getContainerID(),
+                          datanodesWithContainer), replicator));
         }
-
+      }
     }
 
     //important: override the max number of tasks.
@@ -181,6 +182,8 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
 
   private void initializeReplicationSupervisor(
       ConfigurationSource conf, int queueSize) throws IOException {
+    String scmID = UUID.randomUUID().toString();
+    String clusterID = UUID.randomUUID().toString();
     String fakeDatanodeUuid = datanode;
 
     if (fakeDatanodeUuid.isEmpty()) {
@@ -204,6 +207,10 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
       // load rocksDB with readOnly mode, otherwise it will fail.
       HddsVolumeUtil.loadAllHddsVolumeDbStore(
           volumeSet, dbVolumeSet, false, LOG);
+
+      for (StorageVolume volume : volumeSet.getVolumesList()) {
+        StorageVolumeUtil.checkVolume(volume, scmID, clusterID, conf, LOG, dbVolumeSet);
+      }
     }
 
     Map<ContainerType, Handler> handlers = new HashMap<>();
@@ -219,7 +226,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
               metrics,
               containerReplicaProto -> {
               });
-      handler.setClusterID(UUID.randomUUID().toString());
+      handler.setClusterID(clusterID);
       handlers.put(containerType, handler);
     }
 
