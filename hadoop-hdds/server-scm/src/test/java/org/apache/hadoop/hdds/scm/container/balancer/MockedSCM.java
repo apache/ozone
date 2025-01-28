@@ -137,21 +137,36 @@ public final class MockedSCM {
     return task;
   }
 
+  public @Nonnull ContainerBalancerTask startBalancerTaskAsync(
+      @Nonnull ContainerBalancer containerBalancer,
+      @Nonnull ContainerBalancerConfiguration config,
+      Boolean withDelay) {
+    ContainerBalancerTask task = new ContainerBalancerTask(scm, 0, containerBalancer,
+        containerBalancer.getMetrics(), config, withDelay);
+    new Thread(task).start();
+    return task;
+  }
+
   public @Nonnull ContainerBalancerTask startBalancerTask(@Nonnull ContainerBalancerConfiguration config) {
     init(config, new OzoneConfiguration());
     return startBalancerTask(new ContainerBalancer(scm), config);
   }
 
+  public @Nonnull ContainerBalancerTask startBalancerTaskAsync(@Nonnull ContainerBalancerConfiguration config,
+                                                          OzoneConfiguration ozoneConfig,
+                                                          Boolean withDelay) {
+    init(config, ozoneConfig);
+    return startBalancerTaskAsync(new ContainerBalancer(scm), config, withDelay);
+  }
+
+  public @Nonnull ContainerBalancerTask startBalancerTaskAsync(@Nonnull ContainerBalancerConfiguration config,
+                                                               Boolean withDelay) {
+    init(config, new OzoneConfiguration());
+    return startBalancerTaskAsync(new ContainerBalancer(scm), config, withDelay);
+  }
+
   public int getNodeCount() {
     return cluster.getNodeCount();
-  }
-
-  public void enableLegacyReplicationManager() {
-    mockedReplicaManager.conf.setEnableLegacy(true);
-  }
-
-  public void disableLegacyReplicationManager() {
-    mockedReplicaManager.conf.setEnableLegacy(false);
   }
 
   public @Nonnull MoveManager getMoveManager() {
@@ -239,9 +254,6 @@ public final class MockedSCM {
     private MockedReplicationManager() {
       manager = mock(ReplicationManager.class);
       conf = new ReplicationManager.ReplicationManagerConfiguration();
-      // Disable LegacyReplicationManager. This means balancer should select RATIS as well as
-      // EC containers for balancing. Also, MoveManager will be used.
-      conf.setEnableLegacy(false);
     }
 
     private static @Nonnull MockedReplicationManager doMock()
@@ -255,13 +267,6 @@ public final class MockedSCM {
       Mockito
           .when(mockedManager.manager.isContainerReplicatingOrDeleting(Mockito.any(ContainerID.class)))
           .thenReturn(false);
-
-      Mockito
-          .when(mockedManager.manager.move(
-              Mockito.any(ContainerID.class),
-              Mockito.any(DatanodeDetails.class),
-              Mockito.any(DatanodeDetails.class)))
-          .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED));
 
       Mockito
           .when(mockedManager.manager.getClock())

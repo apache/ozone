@@ -23,7 +23,6 @@ import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.VA
 import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.SCM;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
@@ -62,9 +61,8 @@ public class ScmHAUnfinalizedStateValidationAction
     if (!versionManager.isAllowed(SCM_HA) &&
         SCMHAUtils.isSCMHAEnabled(conf) &&
         !storageConf.isSCMHAEnabled()) {
-      throw new UpgradeException(String.format("Configuration %s cannot be " +
-              "used until SCM upgrade has been finalized",
-          ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY),
+      throw new UpgradeException("Ratis cannot be " +
+          "used until SCM upgrade has been finalized",
           UpgradeException.ResultCodes.PREFINALIZE_ACTION_VALIDATION_FAILED);
     }
   }

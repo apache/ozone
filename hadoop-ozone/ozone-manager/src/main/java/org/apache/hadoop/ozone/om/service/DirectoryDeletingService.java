@@ -213,11 +213,11 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     public BackgroundTaskResult call() {
       try {
         if (shouldRun()) {
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Running DirectoryDeletingService");
-          }
           isRunningOnAOS.set(true);
           long rnCnt = getRunCount().incrementAndGet();
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Running DirectoryDeletingService. {}", rnCnt);
+          }
           long dirNum = 0L;
           long subDirNum = 0L;
           long subFileNum = 0L;

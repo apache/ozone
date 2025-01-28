@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -305,9 +304,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected boolean includeRecon = false;
     protected boolean includeS3G = false;
 
-    protected int dnInitialVersion = DatanodeVersion.FUTURE_VERSION.toProtoValue();
-    protected int dnCurrentVersion = DatanodeVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC.toProtoValue();
-
     protected int numOfDatanodes = 3;
     protected boolean  startDataNodes = true;
     protected CertificateClient certClient;
@@ -376,30 +372,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
      */
     public Builder setNumDatanodes(int val) {
       numOfDatanodes = val;
-      return this;
-    }
-
-    /**
-     * Set the initialVersion for all datanodes.
-     *
-     * @param val initialVersion value to be set for all datanodes.
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setDatanodeInitialVersion(int val) {
-      dnInitialVersion = val;
-      return this;
-    }
-
-    /**
-     * Set the currentVersion for all datanodes.
-     *
-     * @param val currentVersion value to be set for all datanodes.
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setDatanodeCurrentVersion(int val) {
-      dnCurrentVersion = val;
       return this;
     }
 

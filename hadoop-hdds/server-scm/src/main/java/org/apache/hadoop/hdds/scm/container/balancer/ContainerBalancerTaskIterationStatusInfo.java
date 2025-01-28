@@ -18,86 +18,160 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
+
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Information about balancer task iteration.
  */
 public class ContainerBalancerTaskIterationStatusInfo {
-  private final Integer iterationNumber;
-  private final String iterationResult;
-  private final long sizeScheduledForMoveGB;
-  private final long dataSizeMovedGB;
-  private final long containerMovesScheduled;
-  private final long containerMovesCompleted;
-  private final long containerMovesFailed;
-  private final long containerMovesTimeout;
-  private final Map<UUID, Long> sizeEnteringNodesGB;
-  private final Map<UUID, Long> sizeLeavingNodesGB;
 
-  @SuppressWarnings("checkstyle:ParameterNumber")
+  private final IterationInfo iterationInfo;
+  private final ContainerMoveInfo containerMoveInfo;
+  private final DataMoveInfo dataMoveInfo;
+
   public ContainerBalancerTaskIterationStatusInfo(
-      Integer iterationNumber,
-      String iterationResult,
-      long sizeScheduledForMoveGB,
-      long dataSizeMovedGB,
-      long containerMovesScheduled,
-      long containerMovesCompleted,
-      long containerMovesFailed,
-      long containerMovesTimeout,
-      Map<UUID, Long> sizeEnteringNodesGB,
-      Map<UUID, Long> sizeLeavingNodesGB) {
-    this.iterationNumber = iterationNumber;
-    this.iterationResult = iterationResult;
-    this.sizeScheduledForMoveGB = sizeScheduledForMoveGB;
-    this.dataSizeMovedGB = dataSizeMovedGB;
-    this.containerMovesScheduled = containerMovesScheduled;
-    this.containerMovesCompleted = containerMovesCompleted;
-    this.containerMovesFailed = containerMovesFailed;
-    this.containerMovesTimeout = containerMovesTimeout;
-    this.sizeEnteringNodesGB = sizeEnteringNodesGB;
-    this.sizeLeavingNodesGB = sizeLeavingNodesGB;
+      IterationInfo iterationInfo,
+      ContainerMoveInfo containerMoveInfo,
+      DataMoveInfo dataMoveInfo) {
+    this.iterationInfo = iterationInfo;
+    this.containerMoveInfo = containerMoveInfo;
+    this.dataMoveInfo = dataMoveInfo;
   }
 
+  /**
+   * Get the number of iterations.
+   * @return iteration number
+   */
   public Integer getIterationNumber() {
-    return iterationNumber;
+    return iterationInfo.getIterationNumber();
   }
 
+  /**
+   * Get the iteration result.
+   * @return iteration result
+   */
   public String getIterationResult() {
-    return iterationResult;
+    return iterationInfo.getIterationResult();
   }
 
-  public long getSizeScheduledForMoveGB() {
-    return sizeScheduledForMoveGB;
+  /**
+   * Get the size of the bytes that are scheduled to move in the iteration.
+   * @return size in bytes
+   */
+  public long getSizeScheduledForMove() {
+    return dataMoveInfo.getSizeScheduledForMove();
   }
 
-  public long getDataSizeMovedGB() {
-    return dataSizeMovedGB;
+  /**
+   * Get the size of the bytes that were moved in the iteration.
+   * @return size in bytes
+   */
+  public long getDataSizeMoved() {
+    return dataMoveInfo.getDataSizeMoved();
   }
 
+  /**
+   * Get the number of containers scheduled to move.
+   * @return number of containers scheduled to move
+   */
   public long getContainerMovesScheduled() {
-    return containerMovesScheduled;
+    return containerMoveInfo.getContainerMovesScheduled();
   }
 
+  /**
+   * Get the number of successfully moved containers.
+   * @return number of successfully moved containers
+   */
   public long getContainerMovesCompleted() {
-    return containerMovesCompleted;
+    return containerMoveInfo.getContainerMovesCompleted();
   }
 
+  /**
+   * Get the number of containers that were not moved successfully.
+   * @return number of unsuccessfully moved containers
+   */
   public long getContainerMovesFailed() {
-    return containerMovesFailed;
+    return containerMoveInfo.getContainerMovesFailed();
   }
 
+  /**
+   * Get the number of containers moved with a timeout.
+   * @return number of moved with timeout containers
+   */
   public long getContainerMovesTimeout() {
-    return containerMovesTimeout;
+    return containerMoveInfo.getContainerMovesTimeout();
   }
 
-  public Map<UUID, Long> getSizeEnteringNodesGB() {
-    return sizeEnteringNodesGB;
+  /**
+   * Get a map of the node IDs and the corresponding data sizes moved to each node.
+   * @return nodeId to size entering from node map
+   */
+  public Map<UUID, Long> getSizeEnteringNodes() {
+    return dataMoveInfo.getSizeEnteringNodes();
   }
 
-  public Map<UUID, Long> getSizeLeavingNodesGB() {
-    return sizeLeavingNodesGB;
+  /**
+   * Get a map of the node IDs and the corresponding data sizes moved from each node.
+   * @return nodeId to size leaving from node map
+   */
+  public Map<UUID, Long> getSizeLeavingNodes() {
+    return dataMoveInfo.getSizeLeavingNodes();
+  }
+
+  /**
+   * Get the iteration duration.
+   * @return iteration duration
+   */
+  public Long getIterationDuration() {
+    return iterationInfo.getIterationDuration();
+  }
+
+  /**
+   * Converts an instance into the protobuf compatible object.
+   * @return proto representation
+   */
+  public StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto toProto() {
+    return StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto.newBuilder()
+        .setIterationNumber(getIterationNumber())
+        .setIterationResult(Optional.ofNullable(getIterationResult()).orElse(""))
+        .setIterationDuration(getIterationDuration())
+        .setSizeScheduledForMove(getSizeScheduledForMove())
+        .setDataSizeMoved(getDataSizeMoved())
+        .setContainerMovesScheduled(getContainerMovesScheduled())
+        .setContainerMovesCompleted(getContainerMovesCompleted())
+        .setContainerMovesFailed(getContainerMovesFailed())
+        .setContainerMovesTimeout(getContainerMovesTimeout())
+        .addAllSizeEnteringNodes(
+            mapToProtoNodeTransferInfo(getSizeEnteringNodes())
+        )
+        .addAllSizeLeavingNodes(
+            mapToProtoNodeTransferInfo(getSizeLeavingNodes())
+        )
+        .build();
+  }
+
+  /**
+   * Converts an instance into the protobuf compatible object.
+   * @param nodes node id to node traffic size
+   * @return node transfer info proto representation
+   */
+  private List<StorageContainerLocationProtocolProtos.NodeTransferInfoProto> mapToProtoNodeTransferInfo(
+      Map<UUID, Long> nodes
+  ) {
+    return nodes.entrySet()
+        .stream()
+        .map(entry -> StorageContainerLocationProtocolProtos.NodeTransferInfoProto.newBuilder()
+            .setUuid(entry.getKey().toString())
+            .setDataVolume(entry.getValue())
+            .build()
+        )
+        .collect(Collectors.toList());
   }
 }
 

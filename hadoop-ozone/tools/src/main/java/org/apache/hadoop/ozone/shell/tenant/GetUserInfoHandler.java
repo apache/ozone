@@ -19,13 +19,11 @@ package org.apache.hadoop.ozone.shell.tenant;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExtendedUserAccessIdInfo;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
-import org.jooq.tools.StringUtils;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -38,9 +36,6 @@ import java.util.List;
     description = "Get tenant related information of a user")
 public class GetUserInfoHandler extends TenantHandler {
 
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
-
   @CommandLine.Parameters(description = "User name (principal)", arity = "1..1")
   private String userPrincipal;
 
@@ -51,11 +46,6 @@ public class GetUserInfoHandler extends TenantHandler {
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
-
-    if (StringUtils.isEmpty(userPrincipal)) {
-      GenericCli.missingSubcommand(spec);
-      return;
-    }
 
     final TenantUserInfoValue tenantUserInfo =
         client.getObjectStore().tenantGetUserInfo(userPrincipal);

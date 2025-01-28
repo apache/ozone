@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.recon.upgrade;
 
 import org.reflections.Reflections;
 
+import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.Optional;
 import java.util.Set;
@@ -31,7 +32,8 @@ import java.util.Set;
  */
 public enum ReconLayoutFeature {
   // Represents the starting point for Recon's layout versioning system.
-  INITIAL_VERSION(0, "Recon Layout Versioning Introduction");
+  INITIAL_VERSION(0, "Recon Layout Versioning Introduction"),
+  TASK_STATUS_STATISTICS(1, "Recon Task Status Statistics Tracking Introduced");
 
   private final int version;
   private final String description;
@@ -90,6 +92,17 @@ public enum ReconLayoutFeature {
         throw new RuntimeException("Failed to register upgrade action: " + actionClass.getSimpleName(), e);
       }
     }
+  }
+
+  /**
+   * Determines the Software Layout Version (SLV) based on the latest feature version.
+   * @return The Software Layout Version (SLV).
+   */
+  public static int determineSLV() {
+    return Arrays.stream(ReconLayoutFeature.values())
+        .mapToInt(ReconLayoutFeature::getVersion)
+        .max()
+        .orElse(0); // Default to 0 if no features are defined
   }
 
   /**

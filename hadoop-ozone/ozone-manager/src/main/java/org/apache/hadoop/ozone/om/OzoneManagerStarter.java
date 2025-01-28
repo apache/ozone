@@ -33,6 +33,7 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 import java.io.IOException;
+import java.util.concurrent.Callable;
 
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 
@@ -44,7 +45,7 @@ import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_H
     hidden = true, description = "Start or initialize the Ozone Manager.",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
-public class OzoneManagerStarter extends GenericCli {
+public class OzoneManagerStarter extends GenericCli implements Callable<Void> {
 
   private OzoneConfiguration conf;
   private OMStarterInterface receiver;
@@ -167,7 +168,7 @@ public class OzoneManagerStarter extends GenericCli {
    * is set and print the startup banner message.
    */
   private void commonInit() {
-    conf = createOzoneConfiguration();
+    conf = getOzoneConf();
     TracingUtil.initTracing("OzoneManager", conf);
 
     String[] originalArgs = getCmd().getParseResult().originalArgs()

@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.admin.nssummary;
 
 import org.apache.hadoop.fs.ozone.OzoneClientUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.OzoneAdmin;
+import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.hdds.cli.AdminSubcommand;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -65,10 +65,6 @@ import static org.apache.hadoop.hdds.server.http.HttpServer2.HTTP_SCHEME;
 public class NSSummaryAdmin implements AdminSubcommand {
   @CommandLine.ParentCommand
   private OzoneAdmin parent;
-
-  public OzoneAdmin getParent() {
-    return parent;
-  }
 
   private boolean isObjectStoreBucket(OzoneBucket bucket, ObjectStore objectStore) {
     boolean enableFileSystemPaths = getOzoneConfig()

@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.request.key.acl;
 
 import com.google.common.collect.Lists;
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -136,9 +136,9 @@ public class OMKeySetAclRequestWithFSO extends OMKeyAclRequestWithFSO {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     ozoneManager.getMetrics().incNumSetAcl();
-    return super.validateAndUpdateCache(ozoneManager, termIndex);
+    return super.validateAndUpdateCache(ozoneManager, context);
   }
 
   @Override

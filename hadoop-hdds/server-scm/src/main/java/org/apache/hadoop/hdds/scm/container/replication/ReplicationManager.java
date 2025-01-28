@@ -42,7 +42,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
-import org.apache.hadoop.hdds.scm.container.balancer.MoveManager;
 import org.apache.hadoop.hdds.scm.container.replication.health.ECMisReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.MismatchedReplicasHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosedWithUnhealthyReplicasHandler;
@@ -85,10 +84,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -106,7 +103,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.E
  * that the containers are properly replicated. Replication Manager deals only
  * with Quasi Closed / Closed container.
  */
-public class ReplicationManager implements SCMService {
+public class ReplicationManager implements SCMService, ContainerReplicaPendingOpsSubscriber {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(ReplicationManager.class);
@@ -154,13 +151,6 @@ public class ReplicationManager implements SCMService {
    * Replication progress related metrics.
    */
   private ReplicationManagerMetrics metrics;
-
-
-  /**
-   * Legacy RM will hopefully be removed after completing refactor
-   * for now, it is used to process non-EC container.
-   */
-  private final LegacyReplicationManager legacyReplicationManager;
 
   /**
    * Set of nodes which have been excluded for replication commands due to the
@@ -214,7 +204,6 @@ public class ReplicationManager implements SCMService {
    * @param scmContext The SCMContext instance
    * @param nodeManager The nodeManager instance
    * @param clock Clock object used to get the current time
-   * @param legacyReplicationManager The legacy ReplicationManager instance
    * @param replicaPendingOps The pendingOps instance
    */
   @SuppressWarnings("parameternumber")
@@ -226,7 +215,6 @@ public class ReplicationManager implements SCMService {
              final SCMContext scmContext,
              final NodeManager nodeManager,
              final Clock clock,
-             final LegacyReplicationManager legacyReplicationManager,
              final ContainerReplicaPendingOps replicaPendingOps)
              throws IOException {
     this.containerManager = containerManager;
@@ -243,7 +231,6 @@ public class ReplicationManager implements SCMService {
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
         TimeUnit.MILLISECONDS);
     this.containerReplicaPendingOps = replicaPendingOps;
-    this.legacyReplicationManager = legacyReplicationManager;
     this.ecReplicationCheckHandler = new ECReplicationCheckHandler();
     this.ecMisReplicationCheckHandler =
         new ECMisReplicationCheckHandler(ecContainerPlacement);
@@ -296,9 +283,6 @@ public class ReplicationManager implements SCMService {
       LOG.info("Starting Replication Monitor Thread.");
       running = true;
       metrics = ReplicationManagerMetrics.create(this);
-      if (rmConf.isLegacyEnabled()) {
-        legacyReplicationManager.setMetrics(metrics);
-      }
       containerReplicaPendingOps.setReplicationMetrics(metrics);
       startSubServices();
     } else {
@@ -330,9 +314,6 @@ public class ReplicationManager implements SCMService {
       underReplicatedProcessorThread.interrupt();
       overReplicatedProcessorThread.interrupt();
       running = false;
-      if (rmConf.isLegacyEnabled()) {
-        legacyReplicationManager.clearInflightActions();
-      }
       metrics.unRegister();
       replicationMonitor.interrupt();
     } else {
@@ -385,10 +366,6 @@ public class ReplicationManager implements SCMService {
         break;
       }
       report.increment(c.getState());
-      if (rmConf.isLegacyEnabled() && !isEC(c.getReplicationConfig())) {
-        legacyReplicationManager.processContainer(c, report);
-        continue;
-      }
       try {
         processContainer(c, newRepQueue, report);
         // TODO - send any commands contained in the health result
@@ -696,8 +673,7 @@ public class ReplicationManager implements SCMService {
     if (cmd.getType() == Type.deleteContainerCommand) {
       DeleteContainerCommand rcc = (DeleteContainerCommand) cmd;
       containerReplicaPendingOps.scheduleDeleteReplica(
-          containerInfo.containerID(), targetDatanode, rcc.getReplicaIndex(),
-          scmDeadlineEpochMs);
+          containerInfo.containerID(), targetDatanode, rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs);
       if (rcc.getReplicaIndex() > 0) {
         getMetrics().incrEcDeletionCmdsSentTotal();
       } else if (rcc.getReplicaIndex() == 0) {
@@ -710,8 +686,7 @@ public class ReplicationManager implements SCMService {
       final ByteString targetIndexes = rcc.getMissingContainerIndexes();
       for (int i = 0; i < targetIndexes.size(); i++) {
         containerReplicaPendingOps.scheduleAddReplica(
-            containerInfo.containerID(), targets.get(i), targetIndexes.byteAt(i),
-            scmDeadlineEpochMs);
+            containerInfo.containerID(), targets.get(i), targetIndexes.byteAt(i), cmd, scmDeadlineEpochMs);
       }
       getMetrics().incrEcReconstructionCmdsSentTotal();
     } else if (cmd.getType() == Type.replicateContainerCommand) {
@@ -725,7 +700,7 @@ public class ReplicationManager implements SCMService {
          */
         containerReplicaPendingOps.scheduleAddReplica(
             containerInfo.containerID(),
-            targetDatanode, rcc.getReplicaIndex(), scmDeadlineEpochMs);
+            targetDatanode, rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs);
       } else {
         /*
         This means the source will push replica to the target, so the op's
@@ -733,7 +708,7 @@ public class ReplicationManager implements SCMService {
          */
         containerReplicaPendingOps.scheduleAddReplica(
             containerInfo.containerID(),
-            rcc.getTargetDatanode(), rcc.getReplicaIndex(), scmDeadlineEpochMs);
+            rcc.getTargetDatanode(), rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs);
       }
 
       if (rcc.getReplicaIndex() > 0) {
@@ -955,12 +930,8 @@ public class ReplicationManager implements SCMService {
       throws ContainerNotFoundException {
     ContainerInfo container = containerManager.getContainer(containerID);
     final boolean isEC = isEC(container.getReplicationConfig());
+    return getContainerReplicaCount(container, isEC);
 
-    if (!isEC && rmConf.isLegacyEnabled()) {
-      return legacyReplicationManager.getContainerReplicaCount(container);
-    } else {
-      return getContainerReplicaCount(container, isEC);
-    }
   }
 
   /**
@@ -1070,34 +1041,33 @@ public class ReplicationManager implements SCMService {
     return replicationQueue.get();
   }
 
+  @Override
+  public void opCompleted(ContainerReplicaOp op, ContainerID containerID, boolean timedOut) {
+    if (!(timedOut && op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE)) {
+      // We only care about expired delete ops. All others should be ignored.
+      return;
+    }
+    try {
+      ContainerInfo containerInfo = containerManager.getContainer(containerID);
+      // Sending the command in this way is un-throttled, and the command will have its deadline
+      // adjusted to a new deadline as part of the sending process.
+      sendDatanodeCommand(op.getCommand(), containerInfo, op.getTarget());
+    } catch (ContainerNotFoundException e) {
+      // Should not happen, as even deleted containers are currently retained in the SCM container map
+      LOG.error("Container {} not found when processing expired delete", containerID, e);
+    } catch (NotLeaderException e) {
+      // If SCM leadership has changed, this is fine to ignore. All pending ops will be expired
+      // once SCM leadership switches.
+      LOG.warn("SCM is not leader when processing expired delete", e);
+    }
+  }
+
   /**
    * Configuration used by the Replication Manager.
    */
   @ConfigGroup(prefix = "hdds.scm.replication")
   public static class ReplicationManagerConfiguration
       extends ReconfigurableConfig {
-    /**
-     * True if LegacyReplicationManager should be used for RATIS containers.
-     */
-    @Config(key = "enable.legacy",
-        type = ConfigType.BOOLEAN,
-        defaultValue = "false",
-        tags = {SCM, OZONE},
-        description =
-            "If true, LegacyReplicationManager will handle RATIS containers " +
-            "while ReplicationManager will handle EC containers. If false, " +
-            "ReplicationManager will handle both RATIS and EC."
-    )
-    private boolean enableLegacy;
-
-    public boolean isLegacyEnabled() {
-      return enableLegacy;
-    }
-
-    public void setEnableLegacy(boolean enableLegacy) {
-      this.enableLegacy = enableLegacy;
-    }
-
     /**
      * The frequency in which ReplicationMonitor thread should run.
      */
@@ -1145,13 +1115,13 @@ public class ReplicationManager implements SCMService {
      */
     @Config(key = "event.timeout",
         type = ConfigType.TIME,
-        defaultValue = "10m",
+        defaultValue = "12m",
         reconfigurable = true,
         tags = {SCM, OZONE},
         description = "Timeout for the container replication/deletion commands "
             + "sent to datanodes. After this timeout the command will be "
             + "retried.")
-    private long eventTimeout = Duration.ofMinutes(10).toMillis();
+    private long eventTimeout = Duration.ofMinutes(12).toMillis();
     public void setInterval(Duration interval) {
       this.interval = interval;
     }
@@ -1167,7 +1137,7 @@ public class ReplicationManager implements SCMService {
      */
     @Config(key = "event.timeout.datanode.offset",
         type = ConfigType.TIME,
-        defaultValue = "30s",
+        defaultValue = "6m",
         reconfigurable = true,
         tags = {SCM, OZONE},
         description = "The amount of time to subtract from "
@@ -1175,7 +1145,7 @@ public class ReplicationManager implements SCMService {
             + "datanodes which is less than the SCM timeout. This ensures "
             + "the datanodes will not process a command after SCM believes it "
             + "should have expired.")
-    private long datanodeTimeoutOffset = Duration.ofSeconds(30).toMillis();
+    private long datanodeTimeoutOffset = Duration.ofMinutes(6).toMillis();
     public long getDatanodeTimeoutOffset() {
       return datanodeTimeoutOffset;
     }
@@ -1414,11 +1384,6 @@ public class ReplicationManager implements SCMService {
           containerReplicaPendingOps.clear();
           serviceStatus = ServiceStatus.RUNNING;
         }
-        if (rmConf.isLegacyEnabled()) {
-          //now, as the current scm is leader and it`s state is up-to-date,
-          //we need to take some action about replicated inflight move options.
-          legacyReplicationManager.notifyStatusChanged();
-        }
       } else {
         serviceStatus = ServiceStatus.PAUSING;
       }
@@ -1456,46 +1421,8 @@ public class ReplicationManager implements SCMService {
     return clock;
   }
 
-  /**
-  * following functions will be refactored in a separate jira.
-  */
-  public CompletableFuture<MoveManager.MoveResult> move(
-      ContainerID cid, DatanodeDetails src, DatanodeDetails tgt)
-      throws NodeNotFoundException, ContainerNotFoundException,
-      TimeoutException {
-    CompletableFuture<MoveManager.MoveResult> ret =
-        new CompletableFuture<>();
-    if (!isRunning()) {
-      ret.complete(MoveManager.MoveResult.FAIL_UNEXPECTED_ERROR);
-      LOG.warn("Failing move because Replication Monitor thread's " +
-          "running state is {}", isRunning());
-      return ret;
-    }
-
-    return legacyReplicationManager.move(cid, src, tgt);
-  }
-
-  public Map<ContainerID, CompletableFuture<MoveManager.MoveResult>>
-      getInflightMove() {
-    return legacyReplicationManager.getInflightMove();
-  }
-
-  public LegacyReplicationManager.MoveScheduler getMoveScheduler() {
-    return legacyReplicationManager.getMoveScheduler();
-  }
-
-  @VisibleForTesting
-  public LegacyReplicationManager getLegacyReplicationManager() {
-    return legacyReplicationManager;
-  }
-
   public boolean isContainerReplicatingOrDeleting(ContainerID containerID) {
-    if (rmConf.isLegacyEnabled()) {
-      return legacyReplicationManager
-          .isContainerReplicatingOrDeleting(containerID);
-    } else {
-      return !getPendingReplicationOps(containerID).isEmpty();
-    }
+    return !getPendingReplicationOps(containerID).isEmpty();
   }
 
   private ContainerReplicaCount getContainerReplicaCount(

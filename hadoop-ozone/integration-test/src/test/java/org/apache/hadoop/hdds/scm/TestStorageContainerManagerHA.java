@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.scm;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -118,7 +117,6 @@ public class TestStorageContainerManagerHA {
     if (cluster != null) {
       cluster.shutdown();
     }
-    DefaultConfigManager.clearDefaultConfigs();
   }
 
   @Test

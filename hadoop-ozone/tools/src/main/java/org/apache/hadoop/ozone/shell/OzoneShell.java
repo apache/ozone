@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.shell;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.shell.bucket.BucketCommands;
 import org.apache.hadoop.ozone.shell.keys.KeyCommands;
 import org.apache.hadoop.ozone.shell.prefix.PrefixCommands;
@@ -47,21 +46,7 @@ import picocli.CommandLine.Command;
     mixinStandardHelpOptions = true)
 public class OzoneShell extends Shell {
 
-  /**
-   * Main for the ozShell Command handling.
-   *
-   * @param argv - System Args Strings[]
-   */
   public static void main(String[] argv) throws Exception {
     new OzoneShell().run(argv);
   }
-
-  @Override
-  public int execute(String[] argv) {
-    TracingUtil.initTracing("shell", createOzoneConfiguration());
-    String spanName = "ozone sh " + String.join(" ", argv);
-    return TracingUtil.executeInNewSpan(spanName,
-        () -> super.execute(argv));
-  }
-
 }
