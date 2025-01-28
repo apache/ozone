@@ -18,11 +18,14 @@
 package org.apache.hadoop.ozone.shell;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.debug.OzoneDebug;
 import org.apache.hadoop.ozone.om.OMStorage;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.repair.OzoneRepair;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -30,6 +33,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import picocli.CommandLine;
 
 import java.io.File;
@@ -37,6 +42,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_DB_NAME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.ozone.test.IntLambda.withTextFromSystemIn;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -52,7 +58,6 @@ public class TestOzoneRepairShell {
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf = null;
   private static String om;
-
   private static final String TRANSACTION_INFO_TABLE_TERM_INDEX_PATTERN = "([0-9]+#[0-9]+)";
 
   @BeforeAll
@@ -80,20 +85,22 @@ public class TestOzoneRepairShell {
     IOUtils.closeQuietly(cluster);
   }
 
-  @Test
-  public void testUpdateTransactionInfoTable() throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {"om", "scm"})
+  public void testUpdateTransactionInfoTable(String component) throws Exception {
     CommandLine cmd = new OzoneRepair().getCmd();
-    String dbPath = new File(OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME).getPath();
+    String dbPath = new File(getDbPath(component)).getPath();
 
     cluster.getOzoneManager().stop();
+    cluster.getStorageContainerManager().stop();
 
-    String cmdOut = scanTransactionInfoTable(dbPath);
+    String cmdOut = scanTransactionInfoTable(dbPath, component);
     String[] originalHighestTermIndex = parseScanOutput(cmdOut);
 
     String testTerm = "1111";
     String testIndex = "1111";
     int exitCode = withTextFromSystemIn("y")
-        .execute(() -> cmd.execute("om", "update-transaction",
+        .execute(() -> cmd.execute(component, "update-transaction",
             "--db", dbPath,
             "--term", testTerm,
             "--index", testIndex));
@@ -105,23 +112,44 @@ public class TestOzoneRepairShell {
             String.format("The highest transaction info has been updated to: (t:%s, i:%s)", testTerm, testIndex)
         );
 
-    String cmdOut2 = scanTransactionInfoTable(dbPath);
+    String cmdOut2 = scanTransactionInfoTable(dbPath, component);
     assertThat(cmdOut2).contains(testTerm + "#" + testIndex);
 
     withTextFromSystemIn("y")
-        .execute(() -> cmd.execute("om", "update-transaction",
+        .execute(() -> cmd.execute(component, "update-transaction",
             "--db", dbPath,
             "--term", originalHighestTermIndex[0],
             "--index", originalHighestTermIndex[1]));
     cluster.getOzoneManager().restart();
     try (OzoneClient ozoneClient = cluster.newClient()) {
-      ozoneClient.getObjectStore().createVolume("vol1");
+      ozoneClient.getObjectStore().createVolume("vol-" + component);
     }
   }
 
-  private String scanTransactionInfoTable(String dbPath) {
+  private String getDbPath(String component) {
+    switch (component) {
+    case "om":
+      return OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME;
+    case "scm":
+      return ServerUtils.getScmDbDir(conf) + "/" + SCM_DB_NAME;
+    default: return "";
+    }
+  }
+
+  private String getColumnFamilyName(String component) {
+    switch (component) {
+    case "om":
+      return OMDBDefinition.TRANSACTION_INFO_TABLE.getName();
+    case "scm":
+      return SCMDBDefinition.TRANSACTIONINFO.getName();
+    default:
+      return "";
+    }
+  }
+
+  private String scanTransactionInfoTable(String dbPath, String component) {
     CommandLine debugCmd = new OzoneDebug().getCmd();
-    debugCmd.execute("ldb", "--db", dbPath, "scan", "--column_family", "transactionInfoTable");
+    debugCmd.execute("ldb", "--db", dbPath, "scan", "--column_family", getColumnFamilyName(component));
     return out.get();
   }
 
