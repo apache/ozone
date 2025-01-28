@@ -91,6 +91,7 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicasWithSameOrigin;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.getNoNodesTestPlacementPolicy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -100,6 +101,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests for the ReplicationManager.
@@ -131,10 +133,10 @@ public class TestReplicationManager {
     configuration.set(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "0s");
     containerManager = Mockito.mock(ContainerManager.class);
     ratisPlacementPolicy = Mockito.mock(PlacementPolicy.class);
-    Mockito.when(ratisPlacementPolicy.validateContainerPlacement(anyList(),
+    when(ratisPlacementPolicy.validateContainerPlacement(anyList(),
         anyInt())).thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
     ecPlacementPolicy = Mockito.mock(PlacementPolicy.class);
-    Mockito.when(ecPlacementPolicy.validateContainerPlacement(
+    when(ecPlacementPolicy.validateContainerPlacement(
         anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
 
@@ -154,14 +156,14 @@ public class TestReplicationManager {
     containerReplicaPendingOps =
         new ContainerReplicaPendingOps(clock);
 
-    Mockito.when(containerManager
+    when(containerManager
         .getContainerReplicas(Mockito.any(ContainerID.class))).thenAnswer(
           invocation -> {
             ContainerID cid = invocation.getArgument(0);
             return containerReplicaMap.get(cid);
           });
 
-    Mockito.when(containerManager.getContainers()).thenAnswer(
+    when(containerManager.getContainers()).thenAnswer(
         invocation -> new ArrayList<>(containerInfoSet));
     replicationManager = createReplicationManager();
     containerReplicaMap = new HashMap<>();
@@ -171,18 +173,18 @@ public class TestReplicationManager {
     repQueue = new ReplicationQueue();
 
     // Ensure that RM will run when asked.
-    Mockito.when(scmContext.isLeaderReady()).thenReturn(true);
-    Mockito.when(scmContext.isInSafeMode()).thenReturn(false);
+    when(scmContext.isLeaderReady()).thenReturn(true);
+    when(scmContext.isInSafeMode()).thenReturn(false);
 
     PipelineManager pipelineManager = mock(PipelineManager.class);
-    Mockito.when(pipelineManager.getPipeline(Matchers.any()))
+    when(pipelineManager.getPipeline(Matchers.any()))
         .thenReturn(HddsTestUtils.getRandomPipeline());
 
     StorageContainerManager scm = mock(StorageContainerManager.class);
-    Mockito.when(scm.getPipelineManager()).thenReturn(pipelineManager);
-    Mockito.when(scm.getContainerTokenGenerator()).thenReturn(ContainerTokenGenerator.DISABLED);
+    when(scm.getPipelineManager()).thenReturn(pipelineManager);
+    when(scm.getContainerTokenGenerator()).thenReturn(ContainerTokenGenerator.DISABLED);
 
-    Mockito.when(scmContext.getScm()).thenReturn(scm);
+    when(scmContext.getScm()).thenReturn(scm);
   }
 
   @AfterEach
@@ -220,9 +222,9 @@ public class TestReplicationManager {
   @Test
   public void testPendingOpsClearedWhenStarting() {
     containerReplicaPendingOps.scheduleAddReplica(ContainerID.valueOf(1),
-        MockDatanodeDetails.randomDatanodeDetails(), 1, Integer.MAX_VALUE);
+        MockDatanodeDetails.randomDatanodeDetails(), 1, null, Integer.MAX_VALUE);
     containerReplicaPendingOps.scheduleDeleteReplica(ContainerID.valueOf(2),
-        MockDatanodeDetails.randomDatanodeDetails(), 1, Integer.MAX_VALUE);
+        MockDatanodeDetails.randomDatanodeDetails(), 1, null, Integer.MAX_VALUE);
     assertEquals(1, containerReplicaPendingOps
         .getPendingOpCount(ContainerReplicaOp.PendingOpType.ADD));
     assertEquals(1, containerReplicaPendingOps
@@ -360,7 +362,7 @@ public class TestReplicationManager {
   @Test
   public void testQuasiClosedContainerWithExcessUnhealthyReplica()
       throws IOException, NodeNotFoundException {
-    Mockito.when(nodeManager.getNodeStatus(any(DatanodeDetails.class)))
+    when(nodeManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenReturn(NodeStatus.inServiceHealthy());
     RatisReplicationConfig ratisRepConfig =
         RatisReplicationConfig.getInstance(THREE);
@@ -489,7 +491,7 @@ public class TestReplicationManager {
             ContainerReplicaProto.State.UNHEALTHY, sequenceID);
     replicas.add(decommissioning);
     storeContainerAndReplicas(container, replicas);
-    Mockito.when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
+    when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocation -> {
           DatanodeDetails dn = invocation.getArgument(0);
           if (dn.equals(decommissioning.getDatanodeDetails())) {
@@ -507,9 +509,9 @@ public class TestReplicationManager {
     assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
 
-    Mockito.when(ratisPlacementPolicy.chooseDatanodes(anyList(), anyList(), eq(null), eq(1), anyLong(),
+    when(ratisPlacementPolicy.chooseDatanodes(anyList(), anyList(), eq(null), eq(1), anyLong(),
         anyLong())).thenAnswer(invocation -> ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()));
-    Mockito.when(nodeManager.getTotalDatanodeCommandCounts(any(DatanodeDetails.class), any(), any()))
+    when(nodeManager.getTotalDatanodeCommandCounts(any(DatanodeDetails.class), any(), any()))
         .thenAnswer(invocation -> {
           Map<SCMCommandProto.Type, Integer> map = new HashMap<>();
           map.put(SCMCommandProto.Type.replicateContainerCommand, 0);
@@ -547,7 +549,7 @@ public class TestReplicationManager {
             ContainerReplicaProto.State.UNHEALTHY);
     replicas.add(unhealthy);
     storeContainerAndReplicas(container, replicas);
-    Mockito.when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
+    when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocation -> {
           DatanodeDetails dn = invocation.getArgument(0);
           if (dn.equals(unhealthy.getDatanodeDetails())) {
@@ -567,9 +569,9 @@ public class TestReplicationManager {
     assertEquals(0, repQueue.overReplicatedQueueSize());
 
     // next, this test sets up some mocks to test if RatisUnderReplicationHandler will handle this container correctly
-    Mockito.when(ratisPlacementPolicy.chooseDatanodes(anyList(), anyList(), eq(null), eq(1), anyLong(),
+    when(ratisPlacementPolicy.chooseDatanodes(anyList(), anyList(), eq(null), eq(1), anyLong(),
         anyLong())).thenAnswer(invocation -> ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()));
-    Mockito.when(nodeManager.getTotalDatanodeCommandCounts(any(DatanodeDetails.class), any(), any()))
+    when(nodeManager.getTotalDatanodeCommandCounts(any(DatanodeDetails.class), any(), any()))
         .thenAnswer(invocation -> {
           Map<SCMCommandProto.Type, Integer> map = new HashMap<>();
           map.put(SCMCommandProto.Type.replicateContainerCommand, 0);
@@ -731,7 +733,7 @@ public class TestReplicationManager {
         HddsProtos.LifeCycleState.CLOSED);
     addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
     containerReplicaPendingOps.scheduleAddReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 5,
+        MockDatanodeDetails.randomDatanodeDetails(), 5, null,
         clock.millis() + 10000);
 
     replicationManager.processContainer(
@@ -973,7 +975,7 @@ public class TestReplicationManager {
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
 
     // now, pass this container to ec under replication handling
-    Mockito.when(nodeManager.getNodeStatus(any(DatanodeDetails.class)))
+    when(nodeManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenReturn(NodeStatus.inServiceHealthy());
     ECUnderReplicationHandler handler = new ECUnderReplicationHandler(
         getNoNodesTestPlacementPolicy(nodeManager, configuration),
@@ -1022,7 +1024,7 @@ public class TestReplicationManager {
     addReplicas(container, ContainerReplicaProto.State.CLOSED,
         1, 2, 3, 4, 5, 5);
     containerReplicaPendingOps.scheduleDeleteReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 5,
+        MockDatanodeDetails.randomDatanodeDetails(), 5, null,
         clock.millis() + 10000);
     replicationManager.processContainer(
         container, repQueue, repReport);
@@ -1036,7 +1038,7 @@ public class TestReplicationManager {
 
   @Test
   public void testMisReplicatedECContainer() throws IOException {
-    Mockito.when(ecPlacementPolicy.validateContainerPlacement(
+    when(ecPlacementPolicy.validateContainerPlacement(
             anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(4, 5, 5));
 
@@ -1064,7 +1066,7 @@ public class TestReplicationManager {
   @Test
   public void testMisReplicatedECContainerWithUnhealthyReplica()
       throws ContainerNotFoundException {
-    Mockito.when(ecPlacementPolicy.validateContainerPlacement(
+    when(ecPlacementPolicy.validateContainerPlacement(
             anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(5, 5, 5, 1,
             Lists.newArrayList(2, 1, 1, 1, 1)));
@@ -1115,7 +1117,7 @@ public class TestReplicationManager {
     replicas.remove(unhealthyReplica);
     containerReplicaPendingOps.completeDeleteReplica(container.containerID(),
         unhealthyReplica.getDatanodeDetails(), 1);
-    Mockito.when(ecPlacementPolicy.validateContainerPlacement(
+    when(ecPlacementPolicy.validateContainerPlacement(
             anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(4, 5, 5, 1,
             Lists.newArrayList(2, 1, 1, 1)));
@@ -1137,7 +1139,7 @@ public class TestReplicationManager {
     // Make it always return mis-replicated. Only a perfectly replicated
     // container should make it the mis-replicated state as under / over
     // replicated take precedence.
-    Mockito.when(ecPlacementPolicy.validateContainerPlacement(
+    when(ecPlacementPolicy.validateContainerPlacement(
             anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(1, 2, 3));
 
@@ -1617,7 +1619,7 @@ public class TestReplicationManager {
   public void testCreateThrottledDeleteContainerCommand()
       throws CommandTargetOverloadedException, NodeNotFoundException,
       NotLeaderException {
-    Mockito.when(nodeManager.getTotalDatanodeCommandCount(any(),
+    when(nodeManager.getTotalDatanodeCommandCount(any(),
             eq(SCMCommandProto.Type.deleteContainerCommand)))
         .thenAnswer(invocation -> 0);
 
@@ -1635,7 +1637,7 @@ public class TestReplicationManager {
       throws NodeNotFoundException {
     int limit = replicationManager.getConfig().getDatanodeDeleteLimit();
 
-    Mockito.when(nodeManager.getTotalDatanodeCommandCount(any(),
+    when(nodeManager.getTotalDatanodeCommandCount(any(),
             eq(SCMCommandProto.Type.deleteContainerCommand)))
         .thenAnswer(invocation -> limit + 1);
 
@@ -1718,7 +1720,7 @@ public class TestReplicationManager {
     int healthyNodes = 10;
     ReplicationManager.ReplicationManagerConfiguration config =
         new ReplicationManager.ReplicationManagerConfiguration();
-    Mockito.when(nodeManager.getNodeCount(
+    when(nodeManager.getNodeCount(
         Mockito.isNull(), eq(HddsProtos.NodeState.HEALTHY)))
         .thenReturn(healthyNodes);
 
@@ -1741,6 +1743,35 @@ public class TestReplicationManager {
         (int) Math.ceil(healthyNodes
             * config.getDatanodeReplicationLimit() * 0.75),
         rm.getReplicationInFlightLimit());
+  }
+
+  @Test
+  public void testPendingOpExpiry() throws ContainerNotFoundException {
+    when(containerManager.getContainer(any()))
+        .thenReturn(ReplicationTestUtil.createContainerInfo(repConfig, 1,
+            HddsProtos.LifeCycleState.CLOSED, 10, 20));
+    // This is just some arbitrary epoch time in the past
+    long commandDeadline = 1000;
+    SCMCommand<?> command = new DeleteContainerCommand(1L, true);
+
+    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
+
+    ContainerReplicaOp addOp = ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD, dn1, 1);
+    ContainerReplicaOp delOp = new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.DELETE, dn2, 1, command, commandDeadline);
+
+    replicationManager.opCompleted(addOp, new ContainerID(1L), false);
+    replicationManager.opCompleted(delOp, new ContainerID(1L), false);
+    // No commands should be sent for either of the above ops.
+    assertEquals(0, commandsSent.size());
+
+    replicationManager.opCompleted(delOp, new ContainerID(1L), true);
+    assertEquals(1, commandsSent.size());
+    Pair<UUID, SCMCommand<?>> sentCommand = commandsSent.iterator().next();
+    // The target should be DN2 and the deadline should have been updated from the value set in commandDeadline above
+    assertEquals(dn2.getUuid(), sentCommand.getLeft());
+    assertNotEquals(commandDeadline, sentCommand.getRight().getDeadline());
   }
 
   @SafeVarargs
@@ -1771,7 +1802,7 @@ public class TestReplicationManager {
       Function<DatanodeDetails, Integer> replicateCount,
       Function<DatanodeDetails, Integer> reconstructCount
   ) throws NodeNotFoundException {
-    Mockito.when(nodeManager.getTotalDatanodeCommandCounts(any(),
+    when(nodeManager.getTotalDatanodeCommandCounts(any(),
             eq(SCMCommandProto.Type.replicateContainerCommand),
             eq(SCMCommandProto.Type.reconstructECContainersCommand)))
         .thenAnswer(invocation -> {

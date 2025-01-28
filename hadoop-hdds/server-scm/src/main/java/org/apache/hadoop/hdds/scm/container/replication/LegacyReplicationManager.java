@@ -1406,14 +1406,14 @@ public class LegacyReplicationManager {
     if (inflightActions != null) {
       for (InflightAction a : inflightActions) {
         pendingOps.add(new ContainerReplicaOp(
-            ADD, a.getDatanode(), 0, Long.MAX_VALUE));
+            ADD, a.getDatanode(), 0, null, Long.MAX_VALUE));
       }
     }
     inflightActions = inflightDeletion.get(containerID);
     if (inflightActions != null) {
       for (InflightAction a : inflightActions) {
         pendingOps.add(new ContainerReplicaOp(
-            DELETE, a.getDatanode(), 0, Long.MAX_VALUE));
+            DELETE, a.getDatanode(), 0, null, Long.MAX_VALUE));
       }
     }
     return pendingOps;

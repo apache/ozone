@@ -392,6 +392,9 @@ public class TestBlockDeletion {
       });
     });
 
+    LogCapturer logCapturer = LogCapturer.captureLogs(
+        legacyEnabled ? LegacyReplicationManager.LOG  : ReplicationManager.LOG);
+    logCapturer.clearOutput();
     cluster.shutdownHddsDatanode(0);
     replicationManager.processAll();
     ((EventQueue)scm.getEventQueue()).processAll(1000);
@@ -399,9 +402,6 @@ public class TestBlockDeletion {
     containerInfos.stream().forEach(container ->
         Assertions.assertEquals(HddsProtos.LifeCycleState.DELETING,
             container.getState()));
-    LogCapturer logCapturer = LogCapturer.captureLogs(
-        legacyEnabled ? LegacyReplicationManager.LOG  : ReplicationManager.LOG);
-    logCapturer.clearOutput();
 
     Thread.sleep(5000);
     replicationManager.processAll();
