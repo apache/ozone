@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone;
 
 import org.apache.commons.lang3.RandomUtils;
-import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -121,7 +120,6 @@ public class TestMultipartObjectGet {
     if (cluster != null) {
       cluster.stop();
     }
-    DefaultConfigManager.clearDefaultConfigs();
   }
 
   private String initiateMultipartUpload() throws IOException, OS3Exception {
