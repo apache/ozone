@@ -162,11 +162,6 @@ public class HddsConfServlet extends HttpServlet {
         if (config.isPropertyTag(tag)) {
           Properties properties = config.getAllPropertiesByTag(tag);
           propMap.put(tag, properties);
-        } else {
-          if (LOG.isDebugEnabled()) {
-            tag = tag.replaceAll("[\n\r]", "_");
-            LOG.debug("Not a valid tag {}", tag);
-          }
         }
       }
       out.write(JsonUtils.toJsonString(propMap));
