@@ -82,8 +82,8 @@ public class ContainerKeyMapperTask implements ReconOmTask {
   }
 
   /**
-   * Read Key -&gt; ContainerId data from OM snapshot DB and write reverse map
-   * (container, key) -&gt; count to Recon Container DB.
+   * Read Key -> ContainerId data from OM snapshot DB and write reverse map
+   * (container, key) -> count to Recon Container DB.
    */
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
@@ -92,105 +92,71 @@ public class ContainerKeyMapperTask implements ReconOmTask {
     Instant start = Instant.now();
 
     try {
-      // 1) Reset Recon DB to start from scratch
+      // Step 1: Reset Recon DB before processing
       reconContainerMetadataManager.reinitWithNewContainerDataFromOm(new HashMap<>());
 
-      // 2) Thread pool
-      int numThreads = 2; // or more, depending on environment
+      // Step 2: Thread pool for parallel execution
+      int numThreads = 2; // Adjust based on performance requirements
       ExecutorService executor = Executors.newFixedThreadPool(numThreads);
 
-      // We want to gather results (boolean success + local key count)
-      class ThreadResult {
-        final boolean success;
-        final long localKeyCount;
-
-        ThreadResult(boolean success, long localKeyCount) {
-          this.success = success;
-          this.localKeyCount = localKeyCount;
-        }
-      }
-
-      // 3) Bucket Layouts to scan
+      // Step 3: List of tasks for parallel execution
+      List<Future<Boolean>> futures = new ArrayList<>();
       List<BucketLayout> layouts = Arrays.asList(
-          BucketLayout.LEGACY,
-          BucketLayout.FILE_SYSTEM_OPTIMIZED
+          BucketLayout.LEGACY, BucketLayout.FILE_SYSTEM_OPTIMIZED
       );
 
-      // 4) Submit tasks for each layout
-      List<Future<ThreadResult>> futures = new ArrayList<>();
       for (BucketLayout layout : layouts) {
         futures.add(executor.submit(() -> {
+          LOG.info("Processing layout: {}", layout);
 
-          Instant layoutStart = Instant.now(); // Start tracking time
-
-          // Local data structures
-          Map<ContainerKeyPrefix, Integer> localKeyMap = new HashMap<>();
-          Map<Long, Long> localKeyCountMap = new HashMap<>();
-          long localKeyCounter = 0L;  // Thread-local count of processed keys
+          Map<ContainerKeyPrefix, Integer> containerKeyMap = new HashMap<>();
+          Map<Long, Long> containerKeyCountMap = new HashMap<>();
 
           try {
-            LOG.info("Scanning layout: {}", layout);
-
             Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable(layout);
             try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iter =
                      omKeyInfoTable.iterator()) {
 
               while (iter.hasNext()) {
                 Table.KeyValue<String, OmKeyInfo> kv = iter.next();
-                String keyName = kv.getKey();
-                OmKeyInfo omKeyInfo = kv.getValue();
+                handleKeyReprocess(kv.getKey(), kv.getValue(), containerKeyMap, containerKeyCountMap);
 
-                // Fill local maps with container-key data
-                // (similar to handleKeyReprocessLocal but no shared structures)
-                localKeyCounter += processOmKeyInfo(
-                    keyName, omKeyInfo,
-                    localKeyMap, localKeyCountMap
-                );
-
-                // Check threshold for partial flush
-                if (localKeyMap.size() >= containerKeyFlushToDBMaxThreshold) {
-                  synchronized (ContainerKeyMapperTask.this) {
-                    flushLocalMaps(localKeyMap, localKeyCountMap);
+                // Partial flush if threshold is reached
+                if (containerKeyMap.size() >= containerKeyFlushToDBMaxThreshold) {
+                  synchronized (this) {
+                    writeToTheDB(containerKeyMap, containerKeyCountMap, Collections.emptyList());
+                    containerKeyMap.clear();
+                    containerKeyCountMap.clear();
                   }
-                  localKeyMap.clear();
-                  localKeyCountMap.clear();
                 }
               }
             }
 
-            // Final flush for leftover data
-            if (!localKeyMap.isEmpty()) {
-              synchronized (ContainerKeyMapperTask.this) {
-                flushLocalMaps(localKeyMap, localKeyCountMap);
+            // Final flush for any remaining data
+            if (!containerKeyMap.isEmpty()) {
+              synchronized (this) {
+                writeToTheDB(containerKeyMap, containerKeyCountMap, Collections.emptyList());
               }
-              localKeyMap.clear();
-              localKeyCountMap.clear();
             }
 
-            long layoutDuration = Duration.between(layoutStart, Instant.now()).toMillis();
-            LOG.info("Completed layout: {} in {} ms, keys processed = {}",
-                layout, layoutDuration, localKeyCounter);
-
-            return new ThreadResult(true, localKeyCounter);
+            LOG.info("Completed layout: {}", layout);
+            return true;
           } catch (Exception e) {
-            LOG.error("Error in reprocess thread for layout {}", layout, e);
-            return new ThreadResult(false, localKeyCounter);
+            LOG.error("Error processing layout {}", layout, e);
+            return false;
           }
         }));
       }
 
-      // 5) Gather results and sum up total key count
-      long totalKeyCount = 0L;
+      // Step 4: Wait for all tasks to finish
       boolean allSuccessful = true;
-
-      for (Future<ThreadResult> f : futures) {
-        ThreadResult result = f.get();
-        if (!result.success) {
+      for (Future<Boolean> f : futures) {
+        if (!f.get()) {
           allSuccessful = false;
         }
-        totalKeyCount += result.localKeyCount;
       }
 
+      // Step 5: Shutdown executor
       executor.shutdown();
       executor.awaitTermination(10, TimeUnit.MINUTES);
 
@@ -201,9 +167,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
 
       // Done, log total
       long durationMillis = Duration.between(start, Instant.now()).toMillis();
-      LOG.info("Completed parallel reprocess in {} ms, total keys processed = {}",
-          durationMillis, totalKeyCount);
-
+      LOG.info("Completed parallel reprocess in {} ms", durationMillis);
       return new ImmutablePair<>(getTaskName(), true);
 
     } catch (IOException ioEx) {
