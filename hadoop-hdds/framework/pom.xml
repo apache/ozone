@@ -128,16 +128,6 @@
       <artifactId>commons-lang3</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdfs-client</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>com.squareup.okhttp</groupId>
-          <artifactId>okhttp</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
       <groupId>org.apache.logging.log4j</groupId>
       <artifactId>log4j-api</artifactId>
     </dependency>
@@ -152,6 +142,10 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-config</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-hadoop-dependency-client</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>

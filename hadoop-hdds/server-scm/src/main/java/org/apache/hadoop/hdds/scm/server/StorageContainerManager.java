@@ -836,6 +836,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       reconfigurationHandler.register(replicationManager.getConfig());
     }
     serviceManager.register(replicationManager);
+    // RM gets notified of expired pending delete from containerReplicaPendingOps by subscribing to it
+    // so it can resend them.
+    containerReplicaPendingOps.registerSubscriber(replicationManager);
     if (configurator.getScmSafeModeManager() != null) {
       scmSafeModeManager = configurator.getScmSafeModeManager();
     } else {
