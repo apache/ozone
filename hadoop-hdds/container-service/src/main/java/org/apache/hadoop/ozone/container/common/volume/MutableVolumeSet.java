@@ -33,6 +33,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
@@ -479,9 +480,10 @@ public class MutableVolumeSet implements VolumeSet {
         if (volumeInfo.isPresent()) {
           try {
             rootDir = volumeInfo.get().getRootDir();
-            scmUsed = volumeInfo.get().getScmUsed();
-            remaining = volumeInfo.get().getAvailable();
-            capacity = volumeInfo.get().getCapacity();
+            SpaceUsageSource usage = volumeInfo.get().getCurrentUsage();
+            scmUsed = usage.getUsedSpace();
+            remaining = usage.getAvailable();
+            capacity = usage.getCapacity();
             committed = (volume instanceof HddsVolume) ?
                 ((HddsVolume) volume).getCommittedBytes() : 0;
             failed = false;

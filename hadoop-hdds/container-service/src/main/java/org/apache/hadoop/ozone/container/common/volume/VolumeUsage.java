@@ -65,18 +65,6 @@ public class VolumeUsage {
     return source.snapshot();
   }
 
-  public long getCapacity() {
-    return getCurrentUsage().getCapacity();
-  }
-
-  public long getAvailable() {
-    return getCurrentUsage().getAvailable();
-  }
-
-  public long getUsedSpace() {
-    return getCurrentUsage().getUsedSpace();
-  }
-
   /**
    * <pre>
    * {@code

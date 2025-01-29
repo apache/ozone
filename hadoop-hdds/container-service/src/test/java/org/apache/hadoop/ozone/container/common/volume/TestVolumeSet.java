@@ -220,7 +220,7 @@ public class TestVolumeSet {
     for (StorageVolume volume : volumesList) {
       assertNotNull(volume.getVolumeInfo().get()
               .getUsageForTesting());
-      volume.getAvailable();
+      volume.getCurrentUsage();
     }
   }
 

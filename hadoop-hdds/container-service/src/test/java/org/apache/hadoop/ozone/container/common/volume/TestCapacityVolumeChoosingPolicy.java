@@ -104,9 +104,9 @@ public class TestCapacityVolumeChoosingPolicy {
     HddsVolume hddsVolume2 = volumes.get(1);
     HddsVolume hddsVolume3 = volumes.get(2);
 
-    assertEquals(100L, hddsVolume1.getAvailable());
-    assertEquals(200L, hddsVolume2.getAvailable());
-    assertEquals(300L, hddsVolume3.getAvailable());
+    assertEquals(100L, hddsVolume1.getCurrentUsage().getAvailable());
+    assertEquals(200L, hddsVolume2.getCurrentUsage().getAvailable());
+    assertEquals(300L, hddsVolume3.getCurrentUsage().getAvailable());
 
     Map<HddsVolume, Integer> chooseCount = new HashMap<>();
     chooseCount.put(hddsVolume1, 0);
