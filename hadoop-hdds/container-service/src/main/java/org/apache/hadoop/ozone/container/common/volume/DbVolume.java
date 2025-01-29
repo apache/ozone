@@ -57,9 +57,9 @@ public class DbVolume extends StorageVolume {
 
     this.hddsDbStorePathMap = new HashMap<>();
     if (!b.getFailedVolume() && getVolumeInfo().isPresent()) {
-      LOG.info("Creating DbVolume: {} of storage type : {} capacity : {}",
+      LOG.info("Creating DbVolume: {} of storage type: {}, {}",
               getStorageDir(), b.getStorageType(),
-              getVolumeInfo().get().getCapacity());
+              getCurrentUsage());
 
       initialize();
     }
