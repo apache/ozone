@@ -153,6 +153,9 @@ public final class ScmConfigKeys {
       "ozone.chunk.read.mapped.buffer.max.count";
   // this max_count could not be greater than Linux platform max_map_count which by default is 65530.
   public static final int OZONE_CHUNK_READ_MAPPED_BUFFER_MAX_COUNT_DEFAULT = 0;
+  public static final String OZONE_CHUNK_READ_NETTY_CHUNKED_NIO_FILE_KEY =
+      "ozone.chunk.read.netty.ChunkedNioFile";
+  public static final boolean OZONE_CHUNK_READ_NETTY_CHUNKED_NIO_FILE_DEFAULT = false;
 
   public static final String OZONE_SCM_CONTAINER_LAYOUT_KEY =
       "ozone.scm.container.layout";
@@ -477,14 +480,6 @@ public final class ScmConfigKeys {
   public static final String HDDS_TRACING_ENABLED = "hdds.tracing.enabled";
   public static final boolean HDDS_TRACING_ENABLED_DEFAULT = false;
 
-  // SCM Ratis related
-  public static final String OZONE_SCM_HA_ENABLE_KEY
-      = "ozone.scm.ratis.enable";
-  /** Default Value would be Overriden based on the current state of Ratis.
-   {@link org.apache.hadoop.hdds.conf.DefaultConfigManager}
-   */
-  public static final boolean OZONE_SCM_HA_ENABLE_DEFAULT
-      = true;
   public static final String OZONE_SCM_RATIS_PORT_KEY
       = "ozone.scm.ratis.port";
   public static final int OZONE_SCM_RATIS_PORT_DEFAULT

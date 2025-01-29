@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
@@ -48,7 +47,6 @@ public class TestStatefulServiceStateManagerImpl {
   @BeforeEach
   void setup(@TempDir File testDir) throws IOException {
     conf = SCMTestUtils.getConf(testDir);
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     statefulServiceConfig =
         SCMDBDefinition.STATEFUL_SERVICE_CONFIG.getTable(dbStore);

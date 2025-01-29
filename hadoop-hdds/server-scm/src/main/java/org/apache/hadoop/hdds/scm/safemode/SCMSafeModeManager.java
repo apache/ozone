@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.safemode;
 
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -28,7 +27,6 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -105,7 +103,6 @@ public class SCMSafeModeManager implements SafeModeManager {
   private Set<String> validatedPreCheckRules = new HashSet<>(1);
 
   private final EventQueue eventPublisher;
-  private final PipelineManager pipelineManager;
   private final SCMServiceManager serviceManager;
   private final SCMContext scmContext;
 
@@ -114,12 +111,10 @@ public class SCMSafeModeManager implements SafeModeManager {
 
   // TODO: Remove allContainers argument. (HDDS-11795)
   public SCMSafeModeManager(ConfigurationSource conf,
-             List<ContainerInfo> allContainers,
              ContainerManager containerManager, PipelineManager pipelineManager,
              EventQueue eventQueue, SCMServiceManager serviceManager,
              SCMContext scmContext) {
     this.config = conf;
-    this.pipelineManager = pipelineManager;
     this.eventPublisher = eventQueue;
     this.serviceManager = serviceManager;
     this.scmContext = scmContext;

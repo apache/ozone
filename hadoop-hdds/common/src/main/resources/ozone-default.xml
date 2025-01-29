@@ -1893,6 +1893,48 @@
   </property>
 
   <property>
+    <name>ozone.s3g.webadmin.http.enabled</name>
+    <value>true</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>This option can be used to disable the web server which serves additional content in Ozone S3 Gateway.</description>
+  </property>
+
+  <property>
+    <name>ozone.s3g.webadmin.https-address</name>
+    <value/>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>Ozone S3Gateway content server's HTTPS address and port.</description>
+  </property>
+
+  <property>
+    <name>ozone.s3g.webadmin.https-bind-host</name>
+    <value/>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>The actual address the HTTPS server will bind to. If this optional address
+      is set, it overrides only the hostname portion of ozone.s3g.webadmin.https-address.
+      This is useful for making the Ozone S3Gateway HTTPS server listen on all
+      interfaces by setting it to 0.0.0.0.</description>
+  </property>
+
+  <property>
+    <name>ozone.s3g.webadmin.http-address</name>
+    <value>0.0.0.0:19878</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>The address and port where Ozone S3Gateway serves
+      web content.</description>
+  </property>
+
+  <property>
+    <name>ozone.s3g.webadmin.http-bind-host</name>
+    <value>0.0.0.0</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>The actual address the HTTP server will bind to. If this optional address
+      is set, it overrides only the hostname portion of ozone.s3g.webadmin.http-address.
+      This is useful for making the Ozone S3Gateway HTTP server listen on all
+      interfaces by setting it to 0.0.0.0.</description>
+  </property>
+
+  <property>
     <name>ozone.s3g.http.auth.kerberos.principal</name>
     <value>HTTP/_HOST@REALM</value>
     <tag>OZONE, S3GATEWAY, SECURITY, KERBEROS</tag>
@@ -2042,15 +2084,6 @@
       false, uses non-fair ordering. See
       java.util.concurrent.locks.ReentrantReadWriteLock
       for more information on fair/non-fair locks.
-    </description>
-  </property>
-
-  <property>
-    <name>ozone.om.ratis.enable</name>
-    <value>true</value>
-    <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
-    <description>Property to enable or disable Ratis server on OM.
-    Please note - this is a temporary property to disable OM Ratis server.
     </description>
   </property>
 
@@ -3323,7 +3356,7 @@
   </property>
   <property>
     <name>ozone.recon.om.snapshot.task.interval.delay</name>
-    <value>10m</value>
+    <value>5s</value>
     <tag>OZONE, RECON, OM</tag>
     <description>
       Interval in MINUTES by Recon to request OM DB Snapshot.
@@ -3339,7 +3372,7 @@
   </property>
   <property>
     <name>recon.om.delta.update.limit</name>
-    <value>2000</value>
+    <value>50000</value>
     <tag>OZONE, RECON</tag>
     <description>
       Recon each time get a limited delta updates from OM.
@@ -3360,7 +3393,7 @@
   </property>
   <property>
     <name>recon.om.delta.update.loop.limit</name>
-    <value>10</value>
+    <value>50</value>
     <tag>OZONE, RECON</tag>
     <description>
       The sync between Recon and OM consists of several small

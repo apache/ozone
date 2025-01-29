@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -76,6 +77,7 @@ import java.util.stream.Stream;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 public class ClosedContainerReplicator extends BaseFreonGenerator implements
     Callable<Void> {
 
@@ -146,6 +148,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
                   datanodesWithContainer), replicator));
         }
       }
+
     }
 
     //important: override the max number of tasks.

@@ -114,7 +114,6 @@ public class TestOzoneManagerRatisRequest {
     OzoneManagerRatisServer ratisServer = mock(OzoneManagerRatisServer.class);
     ProtocolMessageMetrics<ProtocolMessageEnum> protocolMessageMetrics =
         mock(ProtocolMessageMetrics.class);
-    long lastTransactionIndexForNonRatis = 100L;
 
     OzoneManagerProtocolProtos.OMResponse expectedResponse =
         OzoneManagerProtocolProtos.OMResponse.newBuilder()
@@ -126,17 +125,14 @@ public class TestOzoneManagerRatisRequest {
                 omRequest.getCmdType())
             .build();
 
-    boolean[] enableRatisValues = {true, false};
-    for (boolean enableRatis : enableRatisValues) {
-      OzoneManagerProtocolServerSideTranslatorPB serverSideTranslatorPB =
-          new OzoneManagerProtocolServerSideTranslatorPB(ozoneManager,
-              ratisServer, protocolMessageMetrics, enableRatis,
-              lastTransactionIndexForNonRatis);
+    OzoneManagerProtocolServerSideTranslatorPB serverSideTranslatorPB =
+        new OzoneManagerProtocolServerSideTranslatorPB(ozoneManager,
+            ratisServer, protocolMessageMetrics, true,
+            100L);
 
-      OzoneManagerProtocolProtos.OMResponse actualResponse =
-          serverSideTranslatorPB.processRequest(omRequest);
+    OzoneManagerProtocolProtos.OMResponse actualResponse =
+        serverSideTranslatorPB.processRequest(omRequest);
 
-      assertEquals(expectedResponse, actualResponse);
-    }
+    assertEquals(expectedResponse, actualResponse);
   }
 }

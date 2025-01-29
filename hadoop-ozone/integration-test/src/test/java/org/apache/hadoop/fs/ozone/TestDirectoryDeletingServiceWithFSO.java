@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -104,13 +105,12 @@ public class TestDirectoryDeletingServiceWithFSO {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestDirectoryDeletingServiceWithFSO.class);
 
-  private static boolean omRatisEnabled = true;
-
   private static MiniOzoneCluster cluster;
   private static FileSystem fs;
   private static String volumeName;
   private static String bucketName;
   private static OzoneClient client;
+  private static DeletingServiceMetrics metrics;
 
   @BeforeAll
   public static void init() throws Exception {
@@ -120,7 +120,6 @@ public class TestDirectoryDeletingServiceWithFSO {
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1000, TimeUnit.MILLISECONDS);
-    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
@@ -143,6 +142,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
 
     fs = FileSystem.get(conf);
+    metrics = cluster.getOzoneManager().getDeletionMetrics();
   }
 
   @AfterAll
@@ -188,6 +188,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
     assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
 
+    metrics.resetDirectoryMetrics();
     // Delete the appRoot, empty dir
     fs.delete(appRoot, true);
 
@@ -200,6 +201,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 1);
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
     assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
+    assertEquals(1, metrics.getNumDirsPurged());
+    assertEquals(1, metrics.getNumDirsSentForPurge());
 
     try (TableIterator<?, ? extends Table.KeyValue<?, OmDirectoryInfo>>
         iterator = dirTable.iterator()) {
@@ -258,6 +261,7 @@ public class TestDirectoryDeletingServiceWithFSO {
 
     long preRunCount = dirDeletingService.getRunCount().get();
 
+    metrics.resetDirectoryMetrics();
     // Delete the appRoot
     fs.delete(appRoot, true);
 
@@ -272,6 +276,14 @@ public class TestDirectoryDeletingServiceWithFSO {
     // 15 subDir + 3 parentDir
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 18);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 19);
+
+    assertEquals(15, metrics.getNumSubFilesSentForPurge());
+    assertEquals(15, metrics.getNumSubFilesMovedToDeletedTable());
+    assertEquals(19, metrics.getNumDirsPurged());
+    assertEquals(19, metrics.getNumDirsSentForPurge());
+    assertEquals(18, metrics.getNumSubDirsMovedToDeletedDirTable());
+    assertEquals(18, metrics.getNumSubDirsSentForPurge());
+
 
     long elapsedRunCount = dirDeletingService.getRunCount().get() - preRunCount;
     assertThat(dirDeletingService.getRunCount().get()).isGreaterThan(1);
@@ -311,6 +323,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 0);
 
+    metrics.resetDirectoryMetrics();
     // Delete the rootDir, which should delete all keys.
     fs.delete(root, true);
 
@@ -324,7 +337,66 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getMovedFilesCount, 3);
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 2);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 5);
+    assertEquals(5, metrics.getNumDirsSentForPurge());
+    assertEquals(5, metrics.getNumDirsPurged());
+    assertEquals(4, metrics.getNumSubDirsMovedToDeletedDirTable());
+    assertEquals(4, metrics.getNumSubDirsSentForPurge());
+    assertEquals(3, metrics.getNumSubFilesSentForPurge());
+    assertEquals(3, metrics.getNumSubFilesMovedToDeletedTable());
 
+    assertThat(dirDeletingService.getRunCount().get()).isGreaterThan(1);
+  }
+
+  /**
+   * Test to check the following scenario:
+   * A subdir gets marked for move in DirectoryDeletingService and
+   * marked for delete in AbstractKeyDeletingService#optimizeDirDeletesAndSubmitRequest.
+   */
+  @Test
+  public void testDeleteWithLessDirsButMultipleLevels() throws Exception {
+    Path root = new Path("/rootDir");
+    Path appRoot = new Path(root, "appRoot");
+    Path parent = new Path(appRoot, "parentDir");
+    fs.mkdirs(parent);
+    Path child = new Path(parent, "childFile");
+    ContractTestUtils.touch(fs, child);
+
+    Table<String, OmKeyInfo> deletedDirTable =
+        cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
+    Table<String, OmKeyInfo> keyTable =
+        cluster.getOzoneManager().getMetadataManager().getKeyTable(getFSOBucketLayout());
+    Table<String, OmDirectoryInfo> dirTable = cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
+
+    DirectoryDeletingService dirDeletingService =
+        (DirectoryDeletingService) cluster.getOzoneManager().getKeyManager().getDirDeletingService();
+
+    // Before delete
+    assertTableRowCount(deletedDirTable, 0);
+    assertTableRowCount(dirTable, 3);
+    assertTableRowCount(keyTable, 1);
+
+    assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
+    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
+    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 0);
+
+    metrics.resetDirectoryMetrics();
+    fs.delete(appRoot, true);
+
+    // After delete
+    checkPath(appRoot);
+    assertTableRowCount(deletedDirTable, 0);
+    assertTableRowCount(keyTable, 0);
+    assertTableRowCount(dirTable, 1);
+    assertSubPathsCount(dirDeletingService::getMovedFilesCount, 1);
+    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 2);
+    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
+
+    assertEquals(2, metrics.getNumDirsSentForPurge());
+    assertEquals(2, metrics.getNumDirsPurged());
+    assertEquals(1, metrics.getNumSubDirsMovedToDeletedDirTable());
+    assertEquals(1, metrics.getNumSubDirsSentForPurge());
+    assertEquals(1, metrics.getNumSubFilesSentForPurge());
+    assertEquals(1, metrics.getNumSubFilesMovedToDeletedTable());
     assertThat(dirDeletingService.getRunCount().get()).isGreaterThan(1);
   }
 

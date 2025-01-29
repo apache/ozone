@@ -270,6 +270,40 @@ public class TestRatisOverReplicationHandler {
         getOverReplicatedHealthResult(), 0);
   }
 
+  /**
+   * In this test, the container is already mis-replicated, being on 2 racks rather than 3.
+   * Removing a replica does not make it "more" mis-replicated, so the handler should remove
+   * one replica.
+   * @throws IOException
+   */
+  @Test
+  public void testOverReplicatedContainerAlreadyMisReplicated()
+      throws IOException {
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        ContainerReplicaProto.State.CLOSED, 0, 0, 0, 0);
+
+    // Ensure a mis-replicated status is always returned.
+    when(policy.validateContainerPlacement(anyList(), anyInt()))
+        .thenReturn(new ContainerPlacementStatusDefault(2, 3, 3));
+
+    testProcessing(replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1);
+  }
+
+  @Test
+  public void testOverReplicatedContainerBecomesOnSecondRemoval()
+      throws IOException {
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        ContainerReplicaProto.State.CLOSED, 0, 0, 0, 0, 0);
+
+    // Ensure a mis-replicated status is returned when 3 or fewer replicas are
+    // checked.
+    when(policy.validateContainerPlacement(argThat(list -> list.size() <= 3), anyInt()))
+        .thenReturn(new ContainerPlacementStatusDefault(1, 2, 3));
+
+    testProcessing(replicas, Collections.emptyList(),
+        getOverReplicatedHealthResult(), 1);
+  }
+
   @Test
   public void testOverReplicatedAllUnhealthySameBCSID()
       throws IOException {
@@ -478,9 +512,13 @@ public class TestRatisOverReplicationHandler {
     RatisOverReplicationHandler handler =
         new RatisOverReplicationHandler(policy, replicationManager);
 
-    handler.processAndSendCommands(closedReplicas, Collections.emptyList(),
-        getOverReplicatedHealthResult(), 2);
-    assertEquals(2, commandsSent.size());
+    // Only 1 command should be sent, as the first call to sendThrottledDelete
+    // throws an overloaded exception. Rather than skip to the next one, the skipped
+    // one should get retried later.
+    assertThrows(CommandTargetOverloadedException.class,
+        () -> handler.processAndSendCommands(closedReplicas, Collections.emptyList(),
+            getOverReplicatedHealthResult(), 2));
+    assertEquals(1, commandsSent.size());
   }
 
   /**

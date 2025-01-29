@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -62,6 +63,7 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
   private final long openID;
   private final ExcludeList excludeList;
   private List<StreamBuffer> bufferList;
+  private ContainerBlockID lastUpdatedBlockId = new ContainerBlockID(-1, -1);
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public BlockDataStreamOutputEntryPool(
@@ -150,6 +152,33 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
       }
     }
     return locationInfoList;
+  }
+
+  void hsyncKey(long offset) throws IOException {
+    if (keyArgs != null) {
+      // in test, this could be null
+      keyArgs.setDataSize(offset);
+      keyArgs.setLocationInfoList(getLocationInfoList());
+      // When the key is multipart upload part file upload, we should not
+      // commit the key, as this is not an actual key, this is a just a
+      // partial key of a large file.
+      if (keyArgs.getIsMultipartKey()) {
+        throw new IOException("Hsync is unsupported for multipart keys.");
+      } else {
+        if (keyArgs.getLocationInfoList().size() == 0) {
+          omClient.hsyncKey(keyArgs, openID);
+        } else {
+          ContainerBlockID lastBLockId = keyArgs.getLocationInfoList().get(keyArgs.getLocationInfoList().size() - 1)
+              .getBlockID().getContainerBlockID();
+          if (!lastUpdatedBlockId.equals(lastBLockId)) {
+            omClient.hsyncKey(keyArgs, openID);
+            lastUpdatedBlockId = lastBLockId;
+          }
+        }
+      }
+    } else {
+      LOG.warn("Closing KeyOutputStream, but key args is null");
+    }
   }
 
   /**

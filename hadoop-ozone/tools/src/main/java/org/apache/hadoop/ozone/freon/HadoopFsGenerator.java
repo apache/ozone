@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 
 import com.codahale.metrics.Timer;
 import org.apache.hadoop.hdds.conf.StorageSize;
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -37,6 +38,7 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 public class HadoopFsGenerator extends HadoopBaseFreonGenerator
     implements Callable<Void> {
 

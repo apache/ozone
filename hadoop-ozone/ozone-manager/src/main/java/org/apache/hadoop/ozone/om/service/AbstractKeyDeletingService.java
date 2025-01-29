@@ -30,7 +30,9 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
+import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -71,6 +73,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     implements BootstrapStateHandler {
 
   private final OzoneManager ozoneManager;
+  private final DeletingServiceMetrics metrics;
   private final ScmBlockLocationProtocol scmClient;
   private final ClientId clientId = ClientId.randomId();
   private final AtomicLong deletedDirsCount;
@@ -91,6 +94,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     this.movedDirsCount = new AtomicLong(0);
     this.movedFilesCount = new AtomicLong(0);
     this.runCount = new AtomicLong(0);
+    this.metrics = ozoneManager.getDeletionMetrics();
   }
 
   protected int processKeyDeletes(List<BlockGroup> keyBlocksList,
@@ -126,8 +130,10 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         //  OMRequest model.
         delCount = deleteAllKeys(blockDeletionResults, manager);
       }
-      LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms",
-          delCount, blockDeletionResults.size(), Time.monotonicNow() - startTime);
+      int limit = ozoneManager.getConfiguration().getInt(OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK,
+          OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
+      LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms. Limit per task is {}.",
+          delCount, blockDeletionResults.size(), Time.monotonicNow() - startTime, limit);
     }
     return delCount;
   }
@@ -402,6 +408,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       int remainingBufLimit, KeyManager keyManager,
       UUID expectedPreviousSnapshotId, long rnCnt) {
 
+    long limit = remainNum;
     // Optimization to handle delete sub-dir and keys to remove quickly
     // This case will be useful to handle when depth of directory is high
     int subdirDelNum = 0;
@@ -446,16 +453,19 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     }
 
     if (dirNum != 0 || subDirNum != 0 || subFileNum != 0) {
+      long subdirMoved = subDirNum - subdirDelNum;
       deletedDirsCount.addAndGet(dirNum + subdirDelNum);
-      movedDirsCount.addAndGet(subDirNum - subdirDelNum);
+      movedDirsCount.addAndGet(subdirMoved);
       movedFilesCount.addAndGet(subFileNum);
+      long timeTakenInIteration = Time.monotonicNow() - startTime;
       LOG.info("Number of dirs deleted: {}, Number of sub-dir " +
               "deleted: {}, Number of sub-files moved:" +
               " {} to DeletedTable, Number of sub-dirs moved {} to " +
-              "DeletedDirectoryTable, iteration elapsed: {}ms," +
+              "DeletedDirectoryTable, limit per iteration: {}, iteration elapsed: {}ms, " +
               " totalRunCount: {}",
-          dirNum, subdirDelNum, subFileNum, (subDirNum - subdirDelNum),
-          Time.monotonicNow() - startTime, rnCnt);
+          dirNum, subdirDelNum, subFileNum, (subDirNum - subdirDelNum), limit,
+          timeTakenInIteration, rnCnt);
+      metrics.incrementDirectoryDeletionTotalMetrics(dirNum + subdirDelNum, subDirNum, subFileNum);
     }
     return remainNum;
   }

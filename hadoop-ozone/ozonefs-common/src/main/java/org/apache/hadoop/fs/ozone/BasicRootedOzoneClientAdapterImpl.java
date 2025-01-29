@@ -1298,14 +1298,16 @@ public class BasicRootedOzoneClientAdapterImpl
       throws IOException {
     OzoneClientConfig.ChecksumCombineMode combineMode =
         config.getObject(OzoneClientConfig.class).getChecksumCombineMode();
-
+    if (combineMode == null) {
+      return null;
+    }
     OFSPath ofsPath = new OFSPath(keyName, config);
-
     OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
     OzoneBucket bucket = getBucket(ofsPath, false);
     return OzoneClientUtils.getFileChecksumWithCombineMode(
         volume, bucket, ofsPath.getKeyName(),
-        length, combineMode, ozoneClient.getObjectStore().getClientProxy());
+        length, combineMode,
+        ozoneClient.getObjectStore().getClientProxy());
 
   }
 

@@ -40,13 +40,12 @@ public class TaskStatusService {
   private ReconTaskStatusDao reconTaskStatusDao;
 
   /**
-   * Return the list of Recon Tasks and the last successful timestamp and
-   * sequence number.
+   * Return the list of Recon Tasks and their related stats from RECON_TASK_STATUS table.
    * @return {@link Response}
    */
   @GET
   @Path("status")
-  public Response getTaskTimes() {
+  public Response getTaskStats() {
     List<ReconTaskStatus> resultSet = reconTaskStatusDao.findAll();
     return Response.ok(resultSet).build();
   }

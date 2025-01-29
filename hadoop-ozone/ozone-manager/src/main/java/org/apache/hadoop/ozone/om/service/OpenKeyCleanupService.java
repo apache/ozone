@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteOpenKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -51,7 +52,10 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
 /**
  * This is the background service to delete hanging open keys.
@@ -180,6 +184,7 @@ public class OpenKeyCleanupService extends BackgroundService {
       if (!shouldRun()) {
         return BackgroundTaskResult.EmptyTaskResult.newResult();
       }
+      LOG.debug("Running OpenKeyCleanupService");
       long startTime = Time.monotonicNow();
       final ExpiredOpenKeys expiredOpenKeys;
       try {
@@ -202,6 +207,16 @@ public class OpenKeyCleanupService extends BackgroundService {
         final OMResponse response = submitRequest(omRequest);
         if (response != null && response.getSuccess()) {
           ozoneManager.getMetrics().incNumOpenKeysCleaned(numOpenKeys);
+          if (LOG.isDebugEnabled()) {
+            StringBuilder sb = new StringBuilder();
+            for (OpenKeyBucket.Builder openKey : openKeyBuckets) {
+              sb.append(openKey.getVolumeName() + OZONE_URI_DELIMITER +  openKey.getBucketName() + ": ")
+                  .append(openKey.getKeysList().stream().map(OzoneManagerProtocolProtos.OpenKey::getName)
+                      .collect(Collectors.toList()))
+                  .append("\n");
+            }
+            LOG.debug("Non-hsync'ed openKeys being deleted in current iteration: \n" + sb);
+          }
         }
       }
 
@@ -214,15 +229,23 @@ public class OpenKeyCleanupService extends BackgroundService {
           final OMResponse response = submitRequest(createCommitKeyRequest(b));
           if (response != null && response.getSuccess()) {
             ozoneManager.getMetrics().incNumOpenKeysHSyncCleaned();
+            if (LOG.isDebugEnabled()) {
+              StringBuilder sb = new StringBuilder();
+              for (CommitKeyRequest.Builder openKey : hsyncKeys) {
+                sb.append(openKey.getKeyArgs().getVolumeName() + OZONE_URI_DELIMITER +
+                        openKey.getKeyArgs().getBucketName() + ": ")
+                    .append(openKey.getKeyArgs().getKeyName())
+                    .append(", ");
+              }
+              LOG.debug("hsync'ed openKeys committed in current iteration: \n" + sb);
+            }
           }
         });
       }
 
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Number of expired open keys submitted for deletion: {},"
-                + " for commit: {}, elapsed time: {}ms",
-            numOpenKeys, numHsyncKeys, Time.monotonicNow() - startTime);
-      }
+      LOG.info("Number of expired open keys submitted for deletion: {},"
+              + " for commit: {}, cleanupLimit: {}, elapsed time: {}ms",
+          numOpenKeys, numHsyncKeys, cleanupLimitPerTask, Time.monotonicNow() - startTime);
       final int numKeys = numOpenKeys + numHsyncKeys;
       submittedOpenKeyCount.addAndGet(numKeys);
       return () -> numKeys;

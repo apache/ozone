@@ -99,7 +99,7 @@ public class TestHealthyPipelineSafeModeRule {
       pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
           mockRatisProvider);
       SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(
-          config, containers, containerManager, pipelineManager, eventQueue,
+          config, containerManager, pipelineManager, eventQueue,
           serviceManager, scmContext);
 
       HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =
@@ -179,7 +179,7 @@ public class TestHealthyPipelineSafeModeRule {
       MockRatisPipelineProvider.markPipelineHealthy(pipeline3);
 
       SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(
-          config, containers, containerManager, pipelineManager, eventQueue,
+          config, containerManager, pipelineManager, eventQueue,
           serviceManager, scmContext);
 
       HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =
@@ -275,7 +275,7 @@ public class TestHealthyPipelineSafeModeRule {
       MockRatisPipelineProvider.markPipelineHealthy(pipeline3);
 
       SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(
-          config, containers, containerManager, pipelineManager, eventQueue,
+          config, containerManager, pipelineManager, eventQueue,
           serviceManager, scmContext);
 
       HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =

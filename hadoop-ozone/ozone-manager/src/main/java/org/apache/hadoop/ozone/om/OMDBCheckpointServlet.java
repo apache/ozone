@@ -51,6 +51,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -149,7 +150,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     // the same.  For synchronization purposes, some files are copied
     // to a temp directory on the leader.  In those cases the source
     // and dest won't be the same.
-    Map<Path, Path> copyFiles = new HashMap<>();
+    Map<String, Map<Path, Path>> copyFiles = new HashMap<>();
 
     // Map of link to path.
     Map<Path, Path> hardLinkFiles = new HashMap<>();
@@ -168,12 +169,14 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
           differ.getCompactionLogDir());
 
       // Files to be excluded from tarball
-      Map<Path, Path> sstFilesToExclude = normalizeExcludeList(toExcludeList,
+      Map<String, Map<Path, Path>> sstFilesToExclude = normalizeExcludeList(toExcludeList,
           checkpoint.getCheckpointLocation(), sstBackupDir);
       boolean completed = getFilesForArchive(checkpoint, copyFiles,
           hardLinkFiles, sstFilesToExclude, includeSnapshotData(request),
           excludedList, sstBackupDir, compactionLogDir);
-      writeFilesToArchive(copyFiles, hardLinkFiles, archiveOutputStream,
+      Map<Path, Path> flatCopyFiles = copyFiles.values().stream().flatMap(map -> map.entrySet().stream())
+          .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+      writeFilesToArchive(flatCopyFiles, hardLinkFiles, archiveOutputStream,
           completed, checkpoint.getCheckpointLocation());
     } catch (Exception e) {
       LOG.error("got exception writing to archive " + e);
@@ -194,14 +197,19 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
    *         include sst files.)
    */
   @VisibleForTesting
-  public static Map<Path, Path> normalizeExcludeList(
+  public static Map<String, Map<Path, Path>> normalizeExcludeList(
       List<String> toExcludeList,
       Path checkpointLocation,
       DirectoryData sstBackupDir) {
-    Map<Path, Path> paths = new HashMap<>();
+    Map<String, Map<Path, Path>> paths = new HashMap<>();
     Path metaDirPath = getMetaDirPath(checkpointLocation);
     for (String s : toExcludeList) {
+      Path fileName = Paths.get(s).getFileName();
+      if (fileName == null) {
+        continue;
+      }
       Path destPath = Paths.get(metaDirPath.toString(), s);
+      Map<Path, Path> fileMap = paths.computeIfAbsent(fileName.toString(), (k) -> new HashMap<>());
       if (destPath.toString().startsWith(
           sstBackupDir.getOriginalDir().toString())) {
         // The source of the sstBackupDir is a temporary directory and needs
@@ -210,12 +218,12 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
             sstBackupDir.getOriginalDir().toString().length() + 1;
         Path srcPath = Paths.get(sstBackupDir.getTmpDir().toString(),
             truncateFileName(truncateLength, destPath));
-        paths.put(srcPath, destPath);
+        fileMap.put(srcPath, destPath);
       } else if (!s.startsWith(OM_SNAPSHOT_DIR)) {
         Path fixedPath = Paths.get(checkpointLocation.toString(), s);
-        paths.put(fixedPath, fixedPath);
+        fileMap.put(fixedPath, fixedPath);
       } else {
-        paths.put(destPath, destPath);
+        fileMap.put(destPath, destPath);
       }
     }
     return paths;
@@ -266,9 +274,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   private boolean getFilesForArchive(DBCheckpoint checkpoint,
-                                  Map<Path, Path> copyFiles,
+                                  Map<String, Map<Path, Path>> copyFiles,
                                   Map<Path, Path> hardLinkFiles,
-                                  Map<Path, Path> sstFilesToExclude,
+                                  Map<String, Map<Path, Path>> sstFilesToExclude,
                                   boolean includeSnapshotData,
                                   List<String> excluded,
                                   DirectoryData sstBackupDir,
@@ -360,9 +368,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  private boolean processDir(Path dir, Map<Path, Path> copyFiles,
+  private boolean processDir(Path dir, Map<String, Map<Path, Path>> copyFiles,
                           Map<Path, Path> hardLinkFiles,
-                          Map<Path, Path> sstFilesToExclude,
+                          Map<String, Map<Path, Path>> sstFilesToExclude,
                           Set<Path> snapshotPaths,
                           List<String> excluded,
                           AtomicLong copySize,
@@ -437,9 +445,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
    * @param excluded The list of db files that actually were excluded.
    */
   @VisibleForTesting
-  public static long processFile(Path file, Map<Path, Path> copyFiles,
+  public static long processFile(Path file, Map<String, Map<Path, Path>> copyFiles,
                                  Map<Path, Path> hardLinkFiles,
-                                 Map<Path, Path> sstFilesToExclude,
+                                 Map<String, Map<Path, Path>> sstFilesToExclude,
                                  List<String> excluded,
                                  Path destDir)
       throws IOException {
@@ -458,7 +466,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     if (destDir != null) {
       destFile = Paths.get(destDir.toString(), fileName);
     }
-    if (sstFilesToExclude.containsKey(file)) {
+    if (sstFilesToExclude.getOrDefault(fileNamePath.toString(), Collections.emptyMap()).containsKey(file)) {
       excluded.add(destFile.toString());
     } else {
       if (fileName.endsWith(ROCKSDB_SST_SUFFIX)) {
@@ -473,13 +481,13 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
             hardLinkFiles.put(destFile, linkPath);
           } else {
             // Add to tarball.
-            copyFiles.put(file, destFile);
+            copyFiles.computeIfAbsent(fileNamePath.toString(), (k) -> new HashMap<>()).put(file, destFile);
             fileSize = Files.size(file);
           }
         }
       } else {
         // Not sst file.
-        copyFiles.put(file, destFile);
+        copyFiles.computeIfAbsent(fileNamePath.toString(), (k) -> new HashMap<>()).put(file, destFile);
       }
     }
     return fileSize;
@@ -494,7 +502,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
    * @param  file - File to be linked.
    * @return dest path of file to be linked to.
    */
-  private static Path findLinkPath(Map<Path, Path> files, Path file)
+  private static Path findLinkPath(Map<String, Map<Path, Path>> files, Path file)
       throws IOException {
     // findbugs nonsense
     Path fileNamePath = file.getFileName();
@@ -503,7 +511,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
     String fileName = fileNamePath.toString();
 
-    for (Map.Entry<Path, Path> entry: files.entrySet()) {
+    for (Map.Entry<Path, Path> entry : files.getOrDefault(fileName, Collections.emptyMap()).entrySet()) {
       Path srcPath = entry.getKey();
       Path destPath = entry.getValue();
       if (!srcPath.toString().endsWith(fileName)) {
