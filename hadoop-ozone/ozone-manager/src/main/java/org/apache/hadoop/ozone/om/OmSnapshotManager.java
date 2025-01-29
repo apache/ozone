@@ -384,8 +384,7 @@ public final class OmSnapshotManager implements AutoCloseable {
         try {
           // create the other manager instances based on snapshot
           // metadataManager
-          PrefixManagerImpl pm = new PrefixManagerImpl(ozoneManager, snapshotMetadataManager
-          );
+          PrefixManagerImpl pm = new PrefixManagerImpl(ozoneManager, snapshotMetadataManager);
           KeyManagerImpl km = new KeyManagerImpl(ozoneManager,
               ozoneManager.getScmClient(), snapshotMetadataManager, conf,
               ozoneManager.getBlockTokenSecretManager(),
