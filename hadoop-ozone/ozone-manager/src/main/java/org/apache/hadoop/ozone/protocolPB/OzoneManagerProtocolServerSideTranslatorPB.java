@@ -23,14 +23,12 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import java.io.IOException;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
-import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ipc.ProcessingDetails.Timing;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OmUtils;
@@ -40,14 +38,12 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
-import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.validation.RequestValidations;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -57,8 +53,6 @@ import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.ozone.security.S3SecurityUtil;
 import org.apache.ratis.protocol.RaftPeerId;
-import org.apache.ratis.server.protocol.TermIndex;
-import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -264,48 +258,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     LOG.debug(leaderNotReadyException.getMessage());
 
     return new ServiceException(leaderNotReadyException);
-  }
-
-  /**
-   * Submits request directly to OM.
-   */
-  private OMResponse submitRequestDirectlyToOM(OMRequest request) {
-    final OMClientResponse omClientResponse;
-    try {
-      if (OmUtils.isReadOnly(request)) {
-        return handler.handleReadRequest(request);
-      } else {
-        OMClientRequest omClientRequest =
-            createClientRequest(request, ozoneManager);
-        try {
-          request = omClientRequest.preExecute(ozoneManager);
-        } catch (IOException ex) {
-          // log only when audit build is complete as required
-          OMAuditLogger.log(omClientRequest.getAuditBuilder());
-          throw ex;
-        }
-        final TermIndex termIndex = TransactionInfo.getTermIndex(transactionIndex.incrementAndGet());
-        final ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
-        omClientResponse = handler.handleWriteRequest(request, context, null);
-      }
-    } catch (IOException ex) {
-      // As some preExecute returns error. So handle here.
-      return createErrorResponse(request, ex);
-    }
-    try {
-      omClientResponse.getFlushFuture().get();
-      if (LOG.isTraceEnabled()) {
-        LOG.trace("Future for {} is completed", request);
-      }
-    } catch (ExecutionException | InterruptedException ex) {
-      // terminate OM. As if we are in this stage means, while getting
-      // response from flush future, we got an exception.
-      String errorMessage = "Got error during waiting for flush to be " +
-          "completed for " + "request" + request.toString();
-      ExitUtils.terminate(1, errorMessage, ex, LOG);
-      Thread.currentThread().interrupt();
-    }
-    return omClientResponse.getOMResponse();
   }
 
   /** @return an {@link OMResponse} from the given {@link OMRequest} and the given exception. */
