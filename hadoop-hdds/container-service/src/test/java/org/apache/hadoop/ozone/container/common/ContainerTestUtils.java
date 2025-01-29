@@ -63,6 +63,8 @@ import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClient
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.mockito.Mockito;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 import java.io.File;
 import java.io.IOException;
@@ -224,6 +226,54 @@ public final class ContainerTestUtils {
     } catch (InterruptedException ex) {
       // Mockito.when invocations will not throw this exception. It is just
       // required for compilation.
+    }
+  }
+
+  /**
+   * Simulate the pause of scanData and scanMetaData methods.
+   */
+  public static void setupMockContainer(
+      Container<ContainerData> c, boolean shouldScanData,
+      ScanResult metadataScanResult, ScanResult dataScanResult,
+      AtomicLong containerIdSeq, HddsVolume vol, long sleepTime) {
+    ContainerData data = mock(ContainerData.class);
+    when(data.getContainerID()).thenReturn(containerIdSeq.getAndIncrement());
+    when(c.getContainerData()).thenReturn(data);
+    when(c.shouldScanData()).thenReturn(shouldScanData);
+    when(c.shouldScanMetadata()).thenReturn(true);
+    when(c.getContainerData().getVolume()).thenReturn(vol);
+    if (shouldScanData) {
+      try {
+        when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
+            .thenAnswer(new Answer<ScanResult>() {
+              @Override
+              public ScanResult answer(InvocationOnMock invocationOnMock) throws Throwable {
+                Thread.sleep(sleepTime);
+                return dataScanResult;
+              }
+            });
+        when(c.scanMetaData()).thenReturn(metadataScanResult);
+      } catch (InterruptedException ex) {
+        // Mockito.when invocations will not throw this exception. It is just
+        // required for compilation.
+      }
+    }
+
+    if (!shouldScanData) {
+      try {
+        when(c.scanMetaData()).thenAnswer(new Answer<ScanResult>() {
+          @Override
+          public ScanResult answer(InvocationOnMock invocationOnMock) throws Throwable {
+            Thread.sleep(sleepTime);
+            return metadataScanResult;
+          }
+        });
+        when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
+            .thenReturn(dataScanResult);
+      } catch (InterruptedException ex) {
+        // Mockito.when invocations will not throw this exception. It is just
+        // required for compilation.
+      }
     }
   }
 
