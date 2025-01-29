@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 
 import java.io.IOException;
+import java.time.Instant;
 
 /**
  * A factory class for HddsVolume.
@@ -56,7 +57,8 @@ public class HddsVolumeFactory extends StorageVolumeFactory {
   public StorageVolume createFailedVolume(String locationString)
       throws IOException {
     HddsVolume.Builder volumeBuilder = new HddsVolume.Builder(locationString)
-        .failedVolume(true);
+        .failedVolume(true)
+        .failureTime(Instant.now());
     return volumeBuilder.build();
   }
 }
