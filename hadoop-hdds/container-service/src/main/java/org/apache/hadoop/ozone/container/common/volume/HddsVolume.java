@@ -131,9 +131,11 @@ public class HddsVolume extends StorageVolume {
       this.volumeInfoMetrics =
           new VolumeInfoMetrics(b.getVolumeRootStr(), this);
 
-      LOG.info("Creating HddsVolume: {} of storage type : {} capacity : {}",
-          getStorageDir(), b.getStorageType(),
-              getVolumeInfo().get().getCapacity());
+      LOG.info("Creating HddsVolume: {} of storage type: {}, capacity: {}, available: {}",
+          getStorageDir(),
+          b.getStorageType(),
+          getVolumeInfo().get().getCapacity(),
+          getVolumeInfo().get().getAvailable());
 
       initialize();
     } else {
