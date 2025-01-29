@@ -121,15 +121,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         keyBlocksList.size(), Time.monotonicNow() - startTime);
     if (blockDeletionResults != null) {
       startTime = Time.monotonicNow();
-      if (isRatisEnabled()) {
-        delCount = submitPurgeKeysRequest(blockDeletionResults,
-            keysToModify, snapTableKey, expectedPreviousSnapshotId);
-      } else {
-        // TODO: Once HA and non-HA paths are merged, we should have
-        //  only one code path here. Purge keys should go through an
-        //  OMRequest model.
-        delCount = deleteAllKeys(blockDeletionResults, manager);
-      }
+      delCount = submitPurgeKeysRequest(blockDeletionResults,
+          keysToModify, snapTableKey, expectedPreviousSnapshotId);
       int limit = ozoneManager.getConfiguration().getInt(OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK,
           OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
       LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms. Limit per task is {}.",
@@ -639,13 +632,6 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     // For key overwrite the objectID will remain the same, In this
     // case we need to check if OmKeyLocationInfo is also same.
     return !isBlockLocationInfoSame(prevKeyInfo, deletedKeyInfo);
-  }
-
-  public boolean isRatisEnabled() {
-    if (ozoneManager == null) {
-      return false;
-    }
-    return ozoneManager.isRatisEnabled();
   }
 
   public OzoneManager getOzoneManager() {

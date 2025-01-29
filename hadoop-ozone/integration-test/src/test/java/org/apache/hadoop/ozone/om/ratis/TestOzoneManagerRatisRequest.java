@@ -127,8 +127,7 @@ public class TestOzoneManagerRatisRequest {
 
     OzoneManagerProtocolServerSideTranslatorPB serverSideTranslatorPB =
         new OzoneManagerProtocolServerSideTranslatorPB(ozoneManager,
-            ratisServer, protocolMessageMetrics, true,
-            100L);
+            ratisServer, protocolMessageMetrics, 100L);
 
     OzoneManagerProtocolProtos.OMResponse actualResponse =
         serverSideTranslatorPB.processRequest(omRequest);

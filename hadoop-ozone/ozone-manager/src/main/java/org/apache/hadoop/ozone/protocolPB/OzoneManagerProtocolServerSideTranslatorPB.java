@@ -29,7 +29,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
-import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ipc.ProcessingDetails.Timing;
@@ -42,7 +41,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
@@ -79,7 +77,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
    * Only used to handle write requests when ratis is disabled.
    * When ratis is enabled, write requests are handled by the state machine.
    */
-  private final OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
   private final AtomicLong transactionIndex;
   private final OzoneProtocolMessageDispatcher<OMRequest, OMResponse,
       ProtocolMessageEnum> dispatcher;
@@ -98,7 +95,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       OzoneManager impl,
       OzoneManagerRatisServer ratisServer,
       ProtocolMessageMetrics<ProtocolMessageEnum> metrics,
-      boolean enableRatis,
       long lastTransactionIndexForNonRatis) {
     this.ozoneManager = impl;
     this.perfMetrics = impl.getPerfMetrics();
@@ -107,13 +103,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     // onwards to ensure unique objectIDs.
     this.transactionIndex = new AtomicLong(lastTransactionIndexForNonRatis);
 
-    // When ratis is enabled, the handler does not require a double-buffer since it only handle read requests.
-    this.ozoneManagerDoubleBuffer = enableRatis ? null
-        : OzoneManagerDoubleBuffer.newBuilder()
-          .setOmMetadataManager(ozoneManager.getMetadataManager())
-          .enableTracing(TracingUtil.isTracingEnabled(ozoneManager.getConfiguration()))
-          .build()
-          .start();
     this.handler = new OzoneManagerRequestHandler(impl);
     this.omRatisServer = ratisServer;
     dispatcher = new OzoneProtocolMessageDispatcher<>("OzoneProtocol",
@@ -124,10 +113,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         .fromPackage(OM_REQUESTS_PACKAGE)
         .withinContext(ValidationContext.of(ozoneManager.getVersionManager(), ozoneManager.getMetadataManager()))
         .load();
-  }
-
-  private boolean isRatisEnabled() {
-    return ozoneManagerDoubleBuffer == null;
   }
 
   /**
@@ -188,10 +173,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         } catch (IOException ex) {
           return createErrorResponse(request, ex);
         }
-      }
-
-      if (!isRatisEnabled()) {
-        return submitRequestDirectlyToOM(request);
       }
 
       if (OmUtils.isReadOnly(request)) {
@@ -305,7 +286,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         }
         final TermIndex termIndex = TransactionInfo.getTermIndex(transactionIndex.incrementAndGet());
         final ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
-        omClientResponse = handler.handleWriteRequest(request, context, ozoneManagerDoubleBuffer);
+        omClientResponse = handler.handleWriteRequest(request, context, null);
       }
     } catch (IOException ex) {
       // As some preExecute returns error. So handle here.
@@ -344,22 +325,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     return omResponse.build();
   }
 
-  public void stop() {
-    if (ozoneManagerDoubleBuffer != null) {
-      ozoneManagerDoubleBuffer.stop();
-    }
-  }
-
   public static Logger getLog() {
     return LOG;
-  }
-
-  /**
-   * Wait until both buffers are flushed.  This is used in cases like
-   * "follower bootstrap tarball creation" where the rocksDb for the active
-   * fs needs to synchronized with the rocksdb's for the snapshots.
-   */
-  public void awaitDoubleBufferFlush() throws InterruptedException {
-    ozoneManagerDoubleBuffer.awaitFlush();
   }
 }
