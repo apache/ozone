@@ -622,12 +622,11 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         .orElse(Boolean.FALSE);
     if (isOpen) {
       HddsVolume volume = container.getContainerData().getVolume();
-      SpaceUsageSource precomputedVolumeSpace =
-          volume.getCurrentUsage();
-      long volumeCapacity = precomputedVolumeSpace.getCapacity();
+      SpaceUsageSource usage = volume.getCurrentUsage();
+      long volumeCapacity = usage.getCapacity();
       long volumeFreeSpaceToSpare =
           freeSpaceCalculator.get(volumeCapacity);
-      long volumeFree = precomputedVolumeSpace.getAvailable();
+      long volumeFree = usage.getAvailable();
       long volumeCommitted = volume.getCommittedBytes();
       long volumeAvailable = volumeFree - volumeCommitted;
       return (volumeAvailable <= volumeFreeSpaceToSpare);
