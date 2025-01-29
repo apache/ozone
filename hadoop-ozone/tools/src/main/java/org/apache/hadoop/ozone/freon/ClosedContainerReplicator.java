@@ -134,16 +134,16 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
         final Pipeline pipeline = containerOperationClient.getPipeline(container.getPipelineID().getProtobuf());
         final List<DatanodeDetails> datanodesWithContainer = pipeline.getNodes();
         final List<String> datanodeUUIDs =
-                datanodesWithContainer
-                        .stream().map(DatanodeDetails::getUuidString)
-                        .collect(Collectors.toList());
+              datanodesWithContainer
+                  .stream().map(DatanodeDetails::getUuidString)
+                  .collect(Collectors.toList());
 
         //if datanode is specified, replicate only container if it has a
         //replica.
         if (datanode.isEmpty() || datanodeUUIDs.contains(datanode)) {
           replicationTasks.add(new ReplicationTask(
-                  ReplicateContainerCommand.fromSources(container.getContainerID(),
-                          datanodesWithContainer), replicator));
+              ReplicateContainerCommand.fromSources(container.getContainerID(),
+                  datanodesWithContainer), replicator));
         }
       }
     }
