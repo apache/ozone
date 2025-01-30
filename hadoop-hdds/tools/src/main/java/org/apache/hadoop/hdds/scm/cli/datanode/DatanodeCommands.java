@@ -17,16 +17,10 @@
  */
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
-import org.apache.hadoop.hdds.cli.GenericCli;
+import org.apache.hadoop.hdds.cli.AdminSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.OzoneAdmin;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
-import picocli.CommandLine.Model.CommandSpec;
-import picocli.CommandLine.Spec;
-
-import java.util.concurrent.Callable;
 
 /**
  * Subcommand for datanode related operations.
@@ -41,22 +35,10 @@ import java.util.concurrent.Callable;
         DecommissionSubCommand.class,
         MaintenanceSubCommand.class,
         RecommissionSubCommand.class,
+        StatusSubCommand.class,
         UsageInfoSubcommand.class
     })
-@MetaInfServices(SubcommandWithParent.class)
-public class DatanodeCommands implements Callable<Void>, SubcommandWithParent {
+@MetaInfServices(AdminSubcommand.class)
+public class DatanodeCommands implements AdminSubcommand {
 
-  @Spec
-  private CommandSpec spec;
-
-  @Override
-  public Void call() throws Exception {
-    GenericCli.missingSubcommand(spec);
-    return null;
-  }
-
-  @Override
-  public Class<?> getParentType() {
-    return OzoneAdmin.class;
-  }
 }

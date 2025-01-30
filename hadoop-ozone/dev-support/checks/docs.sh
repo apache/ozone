@@ -22,7 +22,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "${DIR}/../../.." || exit 1
 
 source "${DIR}/_lib.sh"
-install_hugo
+source "${DIR}/install/hugo.sh"
 
 REPORT_DIR=${OUTPUT_DIR:-"${DIR}/../../../target/docs"}
 mkdir -p "${REPORT_DIR}"
@@ -33,10 +33,5 @@ rc=$?
 
 grep -o 'ERROR.*' "${REPORT_DIR}/output.log" > "${REPORT_FILE}"
 
-wc -l "${REPORT_FILE}" | awk '{ print $1 }' > "${REPORT_DIR}/failures"
-
-if [[ -s "${REPORT_FILE}" ]]; then
-   exit 1
-fi
-
-exit ${rc}
+ERROR_PATTERN=""
+source "${DIR}/_post_process.sh"

@@ -923,7 +923,7 @@ public final class OmUtils {
   }
   
   public static List<List<String>> format(
-          List<ServiceInfo> nodes, int port, String leaderId) {
+          List<ServiceInfo> nodes, int port, String leaderId, String leaderReadiness) {
     List<List<String>> omInfoList = new ArrayList<>();
     // Ensuring OM's are printed in correct order
     List<ServiceInfo> omNodes = nodes.stream()
@@ -940,6 +940,7 @@ public final class OmUtils {
         omInfo.add(info.getOmRoleInfo().getNodeId());
         omInfo.add(String.valueOf(port));
         omInfo.add(role);
+        omInfo.add(leaderReadiness);
         omInfoList.add(omInfo);
       }
     }

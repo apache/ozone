@@ -51,7 +51,8 @@ public enum S3GAction implements AuditAction {
   REVOKE_SECRET,
   GET_OBJECT_TAGGING,
   PUT_OBJECT_TAGGING,
-  DELETE_OBJECT_TAGGING;
+  DELETE_OBJECT_TAGGING,
+  PUT_OBJECT_ACL;
 
   @Override
   public String getAction() {

@@ -828,10 +828,36 @@ public final class HddsTestUtils {
    */
   public static List<ContainerInfo> getContainerInfo(int numContainers) {
     List<ContainerInfo> containerInfoList = new ArrayList<>();
+    RatisReplicationConfig ratisReplicationConfig =
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE);
     for (int i = 0; i < numContainers; i++) {
       ContainerInfo.Builder builder = new ContainerInfo.Builder();
       containerInfoList.add(builder
           .setContainerID(RandomUtils.nextLong())
+          .setReplicationConfig(ratisReplicationConfig)
+          .build());
+    }
+    return containerInfoList;
+  }
+
+  /**
+   * Generate EC Container data.
+   *
+   * @param numContainers number of ContainerInfo to be included in list.
+   * @param data Data block Num.
+   * @param parity Parity block Num.
+   * @return {@literal List<ContainerInfo>}
+   */
+  public static List<ContainerInfo> getECContainerInfo(int numContainers, int data, int parity) {
+    List<ContainerInfo> containerInfoList = new ArrayList<>();
+    ECReplicationConfig eCReplicationConfig = new ECReplicationConfig(data, parity);
+    for (int i = 0; i < numContainers; i++) {
+      ContainerInfo.Builder builder = new ContainerInfo.Builder();
+      containerInfoList.add(builder
+          .setContainerID(RandomUtils.nextLong())
+          .setOwner("test-owner")
+          .setPipelineID(PipelineID.randomId())
+          .setReplicationConfig(eCReplicationConfig)
           .build());
     }
     return containerInfoList;

@@ -46,12 +46,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_SNAPSHOT_ERROR;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TIMEOUT;
 
 /**
@@ -88,7 +86,7 @@ public final class SnapshotUtils {
     }
     if (snapshotInfo == null) {
       throw new OMException("Snapshot '" + snapshotKey + "' is not found.",
-          KEY_NOT_FOUND);
+          FILE_NOT_FOUND);
     }
     return snapshotInfo;
   }
@@ -164,7 +162,7 @@ public final class SnapshotUtils {
     // is removed in-memory but OMDoubleBuffer has not flushed yet.
     if (snapInfo == null) {
       throw new OMException("Provided Snapshot Info argument is null. Cannot get the next snapshot for a null value",
-          INVALID_SNAPSHOT_ERROR);
+          FILE_NOT_FOUND);
     }
     try {
       if (chainManager.hasNextPathSnapshot(snapInfo.getSnapshotPath(),
@@ -201,7 +199,7 @@ public final class SnapshotUtils {
     // is removed in-memory but OMDoubleBuffer has not flushed yet.
     if (snapInfo == null) {
       throw new OMException("Provided Snapshot Info argument is null. Cannot get the previous snapshot for a null " +
-          "value", INVALID_SNAPSHOT_ERROR);
+          "value", FILE_NOT_FOUND);
     }
     try {
       if (chainManager.hasPreviousPathSnapshot(snapInfo.getSnapshotPath(),

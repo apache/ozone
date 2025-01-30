@@ -56,8 +56,9 @@ public class TestBucketPut {
     clientStub = new OzoneClientStub();
 
     // Create HeadBucket and setClient to OzoneClientStub
-    bucketEndpoint = new BucketEndpoint();
-    bucketEndpoint.setClient(clientStub);
+    bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
+        .setClient(clientStub)
+        .build();
   }
 
   @Test

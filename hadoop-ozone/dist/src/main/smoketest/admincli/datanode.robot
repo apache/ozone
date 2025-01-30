@@ -90,7 +90,7 @@ Get usage info with invalid address
 
 Incomplete command
     ${output} =         Execute And Ignore Error     ozone admin datanode
-                        Should contain   ${output}   Incomplete command
+                        Should contain   ${output}   Missing required subcommand
                         Should contain   ${output}   list
 
 #List datanodes on unknown host

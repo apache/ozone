@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.util.Preconditions;
 
 import java.util.Map;
 import java.util.Objects;
@@ -126,7 +127,10 @@ public final class DispatcherContext {
 
   private final Map<Long, Long> container2BCSIDMap;
 
-  private long startTime;
+  private final boolean releaseSupported;
+  private volatile Runnable releaseMethod;
+
+  private final long startTime = Time.monotonicNowNanos();
 
   private DispatcherContext(Builder b) {
     this.op = Objects.requireNonNull(b.op, "op == null");
@@ -134,7 +138,7 @@ public final class DispatcherContext {
     this.logIndex = b.logIndex;
     this.stage = b.stage;
     this.container2BCSIDMap = b.container2BCSIDMap;
-    this.startTime = Time.monotonicNowNanos();
+    this.releaseSupported = b.releaseSupported;
   }
 
   /** Use {@link DispatcherContext#op(DispatcherContext)} for handling null. */
@@ -162,6 +166,21 @@ public final class DispatcherContext {
     return startTime;
   }
 
+  public boolean isReleaseSupported() {
+    return releaseSupported;
+  }
+
+  public void setReleaseMethod(Runnable releaseMethod) {
+    Preconditions.assertTrue(releaseSupported, "Unsupported release method");
+    this.releaseMethod = releaseMethod;
+  }
+
+  public void release() {
+    if (releaseMethod != null) {
+      releaseMethod.run();
+    }
+  }
+
   @Override
   public String toString() {
     return op + "-" + stage + TermIndex.valueOf(term, logIndex);
@@ -180,6 +199,7 @@ public final class DispatcherContext {
     private long term;
     private long logIndex;
     private Map<Long, Long> container2BCSIDMap;
+    private boolean releaseSupported;
 
     private Builder(Op op) {
       this.op = op;
@@ -228,6 +248,12 @@ public final class DispatcherContext {
       this.container2BCSIDMap = map;
       return this;
     }
+
+    public Builder setReleaseSupported(boolean releaseSupported) {
+      this.releaseSupported = releaseSupported;
+      return this;
+    }
+
     /**
      * Builds and returns DispatcherContext instance.
      *

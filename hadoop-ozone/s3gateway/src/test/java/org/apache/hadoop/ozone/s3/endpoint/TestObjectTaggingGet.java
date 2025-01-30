@@ -61,16 +61,19 @@ public class TestObjectTaggingGet {
     OzoneClient client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket(BUCKET_NAME);
 
-    rest = new ObjectEndpoint();
-    rest.setClient(client);
-    rest.setOzoneConfiguration(config);
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
-    rest.setHeaders(headers);
+
+    rest = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(client)
+        .setConfig(config)
+        .setHeaders(headers)
+        .build();
+
     ByteArrayInputStream body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     // Create a key with object tags
     Mockito.when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
     rest.put(BUCKET_NAME, KEY_WITH_TAG, CONTENT.length(),
-        1, null, null, body);
+        1, null, null, null, body);
 
 
     ContainerRequestContext context = Mockito.mock(ContainerRequestContext.class);

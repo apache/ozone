@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.ratis.grpc.util.ZeroCopyMessageMarshaller;
 import org.apache.ratis.thirdparty.com.google.protobuf.MessageLite;
 import org.apache.ratis.thirdparty.io.grpc.MethodDescriptor;
@@ -98,12 +99,16 @@ public class GrpcXceiverService extends
 
       @Override
       public void onNext(ContainerCommandRequestProto request) {
+        final DispatcherContext context = request.getCmdType() != Type.ReadChunk ? null
+            : DispatcherContext.newBuilder(DispatcherContext.Op.HANDLE_READ_CHUNK)
+            .setReleaseSupported(true)
+            .build();
+
         try {
           if (request.getCmdType() == Type.ReadBlock) {
             dispatcher.streamDataReadOnly(request, responseObserver, null);
           } else {
-            ContainerCommandResponseProto resp =
-                dispatcher.dispatch(request, null);
+            final ContainerCommandResponseProto resp = dispatcher.dispatch(request, context);
             responseObserver.onNext(resp);
           }
         } catch (Throwable e) {
@@ -113,6 +118,9 @@ public class GrpcXceiverService extends
           responseObserver.onError(e);
         } finally {
           zeroCopyMessageMarshaller.release(request);
+          if (context != null) {
+            context.release();
+          }
         }
       }
 

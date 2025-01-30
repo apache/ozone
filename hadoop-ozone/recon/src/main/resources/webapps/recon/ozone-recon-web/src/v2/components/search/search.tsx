@@ -55,7 +55,8 @@ const Search: React.FC<SearchProps> = ({
       suffixIcon={(searchOptions.length > 1) ? <DownOutlined/> : null}
       defaultValue={searchColumn}
       options={searchOptions}
-      onChange={onChange} />)
+      onChange={onChange}
+      data-testid='search-dropdown'/>)
     : null
 
   return (
@@ -69,7 +70,8 @@ const Search: React.FC<SearchProps> = ({
       size='middle'
       style={{
         maxWidth: 400
-      }}/>
+      }}
+      data-testid='search-input'/>
   )
 }
 

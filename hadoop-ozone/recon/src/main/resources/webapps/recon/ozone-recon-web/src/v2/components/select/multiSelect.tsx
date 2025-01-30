@@ -61,7 +61,8 @@ const Option: React.FC<OptionProps<Option, true>> = (props) => {
             marginRight: '8px',
             accentColor: '#1AA57A'
           }}
-          onChange={() => null} />
+          onChange={() => null}
+          disabled={props.isDisabled} />
         <label>{props.label}</label>
       </components.Option>
     </div>
@@ -114,14 +115,13 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
       isSearchable={false}
       controlShouldRenderValue={false}
       classNamePrefix='multi-select'
-      options={options}
+      options={options.map((opt) => ({...opt, isDisabled: (opt.value === fixedColumn)}))}
       components={{
         ValueContainer,
         Option
       }}
       placeholder={placeholder}
       value={selected}
-      isOptionDisabled={(option) => option.value === fixedColumn}
       isDisabled={isDisabled}
       onChange={(selected: ValueType<Option, true>) => {
         if (selected?.length === options.length) return onChange!(options);

@@ -67,7 +67,7 @@ x-volumes:
 
 services:
   kdc:
-    command: ["krb5kdc","-n"]
+    command: ["/opt/hadoop/compose/common/init-kdc.sh"]
     hostname: kdc
     image: ${OZONE_TESTKRB5_IMAGE}
     networks:

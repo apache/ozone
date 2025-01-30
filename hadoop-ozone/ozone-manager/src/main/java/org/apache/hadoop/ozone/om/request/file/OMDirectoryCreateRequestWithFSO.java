@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.file;
 
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -51,12 +51,10 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS_IN_GIVENPATH;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS;
@@ -78,8 +76,8 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long trxnLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long trxnLogIndex = context.getIndex();
 
     CreateDirectoryRequest createDirectoryRequest = getOmRequest()
         .getCreateDirectoryRequest();
@@ -145,8 +143,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
         OmBucketInfo omBucketInfo =
             getBucketInfo(omMetadataManager, volumeName, bucketName);
         // prepare all missing parents
-        missingParentInfos =
-            OMDirectoryCreateRequestWithFSO.getAllMissingParentDirInfo(
+        missingParentInfos = getAllMissingParentDirInfo(
                 ozoneManager, keyArgs, omBucketInfo, omPathInfo, trxnLogIndex);
 
         final long volumeId = omMetadataManager.getVolumeId(volumeName);
@@ -163,7 +160,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
             omPathInfo.getLeafNodeName(),
             keyArgs, omPathInfo.getLeafNodeObjectId(),
             omPathInfo.getLastKnownParentId(), trxnLogIndex,
-            omBucketInfo, omPathInfo);
+            omBucketInfo, omPathInfo, ozoneManager.getConfiguration());
         OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
             volumeId, bucketId, trxnLogIndex,
             missingParentInfos, dirInfo);
@@ -234,87 +231,5 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
       LOG.error("Unrecognized Result for OMDirectoryCreateRequest: {}",
           createDirectoryRequest);
     }
-  }
-
-  /**
-   * Construct OmDirectoryInfo for every parent directory in missing list.
-   *
-   * @param keyArgs      key arguments
-   * @param pathInfo     list of parent directories to be created and its ACLs
-   * @param trxnLogIndex transaction log index id
-   * @return list of missing parent directories
-   * @throws IOException DB failure
-   */
-  public static List<OmDirectoryInfo> getAllMissingParentDirInfo(
-      OzoneManager ozoneManager, KeyArgs keyArgs, OmBucketInfo bucketInfo,
-      OMFileRequest.OMPathInfoWithFSO pathInfo, long trxnLogIndex)
-      throws IOException {
-    List<OmDirectoryInfo> missingParentInfos = new ArrayList<>();
-
-    // The base id is left shifted by 8 bits for creating space to
-    // create (2^8 - 1) object ids in every request.
-    // maxObjId represents the largest object id allocation possible inside
-    // the transaction.
-    long baseObjId = ozoneManager.getObjectIdFromTxId(trxnLogIndex);
-    long maxObjId = baseObjId + getMaxNumOfRecursiveDirs();
-    long objectCount = 1;
-
-    String volumeName = keyArgs.getVolumeName();
-    String bucketName = keyArgs.getBucketName();
-    String keyName = keyArgs.getKeyName();
-
-    long lastKnownParentId = pathInfo.getLastKnownParentId();
-    List<String> missingParents = pathInfo.getMissingParents();
-    for (String missingKey : missingParents) {
-      long nextObjId = baseObjId + objectCount;
-      if (nextObjId > maxObjId) {
-        throw new OMException("Too many directories in path. Exceeds limit of "
-            + getMaxNumOfRecursiveDirs() + ". Unable to create directory: "
-            + keyName + " in volume/bucket: " + volumeName + "/" + bucketName,
-            INVALID_KEY_NAME);
-      }
-
-      LOG.debug("missing parent {} getting added to DirectoryTable",
-              missingKey);
-      OmDirectoryInfo dirInfo = createDirectoryInfoWithACL(missingKey,
-          keyArgs, nextObjId, lastKnownParentId, trxnLogIndex,
-          bucketInfo, pathInfo);
-      objectCount++;
-
-      missingParentInfos.add(dirInfo);
-
-      // updating id for the next sub-dir
-      lastKnownParentId = nextObjId;
-    }
-    pathInfo.setLastKnownParentId(lastKnownParentId);
-    pathInfo.setLeafNodeObjectId(baseObjId + objectCount);
-    return missingParentInfos;
-  }
-
-  /**
-   * Fill in a DirectoryInfo for a new directory entry in OM database.
-   * @param dirName
-   * @param keyArgs
-   * @param objectId
-   * @param parentObjectId
-   * @param bucketInfo
-   * @param omPathInfo
-   * @return the OmDirectoryInfo structure
-   */
-  private static OmDirectoryInfo createDirectoryInfoWithACL(
-      String dirName, KeyArgs keyArgs, long objectId,
-      long parentObjectId, long transactionIndex,
-      OmBucketInfo bucketInfo, OMFileRequest.OMPathInfo omPathInfo) {
-
-    return OmDirectoryInfo.newBuilder()
-        .setName(dirName)
-        .setOwner(keyArgs.getOwnerName())
-        .setCreationTime(keyArgs.getModificationTime())
-        .setModificationTime(keyArgs.getModificationTime())
-        .setObjectID(objectId)
-        .setUpdateID(transactionIndex)
-        .setParentObjectID(parentObjectId)
-        .setAcls(getAclsForDir(keyArgs, bucketInfo, omPathInfo))
-        .build();
   }
 }

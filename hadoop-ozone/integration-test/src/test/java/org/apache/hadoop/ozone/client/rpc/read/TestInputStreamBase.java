@@ -25,15 +25,22 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.TestInstance;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
-// TODO remove this class, set config as default in integration tests
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 abstract class TestInputStreamBase {
 
   static final int CHUNK_SIZE = 1024 * 1024;          // 1MB
@@ -42,8 +49,7 @@ abstract class TestInputStreamBase {
   static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;   // 8MB
   static final int BYTES_PER_CHECKSUM = 256 * 1024;   // 256KB
 
-  protected static MiniOzoneCluster newCluster(
-      ContainerLayoutVersion containerLayout) throws Exception {
+  protected static MiniOzoneCluster newCluster() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
 
     OzoneClientConfig config = conf.getObject(OzoneClientConfig.class);
@@ -57,8 +63,6 @@ abstract class TestInputStreamBase {
     conf.setQuietMode(false);
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 64,
         StorageUnit.MB);
-    conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY,
-        containerLayout.toString());
 
     ReplicationManagerConfiguration repConf =
         conf.getObject(ReplicationManagerConfiguration.class);
@@ -81,4 +85,38 @@ abstract class TestInputStreamBase {
     return UUID.randomUUID().toString();
   }
 
+  protected void updateConfig(ContainerLayoutVersion layout) {
+    cluster.getHddsDatanodes().forEach(dn -> dn.getConf().setEnum(OZONE_SCM_CONTAINER_LAYOUT_KEY, layout));
+    closeContainers();
+  }
+
+  private MiniOzoneCluster cluster;
+
+  protected MiniOzoneCluster getCluster() {
+    return cluster;
+  }
+
+  @BeforeAll
+  void setup() throws Exception {
+    cluster = newCluster();
+    cluster.waitForClusterToBeReady();
+  }
+
+  @AfterAll
+  void cleanup() {
+    IOUtils.closeQuietly(cluster);
+  }
+
+  private void closeContainers() {
+    StorageContainerManager scm = cluster.getStorageContainerManager();
+    scm.getContainerManager().getContainers().forEach(container -> {
+      if (container.isOpen()) {
+        try {
+          TestHelper.waitForContainerClose(getCluster(), container.getContainerID());
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      }
+    });
+  }
 }

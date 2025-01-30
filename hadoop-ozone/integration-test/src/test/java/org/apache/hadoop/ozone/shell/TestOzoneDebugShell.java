@@ -36,9 +36,8 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
-import org.apache.hadoop.ozone.debug.DBScanner;
 import org.apache.hadoop.ozone.debug.OzoneDebug;
-import org.apache.hadoop.ozone.debug.RDBParser;
+import org.apache.hadoop.ozone.debug.ldb.RDBParser;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -84,6 +83,7 @@ public class TestOzoneDebugShell {
 
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient client;
+  private static OzoneDebug ozoneDebugShell;
 
   private static OzoneConfiguration conf = null;
 
@@ -101,7 +101,8 @@ public class TestOzoneDebugShell {
 
   @BeforeAll
   public static void init() throws Exception {
-    conf = new OzoneConfiguration();
+    ozoneDebugShell = new OzoneDebug();
+    conf = ozoneDebugShell.getOzoneConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
         100, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1, SECONDS);
@@ -149,7 +150,6 @@ public class TestOzoneDebugShell {
     StringWriter stdout = new StringWriter();
     PrintWriter pstdout = new PrintWriter(stdout);
     CommandLine cmd = new CommandLine(new RDBParser())
-        .addSubcommand(new DBScanner())
         .setOut(pstdout);
     final String volumeName = UUID.randomUUID().toString();
     final String bucketName = UUID.randomUUID().toString();
@@ -206,9 +206,8 @@ public class TestOzoneDebugShell {
         Path.SEPARATOR + volumeName + Path.SEPARATOR + bucketName;
     String[] args = new String[] {
         getSetConfStringFromConf(OMConfigKeys.OZONE_OM_ADDRESS_KEY),
-        "chunkinfo", bucketPath + Path.SEPARATOR + keyName };
+        "replicas", "chunk-info", bucketPath + Path.SEPARATOR + keyName };
 
-    OzoneDebug ozoneDebugShell = new OzoneDebug(conf);
     int exitCode = ozoneDebugShell.execute(args);
     return exitCode;
   }
@@ -219,8 +218,7 @@ public class TestOzoneDebugShell {
         Path.SEPARATOR + volumeName + Path.SEPARATOR + bucketName;
     String[] args = new String[] {
         getSetConfStringFromConf(OMConfigKeys.OZONE_OM_ADDRESS_KEY),
-        "chunkinfo", bucketPath + Path.SEPARATOR + keyName };
-    OzoneDebug ozoneDebugShell = new OzoneDebug(conf);
+        "replicas", "chunk-info", bucketPath + Path.SEPARATOR + keyName };
     int exitCode = 1;
     try (GenericTestUtils.SystemOutCapturer capture = new GenericTestUtils
         .SystemOutCapturer()) {

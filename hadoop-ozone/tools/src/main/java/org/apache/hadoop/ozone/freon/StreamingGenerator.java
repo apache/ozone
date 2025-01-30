@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.container.stream.DirectoryServerDestination;
 import org.apache.hadoop.ozone.container.stream.DirectoryServerSource;
 import org.apache.hadoop.ozone.container.stream.StreamingClient;
 import org.apache.hadoop.ozone.container.stream.StreamingServer;
+import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -44,6 +45,7 @@ import java.util.concurrent.Callable;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 public class StreamingGenerator extends BaseFreonGenerator
     implements Callable<Void> {
 

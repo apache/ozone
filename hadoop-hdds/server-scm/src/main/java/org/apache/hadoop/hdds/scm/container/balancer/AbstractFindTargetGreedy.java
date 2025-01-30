@@ -283,4 +283,9 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
   public Map<DatanodeDetails, Long> getSizeEnteringNodes() {
     return sizeEnteringNode;
   }
+
+  @Override
+  public void clearSizeEnteringNodes() {
+    sizeEnteringNode.clear();
+  }
 }

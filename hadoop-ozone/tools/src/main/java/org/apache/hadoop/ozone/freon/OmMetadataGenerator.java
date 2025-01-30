@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
 import com.codahale.metrics.Timer;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
@@ -70,6 +71,7 @@ import static java.util.Collections.emptyMap;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 public class OmMetadataGenerator extends BaseFreonGenerator
     implements Callable<Void> {
 
@@ -272,8 +274,7 @@ public class OmMetadataGenerator extends BaseFreonGenerator
         .setVolumeName(volumeName)
         .setReplicationConfig(replicationConfig)
         .setLocationInfoList(new ArrayList<>())
-        .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
-            ALL, ALL));
+        .setAcls(OzoneAclUtil.getAclList(ugi, ALL, ALL));
   }
 
   private String getPath(long counter) {

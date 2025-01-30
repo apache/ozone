@@ -19,8 +19,7 @@ package org.apache.hadoop.ozone;
 
 import com.google.common.collect.Maps;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.cli.OzoneAdmin;
-import org.apache.hadoop.hdds.conf.DefaultConfigManager;
+import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
@@ -103,7 +102,8 @@ public final class TestBlockTokensCLI {
 
   @BeforeAll
   public static void init() throws Exception {
-    conf = new OzoneConfiguration();
+    ozoneAdmin = new OzoneAdmin();
+    conf = ozoneAdmin.getOzoneConf();
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
 
     ExitUtils.disableSystemExit();
@@ -117,7 +117,6 @@ public final class TestBlockTokensCLI {
     setSecretKeysConfig();
     startCluster();
     client = cluster.newClient();
-    ozoneAdmin = new OzoneAdmin(conf);
   }
 
   @AfterAll
@@ -127,7 +126,6 @@ public final class TestBlockTokensCLI {
     if (cluster != null) {
       cluster.stop();
     }
-    DefaultConfigManager.clearDefaultConfigs();
   }
 
   private SecretKeyManager getScmSecretKeyManager() {
@@ -304,7 +302,7 @@ public final class TestBlockTokensCLI {
    * format.
    */
   private String[] createArgsForCommand(String[] additionalArgs) {
-    OzoneConfiguration defaultConf = ozoneAdmin.createOzoneConfiguration();
+    OzoneConfiguration defaultConf = ozoneAdmin.getOzoneConf();
     Map<String, String> diff = Maps.difference(defaultConf.getOzoneProperties(),
         conf.getOzoneProperties()).entriesOnlyOnRight();
     String[] args = new String[diff.size() + additionalArgs.length];

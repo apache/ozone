@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -49,6 +50,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT;
@@ -74,10 +76,10 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   public static final Logger LOG =
       LoggerFactory.getLogger(DirectoryDeletingService.class);
 
-  // Use only a single thread for DirDeletion. Multiple threads would read
-  // or write to same tables and can send deletion requests for same key
-  // multiple times.
-  private static final int DIR_DELETING_CORE_POOL_SIZE = 1;
+  // Using multi thread for DirDeletion. Multiple threads would read
+  // from parent directory info from deleted directory table concurrently
+  // and send deletion requests.
+  private final int dirDeletingCorePoolSize;
   private static final int MIN_ERR_LIMIT_PER_TASK = 1000;
 
   // Number of items(dirs/files) to be batched in an iteration.
@@ -86,11 +88,15 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   private final AtomicBoolean suspended;
   private AtomicBoolean isRunningOnAOS;
 
+  private final DeletedDirSupplier deletedDirSupplier;
+
+  private AtomicInteger taskCount = new AtomicInteger(0);
+
   public DirectoryDeletingService(long interval, TimeUnit unit,
       long serviceTimeout, OzoneManager ozoneManager,
-      OzoneConfiguration configuration) {
+      OzoneConfiguration configuration, int dirDeletingServiceCorePoolSize) {
     super(DirectoryDeletingService.class.getSimpleName(), interval, unit,
-        DIR_DELETING_CORE_POOL_SIZE, serviceTimeout, ozoneManager, null);
+        dirDeletingServiceCorePoolSize, serviceTimeout, ozoneManager, null);
     this.pathLimitPerTask = configuration
         .getInt(OZONE_PATH_DELETING_LIMIT_PER_TASK,
             OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT);
@@ -102,6 +108,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     this.ratisByteLimit = (int) (limit * 0.9);
     this.suspended = new AtomicBoolean(false);
     this.isRunningOnAOS = new AtomicBoolean(false);
+    this.dirDeletingCorePoolSize = dirDeletingServiceCorePoolSize;
+    deletedDirSupplier = new DeletedDirSupplier();
+    taskCount.set(0);
   }
 
   private boolean shouldRun() {
@@ -114,6 +123,10 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
   public boolean isRunningOnAOS() {
     return isRunningOnAOS.get();
+  }
+
+  public AtomicInteger getTaskCount() {
+    return taskCount;
   }
 
   /**
@@ -135,8 +148,53 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
-    queue.add(new DirectoryDeletingService.DirDeletingTask(this));
+    if (taskCount.get() > 0) {
+      LOG.info("{} Directory deleting task(s) already in progress.",
+          taskCount.get());
+      return queue;
+    }
+    try {
+      deletedDirSupplier.reInitItr();
+    } catch (IOException ex) {
+      LOG.error("Unable to get the iterator.", ex);
+      return queue;
+    }
+    taskCount.set(dirDeletingCorePoolSize);
+    for (int i = 0; i < dirDeletingCorePoolSize; i++) {
+      queue.add(new DirectoryDeletingService.DirDeletingTask(this));
+    }
     return queue;
+  }
+
+  @Override
+  public void shutdown() {
+    super.shutdown();
+    deletedDirSupplier.closeItr();
+  }
+
+  private final class DeletedDirSupplier {
+    private TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+        deleteTableIterator;
+
+    private synchronized Table.KeyValue<String, OmKeyInfo> get()
+        throws IOException {
+      if (deleteTableIterator.hasNext()) {
+        return deleteTableIterator.next();
+      }
+      return null;
+    }
+
+    private synchronized void closeItr() {
+      IOUtils.closeQuietly(deleteTableIterator);
+      deleteTableIterator = null;
+    }
+
+    private synchronized void reInitItr() throws IOException {
+      closeItr();
+      deleteTableIterator =
+          getOzoneManager().getMetadataManager().getDeletedDirTable()
+              .iterator();
+    }
   }
 
   private final class DirDeletingTask implements BackgroundTask {
@@ -153,89 +211,93 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
     @Override
     public BackgroundTaskResult call() {
-      if (shouldRun()) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Running DirectoryDeletingService");
-        }
-        isRunningOnAOS.set(true);
-        getRunCount().incrementAndGet();
-        long dirNum = 0L;
-        long subDirNum = 0L;
-        long subFileNum = 0L;
-        long remainNum = pathLimitPerTask;
-        int consumedSize = 0;
-        List<PurgePathRequest> purgePathRequestList = new ArrayList<>();
-        List<Pair<String, OmKeyInfo>> allSubDirList
-            = new ArrayList<>((int) remainNum);
+      try {
+        if (shouldRun()) {
+          isRunningOnAOS.set(true);
+          long rnCnt = getRunCount().incrementAndGet();
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Running DirectoryDeletingService. {}", rnCnt);
+          }
+          long dirNum = 0L;
+          long subDirNum = 0L;
+          long subFileNum = 0L;
+          long remainNum = pathLimitPerTask;
+          int consumedSize = 0;
+          List<PurgePathRequest> purgePathRequestList = new ArrayList<>();
+          List<Pair<String, OmKeyInfo>> allSubDirList =
+              new ArrayList<>((int) remainNum);
 
-        Table.KeyValue<String, OmKeyInfo> pendingDeletedDirInfo;
-
-        try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-                 deleteTableIterator = getOzoneManager().getMetadataManager().
-            getDeletedDirTable().iterator()) {
+          Table.KeyValue<String, OmKeyInfo> pendingDeletedDirInfo;
           // This is to avoid race condition b/w purge request and snapshot chain updation. For AOS taking the global
           // snapshotId since AOS could process multiple buckets in one iteration.
-          UUID expectedPreviousSnapshotId =
-              ((OmMetadataManagerImpl)getOzoneManager().getMetadataManager()).getSnapshotChainManager()
-                  .getLatestGlobalSnapshotId();
+          try {
+            UUID expectedPreviousSnapshotId =
+                ((OmMetadataManagerImpl) getOzoneManager().getMetadataManager()).getSnapshotChainManager()
+                    .getLatestGlobalSnapshotId();
 
-          long startTime = Time.monotonicNow();
-          while (remainNum > 0 && deleteTableIterator.hasNext()) {
-            pendingDeletedDirInfo = deleteTableIterator.next();
-            // Do not reclaim if the directory is still being referenced by
-            // the previous snapshot.
-            if (previousSnapshotHasDir(pendingDeletedDirInfo)) {
-              continue;
-            }
-
-            PurgePathRequest request = prepareDeleteDirRequest(
-                remainNum, pendingDeletedDirInfo.getValue(),
-                pendingDeletedDirInfo.getKey(), allSubDirList,
-                getOzoneManager().getKeyManager());
-            if (isBufferLimitCrossed(ratisByteLimit, consumedSize,
-                request.getSerializedSize())) {
-              if (purgePathRequestList.size() != 0) {
-                // if message buffer reaches max limit, avoid sending further
-                remainNum = 0;
+            long startTime = Time.monotonicNow();
+            while (remainNum > 0) {
+              pendingDeletedDirInfo = getPendingDeletedDirInfo();
+              if (pendingDeletedDirInfo == null) {
                 break;
               }
-              // if directory itself is having a lot of keys / files,
-              // reduce capacity to minimum level
-              remainNum = MIN_ERR_LIMIT_PER_TASK;
-              request = prepareDeleteDirRequest(
-                  remainNum, pendingDeletedDirInfo.getValue(),
+              // Do not reclaim if the directory is still being referenced by
+              // the previous snapshot.
+              if (previousSnapshotHasDir(pendingDeletedDirInfo)) {
+                continue;
+              }
+
+              PurgePathRequest request = prepareDeleteDirRequest(remainNum,
+                  pendingDeletedDirInfo.getValue(),
                   pendingDeletedDirInfo.getKey(), allSubDirList,
                   getOzoneManager().getKeyManager());
+              if (isBufferLimitCrossed(ratisByteLimit, consumedSize,
+                  request.getSerializedSize())) {
+                if (purgePathRequestList.size() != 0) {
+                  // if message buffer reaches max limit, avoid sending further
+                  remainNum = 0;
+                  break;
+                }
+                // if directory itself is having a lot of keys / files,
+                // reduce capacity to minimum level
+                remainNum = MIN_ERR_LIMIT_PER_TASK;
+                request = prepareDeleteDirRequest(remainNum,
+                    pendingDeletedDirInfo.getValue(),
+                    pendingDeletedDirInfo.getKey(), allSubDirList,
+                    getOzoneManager().getKeyManager());
+              }
+              consumedSize += request.getSerializedSize();
+              purgePathRequestList.add(request);
+              // reduce remain count for self, sub-files, and sub-directories
+              remainNum = remainNum - 1;
+              remainNum = remainNum - request.getDeletedSubFilesCount();
+              remainNum = remainNum - request.getMarkDeletedSubDirsCount();
+              // Count up the purgeDeletedDir, subDirs and subFiles
+              if (request.getDeletedDir() != null && !request.getDeletedDir()
+                  .isEmpty()) {
+                dirNum++;
+              }
+              subDirNum += request.getMarkDeletedSubDirsCount();
+              subFileNum += request.getDeletedSubFilesCount();
             }
-            consumedSize += request.getSerializedSize();
-            purgePathRequestList.add(request);
-            // reduce remain count for self, sub-files, and sub-directories
-            remainNum = remainNum - 1;
-            remainNum = remainNum - request.getDeletedSubFilesCount();
-            remainNum = remainNum - request.getMarkDeletedSubDirsCount();
-            // Count up the purgeDeletedDir, subDirs and subFiles
-            if (request.getDeletedDir() != null
-                && !request.getDeletedDir().isEmpty()) {
-              dirNum++;
-            }
-            subDirNum += request.getMarkDeletedSubDirsCount();
-            subFileNum += request.getDeletedSubFilesCount();
+            optimizeDirDeletesAndSubmitRequest(remainNum, dirNum, subDirNum,
+                subFileNum, allSubDirList, purgePathRequestList, null,
+                startTime, ratisByteLimit - consumedSize,
+                getOzoneManager().getKeyManager(), expectedPreviousSnapshotId,
+                rnCnt);
+
+          } catch (IOException e) {
+            LOG.error(
+                "Error while running delete directories and files " + "background task. Will retry at next run.",
+                e);
           }
-
-          optimizeDirDeletesAndSubmitRequest(
-              remainNum, dirNum, subDirNum, subFileNum,
-              allSubDirList, purgePathRequestList, null, startTime,
-              ratisByteLimit - consumedSize,
-              getOzoneManager().getKeyManager(), expectedPreviousSnapshotId);
-
-        } catch (IOException e) {
-          LOG.error("Error while running delete directories and files " +
-              "background task. Will retry at next run.", e);
+          isRunningOnAOS.set(false);
+          synchronized (directoryDeletingService) {
+            this.directoryDeletingService.notify();
+          }
         }
-        isRunningOnAOS.set(false);
-        synchronized (directoryDeletingService) {
-          this.directoryDeletingService.notify();
-        }
+      } finally {
+        taskCount.getAndDecrement();
       }
       // place holder by returning empty results of this call back.
       return BackgroundTaskResult.EmptyTaskResult.newResult();
@@ -299,6 +361,11 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
       return false;
     }
+  }
+
+  public KeyValue<String, OmKeyInfo> getPendingDeletedDirInfo()
+      throws IOException {
+    return deletedDirSupplier.get();
   }
 
 }

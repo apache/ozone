@@ -36,4 +36,10 @@ public interface OMMXBean extends ServiceRuntimeInfo {
 
   String getRocksDbDirectory();
 
+  /**
+   * Gets the OM hostname.
+   *
+   * @return the OM hostname for the datanode.
+   */
+  String getHostname();
 }
