@@ -170,7 +170,7 @@ execute_robot_test() {
 combine_reports() {
   if [[ -d result ]]; then
     rm -f result/output.xml
-    run_rebot result result -o output.xml -N "$(basename "$(pwd)")" result/*.xml
+    run_rebot result result "-o output.xml -N '$(basename $(pwd))' *.xml"
   fi
 }
 

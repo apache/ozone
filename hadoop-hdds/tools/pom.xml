@@ -92,14 +92,6 @@
       <artifactId>hdds-interface-client</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-server-framework</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-server-scm</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-common</artifactId>
     </dependency>

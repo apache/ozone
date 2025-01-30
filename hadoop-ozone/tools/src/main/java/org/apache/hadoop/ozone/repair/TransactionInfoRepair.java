@@ -21,6 +21,7 @@
  */
 package org.apache.hadoop.ozone.repair;
 
+import jakarta.annotation.Nonnull;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -69,16 +70,12 @@ public class TransactionInfoRepair extends RepairTool {
 
   @Override
   public void execute() throws Exception {
-    final Component component = getComponent();
-    if (checkIfServiceIsRunning(component.name())) {
-      return;
-    }
     List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
     List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(
         dbPath);
+    String columnFamilyName = getColumnFamily().getName();
 
     try (ManagedRocksDB db = ManagedRocksDB.open(dbPath, cfDescList, cfHandleList)) {
-      String columnFamilyName = component.columnFamilyDefinition.getName();
       ColumnFamilyHandle transactionInfoCfh = RocksDBUtils.getColumnFamilyHandle(columnFamilyName, cfHandleList);
       if (transactionInfoCfh == null) {
         throw new IllegalArgumentException(columnFamilyName +
@@ -111,7 +108,9 @@ public class TransactionInfoRepair extends RepairTool {
     }
   }
 
-  private Component getComponent() {
+  @Override
+  @Nonnull
+  protected Component serviceToBeOffline() {
     final String parent = spec().parent().name();
     switch (parent) {
     case "om":
@@ -123,14 +122,15 @@ public class TransactionInfoRepair extends RepairTool {
     }
   }
 
-  private enum Component {
-    OM(OMDBDefinition.TRANSACTION_INFO_TABLE),
-    SCM(SCMDBDefinition.TRANSACTIONINFO);
-
-    private final DBColumnFamilyDefinition<String, TransactionInfo> columnFamilyDefinition;
-
-    Component(DBColumnFamilyDefinition<String, TransactionInfo> columnFamilyDefinition) {
-      this.columnFamilyDefinition = columnFamilyDefinition;
+  private DBColumnFamilyDefinition<String, TransactionInfo> getColumnFamily() {
+    Component component = serviceToBeOffline();
+    switch (component) {
+    case OM:
+      return OMDBDefinition.TRANSACTION_INFO_TABLE;
+    case SCM:
+      return SCMDBDefinition.TRANSACTIONINFO;
+    default:
+      throw new IllegalStateException("This tool does not support component: " + component);
     }
   }
 }

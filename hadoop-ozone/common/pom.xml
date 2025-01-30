@@ -93,10 +93,6 @@
       <artifactId>commons-lang3</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdfs-client</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpclient</artifactId>
     </dependency>
@@ -115,6 +111,10 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-config</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-hadoop-dependency-client</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
