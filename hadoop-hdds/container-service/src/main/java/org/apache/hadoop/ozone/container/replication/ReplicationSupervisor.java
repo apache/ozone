@@ -242,8 +242,8 @@ public final class ReplicationSupervisor {
     final int max = maxQueueSize;
     if (getTotalInFlightReplications() >= max) {
       LOG.warn("Ignored {} command for container {} in Replication Supervisor"
-                      + "as queue reached max size of {}.",
-              task.getClass(), task.getContainerId(), max);
+              + "as queue reached max size of {}.",
+          task.getClass(), task.getContainerId(), max);
       return false;
     }
     return true;
@@ -274,7 +274,7 @@ public final class ReplicationSupervisor {
         // returned to SCM in the heartbeat, so we only update the count for
         // priorities other than low.
         taskCounter.computeIfAbsent(task.getClass(),
-                k -> new AtomicInteger()).incrementAndGet();
+            k -> new AtomicInteger()).incrementAndGet();
       }
       queuedCounter.get(task.getMetricName()).incrementAndGet();
       executor.execute(new TaskRunner(task));
