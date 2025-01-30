@@ -19,7 +19,7 @@
 import React, { useRef, useState } from 'react';
 import { AxiosError } from 'axios';
 import {
-  Alert, Button
+  Alert, Button, Tooltip
 } from 'antd';
 import {
   InfoCircleFilled, ReloadOutlined,
@@ -122,9 +122,13 @@ const DiskUsage: React.FC<{}> = () => {
               path={duResponse.path}
               subPaths={duResponse.subPaths}
               updateHandler={loadData} />
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={() => loadData(duResponse.path)} />
+            <Tooltip
+              title="Click to reload Disk Usage data">
+              <Button
+                type='primary'
+                icon={<ReloadOutlined />}
+                onClick={() => loadData(duResponse.path)} />
+            </Tooltip>
           </div>
           <div className='du-table-header-section'>
             <SingleSelect
