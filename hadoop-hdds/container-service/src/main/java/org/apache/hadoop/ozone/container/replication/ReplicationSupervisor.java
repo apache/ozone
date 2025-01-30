@@ -249,20 +249,6 @@ public final class ReplicationSupervisor {
     return true;
   }
 
-  private void addToQueue(AbstractReplicationTask task) {
-    if (inFlight.add(task)) {
-      if (task.getPriority() != ReplicationCommandPriority.LOW) {
-        // Low priority tasks are not included in the replication queue sizes
-        // returned to SCM in the heartbeat, so we only update the count for
-        // priorities other than low.
-        taskCounter.computeIfAbsent(task.getClass(),
-                k -> new AtomicInteger()).incrementAndGet();
-      }
-      queuedCounter.get(task.getMetricName()).incrementAndGet();
-      executor.execute(new TaskRunner(task));
-    }
-  }
-
   public void initCounters(AbstractReplicationTask task) {
     if (requestCounter.get(task.getMetricName()) == null) {
       synchronized (this) {
@@ -278,6 +264,20 @@ public final class ReplicationSupervisor {
           METRICS_MAP.put(task.getMetricName(), task.getMetricDescriptionSegment());
         }
       }
+    }
+  }
+
+  private void addToQueue(AbstractReplicationTask task) {
+    if (inFlight.add(task)) {
+      if (task.getPriority() != ReplicationCommandPriority.LOW) {
+        // Low priority tasks are not included in the replication queue sizes
+        // returned to SCM in the heartbeat, so we only update the count for
+        // priorities other than low.
+        taskCounter.computeIfAbsent(task.getClass(),
+                k -> new AtomicInteger()).incrementAndGet();
+      }
+      queuedCounter.get(task.getMetricName()).incrementAndGet();
+      executor.execute(new TaskRunner(task));
     }
   }
 
