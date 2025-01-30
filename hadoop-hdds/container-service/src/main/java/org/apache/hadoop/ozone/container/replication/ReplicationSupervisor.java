@@ -232,7 +232,7 @@ public final class ReplicationSupervisor {
    * Queue an asynchronous download of the given container.
    */
   public void addTask(AbstractReplicationTask task) {
-    if (queueHasRoomFor(task)){
+    if (queueHasRoomFor(task)) {
       initCounters(task);
       addToQueue(task);
     }
