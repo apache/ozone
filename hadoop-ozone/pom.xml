@@ -25,6 +25,7 @@
   <name>Apache Ozone</name>
   <description>Apache Ozone Project</description>
   <modules>
+    <module>cli-shell</module>
     <module>client</module>
     <module>common</module>
     <module>csi</module>
@@ -148,6 +149,11 @@
         <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-tools</artifactId>
         <version>${hdds.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>ozone-cli-shell</artifactId>
+        <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
