@@ -34,6 +34,7 @@ import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.fs.Syncable;
+import org.apache.hadoop.ozone.client.io.*;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
@@ -83,18 +84,6 @@ import org.apache.hadoop.ozone.client.OzoneSnapshotDiff;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.TenantArgs;
 import org.apache.hadoop.ozone.client.VolumeArgs;
-import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
-import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
-import org.apache.hadoop.ozone.client.io.CipherOutputStreamOzone;
-import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
-import org.apache.hadoop.ozone.client.io.KeyDataStreamOutput;
-import org.apache.hadoop.ozone.client.io.KeyInputStream;
-import org.apache.hadoop.ozone.client.io.KeyOutputStream;
-import org.apache.hadoop.ozone.client.io.LengthInputStream;
-import org.apache.hadoop.ozone.client.io.OzoneCryptoInputStream;
-import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
-import org.apache.hadoop.ozone.client.io.OzoneInputStream;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -1582,7 +1571,7 @@ public class RpcClient implements ClientProtocol {
             = new Pipeline.Builder(pipelineBefore).setNodes(nodes)
             .setId(PipelineID.randomId()).build();
         long length = replicationConfig instanceof ECReplicationConfig
-                ? internalBlockLength(pipelineBefore.getReplicaIndex(dn),
+                ? ECBlockInputStream.internalBlockLength(pipelineBefore.getReplicaIndex(dn),
                 (ECReplicationConfig) replicationConfig, locationInfo.getLength())
                 : locationInfo.getLength();
         OmKeyLocationInfo dnKeyLocation = new OmKeyLocationInfo.Builder()
@@ -1632,34 +1621,6 @@ public class RpcClient implements ClientProtocol {
     }
 
     return result;
-  }
-
-  /**
-   * Helper method to calculate the internal block length of an EC-replicated key.
-   * The length of data blocks differs depending on whether it is the last strip or not.
-   * That of parity blocks can be determined by the data blocks.
-   */
-  private long internalBlockLength(int index, ECReplicationConfig ecRepConfig, long blockLength) {
-    long ecChunkSize = (long) ecRepConfig.getEcChunkSize();
-    long stripeSize = ecChunkSize * ecRepConfig.getData();
-    long lastStripe = blockLength % stripeSize;
-    long blockSize = (blockLength - lastStripe) / ecRepConfig.getData();
-    long lastCell = lastStripe / ecChunkSize + 1;
-    long lastCellLength = lastStripe % ecChunkSize;
-    if (index > ecRepConfig.getData()) {
-      // Parity blocks and their size are driven by the size of the
-      // first block of the block group. All parity blocks have the same size
-      // as block_1.
-      index = 1;
-    }
-
-    if (index < lastCell) {
-      return blockSize + ecChunkSize;
-    } else if (index == lastCell) {
-      return blockSize + lastCellLength;
-    } else {
-      return blockSize;
-    }
   }
 
   @Override
