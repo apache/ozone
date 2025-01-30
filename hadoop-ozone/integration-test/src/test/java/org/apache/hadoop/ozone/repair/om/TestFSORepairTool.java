@@ -60,6 +60,7 @@ import java.util.List;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.ozone.test.IntLambda.withTextFromSystemIn;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -345,12 +346,13 @@ public class TestFSORepairTool {
 
   private int execute(boolean dryRun, String... args) {
     List<String> argList = new ArrayList<>(Arrays.asList("om", "fso-tree", "--db", dbPath));
-    if (!dryRun) {
-      argList.add("--repair");
+    if (dryRun) {
+      argList.add("--dry-run");
     }
     argList.addAll(Arrays.asList(args));
 
-    return cmd.execute(argList.toArray(new String[0]));
+    return withTextFromSystemIn("y")
+        .execute(() -> cmd.execute(argList.toArray(new String[0])));
   }
 
   private <K, V> int countTableEntries(Table<K, V> table) throws Exception {

@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmRatisServerConfig;
@@ -33,6 +32,8 @@ import org.apache.ratis.util.TimeDuration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.File;
 import java.io.IOException;
@@ -74,7 +75,6 @@ class TestSCMConfiguration {
   void setup() {
     conf = new OzoneConfiguration();
     conf.set(OZONE_METADATA_DIRS, tempDir.getAbsolutePath());
-    DefaultConfigManager.clearDefaultConfigs();
   }
 
   @Test
@@ -293,19 +293,21 @@ class TestSCMConfiguration {
 
   }
 
-  @Test
-  public void testDefaultConfigWithInitializedSCM()
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testDefaultConfigWithInitializedSCM(boolean isRatisEnabled)
       throws IOException {
+    // The default config for RatisEnabled is true.
+    assertTrue(SCMHAUtils.isSCMHAEnabled(conf));
+
+    // If the cluster is already initalized, use the value from StorageConfig.
     SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
     when(scmStorageConfig.getState())
         .thenReturn(Storage.StorageState.INITIALIZED);
-    when(scmStorageConfig.isSCMHAEnabled()).thenReturn(false);
-    DefaultConfigManager.clearDefaultConfigs();
+    when(scmStorageConfig.isSCMHAEnabled()).thenReturn(isRatisEnabled);
     SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
+
     assertEquals(SCMHAUtils.isSCMHAEnabled(conf),
         scmStorageConfig.isSCMHAEnabled());
-    when(scmStorageConfig.isSCMHAEnabled()).thenReturn(false);
-    DefaultConfigManager.clearDefaultConfigs();
-    assertTrue(SCMHAUtils.isSCMHAEnabled(conf));
   }
 }

@@ -247,6 +247,7 @@ function get_count_doc_files() {
     local pattern_array=(
         "^hadoop-hdds/docs"
         "^hadoop-ozone/dev-support/checks/docs.sh"
+        "^hadoop-ozone/dev-support/checks/install/hugo.sh"
     )
     filter_changed_files true
     COUNT_DOC_CHANGED_FILES=${match_count}
@@ -278,6 +279,8 @@ function get_count_kubernetes_files() {
     start_end::group_start "Count kubernetes files"
     local pattern_array=(
         "^hadoop-ozone/dev-support/checks/kubernetes.sh"
+        "^hadoop-ozone/dev-support/checks/install/flekszible.sh"
+        "^hadoop-ozone/dev-support/checks/install/k3s.sh"
         "^hadoop-ozone/dist"
     )
     local ignore_array=(
@@ -356,7 +359,7 @@ function check_needs_bats() {
     local pattern_array=(
         "\.bash$"
         "\.bats$"
-        "\.sh$" # includes hadoop-ozone/dev-support/checks/bats.sh
+        "\.sh$" # includes hadoop-ozone/dev-support/checks/bats.sh and hadoop-ozone/dev-support/checks/install/bats.sh
     )
     filter_changed_files
 
@@ -416,6 +419,7 @@ function check_needs_findbugs() {
     start_end::group_start "Check if findbugs is needed"
     local pattern_array=(
         "^hadoop-ozone/dev-support/checks/findbugs.sh"
+        "^hadoop-ozone/dev-support/checks/install/spotbugs.sh"
         "findbugsExcludeFile.xml"
         "pom.xml"
         "src/..../java"

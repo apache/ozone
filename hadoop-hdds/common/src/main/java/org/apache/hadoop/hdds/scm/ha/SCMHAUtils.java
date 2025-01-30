@@ -25,7 +25,6 @@ import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -87,11 +86,14 @@ public final class SCMHAUtils {
     // not used
   }
 
-  // Check if SCM HA is enabled.
+  // This will be removed in follow-up Jira. Ref. HDDS-11754
+  private static boolean isRatisEnabled = true;
   public static boolean isSCMHAEnabled(ConfigurationSource conf) {
-    return conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
-        DefaultConfigManager.getValue(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
-            ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT));
+    return isRatisEnabled;
+  }
+
+  public static void setRatisEnabled(boolean value) {
+    isRatisEnabled = value;
   }
 
   public static String getPrimordialSCM(ConfigurationSource conf) {

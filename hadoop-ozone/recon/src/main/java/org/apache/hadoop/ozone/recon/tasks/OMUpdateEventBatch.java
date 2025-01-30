@@ -27,9 +27,11 @@ import java.util.List;
 public class OMUpdateEventBatch {
 
   private final List<OMDBUpdateEvent> events;
+  private final long batchSequenceNumber;
 
-  public OMUpdateEventBatch(List<OMDBUpdateEvent> e) {
+  public OMUpdateEventBatch(List<OMDBUpdateEvent> e, long batchSequenceNumber) {
     events = e;
+    this.batchSequenceNumber = batchSequenceNumber;
   }
 
   /**
@@ -37,11 +39,7 @@ public class OMUpdateEventBatch {
    * @return Event Info instance.
    */
   long getLastSequenceNumber() {
-    if (events.isEmpty()) {
-      return -1;
-    } else {
-      return events.get(events.size() - 1).getSequenceNumber();
-    }
+    return this.batchSequenceNumber;
   }
 
   /**

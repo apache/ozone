@@ -250,10 +250,10 @@ public class TestReplicationManagerScenarios {
     for (PendingReplica r : scenario.getPendingReplicas()) {
       if (r.getType() == ContainerReplicaOp.PendingOpType.ADD) {
         containerReplicaPendingOps.scheduleAddReplica(container.containerID(), r.getDatanodeDetails(),
-            r.getReplicaIndex(), Long.MAX_VALUE);
+            r.getReplicaIndex(), null, Long.MAX_VALUE);
       } else if (r.getType() == ContainerReplicaOp.PendingOpType.DELETE) {
         containerReplicaPendingOps.scheduleDeleteReplica(container.containerID(), r.getDatanodeDetails(),
-            r.getReplicaIndex(), Long.MAX_VALUE);
+            r.getReplicaIndex(), null, Long.MAX_VALUE);
       }
     }
   }

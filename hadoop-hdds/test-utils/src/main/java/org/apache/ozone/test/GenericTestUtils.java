@@ -20,6 +20,7 @@ package org.apache.ozone.test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.StringWriter;
@@ -34,6 +35,7 @@ import java.util.concurrent.TimeoutException;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.input.CharSequenceInputStream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.Layout;
 import org.apache.log4j.Level;
@@ -438,6 +440,19 @@ public abstract class GenericTestUtils {
     public SystemOutCapturer() {
       super(System.out, System::setOut);
     }
+  }
+
+  /**
+   * Replaces {@link System#in} with a stream that provides {@code lines} as input.
+   * @return an {@code AutoCloseable} to restore the original {@link System#in} stream
+   */
+  public static AutoCloseable supplyOnSystemIn(String... lines) {
+    final InputStream original = System.in;
+    final InputStream in = CharSequenceInputStream.builder()
+        .setCharSequence(String.join("\n", lines))
+        .get();
+    System.setIn(in);
+    return () -> System.setIn(original);
   }
 
   /**

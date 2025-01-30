@@ -74,15 +74,18 @@ public class TestObjectTaggingPut {
     // Create bucket
     clientStub.getObjectStore().createS3Bucket(BUCKET_NAME);
 
-    // Create PutObject and setClient to OzoneClientStub
-    objectEndpoint = new ObjectEndpoint();
-    objectEndpoint.setClient(clientStub);
-    objectEndpoint.setOzoneConfiguration(config);
-
     HttpHeaders headers = mock(HttpHeaders.class);
+
+    // Create PutObject and setClient to OzoneClientStub
+    objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(clientStub)
+        .setConfig(config)
+        .setHeaders(headers)
+        .build();
+
+    
     ByteArrayInputStream body =
         new ByteArrayInputStream("".getBytes(UTF_8));
-    objectEndpoint.setHeaders(headers);
 
     objectEndpoint.put(BUCKET_NAME, KEY_NAME, 0, 1, null, null, null, body);
   }
@@ -167,11 +170,13 @@ public class TestObjectTaggingPut {
     when(mockObjectStore.getS3Volume()).thenReturn(mockVolume);
     when(mockVolume.getBucket("fsoBucket")).thenReturn(mockBucket);
 
-    ObjectEndpoint endpoint = new ObjectEndpoint();
+    ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(mockClient)
+        .build();
     Map<String, String> twoTagsMap = new HashMap<>();
     twoTagsMap.put("tag1", "val1");
     twoTagsMap.put("tag2", "val2");
-    endpoint.setClient(mockClient);
+
 
     doThrow(new OMException("PutObjectTagging is not currently supported for FSO directory",
         ResultCodes.NOT_SUPPORTED_OPERATION)).when(mockBucket).putObjectTagging("dir/", twoTagsMap);

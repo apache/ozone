@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -837,6 +836,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       reconfigurationHandler.register(replicationManager.getConfig());
     }
     serviceManager.register(replicationManager);
+    // RM gets notified of expired pending delete from containerReplicaPendingOps by subscribing to it
+    // so it can resend them.
+    containerReplicaPendingOps.registerSubscriber(replicationManager);
     if (configurator.getScmSafeModeManager() != null) {
       scmSafeModeManager = configurator.getScmSafeModeManager();
     } else {
@@ -1330,8 +1332,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       // Initialize security if security is enabled later.
       initializeSecurityIfNeeded(conf, scmStorageConfig, selfHostName, true);
 
-      if (conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
-          ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT) && !isSCMHAEnabled) {
+      if (SCMHAUtils.isSCMHAEnabled(conf) && !isSCMHAEnabled) {
         SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
             scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(),
             conf);
@@ -1346,8 +1347,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
          */
 
         try {
-          DefaultConfigManager.forceUpdateConfigValue(
-              ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+          SCMHAUtils.setRatisEnabled(true);
           StorageContainerManager scm = createSCM(conf);
           scm.start();
           scm.getScmHAManager().getRatisServer().triggerSnapshot();

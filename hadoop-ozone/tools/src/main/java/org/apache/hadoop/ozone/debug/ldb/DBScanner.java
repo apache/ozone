@@ -27,6 +27,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -87,13 +88,10 @@ import static java.nio.charset.StandardCharsets.UTF_8;
     name = "scan",
     description = "Parse specified metadataTable"
 )
-public class DBScanner implements Callable<Void> {
+public class DBScanner extends AbstractSubcommand implements Callable<Void> {
 
   public static final Logger LOG = LoggerFactory.getLogger(DBScanner.class);
   private static final String SCHEMA_V3 = "V3";
-
-  @CommandLine.Spec
-  private static CommandLine.Model.CommandSpec spec;
 
   @CommandLine.ParentCommand
   private RDBParser parent;
@@ -212,14 +210,6 @@ public class DBScanner implements Callable<Void> {
     }
 
     return null;
-  }
-
-  private static PrintWriter err() {
-    return spec.commandLine().getErr();
-  }
-
-  private static PrintWriter out() {
-    return spec.commandLine().getOut();
   }
 
   public byte[] getValueObject(DBColumnFamilyDefinition dbColumnFamilyDefinition, String key) {
@@ -525,7 +515,7 @@ public class DBScanner implements Callable<Void> {
     return false;
   }
 
-  static Field getRequiredFieldFromAllFields(Class clazz, String fieldName) throws NoSuchFieldException {
+  Field getRequiredFieldFromAllFields(Class clazz, String fieldName) throws NoSuchFieldException {
     List<Field> classFieldList = ValueSchema.getAllFields(clazz);
     Field classField = null;
     for (Field f : classFieldList) {
@@ -680,12 +670,12 @@ public class DBScanner implements Callable<Void> {
   }
 
 
-  private static class Task implements Callable<Void> {
+  private class Task implements Callable<Void> {
 
     private final DBColumnFamilyDefinition dbColumnFamilyDefinition;
     private final ArrayList<ByteArrayKeyValue> batch;
     private final LogWriter logWriter;
-    private static final ObjectWriter WRITER =
+    private final ObjectWriter writer =
         JsonSerializationHelper.getWriter();
     private final long sequenceId;
     private final boolean withKey;
@@ -758,12 +748,12 @@ public class DBScanner implements Callable<Void> {
               }
               String cid = key.toString().substring(0, index);
               String blockId = key.toString().substring(index);
-              sb.append(WRITER.writeValueAsString(LongCodec.get()
+              sb.append(writer.writeValueAsString(LongCodec.get()
                   .fromPersistedFormat(
                       FixedLengthStringCodec.string2Bytes(cid)) +
                   KEY_SEPARATOR_SCHEMA_V3 + blockId));
             } else {
-              sb.append(WRITER.writeValueAsString(key));
+              sb.append(writer.writeValueAsString(key));
             }
             sb.append(": ");
           }
@@ -774,9 +764,9 @@ public class DBScanner implements Callable<Void> {
           if (valueFields != null) {
             Map<String, Object> filteredValue = new HashMap<>();
             filteredValue.putAll(getFieldsFilteredObject(o, dbColumnFamilyDefinition.getValueType(), fieldsSplitMap));
-            sb.append(WRITER.writeValueAsString(filteredValue));
+            sb.append(writer.writeValueAsString(filteredValue));
           } else {
-            sb.append(WRITER.writeValueAsString(o));
+            sb.append(writer.writeValueAsString(o));
           }
 
           results.add(sb.toString());
