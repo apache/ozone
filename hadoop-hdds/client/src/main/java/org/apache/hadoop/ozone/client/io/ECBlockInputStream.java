@@ -182,7 +182,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
 
       BlockLocationInfo blkInfo = new BlockLocationInfo.Builder()
           .setBlockID(blockInfo.getBlockID())
-          .setLength(internalBlockLength(locationIndex + 1, this.repConfig ,this.blockInfo.getLength()))
+          .setLength(internalBlockLength(locationIndex + 1, this.repConfig, this.blockInfo.getLength()))
           .setPipeline(blockInfo.getPipeline())
           .setToken(blockInfo.getToken())
           .setPartNumber(blockInfo.getPartNumber())
@@ -242,9 +242,13 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
    * @param repConfig EC replication config.
    * @param length length of the whole block group.
    */
-  static public long internalBlockLength(int index, ECReplicationConfig repConfig, long length) {
-    if (index <= 0) throw new IllegalArgumentException("Index must start from 1.");
-    if (length < 0) throw new IllegalArgumentException("Block length cannot be negative.");
+  public static long internalBlockLength(int index, ECReplicationConfig repConfig, long length) {
+    if (index <= 0) {
+      throw new IllegalArgumentException("Index must start from 1.");
+    }
+    if (length < 0) {
+      throw new IllegalArgumentException("Block length cannot be negative.");
+    }
     long ecChunkSize = (long) repConfig.getEcChunkSize();
     long stripeSize = ecChunkSize * repConfig.getData();
     long lastStripe = length % stripeSize;
