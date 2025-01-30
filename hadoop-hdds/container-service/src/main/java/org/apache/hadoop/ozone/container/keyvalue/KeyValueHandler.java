@@ -1429,7 +1429,7 @@ public class KeyValueHandler extends Handler {
         dispatcherContext = DispatcherContext.getHandleReadBlock();
       }
 
-      ChunkBuffer data;
+      ChunkBufferToByteString data;
 
       long len =  readBlock.getLen();
       long adjustedChunkOffset, adjustedChunkLen;

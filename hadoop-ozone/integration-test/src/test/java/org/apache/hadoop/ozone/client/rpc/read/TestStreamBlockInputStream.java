@@ -45,14 +45,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Tests {@link StreamBlockInputStream}.
  */
-public class TestStreamBlockInputStream {
+public class TestStreamBlockInputStream extends TestInputStreamBase {
   /**
    * Run the tests as a single test method to avoid needing a new mini-cluster
    * for each test.
    */
   @ContainerLayoutTestInfo.ContainerTest
   void testAll(ContainerLayoutVersion layout) throws Exception {
-    try (MiniOzoneCluster cluster = newCluster(layout)) {
+    try (MiniOzoneCluster cluster = newCluster()) {
       cluster.waitForClusterToBeReady();
 
       OzoneConfiguration conf = cluster.getConf();
@@ -61,6 +61,7 @@ public class TestStreamBlockInputStream {
       OzoneConfiguration copy = new OzoneConfiguration(conf);
       copy.setFromObject(clientConfig);
       try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
+        updateConfig(layout);
         TestBucket bucket = TestBucket.newBuilder(client).build();
 
         testBlockReadBuffers(bucket);

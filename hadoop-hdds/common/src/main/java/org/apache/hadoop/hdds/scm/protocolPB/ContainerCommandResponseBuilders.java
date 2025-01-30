@@ -335,7 +335,7 @@ public final class ContainerCommandResponseBuilders {
 
   public static ContainerCommandResponseProto getReadBlockResponse(
       ContainerCommandRequestProto request, DatanodeBlockID blockID,
-      ChunkInfo chunkInfo, ChunkBuffer data,
+      ChunkInfo chunkInfo, ChunkBufferToByteString data,
       Function<ByteBuffer, ByteString> byteBufferToByteString) {
 
     ReadChunkResponseProto.Builder response;
