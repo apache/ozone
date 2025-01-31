@@ -70,6 +70,12 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-common</artifactId>
+        <version>${hdds.version}</version>
+        <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-config</artifactId>
         <version>${hdds.version}</version>
       </dependency>
@@ -77,6 +83,12 @@
         <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-container-service</artifactId>
         <version>${hdds.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-container-service</artifactId>
+        <version>${hdds.version}</version>
+        <type>test-jar</type>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
@@ -96,6 +108,11 @@
       <dependency>
         <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-hadoop-dependency-server</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-hadoop-dependency-test</artifactId>
         <version>${hdds.version}</version>
       </dependency>
       <dependency>
@@ -135,6 +152,17 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-server-scm</artifactId>
+        <version>${hdds.version}</version>
+        <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-test-utils</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-tools</artifactId>
         <version>${hdds.version}</version>
       </dependency>
@@ -142,39 +170,6 @@
         <groupId>org.apache.ozone</groupId>
         <artifactId>rocksdb-checkpoint-differ</artifactId>
         <version>${hdds.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-common</artifactId>
-        <version>${hdds.version}</version>
-        <type>test-jar</type>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-container-service</artifactId>
-        <version>${hdds.version}</version>
-        <type>test-jar</type>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-hadoop-dependency-test</artifactId>
-        <version>${hdds.version}</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-server-scm</artifactId>
-        <version>${hdds.version}</version>
-        <type>test-jar</type>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-test-utils</artifactId>
-        <version>${hdds.version}</version>
-        <scope>test</scope>
       </dependency>
     </dependencies>
   </dependencyManagement>
