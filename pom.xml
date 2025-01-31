@@ -1717,6 +1717,15 @@
         <artifactId>maven-dependency-plugin</artifactId>
         <executions>
           <execution>
+            <id>analyze</id>
+            <goals>
+              <goal>analyze-only</goal>
+            </goals>
+            <configuration>
+              <ignoreUnusedRuntime>true</ignoreUnusedRuntime>
+            </configuration>
+          </execution>
+          <execution>
             <id>add-classpath-descriptor</id>
             <goals>
               <goal>build-classpath</goal>
