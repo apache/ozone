@@ -58,7 +58,6 @@ public class TestOzoneRepairShell {
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf = null;
   private static String om;
-  private static TransactionInfoRepair transactionInfoRepair;
   private static final String TRANSACTION_INFO_TABLE_TERM_INDEX_PATTERN = "([0-9]+#[0-9]+)";
 
   @BeforeAll
@@ -67,7 +66,6 @@ public class TestOzoneRepairShell {
     cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
     om = conf.get(OZONE_OM_ADDRESS_KEY);
-    transactionInfoRepair = new TransactionInfoRepair();
   }
 
   @BeforeEach
@@ -92,7 +90,7 @@ public class TestOzoneRepairShell {
   public void testUpdateTransactionInfoTable(Component component) throws Exception {
     CommandLine cmd = new OzoneRepair().getCmd();
     String dbPath = getDbPath(component);
-    String componentLowerCase = component.toString().toLowerCase();
+    String componentLowerCase = component.name().toLowerCase();
 
     cluster.getOzoneManager().stop();
     cluster.getStorageContainerManager().stop();
@@ -143,7 +141,7 @@ public class TestOzoneRepairShell {
   private String scanTransactionInfoTable(String dbPath, Component component) {
     CommandLine debugCmd = new OzoneDebug().getCmd();
     debugCmd.execute("ldb", "--db", dbPath, "scan", "--column_family",
-        transactionInfoRepair.getColumnFamily(component).getName());
+        TransactionInfoRepair.getColumnFamily(component).getName());
     return out.get();
   }
 
