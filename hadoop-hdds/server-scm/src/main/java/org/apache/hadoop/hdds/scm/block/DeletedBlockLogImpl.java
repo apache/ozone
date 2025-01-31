@@ -175,38 +175,46 @@ public class DeletedBlockLogImpl
    */
   @Override
   public int resetCount(List<Long> txIDs) throws IOException {
-
-    if (txIDs != null) {
-      try {
-        lock.lock();
-        transactionStatusManager.resetRetryCount(txIDs);
-        return deletedBlockLogStateManager.resetRetryCountOfTransactionInDB(
-            new ArrayList<>(txIDs));
-      } catch (Exception e) {
-        throw new IOException("Error during transaction reset", e);
-      } finally {
-        lock.unlock();
-      }
-    }
-
     final int batchSize = 1000;
     int totalProcessed = 0;
-    long startTxId = 0;
 
     try {
-      // If txIDs are not provided, fetch all failed transactions in batches
+      if (txIDs != null && !txIDs.isEmpty()) {
+        return resetRetryCount(txIDs);
+      }
+
+      // If txIDs are null or empty, fetch all failed transactions in batches
+      long startTxId = 0;
       List<DeletedBlocksTransaction> batch;
+
       do {
         // Fetch the batch of failed transactions
         batch = getFailedTransactions(batchSize, startTxId);
-        List<Long> batchTxIDs = batch.stream().map(DeletedBlocksTransaction::getTxID).collect(Collectors.toList());
-        totalProcessed += resetCount(batchTxIDs);
+        if (batch.isEmpty()) {
+          break;
+        }
 
-        // Update startTxId to continue from the last processed transaction in the next iteration
+        List<Long> batchTxIDs = batch.stream().map(DeletedBlocksTransaction::getTxID).collect(Collectors.toList());
+        totalProcessed += resetRetryCount(new ArrayList<>(batchTxIDs));
+        // Update startTxId to continue from the last processed transaction
         startTxId = batch.get(batch.size() - 1).getTxID() + 1;
       } while (!batch.isEmpty());
-    } catch (IOException ex) {
-      throw new IOException("Unable to get the failed transactions", ex);
+
+    } catch (Exception e) {
+      throw new IOException("Error during transaction reset", e);
+    }
+    return totalProcessed;
+  }
+
+  private int resetRetryCount(List<Long> txIDs) throws IOException {
+    int totalProcessed;
+    lock.lock();
+    try {
+      transactionStatusManager.resetRetryCount(txIDs);
+      totalProcessed = deletedBlockLogStateManager.resetRetryCountOfTransactionInDB(new ArrayList<>(
+          txIDs));
+    } finally {
+      lock.unlock();
     }
     return totalProcessed;
   }
