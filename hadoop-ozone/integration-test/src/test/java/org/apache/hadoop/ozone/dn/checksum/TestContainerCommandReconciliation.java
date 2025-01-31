@@ -19,9 +19,12 @@
 package org.apache.hadoop.ozone.dn.checksum;
 
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -110,7 +113,7 @@ public class TestContainerCommandReconciliation {
     // Disable the container scanner so it does not create merkle tree files that interfere with this test.
     conf.getObject(ContainerScannerConfiguration.class).setEnabled(false);
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
+        .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
     rpcClient = OzoneClientFactory.getRpcClient(conf);
@@ -122,6 +125,10 @@ public class TestContainerCommandReconciliation {
   public static void stop() throws IOException {
     if (rpcClient != null) {
       rpcClient.close();
+    }
+
+    if (dnClient != null) {
+      dnClient.close();
     }
 
     if (cluster != null) {
@@ -276,8 +283,7 @@ public class TestContainerCommandReconciliation {
   public void testContainerChecksumWithBlockMissing() throws Exception {
     // 1. Write data to a container.
     long containerID = writeDataAndGetContainer(true, 20 * 1024 * 1024);
-    Set<DatanodeDetails> peerNodes = cluster.getHddsDatanodes().stream().map(
-        HddsDatanodeService::getDatanodeDetails).collect(Collectors.toSet());
+    TestHelper.waitForReplicasContainerState(cluster, containerID, ContainerReplicaProto.State.CLOSED);
     HddsDatanodeService hddsDatanodeService = cluster.getHddsDatanodes().get(0);
     DatanodeStateMachine datanodeStateMachine = hddsDatanodeService.getDatanodeStateMachine();
     Container<?> container = datanodeStateMachine.getContainer().getContainerSet().getContainer(containerID);
@@ -317,20 +323,32 @@ public class TestContainerCommandReconciliation {
     Assertions.assertNotEquals(oldDataChecksum, dataChecksumAfterBlockDelete);
 
     // 3. Reconcile the container.
-    kvHandler.reconcileContainer(datanodeStateMachine.getDnContainerOperationClientClient(), container, peerNodes);
+    cluster.getStorageContainerManager().getClientProtocolServer().reconcileContainer(containerID);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        ContainerProtos.ContainerChecksumInfo newContainerChecksumInfo = readChecksumFile(container.getContainerData());
+        return newContainerChecksumInfo.getContainerMerkleTree().getDataChecksum() == oldDataChecksum;
+      } catch (Exception ex) {
+        return false;
+      }
+    }, 500, 20000);
     ContainerProtos.ContainerChecksumInfo newContainerChecksumInfo = readChecksumFile(container.getContainerData());
-    long newDataChecksum = newContainerChecksumInfo.getContainerMerkleTree().getDataChecksum();
     assertTreesSortedAndMatch(oldContainerChecksumInfo.getContainerMerkleTree(),
         newContainerChecksumInfo.getContainerMerkleTree());
-    Assertions.assertEquals(oldDataChecksum, newDataChecksum);
+    List<HddsProtos.SCMContainerReplicaProto> containerReplicas = cluster.getStorageContainerManager()
+        .getClientProtocolServer().getContainerReplicas(containerID, ClientVersion.CURRENT_VERSION);
+    // Compare and check if dataChecksum is same on all replicas.
+    Set<Long> dataChecksums = containerReplicas.stream()
+        .map(HddsProtos.SCMContainerReplicaProto::getDataChecksum)
+        .collect(Collectors.toSet());
+    assertEquals(1, dataChecksums.size());
   }
 
   @Test
   public void testContainerChecksumChunkCorruption() throws Exception {
     // 1. Write data to a container.
     long containerID = writeDataAndGetContainer(true, 20 * 1024 * 1024);
-    Set<DatanodeDetails> peerNodes = cluster.getHddsDatanodes().stream().map(
-        HddsDatanodeService::getDatanodeDetails).collect(Collectors.toSet());
+    TestHelper.waitForReplicasContainerState(cluster, containerID, ContainerReplicaProto.State.CLOSED);
     HddsDatanodeService hddsDatanodeService = cluster.getHddsDatanodes().get(0);
     DatanodeStateMachine datanodeStateMachine = hddsDatanodeService.getDatanodeStateMachine();
     Container<?> container = datanodeStateMachine.getContainer().getContainerSet().getContainer(containerID);
@@ -403,12 +421,26 @@ public class TestContainerCommandReconciliation {
     writeContainerDataTreeProto(container.getContainerData(), builder.getContainerMerkleTree());
 
     // 4. Reconcile the container.
-    kvHandler.reconcileContainer(datanodeStateMachine.getDnContainerOperationClientClient(), container, peerNodes);
+    cluster.getStorageContainerManager().getClientProtocolServer().reconcileContainer(containerID);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        ContainerProtos.ContainerChecksumInfo newContainerChecksumInfo = readChecksumFile(container.getContainerData());
+        return newContainerChecksumInfo.getContainerMerkleTree().getDataChecksum() == oldDataChecksum;
+      } catch (Exception ex) {
+        return false;
+      }
+    }, 500, 20000);
     ContainerProtos.ContainerChecksumInfo newContainerChecksumInfo = readChecksumFile(container.getContainerData());
-    long newDataChecksum = newContainerChecksumInfo.getContainerMerkleTree().getDataChecksum();
     assertTreesSortedAndMatch(oldContainerChecksumInfo.getContainerMerkleTree(),
         newContainerChecksumInfo.getContainerMerkleTree());
-    Assertions.assertEquals(oldDataChecksum, newDataChecksum);
+    Assertions.assertEquals(oldDataChecksum, newContainerChecksumInfo.getContainerMerkleTree().getDataChecksum());
+    List<HddsProtos.SCMContainerReplicaProto> containerReplicas = cluster.getStorageContainerManager()
+        .getClientProtocolServer().getContainerReplicas(containerID, ClientVersion.CURRENT_VERSION);
+    // Compare and check if dataChecksum is same on all replicas.
+    Set<Long> dataChecksums = containerReplicas.stream()
+        .map(HddsProtos.SCMContainerReplicaProto::getDataChecksum)
+        .collect(Collectors.toSet());
+    assertEquals(1, dataChecksums.size());
   }
 
   private long writeDataAndGetContainer(boolean close, int dataLen) throws Exception {
@@ -429,6 +461,7 @@ public class TestContainerCommandReconciliation {
         .findFirst().get().getContainerID();
     if (close) {
       TestHelper.waitForContainerClose(cluster, containerID);
+      TestHelper.waitForScmContainerState(cluster, containerID, HddsProtos.LifeCycleState.CLOSED);
     }
     return containerID;
   }

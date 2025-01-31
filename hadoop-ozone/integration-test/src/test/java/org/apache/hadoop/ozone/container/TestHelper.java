@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -378,6 +379,34 @@ public final class TestHelper {
       }
       index++;
     }
+  }
+
+  public static void waitForScmContainerState(MiniOzoneCluster cluster, long containerID,
+                                              HddsProtos.LifeCycleState lifeCycleState)
+      throws InterruptedException, TimeoutException {
+    GenericTestUtils.waitFor(() ->  {
+      try {
+        HddsProtos.LifeCycleState state = cluster.getStorageContainerManager().getContainerManager()
+            .getContainer(ContainerID.valueOf(containerID)).getState();
+        return state == lifeCycleState;
+      } catch (ContainerNotFoundException e) {
+        return false;
+      }
+    }, 500, 100 * 1000);
+  }
+
+  public static void waitForReplicasContainerState(MiniOzoneCluster cluster, long containerID,
+                                                   ContainerReplicaProto.State state)
+      throws InterruptedException, TimeoutException {
+    GenericTestUtils.waitFor(() ->  {
+      try {
+        Set<ContainerReplica> replicas = cluster.getStorageContainerManager().getContainerManager()
+            .getContainerReplicas(ContainerID.valueOf(containerID));
+        return replicas.stream().allMatch(r -> r.getState() == state);
+      } catch (ContainerNotFoundException e) {
+        return false;
+      }
+    }, 500, 100 * 1000);
   }
 
   public static StateMachine getStateMachine(MiniOzoneCluster cluster)

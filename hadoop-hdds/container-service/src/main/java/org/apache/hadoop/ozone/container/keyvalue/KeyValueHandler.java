@@ -1529,7 +1529,8 @@ public class KeyValueHandler extends Handler {
         blockToken, new HashMap<>());
     ContainerProtos.GetCommittedBlockLengthResponseProto blockLengthResponse =
         ContainerProtocolCalls.getCommittedBlockLength(xceiverClient, blockID, blockToken);
-    long blockCommitSequenceId = getBlockManager().getBlock(container, blockID).getBlockCommitSequenceId();
+    long blockCommitSequenceId = getBlockManager().blockExists(container, blockID) ?
+        getBlockManager().getBlock(container, blockID).getBlockCommitSequenceId() : 0;
     // Check the local bcsId with the one from the bcsId from the peer datanode.
     long maxBlockCommitSequenceId = Math.max(blockLengthResponse.getBlockLength(), blockCommitSequenceId);
     List<ContainerProtos.ChunkInfo> chunksList = blockResponse.getBlockData().getChunksList();
@@ -1572,7 +1573,8 @@ public class KeyValueHandler extends Handler {
         blockToken, new HashMap<>());
     ContainerProtos.GetCommittedBlockLengthResponseProto blockLengthResponse =
         ContainerProtocolCalls.getCommittedBlockLength(xceiverClient, blockID, blockToken);
-    long blockCommitSequenceId = getBlockManager().getBlock(container, blockID).getBlockCommitSequenceId();
+    long blockCommitSequenceId = getBlockManager().blockExists(container, blockID) ?
+        getBlockManager().getBlock(container, blockID).getBlockCommitSequenceId() : 0;
     // Check the local bcsId with the one from the bcsId from the peer datanode.
     long maxBlockCommitSequenceId = Math.max(blockLengthResponse.getBlockLength(), blockCommitSequenceId);
     List<ContainerProtos.ChunkInfo> chunksListFromPeer = blockResponse.getBlockData().getChunksList();

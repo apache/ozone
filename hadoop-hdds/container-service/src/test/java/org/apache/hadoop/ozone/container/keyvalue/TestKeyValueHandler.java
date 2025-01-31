@@ -36,6 +36,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
@@ -60,6 +61,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.util.Sets;
 import org.apache.ozone.test.GenericTestUtils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
@@ -77,6 +79,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.any;
 
 import org.junit.jupiter.api.Assertions;
@@ -498,7 +501,14 @@ public class TestKeyValueHandler {
 
     Assertions.assertEquals(0, icrCount.get());
     // This should trigger container report validation in the ICR handler above.
-    keyValueHandler.reconcileContainer(mock(DNContainerOperationClient.class), container, Collections.emptySet());
+    DNContainerOperationClient mockDnClient = mock(DNContainerOperationClient.class);
+    DatanodeDetails peer1 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails peer2 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails peer3 = MockDatanodeDetails.randomDatanodeDetails();
+    when(mockDnClient.getContainerChecksumInfo(anyLong(), any())).thenReturn(null);
+    keyValueHandler.reconcileContainer(mockDnClient, container, Sets.newHashSet(peer1, peer2, peer3));
+    // Make sure all the replicas are used for reconciliation.
+    Mockito.verify(mockDnClient, times(3)).getContainerChecksumInfo(anyLong(), any());
     Assertions.assertEquals(1, icrCount.get());
   }
 
