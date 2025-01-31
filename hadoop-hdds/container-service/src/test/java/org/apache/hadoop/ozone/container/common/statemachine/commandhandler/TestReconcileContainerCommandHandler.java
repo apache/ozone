@@ -44,9 +44,11 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -54,6 +56,7 @@ import java.util.Map;
 import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.createBlockMetaData;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -74,6 +77,10 @@ public class TestReconcileContainerCommandHandler {
   private OzoneContainer ozoneContainer;
   private StateContext context;
   private ReconcileContainerCommandHandler subject;
+  @TempDir
+  private Path tempDir;
+  @TempDir
+  private Path dbFile;
 
   public void init(ContainerLayoutVersion layout, IncrementalReportSender<Container> icrSender)
       throws Exception {
@@ -94,6 +101,8 @@ public class TestReconcileContainerCommandHandler {
     for (int id = 1; id <= NUM_CONTAINERS; id++) {
       KeyValueContainerData data = new KeyValueContainerData(id, layout, GB,
           PipelineID.randomId().toString(), randomDatanodeDetails().getUuidString());
+      data.setMetadataPath(tempDir.toString());
+      data.setDbFile(dbFile.toFile());
       containerSet.addContainer(new KeyValueContainer(data, conf));
     }
 
@@ -123,6 +132,11 @@ public class TestReconcileContainerCommandHandler {
     init(layout, icrSender);
 
     for (int id = 1; id <= NUM_CONTAINERS; id++) {
+      KeyValueContainerData data = new KeyValueContainerData(id, layout, GB,
+          PipelineID.randomId().toString(), randomDatanodeDetails().getUuidString());
+      data.setMetadataPath(tempDir.toString());
+      data.setDbFile(dbFile.toFile());
+      createBlockMetaData(data, 5, 3);
       ReconcileContainerCommand cmd = new ReconcileContainerCommand(id, Collections.emptySet());
       subject.handle(cmd, ozoneContainer, context, null);
     }
