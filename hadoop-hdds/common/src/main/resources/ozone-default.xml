@@ -172,7 +172,7 @@
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
     <description>Determines where on the local filesystem HDDS data will be
-      stored. Defaults to dfs.datanode.data.dir if not specified.
+      stored. Defaults to hdds.datanode.data.dir if not specified.
       The directories should be tagged with corresponding storage types
       ([SSD]/[DISK]/[ARCHIVE]/[RAM_DISK]) for storage policies. The default
       storage type will be DISK if the directory does not have a storage type
