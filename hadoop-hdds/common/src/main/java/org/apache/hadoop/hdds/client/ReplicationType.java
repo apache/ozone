@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 public enum ReplicationType {
   RATIS,
   STAND_ALONE,
+  @Deprecated
   CHAINED,
   EC;
 

@@ -1307,9 +1307,8 @@
       specified when writing the key. The default is used if replication
       is not specified when creating key or no default replication set at
       bucket. Supported values:
-      For Standalone: 1
-      For Ratis: 3
-      For Erasure Coding(EC) supported format:
+      For RATIS: 1, 3
+      For EC (Erasure Coding) supported format:
       {ECCodec}-{DataBlocks}-{ParityBlocks}-{ChunkSize}
         ECCodec: Codec for encoding stripe. Supported values : XOR, RS (Reed Solomon)
         DataBlocks: Number of data blocks in a stripe.
@@ -1327,7 +1326,7 @@
       Default replication type to be used while writing key into ozone. The
       value can be specified when writing the key, default is used when
       nothing is specified when creating key or no default value set at bucket.
-      Supported values: RATIS, STAND_ALONE, CHAINED and EC.
+      Supported values: RATIS, EC.
     </description>
   </property>
 
