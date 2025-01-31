@@ -32,5 +32,5 @@ export OZONE_CLIENT_REPLICATION_TYPE=EC
 
 docker-compose up -d --no-recreate --scale datanode=5
 wait_for_safemode_exit
-execute_robot_test scm -v PREFIX:${prefix} -v OZONE_CLIENT_REPLICATION_TYPE:"${OZONE_CLIENT_REPLICATION_TYPE}" ec/basic.robot
+execute_robot_test scm -v PREFIX:${RANDOM} -v OZONE_CLIENT_REPLICATION_TYPE:"${OZONE_CLIENT_REPLICATION_TYPE}" ec/basic.robot
 docker-compose --ansi never down
