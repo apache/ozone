@@ -55,7 +55,6 @@
     <dependency>
       <groupId>com.googlecode.json-simple</groupId>
       <artifactId>json-simple</artifactId>
-      <version>1.1.1</version>
       <exclusions>
         <exclusion>
           <groupId>junit</groupId>
@@ -214,7 +213,6 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>
-        <version>${maven-checkstyle-plugin.version}</version>
         <configuration>
           <includeTestSourceDirectory>false</includeTestSourceDirectory>
         </configuration>
@@ -275,7 +273,6 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-antrun-plugin</artifactId>
-        <version>${maven-antrun-plugin.version}</version>
         <executions>
           <execution>
             <id>create-web-xmls</id>
