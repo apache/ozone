@@ -1020,7 +1020,6 @@
         <groupId>org.glassfish.jersey.containers</groupId>
         <artifactId>jersey-container-servlet</artifactId>
         <version>${jersey2.version}</version>
-        <scope>compile</scope>
         <exclusions>
           <exclusion>
             <groupId>org.glassfish.hk2</groupId>

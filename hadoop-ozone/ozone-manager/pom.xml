@@ -186,7 +186,6 @@
       <groupId>org.apache.ranger</groupId>
       <artifactId>ranger-plugins-common</artifactId>
       <version>${ranger.version}</version>
-      <scope>compile</scope>
       <!-- Workaround to prevent slf4j binding conflicts until ranger-intg is
        fixed to not introduce this to the classpath -->
       <exclusions>

@@ -154,7 +154,6 @@
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdfs</artifactId>
       <version>${hadoop.version}</version>
-      <scope>compile</scope>
       <exclusions>
         <exclusion>
           <groupId>ch.qos.reload4j</groupId>
