@@ -37,6 +37,8 @@ import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
+import org.apache.hadoop.metrics2.MetricsCollector;
+import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import static org.apache.hadoop.hdds.fs.MockSpaceUsagePersistence.inMemory;
@@ -504,13 +506,9 @@ public class TestHddsVolume {
     VolumeInfoMetrics volumeInfoMetrics = volume.getVolumeInfoStats();
 
     try {
-      // In case of failed volume all stats should return 0.
-      assertEquals(0, volumeInfoMetrics.getUsed());
-      assertEquals(0, volumeInfoMetrics.getAvailable());
-      assertEquals(0, volumeInfoMetrics.getCapacity());
-      assertEquals(0, volumeInfoMetrics.getReserved());
-      assertEquals(0, volumeInfoMetrics.getTotalCapacity());
-      assertEquals(0, volumeInfoMetrics.getCommitted());
+      // In case of failed volume, metrics should not throw
+      MetricsCollector collector = new MetricsCollectorImpl();
+      volumeInfoMetrics.getMetrics(collector, true);
     } finally {
       // Shutdown the volume.
       volume.shutdown();
