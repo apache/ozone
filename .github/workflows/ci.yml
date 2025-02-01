@@ -43,6 +43,7 @@ jobs:
       GITHUB_CONTEXT: ${{ toJson(github) }}
     outputs:
       acceptance-suites: ${{ steps.acceptance-suites.outputs.suites }}
+      integration-suites: ${{ steps.integration-suites.outputs.suites }}
       needs-basic-check: ${{ steps.categorize-basic-checks.outputs.needs-basic-check }}
       needs-native-check: ${{ steps.categorize-basic-checks.outputs.needs-native-check }}
       basic-checks: ${{ steps.categorize-basic-checks.outputs.basic-checks }}
@@ -97,6 +98,9 @@ jobs:
       - name: Acceptance suites
         id: acceptance-suites
         run: dev-support/ci/acceptance_suites.sh
+      - name: Integration suites
+        id: integration-suites
+        run: dev-support/ci/integration_suites.sh
       - name: Categorize Basic Checks
         id: categorize-basic-checks
         env:
@@ -591,17 +595,7 @@ jobs:
     if: needs.build-info.outputs.needs-integration-tests == 'true'
     strategy:
       matrix:
-        profile:
-          - client
-          - container
-          - filesystem
-          - hdds
-          - om
-          - ozone
-          - recon
-          - shell
-          - snapshot
-          - flaky
+        profile: ${{ fromJson(needs.build-info.outputs.integration-suites) }}
       fail-fast: false
     steps:
       - name: Checkout project
@@ -639,7 +633,7 @@ jobs:
             args="$args -DskipShade"
           fi
 
-          hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }} ${args}
+          hadoop-ozone/dev-support/checks/integration.sh -Ptest-${{ matrix.profile }} ${args}
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
       - name: Summary of failures

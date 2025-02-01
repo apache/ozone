@@ -82,5 +82,10 @@ public interface SpaceUsageSource {
     public SpaceUsageSource snapshot() {
       return this; // immutable
     }
+
+    @Override
+    public String toString() {
+      return "capacity=" + capacity + ", used=" + used + ", available=" + available;
+    }
   }
 }
