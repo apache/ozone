@@ -207,7 +207,6 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-patch-plugin</artifactId>
-            <version>1.1.1</version>
             <configuration>
               <patchFile>${basedir}/src/main/patches/rocks-native.patch</patchFile>
               <strip>1</strip>
@@ -224,8 +223,8 @@
             </executions>
           </plugin>
           <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-antrun-plugin</artifactId>
-            <version>${maven-antrun-plugin.version}</version>
             <executions>
               <execution>
                 <id>unzip-artifact</id>
@@ -308,7 +307,6 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-jar-plugin</artifactId>
-            <version>${maven-jar-plugin.version}</version>
             <configuration>
               <includes>
                 <include>**/*.class</include>
