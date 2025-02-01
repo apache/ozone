@@ -182,7 +182,6 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-reconcodegen</artifactId>
-      <version>${ozone.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.ratis</groupId>
@@ -405,7 +404,6 @@
       <plugin>
         <groupId>com.github.eirslett</groupId>
         <artifactId>frontend-maven-plugin</artifactId>
-        <version>${frontend-maven-plugin.version}</version>
         <configuration>
           <npmInheritsProxyConfigFromMaven>false</npmInheritsProxyConfigFromMaven>
           <installDirectory>target</installDirectory>
@@ -451,8 +449,8 @@
         </executions>
       </plugin>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-clean-plugin</artifactId>
-        <version>${maven-clean-plugin.version}</version>
         <configuration>
           <filesets>
             <fileset>
