@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.container.common.volume;
 
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Predicate;
@@ -38,8 +40,9 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
 
   @Override
   public boolean test(HddsVolume vol) {
-    long volumeCapacity = vol.getCapacity();
-    long free = vol.getAvailable();
+    SpaceUsageSource usage = vol.getCurrentUsage();
+    long volumeCapacity = usage.getCapacity();
+    long free = usage.getAvailable();
     long committed = vol.getCommittedBytes();
     long available = free - committed;
     long volumeFreeSpaceToSpare =

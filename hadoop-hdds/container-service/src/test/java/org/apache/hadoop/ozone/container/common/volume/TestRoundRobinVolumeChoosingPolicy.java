@@ -93,8 +93,8 @@ public class TestRoundRobinVolumeChoosingPolicy {
     HddsVolume hddsVolume1 = volumes.get(0);
     HddsVolume hddsVolume2 = volumes.get(1);
 
-    assertEquals(100L, hddsVolume1.getAvailable());
-    assertEquals(200L, hddsVolume2.getAvailable());
+    assertEquals(100L, hddsVolume1.getCurrentUsage().getAvailable());
+    assertEquals(200L, hddsVolume2.getCurrentUsage().getAvailable());
 
     // Test two rounds of round-robin choosing
     assertEquals(hddsVolume1, policy.chooseVolume(volumes, 0));
