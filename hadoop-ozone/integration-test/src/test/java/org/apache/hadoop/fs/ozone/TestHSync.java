@@ -583,6 +583,55 @@ public class TestHSync {
     }
   }
 
+  static Stream<BucketLayout> bucketLayouts() {
+    return Stream.of(BucketLayout.FILE_SYSTEM_OPTIMIZED, BucketLayout.LEGACY);
+  }
+
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testBatchKeyDeletionWithHSync(BucketLayout bucketLayout) throws Exception {
+    // Create a bucket with the specified layout
+    OzoneBucket testBucket = TestDataUtil.createVolumeAndBucket(client, bucketLayout);
+    
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + testBucket.getVolumeName()
+        + OZONE_URI_DELIMITER + testBucket.getName();
+
+    // Create multiple files, some with hsync
+    final int numFiles = 5;
+    List<String> openKeys = new ArrayList<>();
+
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      for (int i = 0; i < numFiles; i++) {
+        String keyName = "batch-key-" + i;
+        Path file = new Path(dir, keyName);
+        try (FSDataOutputStream os = fs.create(file, true)) {
+          os.write(1);
+          os.hsync();
+          openKeys.add(keyName);
+        }
+      }
+
+      client.getObjectStore().getVolume(testBucket.getVolumeName())
+          .getBucket(testBucket.getName())
+          .deleteKeys(openKeys);
+
+      for (String key : openKeys) {
+        assertThrows(FileNotFoundException.class,
+            () -> fs.getFileStatus(new Path(dir, key)));
+        try {
+          fs.open(new Path(dir, key));
+          fail("HSync should throw because the open key is gone");
+        } catch (FileNotFoundException ex) {
+          // expected
+        }
+      }
+    }
+  }
+
   @Test
   public void testHSyncOpenKeyDeletionWhileDeleteDirectory() throws Exception {
     // Verify that when directory is deleted recursively hsync related openKeys should be deleted,
