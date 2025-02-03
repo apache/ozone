@@ -42,6 +42,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.*;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
@@ -76,49 +77,52 @@ public class FileSizeCountTask implements ReconOmTask {
    */
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
-    // Map to store the count of files based on file size
-    Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
+    LOG.info("Starting parallel reprocess of FileSizeCountTask.");
+    ExecutorService executorService = Executors.newFixedThreadPool(2);
+    Map<FileSizeCountKey, Long> fileSizeCountMap = new ConcurrentHashMap<>();
 
     // Delete all records from FILE_COUNT_BY_SIZE table
     int execute = dslContext.delete(FILE_COUNT_BY_SIZE).execute();
     LOG.debug("Deleted {} records from {}", execute, FILE_COUNT_BY_SIZE);
 
-    // Call reprocessBucket method for FILE_SYSTEM_OPTIMIZED bucket layout
-    boolean statusFSO =
-        reprocessBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED,
-            omMetadataManager,
-            fileSizeCountMap);
-    // Call reprocessBucket method for LEGACY bucket layout
-    boolean statusOBS =
-        reprocessBucketLayout(BucketLayout.LEGACY, omMetadataManager,
-            fileSizeCountMap);
-    if (!statusFSO && !statusOBS) {
+    List<Callable<Boolean>> tasks = List.of(
+        () -> reprocessBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED, omMetadataManager, fileSizeCountMap),
+        () -> reprocessBucketLayout(BucketLayout.LEGACY, omMetadataManager, fileSizeCountMap)
+    );
+
+    try {
+      List<Future<Boolean>> results = executorService.invokeAll(tasks);
+      executorService.shutdown();
+      for (Future<Boolean> result : results) {
+        if (!result.get()) {
+          return new ImmutablePair<>(getTaskName(), false);
+        }
+      }
+    } catch (InterruptedException | ExecutionException e) {
+      LOG.error("Error executing reprocess tasks in parallel", e);
       return new ImmutablePair<>(getTaskName(), false);
     }
+
     writeCountsToDB(true, fileSizeCountMap);
-    LOG.debug("Completed a 'reprocess' run of FileSizeCountTask.");
+    LOG.debug("Completed parallel reprocess of FileSizeCountTask.");
     return new ImmutablePair<>(getTaskName(), true);
   }
 
   private boolean reprocessBucketLayout(BucketLayout bucketLayout,
-                               OMMetadataManager omMetadataManager,
-                               Map<FileSizeCountKey, Long> fileSizeCountMap) {
-    Table<String, OmKeyInfo> omKeyInfoTable =
-        omMetadataManager.getKeyTable(bucketLayout);
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-             keyIter = omKeyInfoTable.iterator()) {
+                                        OMMetadataManager omMetadataManager,
+                                        Map<FileSizeCountKey, Long> fileSizeCountMap) {
+    Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable(bucketLayout);
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIter = omKeyInfoTable.iterator()) {
       while (keyIter.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
         handlePutKeyEvent(kv.getValue(), fileSizeCountMap);
-        //  The time complexity of .size() method is constant time, O(1)
         if (fileSizeCountMap.size() >= 100000) {
-          writeCountsToDB(true, fileSizeCountMap);
+          synchronized (this) { writeCountsToDB(true, fileSizeCountMap); }
           fileSizeCountMap.clear();
         }
       }
     } catch (IOException ioEx) {
-      LOG.error("Unable to populate File Size Count for " + bucketLayout +
-          " in Recon DB. ", ioEx);
+      LOG.error("Unable to populate File Size Count for {} in Recon DB.", bucketLayout, ioEx);
       return false;
     }
     return true;
