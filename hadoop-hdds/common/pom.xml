@@ -214,6 +214,12 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
+      <!-- for FileUtil in hadoop-common -->
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-compress</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-reload4j</artifactId>
       <scope>runtime</scope>
