@@ -137,8 +137,7 @@ const DUMetadata: React.FC<MetadataProps> = ({
      */
     const selectedInfoKeys = [
       'bucketName', 'bucketLayout', 'encInfo', 'fileName', 'keyName',
-      'name', 'owner', 'sourceBucket', 'sourceVolume', 'storageType',
-      'usedNamespace', 'volumeName', 'volume'
+      'name', 'owner', 'storageType', 'usedNamespace', 'volumeName', 'volume'
     ] as const;
     const objectInfo: ObjectInfo = summaryResponse.objectInfo ?? {};
 
