@@ -91,9 +91,9 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
       HddsVolume firstVolume = volumesWithEnoughSpace.get(firstIndex);
       HddsVolume secondVolume = volumesWithEnoughSpace.get(secondIndex);
 
-      long firstAvailable = firstVolume.getAvailable()
+      long firstAvailable = firstVolume.getCurrentUsage().getAvailable()
           - firstVolume.getCommittedBytes();
-      long secondAvailable = secondVolume.getAvailable()
+      long secondAvailable = secondVolume.getCurrentUsage().getAvailable()
           - secondVolume.getCommittedBytes();
       return firstAvailable < secondAvailable ? secondVolume : firstVolume;
     }
