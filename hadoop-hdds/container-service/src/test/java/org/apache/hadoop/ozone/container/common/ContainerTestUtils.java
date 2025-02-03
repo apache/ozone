@@ -33,7 +33,9 @@ import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -59,6 +61,8 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.replication.MeasuredReplicator;
+import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -131,7 +135,39 @@ public final class ContainerTestUtils {
       DatanodeDetails datanodeDetails, OzoneConfiguration conf)
       throws IOException {
     StateContext context = getMockContext(datanodeDetails, conf);
-    return new OzoneContainer(datanodeDetails, conf, context);
+    return new OzoneContainer(getMockHddsDatanodeService(mock(ReplicationSupervisor.class),
+        getMockMeasuredReplicator()), datanodeDetails, conf, context);
+  }
+
+  public static OzoneContainer getOzoneContainer(HddsDatanodeService hddsDatanodeService,
+                                                 DatanodeDetails datanodeDetails, OzoneConfiguration conf)
+      throws IOException {
+    StateContext context = getMockContext(datanodeDetails, conf);
+    return new OzoneContainer(hddsDatanodeService, datanodeDetails, conf, context, null, null);
+  }
+
+  public static HddsDatanodeService getMockHddsDatanodeService(ReplicationSupervisor replicationSupervisor,
+                                                               MeasuredReplicator mockMeasuredReplicator) {
+    HddsDatanodeService hddsDatanodeService = mock(HddsDatanodeService.class);
+
+    DatanodeStateMachine datanodeStateMachine = mock(DatanodeStateMachine.class);
+    when(hddsDatanodeService.getDatanodeStateMachine()).thenReturn(datanodeStateMachine);
+
+    when(datanodeStateMachine.getSupervisor()).thenReturn(replicationSupervisor);
+
+    when(datanodeStateMachine.getPushReplicatorWithMetrics()).thenReturn(mockMeasuredReplicator);
+    return hddsDatanodeService;
+  }
+
+  public static MeasuredReplicator getMockMeasuredReplicator() {
+    MeasuredReplicator measuredReplicator = mock(MeasuredReplicator.class);
+    MutableGaugeLong gaugeLong = mock(MutableGaugeLong.class);
+    when(measuredReplicator.getTransferredBytes()).thenReturn(gaugeLong);
+    when(measuredReplicator.getSuccessTime()).thenReturn(gaugeLong);
+    when(measuredReplicator.getFailureBytes()).thenReturn(gaugeLong);
+    when(measuredReplicator.getFailureTime()).thenReturn(gaugeLong);
+    when(measuredReplicator.getQueueTime()).thenReturn(gaugeLong);
+    return measuredReplicator;
   }
 
   public static StateContext getMockContext(DatanodeDetails datanodeDetails,
