@@ -2102,7 +2102,7 @@ public class KeyManagerImpl implements KeyManager {
     while (iterator.hasNext() && remainingBufLimit > 0) {
       Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
       OmDirectoryInfo dirInfo = entry.getValue();
-      long objectSerializedSize = entry.getRawValue().length;
+      long objectSerializedSize = entry.getReadableBytes();
       if (!OMFileRequest.isImmediateChild(dirInfo.getParentObjectID(),
           parentInfo.getObjectID())) {
         processedSubDirs = true;
@@ -2149,7 +2149,7 @@ public class KeyManagerImpl implements KeyManager {
       while (iterator.hasNext() && remainingBufLimit > 0) {
         Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
         OmKeyInfo fileInfo = entry.getValue();
-        long objectSerializedSize = entry.getRawValue().length;
+        long objectSerializedSize = entry.getReadableBytes();
         if (!OMFileRequest.isImmediateChild(fileInfo.getParentObjectID(),
             parentInfo.getObjectID())) {
           processedSubFiles = true;
