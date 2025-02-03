@@ -607,7 +607,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
           throws IOException {
         final KEY key = keyCodec.fromCodecBuffer(raw.getKey());
         final VALUE value = valueCodec.fromCodecBuffer(raw.getValue());
-        return Table.newKeyValue(key, value, raw.getReadableBytes());
+        return Table.newKeyValue(key, value, raw.getRawSize());
       }
     };
   }

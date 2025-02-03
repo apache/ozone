@@ -337,8 +337,8 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
 
     VALUE getValue() throws IOException;
 
-    default int getReadableBytes()  throws IOException {
-      return -1;
+    default int getRawSize()  throws IOException {
+      return 0;
     }
   }
 
@@ -379,7 +379,7 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
     };
   }
 
-  static <K, V> KeyValue<K, V> newKeyValue(K key, V value, int readableBytes) {
+  static <K, V> KeyValue<K, V> newKeyValue(K key, V value, int rawSize) {
     return new KeyValue<K, V>() {
       @Override
       public K getKey() {
@@ -392,8 +392,8 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
       }
 
       @Override
-      public int getReadableBytes() throws IOException {
-        return readableBytes;
+      public int getRawSize() throws IOException {
+        return rawSize;
       }
 
       @Override
