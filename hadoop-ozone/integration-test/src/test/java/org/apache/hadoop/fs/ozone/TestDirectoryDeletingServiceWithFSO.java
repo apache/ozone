@@ -90,7 +90,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -116,7 +115,6 @@ public class TestDirectoryDeletingServiceWithFSO {
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 2000);
-    conf.setInt(OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK, 5);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1000, TimeUnit.MILLISECONDS);
@@ -155,7 +153,7 @@ public class TestDirectoryDeletingServiceWithFSO {
   }
 
   @AfterEach
-  public void cleanup() {
+  public void cleanup() throws InterruptedException, TimeoutException {
     assertDoesNotThrow(() -> {
       Path root = new Path("/");
       FileStatus[] fileStatuses = fs.listStatus(root);
@@ -273,8 +271,6 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(dirTable, 1);
 
     assertSubPathsCount(dirDeletingService::getMovedFilesCount, 15);
-    // 15 subDir + 3 parentDir
-    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 18);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 19);
 
     assertEquals(15, metrics.getNumSubFilesSentForPurge());
@@ -335,7 +331,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(dirTable, 0);
 
     assertSubPathsCount(dirDeletingService::getMovedFilesCount, 3);
-    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 2);
+    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 5);
     assertEquals(5, metrics.getNumDirsSentForPurge());
     assertEquals(5, metrics.getNumDirsPurged());
@@ -431,7 +427,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     omDoubleBuffer.stopDaemon();
 
     OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
-    OzoneBucket bucket = volume.getBucket(bucketName);    long volumeId = metadataManager.getVolumeId(volumeName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    long volumeId = metadataManager.getVolumeId(volumeName);
 
     // manually delete dir and add to deleted table. namespace count occupied "1" as manual deletion do not reduce
     long bucketId = metadataManager.getBucketId(volumeName, bucketName);
@@ -629,13 +626,14 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(deletedDirTable, initialDeletedCount + 1);
     assertTableRowCount(renameTable, initialRenameCount + 1);
     Mockito.doAnswer(i -> {
-      List<OzoneManagerProtocolProtos.PurgePathRequest> purgePathRequestList = i.getArgument(5);
+      List<OzoneManagerProtocolProtos.PurgePathRequest> purgePathRequestList = i.getArgument(4);
       for (OzoneManagerProtocolProtos.PurgePathRequest purgeRequest : purgePathRequestList) {
         Assertions.assertNotEquals(deletePathKey, purgeRequest.getDeletedDir());
       }
-      return i.callRealMethod();
-    }).when(service).optimizeDirDeletesAndSubmitRequest(anyLong(), anyLong(), anyLong(),
-        anyLong(), anyList(), anyList(), eq(null), anyLong(), anyInt(), Mockito.any(), any(), anyLong());
+      return null;
+    }).when(service).optimizeDirDeletesAndSubmitRequest(anyLong(), anyLong(),
+        anyLong(), anyList(), anyList(), eq(null), anyLong(), anyLong(), Mockito.any(), any(),
+        anyLong());
 
     Mockito.doAnswer(i -> {
       store.createSnapshot(testVolumeName, testBucketName, snap2);
@@ -783,6 +781,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 0);
 
     // Manual cleanup deletedDirTable for next tests
+    client.getObjectStore().deleteSnapshot(volumeName, bucketName, "snap1");
     cleanupTables();
   }
 
