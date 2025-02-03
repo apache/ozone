@@ -205,29 +205,32 @@ public class OMBlockPrefetchClient {
                                         String serviceID, ExcludeList excludeList, String clientMachine,
                                         NetworkTopology clusterMap) throws IOException {
     long readStartTime = Time.monotonicNowNanos();
-    ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue = blockQueueMap.get(replicationConfig);
     List<AllocatedBlock> allocatedBlocks = new ArrayList<>();
     int retrievedBlocksCount = 0;
     boolean allocateBlocksFromSCM = false;
-    while (retrievedBlocksCount < numBlocks) {
-      ExpiringAllocatedBlock expiringBlock = queue.poll();
-      if (expiringBlock == null) {
-        break;
-      }
+    ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue = blockQueueMap.get(replicationConfig);
 
-      if (System.currentTimeMillis() > expiringBlock.getExpiryTime()) {
-        continue;
-      }
+    if (queue != null) {
+      while (retrievedBlocksCount < numBlocks) {
+        ExpiringAllocatedBlock expiringBlock = queue.poll();
+        if (expiringBlock == null) {
+          break;
+        }
 
-      AllocatedBlock block = expiringBlock.getBlock();
-      List<DatanodeDetails> sortedNodes = sortDatanodes(block.getPipeline().getNodes(), clientMachine, clusterMap);
-      if (!Objects.equals(sortedNodes, block.getPipeline().getNodesInOrder())) {
-        block = block.toBuilder()
-            .setPipeline(block.getPipeline().copyWithNodesInOrder(sortedNodes))
-            .build();
+        if (System.currentTimeMillis() > expiringBlock.getExpiryTime()) {
+          continue;
+        }
+
+        AllocatedBlock block = expiringBlock.getBlock();
+        List<DatanodeDetails> sortedNodes = sortDatanodes(block.getPipeline().getNodes(), clientMachine, clusterMap);
+        if (!Objects.equals(sortedNodes, block.getPipeline().getNodesInOrder())) {
+          block = block.toBuilder()
+              .setPipeline(block.getPipeline().copyWithNodesInOrder(sortedNodes))
+              .build();
+        }
+        allocatedBlocks.add(block);
+        retrievedBlocksCount++;
       }
-      allocatedBlocks.add(block);
-      retrievedBlocksCount++;
     }
 
     int remainingBlocks = numBlocks - retrievedBlocksCount;
