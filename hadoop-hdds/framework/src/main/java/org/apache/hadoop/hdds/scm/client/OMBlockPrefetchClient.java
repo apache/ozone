@@ -214,12 +214,15 @@ public class OMBlockPrefetchClient {
   @SuppressWarnings("parameternumber")
   public List<AllocatedBlock> getBlocks(long scmBlockSize, int numBlocks, ReplicationConfig replicationConfig,
                                         String serviceID, ExcludeList excludeList, String clientMachine,
-                                        NetworkTopology clusterMap, AtomicBoolean isOverAllocated) throws IOException {
+                                        NetworkTopology clusterMap, AtomicBoolean performPrefetch) throws IOException {
     long readStartTime = Time.monotonicNowNanos();
     List<AllocatedBlock> allocatedBlocks = new ArrayList<>();
     int retrievedBlocksCount = 0;
     ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue = blockQueueMap.get(replicationConfig);
-    if (queue != null) {
+
+    // We redirect to the allocateBlock RPC call to SCM when we encounter an untested ReplicationConfig or a populated
+    // ExcludeList, otherwise we return blocks from cache.
+    if (queue != null && excludeList.isEmpty()) {
       while (retrievedBlocksCount < numBlocks) {
         ExpiringAllocatedBlock expiringBlock = queue.poll();
         if (expiringBlock == null) {
@@ -243,11 +246,12 @@ public class OMBlockPrefetchClient {
     }
 
     int remainingBlocks = numBlocks - retrievedBlocksCount;
-    isOverAllocated.set(remainingBlocks > 0);
+    performPrefetch.set(remainingBlocks == 0);
     // If there aren't enough blocks in the cache, we make an RPC to SCM and prefetch blockPrefetchFactor times the
     // requested blocks in the same call, avoiding a separate prefetchBlocks call to SCM.
     int overAllocateBlocks =
-        (queue != null && remainingBlocks > 0) ? blocksToFetch(queue.size(), numBlocks * blockPrefetchFactor) : 0;
+        (queue != null && remainingBlocks > 0 && excludeList.isEmpty()) ?
+            blocksToFetch(queue.size(), numBlocks * blockPrefetchFactor) : 0;
     List<AllocatedBlock> newBlocks =
         scmBlockLocationProtocol.allocateBlock(scmBlockSize, remainingBlocks + overAllocateBlocks, replicationConfig,
             serviceID, excludeList, clientMachine);
@@ -255,7 +259,7 @@ public class OMBlockPrefetchClient {
     allocatedBlocks.addAll(newBlocks.subList(0, Math.min(remainingBlocks, newBlocks.size())));
     metrics.addReadFromQueueLatency(Time.monotonicNowNanos() - readStartTime);
 
-    if (queue != null && newBlocks.size() > remainingBlocks) {
+    if (queue != null && newBlocks.size() > remainingBlocks && excludeList.isEmpty()) {
       for (AllocatedBlock block : newBlocks.subList(remainingBlocks, newBlocks.size())) {
         queue.offer(new ExpiringAllocatedBlock(block, expiryTime));
       }

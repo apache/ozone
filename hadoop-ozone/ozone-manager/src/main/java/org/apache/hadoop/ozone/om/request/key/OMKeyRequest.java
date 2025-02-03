@@ -294,12 +294,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
     String remoteUser = getRemoteUser().getShortUserName();
     List<AllocatedBlock> allocatedBlocks;
     try {
-      AtomicBoolean isOverAllocated = new AtomicBoolean(false);
+      AtomicBoolean performPrefetch = new AtomicBoolean(true);
       allocatedBlocks = captureLatencyNs(perfMetrics.getGetBlocksFromPrefetchQueueLatencyNs(),
           () -> prefetchClient.getBlocks(scmBlockSize, numBlocks, replicationConfig, serviceID, excludeList,
-              clientMachine, clusterMap, isOverAllocated));
+              clientMachine, clusterMap, performPrefetch));
 
-      if (!isOverAllocated.get()) {
+      if (performPrefetch.get()) {
         captureLatencyNs(perfMetrics.getPrefetchBlocksLatencyNs(),
             () -> prefetchClient.prefetchBlocks(scmBlockSize, numBlocks * blockPrefetchFactor, replicationConfig,
                 serviceID, excludeList));
