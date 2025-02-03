@@ -36,6 +36,7 @@ import static org.mockito.Mockito.when;
 
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -61,6 +62,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.TestContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
+import org.apache.hadoop.ozone.recon.metrics.ContainerHealthMetrics;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
@@ -228,6 +230,14 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     rec = unHealthyContainersTableHandle.fetchByContainerId(7L).get(0);
     assertEquals("MISSING", rec.getContainerState());
     assertEquals(3, rec.getReplicaDelta().intValue());
+
+    Field field = ContainerHealthTask.class.getDeclaredField("containerHealthMetrics");
+    field.setAccessible(true);
+
+    // Read private field value
+    ContainerHealthMetrics containerHealthMetrics = (ContainerHealthMetrics) field.get(containerHealthTask);
+
+    assertEquals(1, containerHealthMetrics.getMissingContainerCount());
 
     rec = unHealthyContainersTableHandle.fetchByContainerId(4L).get(0);
     assertEquals("OVER_REPLICATED", rec.getContainerState());
