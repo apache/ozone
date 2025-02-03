@@ -337,12 +337,8 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
 
     VALUE getValue() throws IOException;
 
-    default byte[] getRawKey() throws IOException {
-      return null;
-    }
-
-    default byte[] getRawValue() throws IOException {
-      return null;
+    default int getRawSize()  throws IOException {
+      return 0;
     }
   }
 
@@ -383,7 +379,7 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
     };
   }
 
-  static <K, V> KeyValue<K, V> newKeyValue(K key, V value, byte[] rawKey, byte[] rawValue) {
+  static <K, V> KeyValue<K, V> newKeyValue(K key, V value, int rawSize) {
     return new KeyValue<K, V>() {
       @Override
       public K getKey() {
@@ -396,13 +392,8 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
       }
 
       @Override
-      public byte[] getRawKey() throws IOException {
-        return rawKey;
-      }
-
-      @Override
-      public byte[] getRawValue() throws IOException {
-        return rawValue;
+      public int getRawSize() throws IOException {
+        return rawSize;
       }
 
       @Override
