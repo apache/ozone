@@ -1740,6 +1740,7 @@
               <ignoreUnusedRuntime>true</ignoreUnusedRuntime>
               <ignoredUnusedDeclaredDependencies>
                 <ignoredUnusedDeclaredDependency>org.junit.jupiter:junit-jupiter-engine</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>org.mockito:mockito-inline</ignoredUnusedDeclaredDependency>
               </ignoredUnusedDeclaredDependencies>
             </configuration>
           </execution>
