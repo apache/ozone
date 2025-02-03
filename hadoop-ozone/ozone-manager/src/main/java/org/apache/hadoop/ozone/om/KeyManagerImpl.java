@@ -2081,21 +2081,17 @@ public class KeyManagerImpl implements KeyManager {
     Table<String, OmDirectoryInfo> dirTable = metadataManager.getDirectoryTable();
     try (TableIterator<String,
         ? extends Table.KeyValue<String, OmDirectoryInfo>>
-        iterator = dirTable.iterator()) {
-      return gatherSubDirsWithIterator(parentInfo, numEntries,
-          seekDirInDB, countEntries, iterator);
+        iterator = dirTable.iterator(seekDirInDB)) {
+      return gatherSubDirsWithIterator(parentInfo, numEntries, countEntries, iterator);
     }
 
   }
 
   private List<OmKeyInfo> gatherSubDirsWithIterator(OmKeyInfo parentInfo,
-      long numEntries, String seekDirInDB,
-      long countEntries,
-      TableIterator<String,
-          ? extends Table.KeyValue<String, OmDirectoryInfo>> iterator)
+      long numEntries, long countEntries,
+      TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>> iterator)
       throws IOException {
     List<OmKeyInfo> directories = new ArrayList<>();
-    iterator.seek(seekDirInDB);
 
     while (iterator.hasNext() && numEntries - countEntries > 0) {
       Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
@@ -2130,9 +2126,7 @@ public class KeyManagerImpl implements KeyManager {
 
     Table fileTable = metadataManager.getFileTable();
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        iterator = fileTable.iterator()) {
-
-      iterator.seek(seekFileInDB);
+        iterator = fileTable.iterator(seekFileInDB)) {
 
       while (iterator.hasNext() && numEntries - countEntries > 0) {
         Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
