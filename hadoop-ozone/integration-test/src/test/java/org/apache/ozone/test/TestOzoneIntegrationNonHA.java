@@ -23,8 +23,8 @@ import org.junit.jupiter.api.TestInstance;
 /** Test Ozone with non-HA cluster. */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestOzoneIntegrationNonHA extends NonHATests {
-  MiniOzoneCluster createCluster() throws Exception {
-    return startBuilding()
+  protected MiniOzoneCluster createCluster() throws Exception {
+    return newClusterBuilder()
         .build();
   }
 

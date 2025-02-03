@@ -30,8 +30,8 @@ import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMI
 class TestOzoneContractFSO extends AbstractOzoneContractTest {
 
   @Override
-  OzoneConfiguration createOzoneConfig() {
-    OzoneConfiguration conf = createBaseConfiguration();
+  protected OzoneConfiguration createOzoneConfig() {
+    OzoneConfiguration conf = super.createOzoneConfig();
     conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, FILE_SYSTEM_OPTIMIZED.name());
     return conf;
   }

@@ -32,7 +32,7 @@ import org.junit.jupiter.api.TestInstance;
 public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
 
   /** Hook method for subclasses. */
-  MiniOzoneCluster.Builder startBuilding() {
+  MiniOzoneCluster.Builder newClusterBuilder() {
     return MiniOzoneCluster.newBuilder(createOzoneConfig())
         .setNumDatanodes(5);
   }

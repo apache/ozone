@@ -35,7 +35,7 @@ import java.util.UUID;
 public abstract class HATests extends ClusterForTests<MiniOzoneHAClusterImpl> {
 
   /** Hook method for subclasses. */
-  MiniOzoneHAClusterImpl.Builder startBuilding() {
+  MiniOzoneHAClusterImpl.Builder newClusterBuilder() {
     return MiniOzoneCluster.newHABuilder(createOzoneConfig())
         .setOMServiceId("om-" + UUID.randomUUID())
         .setNumOfOzoneManagers(3)

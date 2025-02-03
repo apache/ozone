@@ -69,16 +69,16 @@ public abstract class ClusterForTests<C extends MiniOzoneCluster> {
   /**
    * Hook method that allows tweaking the configuration.
    */
-  OzoneConfiguration createOzoneConfig() {
+  protected OzoneConfiguration createOzoneConfig() {
     return createBaseConfiguration();
   }
 
   /**
    * Hook method to create cluster with different parameters.
    */
-  abstract C createCluster() throws Exception;
+  protected abstract C createCluster() throws Exception;
 
-  C getCluster() {
+  protected C getCluster() {
     return cluster;
   }
 

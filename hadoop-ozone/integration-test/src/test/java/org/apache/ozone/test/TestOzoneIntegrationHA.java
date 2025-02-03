@@ -22,8 +22,8 @@ import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 /** Test Ozone with HA cluster. */
 public class TestOzoneIntegrationHA extends HATests {
   @Override
-  MiniOzoneHAClusterImpl createCluster() throws Exception {
-    return startBuilding()
+  protected MiniOzoneHAClusterImpl createCluster() throws Exception {
+    return newClusterBuilder()
         .build();
   }
 }
