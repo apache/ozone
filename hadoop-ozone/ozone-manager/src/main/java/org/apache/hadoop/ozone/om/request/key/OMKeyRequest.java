@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -73,6 +74,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInf
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -111,6 +113,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
 /**
@@ -276,26 +279,27 @@ public abstract class OMKeyRequest extends OMClientRequest {
       long requestedSize, long scmBlockSize, int preallocateBlocksMax,
       boolean grpcBlockTokenEnabled, String serviceID, OMMetrics omMetrics,
       boolean shouldSortDatanodes, UserInfo userInfo, NetworkTopology clusterMap,
-      OMBlockPrefetchClient prefetchClient, int blockPrefetchFactor) throws IOException {
+      OMBlockPrefetchClient prefetchClient, int blockPrefetchFactor, OMPerformanceMetrics perfMetrics)
+      throws IOException {
+    long allocateBlockStartTime = Time.monotonicNowNanos();
     int dataGroupSize = replicationConfig instanceof ECReplicationConfig
         ? ((ECReplicationConfig) replicationConfig).getData() : 1;
     int numBlocks = (int) Math.min(preallocateBlocksMax,
         (requestedSize - 1) / (scmBlockSize * dataGroupSize) + 1);
 
-    String clientMachine = "";
-    if (shouldSortDatanodes) {
-      clientMachine = userInfo.getRemoteAddress();
-    }
+    String clientMachine = shouldSortDatanodes ? userInfo.getRemoteAddress() : "";
 
     List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
     String remoteUser = getRemoteUser().getShortUserName();
     List<AllocatedBlock> allocatedBlocks;
     try {
-      allocatedBlocks = prefetchClient.getBlocks(scmBlockSize, numBlocks, replicationConfig, serviceID, excludeList,
-          clientMachine, clusterMap);
+      allocatedBlocks = captureLatencyNs(perfMetrics.getGetBlocksFromPrefetchQueueLatencyNs(),
+          () -> prefetchClient.getBlocks(scmBlockSize, numBlocks, replicationConfig, serviceID, excludeList,
+              clientMachine, clusterMap));
 
-      prefetchClient.prefetchBlocks(scmBlockSize, numBlocks * blockPrefetchFactor, replicationConfig, serviceID,
-          excludeList);
+      captureLatencyNs(perfMetrics.getPrefetchBlocksLatencyNs(),
+          () -> prefetchClient.prefetchBlocks(scmBlockSize, numBlocks * blockPrefetchFactor, replicationConfig,
+              serviceID, excludeList));
     } catch (SCMException ex) {
       omMetrics.incNumBlockAllocateCallFails();
       if (ex.getResult()
@@ -318,6 +322,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       }
       locationInfos.add(builder.build());
     }
+    perfMetrics.setOverallAllocateBlockLatencyNs(Time.monotonicNowNanos() - allocateBlockStartTime);
     return locationInfos;
   }
 

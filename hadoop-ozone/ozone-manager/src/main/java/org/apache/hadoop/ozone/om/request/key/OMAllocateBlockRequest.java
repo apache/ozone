@@ -123,7 +123,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
             keyArgs.getSortDatanodes(), userInfo,
             ozoneManager.getClusterMap(),
             ozoneManager.getOmBlockPrefetchClient(),
-            ozoneManager.getBlockPrefetchFactor());
+            ozoneManager.getBlockPrefetchFactor(),
+            ozoneManager.getPerfMetrics());
 
     // Set modification time and normalize key if required.
     KeyArgs.Builder newKeyArgs =

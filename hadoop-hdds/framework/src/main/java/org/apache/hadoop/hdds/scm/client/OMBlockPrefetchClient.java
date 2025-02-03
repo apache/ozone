@@ -174,6 +174,7 @@ public class OMBlockPrefetchClient {
                              String serviceID, ExcludeList excludeList) {
     ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue = blockQueueMap.get(replicationConfig);
     prefetchExecutor.submit(() -> {
+      long writeStartTime = Time.monotonicNowNanos();
       int currentSize = queue.size();
       int adjustedNumBlocks = Math.min(numBlocks, maxBlocks);
       int blocksToFetch = adjustedNumBlocks - currentSize;
@@ -184,7 +185,6 @@ public class OMBlockPrefetchClient {
         return;
       }
 
-      long writeStartTime = Time.monotonicNowNanos();
       try {
         List<AllocatedBlock> newBlocks = scmBlockLocationProtocol.allocateBlock(
             scmBlockSize, blocksToFetch, replicationConfig, serviceID, excludeList, null);
