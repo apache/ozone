@@ -456,7 +456,6 @@ function check_needs_native() {
             "^hadoop-hdds/common"
             "^hadoop-hdds/config"
             "^hadoop-hdds/hadoop-dependency-client"
-            "^hadoop-hdds/hadoop-dependency-test"
             "^hadoop-hdds/managed-rocksdb"
             "^hadoop-hdds/test-utils"
             "^pom.xml"
