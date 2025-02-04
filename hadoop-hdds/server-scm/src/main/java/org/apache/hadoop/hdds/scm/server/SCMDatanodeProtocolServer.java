@@ -280,6 +280,22 @@ public class SCMDatanodeProtocolServer implements
     return cmd.getProtoBufMessage();
   }
 
+  private String constructCommandAuditMap(List<SCMCommandProto> cmds) {
+    StringBuilder auditMap = new StringBuilder();
+    auditMap.append('[');
+    for (SCMCommandProto cmd : cmds) {
+      if (cmd.getCommandType().equals(deleteBlocksCommand)) {
+        auditMap.append("commandType:" + cmd.getCommandType());
+        auditMap.append(" No. of deleteTransactions:");
+        auditMap.append(cmd.getDeleteBlocksCommandProto().getDeletedBlocksTransactionsList().size());
+      } else {
+        auditMap.append(cmd);
+      }
+    }
+    auditMap.append(']');
+    return auditMap.toString();
+  }
+
   @Override
   public SCMHeartbeatResponseProto sendHeartbeat(
       SCMHeartbeatRequestProto heartbeat) throws IOException, TimeoutException {
@@ -291,7 +307,7 @@ public class SCMDatanodeProtocolServer implements
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("datanodeUUID", heartbeat.getDatanodeDetails().getUuid());
-    auditMap.put("command", flatten(cmdResponses.toString()));
+    auditMap.put("command", flatten(constructCommandAuditMap(cmdResponses)));
     term.ifPresent(t -> auditMap.put("term", String.valueOf(t)));
     try {
       SCMHeartbeatResponseProto.Builder builder =
