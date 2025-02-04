@@ -17,19 +17,12 @@
 
 package org.apache.hadoop.ozone.container.metrics;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeQueueMetrics;
-import org.junit.jupiter.api.BeforeEach;
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
 
 import static org.apache.commons.text.WordUtils.capitalize;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeQueueMetrics.COMMAND_DISPATCHER_QUEUE_PREFIX;
@@ -41,44 +34,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Test for queue metrics of datanodes.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(300)
-public class TestDatanodeQueueMetrics {
-
-  private MiniOzoneHAClusterImpl cluster = null;
-  private OzoneConfiguration conf;
-  private String omServiceId;
-  private static int numOfOMs = 3;
-  private String scmServiceId;
-  private static int numOfSCMs = 3;
-
-  private static final Logger LOG = LoggerFactory
-      .getLogger(TestDatanodeQueueMetrics.class);
-
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
-  @BeforeEach
-  public void init() throws Exception {
-    conf = new OzoneConfiguration();
-    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, "10s");
-    omServiceId = "om-service-test1";
-    scmServiceId = "scm-service-test1";
-    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
-    builder.setOMServiceId(omServiceId)
-        .setSCMServiceId(scmServiceId)
-        .setNumOfStorageContainerManagers(numOfSCMs)
-        .setNumOfOzoneManagers(numOfOMs)
-        .setNumDatanodes(1);
-    cluster = builder.build();
-    cluster.waitForClusterToBeReady();
-  }
-  /**
-    * Set a timeout for each test.
-    */
+public abstract class TestDatanodeQueueMetrics implements NonHATests.TestCase {
 
   @Test
   public void testQueueMetrics() {
@@ -89,7 +47,6 @@ public class TestDatanodeQueueMetrics {
       assertThat(getGauge(COMMAND_DISPATCHER_QUEUE_PREFIX + typeSize))
           .isGreaterThanOrEqualTo(0);
     }
-
   }
 
   private long getGauge(String metricName) {
