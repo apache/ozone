@@ -27,7 +27,8 @@ In Ozone, user data are separated into blocks and stored in HDDS Containers. Con
 
 Earlier, there was one RocksDB for each Container on datanode. With user data continously growing, there will be hundreds of thousands of RocksDB instances on one datanode. It's a big challenge to manage this amount of RocksDB instances in one JVM. 
 
-Unlike the previous approach, this "Merge Container RocksDB in DN" feature will use only one RocksDB for each data volume, holding all metadata of Containers in this RocksDB. 
+Unlike the previous approach, this "Merge Container RocksDB in DN" feature will use only one RocksDB for each data volume 
+(here, data volume means the disc volume and not the ozone metadata volume) holding all metadata of Containers in this RocksDB. 
   
 ## Configuration
 
