@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
+import org.apache.hadoop.ozone.om.bucket.server.OzoneBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
@@ -103,6 +104,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
   private final NettyMetrics nettyMetrics;
 
+  private final OzoneBucket ozoneBucket;
   public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer,
       boolean isTracingEnabled) throws IOException {
     this.isTracingEnabled = isTracingEnabled;
@@ -124,6 +126,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     this.installSnapshotExecutor =
         HadoopExecutors.newSingleThreadExecutor(installSnapshotThreadFactory);
     this.nettyMetrics = NettyMetrics.create();
+    this.ozoneBucket = new OzoneBucket(ozoneManager, ozoneManager.getConfiguration());
   }
 
   /**

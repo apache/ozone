@@ -111,7 +111,7 @@ public final class OzoneManagerDoubleBuffer {
       return this;
     }
 
-    Builder setUpdateLastAppliedIndex(Consumer<TermIndex> updateLastAppliedIndex) {
+    public Builder setUpdateLastAppliedIndex(Consumer<TermIndex> updateLastAppliedIndex) {
       this.updateLastAppliedIndex = updateLastAppliedIndex;
       return this;
     }

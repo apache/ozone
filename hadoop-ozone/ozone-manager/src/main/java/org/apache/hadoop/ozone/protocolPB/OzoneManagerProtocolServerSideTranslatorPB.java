@@ -36,6 +36,7 @@ import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.bucket.server.OzoneBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
@@ -63,6 +64,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   private static final String OM_REQUESTS_PACKAGE = "org.apache.hadoop.ozone";
 
   private final OzoneManagerRatisServer omRatisServer;
+  private final OzoneBucket ozoneBucket;
   private final RequestHandler handler;
   private final OzoneManager ozoneManager;
   private final OzoneProtocolMessageDispatcher<OMRequest, OMResponse,
@@ -83,6 +85,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       OzoneManagerRatisServer ratisServer,
       ProtocolMessageMetrics<ProtocolMessageEnum> metrics) {
     this.ozoneManager = impl;
+    this.ozoneBucket = new OzoneBucket(this.ozoneManager, this.ozoneManager.getConfiguration());
     this.perfMetrics = impl.getPerfMetrics();
 
     this.handler = new OzoneManagerRequestHandler(impl);
@@ -194,7 +197,14 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         return createErrorResponse(request, ex);
       }
 
-      final OMResponse response = omRatisServer.submitRequest(requestToSubmit);
+      final OMResponse response;
+
+      if (OmUtils.isBucketWriteRequest(request)) {
+        response = ozoneBucket.getWriteChannel().submitRequest(requestToSubmit);
+      } else {
+        response = omRatisServer.submitRequest(requestToSubmit);
+      }
+
       if (!response.getSuccess()) {
         omClientRequest.handleRequestFailure(ozoneManager);
       }

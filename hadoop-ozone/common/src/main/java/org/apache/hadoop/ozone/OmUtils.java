@@ -348,6 +348,132 @@ public final class OmUtils {
     }
   }
 
+  /**
+   * Checks if the OM request is read only or not.
+   * @param omRequest OMRequest proto
+   * @return True if its readOnly, false otherwise.
+   */
+  public static boolean isBucketWriteRequest(
+      OzoneManagerProtocolProtos.OMRequest omRequest) {
+    OzoneManagerProtocolProtos.Type cmdType = omRequest.getCmdType();
+    switch (cmdType) {
+    case CheckVolumeAccess:
+    case InfoVolume:
+    case ListVolume:
+    case InfoBucket:
+    case ListBuckets:
+    case LookupKey:
+    case ListKeys:
+    case ListKeysLight:
+    case ListTrash:
+      // ListTrash is deprecated by HDDS-11251. Keeping this in here
+      // As protobuf currently doesn't support deprecating enum fields
+      // TODO: Remove once migrated to proto3 and mark fields in proto
+      // as deprecated
+    case ServiceList:
+    case ListOpenFiles:
+    case ListMultiPartUploadParts:
+    case GetFileStatus:
+    case LookupFile:
+    case ListStatus:
+    case ListStatusLight:
+    case GetAcl:
+    case DBUpdates:
+    case ListMultipartUploads:
+    case FinalizeUpgradeProgress:
+    case PrepareStatus:
+    case GetS3VolumeContext:
+    case ListTenant:
+    case TenantGetUserInfo:
+    case TenantListUser:
+    case ListSnapshot:
+    case RefetchSecretKey:
+    case RangerBGSync:
+      // RangerBGSync is a read operation in the sense that it doesn't directly
+      // write to OM DB. And therefore it doesn't need a OMClientRequest.
+      // Although indirectly the Ranger sync service task could invoke write
+      // operation SetRangerServiceVersion.
+    case GetKeyInfo:
+    case SnapshotDiff:
+    case CancelSnapshotDiff:
+    case ListSnapshotDiffJobs:
+    case TransferLeadership:
+    case SetSafeMode:
+    case PrintCompactionLogDag:
+    case GetSnapshotInfo:
+    case GetObjectTagging:
+    case GetQuotaRepairStatus:
+    case StartQuotaRepair:
+    case EchoRPC:
+    case RemoveAcl:
+    case SetAcl:
+    case AddAcl:
+    case PurgeKeys:
+    case RecoverTrash:
+    case CreateVolume:
+    case SetVolumeProperty:
+    case DeleteVolume:
+    case CreateBucket:
+    case SetBucketProperty:
+    case DeleteBucket:
+    case RenameKey:
+    case RenameKeys:
+    case DeleteKey:
+    case DeleteKeys:
+    case AllocateBlock:
+    case InitiateMultiPartUpload:
+    case CommitMultiPartUpload:
+    case CompleteMultiPartUpload:
+    case AbortMultiPartUpload:
+    case GetS3Secret:
+    case GetDelegationToken:
+    case RenewDelegationToken:
+    case CancelDelegationToken:
+    case CreateDirectory:
+    case CreateFile:
+      // RecoverTrash is deprecated by HDDS-11251. Keeping this in here
+      // As protobuf currently doesn't support deprecating enum fields
+      // TODO: Remove once migrated to proto3 and mark fields in proto
+      // as deprecated
+    case FinalizeUpgrade:
+    case Prepare:
+    case CancelPrepare:
+    case DeleteOpenKeys:
+    case SetS3Secret:
+    case RevokeS3Secret:
+    case PurgeDirectories:
+    case PurgePaths:
+    case CreateTenant:
+    case DeleteTenant:
+    case TenantAssignUserAccessId:
+    case TenantRevokeUserAccessId:
+    case TenantAssignAdmin:
+    case TenantRevokeAdmin:
+    case SetRangerServiceVersion:
+    case CreateSnapshot:
+    case DeleteSnapshot:
+    case RenameSnapshot:
+    case SnapshotMoveDeletedKeys:
+    case SnapshotMoveTableKeys:
+    case SnapshotPurge:
+    case RecoverLease:
+    case SetTimes:
+    case AbortExpiredMultiPartUploads:
+    case SetSnapshotProperty:
+    case QuotaRepair:
+    case PutObjectTagging:
+    case DeleteObjectTagging:
+    case UnknownCommand:
+      return false;
+    case CreateKey:
+    case CommitKey:
+      return true;
+    default:
+      LOG.error("CmdType {} is not categorized as bucket write request.", cmdType);
+      return false;
+    }
+  }
+
   public static byte[] getSHADigest() throws IOException {
     try {
       SRAND.nextBytes(randomBytes);

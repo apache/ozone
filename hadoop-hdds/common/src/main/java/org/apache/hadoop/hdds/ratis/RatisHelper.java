@@ -194,6 +194,14 @@ public final class RatisHelper {
         : RaftGroup.valueOf(groupId, newPeers);
   }
 
+  public static RaftGroup newRawRaftGroup(RaftGroupId groupId,
+                                       List<RaftPeer> peers, List<Integer> priorityList) {
+    assert peers.size() == priorityList.size();
+
+    return peers.isEmpty() ? RaftGroup.valueOf(groupId, Collections.emptyList())
+        : RaftGroup.valueOf(groupId, peers);
+  }
+
   public static RaftGroup newRaftGroup(RaftGroupId groupId,
       Collection<DatanodeDetails> peers) {
     final List<RaftPeer> newPeers = peers.stream()
