@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterators;
 import com.google.inject.Inject;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -351,6 +352,25 @@ public class OmTableInsightTask implements ReconOmTask {
     return (record == null) ? 0L : record.getValue();
   }
 
+  @VisibleForTesting
+  public void setTables(Collection<String> tables) {
+    this.tables = tables;
+  }
+
+  @VisibleForTesting
+  public void setObjectCountMap(HashMap<String, Long> objectCountMap) {
+    this.objectCountMap = objectCountMap;
+  }
+
+  @VisibleForTesting
+  public void setUnReplicatedSizeMap(HashMap<String, Long> unReplicatedSizeMap) {
+    this.unReplicatedSizeMap = unReplicatedSizeMap;
+  }
+
+  @VisibleForTesting
+  public void setReplicatedSizeMap(HashMap<String, Long> replicatedSizeMap) {
+    this.replicatedSizeMap = replicatedSizeMap;
+  }
 }
 
 
