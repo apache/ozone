@@ -40,6 +40,7 @@ import java.util.stream.Collectors;
 
 import com.google.common.collect.Iterators;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -94,8 +95,6 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconUtils.convertNumericToSymbolic;
 import static org.apache.ratis.proto.RaftProtos.RaftPeerRole.LEADER;
 
@@ -127,8 +126,7 @@ public class OzoneManagerServiceProviderImpl
   private ReconUtils reconUtils;
   private OzoneManagerSyncMetrics metrics;
 
-  private long deltaUpdateLimit;
-  private int deltaUpdateLoopLimit;
+  private final long deltaUpdateLimit;
 
   private AtomicBoolean isSyncDataFromOMRunning;
   private final String threadNamePrefix;
@@ -181,9 +179,6 @@ public class OzoneManagerServiceProviderImpl
 
     long deltaUpdateLimits = configuration.getLong(RECON_OM_DELTA_UPDATE_LIMIT,
         RECON_OM_DELTA_UPDATE_LIMIT_DEFAULT);
-    int deltaUpdateLoopLimits = configuration.getInt(
-        RECON_OM_DELTA_UPDATE_LOOP_LIMIT,
-        RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFAULT);
 
     omSnapshotDBParentDir = reconUtils.getReconDbDir(configuration,
         OZONE_RECON_OM_SNAPSHOT_DB_DIR);
@@ -218,7 +213,6 @@ public class OzoneManagerServiceProviderImpl
     this.configuration = configuration;
     this.metrics = OzoneManagerSyncMetrics.create();
     this.deltaUpdateLimit = deltaUpdateLimits;
-    this.deltaUpdateLoopLimit = deltaUpdateLoopLimits;
     this.isSyncDataFromOMRunning = new AtomicBoolean();
     this.threadNamePrefix =
         reconUtils.getReconNodeDetails(configuration).threadNamePrefix();
@@ -256,7 +250,7 @@ public class OzoneManagerServiceProviderImpl
           LOG.error("Failed fetching a full snapshot from Ozone Manager");
         }
       } catch (IOException e) {
-        LOG.error("Unexpected IOException occurred while trying to fetch a full snapshot: {}", e);
+        LOG.error("Unexpected IOException occurred while trying to fetch a full snapshot", e);
         throw new RuntimeException(runtimeException);
       }
     }
@@ -444,54 +438,45 @@ public class OzoneManagerServiceProviderImpl
   /**
    * Get Delta updates from OM through RPC call and apply to local OM DB as
    * well as accumulate in a buffer.
+   *
    * @param fromSequenceNumber from sequence number to request from.
    * @param omdbUpdatesHandler OM DB updates handler to buffer updates.
-   * @throws IOException when OM RPC request fails.
+   * @return lag count which tells how much Recon OM DB snapshot is lagging from OM DB.
+   * @throws IOException      when OM RPC request fails.
    * @throws RocksDBException when writing to RocksDB fails.
    */
   @VisibleForTesting
-  void getAndApplyDeltaUpdatesFromOM(
+  Long getAndApplyDeltaUpdatesFromOM(
       long fromSequenceNumber, OMDBUpdatesHandler omdbUpdatesHandler)
       throws IOException, RocksDBException {
-    int loopCount = 0;
     LOG.info("OriginalFromSequenceNumber : {} ", fromSequenceNumber);
-    long deltaUpdateCnt = Long.MAX_VALUE;
-    long inLoopStartSequenceNumber = fromSequenceNumber;
-    long inLoopLatestSequenceNumber;
-    while (loopCount < deltaUpdateLoopLimit &&
-        deltaUpdateCnt >= deltaUpdateLimit) {
-      if (!innerGetAndApplyDeltaUpdatesFromOM(
-          inLoopStartSequenceNumber, omdbUpdatesHandler)) {
-        LOG.error(
-            "Retrieve OM DB delta update failed for sequence number : {}, " +
-                "so falling back to full snapshot.", inLoopStartSequenceNumber);
-        throw new RocksDBException(
-            "Unable to get delta updates since sequenceNumber - " +
-                inLoopStartSequenceNumber);
-      }
-      inLoopLatestSequenceNumber = getCurrentOMDBSequenceNumber();
-      deltaUpdateCnt = inLoopLatestSequenceNumber - inLoopStartSequenceNumber;
-      inLoopStartSequenceNumber = inLoopLatestSequenceNumber;
-      loopCount++;
+    ImmutablePair<Boolean, Long> dbUpdatesLatestSeqNumOfOMDB =
+        innerGetAndApplyDeltaUpdatesFromOM(fromSequenceNumber, omdbUpdatesHandler);
+    if (!dbUpdatesLatestSeqNumOfOMDB.getLeft()) {
+      LOG.error(
+          "Retrieve OM DB delta update failed for sequence number : {}, " +
+              "so falling back to full snapshot.", fromSequenceNumber);
+      throw new RocksDBException(
+          "Unable to get delta updates since sequenceNumber - " +
+              fromSequenceNumber);
     }
-
-    omdbUpdatesHandler.setLatestSequenceNumber(getCurrentOMDBSequenceNumber());
-    LOG.info("Delta updates received from OM : {} loops, {} records", loopCount,
-        getCurrentOMDBSequenceNumber() - fromSequenceNumber
-    );
+    LOG.info("Delta updates received from OM : {} records", getCurrentOMDBSequenceNumber() - fromSequenceNumber);
+    return dbUpdatesLatestSeqNumOfOMDB.getRight();
   }
 
   /**
    * Get Delta updates from OM through RPC call and apply to local OM DB as
    * well as accumulate in a buffer.
+   *
    * @param fromSequenceNumber from sequence number to request from.
    * @param omdbUpdatesHandler OM DB updates handler to buffer updates.
-   * @throws IOException when OM RPC request fails.
+   * @return Pair of dbUpdatesSuccess, lag (lag between OM and Recom)
+   * @throws IOException      when OM RPC request fails.
    * @throws RocksDBException when writing to RocksDB fails.
    */
   @VisibleForTesting
-  boolean innerGetAndApplyDeltaUpdatesFromOM(long fromSequenceNumber,
-      OMDBUpdatesHandler omdbUpdatesHandler)
+  ImmutablePair<Boolean, Long> innerGetAndApplyDeltaUpdatesFromOM(long fromSequenceNumber,
+                                                                  OMDBUpdatesHandler omdbUpdatesHandler)
       throws IOException, RocksDBException {
     DBUpdatesRequest dbUpdatesRequest = DBUpdatesRequest.newBuilder()
         .setSequenceNumber(fromSequenceNumber)
@@ -528,7 +513,7 @@ public class OzoneManagerServiceProviderImpl
             "isDBUpdateSuccess: {}", numUpdates, getCurrentOMDBSequenceNumber()
             - fromSequenceNumber, lag,
         null != dbUpdates && dbUpdates.isDBUpdateSuccess());
-    return null != dbUpdates && dbUpdates.isDBUpdateSuccess();
+    return new ImmutablePair<>(null != dbUpdates && dbUpdates.isDBUpdateSuccess(), lag);
   }
 
   /**
@@ -572,15 +557,27 @@ public class OzoneManagerServiceProviderImpl
 
             // Get updates from OM and apply to local Recon OM DB and update task status in table
             reconTaskUpdater.recordRunStart();
-            getAndApplyDeltaUpdatesFromOM(currentSequenceNumber,
-                omdbUpdatesHandler);
-
-            reconTaskUpdater.setLastTaskRunStatus(0);
-            reconTaskUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
-            reconTaskUpdater.recordRunCompletion();
-            // Pass on DB update events to tasks that are listening.
-            reconTaskController.consumeOMEvents(new OMUpdateEventBatch(
-                omdbUpdatesHandler.getEvents(), omdbUpdatesHandler.getLatestSequenceNumber()), omMetadataManager);
+            int loopCount = 0;
+            long fromSequenceNumber = currentSequenceNumber;
+            long diffBetweenOMDbAndReconDBSeqNumber = deltaUpdateLimit + 1;
+            // This loop will continue to fetch and apply OM DB updates till the OM fetch
+            // request will fetch less than deltaUpdateLimit (default value of 1000), so in
+            // high OM write TPS cluster, this simulates continuous pull from OM without any delay.
+            while (diffBetweenOMDbAndReconDBSeqNumber > deltaUpdateLimit) {
+              diffBetweenOMDbAndReconDBSeqNumber =
+                  getAndApplyDeltaUpdatesFromOM(currentSequenceNumber, omdbUpdatesHandler);
+              reconTaskUpdater.setLastTaskRunStatus(0);
+              reconTaskUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
+              reconTaskUpdater.recordRunCompletion();
+              // Pass on DB update events to tasks that are listening.
+              reconTaskController.consumeOMEvents(new OMUpdateEventBatch(
+                  omdbUpdatesHandler.getEvents(), omdbUpdatesHandler.getLatestSequenceNumber()), omMetadataManager);
+              currentSequenceNumber = getCurrentOMDBSequenceNumber();
+              LOG.error("Updated current sequence number: {}", currentSequenceNumber);
+              loopCount++;
+            }
+            LOG.info("Delta updates received from OM : {} loops, {} records", loopCount,
+                getCurrentOMDBSequenceNumber() - fromSequenceNumber);
           } catch (InterruptedException intEx) {
             LOG.error("OM DB Delta update sync thread was interrupted.");
             // We are updating the table even if it didn't run i.e. got interrupted beforehand
@@ -594,8 +591,7 @@ public class OzoneManagerServiceProviderImpl
             metrics.incrNumDeltaRequestsFailed();
             reconTaskUpdater.setLastTaskRunStatus(-1);
             reconTaskUpdater.recordRunCompletion();
-            LOG.warn("Unable to get and apply delta updates from OM.",
-                e.getMessage());
+            LOG.warn("Unable to get and apply delta updates from OM: {}", e.getMessage());
             fullSnapshot = true;
           }
         }

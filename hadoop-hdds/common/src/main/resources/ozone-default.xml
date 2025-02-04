@@ -3358,7 +3358,7 @@
     <value>5s</value>
     <tag>OZONE, RECON, OM</tag>
     <description>
-      Interval in MINUTES by Recon to request OM DB Snapshot.
+      Interval in SECONDS by Recon to request OM DB Snapshot.
     </description>
   </property>
   <property>
@@ -3371,7 +3371,7 @@
   </property>
   <property>
     <name>recon.om.delta.update.limit</name>
-    <value>50000</value>
+    <value>1000</value>
     <tag>OZONE, RECON</tag>
     <description>
       Recon each time get a limited delta updates from OM.
@@ -3388,15 +3388,6 @@
       log files and each log batch data may be huge depending on frequent writes and
       updates by ozone client, so to avoid increase in heap memory, this config is used
       as limiting factor of default 1 GB while preparing DB updates object.
-    </description>
-  </property>
-  <property>
-    <name>recon.om.delta.update.loop.limit</name>
-    <value>50</value>
-    <tag>OZONE, RECON</tag>
-    <description>
-      The sync between Recon and OM consists of several small
-      fetch loops.
     </description>
   </property>
   <property>

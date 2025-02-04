@@ -25,7 +25,6 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SOCKET_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SOCKET_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT;
 import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmDeltaRequest;
 import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmSnapshotRequest;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -108,7 +107,6 @@ public class TestReconWithOzoneManager {
         TimeUnit.MILLISECONDS
     );
     conf.setLong(RECON_OM_DELTA_UPDATE_LIMIT, 2);
-    conf.setLong(RECON_OM_DELTA_UPDATE_LOOP_LIMIT, 10);
 
     RequestConfig config = RequestConfig.custom()
         .setConnectTimeout(socketTimeout)

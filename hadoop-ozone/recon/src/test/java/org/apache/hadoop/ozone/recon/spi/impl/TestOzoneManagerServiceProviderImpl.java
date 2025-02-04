@@ -26,7 +26,6 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeData
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT;
 import static org.apache.hadoop.ozone.recon.ReconUtils.createTarFile;
 import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmDeltaRequest;
 import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmSnapshotRequest;
@@ -431,7 +430,6 @@ public class TestOzoneManagerServiceProviderImpl {
     OzoneConfiguration withLimitConfiguration =
         new OzoneConfiguration(configuration);
     withLimitConfiguration.setLong(RECON_OM_DELTA_UPDATE_LIMIT, 1);
-    withLimitConfiguration.setLong(RECON_OM_DELTA_UPDATE_LOOP_LIMIT, 3);
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         new OzoneManagerServiceProviderImpl(withLimitConfiguration,
             getTestReconOmMetadataManager(omMetadataManager, dirReconMetadata),
@@ -445,21 +443,26 @@ public class TestOzoneManagerServiceProviderImpl {
     assertTrue(dbUpdatesWrapper[2].isDBUpdateSuccess());
     assertTrue(dbUpdatesWrapper[3].isDBUpdateSuccess());
 
-    OMDBUpdatesHandler updatesHandler =
+    /*OMDBUpdatesHandler updatesHandler =
         new OMDBUpdatesHandler(omMetadataManager);
     ozoneManagerServiceProvider.getAndApplyDeltaUpdatesFromOM(
-        0L, updatesHandler);
+        0L, updatesHandler);*/
+    // ReconOM snapshot DB initialized with Volume and bucket creation events already
+    assertEquals(2, ozoneManagerServiceProvider.getCurrentOMDBSequenceNumber());
+
+    ozoneManagerServiceProvider.syncDataFromOM();
+
 
     OzoneManagerSyncMetrics metrics = ozoneManagerServiceProvider.getMetrics();
     assertEquals(1.0,
         metrics.getAverageNumUpdatesInDeltaRequest(), 0.0);
-    assertEquals(3, metrics.getNumNonZeroDeltaRequests());
+    assertEquals(1, metrics.getNumNonZeroDeltaRequests());
 
     // In this method, we have to assert the "GET" path and the "APPLY" path.
 
     // Assert GET path --> verify if the OMDBUpdatesHandler picked up the first
     // 3 of 4 events ( 1 Vol PUT + 1 Bucket PUT + 2 Key PUTs).
-    assertEquals(3, updatesHandler.getEvents().size());
+    assertEquals(3, ozoneManagerServiceProvider.getCurrentOMDBSequenceNumber());
 
     // Assert APPLY path --> Verify if the OM service provider's RocksDB got
     // the first 3 changes, last change not applied.
@@ -571,6 +574,7 @@ public class TestOzoneManagerServiceProviderImpl {
     verify(reconTaskControllerMock, times(1))
         .reInitializeTasks(omMetadataManager);
     assertEquals(1, metrics.getNumSnapshotRequests());
+    omMetadataManager.getStore().close();
   }
 
   private ReconTaskController getMockTaskController() {

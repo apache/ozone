@@ -414,7 +414,7 @@ public class RDBStore implements DBStore {
           }
           // If the above condition was not satisfied, then it is OK to reset
           // the flag.
-          checkValidStartingSeqNumber = false;
+//          checkValidStartingSeqNumber = false;
           if (currSequenceNumber <= sequenceNumber) {
             logIterator.get().next();
             continue;
