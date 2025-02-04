@@ -18,27 +18,24 @@
 
 package org.apache.hadoop.ozone.freon;
 
-import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientCreator;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.junit.jupiter.api.AfterAll;
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import picocli.CommandLine;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -49,32 +46,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * Tests Freon, with MiniOzoneCluster and validate data.
  */
-public class TestDNRPCLoadGenerator {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public abstract class TestDNRPCLoadGenerator implements NonHATests.TestCase {
 
-  private static MiniOzoneCluster cluster = null;
-  private static ContainerWithPipeline container;
+  private ContainerWithPipeline container;
 
-  private static void startCluster(OzoneConfiguration conf) throws Exception {
-    DatanodeRatisServerConfig ratisServerConfig =
-        conf.getObject(DatanodeRatisServerConfig.class);
-    ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));
-    ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(10));
-    conf.setFromObject(ratisServerConfig);
-
-    RatisClientConfig.RaftConfig raftClientConfig =
-        conf.getObject(RatisClientConfig.RaftConfig.class);
-    raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
-    raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(10));
-    conf.setFromObject(raftClientConfig);
-
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(5).build();
-    cluster.waitForClusterToBeReady();
-    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
-        180000);
-
+  @BeforeAll
+  void init() throws Exception {
+    OzoneConfiguration conf = cluster().getConf();
     StorageContainerLocationProtocolClientSideTranslatorPB
-        storageContainerLocationClient = cluster
+        storageContainerLocationClient = cluster()
         .getStorageContainerLocationClient();
     container =
         storageContainerLocationClient.allocateContainer(
@@ -85,23 +66,6 @@ public class TestDNRPCLoadGenerator {
       ContainerProtocolCalls.createContainer(client,
           container.getContainerInfo().getContainerID(), null);
     }
-  }
-
-  static void shutdownCluster() {
-    if (cluster != null) {
-      cluster.shutdown();
-    }
-  }
-
-  @BeforeAll
-  public static void init() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    startCluster(conf);
-  }
-
-  @AfterAll
-  public static void shutdown() {
-    shutdownCluster();
   }
 
   private static Stream<Arguments> provideParameters() {
@@ -117,7 +81,7 @@ public class TestDNRPCLoadGenerator {
   @MethodSource("provideParameters")
   public void test(boolean readOnly, boolean ratis) {
     DNRPCLoadGenerator randomKeyGenerator =
-        new DNRPCLoadGenerator(cluster.getConf());
+        new DNRPCLoadGenerator(cluster().getConf());
     CommandLine cmd = new CommandLine(randomKeyGenerator);
     List<String> cmdArgs = new ArrayList<>(Arrays.asList(
         "--container-id", Long.toString(container.getContainerInfo().getContainerID()),

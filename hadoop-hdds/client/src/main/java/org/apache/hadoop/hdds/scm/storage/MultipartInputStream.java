@@ -220,6 +220,11 @@ public class MultipartInputStream extends ExtendedInputStream {
 
   @Override
   public synchronized long skip(long n) throws IOException {
+    checkOpen();
+    if (!initialized) {
+      initialize();
+    }
+
     if (n <= 0) {
       return 0;
     }
