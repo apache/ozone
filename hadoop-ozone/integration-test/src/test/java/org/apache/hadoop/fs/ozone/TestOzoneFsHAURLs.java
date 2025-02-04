@@ -23,33 +23,28 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FsShell;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ToolRunner;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.HATests;
 import org.apache.ratis.util.LifeCycle;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.util.Optional;
 import java.util.OptionalInt;
 
@@ -62,8 +57,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 /**
  * Test client-side URI handling with Ozone Manager HA.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(300)
-public class TestOzoneFsHAURLs {
+public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
 
   /**
     * Set a timeout for each test.
@@ -72,10 +68,9 @@ public class TestOzoneFsHAURLs {
       TestOzoneFsHAURLs.class);
 
   private OzoneConfiguration conf;
-  private static MiniOzoneHAClusterImpl cluster;
-  private static String omServiceId;
-  private static OzoneManager om;
-  private static int numOfOMs;
+  private MiniOzoneHAClusterImpl cluster;
+  private String omServiceId;
+  private OzoneManager om;
 
   private String volumeName;
   private String bucketName;
@@ -85,7 +80,7 @@ public class TestOzoneFsHAURLs {
       "fs." + OzoneConsts.OZONE_URI_SCHEME + ".impl";
   private static final String O3FS_IMPL_VALUE =
       "org.apache.hadoop.fs.ozone.OzoneFileSystem";
-  private static OzoneClient client;
+  private OzoneClient client;
 
   private static final String OFS_IMPL_KEY =
       "fs." + OzoneConsts.OZONE_OFS_URI_SCHEME + ".impl";
@@ -95,25 +90,10 @@ public class TestOzoneFsHAURLs {
 
 
   @BeforeAll
-  static void initClass(@TempDir File tempDir) throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    omServiceId = "om-service-test1";
-    numOfOMs = 3;
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempDir.getAbsolutePath());
-    conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 3);
-
-    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        BucketLayout.LEGACY.name());
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
-
-    // Start the cluster
-    MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
-    builder.setOMServiceId(omServiceId)
-        .setNumOfOzoneManagers(numOfOMs)
-        .setNumDatanodes(5);
-    cluster = builder.build();
-    cluster.waitForClusterToBeReady();
-    client = OzoneClientFactory.getRpcClient(omServiceId, conf);
+  void initClass() throws Exception {
+    cluster = cluster();
+    omServiceId = cluster.getOzoneManager().getOMServiceId();
+    client = cluster.newClient();
 
     om = cluster.getOzoneManager();
   }
@@ -149,11 +129,8 @@ public class TestOzoneFsHAURLs {
   }
 
   @AfterAll
-  public static void shutdown() {
+  void cleanup() {
     IOUtils.closeQuietly(client);
-    if (cluster != null) {
-      cluster.shutdown();
-    }
   }
 
   /**
