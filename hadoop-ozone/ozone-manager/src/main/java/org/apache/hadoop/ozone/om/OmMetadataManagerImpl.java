@@ -1997,10 +1997,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     // Should we set nextKeyMarker and nextUploadIdMarker if not truncated?
     if (lastKey != null) {
-        String[] parts = lastKey.split(OM_KEY_PREFIX);
-        // parts[] would be like: ["", "volumeName", "bucketName", "keyName", "uploadId"]
-        resultBuilder.setNextKeyMarker(parts[parts.length - 2]);      // keyName
-        resultBuilder.setNextUploadIdMarker(parts[parts.length - 1]); // uploadId
+      String[] parts = lastKey.split(OM_KEY_PREFIX);
+      // parts[] would be like: ["", "volumeName", "bucketName", "keyName", "uploadId"]
+      resultBuilder.setNextKeyMarker(parts[parts.length - 2]);      // keyName
+      resultBuilder.setNextUploadIdMarker(parts[parts.length - 1]); // uploadId
     }
 
     return resultBuilder

@@ -24,7 +24,6 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
-import org.apache.hadoop.ozone.client.OzoneMultipartUpload;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -341,8 +340,8 @@ public class BucketEndpoint extends EndpointBase {
     OzoneBucket bucket = getBucket(bucketName);
 
     try {
-        OzoneMultipartUploadList ozoneMultipartUploadList =
-            bucket.listMultipartUploads(prefix, keyMarker, uploadIdMarker, maxUploads);
+      OzoneMultipartUploadList ozoneMultipartUploadList =
+          bucket.listMultipartUploads(prefix, keyMarker, uploadIdMarker, maxUploads);
 
       ListMultipartUploadsResult result = new ListMultipartUploadsResult();
       result.setBucket(bucketName);

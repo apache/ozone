@@ -491,6 +491,9 @@ public interface OMMetadataManager extends DBStoreHAManager {
       throws IOException;
 
 
+  /**
+   * This class is used to store the result of listMultipartUploads.
+   */
   class MultipartUploadKeys {
     private final Set<String> keys;
     private final String nextKeyMarker;
@@ -524,6 +527,9 @@ public interface OMMetadataManager extends DBStoreHAManager {
       return new Builder();
     }
 
+    /**
+     * Builder class for MultipartUploadKeys.
+     */
     public static class Builder {
       private Set<String> keys;
       private String nextKeyMarker = "";
