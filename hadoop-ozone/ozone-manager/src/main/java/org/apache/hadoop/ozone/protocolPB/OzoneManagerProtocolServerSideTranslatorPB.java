@@ -24,7 +24,6 @@ import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
@@ -67,11 +66,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   private final OzoneManagerRatisServer omRatisServer;
   private final RequestHandler handler;
   private final OzoneManager ozoneManager;
-  /**
-   * Only used to handle write requests when ratis is disabled.
-   * When ratis is enabled, write requests are handled by the state machine.
-   */
-  private final AtomicLong transactionIndex;
   private final OzoneProtocolMessageDispatcher<OMRequest, OMResponse,
       ProtocolMessageEnum> dispatcher;
   private final RequestValidations requestValidations;
@@ -88,14 +82,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   public OzoneManagerProtocolServerSideTranslatorPB(
       OzoneManager impl,
       OzoneManagerRatisServer ratisServer,
-      ProtocolMessageMetrics<ProtocolMessageEnum> metrics,
-      long lastTransactionIndexForNonRatis) {
+      ProtocolMessageMetrics<ProtocolMessageEnum> metrics) {
     this.ozoneManager = impl;
     this.perfMetrics = impl.getPerfMetrics();
-    // Update the transactionIndex with the last TransactionIndex read from DB.
-    // New requests should have transactionIndex incremented from this index
-    // onwards to ensure unique objectIDs.
-    this.transactionIndex = new AtomicLong(lastTransactionIndexForNonRatis);
 
     this.handler = new OzoneManagerRequestHandler(impl);
     this.omRatisServer = ratisServer;
