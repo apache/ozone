@@ -155,6 +155,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_KEY_DELETION_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_KEY_DELETION;
 import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
@@ -243,9 +245,13 @@ public class KeyManagerImpl implements KeyManager {
           OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
           OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT,
           TimeUnit.MILLISECONDS);
-      keyDeletingService = new KeyDeletingService(ozoneManager,
-          scmClient.getBlockClient(), this, blockDeleteInterval,
-          serviceTimeout, configuration, isSnapshotDeepCleaningEnabled);
+      int keyDeletingCorePoolSize =
+          configuration.getInt(OZONE_THREAD_NUMBER_KEY_DELETION,
+              OZONE_THREAD_NUMBER_KEY_DELETION_DEFAULT);
+      keyDeletingService =
+          new KeyDeletingService(ozoneManager, scmClient.getBlockClient(), this,
+              blockDeleteInterval, serviceTimeout, configuration,
+              isSnapshotDeepCleaningEnabled, keyDeletingCorePoolSize);
       keyDeletingService.start();
     }
 
@@ -684,12 +690,13 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public PendingKeysDeletion getPendingDeletionKeys(final int count)
+  public PendingKeysDeletion getPendingDeletionKeys(final int count,
+      KeyDeletingService.DeletedKeySupplier deletedKeySupplier)
       throws IOException {
     OmMetadataManagerImpl omMetadataManager =
         (OmMetadataManagerImpl) metadataManager;
-    return omMetadataManager
-        .getPendingDeletionKeys(count, ozoneManager.getOmSnapshotManager());
+    return omMetadataManager.getPendingDeletionKeys(count,
+        ozoneManager.getOmSnapshotManager(), deletedKeySupplier);
   }
 
   private <V, R> List<Table.KeyValue<String, R>> getTableEntries(String startKey,
