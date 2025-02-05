@@ -4249,7 +4249,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * Return if Ratis is enabled or not.
    */
-  // FIXME remove
+  // TODO remove in HDDS-12161
   public boolean isRatisEnabled() {
     return true;
   }
