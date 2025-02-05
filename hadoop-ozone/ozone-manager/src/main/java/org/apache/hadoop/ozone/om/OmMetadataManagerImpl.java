@@ -1944,7 +1944,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         cacheIterator = getMultipartInfoTable().cacheIterator();
 
 
-    if (keyMarker != "") {
+    if (keyMarker.equals("")) {
       prefix = keyMarker;
     }
 
