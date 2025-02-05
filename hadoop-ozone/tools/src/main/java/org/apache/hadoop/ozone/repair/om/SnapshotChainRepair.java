@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.repair.om;
 
+import jakarta.annotation.Nonnull;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
@@ -76,11 +77,14 @@ public class SnapshotChainRepair extends RepairTool {
       description = "Path previous snapshotId to set for the given snapshot")
   private UUID pathPreviousSnapshotId;
 
+  @Nonnull
+  @Override
+  protected Component serviceToBeOffline() {
+    return Component.OM;
+  }
+
   @Override
   public void execute() throws Exception {
-    if (checkIfServiceIsRunning("OM")) {
-      return;
-    }
     List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
     List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(dbPath);
 

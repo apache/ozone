@@ -38,9 +38,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.junit.jupiter.api.AfterAll;
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -51,24 +52,17 @@ import static org.apache.hadoop.ozone.OmUtils.getOmAddressForClients;
 /**
  * This class is to test the REST interface exposed by OzoneManager.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(300)
-public class TestOzoneManagerRestInterface {
+public abstract class TestOzoneManagerRestInterface implements NonHATests.TestCase {
 
-  private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
+  private MiniOzoneCluster cluster;
+  private OzoneConfiguration conf;
 
   @BeforeAll
-  public static void setUp() throws Exception {
-    conf = new OzoneConfiguration();
-    cluster = MiniOzoneCluster.newBuilder(conf).build();
-    cluster.waitForClusterToBeReady();
-  }
-
-  @AfterAll
-  public static void tearDown() throws Exception {
-    if (cluster != null) {
-      cluster.shutdown();
-    }
+  void setup() {
+    conf = cluster().getConf();
+    cluster = cluster();
   }
 
   @Test
