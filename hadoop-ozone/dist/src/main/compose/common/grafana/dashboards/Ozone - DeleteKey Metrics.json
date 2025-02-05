@@ -795,7 +795,7 @@
               "useBackend": false
             }
           ],
-          "title": "KeyDeletionService: Keys processed",
+          "title": "KeyDeletingService: Keys processed",
           "type": "timeseries"
         },
         {
@@ -889,7 +889,7 @@
               "useBackend": false
             }
           ],
-          "title": "KeyDeletingService: keys sent for purge",
+          "title": "KeyDeletingService: Keys sent for purge",
           "type": "timeseries"
         },
         {
