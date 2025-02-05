@@ -567,12 +567,12 @@ public class TestHSync {
         // getFileStatus should throw FNFE because the key is deleted
         assertThrows(FileNotFoundException.class,
             () -> fs.getFileStatus(key1));
+
         // hsync should throw because the open key is gone
-        try {
-          os.hsync();
-        } catch (OMException omEx) {
-          assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, omEx.getResult());
-        }
+        OMException exception = assertThrows(OMException.class,
+            () -> os.hsync());
+        assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, exception.getResult());
+
         // key1 should not reappear after failed hsync
         assertThrows(FileNotFoundException.class,
             () -> fs.getFileStatus(key1));
@@ -621,13 +621,7 @@ public class TestHSync {
 
       for (String key : openKeys) {
         assertThrows(FileNotFoundException.class,
-            () -> fs.getFileStatus(new Path(dir, key)));
-        try {
-          fs.open(new Path(dir, key));
-          fail("HSync should throw because the open key is gone");
-        } catch (FileNotFoundException ex) {
-          // expected
-        }
+          () -> fs.open(new Path(dir, key)));
       }
     }
   }
