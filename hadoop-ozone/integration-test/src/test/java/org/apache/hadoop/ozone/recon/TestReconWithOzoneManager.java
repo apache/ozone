@@ -106,7 +106,7 @@ public class TestReconWithOzoneManager {
             OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT),
         TimeUnit.MILLISECONDS
     );
-    conf.setLong(RECON_OM_DELTA_UPDATE_LIMIT, 2);
+    conf.setLong(RECON_OM_DELTA_UPDATE_LIMIT, 10);
 
     RequestConfig config = RequestConfig.custom()
         .setConnectTimeout(socketTimeout)

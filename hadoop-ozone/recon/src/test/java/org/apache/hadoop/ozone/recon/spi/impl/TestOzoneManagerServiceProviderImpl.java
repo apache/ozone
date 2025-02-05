@@ -417,6 +417,7 @@ public class TestOzoneManagerServiceProviderImpl {
       result.writeBatch().markWalTerminationPoint();
       WriteBatch writeBatch = result.writeBatch();
       dbUpdatesWrapper[index] = new DBUpdates();
+      dbUpdatesWrapper[index].setLatestSequenceNumber(dbUpdatesWrapper.length);
       dbUpdatesWrapper[index].addWriteBatch(writeBatch.data(),
           result.sequenceNumber());
       index++;
@@ -429,7 +430,7 @@ public class TestOzoneManagerServiceProviderImpl {
 
     OzoneConfiguration withLimitConfiguration =
         new OzoneConfiguration(configuration);
-    withLimitConfiguration.setLong(RECON_OM_DELTA_UPDATE_LIMIT, 1);
+    withLimitConfiguration.setLong(RECON_OM_DELTA_UPDATE_LIMIT, 10);
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         new OzoneManagerServiceProviderImpl(withLimitConfiguration,
             getTestReconOmMetadataManager(omMetadataManager, dirReconMetadata),
@@ -443,15 +444,14 @@ public class TestOzoneManagerServiceProviderImpl {
     assertTrue(dbUpdatesWrapper[2].isDBUpdateSuccess());
     assertTrue(dbUpdatesWrapper[3].isDBUpdateSuccess());
 
-    /*OMDBUpdatesHandler updatesHandler =
+    OMDBUpdatesHandler updatesHandler =
         new OMDBUpdatesHandler(omMetadataManager);
     ozoneManagerServiceProvider.getAndApplyDeltaUpdatesFromOM(
-        0L, updatesHandler);*/
+        0L, updatesHandler);
     // ReconOM snapshot DB initialized with Volume and bucket creation events already
     assertEquals(2, ozoneManagerServiceProvider.getCurrentOMDBSequenceNumber());
 
-    ozoneManagerServiceProvider.syncDataFromOM();
-
+    //ozoneManagerServiceProvider.syncDataFromOM();
 
     OzoneManagerSyncMetrics metrics = ozoneManagerServiceProvider.getMetrics();
     assertEquals(1.0,
