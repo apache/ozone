@@ -810,7 +810,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     uploadPart(bucket, key2, uploadID2, 1, "data".getBytes(UTF_8));
     uploadPart(bucket, key3, uploadID3, 1, "data".getBytes(UTF_8));
 
-    OzoneMultipartUploadList listMPUs = bucket.listMultipartUploads("dir1");
+    OzoneMultipartUploadList listMPUs = bucket.listMultipartUploads("dir1", "", "", 1000);
     assertEquals(3, listMPUs.getUploads().size());
     List<String> expectedList = new ArrayList<>(keys);
     for (OzoneMultipartUpload mpu : listMPUs.getUploads()) {
@@ -818,7 +818,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     }
     assertEquals(0, expectedList.size());
 
-    listMPUs = bucket.listMultipartUploads("dir1/dir2");
+    listMPUs = bucket.listMultipartUploads("dir1/dir2", "", "", 1000);
     assertEquals(2, listMPUs.getUploads().size());
     expectedList = new ArrayList<>();
     expectedList.add(key2);
@@ -828,7 +828,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     }
     assertEquals(0, expectedList.size());
 
-    listMPUs = bucket.listMultipartUploads("dir1/dir2/dir3");
+    listMPUs = bucket.listMultipartUploads("dir1/dir2/dir3", "", "", 1000);
     assertEquals(1, listMPUs.getUploads().size());
     expectedList = new ArrayList<>();
     expectedList.add(key3);
@@ -838,7 +838,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     assertEquals(0, expectedList.size());
 
     // partial key
-    listMPUs = bucket.listMultipartUploads("d");
+    listMPUs = bucket.listMultipartUploads("d", "", "", 1000);
     assertEquals(3, listMPUs.getUploads().size());
     expectedList = new ArrayList<>(keys);
     for (OzoneMultipartUpload mpu : listMPUs.getUploads()) {
@@ -847,7 +847,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     assertEquals(0, expectedList.size());
 
     // partial key
-    listMPUs = bucket.listMultipartUploads("");
+    listMPUs = bucket.listMultipartUploads("", "", "", 1000);
     assertEquals(3, listMPUs.getUploads().size());
     expectedList = new ArrayList<>(keys);
     for (OzoneMultipartUpload mpu : listMPUs.getUploads()) {
