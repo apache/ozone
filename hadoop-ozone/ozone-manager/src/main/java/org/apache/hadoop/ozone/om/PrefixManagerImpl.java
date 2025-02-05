@@ -64,7 +64,16 @@ public class PrefixManagerImpl implements PrefixManager {
   // In-memory prefix tree to optimize ACL evaluation
   private RadixTree<OmPrefixInfo> prefixTree;
 
+  // Ratis is disabled for snapshots
+  private final boolean isRatisEnabled;
+
   public PrefixManagerImpl(OzoneManager ozoneManager, OMMetadataManager metadataManager) {
+    this(ozoneManager, metadataManager, true);
+  }
+
+  public PrefixManagerImpl(OzoneManager ozoneManager, OMMetadataManager metadataManager,
+      boolean isRatisEnabled) {
+    this.isRatisEnabled = isRatisEnabled;
     this.ozoneManager = ozoneManager;
     this.metadataManager = metadataManager;
     loadPrefixTree();
@@ -254,6 +263,9 @@ public class PrefixManagerImpl implements PrefixManager {
     // update the in-memory prefix tree
     prefixTree.insert(ozoneObj.getPath(), prefixInfo);
 
+    if (!isRatisEnabled) {
+      metadataManager.getPrefixTable().put(ozoneObj.getPath(), prefixInfo);
+    }
     return new OMPrefixAclOpResult(prefixInfo, changed);
   }
 
@@ -269,8 +281,14 @@ public class PrefixManagerImpl implements PrefixManager {
     // Under OM HA, update ID of the prefix info is updated for every request.
     if (prefixInfo.getAcls().isEmpty()) {
       prefixTree.removePrefixPath(ozoneObj.getPath());
+      if (!isRatisEnabled) {
+        metadataManager.getPrefixTable().delete(ozoneObj.getPath());
+      }
     } else {
       prefixTree.insert(ozoneObj.getPath(), prefixInfo);
+      if (!isRatisEnabled) {
+        metadataManager.getPrefixTable().put(ozoneObj.getPath(), prefixInfo);
+      }
     }
     return new OMPrefixAclOpResult(prefixInfo, removed);
   }
@@ -325,6 +343,9 @@ public class PrefixManagerImpl implements PrefixManager {
       inheritParentAcl(ozoneObj, prefixInfo);
     }
     prefixTree.insert(ozoneObj.getPath(), prefixInfo);
+    if (!isRatisEnabled) {
+      metadataManager.getPrefixTable().put(ozoneObj.getPath(), prefixInfo);
+    }
     return new OMPrefixAclOpResult(prefixInfo, changed);
   }
 
