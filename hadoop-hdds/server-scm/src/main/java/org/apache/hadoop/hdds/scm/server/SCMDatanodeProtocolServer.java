@@ -282,16 +282,21 @@ public class SCMDatanodeProtocolServer implements
 
   private String constructCommandAuditMap(List<SCMCommandProto> cmds) {
     StringBuilder auditMap = new StringBuilder();
-    auditMap.append('[');
+    auditMap.append("[");
     for (SCMCommandProto cmd : cmds) {
       if (cmd.getCommandType().equals(deleteBlocksCommand)) {
-        auditMap.append("commandType:" + cmd.getCommandType());
-        auditMap.append(" No. of deleteTransactions:");
+        auditMap.append("commandType: ").append(cmd.getCommandType());
+        auditMap.append(" deleteTransactionsCount:");
         auditMap.append(cmd.getDeleteBlocksCommandProto().getDeletedBlocksTransactionsList().size());
       } else {
         auditMap.append(cmd);
       }
+      auditMap.append(" , ");
     }
+    int len = auditMap.toString().length();
+    auditMap.deleteCharAt(len - 1);
+    auditMap.deleteCharAt(len - 2);
+    auditMap.deleteCharAt(len - 3);
     auditMap.append(']');
     return auditMap.toString();
   }
