@@ -3371,7 +3371,7 @@
   </property>
   <property>
     <name>recon.om.delta.update.limit</name>
-    <value>1000</value>
+    <value>0</value>
     <tag>OZONE, RECON</tag>
     <description>
       Recon each time get a limited delta updates from OM.
