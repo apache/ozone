@@ -850,7 +850,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       delegationTokenMgr = createDelegationTokenSecretManager(configuration);
     }
 
-    prefixManager = new PrefixManagerImpl(this, metadataManager);
+    prefixManager = new PrefixManagerImpl(this, metadataManager, true);
     keyManager = new KeyManagerImpl(this, scmClient, configuration,
         perfMetrics);
     // If authorizer is not initialized or the authorizer is Native

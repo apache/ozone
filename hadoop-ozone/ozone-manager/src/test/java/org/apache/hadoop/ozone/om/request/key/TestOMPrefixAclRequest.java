@@ -51,7 +51,7 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
   @Test
   public void testAddAclRequest() throws Exception {
     PrefixManagerImpl prefixManager = new PrefixManagerImpl(ozoneManager,
-        ozoneManager.getMetadataManager());
+        ozoneManager.getMetadataManager(), true);
     when(ozoneManager.getPrefixManager()).thenReturn(prefixManager);
     String prefixName = UUID.randomUUID() + OZONE_URI_DELIMITER;
     OzoneObj prefixObj = createPrefixObj(prefixName);
@@ -117,7 +117,7 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
   @Test
   public void testValidationFailure() {
     PrefixManagerImpl prefixManager = new PrefixManagerImpl(ozoneManager,
-        ozoneManager.getMetadataManager());
+        ozoneManager.getMetadataManager(), true);
     when(ozoneManager.getPrefixManager()).thenReturn(prefixManager);
 
     OzoneAcl acl = OzoneAcl.parseAcl("user:bilbo:rwdlncxy[ACCESS]");
@@ -144,7 +144,7 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
   @Test
   public void testRemoveAclRequest() throws Exception {
     PrefixManagerImpl prefixManager = new PrefixManagerImpl(ozoneManager,
-        ozoneManager.getMetadataManager());
+        ozoneManager.getMetadataManager(), true);
     when(ozoneManager.getPrefixManager()).thenReturn(prefixManager);
     String prefixName = UUID.randomUUID() + OZONE_URI_DELIMITER;
     OzoneObj prefixObj = createPrefixObj(prefixName);
@@ -224,7 +224,7 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
   @Test
   public void testSetAclRequest() throws Exception {
     PrefixManagerImpl prefixManager = new PrefixManagerImpl(ozoneManager,
-        ozoneManager.getMetadataManager());
+        ozoneManager.getMetadataManager(), true);
     when(ozoneManager.getPrefixManager()).thenReturn(prefixManager);
     String prefixName = UUID.randomUUID() + OZONE_URI_DELIMITER;
     OzoneObj prefixObj = createPrefixObj(prefixName);

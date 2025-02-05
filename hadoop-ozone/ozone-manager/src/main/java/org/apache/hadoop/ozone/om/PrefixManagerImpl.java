@@ -67,10 +67,6 @@ public class PrefixManagerImpl implements PrefixManager {
   // Ratis is disabled for snapshots
   private final boolean isRatisEnabled;
 
-  public PrefixManagerImpl(OzoneManager ozoneManager, OMMetadataManager metadataManager) {
-    this(ozoneManager, metadataManager, true);
-  }
-
   public PrefixManagerImpl(OzoneManager ozoneManager, OMMetadataManager metadataManager,
       boolean isRatisEnabled) {
     this.isRatisEnabled = isRatisEnabled;

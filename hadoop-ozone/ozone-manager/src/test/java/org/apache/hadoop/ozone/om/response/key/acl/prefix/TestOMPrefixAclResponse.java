@@ -95,7 +95,7 @@ public class TestOMPrefixAclResponse extends TestOMKeyResponse {
     // Verify that in-memory Prefix Tree (Radix Tree) is able to reload from
     // DB successfully
     PrefixManagerImpl prefixManager =
-        new PrefixManagerImpl(ozoneManager, omMetadataManager);
+        new PrefixManagerImpl(ozoneManager, omMetadataManager, true);
     OzoneObj prefixObj = OzoneObjInfo.Builder.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -138,7 +138,7 @@ public class TestOMPrefixAclResponse extends TestOMKeyResponse {
 
     // Reload prefix tree from DB and validate again.
     prefixManager =
-        new PrefixManagerImpl(ozoneManager, omMetadataManager);
+        new PrefixManagerImpl(ozoneManager, omMetadataManager, true);
     prefixInfo = prefixManager.getPrefixInfo(prefixObj);
     assertEquals(2L, prefixInfo.getUpdateID());
 
