@@ -130,13 +130,16 @@ class TestObjectPut {
     bucket = clientStub.getObjectStore().getS3Bucket(BUCKET_NAME);
     clientStub.getObjectStore().createS3Bucket(DEST_BUCKET_NAME);
 
-    // Create PutObject and setClient to OzoneClientStub
-    objectEndpoint = spy(new ObjectEndpoint());
-    objectEndpoint.setClient(clientStub);
-    objectEndpoint.setOzoneConfiguration(config);
-
     headers = mock(HttpHeaders.class);
-    objectEndpoint.setHeaders(headers);
+
+    // Create PutObject and setClient to OzoneClientStub
+    objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(clientStub)
+        .setConfig(config)
+        .setHeaders(headers)
+        .build();
+
+    objectEndpoint = spy(objectEndpoint);
 
     String volumeName = config.get(OzoneConfigKeys.OZONE_S3_VOLUME_NAME,
         OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT);

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.freon;
 import com.codahale.metrics.Timer;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
 import java.util.concurrent.Callable;
@@ -32,6 +33,7 @@ import java.util.concurrent.Callable;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 public class OzoneClientCreator extends BaseFreonGenerator implements Callable<Void> {
 
   @CommandLine.Option(names = "--om-service-id",

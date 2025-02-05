@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
@@ -84,9 +85,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       ProtocolMessageEnum> dispatcher;
   private final RequestValidations requestValidations;
   private final OMPerformanceMetrics perfMetrics;
-
-  // always true, only used in tests
-  private boolean shouldFlushCache = true;
 
   private OMRequest lastRequestToSubmit;
 
@@ -306,16 +304,15 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
           throw ex;
         }
         final TermIndex termIndex = TransactionInfo.getTermIndex(transactionIndex.incrementAndGet());
-        omClientResponse = handler.handleWriteRequest(request, termIndex, ozoneManagerDoubleBuffer);
+        final ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
+        omClientResponse = handler.handleWriteRequest(request, context, ozoneManagerDoubleBuffer);
       }
     } catch (IOException ex) {
       // As some preExecute returns error. So handle here.
       return createErrorResponse(request, ex);
     }
     try {
-      if (shouldFlushCache) {
-        omClientResponse.getFlushFuture().get();
-      }
+      omClientResponse.getFlushFuture().get();
       if (LOG.isTraceEnabled()) {
         LOG.trace("Future for {} is completed", request);
       }
@@ -364,13 +361,5 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
    */
   public void awaitDoubleBufferFlush() throws InterruptedException {
     ozoneManagerDoubleBuffer.awaitFlush();
-  }
-
-  @VisibleForTesting
-  public void setShouldFlushCache(boolean shouldFlushCache) {
-    if (ozoneManagerDoubleBuffer != null) {
-      ozoneManagerDoubleBuffer.stopDaemon();
-    }
-    this.shouldFlushCache = shouldFlushCache;
   }
 }

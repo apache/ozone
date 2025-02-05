@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
-import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -37,7 +36,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.security.token.Token;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -58,33 +56,6 @@ public class ECFileChecksumHelper extends BaseFileChecksumHelper {
   protected AbstractBlockChecksumComputer getBlockChecksumComputer(List<ContainerProtos.ChunkInfo> chunkInfos,
       long blockLength) {
     return new ECBlockChecksumComputer(chunkInfos, getKeyInfo(), blockLength);
-  }
-
-  @Override
-  protected String populateBlockChecksumBuf(
-      ByteBuffer blockChecksumByteBuffer) throws IOException {
-    String blockChecksumForDebug = null;
-    switch (getCombineMode()) {
-    case MD5MD5CRC:
-      final MD5Hash md5 = new MD5Hash(blockChecksumByteBuffer.array());
-      md5.write(getBlockChecksumBuf());
-      if (LOG.isDebugEnabled()) {
-        blockChecksumForDebug = md5.toString();
-      }
-      break;
-    case COMPOSITE_CRC:
-      byte[] crcBytes = blockChecksumByteBuffer.array();
-      if (LOG.isDebugEnabled()) {
-        blockChecksumForDebug = CrcUtil.toSingleCrcString(crcBytes);
-      }
-      getBlockChecksumBuf().write(crcBytes);
-      break;
-    default:
-      throw new IOException(
-          "Unknown combine mode: " + getCombineMode());
-    }
-
-    return blockChecksumForDebug;
   }
 
   @Override

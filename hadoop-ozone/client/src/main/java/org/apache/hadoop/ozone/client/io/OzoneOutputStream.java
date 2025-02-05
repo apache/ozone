@@ -105,6 +105,12 @@ public class OzoneOutputStream extends ByteArrayStreamOutput
     outputStream.close();
   }
 
+  @Override
+  public void hflush() throws IOException {
+    hsync();
+  }
+
+  @Override
   public void hsync() throws IOException {
     // Disable the feature flag restores the prior behavior.
     if (!enableHsync) {

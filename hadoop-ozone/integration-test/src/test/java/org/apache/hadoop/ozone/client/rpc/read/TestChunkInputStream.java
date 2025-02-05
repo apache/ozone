@@ -22,12 +22,13 @@ import java.nio.ByteBuffer;
 
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.om.TestBucket;
+import org.junit.jupiter.api.TestInstance;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -36,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 /**
  * Tests {@link ChunkInputStream}.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TestChunkInputStream extends TestInputStreamBase {
 
   /**
@@ -44,16 +46,14 @@ class TestChunkInputStream extends TestInputStreamBase {
    */
   @ContainerLayoutTestInfo.ContainerTest
   void testAll(ContainerLayoutVersion layout) throws Exception {
-    try (MiniOzoneCluster cluster = newCluster(layout)) {
-      cluster.waitForClusterToBeReady();
+    try (OzoneClient client = getCluster().newClient()) {
+      updateConfig(layout);
 
-      try (OzoneClient client = cluster.newClient()) {
-        TestBucket bucket = TestBucket.newBuilder(client).build();
+      TestBucket bucket = TestBucket.newBuilder(client).build();
 
-        testChunkReadBuffers(bucket);
-        testBufferRelease(bucket);
-        testCloseReleasesBuffers(bucket);
-      }
+      testChunkReadBuffers(bucket);
+      testBufferRelease(bucket);
+      testCloseReleasesBuffers(bucket);
     }
   }
 

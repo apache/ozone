@@ -600,8 +600,11 @@ public class TestRDBTableStore {
     try (Table.KeyValueIterator<String, String> i = table.iterator(prefix)) {
       int keyCount = 0;
       for (; i.hasNext(); keyCount++) {
+        Table.KeyValue<String, String> entry = i.next();
         assertEquals(prefix,
-            i.next().getKey().substring(0, PREFIX_LENGTH));
+            entry.getKey().substring(0, PREFIX_LENGTH));
+        assertEquals(entry.getValue().getBytes(StandardCharsets.UTF_8).length,
+            entry.getRawSize());
       }
       assertEquals(expectedCount, keyCount);
 

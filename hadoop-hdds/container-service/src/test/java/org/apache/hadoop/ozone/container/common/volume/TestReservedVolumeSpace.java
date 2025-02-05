@@ -70,7 +70,7 @@ public class TestReservedVolumeSpace {
 
     // Gets the total capacity reported by Ozone, which may be limited to less than the volume's real capacity by the
     // DU reserved configurations.
-    long volumeCapacity = hddsVolume.getCapacity();
+    long volumeCapacity = hddsVolume.getCurrentUsage().getCapacity();
     VolumeUsage usage = hddsVolume.getVolumeInfo().get().getUsageForTesting();
 
     // Gets the actual total capacity without accounting for DU reserved space configurations.
@@ -94,7 +94,7 @@ public class TestReservedVolumeSpace {
     float percentage = conf.getFloat(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT,
         HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT);
 
-    long volumeCapacity = hddsVolume.getCapacity();
+    long volumeCapacity = hddsVolume.getCurrentUsage().getCapacity();
     VolumeUsage usage = hddsVolume.getVolumeInfo().get().getUsageForTesting();
 
     //Gets the actual total capacity

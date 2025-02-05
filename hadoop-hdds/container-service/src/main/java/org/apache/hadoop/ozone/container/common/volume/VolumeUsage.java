@@ -65,18 +65,6 @@ public class VolumeUsage {
     return source.snapshot();
   }
 
-  public long getCapacity() {
-    return getCurrentUsage().getCapacity();
-  }
-
-  public long getAvailable() {
-    return getCurrentUsage().getAvailable();
-  }
-
-  public long getUsedSpace() {
-    return getCurrentUsage().getUsedSpace();
-  }
-
   /**
    * <pre>
    * {@code
@@ -114,15 +102,13 @@ public class VolumeUsage {
    * so there could be that DU value > totalUsed when there are deletes.
    * @return other used space
    */
-  private static long getOtherUsed(SpaceUsageSource precomputedVolumeSpace) {
-    long totalUsed = precomputedVolumeSpace.getCapacity() -
-        precomputedVolumeSpace.getAvailable();
-    return Math.max(totalUsed - precomputedVolumeSpace.getUsedSpace(), 0L);
+  private static long getOtherUsed(SpaceUsageSource usage) {
+    long totalUsed = usage.getCapacity() - usage.getAvailable();
+    return Math.max(totalUsed - usage.getUsedSpace(), 0L);
   }
 
-  private long getRemainingReserved(
-      SpaceUsageSource precomputedVolumeSpace) {
-    return Math.max(reservedInBytes - getOtherUsed(precomputedVolumeSpace), 0L);
+  private long getRemainingReserved(SpaceUsageSource usage) {
+    return Math.max(reservedInBytes - getOtherUsed(usage), 0L);
   }
 
   public synchronized void start() {

@@ -30,8 +30,8 @@ import static org.apache.hadoop.ozone.om.helpers.BucketLayout.LEGACY;
 class TestOzoneContractLegacy extends AbstractOzoneContractTest {
 
   @Override
-  OzoneConfiguration createOzoneConfig() {
-    OzoneConfiguration conf = createBaseConfiguration();
+  protected OzoneConfiguration createOzoneConfig() {
+    OzoneConfiguration conf = super.createOzoneConfig();
     conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, LEGACY.name());
     return conf;
   }
