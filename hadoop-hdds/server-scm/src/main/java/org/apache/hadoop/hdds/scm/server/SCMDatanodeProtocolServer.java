@@ -295,9 +295,9 @@ public class SCMDatanodeProtocolServer implements
     }
     int len = auditMap.length();
     if (len > 2) {
-      auditMap.delete(len - 2, len - 1);
+      auditMap.delete(len - 2, len);
     }
-    auditMap.append(']');
+    auditMap.append("]");
     return auditMap.toString();
   }
 
