@@ -59,3 +59,94 @@ To shutdown the cluster, please run
 docker-compose down
 {{< /highlight >}}
 
+## [Add-Ons](https://github.com/apache/ozone/blob/master/hadoop-ozone/dist/src/main/compose/ozone/README.md)
+
+The cluster can be extended with the following optional services:
+* **Monitoring**: Adds Grafana, Jaeger, and Prometheus, and configures Ozone to work with them. This helps you track system performance and diagnose issues.
+* **Profiling**: Enables [async-profiler](https://github.com/async-profiler/async-profiler) to sample CPU and memory usage, helping analyze Ozone’s resource consumption.
+
+You can enable **Monitoring** and **Profiling** add-ons using Docker Compose’s ability to merge multiple configuration files. This can be done by using the [-f option repeatedly](https://docs.docker.com/reference/compose-file/#specifying-multiple-compose-files)
+multiple times or by setting the [COMPOSE_FILE environment variable](https://docs.docker.com/compose/how-tos/environment-variables/envvars/#compose_file) for convenience.
+
+**Enabling Add-ons**
+
+By default, only the core Ozone cluster runs. To enable additional
+features, set the `COMPOSE_FILE` environment variable before starting the cluster:
+{{< highlight bash >}}
+# no COMPOSE_FILE var => only Ozone
+
+# => add monitoring
+export COMPOSE_FILE=docker-compose.yaml:monitoring.yaml
+# => add profiling
+export COMPOSE_FILE=docker-compose.yaml:profiling.yaml
+# => add both
+export COMPOSE_FILE=docker-compose.yaml:monitoring.yaml:profiling.yaml
+{{< /highlight >}}
+
+Once the variable is defined, ozone cluster with add-ons
+can be started/scaled/stopped etc. using the same `docker-compose` commands as for the base cluster.
+
+## Load generator
+
+Apache Ozone includes a built-in generator called
+Freon, which helps to test the system performance
+by generating artificial workloads.
+
+**Running Freon inside a Container**
+
+You can manually start a `Freon` test by entering a running container, such as the SCM, and executing the following command:
+{{< highlight bash >}}
+docker-compose exec scm bash
+ozone freon ockg -n1000
+{{< /highlight >}}
+This runs a test that generates 1,000 objects in Ozone.
+
+You can also start two flavours of Freon as
+separate services, which allows scaling them up.
+Once all the data nodes are started, start
+Freon by adding its definition to `COMPOSE_FILE`
+and re-running the `docker-compose up` or `run.sh` command:
+{{< highlight bash >}}
+export COMPOSE_FILE="${COMPOSE_FILE}:freon-ockg.yaml"
+
+docker-compose up -d --no-recreate --scale datanode=3
+# OR
+./run.sh -d
+{{< /highlight >}}
+
+## How to use
+
+**Monitoring**
+
+You can check the web UI of Prometheus,
+Grafana and Jaeger using the following step:
+
+Do `docker-compose ps` , it will show you list of
+services running in the cluster along with the
+localhost on which each of them are hosted.
+By navigating to the localhost of each services
+you can check the `web UI`.
+
+**Prometheus -**
+It follows a pull based approach where
+metrics are published on an HTTP endpoint.
+
+**Grafana -**
+It comes with three dashboards for ozone:
+
+* Ozone-Object metrics
+* Ozone-RPC Metrics
+* Ozone-Overall Metrics
+
+**Jaeger -**
+It collects distributed tracing information
+from Ozone.
+
+**Profiling**
+
+Start by hitting the `/prof` endpoint on the
+service to be profiled,
+eg. http://localhost:9876/prof for SCM.
+Detailed instructions
+can be found in the Hadoop wiki.
+
