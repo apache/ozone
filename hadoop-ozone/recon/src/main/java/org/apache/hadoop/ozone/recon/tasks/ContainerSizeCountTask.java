@@ -106,7 +106,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
             durationMilliseconds);
       }
     } catch (Throwable t) {
-      LOG.error("Exception in Container Size Distribution task Thread.", t);
+      LOG.debug("Exception in Container Size Distribution task Thread.", t);
       if (t instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
