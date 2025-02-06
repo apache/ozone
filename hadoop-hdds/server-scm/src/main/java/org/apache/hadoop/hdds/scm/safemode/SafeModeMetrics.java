@@ -43,8 +43,6 @@ public class SafeModeMetrics {
   private @Metric MutableCounterLong
       currentContainersWithECDataReplicaReportedCount;
 
-  // When hdds.scm.safemode.pipeline-availability.check is set then only
-  // below metrics will have some values, otherwise they will be zero.
   private @Metric MutableGaugeLong numHealthyPipelinesThreshold;
   private @Metric MutableCounterLong currentHealthyPipelinesCount;
   private @Metric MutableGaugeLong
