@@ -162,10 +162,6 @@ public class OpenKeyCleanupService extends BackgroundService {
     return !suspended.get() && ozoneManager.isLeaderReady();
   }
 
-  private boolean isRatisEnabled() {
-    return ozoneManager.isRatisEnabled();
-  }
-
   private class OpenKeyCleanupTask implements BackgroundTask {
 
     private final BucketLayout bucketLayout;

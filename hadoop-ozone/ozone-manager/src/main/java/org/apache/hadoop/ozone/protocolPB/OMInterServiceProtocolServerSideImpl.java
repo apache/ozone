@@ -39,14 +39,12 @@ public class OMInterServiceProtocolServerSideImpl implements
     OMInterServiceProtocolPB {
 
   private final OzoneManagerRatisServer omRatisServer;
-  private final boolean isRatisEnabled;
   private final OzoneManager ozoneManager;
 
   public OMInterServiceProtocolServerSideImpl(OzoneManager ozoneMgr,
-      OzoneManagerRatisServer ratisServer, boolean enableRatis) {
+      OzoneManagerRatisServer ratisServer) {
     this.ozoneManager = ozoneMgr;
     this.omRatisServer = ratisServer;
-    this.isRatisEnabled = enableRatis;
   }
 
   @Override
@@ -54,14 +52,6 @@ public class OMInterServiceProtocolServerSideImpl implements
       BootstrapOMRequest request) throws ServiceException {
     if (request == null) {
       return null;
-    }
-    if (!isRatisEnabled) {
-      return BootstrapOMResponse.newBuilder()
-          .setSuccess(false)
-          .setErrorCode(ErrorCode.RATIS_NOT_ENABLED)
-          .setErrorMsg("New OM node cannot be bootstrapped as Ratis " +
-              "is not enabled on existing OM")
-          .build();
     }
 
     OzoneManagerRatisUtils.checkLeaderStatus(ozoneManager);

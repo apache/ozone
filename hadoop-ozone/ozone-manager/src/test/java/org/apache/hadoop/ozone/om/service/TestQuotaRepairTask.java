@@ -58,7 +58,6 @@ public class TestQuotaRepairTask extends TestOMKeyRequest {
 
   @Test
   public void testQuotaRepair() throws Exception {
-    when(ozoneManager.isRatisEnabled()).thenReturn(true);
     OzoneManagerProtocolProtos.OMResponse respMock = mock(OzoneManagerProtocolProtos.OMResponse.class);
     when(respMock.getSuccess()).thenReturn(true);
     OzoneManagerRatisServer ratisServerMock = mock(OzoneManagerRatisServer.class);
@@ -136,7 +135,6 @@ public class TestQuotaRepairTask extends TestOMKeyRequest {
 
   @Test
   public void testQuotaRepairForOldVersionVolumeBucket() throws Exception {
-    when(ozoneManager.isRatisEnabled()).thenReturn(true);
     OzoneManagerProtocolProtos.OMResponse respMock = mock(OzoneManagerProtocolProtos.OMResponse.class);
     when(respMock.getSuccess()).thenReturn(true);
     OzoneManagerRatisServer ratisServerMock = mock(OzoneManagerRatisServer.class);

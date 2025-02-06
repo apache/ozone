@@ -87,8 +87,6 @@ public class OzoneDelegationTokenSecretManager
    */
   private final Object noInterruptsLock = new Object();
 
-  private final boolean isRatisEnabled;
-
   /**
    * Create a secret manager with a builder object.
    *
@@ -104,7 +102,6 @@ public class OzoneDelegationTokenSecretManager
     this.ozoneManager = b.ozoneManager;
     this.store = new OzoneSecretStore(b.ozoneConf,
         this.ozoneManager.getMetadataManager());
-    isRatisEnabled = true;
     this.secretKeyClient = b.secretKeyClient;
     loadTokenSecretState(store.loadState());
   }
@@ -217,12 +214,6 @@ public class OzoneDelegationTokenSecretManager
     }
     long expiryTime = identifier.getIssueDate() + getTokenRenewInterval();
 
-    // For HA ratis will take care of updating.
-    // This will be removed, when HA/Non-HA code is merged.
-    if (!isRatisEnabled) {
-      addToTokenStore(identifier, password, expiryTime);
-    }
-
     Token<OzoneTokenIdentifier> token = new Token<>(identifier.getBytes(),
         password, identifier.getKind(), getService());
     if (LOG.isDebugEnabled()) {
@@ -315,18 +306,7 @@ public class OzoneDelegationTokenSecretManager
           + " with non-matching renewer " + id.getRenewer());
     }
 
-    long renewTime = Math.min(id.getMaxDate(), now + getTokenRenewInterval());
-
-    // For HA ratis will take care of updating.
-    // This will be removed, when HA/Non-HA code is merged.
-    if (!isRatisEnabled) {
-      try {
-        addToTokenStore(id, token.getPassword(), renewTime);
-      } catch (IOException e) {
-        LOG.error("Unable to update token " + id.getSequenceNumber(), e);
-      }
-    }
-    return renewTime;
+    return Math.min(id.getMaxDate(), now + getTokenRenewInterval());
   }
 
   public void updateRenewToken(Token<OzoneTokenIdentifier> token,
@@ -372,26 +352,12 @@ public class OzoneDelegationTokenSecretManager
           + " is not authorized to cancel the token " + formatTokenId(id));
     }
 
-    // For HA ratis will take care of removal.
-    // This check will be removed, when HA/Non-HA code is merged.
-    if (!isRatisEnabled) {
-      try {
-        store.removeToken(id);
-      } catch (IOException e) {
-        LOG.error("Unable to remove token " + id.getSequenceNumber(), e);
-      }
-      TokenInfo info = currentTokens.remove(id);
-      if (info == null) {
-        throw new InvalidToken("Token not found " + formatTokenId(id));
-      }
-    } else {
-      // Check whether token is there in-memory map of tokens or not on the
-      // OM leader.
-      TokenInfo info = currentTokens.get(id);
-      if (info == null) {
-        throw new InvalidToken("Token not found in-memory map of tokens" +
-            formatTokenId(id));
-      }
+    // Check whether token is there in-memory map of tokens or not on the
+    // OM leader.
+    TokenInfo info = currentTokens.get(id);
+    if (info == null) {
+      throw new InvalidToken("Token not found in-memory map of tokens" +
+          formatTokenId(id));
     }
     return id;
   }
