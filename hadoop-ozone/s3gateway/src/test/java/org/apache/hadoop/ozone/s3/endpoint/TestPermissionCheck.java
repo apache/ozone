@@ -46,6 +46,7 @@ import java.util.Map;
 
 import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyLong;
@@ -146,12 +147,12 @@ public class TestPermissionCheck {
   @Test
   public void testListMultiUpload() throws IOException {
     when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    doThrow(exception).when(bucket).listMultipartUploads(anyString());
+    doThrow(exception).when(bucket).listMultipartUploads(anyString(), anyString(), anyString(), anyInt());
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () ->
-        bucketEndpoint.listMultipartUploads("bucketName", "prefix"));
+        bucketEndpoint.listMultipartUploads("bucketName", "prefix", 10, "", ""));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 

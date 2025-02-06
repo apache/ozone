@@ -47,6 +47,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
+import javax.validation.constraints.Max;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -137,7 +138,7 @@ public class BucketEndpoint extends EndpointBase {
 
       if (uploads != null) {
         s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
-        return listMultipartUploads(bucketName, prefix);
+        return listMultipartUploads(bucketName, prefix, 100, null, null);
       }
 
       if (prefix == null) {
@@ -328,7 +329,10 @@ public class BucketEndpoint extends EndpointBase {
 
   public Response listMultipartUploads(
       @PathParam("bucket") String bucketName,
-      @QueryParam("prefix") String prefix)
+      @QueryParam("prefix") String prefix,
+      @QueryParam("max-uploads") @DefaultValue("100") @Max(1000) int maxUploads,
+      @QueryParam("key-marker") String keyMarker,
+      @QueryParam("upload-id-marker") String uploadIdMarker)
       throws OS3Exception, IOException {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
@@ -337,10 +341,13 @@ public class BucketEndpoint extends EndpointBase {
 
     try {
       OzoneMultipartUploadList ozoneMultipartUploadList =
-          bucket.listMultipartUploads(prefix);
+          bucket.listMultipartUploads(prefix, keyMarker, uploadIdMarker, maxUploads);
 
       ListMultipartUploadsResult result = new ListMultipartUploadsResult();
       result.setBucket(bucketName);
+      result.setKeyMarker(ozoneMultipartUploadList.getNextKeyMarker());
+      result.setUploadIdMarker(ozoneMultipartUploadList.getNextUploadIdMarker());
+      result.setTruncated(ozoneMultipartUploadList.isTruncated());
 
       ozoneMultipartUploadList.getUploads().forEach(upload -> result.addUpload(
           new ListMultipartUploadsResult.Upload(

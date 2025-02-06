@@ -610,7 +610,7 @@ public interface OzoneManagerProtocol
    * List in-flight uploads.
    */
   OmMultipartUploadList listMultipartUploads(String volumeName,
-      String bucketName, String prefix) throws IOException;
+      String bucketName, String prefix, String keyMarker, String uploadIdMarker, int maxUploads) throws IOException;
 
   /**
    * Gets s3Secret for given kerberos user.

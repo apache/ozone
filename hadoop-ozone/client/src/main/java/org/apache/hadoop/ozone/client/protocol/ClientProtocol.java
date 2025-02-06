@@ -668,7 +668,7 @@ public interface ClientProtocol {
    * Return with the inflight multipart uploads.
    */
   OzoneMultipartUploadList listMultipartUploads(String volumename,
-      String bucketName, String prefix) throws IOException;
+      String bucketName, String prefix, String keyMarker, String uploadIdMarker, int maxUploads) throws IOException;
 
   /**
    * Get a valid Delegation Token.
