@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.shell;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 
 /**
@@ -34,22 +33,15 @@ public class TestOzoneShellHAWithFSO extends TestOzoneShellHA {
    * handler type.
    */
   @BeforeAll
-  public static void init() throws Exception {
+  @Override
+  public void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
     conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
     conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
-    startKMS();
+    // startKMS();
     startCluster(conf);
-  }
-
-  /**
-   * shutdown MiniOzoneCluster.
-   */
-  @AfterAll
-  public static void shutdownCluster() {
-    shutdown();
   }
 }
