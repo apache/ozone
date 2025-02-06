@@ -174,20 +174,25 @@ public final class ContainerUtils {
     if (!path.exists()) {
       throw new IOException("Datanode ID file not found.");
     }
+    DatanodeDetails datanodeDetails;
     try {
-      return DatanodeIdYaml.readDatanodeIdFile(path);
+      datanodeDetails = DatanodeIdYaml.readDatanodeIdFile(path);
     } catch (IOException e) {
       LOG.warn("Error loading DatanodeDetails yaml from {}",
           path.getAbsolutePath(), e);
       // Try to load as protobuf before giving up
       try (FileInputStream in = new FileInputStream(path)) {
-        return DatanodeDetails.getFromProtoBuf(
+        datanodeDetails = DatanodeDetails.getFromProtoBuf(
             HddsProtos.DatanodeDetailsProto.parseFrom(in));
       } catch (IOException io) {
         throw new IOException("Failed to parse DatanodeDetails from "
             + path.getAbsolutePath(), io);
       }
     }
+
+    datanodeDetails.validateDatanodeIpAddress();
+
+    return datanodeDetails;
   }
 
   /**
