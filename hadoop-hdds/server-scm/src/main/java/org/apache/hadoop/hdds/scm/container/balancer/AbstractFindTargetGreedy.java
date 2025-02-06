@@ -128,7 +128,7 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
         return new ContainerMoveSelection(target, container);
       }
     }
-    logger.info("Container Balancer could not find a target for " +
+    logger.debug("Container Balancer could not find a target for " +
         "source datanode {}", source.getUuidString());
     return null;
   }
