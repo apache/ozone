@@ -24,6 +24,7 @@ import java.util.Map;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.lock.OmLockOpr;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -61,6 +62,20 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
 
   public OMKeyAclRequest(OMRequest omRequest) {
     super(omRequest);
+  }
+
+  public OmLockOpr.OmLockInfo lock(OzoneManager ozoneManager, OmLockOpr lockOpr) throws IOException {
+    if (getBucketLayout() == BucketLayout.OBJECT_STORE) {
+      ObjectParser objectParser = new ObjectParser(getPath(), ObjectType.KEY);
+      ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
+          Pair.of(objectParser.getVolume(), objectParser.getBucket()), false, false);
+      return lockOpr.obsLock(resolvedBucket.realBucket(), objectParser.getKey());
+    }
+    return null;
+  }
+
+  public void unlock(OmLockOpr lockOpr, OmLockOpr.OmLockInfo lockInfo) {
+    lockOpr.writeUnlock(lockInfo);
   }
 
   @Override

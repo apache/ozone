@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.bucket;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.lock.OmLockOpr;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -159,6 +160,15 @@ public class OMBucketCreateRequest extends OMClientRequest {
           + " buckets",
           ResultCodes.TOO_MANY_BUCKETS);
     }
+  }
+
+  public OmLockOpr.OmLockInfo lock(OzoneManager ozoneManager, OmLockOpr lockOpr) throws IOException {
+    BucketInfo bucketInfo = getOmRequest().getCreateBucketRequest().getBucketInfo();
+    return lockOpr.volBucketRWLock(bucketInfo.getVolumeName(), bucketInfo.getBucketName());
+  }
+
+  public void unlock(OmLockOpr lockOpr, OmLockOpr.OmLockInfo lockInfo) {
+    lockOpr.writeUnlock(lockInfo);
   }
 
   @Override

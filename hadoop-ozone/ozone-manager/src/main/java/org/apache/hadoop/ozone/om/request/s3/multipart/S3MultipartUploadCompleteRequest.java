@@ -34,6 +34,7 @@ import java.util.function.BiFunction;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.lock.OmLockOpr;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -136,6 +137,18 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     return getOmRequest().toBuilder().setCompleteMultiPartUploadRequest(
         multipartUploadCompleteRequest.toBuilder().setKeyArgs(
             resolvedArgs)).setUserInfo(getUserInfo()).build();
+  }
+
+  public OmLockOpr.OmLockInfo lock(OzoneManager ozoneManager, OmLockOpr lockOpr) throws IOException {
+    if (getBucketLayout() == BucketLayout.OBJECT_STORE) {
+      KeyArgs keyArgs = getOmRequest().getCompleteMultiPartUploadRequest().getKeyArgs();
+      return lockOpr.obsLock(keyArgs.getBucketName(), keyArgs.getKeyName());
+    }
+    return null;
+  }
+
+  public void unlock(OmLockOpr lockOpr, OmLockOpr.OmLockInfo lockInfo) {
+    lockOpr.writeUnlock(lockInfo);
   }
 
   @Override

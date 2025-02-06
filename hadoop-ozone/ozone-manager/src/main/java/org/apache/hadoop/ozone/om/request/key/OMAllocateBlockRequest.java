@@ -27,6 +27,7 @@ import java.util.Map;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.lock.OmLockOpr;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
@@ -147,6 +148,18 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     return getOmRequest().toBuilder().setUserInfo(userInfo)
         .setAllocateBlockRequest(newAllocatedBlockRequest).build();
 
+  }
+
+  public OmLockOpr.OmLockInfo lock(OzoneManager ozoneManager, OmLockOpr lockOpr) throws IOException {
+    if (getBucketLayout() == BucketLayout.OBJECT_STORE) {
+      KeyArgs keyArgs = getOmRequest().getAllocateBlockRequest().getKeyArgs();
+      return lockOpr.obsLock(keyArgs.getBucketName(), keyArgs.getKeyName());
+    }
+    return null;
+  }
+
+  public void unlock(OmLockOpr lockOpr, OmLockOpr.OmLockInfo lockInfo) {
+    lockOpr.writeUnlock(lockInfo);
   }
 
   @Override

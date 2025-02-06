@@ -30,6 +30,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.lock.OmLockOpr;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -182,6 +183,18 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     return getOmRequest().toBuilder()
         .setCreateKeyRequest(newCreateKeyRequest).setUserInfo(getUserInfo())
         .build();
+  }
+
+  public OmLockOpr.OmLockInfo lock(OzoneManager ozoneManager, OmLockOpr lockOpr) throws IOException {
+    if (getBucketLayout() == BucketLayout.OBJECT_STORE) {
+      KeyArgs keyArgs = getOmRequest().getCreateKeyRequest().getKeyArgs();
+      return lockOpr.bucketReadLock(keyArgs.getBucketName());
+    }
+    return null;
+  }
+
+  public void unlock(OmLockOpr lockOpr, OmLockOpr.OmLockInfo lockInfo) {
+    lockOpr.readUnlock(lockInfo);
   }
 
   @Override

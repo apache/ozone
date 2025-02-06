@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.om.lock.OmLockOpr;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -77,6 +78,23 @@ public class OMKeysRenameRequest extends OMKeyRequest {
 
   public OMKeysRenameRequest(OMRequest omRequest, BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
+  }
+
+  public OmLockOpr.OmLockInfo lock(OzoneManager ozoneManager, OmLockOpr lockOpr) throws IOException {
+    if (getBucketLayout() == BucketLayout.OBJECT_STORE) {
+      RenameKeysArgs keyArgs = getOmRequest().getRenameKeysRequest().getRenameKeysArgs();
+      List<String> keyNameList = new ArrayList<>();
+      keyArgs.getRenameKeysMapList().forEach(e -> {
+        keyNameList.add(e.getFromKeyName());
+        keyNameList.add(e.getToKeyName());
+      });
+      return lockOpr.obsLock(keyArgs.getBucketName(), keyNameList);
+    }
+    return null;
+  }
+
+  public void unlock(OmLockOpr lockOpr, OmLockOpr.OmLockInfo lockInfo) {
+    lockOpr.writeUnlock(lockInfo);
   }
 
   @Override
