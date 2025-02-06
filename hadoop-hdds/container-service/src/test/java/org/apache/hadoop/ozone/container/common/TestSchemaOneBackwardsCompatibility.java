@@ -65,7 +65,6 @@ import java.util.HashSet;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -554,9 +553,6 @@ public class TestSchemaOneBackwardsCompatibility {
 
   private void runBlockDeletingService(KeyValueHandler keyValueHandler)
       throws Exception {
-    conf.setInt(OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL, 10);
-
-
     OzoneContainer container = makeMockOzoneContainer(keyValueHandler);
 
     BlockDeletingServiceTestImpl service =
