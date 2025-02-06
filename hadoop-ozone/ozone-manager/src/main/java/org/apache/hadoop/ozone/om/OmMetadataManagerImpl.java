@@ -1955,19 +1955,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       }
     }
 
+    // prefixed iterator will only iterate until keys match the prefix
     try (TableIterator<String, ? extends KeyValue<String, OmMultipartKeyInfo>>
-        iterator = getMultipartInfoTable().iterator()) {
-      iterator.seek(prefixKey);
+        iterator = getMultipartInfoTable().iterator(prefixKey)) {
 
       while (iterator.hasNext()) {
         KeyValue<String, OmMultipartKeyInfo> entry = iterator.next();
-        if (entry.getKey().startsWith(prefixKey)) {
-          // If it is marked for abort, skip it.
-          if (!aborted.contains(entry.getKey())) {
-            response.add(entry.getKey());
-          }
-        } else {
-          break;
+        // If it is marked for abort, skip it.
+        if (!aborted.contains(entry.getKey())) {
+          response.add(entry.getKey());
         }
       }
     }
