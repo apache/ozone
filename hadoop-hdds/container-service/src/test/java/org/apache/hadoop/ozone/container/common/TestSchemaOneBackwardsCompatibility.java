@@ -556,7 +556,7 @@ public class TestSchemaOneBackwardsCompatibility {
   private void runBlockDeletingService(KeyValueHandler keyValueHandler)
       throws Exception {
     conf.setInt(OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL, 10);
-    conf.setInt(OzoneConfigKeys.OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER, 2);
+
 
     OzoneContainer container = makeMockOzoneContainer(keyValueHandler);
 
