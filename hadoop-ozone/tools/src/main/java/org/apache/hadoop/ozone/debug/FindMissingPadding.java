@@ -71,8 +71,8 @@ import static java.util.Comparator.comparing;
 /**
  * Find EC keys affected by missing padding blocks (HDDS-10681).
  */
-@CommandLine.Command(name = "find-missing-padding",
-    aliases = { "fmp" },
+@CommandLine.Command(name = "padding",
+    aliases = { "fmp", "find-missing-padding" },
     description = "List all keys with any missing padding, optionally limited to a volume/bucket/key URI.")
 @MetaInfServices(DebugSubcommand.class)
 public class FindMissingPadding extends Handler implements DebugSubcommand {
@@ -80,7 +80,7 @@ public class FindMissingPadding extends Handler implements DebugSubcommand {
   @CommandLine.Mixin
   private ScmOption scmOption;
 
-  @CommandLine.Parameters(arity = "0..1",
+  @CommandLine.Parameters(arity = "1",
       description = Shell.OZONE_URI_DESCRIPTION)
   private String uri;
 
