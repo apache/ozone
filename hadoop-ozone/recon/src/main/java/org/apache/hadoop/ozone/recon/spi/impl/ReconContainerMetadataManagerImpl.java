@@ -108,16 +108,23 @@ public class ReconContainerMetadataManagerImpl
   public void reinitWithNewContainerDataFromOm(Map<ContainerKeyPrefix, Integer>
                                      containerKeyPrefixCounts)
       throws IOException {
-    // clear and re-init all container-related tables
+    LOG.info("Starting reinitialization of container data...");
+
+    Instant truncateStart = Instant.now();
+
+    // Clear and re-init all container-related tables
     truncateTable(this.containerKeyTable);
     truncateTable(this.keyContainerTable);
     truncateTable(this.containerKeyCountTable);
+
+    long truncateDuration = Duration.between(truncateStart, Instant.now()).toMillis();
+    LOG.info("Table truncation completed in {} ms", truncateDuration);
+
     initializeTables();
 
     if (containerKeyPrefixCounts != null) {
       KeyPrefixContainer tmpKeyPrefixContainer;
-      for (Map.Entry<ContainerKeyPrefix, Integer> entry :
-          containerKeyPrefixCounts.entrySet()) {
+      for (Map.Entry<ContainerKeyPrefix, Integer> entry : containerKeyPrefixCounts.entrySet()) {
         containerKeyTable.put(entry.getKey(), entry.getValue());
         tmpKeyPrefixContainer = entry.getKey().toKeyPrefixContainer();
         if (tmpKeyPrefixContainer != null) {
@@ -126,7 +133,7 @@ public class ReconContainerMetadataManagerImpl
       }
     }
 
-    // reset total count of containers to zero
+    // Reset total count of containers to zero
     storeContainerCount(0L);
   }
 
