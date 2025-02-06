@@ -3336,7 +3336,7 @@
     <value>5s</value>
     <tag>OZONE, RECON, OM</tag>
     <description>
-      Interval in MINUTES by Recon to request OM DB Snapshot.
+      Interval in SECONDS by Recon to request OM DB Snapshot.
     </description>
   </property>
   <property>
@@ -3369,12 +3369,13 @@
     </description>
   </property>
   <property>
-    <name>recon.om.delta.update.loop.limit</name>
-    <value>50</value>
+    <name>recon.om.delta.update.lag.threshold</name>
+    <value>0</value>
     <tag>OZONE, RECON</tag>
     <description>
-      The sync between Recon and OM consists of several small
-      fetch loops.
+      At every Recon OM sync, recon starts fetching OM DB updates, and it continues to
+      fetch from OM till the lag, between OM DB WAL sequence number and Recon OM DB
+      snapshot WAL sequence number, is less than this lag threshold value.
     </description>
   </property>
   <property>
