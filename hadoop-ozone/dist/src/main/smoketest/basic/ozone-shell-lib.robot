@@ -132,7 +132,7 @@ Test ozone shell errors
                     Should contain      ${result}       QUOTA_ERROR
                     Execute and checkrc    ozone sh volume delete ${protocol}${server}/${volume}                            0
     ${result} =     Execute and Ignore Error    ozone sh key put ${protocol}${server}/${volume}/bucket1/key1 sample.txt
-    Should Match Regexp                         ${result}       Error: File not found: .*
+    Should Match                                ${result}       Error: File not found: .*
 
 Test Volume Acls
     [arguments]     ${protocol}         ${server}       ${volume}
