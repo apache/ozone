@@ -221,6 +221,10 @@ public class RDBStore implements DBStore {
     }
   }
 
+  public void compactDB(ManagedCompactRangeOptions options) throws IOException {
+    db.compactDB(options);
+  }
+
   @Override
   public void close() throws IOException {
     if (metrics != null) {

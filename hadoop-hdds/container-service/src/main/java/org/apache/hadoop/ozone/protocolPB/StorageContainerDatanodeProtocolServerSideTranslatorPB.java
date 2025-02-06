@@ -55,7 +55,7 @@ public class StorageContainerDatanodeProtocolServerSideTranslatorPB
 
   private final StorageContainerDatanodeProtocol impl;
   private final OzoneProtocolMessageDispatcher<SCMDatanodeRequest,
-      SCMDatanodeResponse, ProtocolMessageEnum> dispatcher;
+      SCMDatanodeResponse, ProtocolMessageEnum, String> dispatcher;
 
   public StorageContainerDatanodeProtocolServerSideTranslatorPB(
       StorageContainerDatanodeProtocol impl,
@@ -90,7 +90,7 @@ public class StorageContainerDatanodeProtocolServerSideTranslatorPB
   public SCMDatanodeResponse submitRequest(RpcController controller,
       SCMDatanodeRequest request) throws ServiceException {
     return dispatcher.processRequest(request, this::processMessage,
-        request.getCmdType(), request.getTraceID());
+        request.getCmdType(), request.getTraceID(), "");
   }
 
   public SCMDatanodeResponse processMessage(SCMDatanodeRequest request)

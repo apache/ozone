@@ -77,7 +77,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
       .getLogger(ScmBlockLocationProtocolServerSideTranslatorPB.class);
 
   private final OzoneProtocolMessageDispatcher<SCMBlockLocationRequest,
-      SCMBlockLocationResponse, ProtocolMessageEnum>
+      SCMBlockLocationResponse, ProtocolMessageEnum, String>
       dispatcher;
 
   /**
@@ -117,7 +117,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
         request,
         this::processMessage,
         request.getCmdType(),
-        request.getTraceID());
+        request.getTraceID(), "");
   }
 
   private SCMBlockLocationResponse processMessage(
