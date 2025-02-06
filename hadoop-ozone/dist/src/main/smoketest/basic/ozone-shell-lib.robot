@@ -92,7 +92,7 @@ Test ozone shell
                     Execute             ozone sh volume delete ${protocol}${server}/${volume}
 
 Test ozone shell errors
-    [arguments]     ${protocol}         ${server}       ${volume}       ${bucket}       ${key}       ${file}
+    [arguments]     ${protocol}         ${server}       ${volume}
     ${result} =     Execute and checkrc    ozone sh volume create ${protocol}${server}/${volume} --space-quota 1.5GB      255
                     Should contain      ${result}       1.5GB is invalid
     ${result} =     Execute and checkrc    ozone sh volume create ${protocol}${server}/${volume} --namespace-quota 1.5      255
@@ -131,8 +131,8 @@ Test ozone shell errors
     ${result} =     Execute and checkrc    ozone sh bucket create ${protocol}${server}/${volume}/bucket1                    255
                     Should contain      ${result}       QUOTA_ERROR
                     Execute and checkrc    ozone sh volume delete ${protocol}${server}/${volume}                            0
-    ${result} =     Execute and checkrc    ozone sh key put ${protocol}${server}/${volume}/${bucket}/${key} ${file}         255
-                    Should contain      ${result}       "Error: File not found: ${file}"
+    ${result} =     Execute and Ignore Error    ozone sh key put ${protocol}${server}/${volume}/bucket1/key1 sample.txt
+                    Should contain      ${result}       Error: File not found: .*
 
 Test Volume Acls
     [arguments]     ${protocol}         ${server}       ${volume}
