@@ -122,8 +122,16 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final OMRequest omRequest = super.preExecute(ozoneManager);
     final CreateTenantRequest request = omRequest.getCreateTenantRequest();
     Preconditions.checkNotNull(request);
+    Preconditions.checkState(
+        request.getVolumeName().equals(request.getVolumeName()),
+        "CreateTenantRequest's volumeName value should match VolumeInfo's");
     final String tenantId = request.getTenantId();
-
+    // Check ACL: requires volume CREATE permission.
+    if (ozoneManager.getAclsEnabled()) {
+      checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+          OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE, tenantId,
+          null, null);
+    }
     // Check tenantId validity
     if (tenantId.contains(OzoneConsts.TENANT_ID_USERNAME_DELIMITER)) {
       throw new OMException("Invalid tenant name " + tenantId +
