@@ -100,13 +100,10 @@ public class NSSummaryTaskDbEventHandler {
       // as this is a new ID
       nsSummary = new NSSummary();
     }
-    int numOfFile = nsSummary.getNumOfFiles();
-    long sizeOfFile = nsSummary.getSizeOfFiles();
     int[] fileBucket = nsSummary.getFileSizeBucket();
-    nsSummary.setNumOfFiles(numOfFile + 1);
-    long dataSize = keyInfo.getDataSize();
-    nsSummary.setSizeOfFiles(sizeOfFile + dataSize);
-    int binIndex = ReconUtils.getFileSizeBinIndex(dataSize);
+    nsSummary.setNumOfFiles(nsSummary.getNumOfFiles() + 1);
+    nsSummary.setSizeOfFiles(nsSummary.getSizeOfFiles() + keyInfo.getDataSize());
+    int binIndex = ReconUtils.getFileSizeBinIndex(keyInfo.getDataSize());
 
     ++fileBucket[binIndex];
     nsSummary.setFileSizeBucket(fileBucket);
@@ -168,18 +165,15 @@ public class NSSummaryTaskDbEventHandler {
       LOG.error("The namespace table is not correctly populated.");
       return;
     }
-    int numOfFile = nsSummary.getNumOfFiles();
-    long sizeOfFile = nsSummary.getSizeOfFiles();
     int[] fileBucket = nsSummary.getFileSizeBucket();
 
-    long dataSize = keyInfo.getDataSize();
-    int binIndex = ReconUtils.getFileSizeBinIndex(dataSize);
+    int binIndex = ReconUtils.getFileSizeBinIndex(keyInfo.getDataSize());
 
     // decrement count, data size, and bucket count
     // even if there's no direct key, we still keep the entry because
     // we still need children dir IDs info
-    nsSummary.setNumOfFiles(numOfFile - 1);
-    nsSummary.setSizeOfFiles(sizeOfFile - dataSize);
+    nsSummary.setNumOfFiles(nsSummary.getNumOfFiles() - 1);
+    nsSummary.setSizeOfFiles(nsSummary.getSizeOfFiles() - keyInfo.getDataSize());
     --fileBucket[binIndex];
     nsSummary.setFileSizeBucket(fileBucket);
     nsSummaryMap.put(parentObjectId, nsSummary);
@@ -189,7 +183,6 @@ public class NSSummaryTaskDbEventHandler {
                                       Map<Long, NSSummary> nsSummaryMap)
       throws IOException {
     long parentObjectId = directoryInfo.getParentObjectID();
-    long objectId = directoryInfo.getObjectID();
     // Try to get the NSSummary from our local map that maps NSSummaries to IDs
     NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
     if (nsSummary == null) {
@@ -203,7 +196,7 @@ public class NSSummaryTaskDbEventHandler {
       return;
     }
 
-    nsSummary.removeChildDir(objectId);
+    nsSummary.removeChildDir(directoryInfo.getObjectID());
     nsSummaryMap.put(parentObjectId, nsSummary);
   }
 
