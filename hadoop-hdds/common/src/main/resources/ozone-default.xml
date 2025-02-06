@@ -3371,7 +3371,7 @@
   </property>
   <property>
     <name>recon.om.delta.update.limit</name>
-    <value>0</value>
+    <value>50000</value>
     <tag>OZONE, RECON</tag>
     <description>
       Recon each time get a limited delta updates from OM.
@@ -3388,6 +3388,16 @@
       log files and each log batch data may be huge depending on frequent writes and
       updates by ozone client, so to avoid increase in heap memory, this config is used
       as limiting factor of default 1 GB while preparing DB updates object.
+    </description>
+  </property>
+  <property>
+    <name>recon.om.delta.update.lag.threshold</name>
+    <value>0</value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      At every Recon OM sync, recon starts fetching OM DB updates, and it continues to
+      fetch from OM till the lag, between OM DB WAL sequence number and Recon OM DB
+      snapshot WAL sequence number, is less than this lag threshold value.
     </description>
   </property>
   <property>

@@ -98,7 +98,11 @@ public final class  ReconServerConfigKeys {
 
   public static final String RECON_OM_DELTA_UPDATE_LIMIT =
       "recon.om.delta.update.limit";
-  public static final long RECON_OM_DELTA_UPDATE_LIMIT_DEFAULT = 0;
+  public static final long RECON_OM_DELTA_UPDATE_LIMIT_DEFAULT = 50000;
+
+  public static final String RECON_OM_DELTA_UPDATE_LAG_THRESHOLD =
+      "recon.om.delta.update.lag.threshold";
+  public static final long RECON_OM_DELTA_UPDATE_LAG_THRESHOLD_DEFAULT = 0;
 
   public static final String OZONE_RECON_TASK_THREAD_COUNT_KEY =
       "ozone.recon.task.thread.count";

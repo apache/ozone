@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializ
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LAG_THRESHOLD;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT;
 import static org.apache.hadoop.ozone.recon.ReconUtils.createTarFile;
 import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmDeltaRequest;
@@ -363,7 +364,7 @@ public class TestOzoneManagerServiceProviderImpl {
 
     OzoneConfiguration withLimitConfiguration =
         new OzoneConfiguration(configuration);
-    withLimitConfiguration.setLong(RECON_OM_DELTA_UPDATE_LIMIT, 0);
+    withLimitConfiguration.setLong(RECON_OM_DELTA_UPDATE_LIMIT, 10);
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         new OzoneManagerServiceProviderImpl(configuration,
             getTestReconOmMetadataManager(omMetadataManager, dirReconMetadata),
@@ -430,7 +431,8 @@ public class TestOzoneManagerServiceProviderImpl {
 
     OzoneConfiguration withLimitConfiguration =
         new OzoneConfiguration(configuration);
-    withLimitConfiguration.setLong(RECON_OM_DELTA_UPDATE_LIMIT, 1);
+    withLimitConfiguration.setLong(RECON_OM_DELTA_UPDATE_LIMIT, 3);
+    withLimitConfiguration.setLong(RECON_OM_DELTA_UPDATE_LAG_THRESHOLD, 1);
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         new OzoneManagerServiceProviderImpl(withLimitConfiguration,
             getTestReconOmMetadataManager(omMetadataManager, dirReconMetadata),

@@ -93,6 +93,8 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LAG_THRESHOLD;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LAG_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconUtils.convertNumericToSymbolic;
@@ -101,6 +103,7 @@ import static org.apache.ratis.proto.RaftProtos.RaftPeerRole.LEADER;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.sqlite.core.DB;
 
 /**
  * Implementation of the OzoneManager Service provider.
@@ -127,6 +130,7 @@ public class OzoneManagerServiceProviderImpl
   private OzoneManagerSyncMetrics metrics;
 
   private final long deltaUpdateLimit;
+  private final long omDBLagThreshold;
 
   private AtomicBoolean isSyncDataFromOMRunning;
   private final String threadNamePrefix;
@@ -221,6 +225,8 @@ public class OzoneManagerServiceProviderImpl
             .build();
     this.reconContext = reconContext;
     this.taskStatusUpdaterManager = taskStatusUpdaterManager;
+    this.omDBLagThreshold = configuration.getLong(RECON_OM_DELTA_UPDATE_LAG_THRESHOLD,
+        RECON_OM_DELTA_UPDATE_LAG_THRESHOLD_DEFAULT);
   }
 
   @Override
@@ -560,10 +566,14 @@ public class OzoneManagerServiceProviderImpl
             int loopCount = 0;
             long fromSequenceNumber = currentSequenceNumber;
             long diffBetweenOMDbAndReconDBSeqNumber = deltaUpdateLimit + 1;
-            // This loop will continue to fetch and apply OM DB updates till the OM fetch
-            // request will fetch less than deltaUpdateLimit (default value of 1000), so in
-            // high OM write TPS cluster, this simulates continuous pull from OM without any delay.
-            while (diffBetweenOMDbAndReconDBSeqNumber > deltaUpdateLimit) {
+            /**
+            * This loop will continue to fetch and apply OM DB updates and with every
+            * OM DB fetch request, it will fetch {@code deltaUpdateLimit} count of DB updates.
+            * It continues to fetch from OM till the lag, between OM DB WAL sequence number
+            * and Recon OM DB snapshot WAL sequence number, is less than this lag threshold value.
+            * In high OM write TPS cluster, this simulates continuous pull from OM without any delay.
+            */
+            while (diffBetweenOMDbAndReconDBSeqNumber > omDBLagThreshold) {
               diffBetweenOMDbAndReconDBSeqNumber =
                   getAndApplyDeltaUpdatesFromOM(currentSequenceNumber, omdbUpdatesHandler);
               reconTaskUpdater.setLastTaskRunStatus(0);
