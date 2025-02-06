@@ -26,9 +26,9 @@ import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsTag;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 
@@ -56,12 +56,12 @@ public class ReconTaskStatusMetrics implements MetricsSource {
           "Last updated sequence number of corresponding Recon Task");
 
   public void register() {
-    DefaultMetricsSystem.instance()
+    OzoneMetricsSystem.instance()
         .register(SOURCE_NAME, "Recon Task Metrics", this);
   }
 
   public void unregister() {
-    DefaultMetricsSystem.instance()
+    OzoneMetricsSystem.instance()
         .unregisterSource(SOURCE_NAME);
   }
 
