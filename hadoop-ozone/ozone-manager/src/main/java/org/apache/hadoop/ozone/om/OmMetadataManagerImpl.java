@@ -1944,14 +1944,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         cacheIterator = getMultipartInfoTable().cacheIterator();
 
 
-    if (keyMarker.equals("")) {
+    if (!keyMarker.equals("")) {
       prefix = keyMarker;
+      if (!uploadIdMarker.equals("")) {
+        prefix = prefix + OM_KEY_PREFIX + uploadIdMarker;
+      }
     }
 
     String prefixKey =
         OmMultipartUpload.getDbKey(volumeName, bucketName, prefix);
-
-    prefixKey = prefixKey + OM_KEY_PREFIX + uploadIdMarker;
 
     // First iterate all the entries in cache.
     while (cacheIterator.hasNext() && responseKeys.size() < maxUploads) {
