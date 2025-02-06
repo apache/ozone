@@ -102,11 +102,6 @@
     <!-- Test dependencies -->
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-hadoop-dependency-test</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-common</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
