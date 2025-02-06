@@ -906,9 +906,7 @@ public final class OMFileRequest {
             omKeyInfo.getObjectID(), "");
     try (TableIterator<String, ? extends
         Table.KeyValue<String, OmDirectoryInfo>>
-            iterator = dirTable.iterator()) {
-
-      iterator.seek(seekDirInDB);
+            iterator = dirTable.iterator(seekDirInDB)) {
 
       if (iterator.hasNext()) {
         Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
@@ -952,9 +950,7 @@ public final class OMFileRequest {
     String seekFileInDB = metaMgr.getOzonePathKey(volumeId, bucketId,
             omKeyInfo.getObjectID(), "");
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-            iterator = fileTable.iterator()) {
-
-      iterator.seek(seekFileInDB);
+            iterator = fileTable.iterator(seekFileInDB)) {
 
       if (iterator.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
