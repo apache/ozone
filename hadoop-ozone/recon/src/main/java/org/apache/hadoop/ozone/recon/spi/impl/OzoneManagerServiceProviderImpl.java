@@ -103,7 +103,6 @@ import static org.apache.ratis.proto.RaftProtos.RaftPeerRole.LEADER;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.sqlite.core.DB;
 
 /**
  * Implementation of the OzoneManager Service provider.
