@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
@@ -223,9 +222,6 @@ public class TestSchemaTwoBackwardsCompatibility {
   @Test
   public void testDeleteViaTransation() throws IOException, TimeoutException,
       InterruptedException {
-    conf.setInt(OzoneConfigKeys.OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER,
-        BLOCKS_PER_CONTAINER);
-
     // create a container of schema v2
     KeyValueContainer container = createTestContainer();
     assertEquals(container.getContainerData().getSchemaVersion(),
