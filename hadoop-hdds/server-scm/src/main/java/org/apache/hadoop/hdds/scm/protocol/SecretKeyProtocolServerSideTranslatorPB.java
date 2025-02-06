@@ -57,7 +57,7 @@ public class SecretKeyProtocolServerSideTranslatorPB
   private final StorageContainerManager scm;
 
   private OzoneProtocolMessageDispatcher<SCMSecretKeyRequest,
-      SCMSecretKeyResponse, ProtocolMessageEnum> dispatcher;
+      SCMSecretKeyResponse, ProtocolMessageEnum, String> dispatcher;
 
   public SecretKeyProtocolServerSideTranslatorPB(SecretKeyProtocolScm impl,
       StorageContainerManager storageContainerManager,
@@ -78,7 +78,7 @@ public class SecretKeyProtocolServerSideTranslatorPB
           scm.getSecurityProtocolRpcPort(), scm.getScmId());
     }
     return dispatcher.processRequest(request, this::processRequest,
-        request.getCmdType(), request.getTraceID());
+        request.getCmdType(), request.getTraceID(), "");
   }
 
   public SCMSecretKeyResponse processRequest(SCMSecretKeyRequest request)
