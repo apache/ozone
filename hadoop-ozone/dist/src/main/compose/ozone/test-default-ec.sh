@@ -15,18 +15,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-start_docker_env 5
+#suite:EC
 
-## Exclude virtual-host tests. This is tested separately as it requires additional config.
-execute_robot_test scm -v BUCKET:erasure --exclude virtual-host s3
+COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+export COMPOSE_DIR
 
-execute_robot_test scm ec/rewrite.robot
+export SECURITY_ENABLED=false
+export OZONE_REPLICATION_FACTOR=3
 
-prefix=${RANDOM}
-execute_robot_test scm -v PREFIX:${prefix} -v OZONE_CLIENT_REPLICATION_TYPE:"${OZONE_CLIENT_REPLICATION_TYPE}" ec/basic.robot
-docker-compose up -d --no-recreate --scale datanode=4
-execute_robot_test scm -v PREFIX:${prefix} -N read-4-datanodes ec/read.robot
-docker-compose up -d --no-recreate --scale datanode=3
-execute_robot_test scm -v PREFIX:${prefix} -N read-3-datanodes ec/read.robot
+# shellcheck source=/dev/null
+source "$COMPOSE_DIR/../testlib.sh"
+
+# Replication is EC in client side configs
+export COMPOSE_FILE=docker-compose.yaml:ec.yaml
+export OZONE_CLIENT_REPLICATION_TYPE=EC
+
 docker-compose up -d --no-recreate --scale datanode=5
-execute_robot_test scm -v container:1 -v count:5 -N EC-recovery replication/wait.robot
+wait_for_safemode_exit
+execute_robot_test scm -v PREFIX:${RANDOM} -v OZONE_CLIENT_REPLICATION_TYPE:"${OZONE_CLIENT_REPLICATION_TYPE}" ec/basic.robot
+docker-compose --ansi never down
