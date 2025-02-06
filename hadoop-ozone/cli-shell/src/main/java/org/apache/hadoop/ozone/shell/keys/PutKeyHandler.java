@@ -82,8 +82,7 @@ public class PutKeyHandler extends KeyHandler {
 
     File dataFile = new File(fileName);
     if (!dataFile.exists()) {
-      out().printf("Error: File not found: %s%n", fileName);
-      return;
+      throw new IOException("Error: File not found: "+ fileName);
     }
 
     if (isVerbose()) {
