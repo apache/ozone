@@ -291,13 +291,11 @@ public class SCMDatanodeProtocolServer implements
       } else {
         auditMap.append(cmd);
       }
-      auditMap.append(" , ");
+      auditMap.append(", ");
     }
-    int len = auditMap.toString().length();
-    if (len > 3) {
-      auditMap.deleteCharAt(len - 1);
-      auditMap.deleteCharAt(len - 2);
-      auditMap.deleteCharAt(len - 3);
+    int len = auditMap.length();
+    if (len > 2) {
+      auditMap.delete(len - 2, len - 1);
     }
     auditMap.append(']');
     return auditMap.toString();
