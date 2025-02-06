@@ -75,7 +75,23 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
+  class SCMMXBean extends org.apache.hadoop.hdds.scm.TestSCMMXBean {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
   class SCMNodeManagerMXBean extends org.apache.hadoop.hdds.scm.TestSCMNodeManagerMXBean {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class Node2PipelineMap extends org.apache.hadoop.hdds.scm.pipeline.TestNode2PipelineMap {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -91,7 +107,23 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
+  class SCMPipelineMetrics extends org.apache.hadoop.hdds.scm.pipeline.TestSCMPipelineMetrics {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
   class CpuMetrics extends org.apache.hadoop.ozone.TestCpuMetrics {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class DiscardPreallocatedBlocks extends org.apache.hadoop.ozone.client.rpc.TestDiscardPreallocatedBlocks {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -107,7 +139,23 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
+  class LeaseRecoverer extends org.apache.hadoop.ozone.admin.om.lease.TestLeaseRecoverer {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
   class ObjectStore extends org.apache.hadoop.ozone.om.TestObjectStore {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class BucketLayoutWithOlderClient extends org.apache.hadoop.ozone.om.TestBucketLayoutWithOlderClient {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();

@@ -17,14 +17,11 @@
  */
 package org.apache.hadoop.hdds.scm.container;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.DuplicatedPipelineIdException;
 import org.apache.hadoop.hdds.scm.pipeline.InvalidPipelineStateException;
@@ -32,16 +29,15 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.util.Time;
+import org.apache.ozone.test.HATests;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.ozone.ClientVersion.CURRENT_VERSION;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -51,39 +47,18 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 /**
  * Test-cases to verify SCMStateMachine.applyTransaction failure scenarios.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(300)
-public class TestScmApplyTransactionFailure {
+public abstract class TestScmApplyTransactionFailure implements HATests.TestCase {
 
-  private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
-  private static StorageContainerManager scm;
-  private static ContainerManager containerManager;
-  private static PipelineManagerImpl pipelineManager;
-
+  private ContainerManager containerManager;
+  private PipelineManagerImpl pipelineManager;
 
   @BeforeAll
-  public static void init() throws Exception {
-    conf = new OzoneConfiguration();
-    cluster = MiniOzoneCluster.newHABuilder(conf).setSCMServiceId("test")
-        .setNumDatanodes(3).build();
-    conf.setTimeDuration(HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL, 1000,
-        TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT,
-        1000, TimeUnit.MILLISECONDS);
-    cluster.waitForClusterToBeReady();
-    scm = cluster.getStorageContainerManager();
+  public void init() throws Exception {
+    StorageContainerManager scm = cluster().getScmLeader();
     containerManager = scm.getContainerManager();
     pipelineManager = (PipelineManagerImpl) scm.getPipelineManager();
-  }
-
-  /**
-   * Shutdown MiniDFSCluster.
-   */
-  @AfterAll
-  public static void shutdown() {
-    if (cluster != null) {
-      cluster.shutdown();
-    }
   }
 
   @Test

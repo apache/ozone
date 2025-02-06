@@ -19,26 +19,24 @@ package org.apache.hadoop.ozone.admin.om.lease;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.URI;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.fs.LeaseRecoverable;
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 import picocli.CommandLine;
 
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -54,33 +52,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Test cases for LeaseRecoverer.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(value = 120000, unit = TimeUnit.MILLISECONDS)
-public class TestLeaseRecoverer {
-  private static MiniOzoneCluster cluster = null;
-  private static OzoneConfiguration conf;
-  private static OzoneBucket fsoOzoneBucket;
-  private static OzoneClient client;
+public abstract class TestLeaseRecoverer implements NonHATests.TestCase {
+  private OzoneBucket fsoOzoneBucket;
+  private OzoneClient client;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   *
-   * @throws IOException
-   */
   @BeforeAll
-  public static void init() throws Exception {
-    conf = new OzoneConfiguration();
-    conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
-    conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
-    conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
-    conf.set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "0s");
-    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-    clientConfig.setStreamBufferFlushDelay(false);
-    conf.setFromObject(clientConfig);
-    // Set the number of keys to be processed during batch operate.
-    cluster = MiniOzoneCluster.newBuilder(conf).build();
-    cluster.waitForClusterToBeReady();
-    client = cluster.newClient();
+  void init() throws Exception {
+    client = cluster().newClient();
 
     // create a volume and a FSO bucket
     fsoOzoneBucket = TestDataUtil
@@ -88,22 +68,23 @@ public class TestLeaseRecoverer {
   }
 
   @AfterAll
-  public static void teardownClass() {
+  void teardownClass() {
     IOUtils.closeQuietly(client);
-    if (cluster != null) {
-      cluster.shutdown();
-    }
   }
 
   @Test
   public void testCLI() throws IOException {
     final String rootPath = String.format("%s://%s/",
-        OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
-    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
-    FileSystem fs = FileSystem.get(conf);
+        OZONE_OFS_URI_SCHEME, cluster().getConf().get(OZONE_OM_ADDRESS_KEY));
     final String dir = rootPath + fsoOzoneBucket.getVolumeName()
         + OZONE_URI_DELIMITER + fsoOzoneBucket.getName();
     final Path file = new Path(dir, "file");
+    try (FileSystem fs = FileSystem.get(URI.create(rootPath), cluster().getConf())) {
+      testWithFS(fs, file);
+    }
+  }
+
+  private void testWithFS(FileSystem fs, Path file) throws IOException {
     final int dataSize = 1024;
     final byte[] data = new byte[dataSize];
     ThreadLocalRandom.current().nextBytes(data);
