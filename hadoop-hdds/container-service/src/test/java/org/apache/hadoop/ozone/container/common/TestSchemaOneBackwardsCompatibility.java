@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
@@ -554,8 +553,6 @@ public class TestSchemaOneBackwardsCompatibility {
 
   private void runBlockDeletingService(KeyValueHandler keyValueHandler)
       throws Exception {
-    conf.setInt(OzoneConfigKeys.OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER, 2);
-
     OzoneContainer container = makeMockOzoneContainer(keyValueHandler);
 
     BlockDeletingServiceTestImpl service =
