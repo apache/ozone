@@ -61,17 +61,6 @@ public class XException extends Exception {
   }
 
   /**
-   * Creates an XException using another XException as cause.
-   * <p>
-   * The error code and error message are extracted from the cause.
-   *
-   * @param cause exception cause.
-   */
-  public XException(XException cause) {
-    this(cause.getError(), cause.getMessage(), cause);
-  }
-
-  /**
    * Creates an XException using the specified error code. The exception
    * message is resolved using the error code template and the passed
    * parameters.

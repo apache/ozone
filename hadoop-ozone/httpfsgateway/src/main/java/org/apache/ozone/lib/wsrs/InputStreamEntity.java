@@ -44,10 +44,6 @@ public class InputStreamEntity implements StreamingOutput {
     this.len = len;
   }
 
-  public InputStreamEntity(InputStream is) {
-    this(is, 0, -1);
-  }
-
   @Override
   public void write(OutputStream os) throws IOException {
     IOUtils.skipFully(is, offset);
