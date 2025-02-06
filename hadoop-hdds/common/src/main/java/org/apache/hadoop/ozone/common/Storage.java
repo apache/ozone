@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.common;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.util.Time;
@@ -235,7 +234,7 @@ public abstract class Storage {
         LOG.warn("{} is not a directory", rootPath);
         return StorageState.NON_EXISTENT;
       }
-      if (!FileUtil.canWrite(root)) {
+      if (!root.canWrite()) {
         LOG.warn("Cannot access storage directory {}", rootPath);
         return StorageState.NON_EXISTENT;
       }
