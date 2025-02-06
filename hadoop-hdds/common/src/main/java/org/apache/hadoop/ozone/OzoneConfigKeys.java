@@ -333,11 +333,6 @@ public final class OzoneConfigKeys {
   public static final int OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER_DEFAULT
       = 1000;
 
-  public static final String OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL
-      = "ozone.block.deleting.container.limit.per.interval";
-  public static final int
-      OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL_DEFAULT = 10;
-
   public static final String HDDS_CONTAINER_RATIS_ENABLED_KEY
       = ScmConfigKeys.HDDS_CONTAINER_RATIS_ENABLED_KEY;
   public static final boolean HDDS_CONTAINER_RATIS_ENABLED_DEFAULT
