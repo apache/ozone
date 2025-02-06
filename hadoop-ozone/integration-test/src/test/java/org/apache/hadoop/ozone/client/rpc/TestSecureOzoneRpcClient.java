@@ -102,7 +102,7 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
 
   @TempDir
   private static File testDir;
-  private static String keyProviderUri = "kms://http@kms:9600/kms";
+  private static String keyProviderUri = "kms://http@localhost:9600/kms";
 
   @BeforeAll
   public static void init() throws Exception {
