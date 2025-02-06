@@ -238,26 +238,27 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
     // force recovery file
     System.setProperty(FORCE_LEASE_RECOVERY_ENV, String.valueOf(forceRecovery));
     conf.setBoolean(String.format("fs.%s.impl.disable.cache", OZONE_OFS_URI_SCHEME), true);
-    RootedOzoneFileSystem fs = (RootedOzoneFileSystem) FileSystem.get(conf);
-    OzoneOutputStream out = null;
-    try {
-      out = bucket.createKey(keyName, value.getBytes(UTF_8).length, ReplicationType.RATIS,
-          ReplicationFactor.THREE, new HashMap<>());
-      out.write(value.getBytes(UTF_8));
-      out.hsync();
+    try (RootedOzoneFileSystem fs = (RootedOzoneFileSystem) FileSystem.get(conf)) {
+      OzoneOutputStream out = null;
+      try {
+        out = bucket.createKey(keyName, value.getBytes(UTF_8).length, ReplicationType.RATIS,
+            ReplicationFactor.THREE, new HashMap<>());
+        out.write(value.getBytes(UTF_8));
+        out.hsync();
 
-      if (forceRecovery) {
-        fs.recoverLease(file);
-      } else {
-        assertThrows(OMException.class, () -> fs.recoverLease(file));
-      }
-    } finally {
-      if (out != null) {
         if (forceRecovery) {
-          // close failure because the key is already committed
-          assertThrows(OMException.class, out::close);
+          fs.recoverLease(file);
         } else {
-          out.close();
+          assertThrows(OMException.class, () -> fs.recoverLease(file));
+        }
+      } finally {
+        if (out != null) {
+          if (forceRecovery) {
+            // close failure because the key is already committed
+            assertThrows(OMException.class, out::close);
+          } else {
+            out.close();
+          }
         }
       }
     }
@@ -290,51 +291,52 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
     final String rootPath = String.format("%s://%s/",
         OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
-    RootedOzoneFileSystem fs = (RootedOzoneFileSystem) FileSystem.get(conf);
-    OzoneOutputStream out = null;
-    long totalBlock = 10;
-    long usedBlock = (dataSize - 1) / fs.getDefaultBlockSize() + 1;
-    long fileSize = fs.getDefaultBlockSize() * totalBlock;
-    OMMetrics metrics = getCluster().getOzoneManager().getMetrics();
-    long committedBytes = metrics.getDataCommittedBytes();
-    try {
-      out = bucket.createKey(keyName, fileSize, ReplicationType.RATIS,
-          ReplicationFactor.THREE, new HashMap<>());
-      // init used quota check
-      bucket = volume.getBucket(bucketName);
-      assertEquals(0, bucket.getUsedNamespace());
-      assertEquals(0, bucket.getUsedBytes());
+    try (RootedOzoneFileSystem fs = (RootedOzoneFileSystem) FileSystem.get(conf)) {
+      OzoneOutputStream out = null;
+      long totalBlock = 10;
+      long usedBlock = (dataSize - 1) / fs.getDefaultBlockSize() + 1;
+      long fileSize = fs.getDefaultBlockSize() * totalBlock;
+      OMMetrics metrics = getCluster().getOzoneManager().getMetrics();
+      long committedBytes = metrics.getDataCommittedBytes();
+      try {
+        out = bucket.createKey(keyName, fileSize, ReplicationType.RATIS,
+            ReplicationFactor.THREE, new HashMap<>());
+        // init used quota check
+        bucket = volume.getBucket(bucketName);
+        assertEquals(0, bucket.getUsedNamespace());
+        assertEquals(0, bucket.getUsedBytes());
 
-      out.write(data);
-      out.hsync();
-      fs.recoverLease(file);
+        out.write(data);
+        out.hsync();
+        fs.recoverLease(file);
 
-      // check file length
-      FileStatus fileStatus = fs.getFileStatus(file);
-      assertEquals(dataSize, fileStatus.getLen());
-      // check committed bytes
-      assertEquals(committedBytes + dataSize,
-          getCluster().getOzoneManager().getMetrics().getDataCommittedBytes());
-      // check used quota
-      bucket = volume.getBucket(bucketName);
-      assertEquals(1, bucket.getUsedNamespace());
-      assertEquals(dataSize * ReplicationFactor.THREE.getValue(), bucket.getUsedBytes());
+        // check file length
+        FileStatus fileStatus = fs.getFileStatus(file);
+        assertEquals(dataSize, fileStatus.getLen());
+        // check committed bytes
+        assertEquals(committedBytes + dataSize,
+            getCluster().getOzoneManager().getMetrics().getDataCommittedBytes());
+        // check used quota
+        bucket = volume.getBucket(bucketName);
+        assertEquals(1, bucket.getUsedNamespace());
+        assertEquals(dataSize * ReplicationFactor.THREE.getValue(), bucket.getUsedBytes());
 
-      // check unused pre-allocated blocks are reclaimed
-      Table<String, RepeatedOmKeyInfo> deletedTable =
-          getCluster().getOzoneManager().getMetadataManager().getDeletedTable();
-      try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
-               keyIter = deletedTable.iterator()) {
-        while (keyIter.hasNext()) {
-          Table.KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
-          OmKeyInfo key = kv.getValue().getOmKeyInfoList().get(0);
-          assertEquals(totalBlock - usedBlock, key.getKeyLocationVersions().get(0).getLocationListCount());
+        // check unused pre-allocated blocks are reclaimed
+        Table<String, RepeatedOmKeyInfo> deletedTable =
+            getCluster().getOzoneManager().getMetadataManager().getDeletedTable();
+        try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
+                 keyIter = deletedTable.iterator()) {
+          while (keyIter.hasNext()) {
+            Table.KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
+            OmKeyInfo key = kv.getValue().getOmKeyInfoList().get(0);
+            assertEquals(totalBlock - usedBlock, key.getKeyLocationVersions().get(0).getLocationListCount());
+          }
         }
-      }
-    } finally {
-      if (out != null) {
-        // close failure because the key is already committed
-        assertThrows(OMException.class, out::close);
+      } finally {
+        if (out != null) {
+          // close failure because the key is already committed
+          assertThrows(OMException.class, out::close);
+        }
       }
     }
   }
