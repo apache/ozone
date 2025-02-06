@@ -81,6 +81,10 @@ public class PutKeyHandler extends KeyHandler {
     String keyName = address.getKeyName();
 
     File dataFile = new File(fileName);
+    if (!dataFile.exists()) {
+      out().printf("Error: File not found: %s%n",fileName);
+      return;
+    }
 
     if (isVerbose()) {
       try (InputStream stream = Files.newInputStream(dataFile.toPath())) {
