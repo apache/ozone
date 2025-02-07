@@ -20,6 +20,7 @@ package org.apache.ozone.test;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.TestInstance;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
@@ -55,6 +56,14 @@ public abstract class AclTests extends ClusterForTests<MiniOzoneCluster> {
   /** Test cases for non-HA cluster should implement this. */
   public interface TestCase {
     MiniOzoneCluster cluster();
+  }
+
+  @Nested
+  class BucketOwner extends org.apache.hadoop.ozone.om.TestBucketOwner {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
   }
 
 }
