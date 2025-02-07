@@ -222,15 +222,6 @@ public class TestHSync {
     // create a volume and a bucket to be used by OzoneFileSystem
     bucket = TestDataUtil.createVolumeAndBucket(client, layout);
 
-    // Enable DEBUG level logging for relevant classes
-    GenericTestUtils.setLogLevel(BlockManagerImpl.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(AbstractDatanodeStore.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(BlockOutputStream.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(BlockInputStream.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(KeyValueHandler.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(BufferPool.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(ChecksumCache.LOG, Level.DEBUG);
-
     openKeyCleanupService =
         (OpenKeyCleanupService) cluster.getOzoneManager().getKeyManager().getOpenKeyCleanupService();
     openKeyCleanupService.suspend();
