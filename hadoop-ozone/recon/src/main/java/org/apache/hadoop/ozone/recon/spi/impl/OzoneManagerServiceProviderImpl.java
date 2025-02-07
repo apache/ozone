@@ -310,7 +310,7 @@ public class OzoneManagerServiceProviderImpl
       startSyncDataFromOM(0L);
       return true;
     } else {
-      LOG.debug("OM DB sync is already running.");
+      LOG.info("OM DB sync is already running when trying to trigger OM DB sync manually.");
     }
     return false;
   }
@@ -465,6 +465,7 @@ public class OzoneManagerServiceProviderImpl
           "Unable to get delta updates since sequenceNumber - " +
               fromSequenceNumber);
     }
+    omdbUpdatesHandler.setLatestSequenceNumber(getCurrentOMDBSequenceNumber());
     LOG.info("Delta updates received from OM : {} records", getCurrentOMDBSequenceNumber() - fromSequenceNumber);
     return dbUpdatesLatestSeqNumOfOMDB.getRight();
   }
@@ -582,7 +583,7 @@ public class OzoneManagerServiceProviderImpl
               reconTaskController.consumeOMEvents(new OMUpdateEventBatch(
                   omdbUpdatesHandler.getEvents(), omdbUpdatesHandler.getLatestSequenceNumber()), omMetadataManager);
               currentSequenceNumber = getCurrentOMDBSequenceNumber();
-              LOG.error("Updated current sequence number: {}", currentSequenceNumber);
+              LOG.debug("Updated current sequence number: {}", currentSequenceNumber);
               loopCount++;
             }
             LOG.info("Delta updates received from OM : {} loops, {} records", loopCount,
@@ -664,7 +665,7 @@ public class OzoneManagerServiceProviderImpl
         isSyncDataFromOMRunning.set(false);
       }
     } else {
-      LOG.info("OM DB sync is already running.");
+      LOG.info("OM DB sync is already running in syncDataFromOM.");
       return false;
     }
     return true;
