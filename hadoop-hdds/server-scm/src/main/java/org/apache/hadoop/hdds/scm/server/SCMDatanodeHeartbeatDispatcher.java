@@ -229,7 +229,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
       }
       int len = allCommands.length();
       allCommands.delete(len - 2, len);
-      LOG.info("Heartbeat dispatched: datanode=" + datanodeDetails.getUuid() + ", Commands= [" + allCommands + "]");
+      LOG.debug("Heartbeat dispatched: datanode=" + datanodeDetails.getUuid() + ", Commands= [" + allCommands + "]");
     }
 
     return commands;
