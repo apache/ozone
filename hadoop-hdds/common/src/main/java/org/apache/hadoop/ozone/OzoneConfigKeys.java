@@ -650,6 +650,13 @@ public final class OzoneConfigKeys {
       "org.apache.hadoop.ozone.om.TrashPolicyOzone";
 
   public static final String
+      OZONE_OM_SNAPSHOT_COMPACTION_DAG_ENABLED =
+      "ozone.om.snapshot.compaction.dag.enabled";
+
+  public static final boolean
+      OZONE_OM_SNAPSHOT_COMPACTION_DAG_ENABLED_DEFAULT =
+      true;
+  public static final String
       OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED =
       "ozone.om.snapshot.compaction.dag.max.time.allowed";
 

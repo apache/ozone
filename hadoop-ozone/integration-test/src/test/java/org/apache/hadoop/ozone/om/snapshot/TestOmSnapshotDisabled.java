@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -37,6 +38,7 @@ import org.junit.jupiter.api.Timeout;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
@@ -57,6 +59,7 @@ public class TestOmSnapshotDisabled {
     conf.setEnum(HDDS_DB_PROFILE, DBProfile.TEST);
     // Disable filesystem snapshot feature for this test
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, false);
+    conf.setBoolean(OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_ENABLED, false);
 
     cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId("om-service-test1")
@@ -94,5 +97,6 @@ public class TestOmSnapshotDisabled {
     omException = assertThrows(OMException.class,
         () -> store.deleteSnapshot(volumeName, bucketName, snapshotName));
     assertEquals(FEATURE_NOT_ENABLED, omException.getResult());
+    assertNull(cluster.getOzoneManager().getMetadataManager().getStore().getRocksDBCheckpointDiffer());
   }
 }

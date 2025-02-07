@@ -101,6 +101,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import org.apache.commons.lang3.StringUtils;
+
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -584,7 +587,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir, int maxOpenFiles) throws IOException {
-    return loadDB(configuration, metaDir, OM_DB_NAME, false, java.util.Optional.empty(), maxOpenFiles, true, true);
+    boolean enableCompactionDag =
+        configuration.getBoolean(OZONE_OM_SNAPSHOT_COMPACTION_DAG_ENABLED,
+            OZONE_OM_SNAPSHOT_COMPACTION_DAG_ENABLED_DEFAULT);
+    return loadDB(configuration, metaDir, OM_DB_NAME, false, java.util.Optional.empty(), maxOpenFiles, enableCompactionDag, true);
   }
 
   @SuppressWarnings("checkstyle:parameternumber")
