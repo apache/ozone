@@ -235,6 +235,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <artifactId>apache-rat-plugin</artifactId>
         <configuration>
           <excludes>
+            <exclude>**/*.json</exclude>
             <exclude>**/hs_err*.log</exclude>
             <exclude>**/.attach_*</exclude>
             <exclude>**/**.rej</exclude>
