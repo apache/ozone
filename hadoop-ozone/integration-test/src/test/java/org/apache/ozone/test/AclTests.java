@@ -61,11 +61,6 @@ public abstract class AclTests extends ClusterForTests<MiniOzoneCluster> {
     UserGroupInformation.setLoginUser(ADMIN_UGI);
   }
 
-  /** Test cases for non-HA cluster should implement this. */
-  public interface TestCase {
-    MiniOzoneCluster cluster();
-  }
-
   @Nested
   class BucketOwner extends org.apache.hadoop.ozone.om.TestBucketOwner {
     @Override

@@ -49,6 +49,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.ozone.test.AclTests;
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,7 +62,7 @@ import org.junit.jupiter.api.Timeout;
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(120)
-public abstract class TestOzoneManagerListVolumes implements AclTests.TestCase {
+public abstract class TestOzoneManagerListVolumes implements NonHATests.TestCase {
 
   private static final String UNIQUE = UUID.randomUUID().toString();
   private static final String VOL_PREFIX = "vol-" + UNIQUE;

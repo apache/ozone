@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.AclTests;
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -49,7 +50,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(120)
-public abstract class TestBucketOwner implements AclTests.TestCase {
+public abstract class TestBucketOwner implements NonHATests.TestCase {
 
   private static final String UNIQUE = UUID.randomUUID().toString();
   private static final String VOLUME_NAME = "vol-" + UNIQUE;
