@@ -27,6 +27,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.metrics.impl.FileSizeCountTaskMetrics;
+import org.apache.hadoop.util.Time;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
@@ -58,6 +60,7 @@ public class FileSizeCountTask implements ReconOmTask {
 
   private FileCountBySizeDao fileCountBySizeDao;
   private DSLContext dslContext;
+  private final FileSizeCountTaskMetrics metrics;
 
   @Inject
   public FileSizeCountTask(FileCountBySizeDao fileCountBySizeDao,
@@ -65,6 +68,12 @@ public class FileSizeCountTask implements ReconOmTask {
                                utilizationSchemaDefinition) {
     this.fileCountBySizeDao = fileCountBySizeDao;
     this.dslContext = utilizationSchemaDefinition.getDSLContext();
+    this.metrics = FileSizeCountTaskMetrics.register();
+  }
+
+  @Override
+  public void stopMetricsCollection() {
+    this.metrics.unregister();
   }
 
   /**
@@ -76,8 +85,11 @@ public class FileSizeCountTask implements ReconOmTask {
    */
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
+    metrics.incrTaskReprocessCount();
     // Map to store the count of files based on file size
     Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
+
+    long startTime = Time.monotonicNow();
 
     // Delete all records from FILE_COUNT_BY_SIZE table
     int execute = dslContext.delete(FILE_COUNT_BY_SIZE).execute();
@@ -92,7 +104,10 @@ public class FileSizeCountTask implements ReconOmTask {
     boolean statusOBS =
         reprocessBucketLayout(BucketLayout.LEGACY, omMetadataManager,
             fileSizeCountMap);
+
+    metrics.updateTaskReprocessLatency(Time.monotonicNow() - startTime);
     if (!statusFSO && !statusOBS) {
+      metrics.incrTaskReprocessFailureCount();
       return new ImmutablePair<>(getTaskName(), false);
     }
     writeCountsToDB(true, fileSizeCountMap);
@@ -145,11 +160,12 @@ public class FileSizeCountTask implements ReconOmTask {
    */
   @Override
   public Pair<String, Boolean> process(OMUpdateEventBatch events) {
+    metrics.incrTaskProcessCount();
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
     final Collection<String> taskTables = getTaskTables();
 
-    long startTime = System.currentTimeMillis();
+    long startTime = Time.monotonicNow();
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, Object> omdbUpdateEvent = eventIterator.next();
       // Filter event inside process method to avoid duping
@@ -167,14 +183,17 @@ public class FileSizeCountTask implements ReconOmTask {
         try {
           switch (omdbUpdateEvent.getAction()) {
           case PUT:
+            metrics.incrPutKeyEventCount();
             handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
             break;
 
           case DELETE:
+            metrics.incrDeleteKeyEventCount();
             handleDeleteKeyEvent(updatedKey, omKeyInfo, fileSizeCountMap);
             break;
 
           case UPDATE:
+            metrics.incrUpdateKeyEventCount();
             if (omKeyInfoOld != null) {
               handleDeleteKeyEvent(updatedKey, omKeyInfoOld, fileSizeCountMap);
               handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
@@ -191,6 +210,8 @@ public class FileSizeCountTask implements ReconOmTask {
         } catch (Exception e) {
           LOG.error("Unexpected exception while processing key {}.",
               updatedKey, e);
+          metrics.incrTaskProcessFailureCount();
+          metrics.updateTaskProcessLatency(Time.monotonicNow() - startTime);
           return new ImmutablePair<>(getTaskName(), false);
         }
       } else {
@@ -198,9 +219,8 @@ public class FileSizeCountTask implements ReconOmTask {
             value.getClass().getName(), updatedKey);
       }
     }
+    metrics.updateTaskProcessLatency(Time.monotonicNow() - startTime);
     writeCountsToDB(false, fileSizeCountMap);
-    LOG.debug("{} successfully processed in {} milliseconds",
-        getTaskName(), (System.currentTimeMillis() - startTime));
     return new ImmutablePair<>(getTaskName(), true);
   }
 
@@ -211,9 +231,11 @@ public class FileSizeCountTask implements ReconOmTask {
    */
   private void writeCountsToDB(boolean isDbTruncated,
                                Map<FileSizeCountKey, Long> fileSizeCountMap) {
+    metrics.incrTaskWriteToDBCount();
     List<FileCountBySize> insertToDb = new ArrayList<>();
     List<FileCountBySize> updateInDb = new ArrayList<>();
 
+    long startTime = Time.monotonicNow();
     fileSizeCountMap.keySet().forEach((FileSizeCountKey key) -> {
       FileCountBySize newRecord = new FileCountBySize();
       newRecord.setVolume(key.volume);
@@ -247,6 +269,7 @@ public class FileSizeCountTask implements ReconOmTask {
     });
     fileCountBySizeDao.insert(insertToDb);
     fileCountBySizeDao.update(updateInDb);
+    metrics.updateWriteToDBLatency(Time.monotonicNow() - startTime);
   }
 
   private FileSizeCountKey getFileSizeCountKey(OmKeyInfo omKeyInfo) {

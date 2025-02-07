@@ -26,7 +26,9 @@ import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.recon.metrics.impl.OmTableInsightTaskMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.util.Time;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
 import org.jooq.Configuration;
@@ -62,6 +64,7 @@ public class OmTableInsightTask implements ReconOmTask {
   private Configuration sqlConfiguration;
   private ReconOMMetadataManager reconOMMetadataManager;
   private Map<String, OmTableHandler> tableHandlers;
+  private final OmTableInsightTaskMetrics metrics;
 
   @Inject
   public OmTableInsightTask(GlobalStatsDao globalStatsDao,
@@ -70,12 +73,18 @@ public class OmTableInsightTask implements ReconOmTask {
     this.globalStatsDao = globalStatsDao;
     this.sqlConfiguration = sqlConfiguration;
     this.reconOMMetadataManager = reconOMMetadataManager;
+    this.metrics = OmTableInsightTaskMetrics.register();
 
     // Initialize table handlers
     tableHandlers = new HashMap<>();
     tableHandlers.put(OPEN_KEY_TABLE, new OpenKeysInsightHandler());
     tableHandlers.put(OPEN_FILE_TABLE, new OpenKeysInsightHandler());
     tableHandlers.put(DELETED_TABLE, new DeletedKeysInsightHandler());
+  }
+
+  @Override
+  public void stopMetricsCollection() {
+    this.metrics.unregister();
   }
 
   /**
@@ -92,10 +101,12 @@ public class OmTableInsightTask implements ReconOmTask {
    */
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
+    metrics.incrTaskReprocessCount();
     HashMap<String, Long> objectCountMap = initializeCountMap();
     HashMap<String, Long> unReplicatedSizeMap = initializeSizeMap(false);
     HashMap<String, Long> replicatedSizeMap = initializeSizeMap(true);
 
+    long startTime = Time.monotonicNow();
     for (String tableName : getTaskTables()) {
       Table table = omMetadataManager.getTable(tableName);
       if (table == null) {
@@ -120,9 +131,11 @@ public class OmTableInsightTask implements ReconOmTask {
         }
       } catch (IOException ioEx) {
         LOG.error("Unable to populate Table Count in Recon DB.", ioEx);
+        metrics.incrTaskReprocessFailureCount();
         return new ImmutablePair<>(getTaskName(), false);
       }
     }
+    metrics.updateTaskReprocessLatency(Time.monotonicNow() - startTime);
     // Write the data to the DB
     if (!objectCountMap.isEmpty()) {
       writeDataToDB(objectCountMap);
@@ -156,6 +169,7 @@ public class OmTableInsightTask implements ReconOmTask {
    */
   @Override
   public Pair<String, Boolean> process(OMUpdateEventBatch events) {
+    metrics.incrTaskProcessCount();
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     // Initialize maps to store count and size information
     HashMap<String, Long> objectCountMap = initializeCountMap();
@@ -164,7 +178,7 @@ public class OmTableInsightTask implements ReconOmTask {
     final Collection<String> taskTables = getTaskTables();
 
     // Process each update event
-    long startTime = System.currentTimeMillis();
+    long startTime = Time.monotonicNow();
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, Object> omdbUpdateEvent = eventIterator.next();
       String tableName = omdbUpdateEvent.getTable();
@@ -174,16 +188,19 @@ public class OmTableInsightTask implements ReconOmTask {
       try {
         switch (omdbUpdateEvent.getAction()) {
         case PUT:
+          metrics.incrPutEventCount();
           handlePutEvent(omdbUpdateEvent, tableName, objectCountMap,
               unReplicatedSizeMap, replicatedSizeMap);
           break;
 
         case DELETE:
+          metrics.incrDeleteEventCount();
           handleDeleteEvent(omdbUpdateEvent, tableName, objectCountMap,
               unReplicatedSizeMap, replicatedSizeMap);
           break;
 
         case UPDATE:
+          metrics.incrUpdateEventCount();
           handleUpdateEvent(omdbUpdateEvent, tableName, objectCountMap,
               unReplicatedSizeMap, replicatedSizeMap);
           break;
@@ -199,6 +216,7 @@ public class OmTableInsightTask implements ReconOmTask {
         return new ImmutablePair<>(getTaskName(), false);
       }
     }
+    metrics.updateTaskProcessLatency(Time.monotonicNow() - startTime);
     // Write the updated count and size information to the database
     if (!objectCountMap.isEmpty()) {
       writeDataToDB(objectCountMap);
@@ -209,8 +227,7 @@ public class OmTableInsightTask implements ReconOmTask {
     if (!replicatedSizeMap.isEmpty()) {
       writeDataToDB(replicatedSizeMap);
     }
-    LOG.debug("{} successfully processed in {} milliseconds",
-        getTaskName(), (System.currentTimeMillis() - startTime));
+
     return new ImmutablePair<>(getTaskName(), true);
   }
 
@@ -275,9 +292,10 @@ public class OmTableInsightTask implements ReconOmTask {
    * @param dataMap Map containing the updated count and size information.
    */
   private void writeDataToDB(Map<String, Long> dataMap) {
+    metrics.incrTaskWriteToDBCount();
     List<GlobalStats> insertGlobalStats = new ArrayList<>();
     List<GlobalStats> updateGlobalStats = new ArrayList<>();
-
+    long startTime = Time.monotonicNow();
     for (Entry<String, Long> entry : dataMap.entrySet()) {
       Timestamp now =
           using(sqlConfiguration).fetchValue(select(currentTimestamp()));
@@ -295,6 +313,7 @@ public class OmTableInsightTask implements ReconOmTask {
 
     globalStatsDao.insert(insertGlobalStats);
     globalStatsDao.update(updateGlobalStats);
+    metrics.updateWriteToDBLatency(Time.monotonicNow() - startTime);
   }
 
   /**

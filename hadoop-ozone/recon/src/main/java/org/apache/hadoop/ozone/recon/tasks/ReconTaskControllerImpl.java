@@ -149,6 +149,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
           TASK_FAILURE_THRESHOLD) {
         LOG.info("Ignoring task since it failed retry and " +
             "reprocess more than {} times.", TASK_FAILURE_THRESHOLD);
+        reconOmTasks.get(taskName).stopMetricsCollection();
         reconOmTasks.remove(taskName);
       }
     }
@@ -224,6 +225,11 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   @Override
   public synchronized void stop() {
     LOG.info("Stopping Recon Task Controller.");
+    //Stop the metrics for the registered tasks
+    for (ReconOmTask task: getRegisteredTasks().values()) {
+      task.stopMetricsCollection();
+    }
+
     if (this.executorService != null) {
       this.executorService.shutdownNow();
     }

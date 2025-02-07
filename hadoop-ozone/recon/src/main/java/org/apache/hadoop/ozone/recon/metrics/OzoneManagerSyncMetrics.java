@@ -70,6 +70,12 @@ public final class OzoneManagerSyncMetrics {
   @Metric(about = "Number of OM delta requests that failed.")
   private MutableCounterLong numDeltaRequestsFailed;
 
+  @Metric(about = "OM delta update request latency")
+  private MutableRate deltaRequestLatency;
+
+  @Metric(about = "OM delta updates write latency")
+  private MutableRate deltaUpdateWriteLatency;
+
   @Metric(about = "Total number of updates got through OM delta request")
   private MutableCounterLong numUpdatesInDeltaTotal;
 
@@ -91,8 +97,16 @@ public final class OzoneManagerSyncMetrics {
     this.snapshotRequestLatency.add(time);
   }
 
+  public void updateDeltaRequestLatency(long time) {
+    this.deltaRequestLatency.add(time);
+  }
+
+  public void updateDeltaUpdateWriteLatency(long time) {
+    this.deltaUpdateWriteLatency.add(time);
+  }
+
   public void incrNumDeltaRequestsFailed() {
-    this.numSnapshotRequestsFailed.incr();
+    this.numDeltaRequestsFailed.incr();
   }
 
   public void incrNumUpdatesInDeltaTotal(long n) {

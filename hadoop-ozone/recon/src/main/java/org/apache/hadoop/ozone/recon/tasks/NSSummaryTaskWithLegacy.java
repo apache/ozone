@@ -28,8 +28,10 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.metrics.impl.NSSummaryTaskMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,17 +53,16 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(NSSummaryTaskWithLegacy.class);
+  private final NSSummaryTaskMetrics metrics;
 
   private boolean enableFileSystemPaths;
 
-  public NSSummaryTaskWithLegacy(ReconNamespaceSummaryManager
-                                 reconNamespaceSummaryManager,
-                                 ReconOMMetadataManager
-                                 reconOMMetadataManager,
-                                 OzoneConfiguration
-                                 ozoneConfiguration) {
+  public NSSummaryTaskWithLegacy(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+                                 ReconOMMetadataManager reconOMMetadataManager,
+                                 OzoneConfiguration ozoneConfiguration, NSSummaryTaskMetrics metrics) {
     super(reconNamespaceSummaryManager,
         reconOMMetadataManager, ozoneConfiguration);
+    this.metrics = metrics;
     // true if FileSystemPaths enabled
     enableFileSystemPaths = ozoneConfiguration
         .getBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
@@ -69,59 +70,65 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
   }
 
   public boolean processWithLegacy(OMUpdateEventBatch events) {
+    metrics.incrProcessLegacyCount();
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
     ReconOMMetadataManager metadataManager = getReconOMMetadataManager();
 
-    while (eventIterator.hasNext()) {
-      OMDBUpdateEvent<String, ? extends WithParentObjectId> omdbUpdateEvent =
-          eventIterator.next();
-      OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
+    long startTime = Time.monotonicNow();
+    try {
+      while (eventIterator.hasNext()) {
+        OMDBUpdateEvent<String, ? extends WithParentObjectId> omdbUpdateEvent =
+            eventIterator.next();
+        OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
 
-      // we only process updates on OM's KeyTable
-      String table = omdbUpdateEvent.getTable();
+        // we only process updates on OM's KeyTable
+        String table = omdbUpdateEvent.getTable();
 
-      if (!table.equals(KEY_TABLE)) {
-        continue;
-      }
-
-      String updatedKey = omdbUpdateEvent.getKey();
-
-      try {
-        OMDBUpdateEvent<String, ?> keyTableUpdateEvent = omdbUpdateEvent;
-        Object value = keyTableUpdateEvent.getValue();
-        Object oldValue = keyTableUpdateEvent.getOldValue();
-
-        if (!(value instanceof OmKeyInfo)) {
-          LOG.warn("Unexpected value type {} for key {}. Skipping processing.",
-              value.getClass().getName(), updatedKey);
+        if (!table.equals(KEY_TABLE)) {
           continue;
         }
 
-        OmKeyInfo updatedKeyInfo = (OmKeyInfo) value;
-        OmKeyInfo oldKeyInfo = (OmKeyInfo) oldValue;
+        String updatedKey = omdbUpdateEvent.getKey();
 
-        if (!isBucketLayoutValid(metadataManager, updatedKeyInfo)) {
-          continue;
-        }
+        try {
+          OMDBUpdateEvent<String, ?> keyTableUpdateEvent = omdbUpdateEvent;
+          Object value = keyTableUpdateEvent.getValue();
+          Object oldValue = keyTableUpdateEvent.getOldValue();
 
-        if (enableFileSystemPaths) {
-          processWithFileSystemLayout(updatedKeyInfo, oldKeyInfo, action,
-              nsSummaryMap);
-        } else {
-          processWithObjectStoreLayout(updatedKeyInfo, oldKeyInfo, action,
-              nsSummaryMap);
+          if (!(value instanceof OmKeyInfo)) {
+            LOG.warn("Unexpected value type {} for key {}. Skipping processing.",
+                value.getClass().getName(), updatedKey);
+            continue;
+          }
+
+          OmKeyInfo updatedKeyInfo = (OmKeyInfo) value;
+          OmKeyInfo oldKeyInfo = (OmKeyInfo) oldValue;
+
+          if (!isBucketLayoutValid(metadataManager, updatedKeyInfo)) {
+            continue;
+          }
+
+          if (enableFileSystemPaths) {
+            processWithFileSystemLayout(updatedKeyInfo, oldKeyInfo, action,
+                nsSummaryMap);
+          } else {
+            processWithObjectStoreLayout(updatedKeyInfo, oldKeyInfo, action,
+                nsSummaryMap);
+          }
+        } catch (IOException ioEx) {
+          LOG.error("Unable to process Namespace Summary data in Recon DB. ",
+              ioEx);
+          metrics.incrProcessLegacyFailureCount();
+          return false;
         }
-      } catch (IOException ioEx) {
-        LOG.error("Unable to process Namespace Summary data in Recon DB. ",
-            ioEx);
-        return false;
+        if (!checkAndCallFlushToDB(nsSummaryMap)) {
+          return false;
+        }
       }
-      if (!checkAndCallFlushToDB(nsSummaryMap)) {
-        return false;
-      }
+    } finally {
+      metrics.updateProcessLegacyLatency(Time.monotonicNow() - startTime);
     }
-
     // flush and commit left out entries at end
     if (!flushAndCommitNSToDB(nsSummaryMap)) {
       return false;
@@ -141,14 +148,17 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
     if (!updatedKeyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
       switch (action) {
       case PUT:
+        metrics.incrLegacyPutKeyEventCount();
         handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
         break;
 
       case DELETE:
+        metrics.incrLegacyDeleteKeyEventCount();
         handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
         break;
 
       case UPDATE:
+        metrics.incrLegacyUpdateKeyEventCount();
         if (oldKeyInfo != null) {
           setKeyParentID(oldKeyInfo);
           handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
@@ -182,14 +192,17 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
       switch (action) {
       case PUT:
+        metrics.incrLegacyPutDirEventCount();
         handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
         break;
 
       case DELETE:
+        metrics.incrLegacyDeleteDirEventCount();
         handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap);
         break;
 
       case UPDATE:
+        metrics.incrLegacyUpdateDirEventCount();
         if (oldDirectoryInfo != null) {
           handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap);
         } else {
@@ -214,14 +227,17 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
     switch (action) {
     case PUT:
+      metrics.incrLegacyPutKeyEventCount();
       handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
       break;
 
     case DELETE:
+      metrics.incrLegacyDeleteKeyEventCount();
       handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
       break;
 
     case UPDATE:
+      metrics.incrLegacyUpdateKeyEventCount();
       if (oldKeyInfo != null) {
         setParentBucketId(oldKeyInfo);
         handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
@@ -238,8 +254,10 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
   }
 
   public boolean reprocessWithLegacy(OMMetadataManager omMetadataManager) {
+    metrics.incrReprocessLegacyCount();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
+    long startTime = Time.monotonicNow();
     try {
       Table<String, OmKeyInfo> keyTable =
           omMetadataManager.getKeyTable(LEGACY_BUCKET_LAYOUT);
@@ -287,7 +305,10 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
     } catch (IOException ioEx) {
       LOG.error("Unable to reprocess Namespace Summary data in Recon DB. ",
           ioEx);
+      metrics.incrReprocessLegacyFailureCount();
       return false;
+    } finally {
+      metrics.updateReprocessLegacyLatency(Time.monotonicNow() - startTime);
     }
 
     // flush and commit left out entries at end

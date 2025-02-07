@@ -22,8 +22,10 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.recon.metrics.impl.NSSummaryTaskMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,6 +73,7 @@ public class NSSummaryTask implements ReconOmTask {
   private final NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy;
   private final NSSummaryTaskWithOBS nsSummaryTaskWithOBS;
   private final OzoneConfiguration ozoneConfiguration;
+  private final NSSummaryTaskMetrics metrics;
 
   @Inject
   public NSSummaryTask(ReconNamespaceSummaryManager
@@ -82,15 +85,21 @@ public class NSSummaryTask implements ReconOmTask {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconOMMetadataManager = reconOMMetadataManager;
     this.ozoneConfiguration = ozoneConfiguration;
+    this.metrics = NSSummaryTaskMetrics.register();
     this.nsSummaryTaskWithFSO = new NSSummaryTaskWithFSO(
         reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconOMMetadataManager, ozoneConfiguration, this.metrics);
     this.nsSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
         reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconOMMetadataManager, ozoneConfiguration, this.metrics);
     this.nsSummaryTaskWithOBS = new NSSummaryTaskWithOBS(
         reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconOMMetadataManager, ozoneConfiguration, this.metrics);
+  }
+
+  @Override
+  public void stopMetricsCollection() {
+    this.metrics.unregister();
   }
 
   @Override
@@ -100,7 +109,8 @@ public class NSSummaryTask implements ReconOmTask {
 
   @Override
   public Pair<String, Boolean> process(OMUpdateEventBatch events) {
-    long startTime = System.currentTimeMillis();
+    metrics.incrTaskProcessCount();
+    long startTime = Time.monotonicNow();
     boolean success = nsSummaryTaskWithFSO.processWithFSO(events);
     if (!success) {
       LOG.error("processWithFSO failed.");
@@ -112,25 +122,26 @@ public class NSSummaryTask implements ReconOmTask {
     success = nsSummaryTaskWithOBS.processWithOBS(events);
     if (!success) {
       LOG.error("processWithOBS failed.");
+      metrics.incrTaskProcessFailureCount();
     }
-    LOG.debug("{} successfully processed in {} milliseconds",
-        getTaskName(), (System.currentTimeMillis() - startTime));
+    metrics.updateTaskProcessLatency(Time.monotonicNow() - startTime);
     return new ImmutablePair<>(getTaskName(), success);
   }
 
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
+    metrics.incrTaskReprocessCount();
     // Initialize a list of tasks to run in parallel
     Collection<Callable<Boolean>> tasks = new ArrayList<>();
 
-    long startTime = System.nanoTime(); // Record start time
-
+    long startTime = Time.monotonicNow();
     try {
       // reinit Recon RocksDB's namespace CF.
       reconNamespaceSummaryManager.clearNSSummaryTable();
     } catch (IOException ioEx) {
       LOG.error("Unable to clear NSSummary table in Recon DB. ",
           ioEx);
+      metrics.incrTaskReprocessFailureCount();
       return new ImmutablePair<>(getTaskName(), false);
     }
 
@@ -151,25 +162,21 @@ public class NSSummaryTask implements ReconOmTask {
       results = executorService.invokeAll(tasks);
       for (int i = 0; i < results.size(); i++) {
         if (results.get(i).get().equals(false)) {
+          metrics.incrTaskReprocessFailureCount();
           return new ImmutablePair<>(getTaskName(), false);
         }
       }
     } catch (InterruptedException ex) {
       LOG.error("Error while reprocessing NSSummary table in Recon DB.", ex);
+      metrics.incrTaskReprocessFailureCount();
       return new ImmutablePair<>(getTaskName(), false);
     } catch (ExecutionException ex2) {
       LOG.error("Error while reprocessing NSSummary table in Recon DB.", ex2);
+      metrics.incrTaskReprocessFailureCount();
       return new ImmutablePair<>(getTaskName(), false);
     } finally {
+      metrics.updateTaskReprocessLatency(Time.monotonicNow() - startTime);
       executorService.shutdown();
-
-      long endTime = System.nanoTime();
-      // Convert to milliseconds
-      long durationInMillis =
-          TimeUnit.NANOSECONDS.toMillis(endTime - startTime);
-
-      // Log performance metrics
-      LOG.debug("Task execution time: {} milliseconds", durationInMillis);
     }
 
     return new ImmutablePair<>(getTaskName(), true);

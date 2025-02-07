@@ -497,7 +497,10 @@ public class OzoneManagerServiceProviderImpl
         .setSequenceNumber(fromSequenceNumber)
         .setLimitCount(deltaUpdateLimit)
         .build();
+    long startTime = Time.monotonicNow();
     DBUpdates dbUpdates = ozoneManagerClient.getDBUpdates(dbUpdatesRequest);
+    metrics.updateDeltaRequestLatency(Time.monotonicNow() - startTime);
+
     int numUpdates = 0;
     long latestSequenceNumberOfOM = -1L;
     if (null != dbUpdates && dbUpdates.getCurrentSequenceNumber() != -1) {
@@ -508,6 +511,7 @@ public class OzoneManagerServiceProviderImpl
       if (numUpdates > 0) {
         metrics.incrNumUpdatesInDeltaTotal(numUpdates);
       }
+      startTime = Time.monotonicNow();
       for (byte[] data : dbUpdates.getData()) {
         try (ManagedWriteBatch writeBatch = new ManagedWriteBatch(data)) {
           writeBatch.iterate(omdbUpdatesHandler);
@@ -519,6 +523,7 @@ public class OzoneManagerServiceProviderImpl
           }
         }
       }
+      metrics.updateDeltaUpdateWriteLatency(Time.monotonicNow() - startTime);
     }
     long lag = latestSequenceNumberOfOM == -1 ? 0 :
         latestSequenceNumberOfOM - getCurrentOMDBSequenceNumber();

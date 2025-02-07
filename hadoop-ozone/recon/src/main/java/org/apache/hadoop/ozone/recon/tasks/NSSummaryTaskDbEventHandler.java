@@ -24,8 +24,10 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.metrics.impl.NSSummaryTaskMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,20 +48,19 @@ public class NSSummaryTaskDbEventHandler {
       LoggerFactory.getLogger(NSSummaryTaskDbEventHandler.class);
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private ReconOMMetadataManager reconOMMetadataManager;
+  private final NSSummaryTaskMetrics metrics;
 
   private final long nsSummaryFlushToDBMaxThreshold;
 
-  public NSSummaryTaskDbEventHandler(ReconNamespaceSummaryManager
-                                     reconNamespaceSummaryManager,
-                                     ReconOMMetadataManager
-                                     reconOMMetadataManager,
-                                     OzoneConfiguration
-                                     ozoneConfiguration) {
+  public NSSummaryTaskDbEventHandler(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+                                     ReconOMMetadataManager reconOMMetadataManager,
+                                     OzoneConfiguration ozoneConfiguration, NSSummaryTaskMetrics metrics) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconOMMetadataManager = reconOMMetadataManager;
     nsSummaryFlushToDBMaxThreshold = ozoneConfiguration.getLong(
         OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
         OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
+    this.metrics = metrics;
   }
 
   public ReconNamespaceSummaryManager getReconNamespaceSummaryManager() {
@@ -72,17 +73,22 @@ public class NSSummaryTaskDbEventHandler {
 
   protected void writeNSSummariesToDB(Map<Long, NSSummary> nsSummaryMap)
       throws IOException {
+    metrics.incrTaskWriteToDbCount();
+    long startTime = Time.monotonicNow();
     try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
       nsSummaryMap.keySet().forEach((Long key) -> {
         try {
           reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation,
               key, nsSummaryMap.get(key));
         } catch (IOException e) {
+          metrics.incrTaskWriteToDbFailureCount();
           LOG.error("Unable to write Namespace Summary data in Recon DB.",
               e);
         }
       });
       reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
+    } finally {
+      metrics.updateWriteToDBLatency(Time.monotonicNow() - startTime);
     }
   }
 

@@ -25,8 +25,10 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.metrics.impl.NSSummaryTaskMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,15 +49,14 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(NSSummaryTaskWithFSO.class);
+  private final NSSummaryTaskMetrics metrics;
 
-  public NSSummaryTaskWithFSO(ReconNamespaceSummaryManager
-                              reconNamespaceSummaryManager,
-                              ReconOMMetadataManager
-                              reconOMMetadataManager,
-                              OzoneConfiguration
-                              ozoneConfiguration) {
+  public NSSummaryTaskWithFSO(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+                              ReconOMMetadataManager reconOMMetadataManager,
+                              OzoneConfiguration ozoneConfiguration, NSSummaryTaskMetrics metrics) {
     super(reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconOMMetadataManager, ozoneConfiguration, metrics);
+    this.metrics = metrics;
   }
 
   // We only listen to updates from FSO-enabled KeyTable(FileTable) and DirTable
@@ -64,99 +65,112 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
   }
 
   public boolean processWithFSO(OMUpdateEventBatch events) {
+    metrics.incrProcessFSOCount();
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     final Collection<String> taskTables = getTaskTables();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
-    while (eventIterator.hasNext()) {
-      OMDBUpdateEvent<String, ? extends
-              WithParentObjectId> omdbUpdateEvent = eventIterator.next();
-      OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
+    long startTime = Time.monotonicNow();
+    try {
+      while (eventIterator.hasNext()) {
+        OMDBUpdateEvent<String, ? extends
+            WithParentObjectId> omdbUpdateEvent = eventIterator.next();
+        OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
 
-      // we only process updates on OM's FileTable and Dirtable
-      String table = omdbUpdateEvent.getTable();
-      boolean updateOnFileTable = table.equals(FILE_TABLE);
-      if (!taskTables.contains(table)) {
-        continue;
-      }
-
-      String updatedKey = omdbUpdateEvent.getKey();
-
-      try {
-        if (updateOnFileTable) {
-          // key update on fileTable
-          OMDBUpdateEvent<String, OmKeyInfo> keyTableUpdateEvent =
-                  (OMDBUpdateEvent<String, OmKeyInfo>) omdbUpdateEvent;
-          OmKeyInfo updatedKeyInfo = keyTableUpdateEvent.getValue();
-          OmKeyInfo oldKeyInfo = keyTableUpdateEvent.getOldValue();
-
-          switch (action) {
-          case PUT:
-            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
-            break;
-
-          case DELETE:
-            handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
-            break;
-
-          case UPDATE:
-            if (oldKeyInfo != null) {
-              // delete first, then put
-              handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
-            } else {
-              LOG.warn("Update event does not have the old keyInfo for {}.",
-                      updatedKey);
-            }
-            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
-            break;
-
-          default:
-            LOG.debug("Skipping DB update event : {}",
-                    omdbUpdateEvent.getAction());
-          }
-
-        } else {
-          // directory update on DirTable
-          OMDBUpdateEvent<String, OmDirectoryInfo> dirTableUpdateEvent =
-                  (OMDBUpdateEvent<String, OmDirectoryInfo>) omdbUpdateEvent;
-          OmDirectoryInfo updatedDirectoryInfo = dirTableUpdateEvent.getValue();
-          OmDirectoryInfo oldDirectoryInfo = dirTableUpdateEvent.getOldValue();
-
-          switch (action) {
-          case PUT:
-            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
-            break;
-
-          case DELETE:
-            handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap);
-            break;
-
-          case UPDATE:
-            if (oldDirectoryInfo != null) {
-              // delete first, then put
-              handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap);
-            } else {
-              LOG.warn("Update event does not have the old dirInfo for {}.",
-                      updatedKey);
-            }
-            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
-            break;
-
-          default:
-            LOG.debug("Skipping DB update event : {}",
-                    omdbUpdateEvent.getAction());
-          }
+        // we only process updates on OM's FileTable and Dirtable
+        String table = omdbUpdateEvent.getTable();
+        boolean updateOnFileTable = table.equals(FILE_TABLE);
+        if (!taskTables.contains(table)) {
+          continue;
         }
-      } catch (IOException ioEx) {
-        LOG.error("Unable to process Namespace Summary data in Recon DB. ",
-                ioEx);
-        return false;
-      }
-      if (!checkAndCallFlushToDB(nsSummaryMap)) {
-        return false;
-      }
-    }
 
+        String updatedKey = omdbUpdateEvent.getKey();
+
+        try {
+          if (updateOnFileTable) {
+            // key update on fileTable
+            OMDBUpdateEvent<String, OmKeyInfo> keyTableUpdateEvent =
+                (OMDBUpdateEvent<String, OmKeyInfo>) omdbUpdateEvent;
+            OmKeyInfo updatedKeyInfo = keyTableUpdateEvent.getValue();
+            OmKeyInfo oldKeyInfo = keyTableUpdateEvent.getOldValue();
+
+            switch (action) {
+              case PUT:
+                metrics.incrFSOPutKeyEventCount();
+                handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+                break;
+
+              case DELETE:
+                metrics.incrFSODeleteKeyEventCount();
+                handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
+                break;
+
+              case UPDATE:
+                metrics.incrFSOUpdateKeyEventCount();
+                if (oldKeyInfo != null) {
+                  // delete first, then put
+                  handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
+                } else {
+                  LOG.warn("Update event does not have the old keyInfo for {}.",
+                      updatedKey);
+                }
+                handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+                break;
+
+              default:
+                LOG.debug("Skipping DB update event : {}",
+                    omdbUpdateEvent.getAction());
+            }
+
+          } else {
+            // directory update on DirTable
+            OMDBUpdateEvent<String, OmDirectoryInfo> dirTableUpdateEvent =
+                (OMDBUpdateEvent<String, OmDirectoryInfo>) omdbUpdateEvent;
+            OmDirectoryInfo updatedDirectoryInfo = dirTableUpdateEvent.getValue();
+            OmDirectoryInfo oldDirectoryInfo = dirTableUpdateEvent.getOldValue();
+
+            switch (action) {
+              case PUT:
+                metrics.incrFSOPutDirEventCount();
+                handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
+                break;
+
+              case DELETE:
+                metrics.incrFSODeleteDirEventCount();
+                handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap);
+                break;
+
+              case UPDATE:
+                metrics.incrFSOUpdateDirEventCount();
+                if (oldDirectoryInfo != null) {
+                  // delete first, then put
+                  handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap);
+                } else {
+                  LOG.warn("Update event does not have the old dirInfo for {}.",
+                      updatedKey);
+                }
+                handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
+                break;
+
+              default:
+                LOG.debug("Skipping DB update event : {}",
+                    omdbUpdateEvent.getAction());
+            }
+          }
+        } catch (IOException ioEx) {
+          LOG.error("Unable to process Namespace Summary data in Recon DB. ",
+              ioEx);
+          metrics.incrProcessFSOFailureCount();
+          return false;
+        }
+
+        if (!checkAndCallFlushToDB(nsSummaryMap)) {
+          return false;
+        }
+      }
+    } finally {
+      metrics.updateProcessFSOLatency(Time.monotonicNow() - startTime);
+    }
     // flush and commit left out entries at end
     if (!flushAndCommitNSToDB(nsSummaryMap)) {
       return false;
@@ -167,8 +181,10 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
   }
 
   public boolean reprocessWithFSO(OMMetadataManager omMetadataManager) {
+    metrics.incrReprocessFSOCount();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
+    long startTime = Time.monotonicNow();
     try {
       Table<String, OmDirectoryInfo> dirTable =
           omMetadataManager.getDirectoryTable();
@@ -204,7 +220,10 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     } catch (IOException ioEx) {
       LOG.error("Unable to reprocess Namespace Summary data in Recon DB. ",
               ioEx);
+      metrics.incrReprocessFSOFailureCount();
       return false;
+    } finally {
+      metrics.updateReprocessFSOLatency(Time.monotonicNow() - startTime);
     }
     // flush and commit left out keys at end
     if (!flushAndCommitNSToDB(nsSummaryMap)) {

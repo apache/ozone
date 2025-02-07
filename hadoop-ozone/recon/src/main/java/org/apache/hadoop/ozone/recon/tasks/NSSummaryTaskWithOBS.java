@@ -27,8 +27,10 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.metrics.impl.NSSummaryTaskMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,20 +51,22 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(NSSummaryTaskWithOBS.class);
-
+  private final NSSummaryTaskMetrics metrics;
 
   public NSSummaryTaskWithOBS(
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager reconOMMetadataManager,
-      OzoneConfiguration ozoneConfiguration) {
+      OzoneConfiguration ozoneConfiguration, NSSummaryTaskMetrics metrics) {
     super(reconNamespaceSummaryManager,
         reconOMMetadataManager, ozoneConfiguration);
+    this.metrics = metrics;
   }
 
 
   public boolean reprocessWithOBS(OMMetadataManager omMetadataManager) {
+    metrics.incrReprocessOBSCount();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
-
+    long startTime = Time.monotonicNow();
     try {
       Table<String, OmKeyInfo> keyTable =
           omMetadataManager.getKeyTable(BUCKET_LAYOUT);
@@ -100,7 +104,10 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
     } catch (IOException ioEx) {
       LOG.error("Unable to reprocess Namespace Summary data in Recon DB. ",
           ioEx);
+      metrics.incrReprocessOBSFailureCount();
       return false;
+    } finally {
+      metrics.updateReprocessOBSLatency(Time.monotonicNow() - startTime);
     }
 
     // flush and commit left out entries at end
@@ -112,90 +119,100 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
   }
 
   public boolean processWithOBS(OMUpdateEventBatch events) {
+    metrics.incrProcessOBSCount();
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
-    while (eventIterator.hasNext()) {
-      OMDBUpdateEvent<String, ? extends WithParentObjectId> omdbUpdateEvent =
-          eventIterator.next();
-      OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
+    long startTime = Time.monotonicNow();
+    try {
+      while (eventIterator.hasNext()) {
+        OMDBUpdateEvent<String, ? extends WithParentObjectId> omdbUpdateEvent =
+            eventIterator.next();
+        OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
 
-      // We only process updates on OM's KeyTable
-      String table = omdbUpdateEvent.getTable();
-      boolean updateOnKeyTable = table.equals(KEY_TABLE);
-      if (!updateOnKeyTable) {
-        continue;
-      }
-
-      String updatedKey = omdbUpdateEvent.getKey();
-
-      try {
-        OMDBUpdateEvent<String, ?> keyTableUpdateEvent = omdbUpdateEvent;
-        Object value = keyTableUpdateEvent.getValue();
-        Object oldValue = keyTableUpdateEvent.getOldValue();
-        if (value == null) {
-          LOG.warn("Value is null for key {}. Skipping processing.",
-              updatedKey);
-          continue;
-        } else if (!(value instanceof OmKeyInfo)) {
-          LOG.warn("Unexpected value type {} for key {}. Skipping processing.",
-              value.getClass().getName(), updatedKey);
+        // We only process updates on OM's KeyTable
+        String table = omdbUpdateEvent.getTable();
+        boolean updateOnKeyTable = table.equals(KEY_TABLE);
+        if (!updateOnKeyTable) {
           continue;
         }
 
-        OmKeyInfo updatedKeyInfo = (OmKeyInfo) value;
-        OmKeyInfo oldKeyInfo = (OmKeyInfo) oldValue;
+        String updatedKey = omdbUpdateEvent.getKey();
 
-        // KeyTable entries belong to both OBS and Legacy buckets.
-        // Check bucket layout and if it's anything other than OBS,
-        // continue to the next iteration.
-        String volumeName = updatedKeyInfo.getVolumeName();
-        String bucketName = updatedKeyInfo.getBucketName();
-        String bucketDBKey =
-            getReconOMMetadataManager().getBucketKey(volumeName, bucketName);
-        // Get bucket info from bucket table
-        OmBucketInfo omBucketInfo = getReconOMMetadataManager().getBucketTable()
-            .getSkipCache(bucketDBKey);
-
-        if (omBucketInfo.getBucketLayout() != BUCKET_LAYOUT) {
-          continue;
-        }
-
-        setKeyParentID(updatedKeyInfo);
-
-        switch (action) {
-        case PUT:
-          handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
-          break;
-        case DELETE:
-          handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
-          break;
-        case UPDATE:
-          if (oldKeyInfo != null) {
-            // delete first, then put
-            setKeyParentID(oldKeyInfo);
-            handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
-          } else {
-            LOG.warn("Update event does not have the old keyInfo for {}.",
+        try {
+          OMDBUpdateEvent<String, ?> keyTableUpdateEvent = omdbUpdateEvent;
+          Object value = keyTableUpdateEvent.getValue();
+          Object oldValue = keyTableUpdateEvent.getOldValue();
+          if (value == null) {
+            LOG.warn("Value is null for key {}. Skipping processing.",
                 updatedKey);
+            continue;
+          } else if (!(value instanceof OmKeyInfo)) {
+            LOG.warn("Unexpected value type {} for key {}. Skipping processing.",
+                value.getClass().getName(), updatedKey);
+            continue;
           }
-          handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
-          break;
-        default:
-          LOG.debug("Skipping DB update event: {}", action);
-        }
 
+          OmKeyInfo updatedKeyInfo = (OmKeyInfo) value;
+          OmKeyInfo oldKeyInfo = (OmKeyInfo) oldValue;
+
+          // KeyTable entries belong to both OBS and Legacy buckets.
+          // Check bucket layout and if it's anything other than OBS,
+          // continue to the next iteration.
+          String volumeName = updatedKeyInfo.getVolumeName();
+          String bucketName = updatedKeyInfo.getBucketName();
+          String bucketDBKey =
+              getReconOMMetadataManager().getBucketKey(volumeName, bucketName);
+          // Get bucket info from bucket table
+          OmBucketInfo omBucketInfo = getReconOMMetadataManager().getBucketTable()
+              .getSkipCache(bucketDBKey);
+
+          if (omBucketInfo.getBucketLayout() != BUCKET_LAYOUT) {
+            continue;
+          }
+
+          setKeyParentID(updatedKeyInfo);
+
+          switch (action) {
+            case PUT:
+              metrics.incrOBSPutKeyEventCount();
+              handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+              break;
+            case DELETE:
+              metrics.incrOBSDeleteKeyEventCount();
+              handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
+              break;
+            case UPDATE:
+              metrics.incrOBSUpdateKeyEventCount();
+              if (oldKeyInfo != null) {
+                // delete first, then put
+                setKeyParentID(oldKeyInfo);
+                handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
+              } else {
+                LOG.warn("Update event does not have the old keyInfo for {}.",
+                    updatedKey);
+              }
+              handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+              break;
+            default:
+              LOG.debug("Skipping DB update event: {}", action);
+          }
+
+          if (!checkAndCallFlushToDB(nsSummaryMap)) {
+            return false;
+          }
+        } catch (IOException ioEx) {
+          metrics.incrProcessOBSFailureCount();
+          LOG.error("Unable to process Namespace Summary data in Recon DB. ",
+              ioEx);
+          return false;
+        }
         if (!checkAndCallFlushToDB(nsSummaryMap)) {
           return false;
         }
-      } catch (IOException ioEx) {
-        LOG.error("Unable to process Namespace Summary data in Recon DB. ",
-            ioEx);
-        return false;
       }
-      if (!checkAndCallFlushToDB(nsSummaryMap)) {
-        return false;
-      }
+    } finally {
+      metrics.updateProcessOBSLatency(Time.monotonicNow() - startTime);
     }
 
     // Flush and commit left-out entries at the end
