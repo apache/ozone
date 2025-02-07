@@ -75,6 +75,14 @@ public abstract class AclTests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
+  class OzoneManagerListVolumes extends org.apache.hadoop.ozone.om.TestOzoneManagerListVolumes {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
   class RecursiveAclWithFSO extends org.apache.hadoop.ozone.om.TestRecursiveAclWithFSO {
     @Override
     public MiniOzoneCluster cluster() {
