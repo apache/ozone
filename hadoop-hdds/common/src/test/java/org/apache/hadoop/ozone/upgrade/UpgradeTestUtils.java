@@ -18,6 +18,7 @@
  */
 package org.apache.hadoop.ozone.upgrade;
 
+import jakarta.annotation.Nullable;
 import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.common.StorageInfo;
@@ -25,6 +26,7 @@ import org.slf4j.Logger;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 
@@ -40,6 +42,12 @@ public final class UpgradeTestUtils {
    */
   public static File createVersionFile(File parentDir,
       HddsProtos.NodeType nodeType, int mlv) throws IOException {
+    return createVersionFile(parentDir, nodeType, mlv, null);
+  }
+
+  public static File createVersionFile(File parentDir,
+      HddsProtos.NodeType nodeType, int mlv,
+      @Nullable Properties properties) throws IOException {
 
     final String versionFileName = "VERSION";
 
@@ -48,6 +56,11 @@ public final class UpgradeTestUtils {
         UUID.randomUUID().toString(),
         System.currentTimeMillis(),
         mlv);
+
+    if (properties != null) {
+      properties.forEach((key, value) ->
+          info.setProperty((String) key, (String) value));
+    }
 
     File versionFile = new File(parentDir, versionFileName);
     info.writeTo(versionFile);
