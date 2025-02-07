@@ -38,6 +38,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.DELETE;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
@@ -69,8 +71,8 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     fileCountBySizeDao = getDao(FileCountBySizeDao.class);
     UtilizationSchemaDefinition utilizationSchemaDefinition =
         getSchemaDefinition(UtilizationSchemaDefinition.class);
-    fileSizeCountTask =
-        new FileSizeCountTask(fileCountBySizeDao, utilizationSchemaDefinition);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    fileSizeCountTask = new FileSizeCountTask(fileCountBySizeDao, utilizationSchemaDefinition,executor);
     dslContext = utilizationSchemaDefinition.getDSLContext();
     // Truncate table before running each test
     dslContext.truncate(FILE_COUNT_BY_SIZE);

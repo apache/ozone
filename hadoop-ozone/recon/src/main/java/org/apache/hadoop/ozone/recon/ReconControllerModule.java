@@ -22,6 +22,7 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.google.inject.multibindings.Multibinder;
+import com.google.inject.name.Named;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
@@ -74,6 +75,8 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static org.apache.hadoop.hdds.scm.cli.ContainerOperationClient.newContainerRpcClient;
 import static org.apache.hadoop.ozone.OmUtils.getOzoneManagerServiceId;
@@ -134,6 +137,12 @@ public class ReconControllerModule extends AbstractModule {
       taskBinder.addBinding().to(OmTableInsightTask.class);
       taskBinder.addBinding().to(NSSummaryTask.class);
     }
+  }
+
+  @Provides
+  @Singleton
+  public ExecutorService provideReconExecutorService() {
+    return Executors.newFixedThreadPool(5);
   }
 
   /**

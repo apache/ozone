@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import com.google.inject.Inject;
+import com.google.inject.name.Named;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -69,11 +70,11 @@ public class FileSizeCountTask implements ReconOmTask {
 
   @Inject
   public FileSizeCountTask(FileCountBySizeDao fileCountBySizeDao,
-                           UtilizationSchemaDefinition
-                               utilizationSchemaDefinition) {
+                           UtilizationSchemaDefinition utilizationSchemaDefinition,
+                           ExecutorService executorService) {
     this.fileCountBySizeDao = fileCountBySizeDao;
     this.dslContext = utilizationSchemaDefinition.getDSLContext();
-    this.executorService = Executors.newFixedThreadPool(2);
+    this.executorService = executorService;
   }
 
   /**
@@ -98,8 +99,6 @@ public class FileSizeCountTask implements ReconOmTask {
         reprocessBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED, omMetadataManager)));
     futures.add(executorService.submit(() ->
         reprocessBucketLayout(BucketLayout.LEGACY, omMetadataManager)));
-
-    executorService.shutdown();
 
     boolean allSuccess = true;
     try {
