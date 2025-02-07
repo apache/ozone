@@ -110,7 +110,7 @@ public class FileSizeCountTask implements ReconOmTask {
       metrics.incrTaskReprocessFailureCount();
       return new ImmutablePair<>(getTaskName(), false);
     }
-    writeCountsToDB(true, fileSizeCountMap);
+    writeCountsToDB(fileSizeCountMap);
     LOG.debug("Completed a 'reprocess' run of FileSizeCountTask.");
     return new ImmutablePair<>(getTaskName(), true);
   }
@@ -127,7 +127,7 @@ public class FileSizeCountTask implements ReconOmTask {
         handlePutKeyEvent(kv.getValue(), fileSizeCountMap);
         //  The time complexity of .size() method is constant time, O(1)
         if (fileSizeCountMap.size() >= 100000) {
-          writeCountsToDB(true, fileSizeCountMap);
+          writeCountsToDB(fileSizeCountMap);
           fileSizeCountMap.clear();
         }
       }
@@ -220,7 +220,7 @@ public class FileSizeCountTask implements ReconOmTask {
       }
     }
     metrics.updateTaskProcessLatency(Time.monotonicNow() - startTime);
-    writeCountsToDB(false, fileSizeCountMap);
+    writeCountsToDB(fileSizeCountMap);
     return new ImmutablePair<>(getTaskName(), true);
   }
 
@@ -229,11 +229,11 @@ public class FileSizeCountTask implements ReconOmTask {
    * using the dao.
    *
    */
-  private void writeCountsToDB(boolean isDbTruncated,
-                               Map<FileSizeCountKey, Long> fileSizeCountMap) {
+  private void writeCountsToDB(Map<FileSizeCountKey, Long> fileSizeCountMap) {
     metrics.incrTaskWriteToDBCount();
     List<FileCountBySize> insertToDb = new ArrayList<>();
     List<FileCountBySize> updateInDb = new ArrayList<>();
+    boolean isDbTruncated = isFileCountBySizeTableEmpty(); // Check if table is empty
 
     long startTime = Time.monotonicNow();
     fileSizeCountMap.keySet().forEach((FileSizeCountKey key) -> {
@@ -316,6 +316,15 @@ public class FileSizeCountTask implements ReconOmTask {
           fileSizeCountMap.get(countKey) - 1L : -1L;
       fileSizeCountMap.put(countKey, count);
     }
+  }
+
+  /**
+   * Checks if the FILE_COUNT_BY_SIZE table is empty.
+   *
+   * @return true if the table is empty, false otherwise.
+   */
+  private boolean isFileCountBySizeTableEmpty() {
+    return dslContext.fetchCount(FILE_COUNT_BY_SIZE) == 0;
   }
 
   private static class FileSizeCountKey {
