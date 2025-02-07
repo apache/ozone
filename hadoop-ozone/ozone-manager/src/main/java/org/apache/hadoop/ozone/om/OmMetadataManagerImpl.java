@@ -590,7 +590,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     boolean enableCompactionDag =
         configuration.getBoolean(OZONE_OM_SNAPSHOT_COMPACTION_DAG_ENABLED,
             OZONE_OM_SNAPSHOT_COMPACTION_DAG_ENABLED_DEFAULT);
-    return loadDB(configuration, metaDir, OM_DB_NAME, false, java.util.Optional.empty(), maxOpenFiles, enableCompactionDag, true);
+    return loadDB(configuration, metaDir, OM_DB_NAME, false,
+        java.util.Optional.empty(), maxOpenFiles, enableCompactionDag, true);
   }
 
   @SuppressWarnings("checkstyle:parameternumber")
