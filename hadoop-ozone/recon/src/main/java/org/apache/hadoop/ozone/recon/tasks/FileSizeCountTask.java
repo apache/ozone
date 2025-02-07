@@ -65,6 +65,7 @@ public class FileSizeCountTask implements ReconOmTask {
   private FileCountBySizeDao fileCountBySizeDao;
   private DSLContext dslContext;
   private final ConcurrentHashMap<FileSizeCountKey, Long> sharedFileSizeCountMap = new ConcurrentHashMap<>();
+  private final ExecutorService executorService;
 
   @Inject
   public FileSizeCountTask(FileCountBySizeDao fileCountBySizeDao,
@@ -72,6 +73,7 @@ public class FileSizeCountTask implements ReconOmTask {
                                utilizationSchemaDefinition) {
     this.fileCountBySizeDao = fileCountBySizeDao;
     this.dslContext = utilizationSchemaDefinition.getDSLContext();
+    this.executorService = Executors.newFixedThreadPool(2);
   }
 
   /**
@@ -90,15 +92,14 @@ public class FileSizeCountTask implements ReconOmTask {
     int execute = dslContext.delete(FILE_COUNT_BY_SIZE).execute();
     LOG.info("Cleared {} existing records from {}", execute, FILE_COUNT_BY_SIZE);
 
-    ExecutorService executor = Executors.newFixedThreadPool(2);
     List<Future<Boolean>> futures = new ArrayList<>();
 
-    futures.add(executor.submit(() ->
-        processBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED, omMetadataManager)));
-    futures.add(executor.submit(() ->
-        processBucketLayout(BucketLayout.LEGACY, omMetadataManager)));
+    futures.add(executorService.submit(() ->
+        reprocessBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED, omMetadataManager)));
+    futures.add(executorService.submit(() ->
+        reprocessBucketLayout(BucketLayout.LEGACY, omMetadataManager)));
 
-    executor.shutdown();
+    executorService.shutdown();
 
     boolean allSuccess = true;
     try {
@@ -124,7 +125,7 @@ public class FileSizeCountTask implements ReconOmTask {
     return new ImmutablePair<>(getTaskName(), allSuccess);
   }
 
-  private Boolean processBucketLayout(BucketLayout bucketLayout,
+  private Boolean reprocessBucketLayout(BucketLayout bucketLayout,
                                       OMMetadataManager omMetadataManager) {
     long keysProcessed = 0;
 
@@ -147,19 +148,12 @@ public class FileSizeCountTask implements ReconOmTask {
             sharedFileSizeCountMap.clear();
           }
         }
-
-        // Write remaining entries to the database
-        if (!sharedFileSizeCountMap.isEmpty()) {
-          writeCountsToDB(false, sharedFileSizeCountMap);
-          sharedFileSizeCountMap.clear();
-        }
-        LOG.info("Keys Processed are :- {}", keysProcessed);
-        return true;
       }
     } catch (IOException ioEx) {
       LOG.error("Failed to process {} layout: ", bucketLayout, ioEx);
       return false;
     }
+    return true;
   }
 
   @Override
@@ -236,7 +230,9 @@ public class FileSizeCountTask implements ReconOmTask {
             value.getClass().getName(), updatedKey);
       }
     }
-    writeCountsToDB(false, fileSizeCountMap);
+    if (!fileSizeCountMap.isEmpty()) {
+      writeCountsToDB(false, fileSizeCountMap);
+    }
     LOG.info("{} successfully processed in {} milliseconds",
         getTaskName(), (System.currentTimeMillis() - startTime));
     return new ImmutablePair<>(getTaskName(), true);
@@ -285,18 +281,23 @@ public class FileSizeCountTask implements ReconOmTask {
     });
 
     // Perform batch inserts and updates
-    if (!insertToDb.isEmpty()) {
-      fileCountBySizeDao.insert(insertToDb);
-    }
-    if (!updateInDb.isEmpty()) {
-      fileCountBySizeDao.update(updateInDb);
-    }
+    fileCountBySizeDao.insert(insertToDb);
+    fileCountBySizeDao.update(updateInDb);
   }
 
   private FileSizeCountKey getFileSizeCountKey(OmKeyInfo omKeyInfo) {
     return new FileSizeCountKey(omKeyInfo.getVolumeName(),
         omKeyInfo.getBucketName(),
             ReconUtils.getFileSizeUpperBound(omKeyInfo.getDataSize()));
+  }
+
+  /**
+   * Checks if the FILE_COUNT_BY_SIZE table is empty.
+   *
+   * @return true if the table is empty, false otherwise.
+   */
+  private boolean isFileCountBySizeTableEmpty() {
+    return dslContext.fetchCount(FILE_COUNT_BY_SIZE) == 0;
   }
 
   /**

@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMUpdateEventBuilder;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
+import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
 import org.jooq.DSLContext;
 import org.jooq.Record3;
 import org.junit.jupiter.api.BeforeEach;
@@ -77,72 +78,89 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
 
   @Test
   public void testReprocess() throws IOException {
-    // Mock data for FSO and LEGACY layouts
-    OmKeyInfo[] omKeyInfosFso = new OmKeyInfo[3];
-    OmKeyInfo[] omKeyInfosLegacy = new OmKeyInfo[3];
+    OmKeyInfo[] omKeyInfos = new OmKeyInfo[3];
     String[] keyNames = {"key1", "key2", "key3"};
     String[] volumeNames = {"vol1", "vol1", "vol1"};
-    String[] bucketNamesLegacy = {"bucket1", "bucket1", "bucket1"};
-    String[] bucketNamesFso = {"bucket1", "bucket1", "bucket1"};
+    String[] bucketNames = {"bucket1", "bucket1", "bucket1"};
     Long[] dataSizes = {1000L, 100000L, 1125899906842624L * 4};
 
+    // Loop to initialize each instance of OmKeyInfo
     for (int i = 0; i < 3; i++) {
-      omKeyInfosFso[i] = mock(OmKeyInfo.class);
-      given(omKeyInfosFso[i].getKeyName()).willReturn(keyNames[i]);
-      given(omKeyInfosFso[i].getVolumeName()).willReturn(volumeNames[i]);
-      given(omKeyInfosFso[i].getBucketName()).willReturn(bucketNamesFso[i]);
-      given(omKeyInfosFso[i].getDataSize()).willReturn(dataSizes[i]);
-
-      omKeyInfosLegacy[i] = mock(OmKeyInfo.class);
-      given(omKeyInfosLegacy[i].getKeyName()).willReturn(keyNames[i]);
-      given(omKeyInfosLegacy[i].getVolumeName()).willReturn(volumeNames[i]);
-      given(omKeyInfosLegacy[i].getBucketName()).willReturn(bucketNamesLegacy[i]);
-      given(omKeyInfosLegacy[i].getDataSize()).willReturn(dataSizes[i]);
+      omKeyInfos[i] = mock(OmKeyInfo.class);
+      given(omKeyInfos[i].getKeyName()).willReturn(keyNames[i]);
+      given(omKeyInfos[i].getVolumeName()).willReturn(volumeNames[i]);
+      given(omKeyInfos[i].getBucketName()).willReturn(bucketNames[i]);
+      given(omKeyInfos[i].getDataSize()).willReturn(dataSizes[i]);
     }
 
-    // Mock OMMetadataManager
+    // Create two mock instances of TypedTable, one for FILE_SYSTEM_OPTIMIZED
+    // layout and one for LEGACY layout
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
-    TypedTable<String, OmKeyInfo> keyTableFso = mock(TypedTable.class);
     TypedTable<String, OmKeyInfo> keyTableLegacy = mock(TypedTable.class);
+    TypedTable<String, OmKeyInfo> keyTableFso = mock(TypedTable.class);
 
-    when(omMetadataManager.getKeyTable(eq(BucketLayout.FILE_SYSTEM_OPTIMIZED)))
-        .thenReturn(keyTableFso);
+    // Set return values for getKeyTable() for FILE_SYSTEM_OPTIMIZED
+    // and LEGACY layout
     when(omMetadataManager.getKeyTable(eq(BucketLayout.LEGACY)))
         .thenReturn(keyTableLegacy);
+    when(omMetadataManager.getKeyTable(eq(BucketLayout.FILE_SYSTEM_OPTIMIZED)))
+        .thenReturn(keyTableFso);
 
-    // Mock iterators for FSO and LEGACY layouts
-    TypedTable.TypedTableIterator mockKeyIterFso = mock(TypedTable.TypedTableIterator.class);
+    // Create two mock instances of TypedTableIterator, one for each
+    // instance of TypedTable
+    TypedTable.TypedTableIterator mockKeyIterLegacy =
+        mock(TypedTable.TypedTableIterator.class);
+    when(keyTableLegacy.iterator()).thenReturn(mockKeyIterLegacy);
+    // Set return values for hasNext() and next() of the mock instance of
+    // TypedTableIterator for keyTableLegacy
+    when(mockKeyIterLegacy.hasNext()).thenReturn(true, true, true, false);
+    TypedTable.TypedKeyValue mockKeyValueLegacy =
+        mock(TypedTable.TypedKeyValue.class);
+    when(mockKeyIterLegacy.next()).thenReturn(mockKeyValueLegacy);
+    when(mockKeyValueLegacy.getValue()).thenReturn(omKeyInfos[0], omKeyInfos[1],
+        omKeyInfos[2]);
+
+
+    // Same as above, but for keyTableFso
+    TypedTable.TypedTableIterator mockKeyIterFso =
+        mock(TypedTable.TypedTableIterator.class);
     when(keyTableFso.iterator()).thenReturn(mockKeyIterFso);
     when(mockKeyIterFso.hasNext()).thenReturn(true, true, true, false);
-    TypedTable.TypedKeyValue mockKeyValueFso = mock(TypedTable.TypedKeyValue.class);
+    TypedTable.TypedKeyValue mockKeyValueFso =
+        mock(TypedTable.TypedKeyValue.class);
     when(mockKeyIterFso.next()).thenReturn(mockKeyValueFso);
-    when(mockKeyValueFso.getValue()).thenReturn(omKeyInfosFso[0], omKeyInfosFso[1], omKeyInfosFso[2]);
+    when(mockKeyValueFso.getValue()).thenReturn(omKeyInfos[0], omKeyInfos[1],
+        omKeyInfos[2]);
 
-    TypedTable.TypedTableIterator mockKeyIterLegacy = mock(TypedTable.TypedTableIterator.class);
-    when(keyTableLegacy.iterator()).thenReturn(mockKeyIterLegacy);
-    when(mockKeyIterLegacy.hasNext()).thenReturn(true, true, true, false);
-    TypedTable.TypedKeyValue mockKeyValueLegacy = mock(TypedTable.TypedKeyValue.class);
-    when(mockKeyIterLegacy.next()).thenReturn(mockKeyValueLegacy);
-    when(mockKeyValueLegacy.getValue()).thenReturn(omKeyInfosLegacy[0], omKeyInfosLegacy[1], omKeyInfosLegacy[2]);
+    // Reprocess could be called from table having existing entries. Adding
+    // an entry to simulate that.
+    fileCountBySizeDao.insert(
+        new FileCountBySize("vol1", "bucket1", 1024L, 10L));
 
-    // Reprocess
-    Pair<String, Boolean> result = fileSizeCountTask.reprocess(omMetadataManager);
+    Pair<String, Boolean> result =
+        fileSizeCountTask.reprocess(omMetadataManager);
+
+    // Verify that the result of reprocess is true
     assertTrue(result.getRight());
 
-    // Verify the database state
+    // Verify that the number of entries in fileCountBySizeDao is 3
     assertEquals(3, fileCountBySizeDao.count());
 
-    // Verify counts for each bin
+    // Create a record to find the count of files in a specific volume,
+    // bucket and file size
     Record3<String, String, Long> recordToFind = dslContext
         .newRecord(FILE_COUNT_BY_SIZE.VOLUME,
             FILE_COUNT_BY_SIZE.BUCKET,
             FILE_COUNT_BY_SIZE.FILE_SIZE)
         .value1("vol1")
         .value2("bucket1")
-        .value3(1024L); // Bin for 1000L
+        .value3(1024L);
     assertEquals(2L,
-        fileCountBySizeDao.findById(recordToFind).getCount().longValue());     // 2 keys in this bin (FSO + LEGACY)
-
+        fileCountBySizeDao.findById(recordToFind).getCount().longValue());
+    // file size upper bound for 100000L is 131072L (next highest power of 2)
+    recordToFind.value3(131072L);
+    assertEquals(2L,
+        fileCountBySizeDao.findById(recordToFind).getCount().longValue());
     // file size upper bound for 4PB is Long.MAX_VALUE
     recordToFind.value3(Long.MAX_VALUE);
     assertEquals(2L,
