@@ -286,8 +286,11 @@ public class SCMDatanodeProtocolServer implements
     for (SCMCommandProto cmd : cmds) {
       if (cmd.getCommandType().equals(deleteBlocksCommand)) {
         auditMap.append("commandType: ").append(cmd.getCommandType());
-        auditMap.append(" deleteTransactionsCount:");
-        auditMap.append(cmd.getDeleteBlocksCommandProto().getDeletedBlocksTransactionsList().size());
+        auditMap.append(" deleteTransactionsCount: ")
+            .append(cmd.getDeleteBlocksCommandProto().getDeletedBlocksTransactionsCount());
+        auditMap.append(" cmdID: ").append(cmd.getDeleteBlocksCommandProto().getCmdId());
+        auditMap.append(" encodedToken: " + cmd.getEncodedToken());
+        auditMap.append(" deadlineMsSinceEpoch: " + cmd.getDeadlineMsSinceEpoch());
       } else {
         auditMap.append(cmd);
       }
