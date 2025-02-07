@@ -124,8 +124,8 @@ public class TestStorageVolumeHealthChecks {
     final DiskCheckUtil.DiskChecks noPermissions =
         new DiskCheckUtil.DiskChecks() {
           @Override
-          public boolean checkPermissions(File storageDir) {
-            return false;
+          public DiskCheckUtil.ReadWriteStatus checkPermissions(File storageDir) {
+            return DiskCheckUtil.ReadWriteStatus.READ_FAIL;
           }
         };
 
@@ -152,9 +152,9 @@ public class TestStorageVolumeHealthChecks {
 
     DiskCheckUtil.DiskChecks ioFailure = new DiskCheckUtil.DiskChecks() {
           @Override
-          public boolean checkReadWrite(File storageDir, File testFileDir,
+          public DiskCheckUtil.ReadWriteStatus checkReadWrite(File storageDir, File testFileDir,
                                         int numBytesToWrite) {
-            return false;
+            return DiskCheckUtil.ReadWriteStatus.WRITE_FAIL;
           }
         };
     DiskCheckUtil.setTestImpl(ioFailure);
@@ -215,30 +215,46 @@ public class TestStorageVolumeHealthChecks {
   @MethodSource("volumeBuilders")
   public void testCheckIOInitiallyPassing(StorageVolume.Builder<?> builder)
       throws Exception {
-    testCheckIOUntilFailure(builder, 3, 1, true, true, true, false, true,
-        false);
+    testCheckIOUntilFailure(builder, 3, 1,
+        DiskCheckUtil.ReadWriteStatus.READ_WRITE_OK,
+        DiskCheckUtil.ReadWriteStatus.READ_WRITE_OK,
+        DiskCheckUtil.ReadWriteStatus.READ_WRITE_OK,
+        DiskCheckUtil.ReadWriteStatus.READ_FAIL,
+        DiskCheckUtil.ReadWriteStatus.READ_WRITE_OK,
+        DiskCheckUtil.ReadWriteStatus.READ_FAIL);
   }
 
   @ParameterizedTest
   @MethodSource("volumeBuilders")
   public void testCheckIOEarlyFailure(StorageVolume.Builder<?> builder)
       throws Exception {
-    testCheckIOUntilFailure(builder, 3, 1, false, false);
+    testCheckIOUntilFailure(builder, 3, 1,
+        DiskCheckUtil.ReadWriteStatus.READ_FAIL,
+        DiskCheckUtil.ReadWriteStatus.READ_FAIL);
   }
 
   @ParameterizedTest
   @MethodSource("volumeBuilders")
   public void testCheckIOFailuresDiscarded(StorageVolume.Builder<?> builder)
       throws Exception {
-    testCheckIOUntilFailure(builder, 3, 1, false, true, true, true, false,
-        false);
+    testCheckIOUntilFailure(builder, 3, 1,
+        DiskCheckUtil.ReadWriteStatus.READ_FAIL,
+        DiskCheckUtil.ReadWriteStatus.READ_WRITE_OK,
+        DiskCheckUtil.ReadWriteStatus.READ_WRITE_OK,
+        DiskCheckUtil.ReadWriteStatus.READ_WRITE_OK,
+        DiskCheckUtil.ReadWriteStatus.READ_FAIL,
+        DiskCheckUtil.ReadWriteStatus.READ_FAIL);
   }
 
   @ParameterizedTest
   @MethodSource("volumeBuilders")
   public void testCheckIOAlternatingFailures(StorageVolume.Builder<?> builder)
       throws Exception {
-    testCheckIOUntilFailure(builder, 3, 1, true, false, true, false);
+    testCheckIOUntilFailure(builder, 3, 1,
+        DiskCheckUtil.ReadWriteStatus.READ_WRITE_OK,
+        DiskCheckUtil.ReadWriteStatus.READ_FAIL,
+        DiskCheckUtil.ReadWriteStatus.READ_WRITE_OK,
+        DiskCheckUtil.ReadWriteStatus.READ_FAIL);
   }
 
   /**
@@ -253,7 +269,7 @@ public class TestStorageVolumeHealthChecks {
    *    should fail after the last IO check is completed.
    */
   private void testCheckIOUntilFailure(StorageVolume.Builder<?> builder,
-      int ioTestCount, int ioFailureTolerance, boolean... checkResults)
+      int ioTestCount, int ioFailureTolerance, DiskCheckUtil.ReadWriteStatus... checkResults)
       throws Exception {
     DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
     dnConf.setVolumeIOTestCount(ioTestCount);
@@ -265,10 +281,10 @@ public class TestStorageVolumeHealthChecks {
     volume.createTmpDirs(CLUSTER_ID);
 
     for (int i = 0; i < checkResults.length; i++) {
-      final boolean result = checkResults[i];
+      final DiskCheckUtil.ReadWriteStatus result = checkResults[i];
       final DiskCheckUtil.DiskChecks ioResult = new DiskCheckUtil.DiskChecks() {
             @Override
-            public boolean checkReadWrite(File storageDir, File testDir,
+            public DiskCheckUtil.ReadWriteStatus checkReadWrite(File storageDir, File testDir,
                 int numBytesToWrite) {
               return result;
             }
@@ -314,13 +330,13 @@ public class TestStorageVolumeHealthChecks {
     }
 
     @Override
-    public boolean checkPermissions(File storageDir) {
+    public DiskCheckUtil.ReadWriteStatus checkPermissions(File storageDir) {
       assertEquals(volume.getStorageDir(), storageDir);
-      return true;
+      return DiskCheckUtil.ReadWriteStatus.READ_WRITE_OK;
     }
 
     @Override
-    public boolean checkReadWrite(File storageDir, File testFileDir,
+    public DiskCheckUtil.ReadWriteStatus checkReadWrite(File storageDir, File testFileDir,
         int numBytesToWrite) {
       assertEquals(volume.getStorageDir(), storageDir);
 
@@ -340,7 +356,7 @@ public class TestStorageVolumeHealthChecks {
 
       assertEquals(expectedDiskCheckPath.toFile(), volume.getDiskCheckDir());
       assertEquals(expectedDiskCheckPath.toFile(), testFileDir);
-      return true;
+      return DiskCheckUtil.ReadWriteStatus.READ_WRITE_OK;
     }
   }
 }

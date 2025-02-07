@@ -58,9 +58,13 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
       throw new DiskOutOfSpaceException("No more available volumes");
     }
 
+    List<HddsVolume> volumesWithWriteAllowed =
+        volumes.stream().filter(k -> k.getStorageState() != StorageVolume.VolumeState.READ_ONLY)
+            .collect(Collectors.toList());
+
     AvailableSpaceFilter filter = new AvailableSpaceFilter(maxContainerSize);
 
-    List<HddsVolume> volumesWithEnoughSpace = volumes.stream()
+    List<HddsVolume> volumesWithEnoughSpace = volumesWithWriteAllowed.stream()
         .filter(filter)
         .collect(Collectors.toList());
 
