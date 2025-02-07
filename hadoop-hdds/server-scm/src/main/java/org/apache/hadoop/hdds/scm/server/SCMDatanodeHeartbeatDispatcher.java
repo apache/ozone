@@ -207,9 +207,9 @@ public final class SCMDatanodeHeartbeatDispatcher {
       StringBuilder allCommands = new StringBuilder();
       for (SCMCommand cmd : commands) {
         allCommands.append("cmdID: ").append(cmd.getId());
-        allCommands.append(" encodedToken: " + cmd.getEncodedToken());
-        allCommands.append(" term: " + cmd.getTerm());
-        allCommands.append(" deadlineMsSinceEpoch: " + cmd.getDeadline());
+        allCommands.append(" encodedToken: \"").append(cmd.getEncodedToken()).append("\"");
+        allCommands.append(" term: ").append(cmd.getTerm());
+        allCommands.append(" deadlineMsSinceEpoch: ").append(cmd.getDeadline());
         if (cmd.getType().equals(deleteBlocksCommand)) {
           DeleteBlocksCommand delCmd = (DeleteBlocksCommand) cmd;
           allCommands.append(" deleteBlocksTransactions: {");
