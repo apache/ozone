@@ -17,11 +17,14 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintStream;
 import java.io.RandomAccessFile;
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
@@ -228,10 +231,17 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       remoteGroupName, ACCESS, READ);
   private static MessageDigest eTagProvider;
   private static Set<OzoneClient> ozoneClients = new HashSet<>();
+  private static PrintStream old;
+  private static ByteArrayOutputStream baos;
 
   @BeforeAll
-  public static void initialize() throws NoSuchAlgorithmException {
+  public static void initialize() throws NoSuchAlgorithmException, UnsupportedEncodingException {
     eTagProvider = MessageDigest.getInstance(MD5_HASH);
+    System.setProperty("log4j.configurationFile", "auditlog.properties");
+    old = System.out;
+    baos = new ByteArrayOutputStream();
+    PrintStream ps = new PrintStream(baos, true, UTF_8.toString());
+    System.setOut(ps);
   }
 
   /**
@@ -278,6 +288,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     if (cluster != null) {
       cluster.shutdown();
     }
+    System.setOut(old);
   }
 
   private static void setOzClient(OzoneClient ozClient) {
@@ -1074,6 +1085,76 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     );
 
     store.deleteVolume(volumeName);
+  }
+
+  @Test
+  public void testDeleteAuditLog() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    String value = "sample value";
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    // create a three replica file
+    String keyName1 = "key1";
+    try (OzoneOutputStream out = bucket.createKey(keyName1,
+        value.getBytes(UTF_8).length, RATIS, THREE, new HashMap<>())) {
+      out.write(value.getBytes(UTF_8));
+    }
+
+    // create a EC replica file
+    String keyName2 = "key2";
+    ReplicationConfig replicationConfig = new ECReplicationConfig("rs-3-2-1024k");
+    try (OzoneOutputStream out = bucket.createKey(keyName2,
+        value.getBytes(UTF_8).length, replicationConfig, new HashMap<>())) {
+      out.write(value.getBytes(UTF_8));
+    }
+
+    // create a directory and a file
+    String dirName = "dir1";
+    bucket.createDirectory(dirName);
+    String keyName3 = "key3";
+    try (OzoneOutputStream out = bucket.createFile(dirName + "/" + keyName3,
+        value.getBytes(UTF_8).length, RATIS, THREE, true, true)) {
+      out.write(value.getBytes(UTF_8));
+    }
+
+    // delete files and directory
+    bucket.deleteKey(keyName1);
+    bucket.deleteKey(keyName2);
+    bucket.deleteDirectory(dirName, true);
+
+    // create keys for deleteKeys case
+    String keyName4 = "key4";
+    try (OzoneOutputStream out = bucket.createFile(dirName + "/" + keyName4,
+        value.getBytes(UTF_8).length, RATIS, THREE, true, true)) {
+      out.write(value.getBytes(UTF_8));
+    }
+    String keyName5 = "key5";
+    try (OzoneOutputStream out = bucket.createFile(dirName + "/" + keyName5,
+        value.getBytes(UTF_8).length, replicationConfig, true, true)) {
+      out.write(value.getBytes(UTF_8));
+    }
+    List<String> keysToDelete = new ArrayList<>();
+    keysToDelete.add(dirName + "/" + keyName4);
+    keysToDelete.add(dirName + "/" + keyName5);
+    bucket.deleteKeys(keysToDelete);
+
+    String consoleOutput = baos.toString(UTF_8.toString());
+    assertTrue(consoleOutput.contains("op=DELETE_KEY {volume=" + volumeName + ", bucket=" + bucketName +
+        ", key=key1, dataSize=" + value.getBytes(UTF_8).length + ", replicationConfig=RATIS/THREE"));
+    assertTrue(consoleOutput.contains("op=DELETE_KEY {volume=" + volumeName + ", bucket=" + bucketName +
+        ", key=key2, dataSize=" + value.getBytes(UTF_8).length + ", replicationConfig=EC{rs-3-2-1024k}"));
+    assertTrue(consoleOutput.contains("op=DELETE_KEY {volume=" + volumeName + ", bucket=" + bucketName +
+        ", key=dir1, Transaction"));
+    assertTrue(consoleOutput.contains("op=DELETE_KEYS {volume=" + volumeName + ", bucket=" + bucketName +
+        ", deletedKeysList={key=dir1/key4, dataSize=" + value.getBytes(UTF_8).length +
+        ", replicationConfig=RATIS/THREE}, {key=dir1/key5, dataSize=" + value.getBytes(UTF_8).length +
+        ", replicationConfig=EC{rs-3-2-1024k}}, unDeletedKeysList="));
+    System.setOut(old);
   }
 
   protected void verifyReplication(String volumeName, String bucketName,
