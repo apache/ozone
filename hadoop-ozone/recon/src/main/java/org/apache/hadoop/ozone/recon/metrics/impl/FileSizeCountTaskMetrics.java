@@ -12,24 +12,28 @@ import org.apache.hadoop.ozone.recon.metrics.ReconOmTaskMetrics;
 @Metrics(about="Metrics for FileSizeCount task", context="recon")
 public class FileSizeCountTaskMetrics extends ReconOmTaskMetrics {
   private static final String SOURCE_NAME = FileSizeCountTaskMetrics.class.getSimpleName();
-  private static final MetricsInfo TASK_INFO = Interns.info(
-      "ReconTaskMetrics", "Task metrics for FileSizeCount"
-  );
+  private static FileSizeCountTaskMetrics instance;
 
   FileSizeCountTaskMetrics() {
-    super(TASK_INFO, "FileSizeCountTask", SOURCE_NAME);
+    super("FileSizeCountTask", SOURCE_NAME);
   }
 
-  public static FileSizeCountTaskMetrics register() {
-    return DefaultMetricsSystem.instance().register(
-        SOURCE_NAME,
-        "FileSizeCountTask metrics",
-        new FileSizeCountTaskMetrics()
-    );
+  public static synchronized FileSizeCountTaskMetrics register() {
+    if (null == instance) {
+      instance = DefaultMetricsSystem.instance().register(
+          SOURCE_NAME,
+          "FileSizeCountTask metrics",
+          new FileSizeCountTaskMetrics()
+      );
+    }
+    return  instance;
   }
 
   public void unregister() {
-    DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
+    if (null != instance) {
+      DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
+      instance = null;
+    }
   }
 
   private @Metric MutableCounterLong putKeyEventCount;

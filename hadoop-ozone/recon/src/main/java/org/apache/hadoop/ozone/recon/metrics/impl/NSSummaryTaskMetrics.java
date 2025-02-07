@@ -15,21 +15,28 @@ public class NSSummaryTaskMetrics extends ReconOmTaskMetrics {
   private static final MetricsInfo TASK_INFO = Interns.info(
       "ReconTaskMetrics", "Task metrics for NSSummary"
   );
+  private static NSSummaryTaskMetrics instance;
 
   NSSummaryTaskMetrics() {
-    super(TASK_INFO, "NSSummaryTask", SOURCE_NAME);
+    super("NSSummaryTask", SOURCE_NAME);
   }
 
-  public static NSSummaryTaskMetrics register() {
-    return DefaultMetricsSystem.instance().register(
-        SOURCE_NAME,
-        "NSSummaryTask metrics",
-        new NSSummaryTaskMetrics()
-    );
+  public static synchronized NSSummaryTaskMetrics register() {
+    if (null == instance) {
+      instance = DefaultMetricsSystem.instance().register(
+          SOURCE_NAME,
+          "NSSummaryTask metrics",
+          new NSSummaryTaskMetrics()
+      );
+    }
+    return instance;
   }
 
   public void unregister() {
-    DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
+    if (null != instance) {
+      DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
+      instance = null;
+    }
   }
 
   // Metrics relating to processing/reprocessing of FSO based NSSummary task

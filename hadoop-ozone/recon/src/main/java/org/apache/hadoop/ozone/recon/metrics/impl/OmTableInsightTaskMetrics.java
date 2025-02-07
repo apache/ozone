@@ -15,21 +15,28 @@ public class OmTableInsightTaskMetrics extends ReconOmTaskMetrics {
   private static final MetricsInfo TASK_INFO = Interns.info(
       "ReconTaskMetrics", "Task metrics for OmTableInsight"
   );
+  private static OmTableInsightTaskMetrics instance;
 
   OmTableInsightTaskMetrics() {
-    super(TASK_INFO, "OmTableInsightTask", SOURCE_NAME);
+    super("OmTableInsightTask", SOURCE_NAME);
   }
 
-  public static OmTableInsightTaskMetrics register() {
-    return DefaultMetricsSystem.instance().register(
-        SOURCE_NAME,
-        "OmTableInsightTask metrics",
-        new OmTableInsightTaskMetrics()
-    );
+  public static synchronized OmTableInsightTaskMetrics register() {
+    if (null == instance) {
+      instance = DefaultMetricsSystem.instance().register(
+          SOURCE_NAME,
+          "OmTableInsightTask metrics",
+          new OmTableInsightTaskMetrics()
+      );
+    }
+    return instance;
   }
 
   public void unregister() {
-    DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
+    if (null != instance) {
+      DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
+      instance = null;
+    }
   }
 
   private @Metric MutableCounterLong putEventCount;

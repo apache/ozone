@@ -21,9 +21,12 @@ package org.apache.hadoop.ozone.recon.tasks;
 import java.util.Collection;
 import java.util.Collections;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.recon.metrics.DummyDBTaskMetrics;
+import org.apache.hadoop.ozone.recon.metrics.impl.NSSummaryTaskMetrics;
 
 /**
  * Dummy Recon task that has 3 modes of operations.
@@ -34,6 +37,7 @@ public class DummyReconDBTask implements ReconOmTask {
   private int numFailuresAllowed = Integer.MIN_VALUE;
   private int callCtr = 0;
   private String taskName;
+  private final DummyDBTaskMetrics metrics;
 
   DummyReconDBTask(String taskName, TaskType taskType) {
     this.taskName = taskName;
@@ -42,6 +46,17 @@ public class DummyReconDBTask implements ReconOmTask {
     } else if (taskType.equals(TaskType.ALWAYS_FAIL)) {
       numFailuresAllowed = Integer.MAX_VALUE;
     }
+    this.metrics = DummyDBTaskMetrics.register();
+  }
+
+  @VisibleForTesting
+  public DummyDBTaskMetrics getMetricsInstance() {
+    return this.metrics;
+  }
+
+  @Override
+  public void stopMetricsCollection() {
+    this.metrics.unregister();
   }
 
   @Override
@@ -55,7 +70,9 @@ public class DummyReconDBTask implements ReconOmTask {
 
   @Override
   public Pair<String, Boolean> process(OMUpdateEventBatch events) {
+    metrics.incrTaskProcessCount();
     if (++callCtr <= numFailuresAllowed) {
+      metrics.incrTaskProcessFailureCount();
       return new ImmutablePair<>(getTaskName(), false);
     } else {
       return new ImmutablePair<>(getTaskName(), true);
@@ -64,7 +81,9 @@ public class DummyReconDBTask implements ReconOmTask {
 
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
+    metrics.incrTaskReprocessCount();
     if (++callCtr <= numFailuresAllowed) {
+      metrics.incrTaskReprocessFailureCount();
       return new ImmutablePair<>(getTaskName(), false);
     } else {
       return new ImmutablePair<>(getTaskName(), true);

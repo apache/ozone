@@ -61,7 +61,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
                                  ReconOMMetadataManager reconOMMetadataManager,
                                  OzoneConfiguration ozoneConfiguration, NSSummaryTaskMetrics metrics) {
     super(reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconOMMetadataManager, ozoneConfiguration, metrics);
     this.metrics = metrics;
     // true if FileSystemPaths enabled
     enableFileSystemPaths = ozoneConfiguration

@@ -1,10 +1,12 @@
 package org.apache.hadoop.ozone.recon.metrics;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.metrics2.MetricsCollector;
-import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
+import org.apache.hadoop.metrics2.MetricsTag;
 import org.apache.hadoop.metrics2.annotation.Metric;
+import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
@@ -15,7 +17,6 @@ import org.apache.hadoop.metrics2.lib.MutableRate;
 public abstract class ReconOmTaskMetrics implements MetricsSource {
 
   private final MetricsRegistry registry = new MetricsRegistry("ReconOMTasks");
-  private final MetricsInfo mInfo;
   private final String taskName;
   private final String source;
 
@@ -27,8 +28,7 @@ public abstract class ReconOmTaskMetrics implements MetricsSource {
   private @Metric MutableCounterLong taskProcessFailedCount;
   private @Metric MutableRate processLatency;
 
-  protected ReconOmTaskMetrics(MetricsInfo info, String taskName, String source) {
-    this.mInfo = info;
+  protected ReconOmTaskMetrics(String taskName, String source) {
     this.taskName = taskName;
     this.source = source;
   }
@@ -77,11 +77,33 @@ public abstract class ReconOmTaskMetrics implements MetricsSource {
     this.processLatency.add(time);
   }
 
+  @VisibleForTesting
+  public long getTaskReprocessCount() {
+    return this.taskReprocessCount.value();
+  }
+
+  @VisibleForTesting
+  public long getTaskReprocessFailureCount() {
+    return this.taskReprocessFailedCount.value();
+  }
+
+  @VisibleForTesting
+  public long getTaskProcessCount() {
+    return this.taskProcessCount.value();
+
+  }
+
+  @VisibleForTesting
+  public long getTaskProcessFailureCount() {
+    return this.taskProcessFailedCount.value();
+  }
 
   @Override
   public synchronized void getMetrics(MetricsCollector collector, boolean all) {
-    registry.snapshot(collector.addRecord(registry.info()), all);
     MetricsRecordBuilder builder = collector.addRecord(source);
-    builder.tag(mInfo, taskName);
+    builder.add(new MetricsTag(
+        Interns.info("taskName", "ReconOmTask Name"), taskName));
+    builder.endRecord();
+    registry.snapshot(builder, all);
   }
 }

@@ -82,10 +82,9 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
 
   @Test
   public void testConsumeOMEvents() throws Exception {
-    ReconOmTask reconOmTaskMock = getMockTask("MockTask");
-    when(reconOmTaskMock.process(any(OMUpdateEventBatch.class)))
-        .thenReturn(new ImmutablePair<>("MockTask", true));
-    reconTaskController.registerTask(reconOmTaskMock);
+    String taskName = "Dummy_" + System.currentTimeMillis();
+    DummyReconDBTask dummyReconTask = new DummyReconDBTask(taskName, DummyReconDBTask.TaskType.ALWAYS_PASS);
+    reconTaskController.registerTask(dummyReconTask);
     OMUpdateEventBatch omUpdateEventBatchMock = mock(OMUpdateEventBatch.class);
     when(omUpdateEventBatchMock.getLastSequenceNumber()).thenReturn(100L);
     when(omUpdateEventBatchMock.isEmpty()).thenReturn(false);
@@ -95,27 +94,26 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
         omUpdateEventBatchMock,
         mock(OMMetadataManager.class));
 
-    verify(reconOmTaskMock, times(1))
+    verify(dummyReconTask, times(1))
         .process(any());
     long endTime = System.currentTimeMillis();
 
-    ReconTaskStatus reconTaskStatus = reconTaskStatusDao.findById("MockTask");
+    ReconTaskStatus reconTaskStatus = reconTaskStatusDao.findById(taskName);
     long taskTimeStamp = reconTaskStatus.getLastUpdatedTimestamp();
     long seqNumber = reconTaskStatus.getLastUpdatedSeqNumber();
 
     assertThat(taskTimeStamp).isGreaterThanOrEqualTo(startTime).isLessThanOrEqualTo(endTime);
     assertEquals(seqNumber, omUpdateEventBatchMock.getLastSequenceNumber());
+    assertEquals(1, dummyReconTask.getMetricsInstance().getTaskProcessCount());
   }
 
   @Test
   public void testTaskRecordsFailureOnException() throws Exception {
-    ReconOmTask reconOmTaskMock = getMockTask("MockTask");
+    String taskName = "Dummy_" + System.currentTimeMillis();
+    DummyReconDBTask dummyReconTask = new DummyReconDBTask(taskName, DummyReconDBTask.TaskType.FAIL_ONCE);
     OMUpdateEventBatch omUpdateEventBatchMock = mock(OMUpdateEventBatch.class);
 
-    // Throw exception when trying to run task
-    when(reconOmTaskMock.process(any(OMUpdateEventBatch.class)))
-        .thenThrow(new RuntimeException("Mock Failure"));
-    reconTaskController.registerTask(reconOmTaskMock);
+    reconTaskController.registerTask(dummyReconTask);
     when(omUpdateEventBatchMock.getLastSequenceNumber()).thenReturn(100L);
     when(omUpdateEventBatchMock.isEmpty()).thenReturn(false);
 
@@ -124,11 +122,11 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
         omUpdateEventBatchMock,
         mock(OMMetadataManager.class));
 
-    verify(reconOmTaskMock, times(1))
+    verify(dummyReconTask, times(1))
         .process(any());
     long endTime = System.currentTimeMillis();
 
-    ReconTaskStatus reconTaskStatus = reconTaskStatusDao.findById("MockTask");
+    ReconTaskStatus reconTaskStatus = reconTaskStatusDao.findById(taskName);
     long taskTimeStamp = reconTaskStatus.getLastUpdatedTimestamp();
     long seqNumber = reconTaskStatus.getLastUpdatedSeqNumber();
     int taskStatus = reconTaskStatus.getLastTaskRunStatus();
@@ -137,6 +135,8 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     // Task failed so seqNumber should not be updated, and last task status should be -1
     assertEquals(seqNumber, 0);
     assertEquals(taskStatus, -1);
+    assertEquals(1, dummyReconTask.getMetricsInstance().getTaskProcessCount());
+    assertEquals(1, dummyReconTask.getMetricsInstance().getTaskProcessFailureCount());
   }
 
   @Test
@@ -165,6 +165,8 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     assertThat(dbRecord.getLastUpdatedTimestamp()).isGreaterThan(currentTime);
 
     assertEquals(Long.valueOf(100L), dbRecord.getLastUpdatedSeqNumber());
+    assertEquals(1, dummyReconDBTask.getMetricsInstance().getTaskProcessCount());
+    assertEquals(1, dummyReconDBTask.getMetricsInstance().getTaskProcessFailureCount());
   }
 
   @Test
@@ -186,6 +188,8 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
       assertThat(reconTaskController.getRegisteredTasks()).isNotEmpty();
       assertEquals(dummyReconDBTask, reconTaskController.getRegisteredTasks()
           .get(dummyReconDBTask.getTaskName()));
+      assertEquals(3, dummyReconDBTask.getMetricsInstance().getTaskProcessCount());
+      assertEquals(3, dummyReconDBTask.getMetricsInstance().getTaskProcessFailureCount());
     }
 
     //Should be ignored now.
@@ -205,44 +209,31 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
 
   @Test
   public void testReInitializeTasks() throws Exception {
-
+    String taskName = "Dummy_" + System.currentTimeMillis();
+    DummyReconDBTask dummyReconDBTask = new DummyReconDBTask(taskName, DummyReconDBTask.TaskType.ALWAYS_PASS);
     ReconOMMetadataManager omMetadataManagerMock = mock(
         ReconOMMetadataManager.class);
-    ReconOmTask reconOmTaskMock =
-        getMockTask("MockTask2");
-    when(reconOmTaskMock.reprocess(omMetadataManagerMock))
-        .thenReturn(new ImmutablePair<>("MockTask2", true));
     when(omMetadataManagerMock.getLastSequenceNumberFromDB()
     ).thenReturn(100L);
 
     long startTime = System.currentTimeMillis();
-    reconTaskController.registerTask(reconOmTaskMock);
+    reconTaskController.registerTask(dummyReconDBTask);
     reconTaskController.reInitializeTasks(omMetadataManagerMock);
     long endTime = System.currentTimeMillis();
 
-    verify(reconOmTaskMock, times(1))
+    verify(dummyReconDBTask, times(1))
         .reprocess(omMetadataManagerMock);
 
     verify(omMetadataManagerMock, times(1)
     ).getLastSequenceNumberFromDB();
 
-    ReconTaskStatus reconTaskStatus = reconTaskStatusDao.findById("MockTask2");
+    ReconTaskStatus reconTaskStatus = reconTaskStatusDao.findById(taskName);
     long taskTimeStamp = reconTaskStatus.getLastUpdatedTimestamp();
     long seqNumber = reconTaskStatus.getLastUpdatedSeqNumber();
 
     assertThat(taskTimeStamp).isGreaterThanOrEqualTo(startTime).isLessThanOrEqualTo(endTime);
     assertEquals(seqNumber,
         omMetadataManagerMock.getLastSequenceNumberFromDB());
-  }
-
-  /**
-   * Helper method for getting a mocked Task.
-   * @param taskName name of the task.
-   * @return instance of reconOmTask.
-   */
-  private ReconOmTask getMockTask(String taskName) {
-    ReconOmTask reconOmTaskMock = mock(ReconOmTask.class);
-    when(reconOmTaskMock.getTaskName()).thenReturn(taskName);
-    return reconOmTaskMock;
+    assertEquals(1, dummyReconDBTask.getMetricsInstance().getTaskReprocessCount());
   }
 }

@@ -58,7 +58,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
       ReconOMMetadataManager reconOMMetadataManager,
       OzoneConfiguration ozoneConfiguration, NSSummaryTaskMetrics metrics) {
     super(reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconOMMetadataManager, ozoneConfiguration, metrics);
     this.metrics = metrics;
   }
 

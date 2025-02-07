@@ -12,24 +12,28 @@ import org.apache.hadoop.ozone.recon.metrics.ReconOmTaskMetrics;
 @Metrics(about="Metrics for ContainerKeyMapper task", context="recon")
 public class ContainerKeyMapperTaskMetrics extends ReconOmTaskMetrics {
   private static final String SOURCE_NAME = ContainerKeyMapperTaskMetrics.class.getSimpleName();
-  private static final MetricsInfo TASK_INFO = Interns.info(
-      "ReconTaskMetrics", "Task metrics for ContainerKeyMapper"
-  );
+  private static ContainerKeyMapperTaskMetrics instance;
 
   ContainerKeyMapperTaskMetrics() {
-    super(TASK_INFO, "ContainerKeyMapperTask", SOURCE_NAME);
+    super("ContainerKeyMapperTask", SOURCE_NAME);
   }
 
-  public static ContainerKeyMapperTaskMetrics register() {
-    return DefaultMetricsSystem.instance().register(
-        SOURCE_NAME,
-        "ContainerKeyMapperTask metrics",
-        new ContainerKeyMapperTaskMetrics()
-    );
+  public static synchronized ContainerKeyMapperTaskMetrics register() {
+    if (null == instance) {
+      instance = DefaultMetricsSystem.instance().register(
+          SOURCE_NAME,
+          "ContainerKeyMapperTask metrics",
+          new ContainerKeyMapperTaskMetrics()
+      );
+    }
+    return instance;
   }
 
   public void unregister() {
-    DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
+    if (null != instance) {
+      DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
+      instance = null;
+    }
   }
 
   private @Metric MutableCounterLong putKeyEventCount;
