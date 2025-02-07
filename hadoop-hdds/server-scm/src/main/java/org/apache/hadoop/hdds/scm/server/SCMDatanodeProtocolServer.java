@@ -289,8 +289,8 @@ public class SCMDatanodeProtocolServer implements
         auditMap.append(" deleteTransactionsCount: ")
             .append(cmd.getDeleteBlocksCommandProto().getDeletedBlocksTransactionsCount());
         auditMap.append(" cmdID: ").append(cmd.getDeleteBlocksCommandProto().getCmdId());
-        auditMap.append(" encodedToken: " + cmd.getEncodedToken());
-        auditMap.append(" deadlineMsSinceEpoch: " + cmd.getDeadlineMsSinceEpoch());
+        auditMap.append(" encodedToken: \"").append(cmd.getEncodedToken()).append("\"");
+        auditMap.append(" deadlineMsSinceEpoch: ").append(cmd.getDeadlineMsSinceEpoch());
       } else {
         auditMap.append(cmd);
       }
