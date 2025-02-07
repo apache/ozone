@@ -19,7 +19,9 @@ package org.apache.ozone.test;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.TestInstance;
 
@@ -46,11 +48,17 @@ public abstract class AclTests extends ClusterForTests<MiniOzoneCluster> {
 
   @Override
   protected OzoneConfiguration createOzoneConfig() {
-    UserGroupInformation.setLoginUser(ADMIN_UGI);
+    loginAdmin();
     OzoneConfiguration conf = super.createOzoneConfig();
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
     return conf;
+  }
+
+  @BeforeEach
+  void loginAdmin() {
+    UserGroupInformation.setLoginUser(ADMIN_UGI);
   }
 
   /** Test cases for non-HA cluster should implement this. */
@@ -60,6 +68,14 @@ public abstract class AclTests extends ClusterForTests<MiniOzoneCluster> {
 
   @Nested
   class BucketOwner extends org.apache.hadoop.ozone.om.TestBucketOwner {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class RecursiveAclWithFSO extends org.apache.hadoop.ozone.om.TestRecursiveAclWithFSO {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
