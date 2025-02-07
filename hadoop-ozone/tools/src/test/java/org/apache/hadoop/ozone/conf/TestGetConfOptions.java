@@ -17,82 +17,68 @@
  */
 package org.apache.hadoop.ozone.conf;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
-import java.io.UnsupportedEncodingException;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests the ozone getconf command.
  */
 public class TestGetConfOptions {
-  private static OzoneConfiguration conf;
-  private static ByteArrayOutputStream bout;
-  private static PrintStream psBackup;
-  private static final String DEFAULT_ENCODING = UTF_8.name();
+  private static GenericTestUtils.PrintStreamCapturer out;
+  private static OzoneGetConf subject;
 
   @BeforeAll
-  public static void init() throws UnsupportedEncodingException {
-    conf = new OzoneConfiguration();
-    conf.set(OMConfigKeys.OZONE_OM_NODE_ID_KEY, "1");
-    conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, "service1");
-    conf.set(ScmConfigKeys.OZONE_SCM_NAMES, "localhost");
-    psBackup = System.out;
-    bout = new ByteArrayOutputStream();
-    PrintStream psOut = new PrintStream(bout, false, DEFAULT_ENCODING);
-    System.setOut(psOut);
+  public static void init() {
+    out = GenericTestUtils.captureOut();
+    subject = new OzoneGetConf();
+    subject.getConf().set(OMConfigKeys.OZONE_OM_NODE_ID_KEY, "1");
+    subject.getConf().set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, "service1");
+    subject.getConf().set(ScmConfigKeys.OZONE_SCM_NAMES, "localhost");
   }
 
   @AfterEach
   public void setUp() {
-    bout.reset();
+    out.reset();
   }
 
   @AfterAll
   public static void tearDown() {
-    System.setOut(psBackup);
+    IOUtils.closeQuietly(out);
   }
 
   @Test
-  public void testGetConfWithTheOptionConfKey()
-      throws UnsupportedEncodingException {
-    new OzoneGetConf(conf)
-        .run(new String[] {"-confKey", ScmConfigKeys.OZONE_SCM_NAMES});
-    assertEquals("localhost\n", bout.toString(DEFAULT_ENCODING));
-    bout.reset();
-    new OzoneGetConf(conf)
-        .run(new String[] {"confKey", OMConfigKeys.OZONE_OM_NODE_ID_KEY});
-    assertEquals("1\n", bout.toString(DEFAULT_ENCODING));
+  public void testGetConfWithTheOptionConfKey() {
+    subject.run(new String[] {"-confKey", ScmConfigKeys.OZONE_SCM_NAMES});
+    assertEquals("localhost\n", out.get());
+    out.reset();
+    subject.run(new String[] {"confKey", OMConfigKeys.OZONE_OM_NODE_ID_KEY});
+    assertEquals("1\n", out.get());
   }
 
   @Test
-  public void testGetConfWithTheOptionStorageContainerManagers()
-      throws UnsupportedEncodingException {
-    new OzoneGetConf(conf).run(new String[] {"-storagecontainermanagers"});
-    assertEquals("localhost\n", bout.toString(DEFAULT_ENCODING));
-    bout.reset();
-    new OzoneGetConf(conf).run(new String[] {"storagecontainermanagers"});
-    assertEquals("localhost\n", bout.toString(DEFAULT_ENCODING));
+  public void testGetConfWithTheOptionStorageContainerManagers() {
+    subject.execute(new String[] {"-storagecontainermanagers"});
+    assertEquals("localhost\n", out.get());
+    out.reset();
+    subject.execute(new String[] {"storagecontainermanagers"});
+    assertEquals("localhost\n", out.get());
   }
 
   @Test
-  public void testGetConfWithTheOptionOzoneManagers()
-      throws UnsupportedEncodingException {
-    new OzoneGetConf(conf).run(new String[] {"-ozonemanagers"});
-    assertEquals("", bout.toString(DEFAULT_ENCODING));
-    bout.reset();
-    new OzoneGetConf(conf).run(new String[] {"ozonemanagers"});
-    assertEquals("", bout.toString(DEFAULT_ENCODING));
+  public void testGetConfWithTheOptionOzoneManagers() {
+    subject.execute(new String[] {"-ozonemanagers"});
+    assertEquals("", out.get());
+    out.reset();
+    subject.execute(new String[] {"ozonemanagers"});
+    assertEquals("", out.get());
   }
 }

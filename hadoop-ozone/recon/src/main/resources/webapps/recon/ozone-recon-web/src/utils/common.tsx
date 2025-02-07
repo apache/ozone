@@ -18,6 +18,7 @@
 
 import moment from 'moment';
 import { notification } from 'antd';
+import { CanceledError } from 'axios';
 
 export const getCapacityPercent = (used: number, total: number) => Math.round((used / total) * 100);
 
@@ -80,3 +81,31 @@ export const nullAwareLocaleCompare = (a: string, b: string) => {
 
   return a.localeCompare(b);
 };
+
+export function removeDuplicatesAndMerge<T>(origArr: T[], updateArr: T[], mergeKey: string): T[] {
+  return Array.from([...origArr, ...updateArr].reduce(
+    (accumulator, curr) => accumulator.set(curr[mergeKey as keyof T], curr),
+    new Map
+  ).values());
+}
+
+export const checkResponseError = (responses: Awaited<Promise<any>>[]) => {
+  const responseError = responses.filter(
+    (resp) => resp.status === 'rejected'
+  );
+
+  if (responseError.length !== 0) {
+    responseError.forEach((err) => {
+      if (err.reason.toString().includes("CanceledError")) {
+        throw new CanceledError('canceled', "ERR_CANCELED");
+      }
+      else {
+        const reqMethod = err.reason.config.method;
+        const reqURL = err.reason.config.url
+        showDataFetchError(
+          `Failed to ${reqMethod} URL ${reqURL}\n${err.reason.toString()}`
+        );
+      }
+    })
+  }
+}

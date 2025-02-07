@@ -18,15 +18,10 @@
 
 package org.apache.hadoop.ozone.debug.ldb;
 
-import java.util.concurrent.Callable;
-
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.DebugSubcommand;
 
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
-import picocli.CommandLine.Model.CommandSpec;
-import picocli.CommandLine.Spec;
 
 /**
  * Tool that parses rocksdb file.
@@ -38,16 +33,15 @@ import picocli.CommandLine.Spec;
             DropTable.class,
             ListTables.class,
             ValueSchema.class,
+            Checkpoint.class,
         },
         description = "Parse rocksdb file content")
 @MetaInfServices(DebugSubcommand.class)
-public class RDBParser implements Callable<Void>, DebugSubcommand {
-
-  @Spec
-  private CommandSpec spec;
+public class RDBParser implements DebugSubcommand {
 
   @CommandLine.Option(names = {"--db"},
       required = true,
+      scope = CommandLine.ScopeType.INHERIT,
       description = "Database File Path")
   private String dbPath;
 
@@ -57,11 +51,5 @@ public class RDBParser implements Callable<Void>, DebugSubcommand {
 
   public void setDbPath(String dbPath) {
     this.dbPath = dbPath;
-  }
-
-  @Override
-  public Void call() throws Exception {
-    GenericCli.missingSubcommand(spec);
-    return null;
   }
 }

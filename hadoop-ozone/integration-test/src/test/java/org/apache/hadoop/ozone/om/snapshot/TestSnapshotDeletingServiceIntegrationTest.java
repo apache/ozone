@@ -107,7 +107,6 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestSnapshotDeletingServiceIntegrationTest.class);
-  private static boolean omRatisEnabled = true;
   private static final ByteBuffer CONTENT =
       ByteBuffer.allocate(1024 * 1024 * 16);
 
@@ -135,10 +134,8 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT,
         10000, TimeUnit.MILLISECONDS);
     conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 500);
-    conf.setInt(OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK, 5);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 500,
         TimeUnit.MILLISECONDS);
-    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     // Enable filesystem snapshot feature for the test regardless of the default
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);

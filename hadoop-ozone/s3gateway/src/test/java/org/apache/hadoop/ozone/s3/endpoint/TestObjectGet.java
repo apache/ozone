@@ -87,11 +87,12 @@ public class TestObjectGet {
     client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket(BUCKET_NAME);
 
-    rest = new ObjectEndpoint();
-    rest.setClient(client);
-    rest.setOzoneConfiguration(new OzoneConfiguration());
     headers = mock(HttpHeaders.class);
-    rest.setHeaders(headers);
+
+    rest = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(client)
+        .setHeaders(headers)
+        .build();
 
     ByteArrayInputStream body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     rest.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),

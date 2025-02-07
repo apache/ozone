@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
+import org.apache.hadoop.fs.Syncable;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -26,7 +28,7 @@ import java.nio.ByteBuffer;
  * This interface is similar to {@link java.io.OutputStream}
  * except that this class support {@link ByteBuffer} instead of byte[].
  */
-public interface ByteBufferStreamOutput extends Closeable {
+public interface ByteBufferStreamOutput extends Closeable, Syncable {
   /**
    * Similar to {@link java.io.OutputStream#write(byte[])},
    * except that the parameter of this method is a {@link ByteBuffer}.

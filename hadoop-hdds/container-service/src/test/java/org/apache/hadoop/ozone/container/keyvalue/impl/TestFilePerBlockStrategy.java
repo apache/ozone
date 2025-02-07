@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -113,7 +114,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     // Request to read the whole data in a single go.
     ChunkInfo largeChunk = getChunk(blockID.getLocalID(), 0, 0,
         datalen * chunkCount);
-    ChunkBuffer chunk =
+    final ChunkBufferToByteString chunk =
         subject.readChunk(container, blockID, largeChunk,
             null);
     ByteBuffer newdata = chunk.toByteString().asReadOnlyByteBuffer();
@@ -140,18 +141,16 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     ChunkManager subject = createTestSubject();
     subject.writeChunk(container, blockID, info, data, WRITE_STAGE);
 
-    ChunkBuffer readData = subject.readChunk(container, blockID, info, null);
+    final ChunkBufferToByteString readData = subject.readChunk(container, blockID, info, null);
     // data will be ChunkBufferImplWithByteBuffer and readData will return
     // ChunkBufferImplWithByteBufferList. Hence, convert both ByteStrings
     // before comparing.
-    assertEquals(data.rewind().toByteString(),
-        readData.rewind().toByteString());
+    assertEquals(data.rewind().toByteString(), readData.toByteString());
 
     ChunkInfo info2 = getChunk(blockID.getLocalID(), 0, start, length);
-    ChunkBuffer readData2 = subject.readChunk(container, blockID, info2, null);
+    final ChunkBufferToByteString readData2 = subject.readChunk(container, blockID, info2, null);
     assertEquals(length, info2.getLen());
-    assertEquals(data.rewind().toByteString().substring(start, start + length),
-        readData2.rewind().toByteString());
+    assertEquals(data.rewind().toByteString().substring(start, start + length), readData2.toByteString());
   }
 
   @ParameterizedTest
@@ -181,7 +180,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     containerSet.addContainer(kvContainer);
     KeyValueHandler keyValueHandler = createKeyValueHandler(containerSet);
     keyValueHandler.writeChunkForClosedContainer(getChunkInfo(), getBlockID(), writeChunkData, kvContainer);
-    ChunkBuffer readChunkData = keyValueHandler.getChunkManager().readChunk(kvContainer,
+    ChunkBufferToByteString readChunkData = keyValueHandler.getChunkManager().readChunk(kvContainer,
         getBlockID(), getChunkInfo(), WRITE_STAGE);
     rewindBufferToDataStart();
     Assertions.assertEquals(writeChunkData, readChunkData);

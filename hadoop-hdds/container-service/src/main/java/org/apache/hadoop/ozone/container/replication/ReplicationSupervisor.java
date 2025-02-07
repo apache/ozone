@@ -232,14 +232,24 @@ public final class ReplicationSupervisor {
    * Queue an asynchronous download of the given container.
    */
   public void addTask(AbstractReplicationTask task) {
+    if (queueHasRoomFor(task)) {
+      initCounters(task);
+      addToQueue(task);
+    }
+  }
+
+  private boolean queueHasRoomFor(AbstractReplicationTask task) {
     final int max = maxQueueSize;
     if (getTotalInFlightReplications() >= max) {
       LOG.warn("Ignored {} command for container {} in Replication Supervisor"
               + "as queue reached max size of {}.",
           task.getClass(), task.getContainerId(), max);
-      return;
+      return false;
     }
+    return true;
+  }
 
+  public void initCounters(AbstractReplicationTask task) {
     if (requestCounter.get(task.getMetricName()) == null) {
       synchronized (this) {
         if (requestCounter.get(task.getMetricName()) == null) {
@@ -255,7 +265,9 @@ public final class ReplicationSupervisor {
         }
       }
     }
+  }
 
+  private void addToQueue(AbstractReplicationTask task) {
     if (inFlight.add(task)) {
       if (task.getPriority() != ReplicationCommandPriority.LOW) {
         // Low priority tasks are not included in the replication queue sizes

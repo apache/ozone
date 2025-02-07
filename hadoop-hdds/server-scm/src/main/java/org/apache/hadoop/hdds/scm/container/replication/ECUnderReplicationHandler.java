@@ -621,7 +621,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
   private void adjustPendingOps(ECContainerReplicaCount replicaCount,
                                 DatanodeDetails target, int replicaIndex) {
     replicaCount.addPendingOp(new ContainerReplicaOp(
-        ContainerReplicaOp.PendingOpType.ADD, target, replicaIndex,
+        ContainerReplicaOp.PendingOpType.ADD, target, replicaIndex, null,
         Long.MAX_VALUE));
   }
 

@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -71,6 +72,8 @@ public interface ContainerManager extends Closeable {
    */
   List<ContainerInfo> getContainers(ContainerID startID, int count);
 
+
+  List<ContainerInfo> getContainers(ReplicationType type);
 
   /**
    * Returns all the containers which are in the specified state.

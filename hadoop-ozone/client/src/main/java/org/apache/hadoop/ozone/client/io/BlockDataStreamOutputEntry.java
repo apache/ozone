@@ -117,6 +117,18 @@ public final class BlockDataStreamOutputEntry
   }
 
   @Override
+  public void hflush() throws IOException {
+    hsync();
+  }
+
+  @Override
+  public void hsync() throws IOException {
+    if (this.byteBufferStreamOutput != null) {
+      this.byteBufferStreamOutput.hsync();
+    }
+  }
+
+  @Override
   public void close() throws IOException {
     if (this.byteBufferStreamOutput != null) {
       this.byteBufferStreamOutput.close();
