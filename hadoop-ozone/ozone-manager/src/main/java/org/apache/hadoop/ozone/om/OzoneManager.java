@@ -527,6 +527,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins)
             .register(OZONE_READONLY_ADMINISTRATORS,
                 this::reconfOzoneReadOnlyAdmins)
+            .register(OZONE_OM_VOLUME_LISTALL_ALLOWED, this::reconfigureAllowListAllVolumes)
             .register(OZONE_KEY_DELETING_LIMIT_PER_TASK,
                 this::reconfOzoneKeyDeletingLimitPerTask);
 
@@ -759,7 +760,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private void setInstanceVariablesFromConf() {
     this.isAclEnabled = configuration.getBoolean(OZONE_ACL_ENABLED,
         OZONE_ACL_ENABLED_DEFAULT);
-    this.allowListAllVolumes = configuration.getBoolean(
+    setAllowListAllVolumesFromConfig();
+  }
+
+  public void setAllowListAllVolumesFromConfig() {
+    allowListAllVolumes = configuration.getBoolean(
         OZONE_OM_VOLUME_LISTALL_ALLOWED,
         OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT);
   }
@@ -4975,6 +4980,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     getKeyManager().getDeletingService()
         .setKeyLimitPerTask(Integer.parseInt(newVal));
+    return newVal;
+  }
+
+  private String reconfigureAllowListAllVolumes(String newVal) {
+    getConfiguration().setBoolean(OZONE_OM_VOLUME_LISTALL_ALLOWED, Boolean.parseBoolean(newVal));
+    setAllowListAllVolumesFromConfig();
     return newVal;
   }
 
