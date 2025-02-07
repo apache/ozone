@@ -4334,6 +4334,15 @@
   </property>
 
   <property>
+    <name>ozone.om.snapshot.compaction.dag.enabled</name>
+    <value>true</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      If true, compaction DAG will be generated during RocksDB compaction.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.snapshot.compaction.dag.prune.daemon.run.interval</name>
     <value>3600s</value>
     <tag>OZONE, OM</tag>
