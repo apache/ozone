@@ -70,7 +70,7 @@ import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
-import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTree;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -614,7 +614,7 @@ public class KeyValueHandler extends Handler {
 
     try {
       KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
-      ContainerMerkleTree merkleTree = new ContainerMerkleTree();
+      ContainerMerkleTreeWriter merkleTree = new ContainerMerkleTreeWriter();
       try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf);
            BlockIterator<BlockData> blockIterator = dbHandle.getStore().
                getBlockIterator(containerData.getContainerID())) {
@@ -1490,7 +1490,7 @@ public class KeyValueHandler extends Handler {
         .putLong(id)
         .asReadOnlyBuffer();
     byteBuffer.rewind();
-    ChecksumByteBuffer checksumImpl = ChecksumByteBufferFactory.crc32Impl();
+    ChecksumByteBuffer checksumImpl = ChecksumByteBufferFactory.crc32CImpl();
     checksumImpl.update(byteBuffer);
     long dataChecksum = checksumImpl.getValue();
     LOG.info("Generated data checksum of container {} for testing: {}", id, dataChecksum);
