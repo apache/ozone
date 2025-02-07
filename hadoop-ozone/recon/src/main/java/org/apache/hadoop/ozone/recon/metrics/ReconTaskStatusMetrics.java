@@ -38,7 +38,7 @@ import java.util.List;
  * Ship ReconTaskStatus table on persistent DB as a metrics.
  */
 @Singleton
-@Metrics(about = "Recon Task Status Metrics", context = "recon")
+@Metrics(about = "Recon Task Status Metrics", context = OzoneConsts.OZONE)
 public class ReconTaskStatusMetrics implements MetricsSource {
 
   private static final String SOURCE_NAME =

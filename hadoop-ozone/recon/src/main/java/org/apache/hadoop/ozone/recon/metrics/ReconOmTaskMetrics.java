@@ -20,12 +20,12 @@ public abstract class ReconOmTaskMetrics implements MetricsSource {
   private final String taskName;
   private final String source;
 
-  private @Metric MutableCounterLong taskReprocessCount;
-  private @Metric MutableCounterLong taskReprocessFailedCount;
+  private @Metric MutableCounterLong reprocessCount;
+  private @Metric MutableCounterLong reprocessFailedCount;
   private @Metric MutableRate reprocessLatency;
 
-  private @Metric MutableCounterLong taskProcessCount;
-  private @Metric MutableCounterLong taskProcessFailedCount;
+  private @Metric MutableCounterLong processCount;
+  private @Metric MutableCounterLong processFailedCount;
   private @Metric MutableRate processLatency;
 
   protected ReconOmTaskMetrics(String taskName, String source) {
@@ -37,14 +37,14 @@ public abstract class ReconOmTaskMetrics implements MetricsSource {
    * Update the number of reprocess() method calls by the task
    */
   public void incrTaskReprocessCount() {
-   this.taskReprocessCount.incr();
+   this.reprocessCount.incr();
   }
 
   /**
    * Update the number of times reprocess() method call encountered exception
    */
   public void incrTaskReprocessFailureCount() {
-    this.taskReprocessFailedCount.incr();
+    this.reprocessFailedCount.incr();
   }
 
   /**
@@ -59,14 +59,14 @@ public abstract class ReconOmTaskMetrics implements MetricsSource {
    * Update the number of process() method calls by the task
    */
   public void incrTaskProcessCount() {
-    this.taskProcessCount.incr();
+    this.processCount.incr();
   }
 
   /**
    * Update the number of times process() method call encountered exception
    */
   public void incrTaskProcessFailureCount() {
-    this.taskProcessFailedCount.incr();
+    this.processFailedCount.incr();
   }
 
   /**
@@ -79,23 +79,18 @@ public abstract class ReconOmTaskMetrics implements MetricsSource {
 
   @VisibleForTesting
   public long getTaskReprocessCount() {
-    return this.taskReprocessCount.value();
-  }
-
-  @VisibleForTesting
-  public long getTaskReprocessFailureCount() {
-    return this.taskReprocessFailedCount.value();
+    return this.reprocessCount.value();
   }
 
   @VisibleForTesting
   public long getTaskProcessCount() {
-    return this.taskProcessCount.value();
+    return this.processCount.value();
 
   }
 
   @VisibleForTesting
   public long getTaskProcessFailureCount() {
-    return this.taskProcessFailedCount.value();
+    return this.processFailedCount.value();
   }
 
   @Override
