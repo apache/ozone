@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
+import java.io.FileNotFoundException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
@@ -82,7 +83,7 @@ public class PutKeyHandler extends KeyHandler {
 
     File dataFile = new File(fileName);
     if (!dataFile.exists()) {
-      throw new IOException("Error: File not found: " + fileName);
+      throw new FileNotFoundException("Error: File not found: " + fileName);
     }
 
     if (isVerbose()) {
