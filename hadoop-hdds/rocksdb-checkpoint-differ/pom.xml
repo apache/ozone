@@ -129,16 +129,6 @@
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>depcheck</id>
-            <phase />
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>
         <configuration>
           <suppressionsLocation>${basedir}/../../hadoop-hdds/dev-support/checkstyle/suppressions-skip-imports.xml</suppressionsLocation>

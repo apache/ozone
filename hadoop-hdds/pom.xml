@@ -181,23 +181,6 @@
   </dependencyManagement>
   <build>
     <plugins>
-
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>depcheck</id>
-            <configuration>
-              <rules>
-                <DependencyConvergence>
-                  <uniqueVersions>false</uniqueVersions>
-                </DependencyConvergence>
-              </rules>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
