@@ -348,6 +348,7 @@ public class BucketEndpoint extends EndpointBase {
       result.setKeyMarker(ozoneMultipartUploadList.getNextKeyMarker());
       result.setUploadIdMarker(ozoneMultipartUploadList.getNextUploadIdMarker());
       result.setTruncated(ozoneMultipartUploadList.isTruncated());
+      result.setMaxUploads(ozoneMultipartUploadList.getMaxUploads());
 
       ozoneMultipartUploadList.getUploads().forEach(upload -> result.addUpload(
           new ListMultipartUploadsResult.Upload(

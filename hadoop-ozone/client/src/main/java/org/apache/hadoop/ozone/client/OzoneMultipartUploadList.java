@@ -31,17 +31,20 @@ public class OzoneMultipartUploadList {
   private String nextKeyMarker;
   private String nextUploadIdMarker;
   private boolean isTruncated;
+  private int maxUploads;
 
   public OzoneMultipartUploadList(
       List<OzoneMultipartUpload> uploads,
       String nextKeyMarker,
       String nextUploadIdMarker,
-      boolean isTruncated) {
+      boolean isTruncated,
+      int maxUploads) {
     Preconditions.checkNotNull(uploads);
     this.uploads = uploads;
     this.nextKeyMarker = nextKeyMarker;
     this.nextUploadIdMarker = nextUploadIdMarker;
     this.isTruncated = isTruncated;
+    this.maxUploads = maxUploads;
   }
 
   public List<OzoneMultipartUpload> getUploads() {
@@ -63,5 +66,9 @@ public class OzoneMultipartUploadList {
 
   public boolean isTruncated() {
     return isTruncated;
+  }
+
+  public int getMaxUploads() {
+    return maxUploads;
   }
 }
