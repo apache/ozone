@@ -4984,9 +4984,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   private String reconfigureAllowListAllVolumes(String newVal) {
-    getConfiguration().setBoolean(OZONE_OM_VOLUME_LISTALL_ALLOWED, Boolean.parseBoolean(newVal));
+    getConfiguration().set(OZONE_OM_VOLUME_LISTALL_ALLOWED, newVal);
     setAllowListAllVolumesFromConfig();
-    return newVal;
+    return String.valueOf(allowListAllVolumes);
   }
 
   public void validateReplicationConfig(ReplicationConfig replicationConfig)

@@ -22,12 +22,15 @@ import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphabetic;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
@@ -91,6 +94,14 @@ class TestOmReconfiguration extends ReconfigurationTestBase {
         String.valueOf(newValue));
 
     assertEquals(newValue, getCluster().getOzoneManager().getAllowListAllVolumes());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "invalid"})
+  void unsetAllowListAllVolumes(String newValue) throws ReconfigurationException {
+    getSubject().reconfigurePropertyImpl(OZONE_OM_VOLUME_LISTALL_ALLOWED, newValue);
+
+    assertEquals(OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT, getCluster().getOzoneManager().getAllowListAllVolumes());
   }
 
 }
