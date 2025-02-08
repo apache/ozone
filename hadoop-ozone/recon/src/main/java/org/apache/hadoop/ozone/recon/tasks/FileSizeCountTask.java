@@ -75,7 +75,7 @@ public class FileSizeCountTask implements ReconOmTask {
    * @return Pair
    */
   @Override
-  public Pair<String, Pair<Integer, Boolean>> reprocess(OMMetadataManager omMetadataManager) {
+  public Pair<String, Pair<Map<String, Integer>, Boolean>> reprocess(OMMetadataManager omMetadataManager) {
     // Map to store the count of files based on file size
     Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
 
@@ -93,11 +93,11 @@ public class FileSizeCountTask implements ReconOmTask {
         reprocessBucketLayout(BucketLayout.LEGACY, omMetadataManager,
             fileSizeCountMap);
     if (!statusFSO && !statusOBS) {
-      return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(0, false));
+      return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), false));
     }
     writeCountsToDB(true, fileSizeCountMap);
     LOG.debug("Completed a 'reprocess' run of FileSizeCountTask.");
-    return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(0, true));
+    return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), true));
   }
 
   private boolean reprocessBucketLayout(BucketLayout bucketLayout,
@@ -140,12 +140,13 @@ public class FileSizeCountTask implements ReconOmTask {
    * Read the Keys from update events and update the count of files
    * pertaining to a certain upper bound.
    *
-   * @param events Update events - PUT/DELETE.
+   * @param events            Update events - PUT/DELETE.
+   * @param subTaskSeekPosMap
    * @return Pair
    */
   @Override
-  public Pair<String, Pair<Integer, Boolean>> process(OMUpdateEventBatch events,
-                                                      int seekPosition) {
+  public Pair<String, Pair<Map<String, Integer>, Boolean>> process(OMUpdateEventBatch events,
+                                                                   Map<String, Integer> subTaskSeekPosMap) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
     final Collection<String> taskTables = getTaskTables();
@@ -192,7 +193,7 @@ public class FileSizeCountTask implements ReconOmTask {
         } catch (Exception e) {
           LOG.error("Unexpected exception while processing key {}.",
               updatedKey, e);
-          return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(0, false));
+          return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), false));
         }
       } else {
         LOG.warn("Unexpected value type {} for key {}. Skipping processing.",
@@ -202,7 +203,7 @@ public class FileSizeCountTask implements ReconOmTask {
     writeCountsToDB(false, fileSizeCountMap);
     LOG.debug("{} successfully processed in {} milliseconds",
         getTaskName(), (System.currentTimeMillis() - startTime));
-    return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(0, true));
+    return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), true));
   }
 
   /**

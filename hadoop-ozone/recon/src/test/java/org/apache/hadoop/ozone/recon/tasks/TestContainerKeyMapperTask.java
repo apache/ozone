@@ -31,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -339,7 +340,7 @@ public class TestContainerKeyMapperTask {
     assertEquals(1, reconContainerMetadataManager.getKeyCountForContainer(3L));
 
     // Process PUT & DELETE event.
-    containerKeyMapperTask.process(omUpdateEventBatch, 0);
+    containerKeyMapperTask.process(omUpdateEventBatch, new HashMap<>());
 
     keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(1);
@@ -430,7 +431,7 @@ public class TestContainerKeyMapperTask {
         }, 0L);
 
     // Process PUT event for both the keys
-    containerKeyMapperTask.process(omUpdateEventBatch, 0);
+    containerKeyMapperTask.process(omUpdateEventBatch, new HashMap<>());
 
     keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(1);
@@ -463,7 +464,7 @@ public class TestContainerKeyMapperTask {
         }, 0L);
 
     // Process DELETE event for key2
-    containerKeyMapperTask.process(omUpdateEventBatch2, 0);
+    containerKeyMapperTask.process(omUpdateEventBatch2, new HashMap<>());
 
     keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(1);

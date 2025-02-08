@@ -219,14 +219,4 @@ public class NSSummaryTaskDbEventHandler {
     }
     return true;
   }
-
-/*  protected boolean checkAndCallFlushToDB(
-      Map<Long, NSSummary> nsSummaryMap) {
-    // if map contains more than entries, flush to DB and clear the map
-    if (null != nsSummaryMap && nsSummaryMap.size() >=
-        nsSummaryFlushToDBMaxThreshold) {
-      return flushAndCommitNSToDB(nsSummaryMap);
-    }
-    return true;
-  }*/
 }

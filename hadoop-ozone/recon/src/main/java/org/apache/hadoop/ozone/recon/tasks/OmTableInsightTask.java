@@ -81,7 +81,7 @@ public class OmTableInsightTask implements ReconOmTask {
   /**
    * Iterates the rows of each table in the OM snapshot DB and calculates the
    * counts and sizes for table data.
-   *
+   * <p>
    * For tables that require data size calculation
    * (as returned by getTablesToCalculateSize), both the number of
    * records (count) and total data size of the records are calculated.
@@ -91,7 +91,7 @@ public class OmTableInsightTask implements ReconOmTask {
    * @return Pair
    */
   @Override
-  public Pair<String, Pair<Integer, Boolean>> reprocess(OMMetadataManager omMetadataManager) {
+  public Pair<String, Pair<Map<String, Integer>, Boolean>> reprocess(OMMetadataManager omMetadataManager) {
     HashMap<String, Long> objectCountMap = initializeCountMap();
     HashMap<String, Long> unReplicatedSizeMap = initializeSizeMap(false);
     HashMap<String, Long> replicatedSizeMap = initializeSizeMap(true);
@@ -100,7 +100,7 @@ public class OmTableInsightTask implements ReconOmTask {
       Table table = omMetadataManager.getTable(tableName);
       if (table == null) {
         LOG.error("Table " + tableName + " not found in OM Metadata.");
-        return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(0, false));
+        return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), false));
       }
 
       try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator
@@ -120,7 +120,7 @@ public class OmTableInsightTask implements ReconOmTask {
         }
       } catch (IOException ioEx) {
         LOG.error("Unable to populate Table Count in Recon DB.", ioEx);
-        return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(0, false));
+        return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), false));
       }
     }
     // Write the data to the DB
@@ -135,7 +135,7 @@ public class OmTableInsightTask implements ReconOmTask {
     }
 
     LOG.debug("Completed a 'reprocess' run of OmTableInsightTask.");
-    return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(0, true));
+    return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), true));
   }
 
   @Override
@@ -151,12 +151,13 @@ public class OmTableInsightTask implements ReconOmTask {
    * Read the update events and update the count and sizes of respective object
    * (volume, bucket, key etc.) based on the action (put or delete).
    *
-   * @param events Update events - PUT, DELETE and UPDATE.
+   * @param events            Update events - PUT, DELETE and UPDATE.
+   * @param subTaskSeekPosMap
    * @return Pair
    */
   @Override
-  public Pair<String, Pair<Integer, Boolean>> process(OMUpdateEventBatch events,
-                                                      int seekPosition) {
+  public Pair<String, Pair<Map<String, Integer>, Boolean>> process(OMUpdateEventBatch events,
+                                                                   Map<String, Integer> subTaskSeekPosMap) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     // Initialize maps to store count and size information
     HashMap<String, Long> objectCountMap = initializeCountMap();
@@ -197,7 +198,7 @@ public class OmTableInsightTask implements ReconOmTask {
         LOG.error(
             "Unexpected exception while processing the table {}, Action: {}",
             tableName, omdbUpdateEvent.getAction(), e);
-        return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(0, false));
+        return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), false));
       }
     }
     // Write the updated count and size information to the database
@@ -212,7 +213,7 @@ public class OmTableInsightTask implements ReconOmTask {
     }
     LOG.debug("{} successfully processed in {} milliseconds",
         getTaskName(), (System.currentTimeMillis() - startTime));
-    return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(0, true));
+    return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), true));
   }
 
   private void handlePutEvent(OMDBUpdateEvent<String, Object> event,

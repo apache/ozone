@@ -44,6 +44,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -223,7 +224,7 @@ public final class TestNSSummaryTask {
     @BeforeEach
     public void setUp() throws IOException {
       nSSummaryTask.reprocess(reconOMMetadataManager);
-      nSSummaryTask.process(processEventBatch(), 0);
+      nSSummaryTask.process(processEventBatch(), new HashMap<>());
 
       nsSummaryForBucket1 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);

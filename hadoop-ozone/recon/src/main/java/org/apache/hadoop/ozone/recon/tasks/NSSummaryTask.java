@@ -31,7 +31,9 @@ import javax.inject.Inject;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutionException;
@@ -103,29 +105,64 @@ public class NSSummaryTask implements ReconOmTask {
     return "NSSummaryTask";
   }
 
-  @Override
-  public Pair<String, Pair<Integer, Boolean>> process(
-      OMUpdateEventBatch events, int seekPosition) {
-    Pair<Integer, Boolean> itrPosStatusPair =
-        nsSummaryTaskWithFSO.processWithFSO(events, seekPosition);
-    if (!itrPosStatusPair.getRight()) {
-      LOG.error("processWithFSO failed.");
+  /**
+   * Bucket Type Enum which mimic subtasks for their data processing.
+   */
+  public enum BucketType {
+    FSO("File System Optimized Bucket"),
+    OBS("Object Store Bucket"),
+    LEGACY("Legacy Bucket");
+
+    private final String description;
+
+    BucketType(String description) {
+      this.description = description;
     }
-    itrPosStatusPair =
-        nsSummaryTaskWithLegacy.processWithLegacy(events, seekPosition);
-    if (!itrPosStatusPair.getRight()) {
-      LOG.error("processWithLegacy failed.");
+
+    public String getDescription() {
+      return description;
     }
-    itrPosStatusPair =
-        nsSummaryTaskWithOBS.processWithOBS(events, seekPosition);
-    if (!itrPosStatusPair.getRight()) {
-      LOG.error("processWithOBS failed.");
-    }
-    return new ImmutablePair<>(getTaskName(), itrPosStatusPair);
   }
 
   @Override
-  public Pair<String, Pair<Integer, Boolean>> reprocess(OMMetadataManager omMetadataManager) {
+  public Pair<String, Pair<Map<String, Integer>, Boolean>> process(
+      OMUpdateEventBatch events, Map<String, Integer> subTaskSeekPosMap) {
+    boolean anyFailure = false; // Track if any bucket fails
+    Map<String, Integer> updatedSeekPositions = new HashMap<>();
+
+    // Process FSO bucket
+    Integer bucketSeek = subTaskSeekPosMap.getOrDefault(BucketType.FSO.name(), 0);
+    Pair<Integer, Boolean> bucketResult = nsSummaryTaskWithFSO.processWithFSO(events, bucketSeek);
+    updatedSeekPositions.put(BucketType.FSO.name(), bucketResult.getLeft());
+    if (!bucketResult.getRight()) {
+      LOG.error("processWithFSO failed.");
+      anyFailure = true;
+    }
+
+    // Process Legacy bucket
+    bucketSeek = subTaskSeekPosMap.getOrDefault(BucketType.LEGACY.name(), 0);
+    bucketResult = nsSummaryTaskWithLegacy.processWithLegacy(events, bucketSeek);
+    updatedSeekPositions.put(BucketType.LEGACY.name(), bucketResult.getLeft());
+    if (!bucketResult.getRight()) {
+      LOG.error("processWithLegacy failed.");
+      anyFailure = true;
+    }
+
+    // Process OBS bucket
+    bucketSeek = subTaskSeekPosMap.getOrDefault(BucketType.OBS.name(), 0);
+    bucketResult = nsSummaryTaskWithOBS.processWithOBS(events, bucketSeek);
+    updatedSeekPositions.put(BucketType.OBS.name(), bucketResult.getLeft());
+    if (!bucketResult.getRight()) {
+      LOG.error("processWithOBS failed.");
+      anyFailure = true;
+    }
+
+    // Return task failure if any bucket failed, while keeping each bucket's latest seek position
+    return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(updatedSeekPositions, !anyFailure));
+  }
+
+  @Override
+  public Pair<String, Pair<Map<String, Integer>, Boolean>> reprocess(OMMetadataManager omMetadataManager) {
     // Initialize a list of tasks to run in parallel
     Collection<Callable<Boolean>> tasks = new ArrayList<>();
 
@@ -137,7 +174,7 @@ public class NSSummaryTask implements ReconOmTask {
     } catch (IOException ioEx) {
       LOG.error("Unable to clear NSSummary table in Recon DB. ",
           ioEx);
-      return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(0, false));
+      return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), false));
     }
 
     tasks.add(() -> nsSummaryTaskWithFSO
@@ -157,12 +194,12 @@ public class NSSummaryTask implements ReconOmTask {
       results = executorService.invokeAll(tasks);
       for (int i = 0; i < results.size(); i++) {
         if (results.get(i).get().equals(false)) {
-          return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(0, false));
+          return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), false));
         }
       }
     } catch (InterruptedException | ExecutionException ex) {
       LOG.error("Error while reprocessing NSSummary table in Recon DB.", ex);
-      return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(0, false));
+      return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), false));
     } finally {
       executorService.shutdown();
 
@@ -175,7 +212,7 @@ public class NSSummaryTask implements ReconOmTask {
       LOG.debug("Task execution time: {} milliseconds", durationInMillis);
     }
 
-    return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(0, true));
+    return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), true));
   }
 
 }

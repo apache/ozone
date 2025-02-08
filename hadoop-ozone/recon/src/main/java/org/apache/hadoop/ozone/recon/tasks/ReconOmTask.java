@@ -21,6 +21,8 @@ package org.apache.hadoop.ozone.recon.tasks;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 
+import java.util.Map;
+
 /**
  * Interface used to denote a Recon task that needs to act on OM DB events.
  */
@@ -33,20 +35,22 @@ public interface ReconOmTask {
   String getTaskName();
 
   /**
-   * Process a set of OM events on tables that the task is listening on.
+   * Processes a set of OM events on tables that the task is listening to.
    *
-   * @param events Set of events to be processed by the task.
-   * @param seekPosition position from where to start iterating events of events iterator.
-   * @return Pair of task name -&gt; events iterator position, task success.
+   * @param events            Set of events to be processed by the task.
+   * @param subTaskSeekPosMap Position from where to start iterating events of the event iterator for a given sub-task.
+   * @return A pair containing the task name mapped to a map of
+   *         {@code sub-task name, its events iterator position} and a task success flag.
    */
-  Pair<String, Pair<Integer, Boolean>> process(OMUpdateEventBatch events,
-                                               int seekPosition);
+  Pair<String, Pair<Map<String, Integer>, Boolean>> process(OMUpdateEventBatch events,
+                                                            Map<String, Integer> subTaskSeekPosMap);
 
   /**
    * Process a  on tables that the task is listening on.
+   *
    * @param omMetadataManager OM Metadata manager instance.
-   * @return Pair of task name -&gt; task success.
+   * @return Pair of task name -&gt; map of <subtask, seek position>, task success.
    */
-  Pair<String, Pair<Integer, Boolean>> reprocess(OMMetadataManager omMetadataManager);
+  Pair<String, Pair<Map<String, Integer>, Boolean>> reprocess(OMMetadataManager omMetadataManager);
 
 }
