@@ -182,7 +182,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
 
       BlockLocationInfo blkInfo = new BlockLocationInfo.Builder()
           .setBlockID(blockInfo.getBlockID())
-          .setLength(internalBlockLength(locationIndex + 1))
+          .setLength(internalBlockLength(locationIndex + 1, this.repConfig, this.blockInfo.getLength()))
           .setPipeline(blockInfo.getPipeline())
           .setToken(blockInfo.getToken())
           .setPartNumber(blockInfo.getPartNumber())
@@ -238,11 +238,21 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
    * Returns the length of the Nth block in the block group, taking account of a
    * potentially partial last stripe. Note that the internal block index is
    * numbered starting from 1.
-   * @param index - Index number of the internal block, starting from 1
+   * @param index index number of the internal block, starting from 1.
+   * @param repConfig EC replication config.
+   * @param length length of the whole block group.
    */
-  protected long internalBlockLength(int index) {
-    long lastStripe = blockInfo.getLength() % stripeSize;
-    long blockSize = (blockInfo.getLength() - lastStripe) / repConfig.getData();
+  public static long internalBlockLength(int index, ECReplicationConfig repConfig, long length) {
+    if (index <= 0) {
+      throw new IllegalArgumentException("Index must start from 1.");
+    }
+    if (length < 0) {
+      throw new IllegalArgumentException("Block length cannot be negative.");
+    }
+    long ecChunkSize = (long) repConfig.getEcChunkSize();
+    long stripeSize = ecChunkSize * repConfig.getData();
+    long lastStripe = length % stripeSize;
+    long blockSize = (length - lastStripe) / repConfig.getData();
     long lastCell = lastStripe / ecChunkSize + 1;
     long lastCellLength = lastStripe % ecChunkSize;
 

@@ -72,7 +72,7 @@ public class TestReconWithDifferentSqlDBs {
       assertNotNull(reconSqlDB.getDao(dao));
     });
     ReconTaskStatusDao dao = reconSqlDB.getDao(ReconTaskStatusDao.class);
-    dao.insert(new ReconTaskStatus("TestTask", 1L, 2L));
+    dao.insert(new ReconTaskStatus("TestTask", 1L, 2L, 1, 0));
     assertEquals(1, dao.findAll().size());
 
     int numRows = reconSqlDB.getDslContext().

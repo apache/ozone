@@ -894,10 +894,8 @@ public class ContainerBalancerTask implements Runnable {
     sourceContainerIDSet.removeAll(toRemoveContainerIds);
 
     if (moveSelection == null) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("ContainerBalancer could not find a suitable target for " +
-            "source node {}.", source.getUuidString());
-      }
+      LOG.info("ContainerBalancer could not find a suitable target for " +
+          "source node {}.", source.getUuidString());
       return null;
     }
     LOG.info("ContainerBalancer matched source datanode {} with target " +

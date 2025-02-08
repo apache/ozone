@@ -18,18 +18,17 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 
-import org.junit.jupiter.api.AfterEach;
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
@@ -41,27 +40,21 @@ import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test cases to verify the metrics exposed by SCMPipelineManager.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(300)
-public class TestSCMPipelineMetrics {
+public abstract class TestSCMPipelineMetrics implements NonHATests.TestCase {
 
   private MiniOzoneCluster cluster;
 
   @BeforeEach
   public void setup() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,
-        Boolean.TRUE.toString());
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
-        .build();
-    cluster.waitForClusterToBeReady();
+    cluster = cluster();
   }
 
   /**
@@ -82,6 +75,9 @@ public class TestSCMPipelineMetrics {
    */
   @Test
   public void testPipelineDestroy() {
+    final String sourceName = SCMPipelineMetrics.class.getSimpleName();
+    final String metricName = "NumPipelineDestroyed";
+    final long initialDestroyed = getLongCounter(metricName, getMetrics(sourceName));
     PipelineManager pipelineManager = cluster
         .getStorageContainerManager().getPipelineManager();
     Optional<Pipeline> pipeline = pipelineManager
@@ -93,9 +89,7 @@ public class TestSCMPipelineMetrics {
       pm.closePipeline(pipeline.get().getId());
       pm.deletePipeline(pipeline.get().getId());
     });
-    MetricsRecordBuilder metrics = getMetrics(
-        SCMPipelineMetrics.class.getSimpleName());
-    assertCounter("NumPipelineDestroyed", 1L, metrics);
+    assertCounter(metricName, initialDestroyed + 1, getMetrics(sourceName));
   }
 
   @Test
@@ -110,7 +104,7 @@ public class TestSCMPipelineMetrics {
     Pipeline pipeline = block.getPipeline();
     final String metricName = SCMPipelineMetrics.getBlockAllocationMetricName(pipeline);
     long numBlocksAllocated = getLongCounter(metricName, metrics);
-    assertEquals(1, numBlocksAllocated);
+    assertThat(numBlocksAllocated).isPositive();
 
     // destroy the pipeline
     assertDoesNotThrow(() ->
@@ -122,10 +116,5 @@ public class TestSCMPipelineMetrics {
     Throwable t = assertThrows(AssertionError.class, () ->
         getLongCounter(metricName, finalMetrics));
     assertThat(t).hasMessageContaining(metricName);
-  }
-
-  @AfterEach
-  public void teardown() {
-    cluster.shutdown();
   }
 }

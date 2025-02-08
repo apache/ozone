@@ -103,11 +103,14 @@ public class S3MultipartUploadCompleteResponseWithFSO
       }
 
       // namespace quota changes for parent directory
-      String bucketKey = omMetadataManager.getBucketKey(
-          getOmBucketInfo().getVolumeName(),
-          getOmBucketInfo().getBucketName());
-      omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-          bucketKey, getOmBucketInfo());
+      OmBucketInfo omBucketInfo = getOmBucketInfo();
+      if (omBucketInfo != null) {
+        String bucketKey = omMetadataManager.getBucketKey(
+                omBucketInfo.getVolumeName(),
+                omBucketInfo.getBucketName());
+        omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+                bucketKey, omBucketInfo);
+      }
 
       if (OMFileRequest.getOmKeyInfoFromFileTable(true,
           omMetadataManager, getMultiPartKey(), getOmKeyInfo().getKeyName())

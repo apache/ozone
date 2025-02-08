@@ -75,13 +75,6 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
     if (request == null) {
       return null;
     }
-    if (!ozoneManager.isRatisEnabled()) {
-      return DecommissionOMResponse.newBuilder()
-          .setSuccess(false)
-          .setErrorMsg("OM node cannot be decommissioned as Ratis is " +
-              "not enabled.")
-          .build();
-    }
 
     OzoneManagerRatisServer omRatisServer = ozoneManager.getOmRatisServer();
     OzoneManagerRatisUtils.checkLeaderStatus(ozoneManager);

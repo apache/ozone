@@ -311,7 +311,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table snapshotRenamedTable;
   private Table compactionLogTable;
 
-  private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
   private Table deletedDirTable;
 
@@ -352,8 +351,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     this.ozoneManager = ozoneManager;
     this.perfMetrics = perfMetrics;
     this.lock = new OzoneManagerLock(conf);
-    isRatisEnabled = true;
-    this.omEpoch = OmUtils.getOMEpoch(isRatisEnabled);
+    this.omEpoch = OmUtils.getOMEpoch();
     // For test purpose only
     ignorePipelineinKey = conf.getBoolean(
         "ozone.om.ignore.pipeline", Boolean.TRUE);
@@ -567,11 +565,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       // avoid those kind of failures we need to enable sync. When Ratis is
       // enabled, ratis log provides us this guaranty. This check is needed
       // until HA code path becomes default in OM.
-
-      // When ratis is not enabled override and set the sync.
-      if (!isRatisEnabled) {
-        rocksDBConfiguration.setSyncOption(true);
-      }
 
       int maxOpenFiles = configuration.getInt(OZONE_OM_DB_MAX_OPEN_FILES,
           OZONE_OM_DB_MAX_OPEN_FILES_DEFAULT);
@@ -1971,19 +1964,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       }
     }
 
+    // prefixed iterator will only iterate until keys match the prefix
     try (TableIterator<String, ? extends KeyValue<String, OmMultipartKeyInfo>>
-        iterator = getMultipartInfoTable().iterator()) {
-      iterator.seek(prefixKey);
+        iterator = getMultipartInfoTable().iterator(prefixKey)) {
 
       while (iterator.hasNext()) {
         KeyValue<String, OmMultipartKeyInfo> entry = iterator.next();
-        if (entry.getKey().startsWith(prefixKey)) {
-          // If it is marked for abort, skip it.
-          if (!aborted.contains(entry.getKey())) {
-            response.add(entry.getKey());
-          }
-        } else {
-          break;
+        // If it is marked for abort, skip it.
+        if (!aborted.contains(entry.getKey())) {
+          response.add(entry.getKey());
         }
       }
     }

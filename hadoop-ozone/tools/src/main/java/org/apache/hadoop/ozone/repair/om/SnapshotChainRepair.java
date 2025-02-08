@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.repair.om;
 
+import jakarta.annotation.Nonnull;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
@@ -76,16 +77,14 @@ public class SnapshotChainRepair extends RepairTool {
       description = "Path previous snapshotId to set for the given snapshot")
   private UUID pathPreviousSnapshotId;
 
-  @CommandLine.Option(names = {"--dry-run"},
-      required = true,
-      description = "To dry-run the command.", defaultValue = "true")
-  private boolean dryRun;
+  @Nonnull
+  @Override
+  protected Component serviceToBeOffline() {
+    return Component.OM;
+  }
 
   @Override
   public void execute() throws Exception {
-    if (checkIfServiceIsRunning("OM")) {
-      return;
-    }
     List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
     List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(dbPath);
 
@@ -139,12 +138,13 @@ public class SnapshotChainRepair extends RepairTool {
       snapshotInfo.setGlobalPreviousSnapshotId(globalPreviousSnapshotId);
       snapshotInfo.setPathPreviousSnapshotId(pathPreviousSnapshotId);
 
-      if (dryRun) {
-        info("SnapshotInfo would be updated to : %s", snapshotInfo);
-      } else {
-        byte[] snapshotInfoBytes = SnapshotInfo.getCodec().toPersistedFormat(snapshotInfo);
-        db.get()
-            .put(snapshotInfoCfh, StringCodec.get().toPersistedFormat(snapshotInfoTableKey), snapshotInfoBytes);
+      info("Updating SnapshotInfo to %s", snapshotInfo);
+
+      byte[] snapshotInfoBytes = SnapshotInfo.getCodec().toPersistedFormat(snapshotInfo);
+      byte[] persistedFormat = StringCodec.get().toPersistedFormat(snapshotInfoTableKey);
+
+      if (!isDryRun()) {
+        db.get().put(snapshotInfoCfh, persistedFormat, snapshotInfoBytes);
 
         info("Snapshot Info is updated to : %s",
             RocksDBUtils.getValue(db, snapshotInfoCfh, snapshotInfoTableKey, SnapshotInfo.getCodec()));
