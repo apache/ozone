@@ -47,6 +47,7 @@
 
 <module name="Checker">
     <module name="Header">
+        <property name="fileExtensions" value="java"/>
         <property name="headerFile" value="hadoop-hdds/dev-support/checkstyle/license.header"/>
     </module>
 
