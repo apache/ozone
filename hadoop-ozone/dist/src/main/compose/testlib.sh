@@ -18,7 +18,6 @@ set -e -o pipefail
 
 _testlib_this="${BASH_SOURCE[0]}"
 _testlib_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-
 COMPOSE_ENV_NAME=$(basename "$COMPOSE_DIR")
 RESULT_DIR=${RESULT_DIR:-"$COMPOSE_DIR/result"}
 RESULT_DIR_INSIDE="/tmp/smoketest/$(basename "$COMPOSE_ENV_NAME")/result"
@@ -29,6 +28,7 @@ if [[ -n "${OM_SERVICE_ID}" ]] && [[ "${OM_SERVICE_ID}" != "om" ]]; then
 fi
 
 source ${_testlib_dir}/compose_v2_compatibility.sh
+source "${_testlib_dir}/../smoketest/testlib.sh"
 
 : ${OZONE_COMPOSE_RUNNING:=false}
 : ${SCM:=scm}
@@ -410,27 +410,6 @@ cleanup_docker_images() {
   fi
 }
 
-## @description  Run Robot Framework report generator (rebot) in ozone-runner container.
-## @param input directory where source Robot XML files are
-## @param output directory where report should be placed
-## @param rebot options and arguments
-run_rebot() {
-  local input_dir="$(realpath "$1")"
-  local output_dir="$(realpath "$2")"
-
-  shift 2
-
-  local tempdir="$(mktemp -d "${output_dir}"/rebot-XXXXXX)"
-  #Should be writeable from the docker containers where user is different.
-  chmod a+wx "${tempdir}"
-  if docker run --rm -v "${input_dir}":/rebot-input -v "${tempdir}":/rebot-output -w /rebot-input \
-      $(get_runner_image_spec) \
-      bash -c "rebot --nostatusrc -d /rebot-output $@"; then
-    mv -v "${tempdir}"/* "${output_dir}"/
-  fi
-  rmdir "${tempdir}"
-}
-
 ## @description  Generate robot framework reports based on the saved results.
 generate_report(){
   local title="${1:-${COMPOSE_ENV_NAME}}"
@@ -546,18 +525,6 @@ prepare_for_binary_image() {
 
   export OZONE_DIR=/opt/ozone
   export OZONE_TEST_IMAGE="${image}:${v}${flavor}"
-}
-
-## @description Define variables required for using `ozone-runner` docker image
-##   (no binaries included)
-## @param `ozone-runner` image version (optional)
-get_runner_image_spec() {
-  local default_version=${docker.ozone-runner.version} # set at build-time from Maven property
-  local runner_version=${OZONE_RUNNER_VERSION:-${default_version}} # may be specified by user running the test
-  local runner_image=${OZONE_RUNNER_IMAGE:-apache/ozone-runner} # may be specified by user running the test
-  local v=${1:-${runner_version}} # prefer explicit argument
-
-  echo "${runner_image}:${v}"
 }
 
 ## @description Define variables required for using `ozone-runner` docker image

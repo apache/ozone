@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -41,7 +40,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -51,8 +49,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -61,7 +58,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -74,12 +70,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLU
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
-import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
  * Tests FinalizeBlock.
@@ -94,16 +87,7 @@ public class TestFinalizeBlock {
   private static String volumeName = UUID.randomUUID().toString();
   private static String bucketName = UUID.randomUUID().toString();
 
-  public static Stream<Arguments> dnLayoutParams() {
-    return Stream.of(
-        arguments(false, FILE_PER_CHUNK),
-        arguments(true, FILE_PER_CHUNK),
-        arguments(false, FILE_PER_BLOCK),
-        arguments(true, FILE_PER_BLOCK)
-    );
-  }
-
-  private void setup(boolean enableSchemaV3, ContainerLayoutVersion version) throws Exception {
+  private void setup(boolean enableSchemaV3) throws Exception {
     conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CONTAINER_SIZE, "1GB");
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
@@ -116,7 +100,6 @@ public class TestFinalizeBlock {
     conf.setTimeDuration(HDDS_NODE_REPORT_INTERVAL, 1, SECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     conf.setBoolean(CONTAINER_SCHEMA_V3_ENABLED, enableSchemaV3);
-    conf.setEnum(ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY, version);
 
     DatanodeConfiguration datanodeConfiguration = conf.getObject(
         DatanodeConfiguration.class);
@@ -150,10 +133,9 @@ public class TestFinalizeBlock {
   }
 
   @ParameterizedTest
-  @MethodSource("dnLayoutParams")
-  public void testFinalizeBlock(boolean enableSchemaV3, ContainerLayoutVersion version)
-      throws Exception {
-    setup(enableSchemaV3, version);
+  @ValueSource(booleans = {false, true})
+  public void testFinalizeBlock(boolean enableSchemaV3) throws Exception {
+    setup(enableSchemaV3);
     String keyName = UUID.randomUUID().toString();
     // create key
     createKey(keyName);

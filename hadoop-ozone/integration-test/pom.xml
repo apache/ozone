@@ -36,6 +36,10 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-cli-shell</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-client</artifactId>
     </dependency>
     <dependency>
@@ -73,7 +77,6 @@
     <dependency>
       <groupId>org.assertj</groupId>
       <artifactId>assertj-core</artifactId>
-      <version>${assertj.version}</version>
     </dependency>
     <dependency>
       <groupId>org.hamcrest</groupId>

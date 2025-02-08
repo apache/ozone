@@ -22,7 +22,6 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.s3.RequestIdentifier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -44,9 +43,9 @@ public class TestRootList {
     clientStub = new OzoneClientStub();
 
     // Create HeadBucket and setClient to OzoneClientStub
-    rootEndpoint = new RootEndpoint();
-    rootEndpoint.setClient(clientStub);
-    rootEndpoint.setRequestIdentifier(new RequestIdentifier());
+    rootEndpoint = EndpointBuilder.newRootEndpointBuilder()
+        .setClient(clientStub)
+        .build();
 
 
   }

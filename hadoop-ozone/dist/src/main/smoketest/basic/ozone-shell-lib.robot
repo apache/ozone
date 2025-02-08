@@ -17,6 +17,7 @@
 Documentation       Test ozone shell CLI usage
 Library             OperatingSystem
 Resource            ../commonlib.robot
+Resource            ../ozone-lib/shell.robot
 
 *** Variables ***
 ${prefix}    generated
@@ -130,8 +131,8 @@ Test ozone shell errors
     ${result} =     Execute and checkrc    ozone sh bucket create ${protocol}${server}/${volume}/bucket1                    255
                     Should contain      ${result}       QUOTA_ERROR
                     Execute and checkrc    ozone sh volume delete ${protocol}${server}/${volume}                            0
-
-
+    ${result} =     Execute and checkrc    ozone sh key put ${protocol}${server}/${volume}/bucket1/key1 sample.txt          255
+                    Should Match Regexp                    ${result}       Error: File not found: .*
 
 Test Volume Acls
     [arguments]     ${protocol}         ${server}       ${volume}
@@ -168,24 +169,20 @@ Test Bucket Acls
 
 Test key handling
     [arguments]     ${protocol}         ${server}       ${volume}
-                    Execute             ozone sh key put ${protocol}${server}/${volume}/bb1/key1 /opt/hadoop/NOTICE.txt
-                    Execute             rm -f /tmp/NOTICE.txt.1
-                    Execute             ozone sh key get ${protocol}${server}/${volume}/bb1/key1 /tmp/NOTICE.txt.1
+                    Execute             rm -f /tmp/NOTICE.txt.1 /tmp/key1_RATIS /tmp/key1-copy
+                    Ozone Shell Batch   key put ${protocol}${server}/${volume}/bb1/key1 /opt/hadoop/NOTICE.txt
+                    ...                 key get ${protocol}${server}/${volume}/bb1/key1 /tmp/NOTICE.txt.1
+                    ...                 key put -t RATIS ${protocol}${server}/${volume}/bb1/key1_RATIS /opt/hadoop/NOTICE.txt
+                    ...                 key get ${protocol}${server}/${volume}/bb1/key1_RATIS /tmp/key1_RATIS
+                    ...                 key cp ${protocol}${server}/${volume}/bb1 key1 key1-copy
+                    ...                 key get ${protocol}${server}/${volume}/bb1/key1-copy /tmp/key1-copy
                     Execute             diff -q /opt/hadoop/NOTICE.txt /tmp/NOTICE.txt.1
-
-                    Execute             ozone sh key put -t RATIS ${protocol}${server}/${volume}/bb1/key1_RATIS /opt/hadoop/NOTICE.txt
-                    Execute             rm -f /tmp/key1_RATIS
-                    Execute             ozone sh key get ${protocol}${server}/${volume}/bb1/key1_RATIS /tmp/key1_RATIS
                     Execute             diff -q /opt/hadoop/NOTICE.txt /tmp/key1_RATIS
+
     ${result} =     Execute             ozone sh key info ${protocol}${server}/${volume}/bb1/key1_RATIS | jq -r '. | select(.name=="key1_RATIS")'
                     Should contain      ${result}       RATIS
-                    Execute             ozone sh key delete ${protocol}${server}/${volume}/bb1/key1_RATIS
 
-                    Execute             ozone sh key cp ${protocol}${server}/${volume}/bb1 key1 key1-copy
-                    Execute             rm -f /tmp/key1-copy
-                    Execute             ozone sh key get ${protocol}${server}/${volume}/bb1/key1-copy /tmp/key1-copy
                     Execute             diff -q /opt/hadoop/NOTICE.txt /tmp/key1-copy
-                    Execute             ozone sh key delete ${protocol}${server}/${volume}/bb1/key1-copy
 
     ${result} =     Execute And Ignore Error    ozone sh key get ${protocol}${server}/${volume}/bb1/key1 /tmp/NOTICE.txt.1
                     Should Contain      ${result}       NOTICE.txt.1 exists
@@ -199,7 +196,9 @@ Test key handling
                     Execute             ozone sh key rename ${protocol}${server}/${volume}/bb1 key1 key2
     ${result} =     Execute             ozone sh key list ${protocol}${server}/${volume}/bb1 | jq -r '.[] | select(.name=="key2") | .name'
                     Should Be Equal     ${result}       key2
-                    Execute             ozone sh key delete ${protocol}${server}/${volume}/bb1/key2
+                    Ozone Shell Batch   key delete ${protocol}${server}/${volume}/bb1/key2
+                    ...                 key delete ${protocol}${server}/${volume}/bb1/key1_RATIS
+                    ...                 key delete ${protocol}${server}/${volume}/bb1/key1-copy
 
 Test key Acls
     [arguments]     ${protocol}         ${server}       ${volume}
@@ -274,18 +273,18 @@ Test native authorizer
 
 Test Delete key with Trash
     [arguments]    ${protocol}         ${server}       ${volume}
-                   Execute               ozone sh volume create ${protocol}${server}/${volume}
-                   Execute               ozone sh bucket create ${protocol}${server}/${volume}/bfso --layout FILE_SYSTEM_OPTIMIZED
-                   Execute               ozone sh key put -t RATIS ${protocol}${server}/${volume}/bfso/key3 /opt/hadoop/NOTICE.txt
-                   Execute               ozone sh key delete ${protocol}${server}/${volume}/bfso/key3
+                   Ozone Shell Batch     volume create ${protocol}${server}/${volume}
+                   ...                   bucket create ${protocol}${server}/${volume}/bfso --layout FILE_SYSTEM_OPTIMIZED
+                   ...                   key put -t RATIS ${protocol}${server}/${volume}/bfso/key3 /opt/hadoop/NOTICE.txt
+                   ...                   key delete ${protocol}${server}/${volume}/bfso/key3
     ${fsokey} =    Execute               ozone sh key list ${protocol}${server}/${volume}/bfso
     ${result} =    Execute               echo '${fsokey}' | jq -r '.[] | select(.name | startswith(".Trash")) | .name'
                    Should Contain Any    ${result}    .Trash/hadoop    .Trash/testuser    .Trash/root
                    Should contain        ${result}    key3
     ${result} =    Execute               echo '${fsokey}' | jq -r '.[] | select(.name | startswith(".Trash") | not) | .name'
                    Should Not contain    ${result}    key3
-                   Execute               ozone sh bucket create ${protocol}${server}/${volume}/obsbkt --layout OBJECT_STORE
-                   Execute               ozone sh key put -t RATIS ${protocol}${server}/${volume}/obsbkt/key2 /opt/hadoop/NOTICE.txt
-                   Execute               ozone sh key delete ${protocol}${server}/${volume}/obsbkt/key2
+                   Ozone Shell Batch     bucket create ${protocol}${server}/${volume}/obsbkt --layout OBJECT_STORE
+                   ...                   key put -t RATIS ${protocol}${server}/${volume}/obsbkt/key2 /opt/hadoop/NOTICE.txt
+                   ...                   key delete ${protocol}${server}/${volume}/obsbkt/key2
     ${result} =    Execute               ozone sh key list ${protocol}${server}/${volume}/obsbkt
                    Should not contain    ${result}    key2

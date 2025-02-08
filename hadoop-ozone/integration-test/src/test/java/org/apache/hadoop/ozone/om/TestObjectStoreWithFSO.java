@@ -48,10 +48,12 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
@@ -83,30 +85,22 @@ import static org.junit.jupiter.api.Assertions.fail;
 /**
  * Tests to verify Object store with prefix enabled cases.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(1200)
-public class TestObjectStoreWithFSO {
+public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
   private static final Path ROOT =
       new Path(OZONE_URI_DELIMITER);
-  private static MiniOzoneCluster cluster = null;
-  private static OzoneConfiguration conf;
-  private static String volumeName;
-  private static String bucketName;
-  private static FileSystem fs;
-  private static OzoneClient client;
+  private MiniOzoneCluster cluster;
+  private OzoneConfiguration conf;
+  private String volumeName;
+  private String bucketName;
+  private FileSystem fs;
+  private OzoneClient client;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   *
-   * @throws IOException
-   */
   @BeforeAll
-  public static void init() throws Exception {
-    conf = new OzoneConfiguration();
-    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
-    cluster = MiniOzoneCluster.newBuilder(conf).build();
-    cluster.waitForClusterToBeReady();
+  void init() throws Exception {
+    conf = new OzoneConfiguration(cluster().getConf());
+    cluster = cluster();
     client = cluster.newClient();
     // create a volume and a bucket to be used by OzoneFileSystem
     OzoneBucket bucket = TestDataUtil
@@ -147,7 +141,7 @@ public class TestObjectStoreWithFSO {
     }
   }
 
-  private static void deleteRootRecursively(FileStatus[] fileStatuses)
+  private void deleteRootRecursively(FileStatus[] fileStatuses)
       throws IOException {
     for (FileStatus fStatus : fileStatuses) {
       fs.delete(fStatus.getPath(), true);
@@ -829,14 +823,8 @@ public class TestObjectStoreWithFSO {
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
-  public static void shutdown() {
+  void cleanup() {
     IOUtils.closeQuietly(client);
-    if (cluster != null) {
-      cluster.shutdown();
-    }
   }
 }

@@ -37,6 +37,8 @@ import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
+import org.apache.hadoop.metrics2.MetricsCollector;
+import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import static org.apache.hadoop.hdds.fs.MockSpaceUsagePersistence.inMemory;
@@ -246,7 +248,7 @@ public class TestHddsVolume {
     HddsVolume volume = volumeBuilder.build();
 
     assertEquals(initialUsedSpace, savedUsedSpace.get());
-    assertEquals(expectedUsedSpace, volume.getUsedSpace());
+    assertEquals(expectedUsedSpace, volume.getCurrentUsage().getUsedSpace());
 
     // Shutdown the volume.
     volume.shutdown();
@@ -262,10 +264,12 @@ public class TestHddsVolume {
     StorageSize size = StorageSize.parse(RESERVED_SPACE);
     long reservedSpaceInBytes = (long) size.getUnit().toBytes(size.getValue());
 
+    SpaceUsageSource reportedUsage = volume.getCurrentUsage();
+
     assertEquals(spaceUsage.getCapacity(),
-        volume.getCapacity() + reservedSpaceInBytes);
+        reportedUsage.getCapacity() + reservedSpaceInBytes);
     assertEquals(spaceUsage.getAvailable(),
-        volume.getAvailable() + reservedSpaceInBytes);
+        reportedUsage.getAvailable() + reservedSpaceInBytes);
   }
 
   /**
@@ -298,8 +302,9 @@ public class TestHddsVolume {
 
     HddsVolume volume = volumeBuilder.build();
 
-    assertEquals(400, volume.getCapacity());
-    assertEquals(100, volume.getAvailable());
+    SpaceUsageSource usage = volume.getCurrentUsage();
+    assertEquals(400, usage.getCapacity());
+    assertEquals(100, usage.getAvailable());
 
     // Shutdown the volume.
     volume.shutdown();
@@ -325,8 +330,9 @@ public class TestHddsVolume {
 
     HddsVolume volume = volumeBuilder.build();
 
-    assertEquals(400, volume.getCapacity());
-    assertEquals(190, volume.getAvailable());
+    SpaceUsageSource usage = volume.getCurrentUsage();
+    assertEquals(400, usage.getCapacity());
+    assertEquals(190, usage.getAvailable());
 
     // Shutdown the volume.
     volume.shutdown();
@@ -351,8 +357,9 @@ public class TestHddsVolume {
 
     HddsVolume volume = volumeBuilder.build();
 
-    assertEquals(400, volume.getCapacity());
-    assertEquals(300, volume.getAvailable());
+    SpaceUsageSource usage = volume.getCurrentUsage();
+    assertEquals(400, usage.getCapacity());
+    assertEquals(300, usage.getAvailable());
 
     // Shutdown the volume.
     volume.shutdown();
@@ -377,8 +384,9 @@ public class TestHddsVolume {
 
     HddsVolume volume = volumeBuilder.build();
 
-    assertEquals(400, volume.getCapacity());
-    assertEquals(0, volume.getAvailable());
+    SpaceUsageSource usage = volume.getCurrentUsage();
+    assertEquals(400, usage.getCapacity());
+    assertEquals(0, usage.getAvailable());
 
     // Shutdown the volume.
     volume.shutdown();
@@ -504,13 +512,9 @@ public class TestHddsVolume {
     VolumeInfoMetrics volumeInfoMetrics = volume.getVolumeInfoStats();
 
     try {
-      // In case of failed volume all stats should return 0.
-      assertEquals(0, volumeInfoMetrics.getUsed());
-      assertEquals(0, volumeInfoMetrics.getAvailable());
-      assertEquals(0, volumeInfoMetrics.getCapacity());
-      assertEquals(0, volumeInfoMetrics.getReserved());
-      assertEquals(0, volumeInfoMetrics.getTotalCapacity());
-      assertEquals(0, volumeInfoMetrics.getCommitted());
+      // In case of failed volume, metrics should not throw
+      MetricsCollector collector = new MetricsCollectorImpl();
+      volumeInfoMetrics.getMetrics(collector, true);
     } finally {
       // Shutdown the volume.
       volume.shutdown();

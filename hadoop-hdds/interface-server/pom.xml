@@ -36,7 +36,6 @@
     <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
-      <scope>compile</scope>
     </dependency>
     <!-- required to use common hdds.proto -->
     <dependency>
@@ -108,8 +107,8 @@
         </executions>
       </plugin>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-antrun-plugin</artifactId>
-        <version>${maven-antrun-plugin.version}</version>
         <executions>
           <execution>
             <goals>

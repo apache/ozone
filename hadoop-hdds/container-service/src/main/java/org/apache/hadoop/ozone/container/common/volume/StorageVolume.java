@@ -447,23 +447,9 @@ public abstract class StorageVolume
     return volumeInfo.map(VolumeInfo::getRootDir).orElse(null);
   }
 
-  public long getCapacity() {
-    return volumeInfo.map(VolumeInfo::getCapacity).orElse(0L);
-  }
-
-  public long getAvailable() {
-    return volumeInfo.map(VolumeInfo::getAvailable).orElse(0L);
-
-  }
-
   public SpaceUsageSource getCurrentUsage() {
     return volumeInfo.map(VolumeInfo::getCurrentUsage)
         .orElse(SpaceUsageSource.UNKNOWN);
-  }
-
-  public long getUsedSpace() {
-    return volumeInfo.map(VolumeInfo::getScmUsed).orElse(0L);
-
   }
 
   public File getStorageDir() {

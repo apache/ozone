@@ -17,7 +17,7 @@
 # This script installs Hugo.
 # Requires _install_tool from _lib.sh.  Use `source` for both scripts, because it modifies $PATH.
 
-: ${HUGO_VERSION:=0.83.1}
+: ${HUGO_VERSION:=0.141.0}
 
 _install_hugo() {
   local os=$(uname -s)
@@ -25,15 +25,22 @@ _install_hugo() {
 
   mkdir bin
 
-  case "${os}" in
-    Darwin)
-      os=macOS
+  case "${arch}" in
+    x86_64)
+      arch=amd64
+      ;;
+    aarch64)
+      arch=arm64
       ;;
   esac
 
-  case "${arch}" in
-    x86_64)
-      arch=64bit
+  case "${os}" in
+    Darwin)
+      os=darwin
+      arch=universal
+      ;;
+    Linux)
+      os=linux
       ;;
   esac
 
