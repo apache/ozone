@@ -112,7 +112,7 @@ public final class OzoneAuthorizerFactory {
     authorizer.setPrefixManager(pm);
     authorizer.setAdminCheck(om::isAdmin);
     authorizer.setReadOnlyAdminCheck(om::isReadOnlyAdmin);
-    authorizer.setAllowListAllVolumes(om.getAllowListAllVolumes());
+    authorizer.setAllowListAllVolumes(om::getAllowListAllVolumes);
     return authorizer;
   }
 
