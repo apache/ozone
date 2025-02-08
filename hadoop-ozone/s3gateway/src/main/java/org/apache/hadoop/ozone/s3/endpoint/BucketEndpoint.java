@@ -48,6 +48,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import javax.validation.constraints.Max;
+import javax.validation.constraints.Min;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -330,7 +331,7 @@ public class BucketEndpoint extends EndpointBase {
   public Response listMultipartUploads(
       @PathParam("bucket") String bucketName,
       @QueryParam("prefix") String prefix,
-      @QueryParam("max-uploads") @DefaultValue("100") @Max(1000) int maxUploads,
+      @QueryParam("max-uploads") @DefaultValue("100") @Min(1) @Max(1000) int maxUploads,
       @QueryParam("key-marker") String keyMarker,
       @QueryParam("upload-id-marker") String uploadIdMarker)
       throws OS3Exception, IOException {
