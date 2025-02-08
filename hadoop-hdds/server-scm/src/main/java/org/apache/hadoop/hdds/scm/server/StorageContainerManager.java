@@ -387,9 +387,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // This is for the clusters which got upgraded from older version of Ozone.
     // We enable Ratis by default.
     if (!scmStorageConfig.isSCMHAEnabled()) {
-      initializeRatis(conf);
       // Since we have initialized Ratis, we have to reload StorageConfig
-      scmStorageConfig = new SCMStorageConfig(conf);
+      scmStorageConfig = initializeRatis(conf);
     }
 
     threadNamePrefix = getScmNodeDetails().threadNamePrefix();
@@ -1298,7 +1297,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
         scmStorageConfig.setPrimaryScmNodeId(scmStorageConfig.getScmId());
         scmStorageConfig.initialize();
-        initializeRatis(conf);
+        scmStorageConfig = initializeRatis(conf);
 
         LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
                 + "; cid={}; layoutVersion={}; scmId={}",
@@ -1316,7 +1315,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
       // Enable Ratis if it's not already enabled.
       if (!scmStorageConfig.isSCMHAEnabled()) {
-        initializeRatis(conf);
+        scmStorageConfig = initializeRatis(conf);
 
         /*
          * Since Ratis can be initialized on an existing cluster, we have to
@@ -1343,7 +1342,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  private static void initializeRatis(OzoneConfiguration conf)
+  private static SCMStorageConfig initializeRatis(OzoneConfiguration conf)
       throws IOException {
     final SCMStorageConfig storageConfig = new SCMStorageConfig(conf);
     final SCMHANodeDetails haDetails = SCMHANodeDetails.loadSCMHAConfig(conf, storageConfig);
@@ -1353,6 +1352,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     storageConfig.setPrimaryScmNodeId(storageConfig.getScmId());
     storageConfig.forceInitialize();
     LOG.info("Enabled Ratis!");
+    return storageConfig;
   }
 
   private static InetSocketAddress getScmAddress(SCMHANodeDetails haDetails,
