@@ -1943,6 +1943,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmMultipartKeyInfo>>>
         cacheIterator = getMultipartInfoTable().cacheIterator();
 
+    String prefixKey =
+        OmMultipartUpload.getDbKey(volumeName, bucketName, prefix);
 
     if (!keyMarker.equals("")) {
       prefix = keyMarker;
@@ -1950,12 +1952,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         prefix = prefix + OM_KEY_PREFIX + uploadIdMarker;
       }
     }
-
-    String prefixKey =
-        OmMultipartUpload.getDbKey(volumeName, bucketName, prefix);
+    String startKey = OmMultipartUpload.getDbKey(volumeName, bucketName, prefix);
 
     // First iterate all the entries in cache.
-    while (cacheIterator.hasNext() && responseKeys.size() < maxUploads) {
+    while (cacheIterator.hasNext() && responseKeys.size() < maxUploads + 1) {
       Map.Entry<CacheKey<String>, CacheValue<OmMultipartKeyInfo>> cacheEntry =
           cacheIterator.next();
       if (cacheEntry.getKey().getCacheKey().startsWith(prefixKey)) {
@@ -1969,16 +1969,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       }
     }
 
-
-    if (cacheIterator.hasNext() && responseKeys.size() == maxUploads) {
-      resultBuilder.setIsTruncated(true);
-    }
-
     // prefixed iterator will only iterate until keys match the prefix
     try (TableIterator<String, ? extends KeyValue<String, OmMultipartKeyInfo>>
-        iterator = getMultipartInfoTable().iterator(prefixKey)) {
+        iterator = getMultipartInfoTable().iterator()) {
+      iterator.seek(startKey);
 
-      while (iterator.hasNext() && responseKeys.size() < maxUploads) {
+      while (iterator.hasNext() && responseKeys.size() < maxUploads + 1) {
         KeyValue<String, OmMultipartKeyInfo> entry = iterator.next();
         if (entry.getKey().startsWith(prefixKey)) {
           // If it is marked for abort, skip it.
@@ -1990,18 +1986,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           break;
         }
       }
-
-      if (iterator.hasNext() && responseKeys.size() == maxUploads) {
-        resultBuilder.setIsTruncated(true);
-      }
     }
 
-    // Should we set nextKeyMarker and nextUploadIdMarker if not truncated?
-    if (lastKey != null) {
-      String[] parts = lastKey.split(OM_KEY_PREFIX);
-      // parts[] would be like: ["", "volumeName", "bucketName", "keyName", "uploadId"]
-      resultBuilder.setNextKeyMarker(parts[parts.length - 2]);      // keyName
-      resultBuilder.setNextUploadIdMarker(parts[parts.length - 1]); // uploadId
+    if (lastKey != null && responseKeys.size() == maxUploads + 1) {
+      responseKeys.remove(lastKey);
+
+      OmMultipartUpload lastKeyMultipartUpload = OmMultipartUpload.from(lastKey);
+      resultBuilder.setNextKeyMarker(lastKeyMultipartUpload.getKeyName());
+      resultBuilder.setNextUploadIdMarker(lastKeyMultipartUpload.getUploadId());
+      resultBuilder.setIsTruncated(true);
     }
 
     return resultBuilder
