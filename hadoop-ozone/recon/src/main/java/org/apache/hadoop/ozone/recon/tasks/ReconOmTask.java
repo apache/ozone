@@ -50,10 +50,14 @@ public interface ReconOmTask {
                                                             Map<String, Integer> subTaskSeekPosMap);
 
   /**
-   * Process a  on tables that the task is listening on.
+   * Reprocesses full entries in Recon OM RocksDB tables that the task is listening to.
    *
-   * @param omMetadataManager OM Metadata manager instance.
-   * @return Pair of task name -&gt; map of <subtask, seek position>, task success.
+   * @param omMetadataManager The OM Metadata Manager instance used for accessing metadata.
+   * @return A pair where:
+   *         - The first element is the task name.
+   *         - The second element is another pair containing:
+   *           - A map of sub-task names to their respective seek positions.
+   *           - A boolean indicating whether the task was successful.
    */
   Pair<String, Pair<Map<String, Integer>, Boolean>> reprocess(OMMetadataManager omMetadataManager);
 
