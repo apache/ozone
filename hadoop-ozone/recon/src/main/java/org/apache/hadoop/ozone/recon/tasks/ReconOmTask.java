@@ -37,10 +37,14 @@ public interface ReconOmTask {
   /**
    * Processes a set of OM events on tables that the task is listening to.
    *
-   * @param events            Set of events to be processed by the task.
-   * @param subTaskSeekPosMap Position from where to start iterating events of the event iterator for a given sub-task.
-   * @return A pair containing the task name mapped to a map of
-   *         {@code sub-task name, its events iterator position} and a task success flag.
+   * @param events            The batch of OM update events to be processed.
+   * @param subTaskSeekPosMap A map containing the position from where to start
+   *                          iterating events for each sub-task.
+   * @return A pair where:
+   *         - The first element is the task name.
+   *         - The second element is another pair containing:
+   *           - A map of sub-task names to their respective event iterator positions.
+   *           - A boolean indicating task success.
    */
   Pair<String, Pair<Map<String, Integer>, Boolean>> process(OMUpdateEventBatch events,
                                                             Map<String, Integer> subTaskSeekPosMap);
