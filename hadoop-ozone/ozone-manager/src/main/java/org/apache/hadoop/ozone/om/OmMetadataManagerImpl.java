@@ -115,6 +115,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.om.service.SnapshotDeletingService.isBlockLocationInfoSame;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotDirExist;
@@ -892,11 +893,26 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     final long volumeId = getVolumeId(volume);
     final long bucketId = getBucketId(volume,
             bucket);
-    long parentId =
-            OMFileRequest.getParentID(volumeId, bucketId, key, this);
+    long parentId;
+    try {
+      parentId = OMFileRequest.getParentID(volumeId, bucketId, key, this);
+    } catch (final Exception e) {
+      // It is possible we miss directories and exception is thrown.
+      // see https://issues.apache.org/jira/browse/HDDS-11784
+      LOG.warn("Got exception when finding parent id for {}/{}/{}. Use another way to get it",
+          volumeId, bucketId, key, e);
+      final String multipartKey =
+          getMultipartKey(volume, bucket, key, uploadId);
+      final OmMultipartKeyInfo multipartKeyInfo =
+          getMultipartInfoTable().get(multipartKey);
+      if (multipartKeyInfo == null) {
+        LOG.error("Could not find multipartKeyInfo for {}", multipartKey);
+        throw new OMException(NO_SUCH_MULTIPART_UPLOAD_ERROR);
+      }
+      parentId = multipartKeyInfo.getParentID();
+    }
 
-    String fileName = OzoneFSUtils.getFileName(key);
-
+    final String fileName = OzoneFSUtils.getFileName(key);
     return getMultipartKey(volumeId, bucketId, parentId,
             fileName, uploadId);
   }
