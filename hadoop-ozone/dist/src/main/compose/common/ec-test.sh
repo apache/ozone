@@ -23,7 +23,7 @@ execute_robot_test scm -v BUCKET:erasure --exclude virtual-host s3
 execute_robot_test scm ec/rewrite.robot
 
 prefix=${RANDOM}
-execute_robot_test scm -v PREFIX:${prefix} -v OZONE_CLIENT_REPLICATION_TYPE:"${OZONE_CLIENT_REPLICATION_TYPE}" ec/basic.robot
+execute_robot_test scm -v PREFIX:${prefix} ec/basic.robot
 docker-compose up -d --no-recreate --scale datanode=4
 execute_robot_test scm -v PREFIX:${prefix} -N read-4-datanodes ec/read.robot
 docker-compose up -d --no-recreate --scale datanode=3

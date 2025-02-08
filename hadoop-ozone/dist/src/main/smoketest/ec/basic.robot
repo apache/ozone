@@ -91,11 +91,7 @@ Create Key in Default Bucket
     ${file} =    Set Variable    /tmp/${size}
     Create Key    ${key}    ${file}
     Key Should Match Local File    ${key}      ${file}
-    IF  '${OZONE_CLIENT_REPLICATION_TYPE}' == 'EC'
-        Verify Key EC Replication Config    ${key}    RS    3    2    1048576
-    ELSE
-        Verify Key Replica Replication Config   ${key}     RATIS    THREE
-    END
+    Verify Key Replica Replication Config   ${key}     RATIS    THREE
     Verify Key Replica Replication Config   ${dir}     RATIS    THREE
 
 Create Key in Ratis Bucket
@@ -105,11 +101,7 @@ Create Key in Ratis Bucket
     ${file} =    Set Variable    /tmp/${size}
     Create Key    ${key}    ${file}
     Key Should Match Local File    ${key}      ${file}
-    IF  '${OZONE_CLIENT_REPLICATION_TYPE}' == 'EC'
-        Verify Key EC Replication Config    ${key}    RS    3    2    1048576
-    ELSE
-        Verify Key Replica Replication Config   ${key}     RATIS    THREE
-    END
+    Verify Key Replica Replication Config   ${key}     RATIS    THREE
     Verify Key Replica Replication Config   ${dir}     RATIS    THREE
 
 Create Ratis Key In EC Bucket
