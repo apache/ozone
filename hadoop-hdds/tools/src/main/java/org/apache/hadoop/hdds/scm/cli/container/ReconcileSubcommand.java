@@ -18,10 +18,15 @@
 package org.apache.hadoop.hdds.scm.cli.container;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Scanner;
+import java.util.Iterator;
+import java.util.stream.Stream;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.SequenceWriter;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -45,8 +50,12 @@ import picocli.CommandLine.Command;
     versionProvider = HddsVersionProvider.class)
 public class ReconcileSubcommand extends ScmSubcommand {
 
-  @CommandLine.Parameters(description = "ID of the container to reconcile")
-  private long containerId;
+  @CommandLine.Parameters(description = "One or more container IDs separated by spaces. " +
+      "To read from stdin, specify '-' and supply the container IDs " +
+      "separated by newlines.",
+      arity = "1..*",
+      paramLabel = "<container ID>")
+  private String[] containerList;
 
   @CommandLine.Option(names = { "--status" },
       defaultValue = "false",
@@ -56,27 +65,59 @@ public class ReconcileSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    if (status) {
-      printReconciliationStatus(scmClient);
+    Iterator<String> idIterator;
+    if (containerList[0].equals("-")) {
+      // Read from stdin.
+      idIterator = new Scanner(System.in, StandardCharsets.UTF_8.name());
     } else {
-      executeReconciliation(scmClient);
+      // A list of containers was provided.
+      idIterator = Stream.of(containerList).iterator();
+    }
+
+    if (status) {
+      // Automatically creates one array for the output, while allowing us to flush each object individually.
+      try (SequenceWriter arrayWriter = JsonUtils.getSequenceWriter(System.out)) {
+        // Since status is retrieved using container info, do client side validation that it is only used for Ratis
+        // containers. If EC containers are given, print a  message to stderr and eventually exit non-zero, but continue
+        // processing the remaining containers.
+        int invalidCount = 0;
+        while (idIterator.hasNext()) {
+          long containerID = Long.parseLong(idIterator.next());
+          if (!printReconciliationStatus(scmClient, containerID, arrayWriter)) {
+            invalidCount++;
+          }
+        }
+        if (invalidCount > 0) {
+          throw new RuntimeException("Failed to process reconciliation status for " + invalidCount + " containers.");
+        }
+      }
+    } else {
+      // TODO this will fail on the server side if invalid.
+      while (idIterator.hasNext()) {
+        long containerID = Long.parseLong(idIterator.next());
+        executeReconciliation(scmClient, containerID);
+      }
     }
   }
 
-  private void printReconciliationStatus(ScmClient scmClient) throws IOException {
-    ContainerInfo containerInfo = scmClient.getContainer(containerId);
+  private boolean printReconciliationStatus(ScmClient scmClient, long containerID, SequenceWriter arrayWriter)
+      throws IOException {
+    ContainerInfo containerInfo = scmClient.getContainer(containerID);
     if (containerInfo.getReplicationType() != HddsProtos.ReplicationType.RATIS) {
-      throw new RuntimeException("Reconciliation is only supported for Ratis replicated containers");
+      System.err.println("Cannot get status of container " + containerID +
+          ". Reconciliation is only supported for Ratis replicated containers");
+      return false;
     }
-    List<ContainerReplicaInfo> replicas = scmClient.getContainerReplicas(containerId);
-    System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(
-        new ContainerWrapper(containerInfo, replicas)));
+    List<ContainerReplicaInfo> replicas = scmClient.getContainerReplicas(containerID);
+    arrayWriter.write(new ContainerWrapper(containerInfo, replicas));
+    arrayWriter.flush();
+    return true;
   }
 
-  private void executeReconciliation(ScmClient scmClient) throws IOException {
-    scmClient.reconcileContainer(containerId);
-    System.out.println("Reconciliation has been triggered for container " + containerId);
-    System.out.println("Use \"ozone admin container reconcile --status " + containerId + "\" to see the checksums of " +
+  private void executeReconciliation(ScmClient scmClient, long containerID) throws IOException {
+    scmClient.reconcileContainer(containerID);
+    System.out.println("Reconciliation has been triggered for container " + containerID);
+    System.out.println("Use \"ozone admin container reconcile --status " + containerID + "\" to see the checksums of " +
         "each container replica");
   }
 

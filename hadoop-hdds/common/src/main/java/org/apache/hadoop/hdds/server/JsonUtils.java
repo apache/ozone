@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.server;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.Reader;
 import java.util.List;
 
@@ -76,6 +77,10 @@ public final class JsonUtils {
 
   public static String toJsonString(Object obj) throws IOException {
     return MAPPER.writeValueAsString(obj);
+  }
+
+  public static SequenceWriter getSequenceWriter(OutputStream stream) throws IOException {
+    return MAPPER.writer().writeValuesAsArray(stream);
   }
 
   public static String toJsonStringWIthIndent(Object obj)  {
