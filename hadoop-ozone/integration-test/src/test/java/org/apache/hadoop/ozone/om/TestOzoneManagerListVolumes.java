@@ -56,6 +56,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test OzoneManager list volume operation under combinations of configs.
@@ -94,6 +96,7 @@ public abstract class TestOzoneManagerListVolumes implements NonHATests.TestCase
   @AfterEach
   void logout() {
     UserGroupInformation.setLoginUser(null);
+    setListAllVolumesAllowed(OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT);
   }
 
   @BeforeAll
@@ -126,9 +129,10 @@ public abstract class TestOzoneManagerListVolumes implements NonHATests.TestCase
         OZONE_ACL_ENABLED, OZONE_ACL_ENABLED_DEFAULT, expected);
   }
 
-  private void assumeListAllVolumesAllowed(boolean expected) {
-    assumeConfig(cluster().getConf(),
-        OZONE_OM_VOLUME_LISTALL_ALLOWED, OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT, expected);
+  private void setListAllVolumesAllowed(boolean newValue) {
+    OzoneManager om = cluster().getOzoneManager();
+    om.getConfiguration().setBoolean(OZONE_OM_VOLUME_LISTALL_ALLOWED, newValue);
+    om.setAllowListAllVolumesFromConfig();
   }
 
   private static void createVolumeWithOwnerAndAcl(ObjectStore objectStore,
@@ -240,7 +244,7 @@ public abstract class TestOzoneManagerListVolumes implements NonHATests.TestCase
   public void testListVolumeWithOtherUsersListAllAllowed() throws Exception {
     // ozone.acl.enabled = true, ozone.om.volume.listall.allowed = true
     assumeAclEnabled(true);
-    assumeListAllVolumesAllowed(true);
+    setListAllVolumesAllowed(true);
 
     // Login as user1, list other users' volumes
     UserGroupInformation.setLoginUser(user1);
@@ -272,7 +276,7 @@ public abstract class TestOzoneManagerListVolumes implements NonHATests.TestCase
   public void testListVolumeWithOtherUsersListAllDisallowed() throws Exception {
     // ozone.acl.enabled = true, ozone.om.volume.listall.allowed = false
     assumeAclEnabled(true);
-    assumeListAllVolumesAllowed(false);
+    setListAllVolumesAllowed(false);
 
     // Login as user1, list other users' volumes, expect failure
     UserGroupInformation.setLoginUser(user1);
@@ -294,7 +298,7 @@ public abstract class TestOzoneManagerListVolumes implements NonHATests.TestCase
   public void testAclEnabledListAllAllowed() throws Exception {
     // ozone.acl.enabled = true, ozone.om.volume.listall.allowed = true
     assumeAclEnabled(true);
-    assumeListAllVolumesAllowed(true);
+    setListAllVolumesAllowed(true);
 
     checkUser(user1, Arrays.asList(VOLUME_1, VOLUME_3, VOLUME_4,
         VOLUME_5), true);
@@ -310,7 +314,7 @@ public abstract class TestOzoneManagerListVolumes implements NonHATests.TestCase
   public void testAclEnabledListAllDisallowed() throws Exception {
     // ozone.acl.enabled = true, ozone.om.volume.listall.allowed = false
     assumeAclEnabled(true);
-    assumeListAllVolumesAllowed(false);
+    setListAllVolumesAllowed(false);
 
     // The default user is AclTests.ADMIN_UGI as set in init(),
     // listall always succeeds if we use that UGI, we should use non-admin here
@@ -326,10 +330,12 @@ public abstract class TestOzoneManagerListVolumes implements NonHATests.TestCase
         VOLUME_3, VOLUME_4, VOLUME_5, "s3v"), true);
   }
 
-  @Test
-  public void testAclDisabledAdmin() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testAclDisabledAdmin(boolean allowListAllVolumes) throws Exception {
     // ozone.acl.enabled = false, ozone.om.volume.listall.allowed = don't care
     assumeAclEnabled(false);
+    setListAllVolumesAllowed(allowListAllVolumes);
 
     checkUser(user1, Arrays.asList(VOLUME_1, VOLUME_3, VOLUME_5),
         true);
@@ -337,10 +343,12 @@ public abstract class TestOzoneManagerListVolumes implements NonHATests.TestCase
         true);
   }
 
-  @Test
-  public void testAclDisabled() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testAclDisabled(boolean allowListAllVolumes) throws Exception {
     // ozone.acl.enabled = false, ozone.om.volume.listall.allowed = don't care
     assumeAclEnabled(false);
+    setListAllVolumesAllowed(allowListAllVolumes);
 
     // If ACL is disabled, all permission checks are disabled in Ozone by design
     UserGroupInformation.setLoginUser(user1);
