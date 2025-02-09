@@ -139,7 +139,7 @@ public class BucketEndpoint extends EndpointBase {
 
       if (uploads != null) {
         s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
-        return listMultipartUploads(bucketName, prefix, 100, null, null);
+        return listMultipartUploads(bucketName, prefix, null, null, maxKeys);
       }
 
       if (prefix == null) {
@@ -331,9 +331,9 @@ public class BucketEndpoint extends EndpointBase {
   public Response listMultipartUploads(
       @PathParam("bucket") String bucketName,
       @QueryParam("prefix") String prefix,
-      @QueryParam("max-uploads") @DefaultValue("100") @Min(1) @Max(1000) int maxUploads,
       @QueryParam("key-marker") String keyMarker,
-      @QueryParam("upload-id-marker") String uploadIdMarker)
+      @QueryParam("upload-id-marker") String uploadIdMarker,
+      @QueryParam("max-uploads") @DefaultValue("1000") @Min(1) @Max(1000) int maxUploads)
       throws OS3Exception, IOException {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
