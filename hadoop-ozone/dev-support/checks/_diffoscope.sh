@@ -24,6 +24,11 @@ cd "$DIR/../../.." || exit 1
 BASE_DIR="$(pwd -P)"
 : ${OUTPUT_LOG:="${BASE_DIR}/target/repro/output.log"}
 
+if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+  sudo apt update -q
+  sudo apt install -y diffoscope
+fi
+
 for jar in $(grep -o "investigate with diffoscope [^ ]*\.jar [^ ]*\.jar" "${OUTPUT_LOG}" | awk '{ print $NF }'); do
   jarname=$(basename "$jar")
   if [[ ! -e "$jar" ]]; then
