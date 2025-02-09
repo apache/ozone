@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.hdds.protocol;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -173,6 +175,29 @@ public class DatanodeDetails extends NodeImpl implements
    */
   public void setIpAddress(String ip) {
     this.ipAddress = StringWithByteString.valueOf(ip);
+  }
+
+  /**
+   * Resolves and validates the IP address of the datanode based on its hostname.
+   * If the resolved IP address differs from the current IP address,
+   * it updates the IP address to the newly resolved value and logs a warning.
+   */
+  public void validateDatanodeIpAddress() {
+    if (getIpAddress() == null) {
+      return;
+    }
+
+    try {
+      InetAddress inetAddress = InetAddress.getByName(getHostName());
+
+      if (!inetAddress.getHostAddress().equals(getIpAddress())) {
+        LOG.warn("Using resolved IP address '{}' as it differs from the persisted IP address '{}' for datanode '{}'",
+            inetAddress.getHostAddress(), getIpAddress(), getHostName());
+        setIpAddress(inetAddress.getHostAddress());
+      }
+    } catch (UnknownHostException e) {
+      LOG.warn("Failed to validate IP address for the datanode '{}'", getHostName(), e);
+    }
   }
 
   /**
