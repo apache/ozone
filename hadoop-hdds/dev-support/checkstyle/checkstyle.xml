@@ -146,7 +146,6 @@
 
         <!-- Modifier Checks                                    -->
         <!-- See http://checkstyle.sf.net/config_modifiers.html -->
-        <!-- This one is nitty, disable -->
         <module name="RedundantModifier"/>
 
         <!-- Checks for blocks. You know, those {}'s         -->
