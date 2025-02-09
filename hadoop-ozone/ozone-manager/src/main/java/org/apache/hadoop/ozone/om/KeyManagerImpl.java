@@ -848,7 +848,7 @@ public class KeyManagerImpl implements KeyManager {
                       multipartKeyInfo.getReplicationConfig());
             } catch (IOException e) {
               LOG.warn(
-                  "Open key entry for multipart upload record can be read  {}",
+                  "Open key entry for multipart upload record can't be read  {}",
                   metadataManager.getOzoneKey(upload.getVolumeName(),
                           upload.getBucketName(), upload.getKeyName()));
             }
