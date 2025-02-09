@@ -27,8 +27,11 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
@@ -46,13 +49,19 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.replication.MeasuredReplicator;
+import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
+import org.apache.hadoop.ozone.container.replication.ReplicationTask;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.MockedStatic;
 
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
@@ -62,8 +71,13 @@ import java.util.ArrayList;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DISK_OUT_OF_SPACE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getMockHddsDatanodeService;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.when;
 
 /**
  * This class is used to test OzoneContainer.
@@ -249,6 +263,96 @@ public class TestOzoneContainer {
             create(volumeSet, volumeChoosingPolicy, clusterId)
     );
     assertEquals(DISK_OUT_OF_SPACE, e.getResult());
+  }
+
+  @Test
+  public void testNodeReportReplicationMetrics() throws Exception {
+    // given
+    ContainerTestVersionInfo versionInfo = new ContainerTestVersionInfo(
+        "3", ContainerLayoutVersion.FILE_PER_BLOCK);
+    initTest(versionInfo);
+    HddsDatanodeService hddsDatanodeService = getMockedHddsDatanodeService();
+    Map<String, String> metricsMap = new HashMap<>();
+    metricsMap.put("ContainerReplications", "container replications");
+
+
+    try (MockedStatic mocked = mockStatic(ReplicationSupervisor.class)) {
+      mocked.when(ReplicationSupervisor::getMetricsMap).thenReturn(metricsMap);
+      // when
+      OzoneContainer ozoneContainer = ContainerTestUtils.getOzoneContainer(hddsDatanodeService, datanodeDetails, conf);
+      List<HddsProtos.KeyValue> replicationMetrics = ozoneContainer.getNodeReport().getReplicationMetricsList();
+
+      // then
+      assertEquals(13, replicationMetrics.size());
+      assertEquals("numInFlightReplications", replicationMetrics.get(0).getKey());
+      assertEquals("2", replicationMetrics.get(0).getValue());
+      assertEquals("numQueuedReplications", replicationMetrics.get(1).getKey());
+      assertEquals("3", replicationMetrics.get(1).getValue());
+      assertEquals("numRequestedReplications", replicationMetrics.get(2).getKey());
+      assertEquals("4", replicationMetrics.get(2).getValue());
+      assertEquals("numSuccessReplications", replicationMetrics.get(3).getKey());
+      assertEquals("1", replicationMetrics.get(3).getValue());
+      assertEquals("numFailedReplications", replicationMetrics.get(4).getKey());
+      assertEquals("2", replicationMetrics.get(4).getValue());
+      assertEquals("numTimeoutReplications", replicationMetrics.get(5).getKey());
+      assertEquals("3", replicationMetrics.get(5).getValue());
+      assertEquals("numSkippedReplications", replicationMetrics.get(6).getKey());
+      assertEquals("0", replicationMetrics.get(6).getValue());
+      assertEquals("numSkippedReplications", replicationMetrics.get(6).getKey());
+      assertEquals("0", replicationMetrics.get(6).getValue());
+      assertEquals("maxReplicationStreams", replicationMetrics.get(7).getKey());
+      assertEquals("20", replicationMetrics.get(7).getValue());
+      assertEquals("transferredBytes", replicationMetrics.get(8).getKey());
+      assertEquals("12345243563", replicationMetrics.get(8).getValue());
+      assertEquals("successTime", replicationMetrics.get(9).getKey());
+      assertEquals("34632", replicationMetrics.get(9).getValue());
+      assertEquals("failureBytes", replicationMetrics.get(10).getKey());
+      assertEquals("1", replicationMetrics.get(10).getValue());
+      assertEquals("failureTime", replicationMetrics.get(11).getKey());
+      assertEquals("123", replicationMetrics.get(11).getValue());
+      assertEquals("queueTime", replicationMetrics.get(12).getKey());
+      assertEquals("124", replicationMetrics.get(12).getValue());
+    }
+  }
+
+  private static HddsDatanodeService getMockedHddsDatanodeService() {
+    ReplicationSupervisor replicationSupervisor = mock(ReplicationSupervisor.class);
+    when(replicationSupervisor.getInFlightReplications(eq(ReplicationTask.class))).thenReturn(2);
+    when(replicationSupervisor.getQueueSize()).thenReturn(3L);
+    when(replicationSupervisor.getReplicationRequestCount()).thenReturn(4L);
+    when(replicationSupervisor.getReplicationRequestCount(eq("ContainerReplications"))).thenReturn(4L);
+    when(replicationSupervisor.getReplicationSuccessCount()).thenReturn(1L);
+    when(replicationSupervisor.getReplicationSuccessCount(eq("ContainerReplications"))).thenReturn(1L);
+    when(replicationSupervisor.getReplicationFailureCount()).thenReturn(2L);
+    when(replicationSupervisor.getReplicationFailureCount(eq("ContainerReplications"))).thenReturn(2L);
+    when(replicationSupervisor.getReplicationTimeoutCount()).thenReturn(3L);
+    when(replicationSupervisor.getReplicationTimeoutCount(eq("ContainerReplications"))).thenReturn(3L);
+    when(replicationSupervisor.getReplicationSkippedCount()).thenReturn(0L);
+    when(replicationSupervisor.getReplicationSkippedCount(eq("ContainerReplications"))).thenReturn(0L);
+    when(replicationSupervisor.getMaxReplicationStreams()).thenReturn(20L);
+
+    MeasuredReplicator pushReplicatorMetrics = mock(MeasuredReplicator.class);
+
+    MutableGaugeLong successTimeMetric = mock(MutableGaugeLong.class);
+    when(successTimeMetric.value()).thenReturn(34632L);
+    when(pushReplicatorMetrics.getSuccessTime()).thenReturn(successTimeMetric);
+
+    MutableGaugeLong transferBytesMetric = mock(MutableGaugeLong.class);
+    when(transferBytesMetric.value()).thenReturn(12345243563L);
+    when(pushReplicatorMetrics.getTransferredBytes()).thenReturn(transferBytesMetric);
+
+    MutableGaugeLong failureTimeMetric = mock(MutableGaugeLong.class);
+    when(failureTimeMetric.value()).thenReturn(123L);
+    when(pushReplicatorMetrics.getFailureTime()).thenReturn(failureTimeMetric);
+
+    MutableGaugeLong queueTimeMetric = mock(MutableGaugeLong.class);
+    when(queueTimeMetric.value()).thenReturn(124L);
+    when(pushReplicatorMetrics.getQueueTime()).thenReturn(queueTimeMetric);
+
+    MutableGaugeLong failureBytesMetric = mock(MutableGaugeLong.class);
+    when(failureBytesMetric.value()).thenReturn(1L);
+    when(pushReplicatorMetrics.getFailureBytes()).thenReturn(failureBytesMetric);
+    return getMockHddsDatanodeService(replicationSupervisor, pushReplicatorMetrics);
   }
 
   //verify committed space on each volume
