@@ -29,6 +29,7 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.slf4j.bridge.SLF4JBridgeHandler;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
@@ -53,6 +54,9 @@ public class OzoneManagerStarter extends GenericCli implements Callable<Void> {
       LoggerFactory.getLogger(OzoneManagerStarter.class);
 
   public static void main(String[] args) throws Exception {
+    // redirect JUL to slf4j
+    SLF4JBridgeHandler.removeHandlersForRootLogger();
+    SLF4JBridgeHandler.install();
     OzoneNetUtils.disableJvmNetworkAddressCacheIfRequired(
             new OzoneConfiguration());
     new OzoneManagerStarter(
