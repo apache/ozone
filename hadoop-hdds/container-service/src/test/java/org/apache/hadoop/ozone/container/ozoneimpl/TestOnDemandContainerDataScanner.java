@@ -23,6 +23,8 @@ import org.apache.commons.compress.utils.Lists;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 import org.junit.jupiter.api.AfterEach;
@@ -38,6 +40,7 @@ import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyScanResult;
@@ -54,6 +57,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 
 /**
  * Unit tests for the on-demand container scanner.
@@ -177,6 +181,20 @@ public class TestOnDemandContainerDataScanner extends
     // the number of scanned containers
     assertEquals(1, metrics.getNumUnHealthyContainers());
     assertEquals(2, metrics.getNumContainersScanned());
+
+    Container<ContainerData> container1 = mock(Container.class);
+    ContainerTestUtils.setupMockContainer(container1,
+        true, ScanResult.healthy(), getUnhealthyScanResult(),
+        new AtomicLong(1), vol, 200);
+    OnDemandContainerDataScanner.scanContainer(container1).get().get();
+    assertTrue(metrics.getTotalRunTime() > 200);
+
+    Container<ContainerData> container2 = mock(Container.class);
+    ContainerTestUtils.setupMockContainer(container2,
+        true, ScanResult.healthy(), getUnhealthyScanResult(),
+        new AtomicLong(2), vol, 300);
+    OnDemandContainerDataScanner.scanContainer(container2).get().get();
+    assertTrue(metrics.getTotalRunTime() > 500);
   }
 
   @Test
