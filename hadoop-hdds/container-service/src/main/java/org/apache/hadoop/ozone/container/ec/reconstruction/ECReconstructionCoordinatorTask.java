@@ -71,15 +71,12 @@ public class ECReconstructionCoordinatorTask
     // respective container. HDDS-6582
     // 5. Close/finalize the recovered containers.
     long start = Time.monotonicNow();
-
-    LOG.info("{}", this);
-
     try {
       reconstructionCoordinator.reconstructECContainerGroup(
           reconstructionCommandInfo.getContainerID(),
           reconstructionCommandInfo.getEcReplicationConfig(),
           reconstructionCommandInfo.getSourceNodeMap(),
-          reconstructionCommandInfo.getTargetNodeMap());
+          reconstructionCommandInfo.getTargetNodeMap(), this);
       long elapsed = Time.monotonicNow() - start;
       setStatus(Status.DONE);
       LOG.info("{} in {} ms", this, elapsed);
@@ -88,6 +85,7 @@ public class ECReconstructionCoordinatorTask
       setStatus(Status.FAILED);
       LOG.warn("{} after {} ms", this, elapsed, e);
     }
+    LOG.info("{}", this);
   }
 
   @Override
