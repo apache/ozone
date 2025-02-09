@@ -91,6 +91,14 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
+  class XceiverClientManager extends org.apache.hadoop.hdds.scm.TestXceiverClientManager {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
   class Node2PipelineMap extends org.apache.hadoop.hdds.scm.pipeline.TestNode2PipelineMap {
     @Override
     public MiniOzoneCluster cluster() {
