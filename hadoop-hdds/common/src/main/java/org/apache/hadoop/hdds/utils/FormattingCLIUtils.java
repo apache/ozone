@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.utils;
+package org.apache.hadoop.hdds.utils;
 
 import java.util.ArrayList;
 import java.util.HashMap;

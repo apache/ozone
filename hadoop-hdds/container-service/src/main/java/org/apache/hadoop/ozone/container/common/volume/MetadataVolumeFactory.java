@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 
 import java.io.IOException;
+import java.time.Instant;
 
 /**
  * A factory class for MetadataVolume.
@@ -50,7 +51,8 @@ public class MetadataVolumeFactory extends StorageVolumeFactory {
   StorageVolume createFailedVolume(String locationString) throws IOException {
     MetadataVolume.Builder volumeBuilder =
         new MetadataVolume.Builder(locationString)
-            .failedVolume(true);
+            .failedVolume(true)
+            .failureTime(Instant.now());
     return volumeBuilder.build();
   }
 }
