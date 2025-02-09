@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 
 import java.io.IOException;
@@ -81,6 +82,9 @@ public final class OmTestManagers {
   }
   public OzoneClient getRpcClient() {
     return rpcClient;
+  }
+  public OzoneManagerStateMachine getOzoneManagerStateMachine() {
+    return om.getOmRatisServer().getOmStateMachine();
   }
 
   public OmTestManagers(OzoneConfiguration conf)

@@ -38,8 +38,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import javax.validation.constraints.NotNull;
-
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -1932,53 +1930,36 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   @Override
   public MultipartUploadKeys getMultipartUploadKeys(
-      String volumeName, String bucketName, String prefix, @NotNull String keyMarker,
-      @NotNull String uploadIdMarker, int maxUploads) throws IOException {
+      String volumeName, String bucketName, String prefix, String keyMarker,
+      String uploadIdMarker, int maxUploads) throws IOException {
 
     MultipartUploadKeys.Builder resultBuilder = MultipartUploadKeys.newBuilder();
     Set<String> responseKeys = new TreeSet<>();
-    Set<String> aborted = new TreeSet<>();
     String lastKey = null;
-
-    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmMultipartKeyInfo>>>
-        cacheIterator = getMultipartInfoTable().cacheIterator();
 
     String prefixKey =
         OmMultipartUpload.getDbKey(volumeName, bucketName, prefix);
 
-    if (!keyMarker.equals("")) {
+    if (!keyMarker.isEmpty()) {
       prefix = keyMarker;
-      if (!uploadIdMarker.equals("")) {
+      if (!uploadIdMarker.isEmpty()) {
         prefix = prefix + OM_KEY_PREFIX + uploadIdMarker;
       }
     }
     String startKey = OmMultipartUpload.getDbKey(volumeName, bucketName, prefix);
 
-    // First iterate all the entries in cache.
-    while (cacheIterator.hasNext() && responseKeys.size() < maxUploads + 1) {
-      Map.Entry<CacheKey<String>, CacheValue<OmMultipartKeyInfo>> cacheEntry =
-          cacheIterator.next();
-      if (cacheEntry.getKey().getCacheKey().startsWith(prefixKey)) {
-        // Check if it is marked for delete, due to abort mpu
-        if (cacheEntry.getValue().getCacheValue() != null) {
-          responseKeys.add(cacheEntry.getKey().getCacheKey());
-          lastKey = cacheEntry.getKey().getCacheKey();
-        } else {
-          aborted.add(cacheEntry.getKey().getCacheKey());
-        }
-      }
-    }
-
     // prefixed iterator will only iterate until keys match the prefix
     try (TableIterator<String, ? extends KeyValue<String, OmMultipartKeyInfo>>
-        iterator = getMultipartInfoTable().iterator()) {
+        iterator = getMultipartInfoTable().iterator(prefixKey)) {
       iterator.seek(startKey);
 
       while (iterator.hasNext() && responseKeys.size() < maxUploads + 1) {
         KeyValue<String, OmMultipartKeyInfo> entry = iterator.next();
         if (entry.getKey().startsWith(prefixKey)) {
           // If it is marked for abort, skip it.
-          if (!aborted.contains(entry.getKey())) {
+          CacheValue<OmMultipartKeyInfo> cacheValue = getMultipartInfoTable()
+              .getCacheValue(new CacheKey<String>(entry.getKey()));
+          if (cacheValue == null || cacheValue.getCacheValue() != null) {
             responseKeys.add(entry.getKey());
             lastKey = entry.getKey();
           }
@@ -1992,9 +1973,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       responseKeys.remove(lastKey);
 
       OmMultipartUpload lastKeyMultipartUpload = OmMultipartUpload.from(lastKey);
-      resultBuilder.setNextKeyMarker(lastKeyMultipartUpload.getKeyName());
-      resultBuilder.setNextUploadIdMarker(lastKeyMultipartUpload.getUploadId());
-      resultBuilder.setIsTruncated(true);
+      resultBuilder.setNextKeyMarker(lastKeyMultipartUpload.getKeyName())
+          .setNextUploadIdMarker(lastKeyMultipartUpload.getUploadId())
+          .setIsTruncated(true);
     }
 
     return resultBuilder
