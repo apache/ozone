@@ -12,6 +12,7 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
+<!-- TODO: To be removed as soon as epic https://issues.apache.org/jira/browse/HDDS-12251 is done. -->
 <!DOCTYPE suppressions PUBLIC
     "-//Checkstyle//DTD SuppressionFilter Configuration 1.1//EN"
     "https://checkstyle.org/dtds/suppressions_1_1.dtd">
