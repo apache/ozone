@@ -90,7 +90,7 @@ public class FileSizeCountTask implements ReconOmTask {
 
     // Truncate table first
     int execute = dslContext.delete(FILE_COUNT_BY_SIZE).execute();
-    LOG.info("Cleared {} existing records from {}", execute, FILE_COUNT_BY_SIZE);
+    LOG.debug("Cleared {} existing records from {}", execute, FILE_COUNT_BY_SIZE);
 
     List<Future<Boolean>> futures = Arrays.asList(
         submitReprocessTask("FSO", BucketLayout.FILE_SYSTEM_OPTIMIZED, omMetadataManager),
@@ -246,7 +246,7 @@ public class FileSizeCountTask implements ReconOmTask {
     if (!fileSizeCountMap.isEmpty()) {
       writeCountsToDB(fileSizeCountMap);
     }
-    LOG.info("{} successfully processed in {} milliseconds",
+    LOG.debug("{} successfully processed in {} milliseconds",
         getTaskName(), (System.currentTimeMillis() - startTime));
     return new ImmutablePair<>(getTaskName(), true);
   }
