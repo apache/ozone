@@ -357,6 +357,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       AuditLoggerType.OMSYSTEMLOGGER);
 
   private static final String OM_DAEMON = "om";
+  private static final String NO_LEADER_ERROR_MESSAGE =
+          "There is no leader among the Ozone Manager servers. If this message " +
+                  "persists, the service may be down. Possible cause: only one OM is up, or " +
+                  "other OMs are unable to respond to Ratis leader vote messages";
+
 
   // This is set for read requests when OMRequest has S3Authentication set,
   // and it is reset when read request is processed.
@@ -3056,12 +3061,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     String leaderReadiness = omRatisServer.checkLeaderStatus().name();
     final RaftPeerId leaderId = omRatisServer.getLeaderId();
     if (leaderId == null) {
-      LOG.error("There is no leader among the Ozone Manager servers. If this message persists, the service may " +
-              "be down. Possible cause: only one OM is up, or other OMs are unable to respond to Ratis " +
-              "leader vote messages.");
-      return getRatisRolesException("There is no leader among the Ozone Manager servers. If this message " +
-              "persists, the service may be down. Possible cause: only one OM is up, or " +
-              "other OMs are unable to respond to Ratis leader vote messages");
+      LOG.error(NO_LEADER_ERROR_MESSAGE);
+      return getRatisRolesException(NO_LEADER_ERROR_MESSAGE);
     }
 
     final List<ServiceInfo> serviceList;
