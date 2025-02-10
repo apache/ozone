@@ -100,7 +100,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   @Override
   public synchronized void consumeOMEvents(OMUpdateEventBatch events, OMMetadataManager omMetadataManager) {
     if (!events.isEmpty()) {
-      Collection<NamedCallableTask<Pair<String, Pair<Map<String, Integer>, Boolean>>>> tasks = new ArrayList<>();
+      Collection<NamedCallableTask<ReconOmTask.TaskResult>> tasks = new ArrayList<>();
       List<Pair<String, Map<String, Integer>>> failedTasks = new ArrayList<>();
       for (Map.Entry<String, ReconOmTask> taskEntry :
           reconOmTasks.entrySet()) {
@@ -161,7 +161,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
 
   @Override
   public synchronized void reInitializeTasks(ReconOMMetadataManager omMetadataManager) {
-    Collection<NamedCallableTask<Pair<String, Pair<Map<String, Integer>, Boolean>>>> tasks = new ArrayList<>();
+    Collection<NamedCallableTask<ReconOmTask.TaskResult>> tasks = new ArrayList<>();
     for (Map.Entry<String, ReconOmTask> taskEntry :
         reconOmTasks.entrySet()) {
       ReconOmTask task = taskEntry.getValue();
@@ -185,10 +185,10 @@ public class ReconTaskControllerImpl implements ReconTaskController {
               throw new TaskExecutionException(task.getTaskName(), e);
             }
           }, executorService).thenAccept(result -> {
-            String taskName = result.getLeft();
+            String taskName = result.getTaskName();
             ReconTaskStatusUpdater taskStatusUpdater =
                 taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
-            if (!result.getRight().getRight()) {
+            if (!result.isTaskSuccess()) {
               LOG.error("Init failed for task {}.", taskName);
               taskStatusUpdater.setLastTaskRunStatus(-1);
             } else {
@@ -247,7 +247,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
    * @param failedTasks Reference of the list to which we want to add the failed tasks for retry/reprocessing
    */
   private void processTasks(
-      Collection<NamedCallableTask<Pair<String, Pair<Map<String, Integer>, Boolean>>>> tasks,
+      Collection<NamedCallableTask<ReconOmTask.TaskResult>> tasks,
       OMUpdateEventBatch events, List<Pair<String, Map<String, Integer>>> failedTasks) {
     List<CompletableFuture<Void>> futures = tasks.stream()
         .map(task -> CompletableFuture.supplyAsync(() -> {
@@ -261,12 +261,12 @@ public class ReconTaskControllerImpl implements ReconTaskController {
             throw new TaskExecutionException(task.getTaskName(), e);
           }
         }, executorService).thenAccept(result -> {
-          String taskName = result.getLeft();
+          String taskName = result.getTaskName();
           ReconTaskStatusUpdater taskStatusUpdater =
               taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
-          if (!result.getRight().getRight()) {
+          if (!result.isTaskSuccess()) {
             LOG.error("Task {} failed", taskName);
-            failedTasks.add(new ImmutablePair<>(taskName, result.getRight().getLeft()));
+            failedTasks.add(new ImmutablePair<>(taskName, result.getSubTaskSeekPositions()));
             taskStatusUpdater.setLastTaskRunStatus(-1);
           } else {
             taskFailureCounter.get(taskName).set(0);

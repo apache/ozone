@@ -35,8 +35,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -85,7 +83,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
    * (container, key) -&gt; count to Recon Container DB.
    */
   @Override
-  public Pair<String, Pair<Map<String, Integer>, Boolean>> reprocess(OMMetadataManager omMetadataManager) {
+  public TaskResult reprocess(OMMetadataManager omMetadataManager) {
     long omKeyCount = 0;
 
     // In-memory maps for fast look up and batch write
@@ -121,7 +119,10 @@ public class ContainerKeyMapperTask implements ReconOmTask {
                 containerKeyCountMap);
             if (!checkAndCallFlushToDB(containerKeyMap)) {
               LOG.error("Unable to flush containerKey information to the DB");
-              return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), false));
+              return new TaskResult.Builder()
+                  .setTaskName(getTaskName())
+                  .setTaskSuccess(false)
+                  .build();
             }
             omKeyCount++;
           }
@@ -134,7 +135,10 @@ public class ContainerKeyMapperTask implements ReconOmTask {
           containerKeyCountMap)) {
         LOG.error("Unable to flush Container Key Count and " +
             "remaining Container Key information to the DB");
-        return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), false));
+        return new TaskResult.Builder()
+            .setTaskName(getTaskName())
+            .setTaskSuccess(false)
+            .build();
       }
 
       LOG.debug("Completed 'reprocess' of ContainerKeyMapperTask.");
@@ -145,9 +149,15 @@ public class ContainerKeyMapperTask implements ReconOmTask {
     } catch (IOException ioEx) {
       LOG.error("Unable to populate Container Key data in Recon DB. ",
           ioEx);
-      return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), false));
+      return new TaskResult.Builder()
+          .setTaskName(getTaskName())
+          .setTaskSuccess(false)
+          .build();
     }
-    return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), true));
+    return new TaskResult.Builder()
+        .setTaskName(getTaskName())
+        .setTaskSuccess(true)
+        .build();
   }
 
   private boolean flushAndCommitContainerKeyInfoToDB(
@@ -192,8 +202,8 @@ public class ContainerKeyMapperTask implements ReconOmTask {
   }
 
   @Override
-  public Pair<String, Pair<Map<String, Integer>, Boolean>> process(OMUpdateEventBatch events,
-                                                                   Map<String, Integer> subTaskSeekPosMap) {
+  public TaskResult process(OMUpdateEventBatch events,
+                            Map<String, Integer> subTaskSeekPosMap) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     int eventCount = 0;
     final Collection<String> taskTables = getTaskTables();
@@ -250,18 +260,27 @@ public class ContainerKeyMapperTask implements ReconOmTask {
       } catch (IOException e) {
         LOG.error("Unexpected exception while updating key data : {} ",
             updatedKey, e);
-        return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), false));
+        return new TaskResult.Builder()
+            .setTaskName(getTaskName())
+            .setTaskSuccess(false)
+            .build();
       }
     }
     try {
       writeToTheDB(containerKeyMap, containerKeyCountMap, deletedKeyCountList);
     } catch (IOException e) {
       LOG.error("Unable to write Container Key Prefix data in Recon DB.", e);
-      return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), false));
+      return new TaskResult.Builder()
+          .setTaskName(getTaskName())
+          .setTaskSuccess(false)
+          .build();
     }
     LOG.debug("{} successfully processed {} OM DB update event(s) in {} milliseconds.",
         getTaskName(), eventCount, (System.currentTimeMillis() - startTime));
-    return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), true));
+    return new TaskResult.Builder()
+        .setTaskName(getTaskName())
+        .setTaskSuccess(true)
+        .build();
   }
 
   private void writeToTheDB(Map<ContainerKeyPrefix, Integer> containerKeyMap,

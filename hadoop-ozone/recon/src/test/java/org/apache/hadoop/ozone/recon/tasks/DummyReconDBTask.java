@@ -20,11 +20,8 @@ package org.apache.hadoop.ozone.recon.tasks;
 
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 
 /**
@@ -56,21 +53,33 @@ public class DummyReconDBTask implements ReconOmTask {
   }
 
   @Override
-  public Pair<String, Pair<Map<String, Integer>, Boolean>> process(
+  public TaskResult process(
       OMUpdateEventBatch events, Map<String, Integer> seekPos) {
     if (++callCtr <= numFailuresAllowed) {
-      return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), false));
+      return new TaskResult.Builder()
+          .setTaskName(getTaskName())
+          .setTaskSuccess(false)
+          .build();
     } else {
-      return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), true));
+      return new TaskResult.Builder()
+          .setTaskName(getTaskName())
+          .setTaskSuccess(true)
+          .build();
     }
   }
 
   @Override
-  public Pair<String, Pair<Map<String, Integer>, Boolean>> reprocess(OMMetadataManager omMetadataManager) {
+  public TaskResult reprocess(OMMetadataManager omMetadataManager) {
     if (++callCtr <= numFailuresAllowed) {
-      return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), false));
+      return new TaskResult.Builder()
+          .setTaskName(getTaskName())
+          .setTaskSuccess(false)
+          .build();
     } else {
-      return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), true));
+      return new TaskResult.Builder()
+          .setTaskName(getTaskName())
+          .setTaskSuccess(true)
+          .build();
     }
   }
 

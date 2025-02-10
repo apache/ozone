@@ -20,8 +20,6 @@ package org.apache.hadoop.ozone.recon.tasks;
 
 import com.google.common.collect.Iterators;
 import com.google.inject.Inject;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -91,7 +89,7 @@ public class OmTableInsightTask implements ReconOmTask {
    * @return Pair
    */
   @Override
-  public Pair<String, Pair<Map<String, Integer>, Boolean>> reprocess(OMMetadataManager omMetadataManager) {
+  public TaskResult reprocess(OMMetadataManager omMetadataManager) {
     HashMap<String, Long> objectCountMap = initializeCountMap();
     HashMap<String, Long> unReplicatedSizeMap = initializeSizeMap(false);
     HashMap<String, Long> replicatedSizeMap = initializeSizeMap(true);
@@ -100,7 +98,10 @@ public class OmTableInsightTask implements ReconOmTask {
       Table table = omMetadataManager.getTable(tableName);
       if (table == null) {
         LOG.error("Table " + tableName + " not found in OM Metadata.");
-        return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), false));
+        return new TaskResult.Builder()
+            .setTaskName(getTaskName())
+            .setTaskSuccess(false)
+            .build();
       }
 
       try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator
@@ -120,7 +121,10 @@ public class OmTableInsightTask implements ReconOmTask {
         }
       } catch (IOException ioEx) {
         LOG.error("Unable to populate Table Count in Recon DB.", ioEx);
-        return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), false));
+        return new TaskResult.Builder()
+            .setTaskName(getTaskName())
+            .setTaskSuccess(false)
+            .build();
       }
     }
     // Write the data to the DB
@@ -135,7 +139,10 @@ public class OmTableInsightTask implements ReconOmTask {
     }
 
     LOG.debug("Completed a 'reprocess' run of OmTableInsightTask.");
-    return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), true));
+    return new TaskResult.Builder()
+        .setTaskName(getTaskName())
+        .setTaskSuccess(true)
+        .build();
   }
 
   @Override
@@ -156,8 +163,8 @@ public class OmTableInsightTask implements ReconOmTask {
    * @return Pair
    */
   @Override
-  public Pair<String, Pair<Map<String, Integer>, Boolean>> process(OMUpdateEventBatch events,
-                                                                   Map<String, Integer> subTaskSeekPosMap) {
+  public TaskResult process(OMUpdateEventBatch events,
+                            Map<String, Integer> subTaskSeekPosMap) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     // Initialize maps to store count and size information
     HashMap<String, Long> objectCountMap = initializeCountMap();
@@ -198,7 +205,10 @@ public class OmTableInsightTask implements ReconOmTask {
         LOG.error(
             "Unexpected exception while processing the table {}, Action: {}",
             tableName, omdbUpdateEvent.getAction(), e);
-        return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), false));
+        return new TaskResult.Builder()
+            .setTaskName(getTaskName())
+            .setTaskSuccess(false)
+            .build();
       }
     }
     // Write the updated count and size information to the database
@@ -213,7 +223,10 @@ public class OmTableInsightTask implements ReconOmTask {
     }
     LOG.debug("{} successfully processed in {} milliseconds",
         getTaskName(), (System.currentTimeMillis() - startTime));
-    return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), true));
+    return new TaskResult.Builder()
+        .setTaskName(getTaskName())
+        .setTaskSuccess(true)
+        .build();
   }
 
   private void handlePutEvent(OMDBUpdateEvent<String, Object> event,

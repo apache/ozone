@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -39,7 +38,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.DELETE;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
@@ -139,11 +137,11 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     fileCountBySizeDao.insert(
         new FileCountBySize("vol1", "bucket1", 1024L, 10L));
 
-    Pair<String, Pair<Map<String, Integer>, Boolean>> result =
+    ReconOmTask.TaskResult result =
         fileSizeCountTask.reprocess(omMetadataManager);
 
     // Verify that the result of reprocess is true
-    assertTrue(result.getRight().getRight());
+    assertTrue(result.isTaskSuccess());
 
     // Verify that the number of entries in fileCountBySizeDao is 3
     assertEquals(3, fileCountBySizeDao.count());
@@ -326,9 +324,9 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     when(mockKeyValueFso.getValue())
         .thenAnswer(returnsElementsOf(omKeyInfoList));
 
-    Pair<String, Pair<Map<String, Integer>, Boolean>> result =
+    ReconOmTask.TaskResult result =
         fileSizeCountTask.reprocess(omMetadataManager);
-    assertTrue(result.getRight().getRight());
+    assertTrue(result.isTaskSuccess());
 
     // 2 volumes * 500 buckets * 42 bins = 42000 rows
     assertEquals(42000, fileCountBySizeDao.count());

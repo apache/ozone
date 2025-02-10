@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -125,7 +124,7 @@ public class NSSummaryTask implements ReconOmTask {
   }
 
   @Override
-  public Pair<String, Pair<Map<String, Integer>, Boolean>> process(
+  public TaskResult process(
       OMUpdateEventBatch events, Map<String, Integer> subTaskSeekPosMap) {
     boolean anyFailure = false; // Track if any bucket fails
     Map<String, Integer> updatedSeekPositions = new HashMap<>();
@@ -158,11 +157,15 @@ public class NSSummaryTask implements ReconOmTask {
     }
 
     // Return task failure if any bucket failed, while keeping each bucket's latest seek position
-    return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(updatedSeekPositions, !anyFailure));
+    return new TaskResult.Builder()
+        .setTaskName(getTaskName())
+        .setSubTaskSeekPositions(updatedSeekPositions)
+        .setTaskSuccess(!anyFailure)
+        .build();
   }
 
   @Override
-  public Pair<String, Pair<Map<String, Integer>, Boolean>> reprocess(OMMetadataManager omMetadataManager) {
+  public TaskResult reprocess(OMMetadataManager omMetadataManager) {
     // Initialize a list of tasks to run in parallel
     Collection<Callable<Boolean>> tasks = new ArrayList<>();
 
@@ -174,7 +177,10 @@ public class NSSummaryTask implements ReconOmTask {
     } catch (IOException ioEx) {
       LOG.error("Unable to clear NSSummary table in Recon DB. ",
           ioEx);
-      return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), false));
+      return new TaskResult.Builder()
+          .setTaskName(getTaskName())
+          .setTaskSuccess(false)
+          .build();
     }
 
     tasks.add(() -> nsSummaryTaskWithFSO
@@ -194,12 +200,18 @@ public class NSSummaryTask implements ReconOmTask {
       results = executorService.invokeAll(tasks);
       for (int i = 0; i < results.size(); i++) {
         if (results.get(i).get().equals(false)) {
-          return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), false));
+          return new TaskResult.Builder()
+              .setTaskName(getTaskName())
+              .setTaskSuccess(false)
+              .build();
         }
       }
     } catch (InterruptedException | ExecutionException ex) {
       LOG.error("Error while reprocessing NSSummary table in Recon DB.", ex);
-      return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), false));
+      return new TaskResult.Builder()
+          .setTaskName(getTaskName())
+          .setTaskSuccess(false)
+          .build();
     } finally {
       executorService.shutdown();
 
@@ -212,7 +224,10 @@ public class NSSummaryTask implements ReconOmTask {
       LOG.debug("Task execution time: {} milliseconds", durationInMillis);
     }
 
-    return new ImmutablePair<>(getTaskName(), new ImmutablePair<>(new HashMap<>(), true));
+    return new TaskResult.Builder()
+        .setTaskName(getTaskName())
+        .setTaskSuccess(true)
+        .build();
   }
 
 }

@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -89,6 +88,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImp
 import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
+import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
@@ -788,9 +788,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     });
 
     // check volume, bucket and key count after running table count task
-    Pair<String, Pair<Map<String, Integer>, Boolean>> result =
+    ReconOmTask.TaskResult result =
         omTableInsightTask.reprocess(reconOMMetadataManager);
-    assertTrue(result.getRight().getRight());
+    assertTrue(result.isTaskSuccess());
     response = clusterStateEndpoint.getClusterState();
     clusterStateResponse = (ClusterStateResponse) response.getEntity();
     assertEquals(2, clusterStateResponse.getVolumes());
@@ -867,9 +867,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         .thenReturn(omKeyInfo2)
         .thenReturn(omKeyInfo3);
 
-    Pair<String, Pair<Map<String, Integer>, Boolean>> result =
+    ReconOmTask.TaskResult result =
         fileSizeCountTask.reprocess(omMetadataManager);
-    assertTrue(result.getRight().getRight());
+    assertTrue(result.isTaskSuccess());
 
     assertEquals(3, fileCountBySizeDao.count());
     Response response = utilizationEndpoint.getFileCounts(null, null, 0);

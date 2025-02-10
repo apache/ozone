@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -52,7 +51,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
@@ -283,9 +281,9 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     // Generate NamespaceSummary for the OM DB
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
 
-    Pair<String, Pair<Map<String, Integer>, Boolean>> result =
+    ReconOmTask.TaskResult result =
         omTableInsightTask.reprocess(reconOMMetadataManager);
-    assertTrue(result.getRight().getRight());
+    assertTrue(result.isTaskSuccess());
     assertEquals(3, getCountForTable(DELETED_DIR_TABLE));
   }
 
@@ -370,10 +368,10 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
       when(mockIter.next()).thenReturn(mockKeyValue);
     }
 
-    Pair<String, Pair<Map<String, Integer>, Boolean>> result =
+    ReconOmTask.TaskResult result =
         omTableInsightTask.reprocess(omMetadataManager);
 
-    assertTrue(result.getRight().getRight());
+    assertTrue(result.isTaskSuccess());
     assertEquals(5L, getCountForTable(KEY_TABLE));
     assertEquals(5L, getCountForTable(VOLUME_TABLE));
     assertEquals(5L, getCountForTable(BUCKET_TABLE));
@@ -391,9 +389,9 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     writeOpenKeyToOm(reconOMMetadataManager,
         "key1", "Bucket3", "Volume3", null, 3L);
 
-    Pair<String, Pair<Map<String, Integer>, Boolean>> result =
+    ReconOmTask.TaskResult result =
         omTableInsightTask.reprocess(reconOMMetadataManager);
-    assertTrue(result.getRight().getRight());
+    assertTrue(result.isTaskSuccess());
     assertEquals(3L, getCountForTable(OPEN_KEY_TABLE));
     // Test for both replicated and unreplicated size for OPEN_KEY_TABLE
     assertEquals(6L, getUnReplicatedSizeForTable(OPEN_KEY_TABLE));
@@ -410,9 +408,9 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     writeOpenFileToOm(reconOMMetadataManager,
         "file3", "Bucket3", "Volume3", "file3", 3, 0, 3, 3, null, 3L);
 
-    Pair<String, Pair<Map<String, Integer>, Boolean>> result =
+    ReconOmTask.TaskResult result =
         omTableInsightTask.reprocess(reconOMMetadataManager);
-    assertTrue(result.getRight().getRight());
+    assertTrue(result.isTaskSuccess());
     assertEquals(3L, getCountForTable(OPEN_FILE_TABLE));
     // Test for both replicated and unreplicated size for OPEN_FILE_TABLE
     assertEquals(6L, getUnReplicatedSizeForTable(OPEN_FILE_TABLE));
@@ -434,9 +432,9 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
         deletedKeysList3, "Bucket3", "Volume3");
 
 
-    Pair<String, Pair<Map<String, Integer>, Boolean>> result =
+    ReconOmTask.TaskResult result =
         omTableInsightTask.reprocess(reconOMMetadataManager);
-    assertTrue(result.getRight().getRight());
+    assertTrue(result.isTaskSuccess());
     assertEquals(6L, getCountForTable(DELETED_TABLE));
     // Test for both replicated and unreplicated size for DELETED_TABLE
     assertEquals(600L, getUnReplicatedSizeForTable(DELETED_TABLE));

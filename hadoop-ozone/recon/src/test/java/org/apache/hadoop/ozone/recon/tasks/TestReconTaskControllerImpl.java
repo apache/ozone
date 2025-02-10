@@ -29,10 +29,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
-import java.util.HashMap;
 import java.util.HashSet;
 
-import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
@@ -86,7 +84,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
   public void testConsumeOMEvents() throws Exception {
     ReconOmTask reconOmTaskMock = getMockTask("MockTask");
     when(reconOmTaskMock.process(any(OMUpdateEventBatch.class), anyMap()))
-        .thenReturn(new ImmutablePair<>("MockTask", new ImmutablePair<>(new HashMap<>(), true)));
+        .thenReturn(new ReconOmTask.TaskResult.Builder().setTaskName("MockTask").setTaskSuccess(true).build());
     reconTaskController.registerTask(reconOmTaskMock);
     OMUpdateEventBatch omUpdateEventBatchMock = mock(OMUpdateEventBatch.class);
     when(omUpdateEventBatchMock.getLastSequenceNumber()).thenReturn(100L);
@@ -213,7 +211,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     ReconOmTask reconOmTaskMock =
         getMockTask("MockTask2");
     when(reconOmTaskMock.reprocess(omMetadataManagerMock))
-        .thenReturn(new ImmutablePair<>("MockTask2", new ImmutablePair<>(new HashMap<>(), true)));
+        .thenReturn(new ReconOmTask.TaskResult.Builder().setTaskName("MockTask2").setTaskSuccess(true).build());
     when(omMetadataManagerMock.getLastSequenceNumberFromDB()
     ).thenReturn(100L);
 
