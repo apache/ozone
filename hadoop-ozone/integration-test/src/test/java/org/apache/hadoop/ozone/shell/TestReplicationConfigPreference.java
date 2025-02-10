@@ -108,15 +108,15 @@ public class TestReplicationConfigPreference {
   protected static void createAllKeys(OzoneShell ozoneShell,
                                       String volumeName, String bucketName) {
     ozoneShell.execute(new String[] {"key", "put", "o3://" + omServiceId
-        + "/" + volumeName + "/" + bucketName + "/" + DEFAULT_KEY,
+          + "/" + volumeName + "/" + bucketName + "/" + DEFAULT_KEY,
         testFile.getPath()});
     ozoneShell.execute(new String[] {"key", "put", "o3://" + omServiceId
-        + "/" + volumeName + "/" + bucketName + "/" + RATIS_KEY,
+          + "/" + volumeName + "/" + bucketName + "/" + RATIS_KEY,
         testFile.getPath(),
         "--type=" + RATIS_REPL_CONF.getReplicationType().name(),
         "--replication=" + RATIS_REPL_CONF.getReplication()});
     ozoneShell.execute(new String[] {"key", "put", "o3://" + omServiceId
-        + "/" + volumeName + "/" + bucketName + "/" + EC_KEY,
+          + "/" + volumeName + "/" + bucketName + "/" + EC_KEY,
         testFile.getPath(),
         "--type=" + EC_REPL_CONF.getReplicationType().name(),
         "--replication=" + EC_REPL_CONF.getReplication()});
@@ -129,9 +129,9 @@ public class TestReplicationConfigPreference {
       ozoneShell.setConfigurationOverrides(clientConf);
     }
     ozoneShell.execute(new String[] {"volume", "create", "o3://" + omServiceId
-        + "/" + volumeName});
+          + "/" + volumeName});
     ozoneShell.execute(new String[] {"bucket", "create", "o3://" + omServiceId
-        + "/" + volumeName + "/" + DEFAULT_BUCKET});
+          + "/" + volumeName + "/" + DEFAULT_BUCKET});
     createAllKeys(ozoneShell, volumeName, DEFAULT_BUCKET);
 
     ozoneShell = new OzoneShell();
@@ -139,7 +139,7 @@ public class TestReplicationConfigPreference {
       ozoneShell.setConfigurationOverrides(clientConf);
     }
     ozoneShell.execute(new String[] {"bucket", "create", "o3://" + omServiceId
-        + "/" + volumeName + "/" + RATIS_BUCKET,
+          + "/" + volumeName + "/" + RATIS_BUCKET,
         "--type=" + RATIS_REPL_CONF.getReplicationType().name(),
         "--replication=" + RATIS_REPL_CONF.getReplication()});
     createAllKeys(ozoneShell, volumeName, RATIS_BUCKET);
@@ -149,7 +149,7 @@ public class TestReplicationConfigPreference {
       ozoneShell.setConfigurationOverrides(clientConf);
     }
     ozoneShell.execute(new String[] {"bucket", "create", "o3://" + omServiceId
-        + "/" + volumeName + "/" + EC_BUCKET,
+          + "/" + volumeName + "/" + EC_BUCKET,
         "--type=" + EC_REPL_CONF.getReplicationType().name(),
         "--replication=" + EC_REPL_CONF.getReplication()});
     createAllKeys(ozoneShell, volumeName, EC_BUCKET);
@@ -239,9 +239,9 @@ public class TestReplicationConfigPreference {
 
     // Replication configs are set in Client configuration.
     Map<String, String> clientConf = new HashMap<String, String>() {{
-      put(OZONE_REPLICATION_TYPE, EC_REPL_CONF.getReplicationType().name());
-      put(OZONE_REPLICATION, EC_REPL_CONF.getReplication());
-    }};
+        put(OZONE_REPLICATION_TYPE, EC_REPL_CONF.getReplicationType().name());
+        put(OZONE_REPLICATION, EC_REPL_CONF.getReplication());
+      }};
     volumeName = "volume" + RandomStringUtils.randomNumeric(5);
     createAllBucketsAndKeys(clientConf, volumeName);
     validateReplicationOrder(volumeName,
@@ -271,9 +271,9 @@ public class TestReplicationConfigPreference {
 
     // Replication configs are set in Client configuration.
     Map<String, String> clientConf = new HashMap<String, String>() {{
-      put(OZONE_REPLICATION_TYPE, RATIS_REPL_CONF.getReplicationType().name());
-      put(OZONE_REPLICATION, RATIS_REPL_CONF.getReplication());
-    }};
+        put(OZONE_REPLICATION_TYPE, RATIS_REPL_CONF.getReplicationType().name());
+        put(OZONE_REPLICATION, RATIS_REPL_CONF.getReplication());
+      }};
     volumeName = "volume" + RandomStringUtils.randomNumeric(5);
     createAllBucketsAndKeys(clientConf, volumeName);
     validateReplicationOrder(volumeName,
