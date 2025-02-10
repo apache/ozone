@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.reconfig;
 
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.BeforeAll;
@@ -49,10 +48,6 @@ abstract class ReconfigurationTestBase implements NonHATests.TestCase {
   }
 
   abstract ReconfigurationHandler getSubject();
-
-  MiniOzoneCluster getCluster() {
-    return cluster();
-  }
 
   String getCurrentUser() {
     return currentUser;

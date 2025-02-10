@@ -40,7 +40,7 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
 
   @Override
   ReconfigurationHandler getSubject() {
-    return getCluster().getOzoneManager().getReconfigurationHandler();
+    return cluster().getOzoneManager().getReconfigurationHandler();
   }
 
   @Test
@@ -59,7 +59,7 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
 
     assertEquals(
         ImmutableSet.of(newValue, getCurrentUser()),
-        getCluster().getOzoneManager().getOmAdminUsernames());
+        cluster().getOzoneManager().getOmAdminUsernames());
   }
 
   @Test
@@ -71,29 +71,29 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
 
     assertEquals(
         ImmutableSet.of(newValue),
-        getCluster().getOzoneManager().getOmReadOnlyAdminUsernames());
+        cluster().getOzoneManager().getOmReadOnlyAdminUsernames());
   }
 
   @Test
   public void keyDeletingLimitPerTask() throws ReconfigurationException {
-    int originLimit = getCluster().getOzoneManager()
+    int originLimit = cluster().getOzoneManager()
         .getKeyManager().getDeletingService().getKeyLimitPerTask();
 
     getSubject().reconfigurePropertyImpl(OZONE_KEY_DELETING_LIMIT_PER_TASK,
         String.valueOf(originLimit + 1));
 
-    assertEquals(originLimit + 1, getCluster().getOzoneManager()
+    assertEquals(originLimit + 1, cluster().getOzoneManager()
         .getKeyManager().getDeletingService().getKeyLimitPerTask());
   }
 
   @Test
   void allowListAllVolumes() throws ReconfigurationException {
-    final boolean newValue = !getCluster().getOzoneManager().getAllowListAllVolumes();
+    final boolean newValue = !cluster().getOzoneManager().getAllowListAllVolumes();
 
     getSubject().reconfigurePropertyImpl(OZONE_OM_VOLUME_LISTALL_ALLOWED,
         String.valueOf(newValue));
 
-    assertEquals(newValue, getCluster().getOzoneManager().getAllowListAllVolumes());
+    assertEquals(newValue, cluster().getOzoneManager().getAllowListAllVolumes());
   }
 
   @ParameterizedTest
@@ -101,7 +101,7 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
   void unsetAllowListAllVolumes(String newValue) throws ReconfigurationException {
     getSubject().reconfigurePropertyImpl(OZONE_OM_VOLUME_LISTALL_ALLOWED, newValue);
 
-    assertEquals(OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT, getCluster().getOzoneManager().getAllowListAllVolumes());
+    assertEquals(OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT, cluster().getOzoneManager().getAllowListAllVolumes());
   }
 
 }

@@ -108,7 +108,7 @@ public abstract class TestDatanodeReconfiguration extends ReconfigurationTestBas
   }
 
   private HddsDatanodeService getFirstDatanode() {
-    return getCluster().getHddsDatanodes().get(0);
+    return cluster().getHddsDatanodes().get(0);
   }
 
 }

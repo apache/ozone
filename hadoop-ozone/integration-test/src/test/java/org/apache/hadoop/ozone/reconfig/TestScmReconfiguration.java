@@ -42,7 +42,7 @@ public abstract class TestScmReconfiguration extends ReconfigurationTestBase {
 
   @Override
   ReconfigurationHandler getSubject() {
-    return getCluster().getStorageContainerManager()
+    return cluster().getStorageContainerManager()
         .getReconfigurationHandler();
   }
 
@@ -69,7 +69,7 @@ public abstract class TestScmReconfiguration extends ReconfigurationTestBase {
 
     assertEquals(
         ImmutableSet.of(newValue, getCurrentUser()),
-        getCluster().getStorageContainerManager().getScmAdminUsernames());
+        cluster().getStorageContainerManager().getScmAdminUsernames());
   }
 
   @Test
@@ -81,7 +81,7 @@ public abstract class TestScmReconfiguration extends ReconfigurationTestBase {
 
     assertEquals(
         ImmutableSet.of(newValue),
-        getCluster().getStorageContainerManager()
+        cluster().getStorageContainerManager()
             .getScmReadOnlyAdminUsernames());
   }
 
@@ -97,14 +97,14 @@ public abstract class TestScmReconfiguration extends ReconfigurationTestBase {
   }
 
   private ReplicationManagerConfiguration replicationManagerConfig() {
-    return getCluster().getStorageContainerManager().getReplicationManager()
+    return cluster().getStorageContainerManager().getReplicationManager()
         .getConfig();
   }
 
   @Test
   void blockDeletionPerInterval() throws ReconfigurationException {
     SCMBlockDeletingService blockDeletingService =
-        getCluster().getStorageContainerManager().getScmBlockManager()
+        cluster().getStorageContainerManager().getScmBlockManager()
         .getSCMBlockDeletingService();
     int blockDeleteTXNum = blockDeletingService.getBlockDeleteTXNum();
     int newValue = blockDeleteTXNum + 1;
