@@ -185,7 +185,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
       omClientResponse = new OMKeyDeleteResponse(
           omResponse.setDeleteKeyResponse(DeleteKeyResponse.newBuilder())
-              .build(), omKeyInfo, ozoneManager.isRatisEnabled(),
+              .build(), omKeyInfo,
           omBucketInfo.copyObject(), deletedOpenKeyInfo);
 
       result = Result.SUCCESS;

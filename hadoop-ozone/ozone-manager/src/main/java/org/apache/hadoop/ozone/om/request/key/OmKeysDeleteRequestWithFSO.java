@@ -164,7 +164,7 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
             OzoneManagerProtocolProtos.DeleteKeysResponse.newBuilder()
                 .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys).addAllErrors(deleteKeyErrors))
         .setStatus(deleteStatus ? OK : PARTIAL_DELETE).setSuccess(deleteStatus)
-        .build(), omKeyInfoList, dirList, ozoneManager.isRatisEnabled(),
+        .build(), omKeyInfoList, dirList,
         omBucketInfo.copyObject(), volumeId, openKeyInfoMap);
     return omClientResponse;
   }

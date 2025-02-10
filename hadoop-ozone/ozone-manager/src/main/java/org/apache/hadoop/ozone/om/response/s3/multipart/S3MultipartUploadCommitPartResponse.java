@@ -58,7 +58,6 @@ public class S3MultipartUploadCommitPartResponse extends OmKeyResponse {
   private OmMultipartKeyInfo omMultipartKeyInfo;
   private OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo;
   private OmKeyInfo openPartKeyInfoToBeDeleted;
-  private boolean isRatisEnabled;
   private OmBucketInfo omBucketInfo;
 
   /**
@@ -72,7 +71,6 @@ public class S3MultipartUploadCommitPartResponse extends OmKeyResponse {
    * @param omMultipartKeyInfo
    * @param oldPartKeyInfo
    * @param openPartKeyInfoToBeDeleted
-   * @param isRatisEnabled
    * @param omBucketInfo
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -81,7 +79,7 @@ public class S3MultipartUploadCommitPartResponse extends OmKeyResponse {
       @Nullable OmMultipartKeyInfo omMultipartKeyInfo,
       @Nullable OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo,
       @Nullable OmKeyInfo openPartKeyInfoToBeDeleted,
-      boolean isRatisEnabled, @Nonnull OmBucketInfo omBucketInfo,
+      @Nonnull OmBucketInfo omBucketInfo,
       @Nonnull BucketLayout bucketLayout) {
     super(omResponse, bucketLayout);
     this.multipartKey = multipartKey;
@@ -89,7 +87,6 @@ public class S3MultipartUploadCommitPartResponse extends OmKeyResponse {
     this.omMultipartKeyInfo = omMultipartKeyInfo;
     this.oldPartKeyInfo = oldPartKeyInfo;
     this.openPartKeyInfoToBeDeleted = openPartKeyInfoToBeDeleted;
-    this.isRatisEnabled = isRatisEnabled;
     this.omBucketInfo = omBucketInfo;
   }
 

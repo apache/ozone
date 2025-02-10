@@ -116,8 +116,8 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
       }
 
       omClientResponse = new S3ExpiredMultipartUploadsAbortResponse(
-          omResponse.build(), abortedMultipartUploads,
-          ozoneManager.isRatisEnabled());
+          omResponse.build(), abortedMultipartUploads
+      );
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

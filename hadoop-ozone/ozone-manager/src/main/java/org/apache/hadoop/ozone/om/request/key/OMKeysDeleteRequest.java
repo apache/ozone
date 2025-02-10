@@ -291,7 +291,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
             DeleteKeysResponse.newBuilder().setStatus(deleteStatus)
                 .setUnDeletedKeys(unDeletedKeys).addAllErrors(deleteKeyErrors))
         .setStatus(deleteStatus ? OK : PARTIAL_DELETE).setSuccess(deleteStatus)
-        .build(), omKeyInfoList, ozoneManager.isRatisEnabled(),
+        .build(), omKeyInfoList,
         omBucketInfo.copyObject(), openKeyInfoMap);
     return omClientResponse;
   }

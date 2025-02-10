@@ -50,9 +50,8 @@ public class S3ExpiredMultipartUploadsAbortResponse extends
 
   public S3ExpiredMultipartUploadsAbortResponse(
       @Nonnull OMResponse omResponse,
-      @Nonnull Map<OmBucketInfo, List<OmMultipartAbortInfo>> mpusToDelete,
-      boolean isRatisEnabled) {
-    super(omResponse, isRatisEnabled);
+      @Nonnull Map<OmBucketInfo, List<OmMultipartAbortInfo>> mpusToDelete) {
+    super(omResponse);
     this.mpusToDelete = mpusToDelete;
   }
 
@@ -65,6 +64,7 @@ public class S3ExpiredMultipartUploadsAbortResponse extends
     // Set BucketLayout.DEFAULT just as a placeholder
     // OmMultipartAbortInfo already contains the bucket layout info
     super(omResponse, BucketLayout.DEFAULT);
+    checkStatusNotOK();
   }
 
   @Override
