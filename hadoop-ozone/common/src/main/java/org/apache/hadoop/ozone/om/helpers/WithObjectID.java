@@ -37,6 +37,12 @@ public abstract class WithObjectID extends WithMetadata {
     updateID = b.updateID;
   }
 
+  protected WithObjectID(WithObjectID other) {
+    super(other);
+    objectID = other.objectID;
+    updateID = other.updateID;
+  }
+
   /**
    * ObjectIDs are unique and immutable identifier for each object in the
    * System.
@@ -110,16 +116,12 @@ public abstract class WithObjectID extends WithMetadata {
           getObjectInfo()));
     }
 
-    this.setUpdateID(updateId);
+    this.updateID = updateId;
   }
 
   /** Hook method, customized in subclasses. */
   public String getObjectInfo() {
     return this.toString();
-  }
-
-  public final void setUpdateID(long updateID) {
-    this.updateID = updateID;
   }
 
   /** Builder for {@link WithObjectID}. */
