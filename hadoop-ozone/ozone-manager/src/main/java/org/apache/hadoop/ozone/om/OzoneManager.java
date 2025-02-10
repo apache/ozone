@@ -3056,8 +3056,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     String leaderReadiness = omRatisServer.checkLeaderStatus().name();
     final RaftPeerId leaderId = omRatisServer.getLeaderId();
     if (leaderId == null) {
-      LOG.error("There are no leader among the Ozone Manager servers. If this message persists, the service may be down. Possible cause: only one OM is up, or other OMs are unable to respond to Ratis leader vote messages");
-      return getRatisRolesException("There are no leader among the Ozone Manager servers. If this message persists, the service may be down. Possible cause: only one OM is up, or other OMs are unable to respond to Ratis leader vote messages");
+      LOG.error("There are no leader among the Ozone Manager servers. If this message persists, the service may be down. "+
+              "Possible cause: only one OM is up, or other OMs are unable to respond to Ratis leader vote messages");
+      return getRatisRolesException("There are no leader among the Ozone Manager servers. If this message persists, the service may be down. "+
+              "Possible cause: only one OM is up, or other OMs are unable to respond to Ratis leader vote messages");
     }
 
     final List<ServiceInfo> serviceList;
