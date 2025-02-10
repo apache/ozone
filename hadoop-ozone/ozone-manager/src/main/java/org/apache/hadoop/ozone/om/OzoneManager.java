@@ -373,6 +373,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private ScmTopologyClient scmTopologyClient;
   private final Text omRpcAddressTxt;
   private OzoneConfiguration configuration;
+  private OmConfig config;
   private RPC.Server omRpcServer;
   private GrpcOzoneManagerServer omS3gGrpcServer;
   private final InetSocketAddress omRpcAddress;
@@ -4136,9 +4137,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return configuration;
   }
 
+  public OmConfig getConfig() {
+    return config;
+  }
+
   @VisibleForTesting
   public void setConfiguration(OzoneConfiguration conf) {
     this.configuration = conf;
+    config = conf.getObject(OmConfig.class);
   }
 
   public OzoneConfiguration reloadConfiguration() {
