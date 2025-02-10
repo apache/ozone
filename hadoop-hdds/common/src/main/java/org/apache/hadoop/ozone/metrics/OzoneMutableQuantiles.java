@@ -36,13 +36,9 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import static org.apache.hadoop.metrics2.lib.Interns.info;
 
 /**
- * Watches a stream of long values.
- * Maintaining online estimates of specific quantiles with provably low error
- * bounds. This is particularly useful for accurate high-percentile
- * (e.g. 95th, 99th) latency metrics.
- * (non-synchronized version of org.apache.hadoop.metrics2.lib.MutableQuantiles)
+ * Non-synchronized version of {@link org.apache.hadoop.metrics2.lib.MutableQuantiles}.
  */
-public class MutableQuantiles extends MutableMetric {
+public class OzoneMutableQuantiles extends MutableMetric {
 
   private static final Quantile[] QUANTILES = {new Quantile(0.50, 0.050),
       new Quantile(0.75, 0.025), new Quantile(0.90, 0.010),
@@ -53,9 +49,13 @@ public class MutableQuantiles extends MutableMetric {
 
   private final MetricsInfo numInfo;
   private final MetricsInfo[] quantileInfos;
+
+  /**
+   * Rollover interval (in seconds) of the estimator.
+   */
   private final int interval;
 
-  private SampleQuantiles estimator;
+  private OzoneSampleQuantiles estimator;
   private long previousCount = 0;
   private ScheduledFuture<?> scheduledTask;
 
@@ -63,14 +63,14 @@ public class MutableQuantiles extends MutableMetric {
 
   private volatile boolean changed = false;
 
-  private ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+  private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
-  private ReentrantReadWriteLock.ReadLock readLock = lock.readLock();
+  private final ReentrantReadWriteLock.ReadLock readLock = lock.readLock();
 
-  private ReentrantReadWriteLock.WriteLock writeLock = lock.writeLock();
+  private final ReentrantReadWriteLock.WriteLock writeLock = lock.writeLock();
 
   /**
-   * Instantiates a new {@link MutableQuantiles} for a metric that rolls itself
+   * Instantiates a new {@link OzoneMutableQuantiles} for a metric that rolls itself
    * over on the specified time interval.
    *
    * @param name
@@ -84,8 +84,8 @@ public class MutableQuantiles extends MutableMetric {
    * @param interval
    *          rollover interval (in seconds) of the estimator
    */
-  public MutableQuantiles(String name, String description, String sampleName,
-                          String valueName, int interval) {
+  public OzoneMutableQuantiles(String name, String description, String sampleName,
+                               String valueName, int interval) {
     String ucName = StringUtils.capitalize(name);
     String usName = StringUtils.capitalize(sampleName);
     String uvName = StringUtils.capitalize(valueName);
@@ -106,7 +106,7 @@ public class MutableQuantiles extends MutableMetric {
           String.format(descTemplate, percentile));
     }
 
-    estimator = new SampleQuantiles(QUANTILES);
+    estimator = new OzoneSampleQuantiles(QUANTILES);
 
     this.interval = interval;
     scheduledTask = SCHEDULER.scheduleWithFixedDelay(new RolloverSample(this),
@@ -122,7 +122,7 @@ public class MutableQuantiles extends MutableMetric {
         for (int i = 0; i < QUANTILES.length; i++) {
           long newValue = 0;
           // If snapshot is null, we failed to update since the window was empty
-          if (previousSnapshot != null) {
+          if (previousSnapshot != null && !previousSnapshot.isEmpty()) {
             newValue = previousSnapshot.get(QUANTILES[i]);
           }
           builder.addGauge(quantileInfos[i], newValue);
@@ -170,19 +170,19 @@ public class MutableQuantiles extends MutableMetric {
     writeLock.lock();
   }
 
-  public void releaseWriteLock() {
+  private void releaseWriteLock() {
     writeLock.unlock();
   }
 
   /**
    * Runnable used to periodically roll over the internal
-   * {@link SampleQuantiles} every interval.
+   * {@link OzoneSampleQuantiles} every interval.
    */
   private static class RolloverSample implements Runnable {
 
-    private MutableQuantiles parent;
+    private final OzoneMutableQuantiles parent;
 
-    RolloverSample(MutableQuantiles parent) {
+    RolloverSample(OzoneMutableQuantiles parent) {
       this.parent = parent;
     }
 

@@ -35,10 +35,17 @@ public class OzoneMetricsFactory
   private static final MutableMetricsFactory INSTANCE =
       new OzoneMetricsFactory();
 
+  /**
+   * Get {@link MutableMetricsFactory} instance.
+   * @return {@link MutableMetricsFactory} instance
+   */
   public static MutableMetricsFactory getInstance() {
     return INSTANCE;
   }
 
+  /**
+   * Register as factory for {@link DefaultMetricsFactory} instance.
+   */
   public static void registerAsDefaultMutableMetricsFactory() {
     DefaultMetricsFactory.INSTANCE.setInstance(INSTANCE);
   }
@@ -56,8 +63,8 @@ public class OzoneMetricsFactory
       return new OzoneMutableRate(info.name(), info.description(),
           annotation.always());
     }
-    if (cls == MutableQuantiles.class) {
-      return new MutableQuantiles(info.name(), annotation.about(),
+    if (cls == OzoneMutableQuantiles.class) {
+      return new OzoneMutableQuantiles(info.name(), annotation.about(),
           annotation.sampleName(), annotation.valueName(),
           annotation.interval());
     }
