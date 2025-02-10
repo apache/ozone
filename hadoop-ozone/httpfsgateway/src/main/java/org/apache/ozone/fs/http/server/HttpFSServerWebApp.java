@@ -75,21 +75,6 @@ public class HttpFSServerWebApp extends ServerWebApp {
   }
 
   /**
-   * Constructor used for testing purposes.
-   */
-  public HttpFSServerWebApp(String homeDir, String configDir, String logDir,
-                               String tempDir, Configuration config) {
-    super(NAME, homeDir, configDir, logDir, tempDir, config);
-  }
-
-  /**
-   * Constructor used for testing purposes.
-   */
-  public HttpFSServerWebApp(String homeDir, Configuration config) {
-    super(NAME, homeDir, config);
-  }
-
-  /**
    * Initializes the HttpFSServer server, loads configuration and required
    * services.
    *

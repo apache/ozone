@@ -40,6 +40,8 @@ if [ ! -d "$DIST_DIR" ]; then
     "$DIR/build.sh" -Pcoverage
 fi
 
+create_aws_dir
+
 mkdir -p "$REPORT_DIR"
 
 if [[ "${OZONE_ACCEPTANCE_SUITE}" == "s3a" ]]; then
