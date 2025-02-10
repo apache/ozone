@@ -58,6 +58,9 @@ public class ContainerSafeModeRule extends
     SafeModeExitRule<NodeRegistrationContainerReport> {
 
   public static final Logger LOG = LoggerFactory.getLogger(ContainerSafeModeRule.class);
+  
+  private static final String NAME = "ContainerSafeModeRule";
+
   private final ContainerManager containerManager;
   // Required cutoff % for containers with at least 1 reported replica.
   private final double safeModeCutoff;
@@ -71,12 +74,11 @@ public class ContainerSafeModeRule extends
   private double ratisMaxContainer;
   private double ecMaxContainer;
 
-  public ContainerSafeModeRule(final String ruleName,
-                               final EventQueue eventQueue,
+  public ContainerSafeModeRule(final EventQueue eventQueue,
                                final ConfigurationSource conf,
                                final ContainerManager containerManager,
                                final SCMSafeModeManager manager) {
-    super(manager, ruleName, eventQueue);
+    super(manager, NAME, eventQueue);
     this.safeModeCutoff = getSafeModeCutoff(conf);
     this.containerManager = containerManager;
     this.ratisContainers = new HashSet<>();

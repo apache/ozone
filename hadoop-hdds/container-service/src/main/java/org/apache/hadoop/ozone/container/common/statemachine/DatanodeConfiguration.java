@@ -573,6 +573,20 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   private boolean bCheckEmptyContainerDir =
       OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT;
 
+  @Config(key = "delete.container.timeout",
+      type = ConfigType.TIME,
+      defaultValue = "60s",
+      tags = { DATANODE },
+      description = "If a delete container request spends more than this time waiting on the container lock or " +
+          "performing pre checks, the command will be skipped and SCM will resend it automatically. This avoids " +
+          "commands running for a very long time without SCM being informed of the progress."
+  )
+  private long deleteContainerTimeoutMs = Duration.ofSeconds(60).toMillis();
+
+  public long getDeleteContainerTimeoutMs() {
+    return deleteContainerTimeoutMs;
+  }
+
   @PostConstruct
   public void validate() {
     if (containerDeleteThreads < 1) {

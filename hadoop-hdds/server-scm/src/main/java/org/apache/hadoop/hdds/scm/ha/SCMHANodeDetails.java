@@ -18,8 +18,6 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.conf.ConfigurationException;
-import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmUtils;
@@ -149,10 +147,7 @@ public class SCMHANodeDetails {
   }
 
   /** Validates SCM HA Config.
-    For Non Initialized SCM the value is taken directly based on the config
-   {@link org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY}
-   which defaults to
-   {@link org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT}
+   For Non Initialized SCM the value is true.
    For Previously Initialized SCM the values are taken from the version file
    <br>
    Ratis SCM -> Non Ratis SCM is not supported.
@@ -164,30 +159,8 @@ public class SCMHANodeDetails {
     boolean scmHAEnableDefault = state == Storage.StorageState.INITIALIZED
         ? scmStorageConfig.isSCMHAEnabled()
         : SCMHAUtils.isSCMHAEnabled(conf);
-    boolean scmHAEnabled = SCMHAUtils.isSCMHAEnabled(conf);
-
-    if (Storage.StorageState.INITIALIZED.equals(state) &&
-            scmHAEnabled != scmHAEnableDefault) {
-      String errorMessage = String.format("Current State of SCM: %s",
-              scmHAEnableDefault ? "SCM is running with Ratis. "
-              : "SCM is running without Ratis. ")
-              + "Ratis SCM -> Non Ratis SCM is not supported.";
-      if (!scmHAEnabled) {
-        throw new ConfigurationException(String.format("Invalid Config %s " +
-                "Provided ConfigValue: false, Expected Config Value: true. %s",
-            ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, errorMessage));
-      } else {
-        LOG.warn("Default/Configured value of config {} conflicts with " +
-                "the expected value. " +
-                "Default/Configured: {}. " +
-                "Expected: {}. " +
-                "Falling back to the expected value. {}",
-            ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
-            scmHAEnabled, scmHAEnableDefault, errorMessage);
-      }
-    }
-    DefaultConfigManager.setConfigValue(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
-        scmHAEnableDefault);
+    // If we have an initialized cluster, use the value from VERSION file.
+    SCMHAUtils.setRatisEnabled(scmHAEnableDefault);
   }
 
   public static SCMHANodeDetails loadSCMHAConfig(OzoneConfiguration conf,

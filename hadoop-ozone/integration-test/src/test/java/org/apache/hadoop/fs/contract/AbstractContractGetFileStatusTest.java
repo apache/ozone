@@ -394,7 +394,7 @@ public abstract class AbstractContractGetFileStatusTest extends
     Assertions.assertThat(statusList)
             .describedAs(msg)
             .hasSize(1);
-    Assertions.assertThat(statusList.get(0).getPath())
+    Assertions.assertThatObject(statusList.get(0).getPath())
             .describedAs("path returned should match with the input path")
             .isEqualTo(f);
     Assertions.assertThat(statusList.get(0).isFile())
@@ -471,7 +471,7 @@ public abstract class AbstractContractGetFileStatusTest extends
    * @param fileStatus status to validate
    */
   private void assertIsNamedFile(Path f, FileStatus fileStatus) {
-    Assertions.assertThat(fileStatus.getPath())
+    Assertions.assertThatObject(fileStatus.getPath())
         .withFailMessage("Wrong pathname in " + fileStatus)
         .isEqualTo(f);
     Assertions.assertThat(fileStatus.isFile())
@@ -569,15 +569,15 @@ public abstract class AbstractContractGetFileStatusTest extends
 
     MatchesNameFilter file1Filter = new MatchesNameFilter("file-1.txt");
     result = verifyListStatus(1, parent, file1Filter);
-    Assertions.assertThat(result[0].getPath())
+    Assertions.assertThatObject(result[0].getPath())
         .isEqualTo(file1);
 
     verifyListStatus(0, file1, NO_PATHS);
     result = verifyListStatus(1, file1, ALL_PATHS);
-    Assertions.assertThat(result[0].getPath())
+    Assertions.assertThatObject(result[0].getPath())
         .isEqualTo(file1);
     result = verifyListStatus(1, file1, file1Filter);
-    Assertions.assertThat(result[0].getPath())
+    Assertions.assertThatObject(result[0].getPath())
         .isEqualTo(file1);
 
     // empty subdirectory
@@ -608,15 +608,15 @@ public abstract class AbstractContractGetFileStatusTest extends
 
     MatchesNameFilter file1Filter = new MatchesNameFilter("file-1.txt");
     result = verifyListLocatedStatus(xfs, 1, parent, file1Filter);
-    Assertions.assertThat(result.get(0).getPath())
+    Assertions.assertThatObject(result.get(0).getPath())
         .isEqualTo(file1);
 
     verifyListLocatedStatus(xfs, 0, file1, NO_PATHS);
     verifyListLocatedStatus(xfs, 1, file1, ALL_PATHS);
-    Assertions.assertThat(result.get(0).getPath())
+    Assertions.assertThatObject(result.get(0).getPath())
         .isEqualTo(file1);
     verifyListLocatedStatus(xfs, 1, file1, file1Filter);
-    Assertions.assertThat(result.get(0).getPath())
+    Assertions.assertThatObject(result.get(0).getPath())
         .isEqualTo(file1);
     verifyListLocatedStatusNextCalls(xfs, 1, file1, file1Filter);
 

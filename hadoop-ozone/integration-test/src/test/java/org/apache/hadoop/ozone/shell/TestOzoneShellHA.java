@@ -69,6 +69,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 import org.apache.hadoop.hdds.JsonTestUtils;
@@ -109,6 +110,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -128,6 +130,7 @@ import picocli.CommandLine.RunLast;
  * This class tests Ozone sh shell command.
  * Inspired by TestS3Shell
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(300)
 @TestMethodOrder(OrderAnnotation.class)
 public class TestOzoneShellHA {
@@ -165,11 +168,11 @@ public class TestOzoneShellHA {
    * @throws Exception
    */
   @BeforeAll
-  public static void init() throws Exception {
+  public void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
     conf.setBoolean(OZONE_FS_HSYNC_ENABLED, true);
-    startKMS();
+    // startKMS();
     startCluster(conf);
   }
 
@@ -209,7 +212,7 @@ public class TestOzoneShellHA {
    * shutdown MiniOzoneCluster.
    */
   @AfterAll
-  public static void shutdown() {
+  public void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
@@ -956,7 +959,7 @@ public class TestOzoneShellHA {
       execute(ozoneAdminShell, args);
     }
 
-    String[] args1 = new String[] {"container", "list", "-c", "10", "--scm",
+    String[] args1 = new String[] {"container", "list", "-c", "1", "--scm",
         "localhost:" + cluster.getStorageContainerManager().getClientRpcPort()};
     execute(ozoneAdminShell, args1);
     //results will be capped at the maximum allowed count
@@ -965,8 +968,9 @@ public class TestOzoneShellHA {
     String[] args2 = new String[] {"container", "list", "-a", "--scm",
         "localhost:" + cluster.getStorageContainerManager().getClientRpcPort()};
     execute(ozoneAdminShell, args2);
-    //Lists all containers
-    assertNotEquals(1, getNumOfContainers());
+    //Lists all containers, at least the two created for this method
+    assertThat(getNumOfContainers())
+        .isGreaterThanOrEqualTo(2);
   }
 
   private int getNumOfContainers()
@@ -1807,6 +1811,7 @@ public class TestOzoneShellHA {
   }
 
   @Test
+  @Unhealthy("HDDS-11879")
   public void testSetEncryptionKey() throws Exception {
     final String volumeName = "volume111";
     getVolume(volumeName);
@@ -2190,8 +2195,7 @@ public class TestOzoneShellHA {
     ParameterException exception = assertThrows(ParameterException.class,
         () -> execute(ozoneShell, arg2));
     assertThat(exception.getMessage())
-        .contains("expected one of [FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, " +
-            "LEGACY]");
+        .contains("cannot convert '' to BucketLayout");
 
 
     String[] arg3 = new String[]{
@@ -2202,8 +2206,7 @@ public class TestOzoneShellHA {
     exception = assertThrows(ParameterException.class,
         () -> execute(ozoneShell, arg3));
     assertThat(exception.getMessage())
-        .contains("expected one of [FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, " +
-            "LEGACY] ");
+        .contains("cannot convert 'INVALID' to BucketLayout");
   }
 
   @Test
@@ -2488,6 +2491,10 @@ public class TestOzoneShellHA {
   }
 
   private static String getKeyProviderURI(MiniKMS kms) {
+    // HDDS-11879
+    if (kms == null) {
+      return "";
+    }
     return KMSClientProvider.SCHEME_NAME + "://" +
         kms.getKMSUrl().toExternalForm().replace("://", "@");
   }

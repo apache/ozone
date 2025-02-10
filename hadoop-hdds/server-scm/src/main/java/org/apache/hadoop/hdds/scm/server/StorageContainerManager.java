@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -77,7 +76,6 @@ import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManagerImpl;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManagerImpl;
 import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
-import org.apache.hadoop.hdds.scm.server.upgrade.ScmHAUnfinalizedStateValidationAction;
 import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
 import org.apache.hadoop.hdds.security.token.ContainerTokenGenerator;
@@ -161,7 +159,6 @@ import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.lease.LeaseManagerNotRunningException;
 import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.SecurityUtil;
@@ -837,6 +834,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       reconfigurationHandler.register(replicationManager.getConfig());
     }
     serviceManager.register(replicationManager);
+    // RM gets notified of expired pending delete from containerReplicaPendingOps by subscribing to it
+    // so it can resend them.
+    containerReplicaPendingOps.registerSubscriber(replicationManager);
     if (configurator.getScmSafeModeManager() != null) {
       scmSafeModeManager = configurator.getScmSafeModeManager();
     } else {
@@ -1312,26 +1312,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         return false;
       }
     } else {
-      // If SCM HA was not being used before pre-finalize, and is being used
-      // when the cluster is pre-finalized for the SCM HA feature, init
-      // should fail.
-      final LayoutVersionManager layoutVersionManager =
-          new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
-      try {
-        ScmHAUnfinalizedStateValidationAction.checkScmHA(conf, scmStorageConfig,
-            layoutVersionManager);
-      } finally {
-        layoutVersionManager.close();
-      }
-
       clusterId = scmStorageConfig.getClusterID();
       final boolean isSCMHAEnabled = scmStorageConfig.isSCMHAEnabled();
 
       // Initialize security if security is enabled later.
       initializeSecurityIfNeeded(conf, scmStorageConfig, selfHostName, true);
 
-      if (conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
-          ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT) && !isSCMHAEnabled) {
+      if (SCMHAUtils.isSCMHAEnabled(conf) && !isSCMHAEnabled) {
         SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
             scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(),
             conf);
@@ -1346,8 +1333,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
          */
 
         try {
-          DefaultConfigManager.forceUpdateConfigValue(
-              ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+          SCMHAUtils.setRatisEnabled(true);
           StorageContainerManager scm = createSCM(conf);
           scm.start();
           scm.getScmHAManager().getRatisServer().triggerSnapshot();

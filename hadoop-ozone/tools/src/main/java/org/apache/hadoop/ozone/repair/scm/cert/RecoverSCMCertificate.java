@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.repair.scm.cert;
 
+import jakarta.annotation.Nonnull;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
@@ -71,11 +72,14 @@ public class RecoverSCMCertificate extends RepairTool {
       description = "SCM DB Path")
   private String dbPath;
 
+  @Nonnull
+  @Override
+  protected Component serviceToBeOffline() {
+    return Component.SCM;
+  }
+
   @Override
   public void execute() throws Exception {
-    if (checkIfServiceIsRunning("SCM")) {
-      return;
-    }
     dbPath = removeTrailingSlashIfNeeded(dbPath);
     String tableName = VALID_SCM_CERTS.getName();
     DBDefinition dbDefinition =
@@ -194,29 +198,31 @@ public class RecoverSCMCertificate extends RepairTool {
     CertificateCodec certCodec =
         new CertificateCodec(securityConfig, SCMCertificateClient.COMPONENT_NAME);
 
-    info("Writing certs to path : %s", certCodec.getLocation());
-
     CertPath certPath = addRootCertInPath(scmCertificate, rootCertificate);
     CertPath rootCertPath = getRootCertPath(rootCertificate);
     String encodedCert = CertificateCodec.getPEMEncodedString(certPath);
     String certName = String.format(CERT_FILE_NAME_FORMAT,
         CAType.NONE.getFileNamePrefix() + scmCertificate.getSerialNumber());
-    certCodec.writeCertificate(certName, encodedCert);
+    writeCertificate(certCodec, certName, encodedCert);
 
     String rootCertName = String.format(CERT_FILE_NAME_FORMAT,
         CAType.SUBORDINATE.getFileNamePrefix() + rootCertificate.getSerialNumber());
     String encodedRootCert = CertificateCodec.getPEMEncodedString(rootCertPath);
-    certCodec.writeCertificate(rootCertName, encodedRootCert);
+    writeCertificate(certCodec, rootCertName, encodedRootCert);
 
-    certCodec.writeCertificate(certCodec.getLocation().toAbsolutePath(),
-        securityConfig.getCertificateFileName(), encodedCert);
+    writeCertificate(certCodec, securityConfig.getCertificateFileName(), encodedCert);
 
     if (isRootCA) {
       CertificateCodec rootCertCodec =
           new CertificateCodec(securityConfig, OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME);
-      info("Writing root certs to path : %s", rootCertCodec.getLocation());
-      rootCertCodec.writeCertificate(rootCertCodec.getLocation().toAbsolutePath(),
-          securityConfig.getCertificateFileName(), encodedRootCert);
+      writeCertificate(rootCertCodec, securityConfig.getCertificateFileName(), encodedRootCert);
+    }
+  }
+
+  private void writeCertificate(CertificateCodec codec, String name, String encodedCert) throws IOException {
+    info("Writing cert %s to %s", name, codec.getLocation());
+    if (!isDryRun()) {
+      codec.writeCertificate(name, encodedCert);
     }
   }
 

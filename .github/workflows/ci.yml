@@ -42,13 +42,13 @@ jobs:
       GITHUB_CONTEXT: ${{ toJson(github) }}
     outputs:
       acceptance-suites: ${{ steps.acceptance-suites.outputs.suites }}
+      integration-suites: ${{ steps.integration-suites.outputs.suites }}
       needs-basic-check: ${{ steps.categorize-basic-checks.outputs.needs-basic-check }}
       needs-native-check: ${{ steps.categorize-basic-checks.outputs.needs-native-check }}
       basic-checks: ${{ steps.categorize-basic-checks.outputs.basic-checks }}
       needs-build: ${{ steps.selective-checks.outputs.needs-build }}
       needs-compile: ${{ steps.selective-checks.outputs.needs-compile }}
       needs-compose-tests: ${{ steps.selective-checks.outputs.needs-compose-tests }}
-      needs-dependency-check: ${{ steps.selective-checks.outputs.needs-dependency-check }}
       needs-integration-tests: ${{ steps.selective-checks.outputs.needs-integration-tests }}
       needs-kubernetes-tests: ${{ steps.selective-checks.outputs.needs-kubernetes-tests }}
       sha: ${{ steps.get-sha.outputs.sha }}
@@ -100,6 +100,9 @@ jobs:
       - name: Acceptance suites
         id: acceptance-suites
         run: dev-support/ci/acceptance_suites.sh
+      - name: Integration suites
+        id: integration-suites
+        run: dev-support/ci/integration_suites.sh
       - name: Categorize Basic Checks
         id: categorize-basic-checks
         env:
@@ -190,7 +193,6 @@ jobs:
     needs:
       - build-info
       - build
-    if: needs.build-info.outputs.needs-dependency-check == 'true'
     uses: ./.github/workflows/check.yml
     secrets: inherit
     with:
@@ -204,7 +206,6 @@ jobs:
     needs:
       - build-info
       - build
-    if: needs.build-info.outputs.needs-dependency-check == 'true'
     uses: ./.github/workflows/check.yml
     secrets: inherit
     with:
@@ -218,6 +219,9 @@ jobs:
     needs:
       - build-info
       - build
+      - basic
+      - dependency
+      - license
     uses: ./.github/workflows/check.yml
     secrets: inherit
     with:
@@ -291,17 +295,7 @@ jobs:
       with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
     strategy:
       matrix:
-        profile:
-          - client
-          - container
-          - filesystem
-          - hdds
-          - om
-          - ozone
-          - recon
-          - shell
-          - snapshot
-          - flaky
+        profile: ${{ fromJson(needs.build-info.outputs.integration-suites) }}
       fail-fast: false
 
   coverage:

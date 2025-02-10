@@ -124,10 +124,10 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Containe
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
 
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.ratis.util.ExitUtils;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
-import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -184,7 +184,6 @@ public class ReconStorageContainerManagerFacade
   @SuppressWarnings({"checkstyle:ParameterNumber", "checkstyle:MethodLength"})
   public ReconStorageContainerManagerFacade(OzoneConfiguration conf,
                                             StorageContainerServiceProvider scmServiceProvider,
-                                            ReconTaskStatusDao reconTaskStatusDao,
                                             ContainerCountBySizeDao containerCountBySizeDao,
                                             UtilizationSchemaDefinition utilizationSchemaDefinition,
                                             ContainerHealthSchemaManager containerHealthSchemaManager,
@@ -192,7 +191,9 @@ public class ReconStorageContainerManagerFacade
                                             ReconUtils reconUtils,
                                             ReconSafeModeManager safeModeManager,
                                             ReconContext reconContext,
-                                            DataSource dataSource) throws IOException {
+                                            DataSource dataSource,
+                                            ReconTaskStatusUpdaterManager taskStatusUpdaterManager)
+      throws IOException {
     reconNodeDetails = reconUtils.getReconNodeDetails(conf);
     this.threadNamePrefix = reconNodeDetails.threadNamePrefix();
     this.eventQueue = new EventQueue(threadNamePrefix);
@@ -270,24 +271,15 @@ public class ReconStorageContainerManagerFacade
         new PipelineActionHandler(pipelineManager, scmContext, conf);
 
     ReconTaskConfig reconTaskConfig = conf.getObject(ReconTaskConfig.class);
-    PipelineSyncTask pipelineSyncTask = new PipelineSyncTask(
-        pipelineManager,
-        nodeManager,
-        scmServiceProvider,
-        reconTaskStatusDao,
-        reconTaskConfig);
-    containerHealthTask = new ContainerHealthTask(
-        containerManager, scmServiceProvider, reconTaskStatusDao,
-        containerHealthSchemaManager, containerPlacementPolicy, reconTaskConfig,
-        reconContainerMetadataManager, conf);
+    PipelineSyncTask pipelineSyncTask = new PipelineSyncTask(pipelineManager, nodeManager,
+        scmServiceProvider, reconTaskConfig, taskStatusUpdaterManager);
 
-    this.containerSizeCountTask = new ContainerSizeCountTask(
-        containerManager,
-        scmServiceProvider,
-        reconTaskStatusDao,
-        reconTaskConfig,
-        containerCountBySizeDao,
-        utilizationSchemaDefinition);
+    containerHealthTask = new ContainerHealthTask(containerManager, scmServiceProvider,
+        containerHealthSchemaManager, containerPlacementPolicy,
+        reconTaskConfig, reconContainerMetadataManager, conf, taskStatusUpdaterManager);
+
+    this.containerSizeCountTask = new ContainerSizeCountTask(containerManager, scmServiceProvider,
+        reconTaskConfig, containerCountBySizeDao, utilizationSchemaDefinition, taskStatusUpdaterManager);
 
     this.dataSource = dataSource;
 
