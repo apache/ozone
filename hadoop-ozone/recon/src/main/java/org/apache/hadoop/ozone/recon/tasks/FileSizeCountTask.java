@@ -112,7 +112,7 @@ public class FileSizeCountTask implements ReconOmTask {
 
     // Write any remaining entries to the database
     if (!sharedFileSizeCountMap.isEmpty()) {
-      writeCountsToDB(true, sharedFileSizeCountMap);
+      writeCountsToDB(sharedFileSizeCountMap);
       sharedFileSizeCountMap.clear();
     }
 
@@ -157,7 +157,7 @@ public class FileSizeCountTask implements ReconOmTask {
 
           // Periodically write to the database to avoid memory overflow
           if (sharedFileSizeCountMap.size() >= 100_000) {
-            writeCountsToDB(false, sharedFileSizeCountMap);
+            writeCountsToDB(sharedFileSizeCountMap);
             sharedFileSizeCountMap.clear();
           }
         }
@@ -244,7 +244,7 @@ public class FileSizeCountTask implements ReconOmTask {
       }
     }
     if (!fileSizeCountMap.isEmpty()) {
-      writeCountsToDB(false, fileSizeCountMap);
+      writeCountsToDB(fileSizeCountMap);
     }
     LOG.info("{} successfully processed in {} milliseconds",
         getTaskName(), (System.currentTimeMillis() - startTime));
@@ -256,11 +256,11 @@ public class FileSizeCountTask implements ReconOmTask {
    * using the dao.
    *
    */
-  private synchronized void writeCountsToDB(boolean isDbTruncated,
-                                            Map<FileSizeCountKey, Long> fileSizeCountMap) {
+  private void writeCountsToDB(Map<FileSizeCountKey, Long> fileSizeCountMap) {
+
     List<FileCountBySize> insertToDb = new ArrayList<>();
     List<FileCountBySize> updateInDb = new ArrayList<>();
-
+    boolean isDbTruncated = isFileCountBySizeTableEmpty(); // Check if table is empty
     fileSizeCountMap.forEach((key, count) -> {
       FileCountBySize newRecord = new FileCountBySize();
       newRecord.setVolume(key.volume);
@@ -305,15 +305,6 @@ public class FileSizeCountTask implements ReconOmTask {
   }
 
   /**
-   * Checks if the FILE_COUNT_BY_SIZE table is empty.
-   *
-   * @return true if the table is empty, false otherwise.
-   */
-  private boolean isFileCountBySizeTableEmpty() {
-    return dslContext.fetchCount(FILE_COUNT_BY_SIZE) == 0;
-  }
-
-  /**
    * Calculate and update the count of files being tracked by
    * fileSizeCountMap.
    * Used by reprocess() and process().
@@ -351,6 +342,15 @@ public class FileSizeCountTask implements ReconOmTask {
           fileSizeCountMap.get(countKey) - 1L : -1L;
       fileSizeCountMap.put(countKey, count);
     }
+  }
+
+  /**
+   * Checks if the FILE_COUNT_BY_SIZE table is empty.
+   *
+   * @return true if the table is empty, false otherwise.
+   */
+  private boolean isFileCountBySizeTableEmpty() {
+    return dslContext.fetchCount(FILE_COUNT_BY_SIZE) == 0;
   }
 
   private static class BucketLayoutProcessResult {
