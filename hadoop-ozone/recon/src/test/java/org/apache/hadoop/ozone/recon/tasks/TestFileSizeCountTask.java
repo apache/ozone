@@ -72,7 +72,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     UtilizationSchemaDefinition utilizationSchemaDefinition =
         getSchemaDefinition(UtilizationSchemaDefinition.class);
     ExecutorService executor = Executors.newFixedThreadPool(2);
-    fileSizeCountTask = new FileSizeCountTask(fileCountBySizeDao, utilizationSchemaDefinition,executor);
+    fileSizeCountTask = new FileSizeCountTask(fileCountBySizeDao, utilizationSchemaDefinition, executor);
     dslContext = utilizationSchemaDefinition.getDSLContext();
     // Truncate table before running each test
     dslContext.truncate(FILE_COUNT_BY_SIZE);

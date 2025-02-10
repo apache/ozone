@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import com.google.inject.Inject;
-import com.google.inject.name.Named;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -37,14 +36,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Iterator;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Arrays;
 
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ExecutionException;
@@ -93,12 +92,10 @@ public class FileSizeCountTask implements ReconOmTask {
     int execute = dslContext.delete(FILE_COUNT_BY_SIZE).execute();
     LOG.info("Cleared {} existing records from {}", execute, FILE_COUNT_BY_SIZE);
 
-    List<Future<Boolean>> futures = new ArrayList<>();
-
-    futures.add(executorService.submit(() ->
-        reprocessBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED, omMetadataManager)));
-    futures.add(executorService.submit(() ->
-        reprocessBucketLayout(BucketLayout.LEGACY, omMetadataManager)));
+    List<Future<Boolean>> futures = Arrays.asList(
+        submitReprocessTask("FSO", BucketLayout.FILE_SYSTEM_OPTIMIZED, omMetadataManager),
+        submitReprocessTask("LEGACY", BucketLayout.LEGACY, omMetadataManager)
+    );
 
     boolean allSuccess = true;
     try {
@@ -122,6 +119,23 @@ public class FileSizeCountTask implements ReconOmTask {
     LOG.info("Reprocess completed. Success: {}. Time taken: {} ms",
         allSuccess, (System.currentTimeMillis() - startTime));
     return new ImmutablePair<>(getTaskName(), allSuccess);
+  }
+
+  /**
+   * Submits a reprocess task with proper thread naming.
+   */
+  private Future<Boolean> submitReprocessTask(String bucketType, BucketLayout layout,
+                                              OMMetadataManager omMetadataManager) {
+    return executorService.submit(() -> {
+      Thread currentThread = Thread.currentThread();
+      String originalName = currentThread.getName();
+      try {
+        currentThread.setName("FileSizeCountTask-" + bucketType + "-" + originalName);
+        return reprocessBucketLayout(layout, omMetadataManager);
+      } finally {
+        currentThread.setName(originalName); // Restore original name after execution
+      }
+    });
   }
 
   private Boolean reprocessBucketLayout(BucketLayout bucketLayout,
