@@ -353,7 +353,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
    */
   protected static void addDeletedKeys(Map<String, String> auditMap,
       List<OmKeyInfo> deletedKeyInfos, List<String> unDeletedKeys) {
-    StringBuffer keys = new StringBuffer();
+    StringBuilder keys = new StringBuilder();
     for (int i = 0; i < deletedKeyInfos.size(); i++) {
       OmKeyInfo key = deletedKeyInfos.get(i);
       keys.append("{").append(KEY).append("=").append(key.getKeyName()).append(", ");
