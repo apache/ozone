@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.metrics;
 
+import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.metrics2.MetricsException;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -25,7 +26,6 @@ import org.apache.hadoop.metrics2.lib.MutableMetric;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.Map;
 
 
 /**
@@ -40,61 +40,101 @@ public final class OzoneMetricsSystem {
   private OzoneMetricsSystem() {
   }
 
+  /**
+   * Initialize this metric system as default.
+   * @param prefix for the metrics system configuration
+   * @return the metrics system instance
+   */
   public static MetricsSystem initialize(String prefix) {
     return DefaultMetricsSystem.initialize(prefix);
   }
 
-  public static <T> T register(String name, String desc, T sink) {
-    return instance().register(name, desc, sink);
+  /**
+   * Register a metrics source.
+   * @param <T>   the actual type of the source object
+   * @param source object to register
+   * @param name  of the source. Must be unique or null (then extracted from
+   *              the annotations of the source object.)
+   * @param desc  the description of the source (or null. See above.)
+   * @return the source object
+   * @exception MetricsException Metrics Exception.
+   */
+  public static <T> T register(String name, String desc, T source) {
+    return instance().register(name, desc, source);
   }
 
+  /**
+   * Unregister a metrics source.
+   * @param name of the source. This is the name you use to call register()
+   */
   public static void unregisterSource(String name) {
     DefaultMetricsSystem.instance().unregisterSource(name);
   }
 
+  /**
+   * @return the metrics system object
+   */
   public static MetricsSystem instance() {
     return DefaultMetricsSystem.instance();
   }
 
+  /**
+   * Shutdown the metrics system.
+   */
   public static void shutdown() {
     DefaultMetricsSystem.shutdown();
   }
 
+  @VisibleForTesting
   public static void setMiniClusterMode(boolean choice) {
     DefaultMetricsSystem.setMiniClusterMode(choice);
   }
 
-  public static void registerNewMutableMetrics(MetricsRegistry registry, Map<String, MutableMetric> metrics) {
-    try {
-      Method add = registry.getClass().getDeclaredMethod("add", String.class, MutableMetric.class);
-      add.setAccessible(true);
-      for (Map.Entry<String, MutableMetric> entry : metrics.entrySet()) {
-        add.invoke(registry, entry.getKey(), entry.getValue());
-      }
-      add.setAccessible(false);
-    } catch (InvocationTargetException | NoSuchMethodException
-             | IllegalAccessException ex) {
-      System.out.println("OOooooooops");
-    }
-  }
-
-  public static MutableQuantiles registerNewMutableQuantiles(
-      MetricsRegistry registry, String name, String desc, String sampleName, String valueName, int interval) {
+  /**
+   * Register new mutable quantiles metric.
+   * @param registry      of the metric type
+   * @param name          of the metric
+   * @param description   of the metric
+   * @param sampleName    of the metric (e.g. "Ops")
+   * @param valueName     of the metric (e.g. "Time", "Latency")
+   * @param interval      rollover interval (in seconds) of the estimator.
+   * @return a new mutable quantiles metric object
+   */
+  public static OzoneMutableQuantiles registerNewMutableQuantiles(
+      MetricsRegistry registry, String name, String description, String sampleName, String valueName, int interval) {
     if (interval <= 0) {
       throw new MetricsException("Interval should be positive.  Value passed" +
                                  " is: " + interval);
     }
-    MutableQuantiles metric = new MutableQuantiles(name, desc, sampleName, valueName, interval);
+    OzoneMutableQuantiles metric = new OzoneMutableQuantiles(name, description, sampleName, valueName, interval);
     addMetric(registry, name, metric);
     return metric;
   }
 
+  /**
+   * Register new mutable rate metric with default false 'extended' and true 'returnExisting'.
+   *
+   * @param registry          of the metric type
+   * @param name              of the metric
+   * @param description       of the metric
+   * @return a new mutable rate metric object
+   */
   public static OzoneMutableRate registerNewMutableRate(
-      MetricsRegistry registry, String name, String desc) {
-    return registerNewMutableRate(registry, name, desc, false, true);
+      MetricsRegistry registry, String name, String description) {
+    return registerNewMutableRate(registry, name, description, false, true);
   }
+
+  /**
+   * Register new mutable rate metric.
+   * @param registry          of the metric type
+   * @param name              of the metric
+   * @param description       of the metric
+   * @param extended          create extended stats (stdev, min/max etc.) by default.
+   * @param returnExisting    return existing metric if it exists
+   * @return a new mutable rate metric object
+   */
   public static OzoneMutableRate registerNewMutableRate(
-      MetricsRegistry registry, String name, String desc, boolean extended, boolean returnExisting) {
+      MetricsRegistry registry, String name, String description, boolean extended, boolean returnExisting) {
 
     if (returnExisting) {
       MutableMetric rate = registry.get(name);
@@ -106,16 +146,27 @@ public final class OzoneMetricsSystem {
                                    + " for " + name);
       }
     }
-    OzoneMutableRate metric = new OzoneMutableRate(name, desc, extended);
+    OzoneMutableRate metric = new OzoneMutableRate(name, description, extended);
     addMetric(registry, name, metric);
     return metric;
   }
 
+  /**
+   * Register new mutable stat metric.
+   *
+   * @param registry    of the metric type
+   * @param name        of the metric
+   * @param description        of the metric
+   * @param sampleName  of the metric (e.g. "Ops")
+   * @param valueName   of the metric (e.g. "Time", "Latency")
+   * @param extended    create extended stats (stdev, min/max etc.) by default.
+   * @return a new mutable stat metric object
+   */
   public static OzoneMutableStat registerNewMutableStat(
-      MetricsRegistry registry, String name, String desc,
+      MetricsRegistry registry, String name, String description,
       String sampleName, String valueName, boolean extended) {
 
-    OzoneMutableStat metric = new OzoneMutableStat(name, desc, sampleName, valueName, extended);
+    OzoneMutableStat metric = new OzoneMutableStat(name, description, sampleName, valueName, extended);
     addMetric(registry, name, metric);
     return metric;
   }
@@ -128,12 +179,8 @@ public final class OzoneMetricsSystem {
       add.setAccessible(false);
     } catch (InvocationTargetException | NoSuchMethodException
              | IllegalAccessException ex) {
-      System.out.println("OOooooooops");
+      throw new MetricsException("Problem to use 'add' registry method.Incorrect metrics source registry class "
+                                 + registry.getClass() + " for " + name);
     }
-  }
-
-  public static <T extends MutableMetric> T registerNewRate(MetricsRegistry registry, String metricName, T metric) {
-    addMetric(registry, metricName, metric);
-    return metric;
   }
 }

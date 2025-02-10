@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.util;
 
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
-import org.apache.hadoop.ozone.metrics.MutableQuantiles;
+import org.apache.hadoop.ozone.metrics.OzoneMutableQuantiles;
 import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 import org.apache.hadoop.ozone.metrics.OzoneMutableRate;
 import org.apache.hadoop.util.Time;
@@ -94,9 +94,9 @@ public final class MetricUtil {
    * @param intervals   An array of intervals for the quantiles.
    * @return A list of created MutableQuantiles instances.
    */
-  public static List<MutableQuantiles> createQuantiles(MetricsRegistry registry,
-                                                       String name, String description, String sampleName,
-                                                       String valueName, int... intervals) {
+  public static List<OzoneMutableQuantiles> createQuantiles(MetricsRegistry registry,
+                                                            String name, String description, String sampleName,
+                                                            String valueName, int... intervals) {
     if (intervals == null) {
       throw new IllegalArgumentException(
           "At least one interval should be provided.");
@@ -112,15 +112,15 @@ public final class MetricUtil {
     }).collect(Collectors.toList());
   }
 
-  public static void stop(MutableQuantiles... quantiles) {
+  public static void stop(OzoneMutableQuantiles... quantiles) {
     if (quantiles != null) {
       stop(Arrays.asList(quantiles));
     }
   }
 
-  public static void stop(Iterable<MutableQuantiles> quantiles) {
+  public static void stop(Iterable<OzoneMutableQuantiles> quantiles) {
     if (quantiles != null) {
-      for (MutableQuantiles q : quantiles) {
+      for (OzoneMutableQuantiles q : quantiles) {
         if (q != null) {
           q.stop();
         }

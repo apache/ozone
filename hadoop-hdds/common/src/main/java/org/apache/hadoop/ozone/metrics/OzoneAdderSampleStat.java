@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.LongAdder;
 
 /**
  * Helper to compute running sample stats.
+ * Thread safe realization for {@link org.apache.hadoop.metrics2.util.SampleStat}.
  */
 public class OzoneAdderSampleStat extends SampleStat {
   private final MinMax minmax = new MinMax();
@@ -45,6 +46,9 @@ public class OzoneAdderSampleStat extends SampleStat {
     total = new DoubleAdder();
   }
 
+  /**
+   * Reset state.
+   */
   public void reset() {
     numSamples.reset();
     a0.reset();
@@ -238,10 +242,6 @@ public class OzoneAdderSampleStat extends SampleStat {
     public void reset(MinMax other) {
       min.set(other.min());
       max.set(other.max());
-    }
-    public void copyTo(MinMax other) {
-      other.min.set(other.min());
-      other.max.set(other.max());
     }
   }
 }

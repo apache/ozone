@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.util;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableStat;
-import org.apache.hadoop.ozone.metrics.MutableQuantiles;
+import org.apache.hadoop.ozone.metrics.OzoneMutableQuantiles;
 
 import java.io.Closeable;
 import java.util.List;
@@ -34,7 +34,7 @@ import java.util.Map;
  */
 public class PerformanceMetrics implements Closeable {
   private final MutableStat stat;
-  private final List<MutableQuantiles> quantiles;
+  private final List<OzoneMutableQuantiles> quantiles;
   private final MutableMinMax minMax;
 
   /**
