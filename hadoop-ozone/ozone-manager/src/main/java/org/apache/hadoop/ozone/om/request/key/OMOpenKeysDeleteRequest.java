@@ -161,8 +161,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
             omMetadataManager.getOpenKeyTable(getBucketLayout())
                 .get(fullKeyName);
         if (omKeyInfo != null) {
-          if (ozoneManager.isRatisEnabled() &&
-              trxnLogIndex < omKeyInfo.getUpdateID()) {
+          if (trxnLogIndex < omKeyInfo.getUpdateID()) {
             LOG.warn("Transaction log index {} is smaller than " +
                 "the current updateID {} of key {}, skipping deletion.",
                 trxnLogIndex, omKeyInfo.getUpdateID(), fullKeyName);

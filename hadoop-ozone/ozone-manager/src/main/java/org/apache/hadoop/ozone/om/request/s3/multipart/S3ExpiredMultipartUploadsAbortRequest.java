@@ -230,8 +230,7 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
             omMetadataManager.getMultipartInfoTable().get(expiredMPUKeyName);
 
         if (omMultipartKeyInfo != null) {
-          if (ozoneManager.isRatisEnabled() &&
-              trxnLogIndex < omMultipartKeyInfo.getUpdateID()) {
+          if (trxnLogIndex < omMultipartKeyInfo.getUpdateID()) {
             LOG.warn("Transaction log index {} is smaller than " +
                     "the current updateID {} of MPU key {}, skipping deletion.",
                 trxnLogIndex, omMultipartKeyInfo.getUpdateID(),
