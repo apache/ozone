@@ -103,8 +103,8 @@ public class S3MultipartUploadCommitPartResponse extends OmKeyResponse {
 
       RepeatedOmKeyInfo repeatedOmKeyInfo =
           OmUtils.prepareKeyForDelete(openPartKeyInfoToBeDeleted,
-              openPartKeyInfoToBeDeleted.getUpdateID(),
-              isRatisEnabled);
+              openPartKeyInfoToBeDeleted.getUpdateID()
+          );
       // multi-part key format is volumeName/bucketName/keyName/uploadId
       String deleteKey = omMetadataManager.getOzoneDeletePathKey(
           openPartKeyInfoToBeDeleted.getObjectID(), multipartKey);
@@ -137,7 +137,7 @@ public class S3MultipartUploadCommitPartResponse extends OmKeyResponse {
 
       RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
           partKeyToBeDeleted,
-          omMultipartKeyInfo.getUpdateID(), isRatisEnabled);
+          omMultipartKeyInfo.getUpdateID());
       // multi-part key format is volumeName/bucketName/keyName/uploadId
       String deleteKey = omMetadataManager.getOzoneDeletePathKey(
           partKeyToBeDeleted.getObjectID(), multipartKey);

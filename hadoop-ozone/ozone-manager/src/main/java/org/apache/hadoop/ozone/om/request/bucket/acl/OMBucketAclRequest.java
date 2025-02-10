@@ -108,8 +108,7 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
       }
 
       operationResult = omBucketAclOp.test(ozoneAcls, omBucketInfo);
-      omBucketInfo.setUpdateID(transactionLogIndex,
-          ozoneManager.isRatisEnabled());
+      omBucketInfo.setUpdateID(transactionLogIndex);
 
       if (operationResult) {
         // Update the modification time when updating ACLs of Bucket.

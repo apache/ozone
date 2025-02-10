@@ -308,7 +308,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName)),
           CacheValue.get(trxnLogIndex));
 
-      omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+      omKeyInfo.setUpdateID(trxnLogIndex);
       quotaReleased += sumBlockLengths(omKeyInfo);
 
       // If omKeyInfo has hsync metadata, delete its corresponding open key as well

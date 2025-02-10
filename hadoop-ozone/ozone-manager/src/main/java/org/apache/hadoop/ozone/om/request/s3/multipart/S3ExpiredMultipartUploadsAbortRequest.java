@@ -240,8 +240,7 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
           }
 
           // Set the UpdateID to current transactionLogIndex
-          omMultipartKeyInfo.setUpdateID(trxnLogIndex,
-              ozoneManager.isRatisEnabled());
+          omMultipartKeyInfo.setUpdateID(trxnLogIndex);
 
           // Parse the multipart upload components (e.g. volume, bucket, key)
           // from the multipartInfoTable db key

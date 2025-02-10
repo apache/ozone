@@ -170,7 +170,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
           }
 
           // Set the UpdateID to current transactionLogIndex
-          omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+          omKeyInfo.setUpdateID(trxnLogIndex);
           deletedOpenKeys.put(fullKeyName, omKeyInfo);
 
           // Update openKeyTable cache.
