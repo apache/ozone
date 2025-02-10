@@ -108,13 +108,12 @@ public class TestQuasiClosedContainerHandler {
   }
 
   /**
-   * When a container is QUASI_CLOSED, and it has greater than 50% of its
+   * When a container is QUASI_CLOSED, and it has only 2
    * replicas in QUASI_CLOSED state with unique origin node id,
-   * the handler should send force close commands to the replica(s) with
-   * highest BCSID.
+   * the handler should not force close it as all 3 unique replicas are needed.
    */
   @Test
-  public void testQuasiClosedWithQuorumReturnsTrue() {
+  public void testQuasiClosedWithQuorumReturnsFalse() {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
         ratisReplicationConfig, 1, QUASI_CLOSED);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
@@ -140,14 +139,48 @@ public class TestQuasiClosedContainerHandler {
 
     assertFalse(quasiClosedContainerHandler.handle(request));
     assertFalse(quasiClosedContainerHandler.handle(readRequest));
-    verify(replicationManager, times(2))
+    verify(replicationManager, times(0))
+        .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
+    assertEquals(1, request.getReport().getStat(
+        ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK));
+  }
+
+  /**
+   * When a container is QUASI_CLOSED, and all 3 replicas are reported with unique
+   * origins, it should be forced closed.
+   */
+  @Test
+  public void testQuasiClosedWithAllUniqueOriginSendsForceClose() {
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        ratisReplicationConfig, 1, QUASI_CLOSED);
+    // These 3 replicas will have the same BCSID and unique origin node ids
+    Set<ContainerReplica> containerReplicas = ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(),
+            State.QUASI_CLOSED, 0, 0, 0);
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .build();
+    ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .setReadOnly(true)
+        .build();
+
+    assertFalse(quasiClosedContainerHandler.handle(request));
+    assertFalse(quasiClosedContainerHandler.handle(readRequest));
+    verify(replicationManager, times(3))
         .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
   }
 
   /**
    * The replicas are QUASI_CLOSED, but all of them have the same origin node
-   * id. Since a quorum (greater than 50% of replicas with unique origin node
-   * ids in QUASI_CLOSED state) is not formed, the handler should return false.
+   * id. Since all replicas must have unique origin node ids, the handler
+   * should not force close it.
    */
   @Test
   public void testHealthyQuasiClosedContainerReturnsFalse() {
@@ -172,8 +205,7 @@ public class TestQuasiClosedContainerHandler {
 
   /**
    * Only one replica is in QUASI_CLOSED state. This fails the condition of
-   * having greater than 50% of replicas with unique origin nodes in
-   * QUASI_CLOSED state. The handler should return false.
+   * having all replicas with unique origin nodes in QUASI_CLOSED state.
    */
   @Test
   public void testQuasiClosedWithTwoOpenReplicasReturnsFalse() {

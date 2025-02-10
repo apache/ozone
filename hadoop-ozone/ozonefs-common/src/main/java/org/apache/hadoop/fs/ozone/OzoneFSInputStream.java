@@ -105,6 +105,11 @@ public class OzoneFSInputStream extends FSInputStream
   }
 
   @Override
+  public long skip(long n) throws IOException {
+    return inputStream.skip(n);
+  }
+
+  @Override
   public boolean seekToNewSource(long targetPos) throws IOException {
     return false;
   }

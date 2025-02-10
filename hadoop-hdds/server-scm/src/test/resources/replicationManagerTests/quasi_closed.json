@@ -1,0 +1,62 @@
+[
+  { "description": "Quasi-closed replicas with one open", "containerState": "QUASI_CLOSED", "replicationConfig": "RATIS:THREE", "sequenceId": 12,
+    "replicas": [
+      { "state": "QUASI_CLOSED", "index": 0,   "datanode": "d1", "sequenceId": 12, "isEmpty": false, "origin": "o1"},
+      { "state": "QUASI_CLOSED", "index": 0,   "datanode": "d2", "sequenceId": 12, "isEmpty": false, "origin": "o2"},
+      { "state": "OPEN",         "index": 0,   "datanode": "d3", "sequenceId": 12, "isEmpty": false, "origin": "o3"}
+    ],
+    "expectation": { "overReplicated": 0, "overReplicatedQueue":  0, "quasiClosedStuck": 1},
+    "checkCommands": [
+      { "type": "closeContainerCommand", "datanode": "d3" }
+    ],
+    "commands": []
+  },
+  { "description": "Quasi-closed with 2 replicas", "containerState": "QUASI_CLOSED", "replicationConfig": "RATIS:THREE", "sequenceId": 12,
+    "replicas": [
+      { "state": "QUASI_CLOSED", "index": 0,   "datanode": "d1", "sequenceId": 12, "isEmpty": false, "origin": "o1"},
+      { "state": "QUASI_CLOSED", "index": 0,   "datanode": "d2", "sequenceId": 12, "isEmpty": false, "origin": "o2"}
+    ],
+    "expectation": { "underReplicated": 1, "underReplicatedQueue": 1, "overReplicated": 0, "overReplicatedQueue":  0, "quasiClosedStuck": 1},
+    "checkCommands": [],
+    "commands": [
+      { "type": "replicateContainerCommand" }
+    ]
+  },
+  { "description": "Quasi-closed with 3 replicas 2 origins", "containerState": "QUASI_CLOSED", "replicationConfig": "RATIS:THREE", "sequenceId": 12,
+    "replicas": [
+      { "state": "QUASI_CLOSED", "index": 0,   "datanode": "d1", "sequenceId": 12, "isEmpty": false, "origin": "o1"},
+      { "state": "QUASI_CLOSED", "index": 0,   "datanode": "d2", "sequenceId": 12, "isEmpty": false, "origin": "o2"},
+      { "state": "QUASI_CLOSED", "index": 0,   "datanode": "d3", "sequenceId": 12, "isEmpty": false, "origin": "o2"}
+    ],
+    "expectation": { "underReplicated": 0, "underReplicatedQueue": 0, "overReplicated": 0, "overReplicatedQueue":  0, "quasiClosedStuck": 1},
+    "checkCommands": [],
+    "commands": []
+  },
+  { "description": "Quasi-closed with 3 replicas 3 origins", "containerState": "QUASI_CLOSED", "replicationConfig": "RATIS:THREE", "sequenceId": 12,
+    "replicas": [
+      { "state": "QUASI_CLOSED", "index": 0,   "datanode": "d1", "sequenceId": 12, "isEmpty": false, "origin": "o1"},
+      { "state": "QUASI_CLOSED", "index": 0,   "datanode": "d2", "sequenceId": 12, "isEmpty": false, "origin": "o2"},
+      { "state": "QUASI_CLOSED", "index": 0,   "datanode": "d3", "sequenceId": 12, "isEmpty": false, "origin": "o3"}
+    ],
+    "expectation": { "underReplicated": 0, "underReplicatedQueue": 0, "overReplicated": 0, "overReplicatedQueue":  0, "quasiClosedStuck": 0 },
+    "checkCommands": [
+      { "type": "closeContainerCommand", "datanode": "d1" },
+      { "type": "closeContainerCommand", "datanode": "d2" },
+      { "type": "closeContainerCommand", "datanode": "d3" }
+    ],
+    "commands": []
+  },
+  { "description": "Quasi-closed with 3 replicas 3 origins different BCSID", "containerState": "QUASI_CLOSED", "replicationConfig": "RATIS:THREE", "sequenceId": 12,
+    "replicas": [
+      { "state": "QUASI_CLOSED", "index": 0,   "datanode": "d1", "sequenceId": 12, "isEmpty": false, "origin": "o1"},
+      { "state": "QUASI_CLOSED", "index": 0,   "datanode": "d2", "sequenceId": 12, "isEmpty": false, "origin": "o2"},
+      { "state": "QUASI_CLOSED", "index": 0,   "datanode": "d3", "sequenceId": 11, "isEmpty": false, "origin": "o3"}
+    ],
+    "expectation": { "underReplicated": 0, "underReplicatedQueue": 0, "overReplicated": 0, "overReplicatedQueue":  0, "quasiClosedStuck": 0 },
+    "checkCommands": [
+      { "type": "closeContainerCommand", "datanode": "d1" },
+      { "type": "closeContainerCommand", "datanode": "d2" }
+    ],
+    "commands": []
+  }
+]

@@ -101,7 +101,6 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-rocks-native</artifactId>
-      <version>${project.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
@@ -127,15 +126,6 @@
         <configuration>
           <proc>none</proc>
         </configuration>
-      </plugin>
-      <plugin>
-        <artifactId>maven-enforcer-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>depcheck</id>
-            <phase />
-          </execution>
-        </executions>
       </plugin>
     </plugins>
   </build>

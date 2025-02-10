@@ -51,6 +51,7 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
   private long cachedUsedSpace;
   private long cachedAvailable;
   private long cachedCapacity;
+  private SpaceUsageSource cachedUsage;
   private final Duration refresh;
   private final SpaceUsageSource source;
   private final SpaceUsagePersistence persistence;
@@ -104,7 +105,15 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
   @Override
   public SpaceUsageSource snapshot() {
     try (AutoCloseableLock ignored = lock.readLock(null, null)) {
-      return new Fixed(cachedCapacity, cachedAvailable, cachedUsedSpace);
+      if (cachedUsage != null) {
+        return cachedUsage;
+      }
+    }
+    try (AutoCloseableLock ignored = lock.writeLock(null, null)) {
+      if (cachedUsage == null) {
+        cachedUsage = new Fixed(cachedCapacity, cachedAvailable, cachedUsedSpace);
+      }
+      return cachedUsage;
     }
   }
 
@@ -119,6 +128,7 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
       change = Math.min(current, usedSpace);
       cachedAvailable -= change;
       cachedUsedSpace += change;
+      cachedUsage = null;
     }
 
     if (change != usedSpace) {
@@ -138,6 +148,7 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
       change = Math.min(current, reclaimedSpace);
       cachedUsedSpace -= change;
       cachedAvailable += change;
+      cachedUsage = null;
     }
 
     if (change != reclaimedSpace) {
@@ -202,6 +213,7 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
     try (AutoCloseableLock ignored = lock.writeLock(null, null)) {
       cachedAvailable = available;
       cachedCapacity = capacity;
+      cachedUsage = null;
     }
   }
 
@@ -215,6 +227,7 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
       cachedAvailable = available;
       cachedCapacity = capacity;
       cachedUsedSpace = used;
+      cachedUsage = null;
     }
   }
 

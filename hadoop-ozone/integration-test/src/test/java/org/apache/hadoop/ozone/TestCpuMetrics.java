@@ -22,13 +22,11 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KE
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
-import java.util.concurrent.TimeoutException;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.junit.jupiter.api.BeforeAll;
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -37,25 +35,15 @@ import org.junit.jupiter.api.Test;
  *  <p>jvm_metrics_cpu_system_load</p>
  *  <p>jvm_metrics_cpu_jvm_load</p>
  */
-public class TestCpuMetrics {
+public abstract class TestCpuMetrics implements NonHATests.TestCase {
 
-  private static MiniOzoneCluster cluster;
   private final OkHttpClient httpClient = new OkHttpClient();
-
-  @BeforeAll
-  public static void setup() throws InterruptedException, TimeoutException,
-      IOException {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(1).build();
-    cluster.waitForClusterToBeReady();
-  }
 
   @Test
   public void testCpuMetrics() throws IOException {
     // given
     String scmHttpServerUrl = "http://localhost:" +
-        HddsUtils.getPortNumberFromConfigKeys(cluster.getConf(),
+        HddsUtils.getPortNumberFromConfigKeys(cluster().getConf(),
                 OZONE_SCM_HTTP_ADDRESS_KEY).getAsInt();
     Request prometheusMetricsRequest = new Request.Builder()
         .url(scmHttpServerUrl + "/prom")
