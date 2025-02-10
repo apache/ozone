@@ -18,8 +18,7 @@
 package org.apache.hadoop.ozone.metrics;
 
 /**
- * A convenient mutable metric for throughput measurement.
- * (non-synchronized version of org.apache.hadoop.metrics2.lib.MutableRate)
+ * Non-synchronized version of {@link org.apache.hadoop.metrics2.lib.MutableRate}.
  */
 public class OzoneMutableRate extends OzoneMutableStat {
 

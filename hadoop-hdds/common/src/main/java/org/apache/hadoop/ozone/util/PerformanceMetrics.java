@@ -23,7 +23,7 @@ import java.util.Map;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableStat;
-import org.apache.hadoop.ozone.metrics.MutableQuantiles;
+import org.apache.hadoop.ozone.metrics.OzoneMutableQuantiles;
 
 /**
  * The {@code PerformanceMetrics} class encapsulates a collection of related
@@ -33,7 +33,7 @@ import org.apache.hadoop.ozone.metrics.MutableQuantiles;
  */
 public class PerformanceMetrics implements Closeable {
   private final MutableStat stat;
-  private final List<MutableQuantiles> quantiles;
+  private final List<OzoneMutableQuantiles> quantiles;
   private final MutableMinMax minMax;
 
   /**

@@ -29,7 +29,7 @@ import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.metrics.MutableQuantiles;
+import org.apache.hadoop.ozone.metrics.OzoneMutableQuantiles;
 import org.apache.hadoop.ozone.metrics.OzoneMutableRate;
 import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
@@ -67,14 +67,14 @@ public final class ContainerClientMetrics {
   private MutableCounterLong flushesDuringWrite;
 
 
-  private MutableQuantiles[] listBlockLatency;
-  private MutableQuantiles[] getBlockLatency;
-  private MutableQuantiles[] getCommittedBlockLengthLatency;
-  private MutableQuantiles[] readChunkLatency;
-  private MutableQuantiles[] getSmallFileLatency;
-  private MutableQuantiles[] hsyncLatencyNs;
-  private MutableQuantiles[] omHsyncLatencyNs;
-  private MutableQuantiles[] datanodeHsyncLatencyNs;
+  private OzoneMutableQuantiles[] listBlockLatency;
+  private OzoneMutableQuantiles[] getBlockLatency;
+  private OzoneMutableQuantiles[] getCommittedBlockLengthLatency;
+  private OzoneMutableQuantiles[] readChunkLatency;
+  private OzoneMutableQuantiles[] getSmallFileLatency;
+  private OzoneMutableQuantiles[] hsyncLatencyNs;
+  private OzoneMutableQuantiles[] omHsyncLatencyNs;
+  private OzoneMutableQuantiles[] datanodeHsyncLatencyNs;
   private final Map<PipelineID, MutableCounterLong> writeChunkCallsByPipeline;
   private final Map<PipelineID, MutableCounterLong> writeChunkBytesByPipeline;
   private final Map<UUID, MutableCounterLong> writeChunksCallsByLeaders;
@@ -110,14 +110,14 @@ public final class ContainerClientMetrics {
     writeChunkBytesByPipeline = new ConcurrentHashMap<>();
     writeChunksCallsByLeaders = new ConcurrentHashMap<>();
 
-    listBlockLatency = new MutableQuantiles[3];
-    getBlockLatency = new MutableQuantiles[3];
-    getCommittedBlockLengthLatency = new MutableQuantiles[3];
-    readChunkLatency = new MutableQuantiles[3];
-    getSmallFileLatency = new MutableQuantiles[3];
-    hsyncLatencyNs = new MutableQuantiles[3];
-    omHsyncLatencyNs = new MutableQuantiles[3];
-    datanodeHsyncLatencyNs = new MutableQuantiles[3];
+    listBlockLatency = new OzoneMutableQuantiles[3];
+    getBlockLatency = new OzoneMutableQuantiles[3];
+    getCommittedBlockLengthLatency = new OzoneMutableQuantiles[3];
+    readChunkLatency = new OzoneMutableQuantiles[3];
+    getSmallFileLatency = new OzoneMutableQuantiles[3];
+    hsyncLatencyNs = new OzoneMutableQuantiles[3];
+    omHsyncLatencyNs = new OzoneMutableQuantiles[3];
+    datanodeHsyncLatencyNs = new OzoneMutableQuantiles[3];
     int[] intervals = {60, 300, 900};
     for (int i = 0; i < intervals.length; i++) {
       int interval = intervals[i];
@@ -194,7 +194,7 @@ public final class ContainerClientMetrics {
   }
 
   public void addListBlockLatency(long latency) {
-    for (MutableQuantiles q : listBlockLatency) {
+    for (OzoneMutableQuantiles q : listBlockLatency) {
       if (q != null) {
         q.add(latency);
       }
@@ -202,7 +202,7 @@ public final class ContainerClientMetrics {
   }
 
   public void addHsyncLatency(long hsyncLatencyTime) {
-    for (MutableQuantiles q : hsyncLatencyNs) {
+    for (OzoneMutableQuantiles q : hsyncLatencyNs) {
       if (q != null) {
         q.add(hsyncLatencyTime);
       }
@@ -210,7 +210,7 @@ public final class ContainerClientMetrics {
   }
 
   public void addGetBlockLatency(long latency) {
-    for (MutableQuantiles q : getBlockLatency) {
+    for (OzoneMutableQuantiles q : getBlockLatency) {
       if (q != null) {
         q.add(latency);
       }
@@ -218,7 +218,7 @@ public final class ContainerClientMetrics {
   }
 
   public void addOMHsyncLatency(long hsyncLatencyTime) {
-    for (MutableQuantiles q : omHsyncLatencyNs) {
+    for (OzoneMutableQuantiles q : omHsyncLatencyNs) {
       if (q != null) {
         q.add(hsyncLatencyTime);
       }
@@ -226,7 +226,7 @@ public final class ContainerClientMetrics {
   }
 
   public void addGetCommittedBlockLengthLatency(long latency) {
-    for (MutableQuantiles q : getCommittedBlockLengthLatency) {
+    for (OzoneMutableQuantiles q : getCommittedBlockLengthLatency) {
       if (q != null) {
         q.add(latency);
       }
@@ -234,7 +234,7 @@ public final class ContainerClientMetrics {
   }
 
   public void addReadChunkLatency(long latency) {
-    for (MutableQuantiles q : readChunkLatency) {
+    for (OzoneMutableQuantiles q : readChunkLatency) {
       if (q != null) {
         q.add(latency);
       }
@@ -242,7 +242,7 @@ public final class ContainerClientMetrics {
   }
 
   public void addGetSmallFileLatency(long latency) {
-    for (MutableQuantiles q : getSmallFileLatency) {
+    for (OzoneMutableQuantiles q : getSmallFileLatency) {
       if (q != null) {
         q.add(latency);
       }
@@ -250,7 +250,7 @@ public final class ContainerClientMetrics {
   }
 
   public void addDataNodeHsyncLatency(long hsyncLatencyTime) {
-    for (MutableQuantiles q : datanodeHsyncLatencyNs) {
+    for (OzoneMutableQuantiles q : datanodeHsyncLatencyNs) {
       if (q != null) {
         q.add(hsyncLatencyTime);
       }

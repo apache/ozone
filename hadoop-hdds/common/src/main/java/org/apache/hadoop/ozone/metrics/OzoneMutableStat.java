@@ -50,22 +50,37 @@ public class OzoneMutableStat extends MutableStat {
   private final OzoneAdderSampleStat.MinMax minMax = new OzoneAdderSampleStat.MinMax();
   private volatile long numSamples = 0;
   private long snapshotTimeStamp = 0;
-  private AtomicBoolean extended = new AtomicBoolean();
-  private AtomicBoolean updateTimeStamp = new AtomicBoolean();
+  private final AtomicBoolean extended = new AtomicBoolean();
+  private final AtomicBoolean updateTimeStamp = new AtomicBoolean();
 
-  private AtomicBoolean changed = new AtomicBoolean();
+  private final AtomicBoolean changed = new AtomicBoolean();
 
-  private ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+  private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
-  private ReentrantReadWriteLock.ReadLock readLock = lock.readLock();
+  private final ReentrantReadWriteLock.ReadLock readLock = lock.readLock();
 
-  private ReentrantReadWriteLock.WriteLock writeLock = lock.writeLock();
+  private final ReentrantReadWriteLock.WriteLock writeLock = lock.writeLock();
 
+  /**
+   * Construct a sample statistics metric.
+   * @param name        of the metric
+   * @param description of the metric
+   * @param sampleName  of the metric (e.g. "Ops")
+   * @param valueName   of the metric (e.g. "Time", "Latency")
+   */
   public OzoneMutableStat(String name, String description,
                      String sampleName, String valueName) {
     this(name, description, sampleName, valueName, false);
   }
 
+  /**
+   * Construct a sample statistics metric.
+   * @param name        of the metric
+   * @param description of the metric
+   * @param sampleName  of the metric (e.g. "Ops")
+   * @param valueName   of the metric (e.g. "Time", "Latency")
+   * @param extended    create extended stats (stdev, min/max etc.) by default.
+   */
   public OzoneMutableStat(String name, String description,
                      String sampleName, String valueName, boolean extended) {
 
@@ -158,7 +173,6 @@ public class OzoneMutableStat extends MutableStat {
     }
   }
 
-  @Override
   public void snapshot(MetricsRecordBuilder builder, boolean all) {
     try {
       writeLock.lock();

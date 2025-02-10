@@ -28,6 +28,7 @@ import org.apache.hadoop.metrics2.util.QuantileEstimator;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
@@ -39,51 +40,34 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * Implementation of the Cormode, Korn, Muthukrishnan, and Srivastava algorithm.
- * For streaming calculation of targeted high-percentile epsilon-approximate
- * quantiles.
- *
- * This is a generalization of the earlier work by Greenwald and Khanna (GK),
- * which essentially allows different error bounds on the targeted quantiles,
- * which allows for far more efficient calculation of high-percentiles.
- *
- * See: Cormode, Korn, Muthukrishnan, and Srivastava
- * "Effective Computation of Biased Quantiles over Data Streams" in ICDE 2005
- *
- * Greenwald and Khanna,
- * "Space-efficient online computation of quantile summaries" in SIGMOD 2001
- * (non-synchronized version of org.apache.hadoop.metrics2.util.SampleQuantiles)
+ * Non-synchronized version of {@link org.apache.hadoop.metrics2.util.SampleQuantiles}.
  */
-public class SampleQuantiles implements QuantileEstimator {
+public class OzoneSampleQuantiles implements QuantileEstimator {
 
   private static final int BUFFER_SIZE = 500;
 
   private final BlockingQueue<Long> samplesBuffer =
-      new ArrayBlockingQueue<Long>(BUFFER_SIZE, true);
-
-  /**
-   * Total number of items in stream.
-   */
-  private AtomicLong count = new AtomicLong();
-
-  /**
-   * Current list of sampled items.
-   * Maintained in sorted order with error bounds.
-   */
-  private LinkedList<SampleItem> samples;
+      new ArrayBlockingQueue<>(BUFFER_SIZE, true);
 
   /**
    * Array of Quantiles that we care about, along with desired error.
    */
   private final Quantile[] quantiles;
-
   private final ReentrantReadWriteLock samplesLock =
       new ReentrantReadWriteLock();
-
   private final ReentrantReadWriteLock samplesBufferLock =
       new ReentrantReadWriteLock();
+  /**
+   * Total number of items in stream.
+   */
+  private final AtomicLong count = new AtomicLong();
+  /**
+   * Current list of sampled items.
+   * Maintained in sorted order with error bounds.
+   */
+  private final LinkedList<SampleItem> samples;
 
-  public SampleQuantiles(Quantile[] quantiles) {
+  public OzoneSampleQuantiles(Quantile[] quantiles) {
     this.quantiles = Arrays.copyOf(quantiles, quantiles.length);
     this.samples = new LinkedList<>();
   }
@@ -91,12 +75,11 @@ public class SampleQuantiles implements QuantileEstimator {
   /**
    * Specifies the allowable error for this rank.
    * (depending on which quantiles are being targeted)
-   *
+   * <p>
    * This is the f(r_i, n) function from the CKMS paper. It's basically how wide
    * the range of this rank can be.
    *
-   * @param rank
-   *          the index in the list of samples
+   * @param rank the index in the list of samples
    */
   private double allowableError(int rank) {
     int size = samples.size();
@@ -122,27 +105,24 @@ public class SampleQuantiles implements QuantileEstimator {
    * @param v v.
    */
   public void insert(long v) {
-    samplesBufferLock.readLock().lock();
+    samplesBufferLock.writeLock().lock();
     try {
-      samplesBuffer.put(v);
+      if (samplesBuffer.size() == 500) {
+        samplesLock.writeLock().lock();
+        try {
+          insertBatch();
+          compress();
+        } finally {
+          samplesLock.writeLock().unlock();
+        }
+      }
 
+      samplesBuffer.put(v);
       count.getAndIncrement();
     } catch (InterruptedException e) {
       throw new MetricsException("New quantiles sample won't be added!", e);
     } finally {
-      samplesBufferLock.readLock().unlock();
-    }
-
-    if (samplesBuffer.size() == 500) {
-      samplesBufferLock.writeLock().lock();
-      samplesLock.writeLock().lock();
-      try {
-        insertBatch();
-        compress();
-      } finally {
-        samplesBufferLock.writeLock().unlock();
-        samplesLock.writeLock().unlock();
-      }
+      samplesBufferLock.writeLock().unlock();
     }
   }
 
@@ -151,23 +131,28 @@ public class SampleQuantiles implements QuantileEstimator {
    * This is more efficient than doing an insert on every item.
    */
   private void insertBatch() {
+
+    if (samplesBuffer.isEmpty()) {
+      return;
+    }
+
     List<Long> buffer = new ArrayList<>();
     samplesBuffer.drainTo(buffer);
-    Object[] buffer1 = buffer.toArray();
-    Arrays.sort(buffer1, 0, buffer.size());
+    Object[] objectBuffer = buffer.toArray();
+    Arrays.sort(objectBuffer, 0, buffer.size());
 
     // Base case: no samples
     int start = 0;
     if (samples.isEmpty()) {
-      SampleItem newItem = new SampleItem((Long) buffer1[0], 1, 0);
+      SampleItem newItem = new SampleItem((Long) objectBuffer[0], 1, 0);
       samples.add(newItem);
       start++;
     }
 
     ListIterator<SampleItem> it = samples.listIterator();
     SampleItem item = it.next();
-    for (int i = start; i < buffer1.length; i++) {
-      long v = (long) buffer1[i];
+    for (int i = start; i < objectBuffer.length; i++) {
+      long v = (long) objectBuffer[i];
       while (it.nextIndex() < samples.size() && item.value < v) {
         item = it.next();
       }
@@ -271,7 +256,7 @@ public class SampleQuantiles implements QuantileEstimator {
       }
 
       if (samples.isEmpty()) {
-        return null;
+        return Collections.emptyMap();
       }
 
       Map<Quantile, Long> values = new TreeMap<>();
@@ -349,20 +334,18 @@ public class SampleQuantiles implements QuantileEstimator {
      * Value of the sampled item (e.g. a measured latency value)
      */
     private final long value;
-
-    /**
-     * Difference between the lowest possible rank of the previous item.
-     * And the lowest possible rank of this item.
-     *
-     * The sum of the g of all previous items yields this item's lower bound.
-     */
-    private int g;
-
     /**
      * Difference between the item's greatest possible rank and lowest possible
      * rank.
      */
     private final int delta;
+    /**
+     * Difference between the lowest possible rank of the previous item.
+     * And the lowest possible rank of this item.
+     * <p>
+     * The sum of the g of all previous items yields this item's lower bound.
+     */
+    private int g;
 
     SampleItem(long value, int lowerDelta, int delta) {
       this.value = value;

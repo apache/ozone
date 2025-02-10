@@ -28,7 +28,7 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.hadoop.ozone.metrics.MutableQuantiles;
+import org.apache.hadoop.ozone.metrics.OzoneMutableQuantiles;
 import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 import org.apache.hadoop.ozone.metrics.OzoneMutableRate;
 import org.apache.hadoop.ozone.util.MetricUtil;
@@ -61,12 +61,12 @@ public class ContainerMetrics implements Closeable {
   private final EnumMap<ContainerProtos.Type, MutableCounterLong> numOpsArray;
   private final EnumMap<ContainerProtos.Type, MutableCounterLong> opsBytesArray;
   private final EnumMap<ContainerProtos.Type, OzoneMutableRate> opsLatency;
-  private final EnumMap<ContainerProtos.Type, MutableQuantiles[]> opsLatQuantiles;
+  private final EnumMap<ContainerProtos.Type, OzoneMutableQuantiles[]> opsLatQuantiles;
   private MetricsRegistry registry = null;
 
   public ContainerMetrics(int[] intervals) {
     final int len = intervals.length;
-    MutableQuantiles[] latQuantiles = new MutableQuantiles[len];
+    OzoneMutableQuantiles[] latQuantiles = new OzoneMutableQuantiles[len];
     this.numOpsArray = new EnumMap<>(ContainerProtos.Type.class);
     this.opsBytesArray = new EnumMap<>(ContainerProtos.Type.class);
     this.opsLatency = new EnumMap<>(ContainerProtos.Type.class);
@@ -120,7 +120,7 @@ public class ContainerMetrics implements Closeable {
 
   public void incContainerOpsLatencies(ContainerProtos.Type type, long latencyNs) {
     opsLatency.get(type).add(latencyNs);
-    for (MutableQuantiles q: opsLatQuantiles.get(type)) {
+    for (OzoneMutableQuantiles q: opsLatQuantiles.get(type)) {
       q.add(latencyNs);
     }
   }
