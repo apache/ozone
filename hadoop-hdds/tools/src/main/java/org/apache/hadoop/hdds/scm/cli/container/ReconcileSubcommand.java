@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 import java.util.Iterator;
-import java.util.stream.Stream;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.SequenceWriter;
@@ -41,7 +40,7 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 /**
- * Handle the container reconcile command.
+ * Handle the container reconcile CLI command.
  */
 @Command(
     name = "reconcile",
@@ -55,7 +54,7 @@ public class ReconcileSubcommand extends ScmSubcommand {
       "separated by newlines.",
       arity = "1..*",
       paramLabel = "<container ID>")
-  private String[] containerList;
+  private List<String> containerList;
 
   @CommandLine.Option(names = { "--status" },
       defaultValue = "false",
@@ -66,12 +65,13 @@ public class ReconcileSubcommand extends ScmSubcommand {
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     Iterator<String> idIterator;
-    if (containerList[0].equals("-")) {
+    // PicoCLI arity check guarantees at least one element will be present.
+    if (containerList.get(0).equals("-")) {
       // Read from stdin.
       idIterator = new Scanner(System.in, StandardCharsets.UTF_8.name());
     } else {
       // A list of containers was provided.
-      idIterator = Stream.of(containerList).iterator();
+      idIterator = containerList.iterator();
     }
 
     if (status) {
@@ -88,14 +88,22 @@ public class ReconcileSubcommand extends ScmSubcommand {
           }
         }
         if (invalidCount > 0) {
-          throw new RuntimeException("Failed to process reconciliation status for " + invalidCount + " containers.");
+          throw new RuntimeException("Failed to process reconciliation status for " + invalidCount + " containers");
         }
       }
     } else {
-      // TODO this will fail on the server side if invalid.
+      int invalidCount = 0;
       while (idIterator.hasNext()) {
         long containerID = Long.parseLong(idIterator.next());
-        executeReconciliation(scmClient, containerID);
+        try {
+          executeReconciliation(scmClient, containerID);
+        } catch (Exception ex) {
+          System.err.println("Failed to send reconciliation to container " + containerID + ": " + ex.getMessage());
+          invalidCount++;
+        }
+      }
+      if (invalidCount > 0) {
+        throw new RuntimeException("Failed trigger reconciliation for " + invalidCount + " containers");
       }
     }
   }
