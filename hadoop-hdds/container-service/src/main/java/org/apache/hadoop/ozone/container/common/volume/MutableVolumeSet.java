@@ -230,8 +230,6 @@ public class MutableVolumeSet implements VolumeSet {
     }
 
     if (failedVolumeMap.size() > 0 || failedVolumes.size() > 0) {
-      LOG.warn("checkAllVolumes got {} failed volumes - {}",
-          failedVolumes.size(), failedVolumes);
       handleVolumeFailures(failedVolumes);
     } else {
       LOG.debug("checkAllVolumes encountered no failures");
