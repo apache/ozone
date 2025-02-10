@@ -24,6 +24,8 @@ import org.apache.logging.log4j.Logger;
 
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 
+import static org.apache.hadoop.hdds.HddsUtils.getHexString;
+
 /**
  * Utility class defining methods to write to the datanode container log.
  *
@@ -144,6 +146,18 @@ public final class ContainerLogger {
    */
   public static void logRecovered(ContainerData containerData) {
     LOG.info(getMessage(containerData));
+  }
+
+  /**
+   * Logged when a container is reconciled.
+   *
+   * @param containerData The container that was reconciled on this datanode.
+   * @param oldDataChecksum The old data checksum.
+   * @param newDataChecksum The new data checksum.
+   */
+  public static void logReconciled(ContainerData containerData, long oldDataChecksum, long newDataChecksum) {
+    LOG.info(getMessage(containerData, "Container reconciled. Old checksum is " + getHexString(oldDataChecksum) +
+        " , New checksum is " + getHexString(newDataChecksum)));
   }
 
   private static String getMessage(ContainerData containerData,

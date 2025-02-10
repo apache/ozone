@@ -125,7 +125,7 @@ public class BlockManagerImpl implements BlockManager {
       // default blockCommitSequenceId for any block is 0. It the putBlock
       // request is not coming via Ratis(for test scenarios), it will be 0.
       // In such cases, we should overwrite the block as well
-      if ((bcsId != 0) && (bcsId <= containerBCSId)) {
+      if ((bcsId != 0) && (bcsId < containerBCSId)) {
         // Since the blockCommitSequenceId stored in the db is greater than
         // equal to blockCommitSequenceId to be updated, it means the putBlock
         // transaction is reapplied in the ContainerStateMachine on restart.
@@ -368,6 +368,19 @@ public class BlockManagerImpl implements BlockManager {
       }
     } finally {
       container.readUnlock();
+    }
+  }
+
+  @Override
+  public boolean blockExists(Container container, BlockID blockID) throws IOException {
+    KeyValueContainerData containerData = (KeyValueContainerData) container
+        .getContainerData();
+    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
+      // This is a post condition that acts as a hint to the user.
+      // Should never fail.
+      Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
+      String blockKey = containerData.getBlockKey(blockID.getLocalID());
+      return db.getStore().getBlockDataTable().isExist(blockKey);
     }
   }
 

@@ -315,7 +315,7 @@ public class ContainerChecksumTreeManager {
    * Callers are not required to hold a lock while calling this since writes are done to a tmp file and atomically
    * swapped into place.
    */
-  private Optional<ContainerProtos.ContainerChecksumInfo> read(ContainerData data) throws IOException {
+  public Optional<ContainerProtos.ContainerChecksumInfo> read(ContainerData data) throws IOException {
     long containerID = data.getContainerID();
     File checksumFile = getContainerChecksumFile(data);
     try {
