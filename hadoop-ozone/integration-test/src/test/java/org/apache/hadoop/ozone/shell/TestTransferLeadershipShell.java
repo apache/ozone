@@ -17,7 +17,7 @@
 package org.apache.hadoop.ozone.shell;
 
 
-import org.apache.hadoop.hdds.cli.OzoneAdmin;
+import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;

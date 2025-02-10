@@ -41,11 +41,23 @@ public abstract class SafeModeExitRule<T> implements EventHandler<T> {
   protected static final int SAMPLE_CONTAINER_DISPLAY_LIMIT = 5;
   protected static final int SAMPLE_PIPELINE_DISPLAY_LIMIT = 5;
 
+  // TODO: Report processing logic will be removed in future. HDDS-11958.
+  //   This flag is to add new code without breaking Safemode logic until we have HDDS-11958.
+  private boolean validateBasedOnReportProcessing = true;
+
   public SafeModeExitRule(SCMSafeModeManager safeModeManager,
       String ruleName, EventQueue eventQueue) {
     this.safeModeManager = safeModeManager;
     this.ruleName = ruleName;
     eventQueue.addHandler(getEventType(), this);
+  }
+
+  public void setValidateBasedOnReportProcessing(boolean newValue) {
+    validateBasedOnReportProcessing = newValue;
+  }
+
+  protected boolean validateBasedOnReportProcessing() {
+    return validateBasedOnReportProcessing;
   }
 
   /**

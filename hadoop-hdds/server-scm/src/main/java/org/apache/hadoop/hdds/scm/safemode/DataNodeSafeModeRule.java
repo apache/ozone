@@ -35,16 +35,18 @@ import org.apache.hadoop.hdds.server.events.TypedEvent;
 public class DataNodeSafeModeRule extends
     SafeModeExitRule<NodeRegistrationContainerReport> {
 
+  private static final String NAME = "DataNodeSafeModeRule";
+
   // Min DataNodes required to exit safe mode.
   private int requiredDns;
   private int registeredDns = 0;
   // Set to track registered DataNodes.
   private HashSet<UUID> registeredDnSet;
 
-  public DataNodeSafeModeRule(String ruleName, EventQueue eventQueue,
+  public DataNodeSafeModeRule(EventQueue eventQueue,
       ConfigurationSource conf,
       SCMSafeModeManager manager) {
-    super(manager, ruleName, eventQueue);
+    super(manager, NAME, eventQueue);
     requiredDns = conf.getInt(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE_DEFAULT);

@@ -17,16 +17,11 @@
  */
 package org.apache.hadoop.hdds.scm.cli.pipeline;
 
-import java.util.concurrent.Callable;
-
 import org.apache.hadoop.hdds.cli.AdminSubcommand;
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Model.CommandSpec;
-import picocli.CommandLine.Spec;
 
 /**
  * Subcommand to group pipeline related operations.
@@ -44,14 +39,6 @@ import picocli.CommandLine.Spec;
         ClosePipelineSubcommand.class
     })
 @MetaInfServices(AdminSubcommand.class)
-public class PipelineCommands implements Callable<Void>, AdminSubcommand {
+public class PipelineCommands implements AdminSubcommand {
 
-  @Spec
-  private CommandSpec spec;
-
-  @Override
-  public Void call() throws Exception {
-    GenericCli.missingSubcommand(spec);
-    return null;
-  }
 }

@@ -1,4 +1,4 @@
-# Licensed to the Apache Software Foundation (ASF) under one or more
+# Licensed to the Apache Software Foundation (ASF) under one or moreD
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
 # The ASF licenses this file to You under the Apache License, Version 2.0
@@ -77,17 +77,6 @@ Verbose container info
     ${output} =         Execute          ozone admin --verbose container info "${CONTAINER}"
                         Should contain   ${output}   Pipeline Info
 
-Incomplete command
-    ${output} =         Execute And Ignore Error     ozone admin container
-                        Should contain   ${output}   Incomplete command
-                        Should contain   ${output}   list
-                        Should contain   ${output}   info
-                        Should contain   ${output}   create
-                        Should contain   ${output}   close
-                        Should contain   ${output}   reconcile
-                        Should contain   ${output}   report
-                        Should contain   ${output}   upgrade
-
 List containers as JSON
     ${output} =         Execute          ozone admin container info "${CONTAINER}" --json | jq -r '.'
                         Should contain   ${output}    containerInfo
@@ -112,6 +101,17 @@ List all containers according to count (batchSize)
 List all containers from a particular container ID
     ${output} =         Execute          ozone admin container list --all --start 1
                         Should contain   ${output}   OPEN
+
+Incomplete command
+    ${output} =         Execute And Ignore Error     ozone admin container
+                        Should contain   ${output}   Missing required subcommand
+                        Should contain   ${output}   list
+                        Should contain   ${output}   info
+                        Should contain   ${output}   create
+                        Should contain   ${output}   close
+                        Should contain   ${output}   report
+                        Should contain   ${output}   upgrade
+                        Should contain   ${output}   reconcile
 
 #List containers on unknown host
 #    ${output} =         Execute And Ignore Error     ozone admin --verbose container list --scm unknown-host

@@ -293,8 +293,8 @@ public class TestLDBCli {
     // Prepare scan args
     List<String> completeScanArgs = new ArrayList<>();
     completeScanArgs.addAll(Arrays.asList(
-        "--db", dbStore.getDbLocation().getAbsolutePath(),
         "scan",
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
         "--column-family", tableName));
     completeScanArgs.addAll(scanArgs);
 
@@ -353,9 +353,9 @@ public class TestLDBCli {
     // Prepare scan args
     int maxRecordsPerFile = 2;
     List<String> completeScanArgs1 = new ArrayList<>(Arrays.asList(
-        "--db", dbStore.getDbLocation().getAbsolutePath(),
         "scan",
         "--column-family", KEY_TABLE, "--out", scanDir1 + File.separator + "keytable",
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
         "--max-records-per-file", String.valueOf(maxRecordsPerFile)));
     File tmpDir1 = new File(scanDir1);
     tmpDir1.deleteOnExit();

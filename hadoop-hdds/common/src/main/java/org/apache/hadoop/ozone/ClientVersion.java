@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone;
 import org.apache.hadoop.hdds.ComponentVersion;
 
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Map;
 
 import static java.util.function.Function.identity;
@@ -75,8 +76,8 @@ public enum ClientVersion implements ComponentVersion {
   }
 
   private static ClientVersion latest() {
-    ClientVersion[] versions = ClientVersion.values();
-    return versions[versions.length - 2];
+    return Arrays.stream(ClientVersion.values())
+        .max(Comparator.comparingInt(ComponentVersion::toProtoValue)).orElse(null);
   }
 
 }

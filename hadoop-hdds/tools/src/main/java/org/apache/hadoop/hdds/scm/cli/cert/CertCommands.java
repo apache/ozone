@@ -17,16 +17,11 @@
  */
 package org.apache.hadoop.hdds.scm.cli.cert;
 
-import java.util.concurrent.Callable;
-
 import org.apache.hadoop.hdds.cli.AdminSubcommand;
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Model.CommandSpec;
-import picocli.CommandLine.Spec;
 
 /**
  * Sub command for certificate related operations.
@@ -43,14 +38,5 @@ import picocli.CommandLine.Spec;
     })
 
 @MetaInfServices(AdminSubcommand.class)
-public class CertCommands implements Callable<Void>, AdminSubcommand {
-
-  @Spec
-  private CommandSpec spec;
-
-  @Override
-  public Void call() throws Exception {
-    GenericCli.missingSubcommand(spec);
-    return null;
-  }
+public class CertCommands implements AdminSubcommand {
 }

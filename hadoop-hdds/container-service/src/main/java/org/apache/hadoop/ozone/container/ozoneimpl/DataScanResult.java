@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTree;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 
 import java.util.Collections;
 import java.util.List;
@@ -31,12 +31,12 @@ import java.util.List;
  */
 public final class DataScanResult extends MetadataScanResult {
 
-  private final ContainerMerkleTree dataTree;
+  private final ContainerMerkleTreeWriter dataTree;
   // Only deleted results can be interned. Healthy results will still have different trees.
   private static final DataScanResult DELETED = new DataScanResult(Collections.emptyList(),
-      new ContainerMerkleTree(), true);
+      new ContainerMerkleTreeWriter(), true);
 
-  private DataScanResult(List<ContainerScanError> errors, ContainerMerkleTree dataTree, boolean deleted) {
+  private DataScanResult(List<ContainerScanError> errors, ContainerMerkleTreeWriter dataTree, boolean deleted) {
     super(errors, deleted);
     this.dataTree = dataTree;
   }
@@ -47,7 +47,7 @@ public final class DataScanResult extends MetadataScanResult {
    */
   public static DataScanResult unhealthyMetadata(MetadataScanResult result) {
     Preconditions.checkArgument(!result.isHealthy());
-    return new DataScanResult(result.getErrors(), new ContainerMerkleTree(), false);
+    return new DataScanResult(result.getErrors(), new ContainerMerkleTreeWriter(), false);
   }
 
   /**
@@ -60,11 +60,11 @@ public final class DataScanResult extends MetadataScanResult {
   /**
    * Constructs a data scan result whose health will be determined based on the presence of errors.
    */
-  public static DataScanResult fromErrors(List<ContainerScanError> errors, ContainerMerkleTree dataTree) {
+  public static DataScanResult fromErrors(List<ContainerScanError> errors, ContainerMerkleTreeWriter dataTree) {
     return new DataScanResult(errors, dataTree, false);
   }
 
-  public ContainerMerkleTree getDataTree() {
+  public ContainerMerkleTreeWriter getDataTree() {
     return dataTree;
   }
 }

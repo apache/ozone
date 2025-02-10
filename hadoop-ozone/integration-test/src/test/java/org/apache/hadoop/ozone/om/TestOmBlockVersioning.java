@@ -16,15 +16,12 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -40,50 +37,35 @@ import org.apache.commons.lang3.RandomStringUtils;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 
 /**
  * This class tests the versioning of blocks from OM side.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(300)
-public class TestOmBlockVersioning {
+public abstract class TestOmBlockVersioning implements NonHATests.TestCase {
 
-  private static MiniOzoneCluster cluster = null;
-  private static OzoneClient client;
-  private static OzoneConfiguration conf;
-  private static OzoneManager ozoneManager;
-  private static OzoneManagerProtocol writeClient;
+  private OzoneClient client;
+  private OzoneManager ozoneManager;
+  private OzoneManagerProtocol writeClient;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeAll
-  public static void init() throws Exception {
-    conf = new OzoneConfiguration();
-    cluster = MiniOzoneCluster.newBuilder(conf).build();
-    cluster.waitForClusterToBeReady();
-    client = cluster.newClient();
-    ozoneManager = cluster.getOzoneManager();
+  void init() throws Exception {
+    client = cluster().newClient();
+    ozoneManager = cluster().getOzoneManager();
     writeClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
-  public static void shutdown() {
+  void cleanup() {
     IOUtils.closeQuietly(client);
-    if (cluster != null) {
-      cluster.shutdown();
-    }
   }
 
   @Test

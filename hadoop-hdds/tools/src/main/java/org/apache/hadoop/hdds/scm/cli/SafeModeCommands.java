@@ -17,16 +17,11 @@
  */
 package org.apache.hadoop.hdds.scm.cli;
 
-import java.util.concurrent.Callable;
-
 import org.apache.hadoop.hdds.cli.AdminSubcommand;
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Model.CommandSpec;
-import picocli.CommandLine.Spec;
 
 /**
  * Subcommand to group safe mode related operations.
@@ -42,14 +37,6 @@ import picocli.CommandLine.Spec;
         SafeModeWaitSubcommand.class
     })
 @MetaInfServices(AdminSubcommand.class)
-public class SafeModeCommands implements Callable<Void>, AdminSubcommand {
+public class SafeModeCommands implements AdminSubcommand {
 
-  @Spec
-  private CommandSpec spec;
-
-  @Override
-  public Void call() throws Exception {
-    GenericCli.missingSubcommand(spec);
-    return null;
-  }
 }

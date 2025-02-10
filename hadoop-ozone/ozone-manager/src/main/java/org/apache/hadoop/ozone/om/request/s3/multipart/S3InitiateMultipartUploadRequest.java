@@ -22,7 +22,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
@@ -111,8 +111,8 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long transactionLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long transactionLogIndex = context.getIndex();
     MultipartInfoInitiateRequest multipartInfoInitiateRequest =
         getOmRequest().getInitiateMultiPartUploadRequest();
 

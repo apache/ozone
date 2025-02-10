@@ -54,7 +54,7 @@ public class CsiServer extends GenericCli implements Callable<Void> {
   public Void call() throws Exception {
     String[] originalArgs = getCmd().getParseResult().originalArgs()
             .toArray(new String[0]);
-    OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
+    OzoneConfiguration ozoneConfiguration = getOzoneConf();
     HddsServerUtil.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
             CsiServer.class, originalArgs, LOG, ozoneConfiguration);
     CsiConfig csiConfig = ozoneConfiguration.getObject(CsiConfig.class);

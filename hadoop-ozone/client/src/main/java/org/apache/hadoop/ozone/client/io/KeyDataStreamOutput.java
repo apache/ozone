@@ -65,7 +65,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
    * Defines stream action while calling handleFlushOrClose.
    */
   enum StreamAction {
-    FLUSH, CLOSE, FULL
+    FLUSH, HSYNC, CLOSE, FULL
   }
 
   public static final Logger LOG =
@@ -234,6 +234,21 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
     return writeLen;
   }
 
+  @Override
+  public void hflush() throws IOException {
+    hsync();
+  }
+
+  @Override
+  public void hsync() throws IOException {
+    checkNotClosed();
+    final long hsyncPos = writeOffset;
+    handleFlushOrClose(KeyDataStreamOutput.StreamAction.HSYNC);
+    Preconditions.checkState(offset >= hsyncPos,
+        "offset = %s < hsyncPos = %s", offset, hsyncPos);
+    blockDataStreamOutputEntryPool.hsyncKey(hsyncPos);
+  }
+
   /**
    * It performs following actions :
    * a. Updates the committed length at datanode for the current stream in
@@ -393,6 +408,9 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
       break;
     case FLUSH:
       entry.flush();
+      break;
+    case HSYNC:
+      entry.hsync();
       break;
     default:
       throw new IOException("Invalid Operation");

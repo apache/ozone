@@ -34,8 +34,6 @@ import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.server.http.HttpServer2;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * A servlet to print out the running configuration data.
@@ -51,9 +49,6 @@ public class HddsConfServlet extends HttpServlet {
   private static final String COMMAND = "cmd";
   private static final OzoneConfiguration OZONE_CONFIG =
       new OzoneConfiguration();
-  private static final transient Logger LOG =
-      LoggerFactory.getLogger(HddsConfServlet.class);
-
 
   /**
    * Return the Configuration of the daemon hosting this servlet.
@@ -162,10 +157,6 @@ public class HddsConfServlet extends HttpServlet {
         if (config.isPropertyTag(tag)) {
           Properties properties = config.getAllPropertiesByTag(tag);
           propMap.put(tag, properties);
-        } else {
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Not a valid tag {}", tag);
-          }
         }
       }
       out.write(JsonUtils.toJsonString(propMap));

@@ -455,6 +455,7 @@ public final class FSOperations {
       OutputStream os = fs.append(path, bufferSize);
       long bytes = copyBytes(is, os);
       HttpFSServerWebApp.get().getMetrics().incrBytesWritten(bytes);
+      HttpFSServerWebApp.get().getMetrics().incrOpsAppend();
       return null;
     }
 
@@ -667,6 +668,7 @@ public final class FSOperations {
           null);
       long bytes = copyBytes(is, os);
       HttpFSServerWebApp.get().getMetrics().incrBytesWritten(bytes);
+      HttpFSServerWebApp.get().getMetrics().incrOpsCreate();
       return null;
     }
 

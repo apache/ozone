@@ -50,6 +50,9 @@ public enum OzoneManagerVersion implements ComponentVersion {
   S3_OBJECT_TAGGING_API(9, "OzoneManager version that supports S3 object tagging APIs, such as " +
       "PutObjectTagging, GetObjectTagging, and DeleteObjectTagging"),
 
+  S3_PART_AWARE_GET(10, "OzoneManager version that supports S3 get for a specific multipart " +
+                        "upload part number"),
+
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
       + " newer and an unknown server version has arrived to the client.");
 

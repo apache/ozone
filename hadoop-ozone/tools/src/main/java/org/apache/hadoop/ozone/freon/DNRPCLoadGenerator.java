@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.util.PayloadUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -59,6 +60,7 @@ import static org.apache.hadoop.hdds.client.ReplicationConfig.getLegacyFactor;
         versionProvider = HddsVersionProvider.class,
         mixinStandardHelpOptions = true,
         showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 public class DNRPCLoadGenerator extends BaseFreonGenerator
         implements Callable<Void> {
   private static final Logger LOG =
@@ -111,7 +113,7 @@ public class DNRPCLoadGenerator extends BaseFreonGenerator
   private Freon freon;
 
   // empy constructor for picocli
-  DNRPCLoadGenerator() {
+  public DNRPCLoadGenerator() {
   }
 
   @VisibleForTesting
@@ -127,7 +129,7 @@ public class DNRPCLoadGenerator extends BaseFreonGenerator
             "OM echo response payload size should be positive value or zero.");
 
     if (configuration == null) {
-      configuration = freon.createOzoneConfiguration();
+      configuration = freon.getOzoneConf();
     }
     ContainerOperationClient scmClient = new ContainerOperationClient(configuration);
     ContainerInfo containerInfo = scmClient.getContainer(containerID);

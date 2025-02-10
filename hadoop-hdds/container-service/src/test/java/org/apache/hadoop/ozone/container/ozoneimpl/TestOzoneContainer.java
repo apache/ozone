@@ -234,7 +234,7 @@ public class TestOzoneContainer {
       volume.format(clusterId);
 
       // eat up all available space except size of 1 container
-      volume.incCommittedBytes(volume.getAvailable() - containerSize);
+      volume.incCommittedBytes(volume.getCurrentUsage().getAvailable() - containerSize);
       // eat up 10 bytes more, now available space is less than 1 container
       volume.incCommittedBytes(10);
     }

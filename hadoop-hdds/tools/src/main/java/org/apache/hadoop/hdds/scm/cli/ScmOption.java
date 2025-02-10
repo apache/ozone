@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.scm.cli;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.hdds.cli.GenericParentCommand;
+import org.apache.hadoop.hdds.cli.AbstractMixin;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -33,15 +33,11 @@ import java.io.IOException;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
-import static picocli.CommandLine.Spec.Target.MIXEE;
 
 /**
  * Defines command-line option for SCM address.
  */
-public class ScmOption {
-
-  @CommandLine.Spec(MIXEE)
-  private CommandLine.Model.CommandSpec spec;
+public class ScmOption extends AbstractMixin {
 
   @CommandLine.Option(names = {"--scm"},
       description = "The destination scm (host:port)")
@@ -53,9 +49,7 @@ public class ScmOption {
   private String scmServiceId;
 
   public ScmClient createScmClient() throws IOException {
-    GenericParentCommand parent = (GenericParentCommand)
-        spec.root().userObject();
-    OzoneConfiguration conf = parent.createOzoneConfiguration();
+    OzoneConfiguration conf = getOzoneConf();
     checkAndSetSCMAddressArg(conf);
 
     return new ContainerOperationClient(conf);
@@ -91,13 +85,10 @@ public class ScmOption {
 
   public SCMSecurityProtocol createScmSecurityClient() {
     try {
-      GenericParentCommand parent = (GenericParentCommand)
-          spec.root().userObject();
-      return getScmSecurityClient(parent.createOzoneConfiguration());
+      return getScmSecurityClient(getOzoneConf());
     } catch (IOException ex) {
       throw new IllegalArgumentException(
           "Can't create SCM Security client", ex);
     }
   }
-
 }

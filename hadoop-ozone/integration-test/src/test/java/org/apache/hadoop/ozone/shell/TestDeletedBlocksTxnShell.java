@@ -21,7 +21,6 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -93,7 +92,6 @@ public class TestDeletedBlocksTxnShell {
     conf = new OzoneConfiguration();
     scmServiceId = "scm-service-test1";
 
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     conf.setInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
 
     cluster = MiniOzoneCluster.newHABuilder(conf)
