@@ -39,7 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * Tests for Datanode reconfiguration.
  */
-class TestDatanodeReconfiguration extends ReconfigurationTestBase {
+public abstract class TestDatanodeReconfiguration extends ReconfigurationTestBase {
   @Override
   ReconfigurationHandler getSubject() {
     return getFirstDatanode().getReconfigurationHandler();

@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * Tests for OM reconfiguration.
  */
-class TestOmReconfiguration extends ReconfigurationTestBase {
+public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
 
   @Override
   ReconfigurationHandler getSubject() {

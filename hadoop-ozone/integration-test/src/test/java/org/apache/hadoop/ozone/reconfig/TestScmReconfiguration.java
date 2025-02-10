@@ -38,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * Tests for SCM reconfiguration.
  */
-class TestScmReconfiguration extends ReconfigurationTestBase {
+public abstract class TestScmReconfiguration extends ReconfigurationTestBase {
 
   @Override
   ReconfigurationHandler getSubject() {
