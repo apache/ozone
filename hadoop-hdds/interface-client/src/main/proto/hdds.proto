@@ -129,19 +129,20 @@ message Pipeline {
     optional ReplicationType type = 3 [default = STAND_ALONE];
     optional ReplicationFactor factor = 4 [default = ONE];
     required PipelineID id = 5;
-    // TODO: Deprecate this and replace with leaderDnID
+    // TODO: Deprecate this and replace with leaderDatanodeID
     optional string leaderID = 6;
     repeated uint32 memberOrders = 7;
     optional uint64 creationTimeStamp = 8;
-    // TODO: Deprecate this and replace with suggesterLeaderDnID
+    // TODO: Deprecate this and replace with suggestedLeaderDatanodeID
     optional UUID suggestedLeaderID = 9;
     repeated uint32 memberReplicaIndexes = 10;
     optional ECReplicationConfig ecReplicationConfig = 11;
 
-    optional UUID leaderID128 = 100;
     // TODO: Replace UUID with DatanodeIDProto
-    optional DatanodeIDProto leaderDnID = 101;
-    optional DatanodeIDProto suggesterLeaderDnID = 102;
+    optional UUID leaderID128 = 100;
+
+    optional DatanodeIDProto leaderDatanodeID = 101;
+    optional DatanodeIDProto suggestedLeaderDatanodeID = 102;
 }
 
 message KeyValue {
