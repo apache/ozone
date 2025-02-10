@@ -80,7 +80,7 @@ public abstract class WithObjectID extends WithMetadata {
    * Sets the update ID. For each modification of this object, we will set
    * this to a value greater than the current value.
    */
-  public final void setUpdateID(long updateId) {
+  public final void setUpdateID(long newValue) {
 
     // Because in non-HA, we have multiple rpc handler threads and
     // transactionID is generated in OzoneManagerServerSideTranslatorPB.
@@ -107,14 +107,15 @@ public abstract class WithObjectID extends WithMetadata {
     // Main reason, in non-HA transaction Index after restart starts from 0.
     // And also because of this same reason we don't do replay checks in non-HA.
 
-    if (updateId < this.getUpdateID()) {
+    final long currentValue = getUpdateID();
+    if (newValue < currentValue) {
       throw new IllegalArgumentException(String.format(
           "Trying to set updateID to %d which is not greater than the " +
-              "current value of %d for %s", updateId, this.getUpdateID(),
+              "current value of %d for %s", newValue, currentValue,
           getObjectInfo()));
     }
 
-    this.updateID = updateId;
+    updateID = newValue;
   }
 
   /** Hook method, customized in subclasses. */
