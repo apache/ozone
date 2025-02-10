@@ -27,7 +27,6 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.DatanodeVersion;
@@ -513,21 +512,17 @@ public class DatanodeDetails extends NodeImpl implements
    *                        If empty, all available ports will be included.
    * @return A {@link HddsProtos.DatanodeDetailsProto.Builder} Object.
    */
-  @VisibleForTesting
   public HddsProtos.DatanodeDetailsProto.Builder toProtoBuilder(
       int clientVersion, Set<Port.Name> filterPorts) {
 
-
-    HddsProtos.UUID uuid128 = id.toProto().getUuid();
-
-    HddsProtos.DatanodeDetailsProto.Builder builder =
+    final HddsProtos.DatanodeIDProto idProto = id.toProto();
+    final HddsProtos.DatanodeDetailsProto.Builder builder =
         HddsProtos.DatanodeDetailsProto.newBuilder();
 
-    builder.setId(id.toProto());
+    builder.setId(idProto);
     // Both are deprecated.
-    builder.setUuid128(uuid128);
-    builder.setUuid(new UUID(uuid128.getMostSigBits(), uuid128.getLeastSigBits())
-        .toString());
+    builder.setUuid128(idProto.getUuid());
+    builder.setUuid(id.toString());
 
     if (ipAddress != null) {
       builder.setIpAddressBytes(ipAddress.getBytes());
@@ -633,7 +628,7 @@ public class DatanodeDetails extends NodeImpl implements
   }
 
   public String toDebugString() {
-    return id.toString() + "{" +
+    return id + "{" +
         "ip: " +
         ipAddress +
         ", host: " +

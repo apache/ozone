@@ -36,9 +36,11 @@ public final class DatanodeID implements Comparable<DatanodeID> {
   private static final ConcurrentMap<UUID, DatanodeID> CACHE = new ConcurrentHashMap<>();
 
   private final UUID uuid;
+  private final String uuidString;
 
   private DatanodeID(final UUID uuid) {
     this.uuid = uuid;
+    this.uuidString = uuid.toString();
   }
 
   // Mainly used for JSON conversion
@@ -64,7 +66,7 @@ public final class DatanodeID implements Comparable<DatanodeID> {
 
   @Override
   public String toString() {
-    return uuid.toString();
+    return uuidString;
   }
 
   public DatanodeIDProto toProto() {
