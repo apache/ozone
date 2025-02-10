@@ -161,6 +161,7 @@ class TestCachingSpaceUsageSource {
     assertEquals(0, subject.getUsedSpace());
     // available and used change by same amount (in opposite directions)
     assertEquals(original.getAvailable() + original.getUsedSpace(), subject.getAvailable());
+    assertSnapshotIsUpToDate(subject);
   }
 
   @Test
@@ -179,6 +180,14 @@ class TestCachingSpaceUsageSource {
     assertEquals(0, subject.getAvailable());
     // available and used change by same amount (in opposite directions)
     assertEquals(original.getUsedSpace() + original.getAvailable(), subject.getUsedSpace());
+    assertSnapshotIsUpToDate(subject);
+  }
+
+  private static void assertSnapshotIsUpToDate(SpaceUsageSource subject) {
+    SpaceUsageSource snapshot = subject.snapshot();
+    assertEquals(subject.getCapacity(), snapshot.getCapacity());
+    assertEquals(subject.getAvailable(), snapshot.getAvailable());
+    assertEquals(subject.getUsedSpace(), snapshot.getUsedSpace());
   }
 
   private static long missingInitialValue() {
@@ -238,6 +247,7 @@ class TestCachingSpaceUsageSource {
 
     assertEquals(source.getCapacity(), subject.getCapacity());
     assertEquals(source.getAvailable(), subject.getAvailable());
+    assertSnapshotIsUpToDate(subject);
   }
 
   private static void assertSubjectWasRefreshed(SpaceUsageSource source,

@@ -605,11 +605,10 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       @Override
       KeyValue<KEY, VALUE> convert(KeyValue<CodecBuffer, CodecBuffer> raw)
           throws IOException {
-        CodecBuffer keyCodecBuffer = raw.getKey();
-        final KEY key = keyCodec.fromCodecBuffer(keyCodecBuffer);
-        CodecBuffer valueCodecBuffer = raw.getValue();
-        final VALUE value = valueCodec.fromCodecBuffer(valueCodecBuffer);
-        return Table.newKeyValue(key, value, keyCodecBuffer.getArray(), valueCodecBuffer.getArray());
+        final int rawSize = raw.getValue().readableBytes();
+        final KEY key = keyCodec.fromCodecBuffer(raw.getKey());
+        final VALUE value = valueCodec.fromCodecBuffer(raw.getValue());
+        return Table.newKeyValue(key, value, rawSize);
       }
     };
   }

@@ -1733,7 +1733,7 @@ public class SCMNodeManager implements NodeManager {
     }
     Set<UUID> uuids = dnsToUuidMap.get(address);
     if (uuids == null) {
-      LOG.warn("Cannot find node for address {}", address);
+      LOG.debug("Cannot find node for address {}", address);
       return results;
     }
 

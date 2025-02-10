@@ -149,16 +149,4 @@ public class HttpFSServerMetrics {
   public void shutdown() {
     DefaultMetricsSystem.shutdown();
   }
-
-  public long getOpsMkdir() {
-    return opsMkdir.value();
-  }
-
-  public long getOpsListing() {
-    return opsListing.value();
-  }
-
-  public long getOpsStat() {
-    return opsStat.value();
-  }
 }
