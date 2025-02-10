@@ -55,10 +55,10 @@ public class RocksDBConfiguration {
 
   @Config(key = "rocksdb.keep.log.file.num",
       type = ConfigType.INT,
-      defaultValue = "1000",
+      defaultValue = "10",
       tags = {OM, SCM, DATANODE},
       description = "Maximum number of RocksDB application log files.")
-  private int rocksdbKeepLogFileNum = 1000;
+  private int rocksdbKeepLogFileNum = 10;
 
   @Config(key = "rocksdb.writeoption.sync",
       type = ConfigType.BOOLEAN,
