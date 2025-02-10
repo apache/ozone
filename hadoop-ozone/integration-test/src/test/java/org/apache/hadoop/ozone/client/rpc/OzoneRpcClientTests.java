@@ -231,13 +231,13 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       remoteGroupName, ACCESS, READ);
   private static MessageDigest eTagProvider;
   private static Set<OzoneClient> ozoneClients = new HashSet<>();
-  private static GenericTestUtils.PrintStreamCapturer out;
+  private static GenericTestUtils.PrintStreamCapturer output;
 
   @BeforeAll
   public static void initialize() throws NoSuchAlgorithmException, UnsupportedEncodingException {
     eTagProvider = MessageDigest.getInstance(MD5_HASH);
     AuditLogTestUtils.enableAuditLog();
-    out = GenericTestUtils.captureOut();
+    output = GenericTestUtils.captureOut();
   }
 
   /**
@@ -276,7 +276,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   static void shutdownCluster() {
     org.apache.hadoop.hdds.utils.IOUtils.closeQuietly(ozoneClients);
     ozoneClients.clear();
-    org.apache.hadoop.hdds.utils.IOUtils.closeQuietly(out);
+    org.apache.hadoop.hdds.utils.IOUtils.closeQuietly(output);
 
     if (storageContainerLocationClient != null) {
       storageContainerLocationClient.close();
@@ -1111,7 +1111,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     TestDataUtil.createKey(bucket, keyName3, THREE, RATIS, value);
 
     // delete files and directory
-    out.reset();
+    output.reset();
     bucket.deleteKey(keyName1);
     bucket.deleteKey(keyName2);
     bucket.deleteDirectory(dirName, true);
@@ -1128,7 +1128,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     keysToDelete.add(dirName + "/" + keyName5);
     bucket.deleteKeys(keysToDelete);
 
-    String consoleOutput = out.get();
+    String consoleOutput = output.get();
     assertThat(consoleOutput).contains("op=DELETE_KEY {volume=" + volumeName + ", bucket=" + bucketName +
         ", key=key1, dataSize=" + valueLength + ", replicationConfig=RATIS/THREE");
     assertThat(consoleOutput).contains("op=DELETE_KEY {volume=" + volumeName + ", bucket=" + bucketName +
