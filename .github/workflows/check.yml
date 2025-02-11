@@ -102,7 +102,7 @@ on:
       runner:
         type: string
         description: "GitHub Actions runner to use"
-        default: 'ubuntu-24.04'
+        default: 'ubuntu-20.04'
         required: false
 
       script-args:
