@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,23 +17,21 @@
 
 package org.apache.hadoop.ozone.metrics;
 
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.metrics2.MetricsInfo;
-import org.apache.hadoop.metrics2.MetricsRecordBuilder;
-import org.apache.hadoop.metrics2.lib.MutableStat;
-import org.apache.hadoop.metrics2.util.SampleStat;
-import org.apache.hadoop.util.Time;
+import static org.apache.hadoop.metrics2.lib.Interns.info;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-
-import static org.apache.hadoop.metrics2.lib.Interns.info;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.metrics2.MetricsInfo;
+import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.metrics2.lib.MutableMetric;
+import org.apache.hadoop.util.Time;
 
 /**
  * A convenient mutable metric for throughput measurement.
  * (non-synchronized version of org.apache.hadoop.metrics2.lib.MutableStat)
  */
-public class OzoneMutableStat extends MutableStat {
+public class MutableStat extends MutableMetric {
 
   private final MetricsInfo numInfo;
   private final MetricsInfo avgInfo;
@@ -45,9 +42,9 @@ public class OzoneMutableStat extends MutableStat {
   private final MetricsInfo maxInfo;
   private final MetricsInfo iNumInfo;
 
-  private final OzoneAdderSampleStat intervalStat = new OzoneAdderSampleStat();
-  private final OzoneAdderSampleStat prevStat = new OzoneAdderSampleStat();
-  private final OzoneAdderSampleStat.MinMax minMax = new OzoneAdderSampleStat.MinMax();
+  private final SampleStat intervalStat = new SampleStat();
+  private final SampleStat prevStat = new SampleStat();
+  private final SampleStat.MinMax minMax = new SampleStat.MinMax();
   private volatile long numSamples = 0;
   private long snapshotTimeStamp = 0;
   private final AtomicBoolean extended = new AtomicBoolean();
@@ -68,7 +65,7 @@ public class OzoneMutableStat extends MutableStat {
    * @param sampleName  of the metric (e.g. "Ops")
    * @param valueName   of the metric (e.g. "Time", "Latency")
    */
-  public OzoneMutableStat(String name, String description,
+  public MutableStat(String name, String description,
                      String sampleName, String valueName) {
     this(name, description, sampleName, valueName, false);
   }
@@ -81,10 +78,8 @@ public class OzoneMutableStat extends MutableStat {
    * @param valueName   of the metric (e.g. "Time", "Latency")
    * @param extended    create extended stats (stdev, min/max etc.) by default.
    */
-  public OzoneMutableStat(String name, String description,
+  public MutableStat(String name, String description,
                      String sampleName, String valueName, boolean extended) {
-
-    super(name, description, sampleName, valueName, extended);
 
     String ucName = StringUtils.capitalize(name);
     String usName = StringUtils.capitalize(sampleName);

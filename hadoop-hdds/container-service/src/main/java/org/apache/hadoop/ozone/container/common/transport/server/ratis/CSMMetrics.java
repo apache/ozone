@@ -17,22 +17,20 @@
 
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
+import static org.apache.hadoop.ozone.metrics.MetricsSystem.registerNewMutableRate;
+
 import java.util.EnumMap;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
-import org.apache.hadoop.ozone.metrics.OzoneMutableRate;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
+import org.apache.hadoop.ozone.metrics.MutableRate;
 import org.apache.ratis.protocol.RaftGroupId;
 
-import java.util.EnumMap;
-
-import static org.apache.hadoop.ozone.metrics.OzoneMetricsSystem.registerNewMutableRate;
 
 /**
  * This class is for maintaining Container State Machine statistics.
@@ -53,9 +51,9 @@ public class CSMMetrics {
   private @Metric MutableCounterLong numBytesWrittenCount;
   private @Metric MutableCounterLong numBytesCommittedCount;
 
-  private @Metric OzoneMutableRate transactionLatencyMs;
-  private final EnumMap<Type, OzoneMutableRate> opsLatencyMs;
-  private final EnumMap<Type, OzoneMutableRate> opsQueueingDelay;
+  private @Metric MutableRate transactionLatencyMs;
+  private final EnumMap<Type, MutableRate> opsLatencyMs;
+  private final EnumMap<Type, MutableRate> opsQueueingDelay;
 
   // Failure Metrics
   private @Metric MutableCounterLong numWriteStateMachineFails;
@@ -71,11 +69,11 @@ public class CSMMetrics {
   private @Metric MutableCounterLong numEvictedCacheCount;
   private @Metric MutableCounterLong pendingApplyTransactions;
 
-  private @Metric OzoneMutableRate applyTransactionNs;
-  private @Metric OzoneMutableRate writeStateMachineDataNs;
-  private @Metric OzoneMutableRate writeStateMachineQueueingLatencyNs;
-  private @Metric OzoneMutableRate untilApplyTransactionNs;
-  private @Metric OzoneMutableRate startTransactionCompleteNs;
+  private @Metric MutableRate applyTransactionNs;
+  private @Metric MutableRate writeStateMachineDataNs;
+  private @Metric MutableRate writeStateMachineQueueingLatencyNs;
+  private @Metric MutableRate untilApplyTransactionNs;
+  private @Metric MutableRate startTransactionCompleteNs;
 
   public CSMMetrics(RaftGroupId gid) {
     this.gid = gid;
@@ -92,7 +90,7 @@ public class CSMMetrics {
   }
 
   public static CSMMetrics create(RaftGroupId gid) {
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     return ms.register(SOURCE_NAME + gid.toString(),
         "Container State Machine",
         new CSMMetrics(gid));
@@ -199,7 +197,7 @@ public class CSMMetrics {
     return numBytesCommittedCount.value();
   }
 
-  OzoneMutableRate getApplyTransactionLatencyNs() {
+  MutableRate getApplyTransactionLatencyNs() {
     return applyTransactionNs;
   }
 
@@ -263,7 +261,7 @@ public class CSMMetrics {
   }
 
   public void unRegister() {
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME + gid.toString());
   }
 }

@@ -17,12 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 
 /**
  * Metrics related to Container Balancer running in SCM.
@@ -33,7 +31,7 @@ public final class ContainerBalancerMetrics {
   public static final String NAME =
       ContainerBalancerMetrics.class.getSimpleName();
 
-  private final MetricsSystem ms;
+  private final org.apache.hadoop.metrics2.MetricsSystem ms;
 
   @Metric(about = "Amount of Gigabytes that Container Balancer moved" +
       " in the latest iteration.")
@@ -98,12 +96,12 @@ public final class ContainerBalancerMetrics {
    * @return {@link ContainerBalancerMetrics}
    */
   public static ContainerBalancerMetrics create() {
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     return ms.register(NAME, "Container Balancer Metrics",
         new ContainerBalancerMetrics(ms));
   }
 
-  private ContainerBalancerMetrics(MetricsSystem ms) {
+  private ContainerBalancerMetrics(org.apache.hadoop.metrics2.MetricsSystem ms) {
     this.ms = ms;
   }
 

@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,7 +17,15 @@
 
 package org.apache.hadoop.ozone.metrics;
 
+import static org.apache.hadoop.metrics2.lib.Interns.info;
+
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.metrics2.MetricsInfo;
@@ -26,19 +33,11 @@ import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.lib.MutableMetric;
 import org.apache.hadoop.metrics2.util.Quantile;
 
-import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-
-import static org.apache.hadoop.metrics2.lib.Interns.info;
 
 /**
  * Non-synchronized version of {@link org.apache.hadoop.metrics2.lib.MutableQuantiles}.
  */
-public class OzoneMutableQuantiles extends MutableMetric {
+public class MutableQuantiles extends MutableMetric {
 
   private static final Quantile[] QUANTILES = {new Quantile(0.50, 0.050),
       new Quantile(0.75, 0.025), new Quantile(0.90, 0.010),
@@ -55,7 +54,7 @@ public class OzoneMutableQuantiles extends MutableMetric {
    */
   private final int interval;
 
-  private OzoneSampleQuantiles estimator;
+  private SampleQuantiles estimator;
   private long previousCount = 0;
   private ScheduledFuture<?> scheduledTask;
 
@@ -70,7 +69,7 @@ public class OzoneMutableQuantiles extends MutableMetric {
   private final ReentrantReadWriteLock.WriteLock writeLock = lock.writeLock();
 
   /**
-   * Instantiates a new {@link OzoneMutableQuantiles} for a metric that rolls itself
+   * Instantiates a new {@link MutableQuantiles} for a metric that rolls itself
    * over on the specified time interval.
    *
    * @param name
@@ -84,8 +83,8 @@ public class OzoneMutableQuantiles extends MutableMetric {
    * @param interval
    *          rollover interval (in seconds) of the estimator
    */
-  public OzoneMutableQuantiles(String name, String description, String sampleName,
-                               String valueName, int interval) {
+  public MutableQuantiles(String name, String description, String sampleName,
+                          String valueName, int interval) {
     String ucName = StringUtils.capitalize(name);
     String usName = StringUtils.capitalize(sampleName);
     String uvName = StringUtils.capitalize(valueName);
@@ -106,7 +105,7 @@ public class OzoneMutableQuantiles extends MutableMetric {
           String.format(descTemplate, percentile));
     }
 
-    estimator = new OzoneSampleQuantiles(QUANTILES);
+    estimator = new SampleQuantiles(QUANTILES);
 
     this.interval = interval;
     scheduledTask = SCHEDULER.scheduleWithFixedDelay(new RolloverSample(this),
@@ -176,13 +175,13 @@ public class OzoneMutableQuantiles extends MutableMetric {
 
   /**
    * Runnable used to periodically roll over the internal
-   * {@link OzoneSampleQuantiles} every interval.
+   * {@link SampleQuantiles} every interval.
    */
   private static class RolloverSample implements Runnable {
 
-    private final OzoneMutableQuantiles parent;
+    private final MutableQuantiles parent;
 
-    RolloverSample(OzoneMutableQuantiles parent) {
+    RolloverSample(MutableQuantiles parent) {
       this.parent = parent;
     }
 

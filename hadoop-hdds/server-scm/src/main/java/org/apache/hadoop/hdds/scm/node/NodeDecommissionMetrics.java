@@ -27,12 +27,11 @@ import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsTag;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 
 /**
  * Class contains metrics related to the NodeDecommissionManager.
@@ -154,7 +153,7 @@ public final class NodeDecommissionMetrics implements MetricsSource {
    * @return NodeDecommissionMetrics
    */
   public static NodeDecommissionMetrics create() {
-    return OzoneMetricsSystem.instance().register(METRICS_SOURCE_NAME,
+    return MetricsSystem.instance().register(METRICS_SOURCE_NAME,
         "Metrics tracking the progress of nodes in the "
             + "Decommissioning and Maintenance workflows.  "
             + "Tracks num nodes in mode and container "
@@ -201,7 +200,7 @@ public final class NodeDecommissionMetrics implements MetricsSource {
    * Unregister the metrics instance.
    */
   public void unRegister() {
-    OzoneMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
+    MetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
   }
 
   public synchronized void setDecommissioningMaintenanceNodesTotal(

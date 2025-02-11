@@ -1,43 +1,41 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.metrics;
 
-import org.apache.hadoop.classification.VisibleForTesting;
-import org.apache.hadoop.metrics2.MetricsException;
-import org.apache.hadoop.metrics2.MetricsSystem;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.metrics2.lib.MetricsRegistry;
-import org.apache.hadoop.metrics2.lib.MutableMetric;
+package org.apache.hadoop.ozone.metrics;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import org.apache.hadoop.classification.VisibleForTesting;
+import org.apache.hadoop.metrics2.MetricsException;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.MutableMetric;
 
 
 /**
  * The metrics Ozone system.
  */
-public final class OzoneMetricsSystem {
+public final class MetricsSystem {
 
   static {
-    OzoneMetricsFactory.registerAsDefaultMutableMetricsFactory();
+    CustomMetricsFactory.registerAsDefaultMutableMetricsFactory();
   }
 
-  private OzoneMetricsSystem() {
+  private MetricsSystem() {
   }
 
   /**
@@ -45,7 +43,7 @@ public final class OzoneMetricsSystem {
    * @param prefix for the metrics system configuration
    * @return the metrics system instance
    */
-  public static MetricsSystem initialize(String prefix) {
+  public static org.apache.hadoop.metrics2.MetricsSystem initialize(String prefix) {
     return DefaultMetricsSystem.initialize(prefix);
   }
 
@@ -74,7 +72,7 @@ public final class OzoneMetricsSystem {
   /**
    * @return the metrics system object
    */
-  public static MetricsSystem instance() {
+  public static org.apache.hadoop.metrics2.MetricsSystem instance() {
     return DefaultMetricsSystem.instance();
   }
 
@@ -100,13 +98,13 @@ public final class OzoneMetricsSystem {
    * @param interval      rollover interval (in seconds) of the estimator.
    * @return a new mutable quantiles metric object
    */
-  public static OzoneMutableQuantiles registerNewMutableQuantiles(
+  public static MutableQuantiles registerNewMutableQuantiles(
       MetricsRegistry registry, String name, String description, String sampleName, String valueName, int interval) {
     if (interval <= 0) {
       throw new MetricsException("Interval should be positive.  Value passed" +
                                  " is: " + interval);
     }
-    OzoneMutableQuantiles metric = new OzoneMutableQuantiles(name, description, sampleName, valueName, interval);
+    MutableQuantiles metric = new MutableQuantiles(name, description, sampleName, valueName, interval);
     addMetric(registry, name, metric);
     return metric;
   }
@@ -119,7 +117,7 @@ public final class OzoneMetricsSystem {
    * @param description       of the metric
    * @return a new mutable rate metric object
    */
-  public static OzoneMutableRate registerNewMutableRate(
+  public static MutableRate registerNewMutableRate(
       MetricsRegistry registry, String name, String description) {
     return registerNewMutableRate(registry, name, description, false, true);
   }
@@ -133,20 +131,20 @@ public final class OzoneMetricsSystem {
    * @param returnExisting    return existing metric if it exists
    * @return a new mutable rate metric object
    */
-  public static OzoneMutableRate registerNewMutableRate(
+  public static MutableRate registerNewMutableRate(
       MetricsRegistry registry, String name, String description, boolean extended, boolean returnExisting) {
 
     if (returnExisting) {
       MutableMetric rate = registry.get(name);
       if (rate != null) {
-        if (rate instanceof OzoneMutableRate) {
-          return (OzoneMutableRate) rate;
+        if (rate instanceof MutableRate) {
+          return (MutableRate) rate;
         }
         throw new MetricsException("Unexpected metrics type " + rate.getClass()
                                    + " for " + name);
       }
     }
-    OzoneMutableRate metric = new OzoneMutableRate(name, description, extended);
+    MutableRate metric = new MutableRate(name, description, extended);
     addMetric(registry, name, metric);
     return metric;
   }
@@ -162,11 +160,11 @@ public final class OzoneMetricsSystem {
    * @param extended    create extended stats (stdev, min/max etc.) by default.
    * @return a new mutable stat metric object
    */
-  public static OzoneMutableStat registerNewMutableStat(
+  public static MutableStat registerNewMutableStat(
       MetricsRegistry registry, String name, String description,
       String sampleName, String valueName, boolean extended) {
 
-    OzoneMutableStat metric = new OzoneMutableStat(name, description, sampleName, valueName, extended);
+    MutableStat metric = new MutableStat(name, description, sampleName, valueName, extended);
     addMetric(registry, name, metric);
     return metric;
   }

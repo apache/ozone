@@ -24,9 +24,9 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
-import org.apache.hadoop.ozone.metrics.OzoneMutableQuantiles;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
-import org.apache.hadoop.ozone.metrics.OzoneMutableRate;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
+import org.apache.hadoop.ozone.metrics.MutableQuantiles;
+import org.apache.hadoop.ozone.metrics.MutableRate;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.function.CheckedRunnable;
 import org.apache.ratis.util.function.CheckedSupplier;
@@ -39,7 +39,7 @@ public final class MetricUtil {
   }
 
   public static <T, E extends Exception> T captureLatencyNs(
-      OzoneMutableRate metric,
+      MutableRate metric,
       CheckedSupplier<T, E> block) throws E {
     long start = Time.monotonicNowNanos();
     try {
@@ -50,7 +50,7 @@ public final class MetricUtil {
   }
 
   public static <E extends IOException> void captureLatencyNs(
-      OzoneMutableRate metric,
+      MutableRate metric,
       CheckedRunnable<E> block) throws IOException {
     long start = Time.monotonicNowNanos();
     try {
@@ -93,9 +93,9 @@ public final class MetricUtil {
    * @param intervals   An array of intervals for the quantiles.
    * @return A list of created MutableQuantiles instances.
    */
-  public static List<OzoneMutableQuantiles> createQuantiles(MetricsRegistry registry,
-                                                            String name, String description, String sampleName,
-                                                            String valueName, int... intervals) {
+  public static List<MutableQuantiles> createQuantiles(MetricsRegistry registry,
+                                                       String name, String description, String sampleName,
+                                                       String valueName, int... intervals) {
     if (intervals == null) {
       throw new IllegalArgumentException(
           "At least one interval should be provided.");
@@ -106,20 +106,20 @@ public final class MetricUtil {
 
     return Arrays.stream(intervals).mapToObj(interval -> {
       String quantileName = name + interval + "s";
-      return OzoneMetricsSystem.registerNewMutableQuantiles(
+      return MetricsSystem.registerNewMutableQuantiles(
           registry, quantileName, description, sampleName, valueName, interval);
     }).collect(Collectors.toList());
   }
 
-  public static void stop(OzoneMutableQuantiles... quantiles) {
+  public static void stop(MutableQuantiles... quantiles) {
     if (quantiles != null) {
       stop(Arrays.asList(quantiles));
     }
   }
 
-  public static void stop(Iterable<OzoneMutableQuantiles> quantiles) {
+  public static void stop(Iterable<MutableQuantiles> quantiles) {
     if (quantiles != null) {
-      for (OzoneMutableQuantiles q : quantiles) {
+      for (MutableQuantiles q : quantiles) {
         if (q != null) {
           q.stop();
         }

@@ -30,10 +30,9 @@ import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -99,7 +98,7 @@ public final class OmTestManagers {
         new ScmBlockLocationTestingClient(null, null, 0);
 
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
-    OzoneMetricsSystem.setMiniClusterMode(true);
+    MetricsSystem.setMiniClusterMode(true);
     OMStorage omStorage = new OMStorage(conf);
     omStorage.setClusterId("omtest");
     omStorage.setOmId("omtest");

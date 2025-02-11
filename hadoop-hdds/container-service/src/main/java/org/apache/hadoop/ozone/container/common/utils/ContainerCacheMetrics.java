@@ -17,11 +17,10 @@
 
 package org.apache.hadoop.ozone.container.common.utils;
 
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.hadoop.ozone.metrics.OzoneMutableRate;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
+import org.apache.hadoop.ozone.metrics.MutableRate;
 
 /**
  * Metrics for the usage of ContainerDB.
@@ -29,13 +28,13 @@ import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 public final class ContainerCacheMetrics {
 
   private final String name;
-  private final MetricsSystem ms;
+  private final org.apache.hadoop.metrics2.MetricsSystem ms;
 
   @Metric("Rate to measure the db open latency")
-  private OzoneMutableRate dbOpenLatency;
+  private MutableRate dbOpenLatency;
 
   @Metric("Rate to measure the db close latency")
-  private OzoneMutableRate dbCloseLatency;
+  private MutableRate dbCloseLatency;
 
   @Metric("Number of Container Cache Hits")
   private MutableCounterLong numCacheHits;
@@ -52,13 +51,13 @@ public final class ContainerCacheMetrics {
   @Metric("Number of Container Cache Evictions")
   private MutableCounterLong numCacheEvictions;
 
-  private ContainerCacheMetrics(String name, MetricsSystem ms) {
+  private ContainerCacheMetrics(String name, org.apache.hadoop.metrics2.MetricsSystem ms) {
     this.name = name;
     this.ms = ms;
   }
 
   public static ContainerCacheMetrics create() {
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     String name = "ContainerCacheMetrics";
 
     return ms.register(name, "null", new ContainerCacheMetrics(name, ms));
