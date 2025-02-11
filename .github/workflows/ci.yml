@@ -527,11 +527,11 @@ jobs:
           mkdir -p hadoop-ozone/dist/target
           tar xzvf ozone*.tar.gz -C hadoop-ozone/dist/target
           rm ozone*.tar.gz
-      - name: Setup java ${{ env.TEST_JAVA_VERSION }}
+      - name: Setup java 11
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: ${{ env.TEST_JAVA_VERSION }}
+          java-version: 11 # Hadoop may not work with newer Java
       - name: Execute tests
         run: |
           ./hadoop-ozone/dev-support/checks/acceptance.sh
