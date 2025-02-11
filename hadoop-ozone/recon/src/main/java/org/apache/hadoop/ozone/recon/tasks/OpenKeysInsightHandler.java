@@ -26,7 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Manages records in the OpenKey Table, updating counts and sizes of
@@ -44,9 +44,9 @@ public class OpenKeysInsightHandler implements OmTableHandler {
   @Override
   public void handlePutEvent(OMDBUpdateEvent<String, Object> event,
                              String tableName,
-                             HashMap<String, Long> objectCountMap,
-                             HashMap<String, Long> unReplicatedSizeMap,
-                             HashMap<String, Long> replicatedSizeMap) {
+                             Map<String, Long> objectCountMap,
+                             Map<String, Long> unReplicatedSizeMap,
+                             Map<String, Long> replicatedSizeMap) {
 
     if (event.getValue() != null) {
       OmKeyInfo omKeyInfo = (OmKeyInfo) event.getValue();
@@ -68,9 +68,9 @@ public class OpenKeysInsightHandler implements OmTableHandler {
   @Override
   public void handleDeleteEvent(OMDBUpdateEvent<String, Object> event,
                                 String tableName,
-                                HashMap<String, Long> objectCountMap,
-                                HashMap<String, Long> unReplicatedSizeMap,
-                                HashMap<String, Long> replicatedSizeMap) {
+                                Map<String, Long> objectCountMap,
+                                Map<String, Long> unReplicatedSizeMap,
+                                Map<String, Long> replicatedSizeMap) {
 
     if (event.getValue() != null) {
       OmKeyInfo omKeyInfo = (OmKeyInfo) event.getValue();
@@ -95,9 +95,9 @@ public class OpenKeysInsightHandler implements OmTableHandler {
   @Override
   public void handleUpdateEvent(OMDBUpdateEvent<String, Object> event,
                                 String tableName,
-                                HashMap<String, Long> objectCountMap,
-                                HashMap<String, Long> unReplicatedSizeMap,
-                                HashMap<String, Long> replicatedSizeMap) {
+                                Map<String, Long> objectCountMap,
+                                Map<String, Long> unReplicatedSizeMap,
+                                Map<String, Long> replicatedSizeMap) {
 
     if (event.getValue() != null) {
       if (event.getOldValue() == null) {

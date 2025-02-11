@@ -27,7 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Manages records in the Deleted Table, updating counts and sizes of
@@ -45,9 +45,9 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
   @Override
   public void handlePutEvent(OMDBUpdateEvent<String, Object> event,
                              String tableName,
-                             HashMap<String, Long> objectCountMap,
-                             HashMap<String, Long> unReplicatedSizeMap,
-                             HashMap<String, Long> replicatedSizeMap) {
+                             Map<String, Long> objectCountMap,
+                             Map<String, Long> unReplicatedSizeMap,
+                             Map<String, Long> replicatedSizeMap) {
 
     if (event.getValue() != null) {
       RepeatedOmKeyInfo repeatedOmKeyInfo =
@@ -73,9 +73,9 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
   @Override
   public void handleDeleteEvent(OMDBUpdateEvent<String, Object> event,
                                 String tableName,
-                                HashMap<String, Long> objectCountMap,
-                                HashMap<String, Long> unReplicatedSizeMap,
-                                HashMap<String, Long> replicatedSizeMap) {
+                                Map<String, Long> objectCountMap,
+                                Map<String, Long> unReplicatedSizeMap,
+                                Map<String, Long> replicatedSizeMap) {
 
     if (event.getValue() != null) {
       RepeatedOmKeyInfo repeatedOmKeyInfo =
@@ -101,9 +101,9 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
   @Override
   public void handleUpdateEvent(OMDBUpdateEvent<String, Object> event,
                                 String tableName,
-                                HashMap<String, Long> objectCountMap,
-                                HashMap<String, Long> unReplicatedSizeMap,
-                                HashMap<String, Long> replicatedSizeMap) {
+                                Map<String, Long> objectCountMap,
+                                Map<String, Long> unReplicatedSizeMap,
+                                Map<String, Long> replicatedSizeMap) {
     // The size of deleted keys cannot change hence no-op.
     return;
   }

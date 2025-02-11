@@ -64,12 +64,10 @@ public class OmTableInsightTask implements ReconOmTask {
   private ReconOMMetadataManager reconOMMetadataManager;
   private Map<String, OmTableHandler> tableHandlers;
   private Collection<String> tables;
-  private HashMap<String, Long> objectCountMap;
-  private HashMap<String, Long> unReplicatedSizeMap;
-  private HashMap<String, Long> replicatedSizeMap;
+  private Map<String, Long> objectCountMap;
+  private Map<String, Long> unReplicatedSizeMap;
+  private Map<String, Long> replicatedSizeMap;
 
-  private List<GlobalStats> insertGlobalStats;
-  private List<GlobalStats> updateGlobalStats;
 
   @Inject
   public OmTableInsightTask(GlobalStatsDao globalStatsDao,
@@ -84,9 +82,6 @@ public class OmTableInsightTask implements ReconOmTask {
     tableHandlers.put(OPEN_KEY_TABLE, new OpenKeysInsightHandler());
     tableHandlers.put(OPEN_FILE_TABLE, new OpenKeysInsightHandler());
     tableHandlers.put(DELETED_TABLE, new DeletedKeysInsightHandler());
-
-    insertGlobalStats = new ArrayList<>();
-    updateGlobalStats = new ArrayList<>();
   }
 
   /**
@@ -270,6 +265,9 @@ public class OmTableInsightTask implements ReconOmTask {
    * @param dataMap Map containing the updated count and size information.
    */
   private void writeDataToDB(Map<String, Long> dataMap) {
+    List<GlobalStats> insertGlobalStats = new ArrayList<>();
+    List<GlobalStats> updateGlobalStats = new ArrayList<>();
+
     for (Entry<String, Long> entry : dataMap.entrySet()) {
       Timestamp now =
           using(sqlConfiguration).fetchValue(select(currentTimestamp()));
@@ -287,9 +285,6 @@ public class OmTableInsightTask implements ReconOmTask {
 
     globalStatsDao.insert(insertGlobalStats);
     globalStatsDao.update(updateGlobalStats);
-
-    insertGlobalStats.clear();
-    updateGlobalStats.clear();
   }
 
   /**
