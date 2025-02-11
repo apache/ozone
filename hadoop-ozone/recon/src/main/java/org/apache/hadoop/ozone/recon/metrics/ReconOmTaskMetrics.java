@@ -1,3 +1,21 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.hadoop.ozone.recon.metrics;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -12,7 +30,7 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 
 /**
- * This interface is to be implemented by the various metrics for different tasks
+ * This interface is to be implemented by the various metrics for different tasks.
  */
 public abstract class ReconOmTaskMetrics implements MetricsSource {
 
@@ -34,44 +52,44 @@ public abstract class ReconOmTaskMetrics implements MetricsSource {
   }
 
   /**
-   * Update the number of reprocess() method calls by the task
+   * Update the number of reprocess() method calls by the task.
    */
   public void incrTaskReprocessCount() {
    this.reprocessCount.incr();
   }
 
   /**
-   * Update the number of times reprocess() method call encountered exception
+   * Update the number of times reprocess() method call encountered exception.
    */
   public void incrTaskReprocessFailureCount() {
     this.reprocessFailedCount.incr();
   }
 
   /**
-   * Update the time taken by one call of reprocess()
-   * @param time The amount of time that was taken to reprocess
+   * Update the time taken by one call of reprocess().
+   * @param time The amount of time that was taken to reprocess.
    */
   public void updateTaskReprocessLatency(long time) {
     this.reprocessLatency.add(time);
   }
 
   /**
-   * Update the number of process() method calls by the task
+   * Update the number of process() method calls by the task.
    */
   public void incrTaskProcessCount() {
     this.processCount.incr();
   }
 
   /**
-   * Update the number of times process() method call encountered exception
+   * Update the number of times process() method call encountered exception.
    */
   public void incrTaskProcessFailureCount() {
     this.processFailedCount.incr();
   }
 
   /**
-   * Updated the time taken by one call of process()
-   * @param time The amount of time taken to process
+   * Updated the time taken by one call of process().
+   * @param time The amount of time taken to process.
    */
   public void updateTaskProcessLatency(long time) {
     this.processLatency.add(time);

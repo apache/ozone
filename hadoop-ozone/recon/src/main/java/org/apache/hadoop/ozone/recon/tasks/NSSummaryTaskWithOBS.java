@@ -174,28 +174,28 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
           setKeyParentID(updatedKeyInfo);
 
           switch (action) {
-            case PUT:
-              metrics.incrOBSPutKeyEventCount();
-              handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
-              break;
-            case DELETE:
-              metrics.incrOBSDeleteKeyEventCount();
-              handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
-              break;
-            case UPDATE:
-              metrics.incrOBSUpdateKeyEventCount();
-              if (oldKeyInfo != null) {
-                // delete first, then put
-                setKeyParentID(oldKeyInfo);
-                handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
-              } else {
-                LOG.warn("Update event does not have the old keyInfo for {}.",
-                    updatedKey);
-              }
-              handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
-              break;
-            default:
-              LOG.debug("Skipping DB update event: {}", action);
+          case PUT:
+            metrics.incrOBSPutKeyEventCount();
+            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+            break;
+          case DELETE:
+            metrics.incrOBSDeleteKeyEventCount();
+            handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
+            break;
+          case UPDATE:
+            metrics.incrOBSUpdateKeyEventCount();
+            if (oldKeyInfo != null) {
+              // delete first, then put
+              setKeyParentID(oldKeyInfo);
+              handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
+            } else {
+              LOG.warn("Update event does not have the old keyInfo for {}.",
+                  updatedKey);
+            }
+            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+            break;
+          default:
+            LOG.debug("Skipping DB update event: {}", action);
           }
 
           if (!checkAndCallFlushToDB(nsSummaryMap)) {

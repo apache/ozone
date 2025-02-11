@@ -73,7 +73,7 @@ public class FileSizeCountTask implements ReconOmTask {
 
   @Override
   public void stopMetricsCollection() {
-    this.metrics.unregister();
+    FileSizeCountTaskMetrics.unregister();
   }
 
   /**

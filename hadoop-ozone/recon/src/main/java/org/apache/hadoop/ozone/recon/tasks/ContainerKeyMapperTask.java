@@ -22,8 +22,6 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 
 import java.io.IOException;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -86,7 +84,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
 
   @Override
   public void stopMetricsCollection() {
-    this.metrics.unregister();
+    ContainerKeyMapperTaskMetrics.unregister();
   }
 
   /**

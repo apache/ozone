@@ -40,7 +40,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Task to query data from OMDB and write into Recon RocksDB.
@@ -99,7 +98,7 @@ public class NSSummaryTask implements ReconOmTask {
 
   @Override
   public void stopMetricsCollection() {
-    this.metrics.unregister();
+    NSSummaryTaskMetrics.unregister();
   }
 
   @Override

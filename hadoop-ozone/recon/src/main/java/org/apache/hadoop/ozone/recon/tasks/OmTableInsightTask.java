@@ -84,7 +84,7 @@ public class OmTableInsightTask implements ReconOmTask {
 
   @Override
   public void stopMetricsCollection() {
-    this.metrics.unregister();
+    OmTableInsightTaskMetrics.unregister();
   }
 
   /**

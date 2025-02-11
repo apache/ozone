@@ -26,7 +26,6 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.metrics.DummyDBTaskMetrics;
-import org.apache.hadoop.ozone.recon.metrics.impl.NSSummaryTaskMetrics;
 
 /**
  * Dummy Recon task that has 3 modes of operations.

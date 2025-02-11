@@ -95,31 +95,31 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
             OmKeyInfo oldKeyInfo = keyTableUpdateEvent.getOldValue();
 
             switch (action) {
-              case PUT:
-                metrics.incrFSOPutKeyEventCount();
-                handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
-                break;
+            case PUT:
+              metrics.incrFSOPutKeyEventCount();
+              handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+              break;
 
-              case DELETE:
-                metrics.incrFSODeleteKeyEventCount();
-                handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
-                break;
+            case DELETE:
+              metrics.incrFSODeleteKeyEventCount();
+              handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
+              break;
 
-              case UPDATE:
-                metrics.incrFSOUpdateKeyEventCount();
-                if (oldKeyInfo != null) {
-                  // delete first, then put
-                  handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
-                } else {
-                  LOG.warn("Update event does not have the old keyInfo for {}.",
-                      updatedKey);
-                }
-                handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
-                break;
+            case UPDATE:
+              metrics.incrFSOUpdateKeyEventCount();
+              if (oldKeyInfo != null) {
+                // delete first, then put
+                handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
+              } else {
+                LOG.warn("Update event does not have the old keyInfo for {}.",
+                    updatedKey);
+              }
+              handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+              break;
 
-              default:
-                LOG.debug("Skipping DB update event : {}",
-                    omdbUpdateEvent.getAction());
+            default:
+              LOG.debug("Skipping DB update event : {}",
+                  omdbUpdateEvent.getAction());
             }
 
           } else {
@@ -130,31 +130,31 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
             OmDirectoryInfo oldDirectoryInfo = dirTableUpdateEvent.getOldValue();
 
             switch (action) {
-              case PUT:
-                metrics.incrFSOPutDirEventCount();
-                handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
-                break;
+            case PUT:
+              metrics.incrFSOPutDirEventCount();
+              handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
+              break;
 
-              case DELETE:
-                metrics.incrFSODeleteDirEventCount();
-                handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap);
-                break;
+            case DELETE:
+              metrics.incrFSODeleteDirEventCount();
+              handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap);
+              break;
 
-              case UPDATE:
-                metrics.incrFSOUpdateDirEventCount();
-                if (oldDirectoryInfo != null) {
-                  // delete first, then put
-                  handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap);
-                } else {
-                  LOG.warn("Update event does not have the old dirInfo for {}.",
-                      updatedKey);
-                }
-                handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
-                break;
+            case UPDATE:
+              metrics.incrFSOUpdateDirEventCount();
+              if (oldDirectoryInfo != null) {
+                // delete first, then put
+                handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap);
+              } else {
+                LOG.warn("Update event does not have the old dirInfo for {}.",
+                    updatedKey);
+              }
+              handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
+              break;
 
-              default:
-                LOG.debug("Skipping DB update event : {}",
-                    omdbUpdateEvent.getAction());
+            default:
+              LOG.debug("Skipping DB update event : {}",
+                  omdbUpdateEvent.getAction());
             }
           }
         } catch (IOException ioEx) {

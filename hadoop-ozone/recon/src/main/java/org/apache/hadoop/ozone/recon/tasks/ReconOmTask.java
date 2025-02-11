@@ -47,7 +47,7 @@ public interface ReconOmTask {
   Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager);
 
   /**
-   * Stops the collection of metrics for the respective child task
+   * Stops the collection of metrics for the respective child task.
    */
   void stopMetricsCollection();
 }
