@@ -367,7 +367,7 @@ public final class RatisHelper {
         getDatanodeRatisPrefixProps(ozoneConf);
     ratisClientConf.forEach((key, val) -> {
       if (isClientConfig(key) || isGrpcClientConfig(key)
-              || isNettyStreamConfig(key)) {
+              || isNettyStreamConfig(key) || isDataStreamConfig(key)) {
         raftProperties.set(key, val);
       }
     });
@@ -375,6 +375,10 @@ public final class RatisHelper {
 
   private static boolean isClientConfig(String key) {
     return key.startsWith(RaftClientConfigKeys.PREFIX);
+  }
+
+  private static boolean isDataStreamConfig(String key) {
+    return key.startsWith(RaftConfigKeys.DataStream.PREFIX);
   }
 
   private static boolean isGrpcClientConfig(String key) {
