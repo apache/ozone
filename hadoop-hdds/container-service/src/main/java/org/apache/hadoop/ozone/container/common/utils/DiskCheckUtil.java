@@ -113,24 +113,22 @@ public final class DiskCheckUtil {
     public ReadWriteStatus checkPermissions(File storageDir) {
       // Check all permissions on the volume. If there are multiple permission
       // errors, count it as one failure so the admin can fix them all at once.
-      ReadWriteStatus readWriteStatus = ReadWriteStatus.READ_WRITE_OK;
       if (!storageDir.canRead()) {
         logError(storageDir,
             "Datanode does not have read permission on volume.");
-        readWriteStatus = ReadWriteStatus.READ_FAIL;
-      }
-      if (!storageDir.canWrite()) {
-        logError(storageDir,
-            "Datanode does not have write permission on volume.");
-        readWriteStatus = ReadWriteStatus.WRITE_FAIL;
+        return ReadWriteStatus.READ_FAIL;
       }
       if (!storageDir.canExecute()) {
         logError(storageDir, "Datanode does not have execute" +
             "permission on volume.");
-        readWriteStatus = ReadWriteStatus.READ_FAIL;
+        return ReadWriteStatus.READ_FAIL;
       }
-
-      return readWriteStatus;
+      if (!storageDir.canWrite()) {
+        logError(storageDir,
+            "Datanode does not have write permission on volume.");
+        return ReadWriteStatus.WRITE_FAIL;
+      }
+      return ReadWriteStatus.READ_WRITE_OK;
     }
 
     @Override
