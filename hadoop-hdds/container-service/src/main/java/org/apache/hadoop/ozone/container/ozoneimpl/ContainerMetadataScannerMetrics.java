@@ -18,9 +18,8 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 
 /**
  * This class captures the container meta-data scanner metrics on the
@@ -31,12 +30,12 @@ import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 public final class ContainerMetadataScannerMetrics
     extends AbstractContainerScannerMetrics {
 
-  private ContainerMetadataScannerMetrics(String name, MetricsSystem ms) {
+  private ContainerMetadataScannerMetrics(String name, org.apache.hadoop.metrics2.MetricsSystem ms) {
     super(name, ms);
   }
 
   public static ContainerMetadataScannerMetrics create() {
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     String name = "ContainerMetadataScannerMetrics";
     return ms.register(name, null,
         new ContainerMetadataScannerMetrics(name, ms));

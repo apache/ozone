@@ -24,8 +24,7 @@ import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
-import org.apache.hadoop.metrics2.MetricsSystem;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 
 /**
  * This class emits Netty metrics.
@@ -52,7 +51,7 @@ public final class NettyMetrics implements MetricsSource {
 
 
   public static NettyMetrics create() {
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     NettyMetrics metrics = new NettyMetrics();
     return ms.register(SOURCE_NAME, "Netty metrics", metrics);
   }
@@ -68,7 +67,7 @@ public final class NettyMetrics implements MetricsSource {
   }
 
   public void unregister() {
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }
 }

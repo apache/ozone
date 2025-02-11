@@ -53,7 +53,7 @@ import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AccessControlList;
 import org.eclipse.jetty.webapp.WebAppContext;
@@ -327,7 +327,7 @@ public abstract class BaseHttpServer {
     if (httpServer != null && isEnabled()) {
       httpServer.start();
       if (prometheusSupport) {
-        OzoneMetricsSystem.instance()
+        MetricsSystem.instance()
             .register("prometheus", "Hadoop metrics prometheus exporter",
                 prometheusMetricsSink);
       }

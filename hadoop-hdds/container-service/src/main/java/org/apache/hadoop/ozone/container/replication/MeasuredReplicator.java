@@ -24,7 +24,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 import org.apache.hadoop.util.Time;
 
 /**
@@ -62,7 +62,7 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
   public MeasuredReplicator(ContainerReplicator delegate, String name) {
     this.delegate = delegate;
     this.name = name;
-    OzoneMetricsSystem.instance().register(metricsName(),
+    MetricsSystem.instance().register(metricsName(),
         "Closed container " + name + " replication metrics", this);
   }
 
@@ -92,7 +92,7 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
 
   @Override
   public void close() throws Exception {
-    OzoneMetricsSystem.instance().unregisterSource(metricsName());
+    MetricsSystem.instance().unregisterSource(metricsName());
   }
 
   MutableCounterLong getSuccess() {

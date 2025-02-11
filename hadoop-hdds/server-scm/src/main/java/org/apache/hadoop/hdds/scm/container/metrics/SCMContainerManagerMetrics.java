@@ -17,13 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.container.metrics;
 
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 
 /**
  * Class contains metrics related to ContainerManager.
@@ -58,7 +56,7 @@ public final class SCMContainerManagerMetrics {
    * @return SCMContainerManagerMetrics
    */
   public static SCMContainerManagerMetrics create() {
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     return ms.register(SOURCE_NAME, "SCM ContainerManager Metrics",
         new SCMContainerManagerMetrics());
   }
@@ -67,7 +65,7 @@ public final class SCMContainerManagerMetrics {
    * Unregister metrics.
    */
   public void unRegister() {
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }
 

@@ -33,7 +33,7 @@ import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.http.HttpConfig;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -98,7 +98,7 @@ public class TestOzoneManagerHttpServer {
     OzoneManagerHttpServer server = null;
     try {
       server = new OzoneManagerHttpServer(conf, null);
-      OzoneMetricsSystem.initialize("TestOzoneManagerHttpServer");
+      MetricsSystem.initialize("TestOzoneManagerHttpServer");
       server.start();
 
       assertTrue(implies(policy.isHttpEnabled(),
@@ -124,7 +124,7 @@ public class TestOzoneManagerHttpServer {
     OzoneManagerHttpServer server = null;
     try {
       server = new OzoneManagerHttpServer(conf, null);
-      OzoneMetricsSystem.initialize("TestOzoneManagerHttpServer");
+      MetricsSystem.initialize("TestOzoneManagerHttpServer");
       server.start();
       // Checking if the /webserver directory does get created
       File webServerDir =

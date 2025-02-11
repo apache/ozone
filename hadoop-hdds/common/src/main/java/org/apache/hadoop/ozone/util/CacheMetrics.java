@@ -23,8 +23,7 @@ import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
-import org.apache.hadoop.metrics2.MetricsSystem;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 import org.apache.ratis.util.JavaUtils;
 
 /**
@@ -77,7 +76,7 @@ public final class CacheMetrics implements MetricsSource {
   }
 
   public static CacheMetrics create(Cache<?, ?> cache, String name) {
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     CacheMetrics source = new CacheMetrics(cache, name);
     return ms.register(source.sourceName, "Cache Metrics", source);
   }
@@ -105,7 +104,7 @@ public final class CacheMetrics implements MetricsSource {
   }
 
   public void unregister() {
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     ms.unregisterSource(sourceName);
   }
 }

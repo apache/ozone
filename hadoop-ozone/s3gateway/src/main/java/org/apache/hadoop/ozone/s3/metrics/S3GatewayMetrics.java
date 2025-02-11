@@ -25,10 +25,9 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -306,7 +305,7 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
     if (instance != null) {
       return instance;
     }
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     instance = ms.register(SOURCE_NAME, "S3 Gateway Metrics",
         new S3GatewayMetrics(conf));
     return instance;
@@ -318,7 +317,7 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
   public static void unRegister() {
     IOUtils.closeQuietly(instance);
     instance = null;
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }
 

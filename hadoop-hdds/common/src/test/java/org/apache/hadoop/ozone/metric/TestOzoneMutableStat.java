@@ -1,34 +1,33 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.metric;
-
-import org.apache.hadoop.metrics2.AbstractMetric;
-import org.apache.hadoop.metrics2.util.SampleStat;
-import org.apache.hadoop.ozone.metric.util.MetricsRecordBuilderImpl;
-import org.apache.hadoop.ozone.metrics.OzoneMutableStat;
-import org.junit.jupiter.api.Test;
-
-import java.util.List;
 
 import static org.apache.hadoop.ozone.metric.TestMetricsConsistency.getMetricsRecordBuilder;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.List;
+import org.apache.hadoop.metrics2.AbstractMetric;
+import org.apache.hadoop.ozone.metric.util.MetricsRecordBuilderImpl;
+import org.apache.hadoop.ozone.metrics.MutableStat;
+import org.apache.hadoop.ozone.metrics.SampleStat;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests for OzoneMutableStat.
@@ -37,7 +36,7 @@ class TestOzoneMutableStat {
 
   @Test
   void testOzoneMutableStatHasEmptyMetricsAfterCreation() {
-    OzoneMutableStat metric = createMutableStat();
+    MutableStat metric = createMutableStat();
     MetricsRecordBuilderImpl metricsRecordBuilder = getMetricsRecordBuilder();
     metric.snapshot(metricsRecordBuilder);
     List<AbstractMetric> metrics = metricsRecordBuilder.metrics();
@@ -46,7 +45,7 @@ class TestOzoneMutableStat {
 
   @Test
   void testOzoneMutableStatMetricsSizeAfterInsertElements() {
-    OzoneMutableStat metric = createMutableStat();
+    MutableStat metric = createMutableStat();
     MetricsRecordBuilderImpl metricsRecordBuilder = getMetricsRecordBuilder();
 
     insertTenElements(metric);
@@ -58,7 +57,7 @@ class TestOzoneMutableStat {
 
   @Test
   void testOzoneMutableStatMetricsValuesAfterInsertElements() {
-    OzoneMutableStat metric = createMutableStat();
+    MutableStat metric = createMutableStat();
     MetricsRecordBuilderImpl metricsRecordBuilder = getMetricsRecordBuilder();
 
     insertTenElements(metric);
@@ -71,7 +70,7 @@ class TestOzoneMutableStat {
 
   @Test
   void testOzoneMutableStatMetricsSizeAfterInsertWithSumElements() {
-    OzoneMutableStat metric = createMutableStat();
+    MutableStat metric = createMutableStat();
     MetricsRecordBuilderImpl metricsRecordBuilder = getMetricsRecordBuilder();
 
     metric.add(5, 100);
@@ -85,7 +84,7 @@ class TestOzoneMutableStat {
 
   @Test
   void testOzoneMutableStatMetricsValuesAfterInsertWithSumElements() {
-    OzoneMutableStat metric = createMutableStat();
+    MutableStat metric = createMutableStat();
     MetricsRecordBuilderImpl metricsRecordBuilder = getMetricsRecordBuilder();
 
     metric.add(5, 100);
@@ -100,7 +99,7 @@ class TestOzoneMutableStat {
 
   @Test
   void testOzoneMutableStatChangedWhenElementsAdded() {
-    OzoneMutableStat metric = createMutableStat();
+    MutableStat metric = createMutableStat();
 
     insertTenElements(metric);
     assertTrue(metric.changed());
@@ -108,14 +107,14 @@ class TestOzoneMutableStat {
 
   @Test
   void testOzoneMutableStatNotChangedWhenNoElementsAdded() {
-    OzoneMutableStat metric = createMutableStat();
+    MutableStat metric = createMutableStat();
 
     assertFalse(metric.changed());
   }
 
   @Test
   void testGetLastStatWithAddMethod() {
-    OzoneMutableStat metric = createMutableStat();
+    MutableStat metric = createMutableStat();
 
     insertTenElements(metric);
 
@@ -129,7 +128,7 @@ class TestOzoneMutableStat {
 
   @Test
   void testGetLastStatWithAddSumMethod() {
-    OzoneMutableStat metric = createMutableStat();
+    MutableStat metric = createMutableStat();
     metric.add(5, 100);
     metric.add(5, 100);
     metric.add(5, 100);
@@ -144,14 +143,14 @@ class TestOzoneMutableStat {
 
   @Test
   void testOzoneMutableStatMetricsSizeAfterInsertElements1() {
-    OzoneMutableStat metric = createMutableStat();
+    MutableStat metric = createMutableStat();
     metric.setUpdateTimeStamp(true);
     assertTrue(metric.getSnapshotTimeStamp() == 0);
   }
 
   @Test
   void testOzoneMutableStatMetricsSizeAfterInsertElements2() {
-    OzoneMutableStat metric = createMutableStat();
+    MutableStat metric = createMutableStat();
     metric.setUpdateTimeStamp(true);
     MetricsRecordBuilderImpl metricsRecordBuilder = getMetricsRecordBuilder();
 
@@ -162,14 +161,14 @@ class TestOzoneMutableStat {
     assertTrue(metric.getSnapshotTimeStamp() > 0);
   }
 
-  private static void insertTenElements(OzoneMutableStat metric) {
+  private static void insertTenElements(MutableStat metric) {
     for (int i = 1; i <= 10; i++) {
       metric.add(i);
     }
   }
 
-  private static OzoneMutableStat createMutableStat() {
-    return new OzoneMutableStat(
+  private static MutableStat createMutableStat() {
+    return new MutableStat(
         "Test_name",
         "Test_description",
         "Test_sample_name",

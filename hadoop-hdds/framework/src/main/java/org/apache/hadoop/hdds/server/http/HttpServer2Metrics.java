@@ -22,8 +22,7 @@ import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
-import org.apache.hadoop.metrics2.MetricsSystem;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 
 /**
@@ -66,7 +65,7 @@ public final class HttpServer2Metrics implements MetricsSource {
 
   public static HttpServer2Metrics create(
       QueuedThreadPool threadPool, String name) {
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     return ms.register(NAME, "HttpServer2 Metrics",
         new HttpServer2Metrics(threadPool, name));
   }
@@ -88,7 +87,7 @@ public final class HttpServer2Metrics implements MetricsSource {
   }
 
   public void unRegister() {
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     ms.unregisterSource(NAME);
   }
 }

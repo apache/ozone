@@ -23,14 +23,13 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.hadoop.ozone.metrics.OzoneMutableQuantiles;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
-import org.apache.hadoop.ozone.metrics.OzoneMutableRate;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
+import org.apache.hadoop.ozone.metrics.MutableQuantiles;
+import org.apache.hadoop.ozone.metrics.MutableRate;
 import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
@@ -60,13 +59,13 @@ public class ContainerMetrics implements Closeable {
 
   private final EnumMap<ContainerProtos.Type, MutableCounterLong> numOpsArray;
   private final EnumMap<ContainerProtos.Type, MutableCounterLong> opsBytesArray;
-  private final EnumMap<ContainerProtos.Type, OzoneMutableRate> opsLatency;
-  private final EnumMap<ContainerProtos.Type, OzoneMutableQuantiles[]> opsLatQuantiles;
+  private final EnumMap<ContainerProtos.Type, MutableRate> opsLatency;
+  private final EnumMap<ContainerProtos.Type, MutableQuantiles[]> opsLatQuantiles;
   private MetricsRegistry registry = null;
 
   public ContainerMetrics(int[] intervals) {
     final int len = intervals.length;
-    OzoneMutableQuantiles[] latQuantiles = new OzoneMutableQuantiles[len];
+    MutableQuantiles[] latQuantiles = new MutableQuantiles[len];
     this.numOpsArray = new EnumMap<>(ContainerProtos.Type.class);
     this.opsBytesArray = new EnumMap<>(ContainerProtos.Type.class);
     this.opsLatency = new EnumMap<>(ContainerProtos.Type.class);
@@ -80,13 +79,13 @@ public class ContainerMetrics implements Closeable {
           "bytes" + type, "bytes used by " + type + "op", (long) 0));
       opsLatency.put(
           type,
-          OzoneMetricsSystem.registerNewMutableRate(registry, "latencyNs" + type, type + " op")
+          MetricsSystem.registerNewMutableRate(registry, "latencyNs" + type, type + " op")
       );
 
       for (int j = 0; j < len; j++) {
         int interval = intervals[j];
         String quantileName = type + "Nanos" + interval + "s";
-        latQuantiles[j] = OzoneMetricsSystem.registerNewMutableQuantiles(registry,
+        latQuantiles[j] = MetricsSystem.registerNewMutableQuantiles(registry,
             quantileName, "latency of Container ops", "ops", "latencyNs", interval);
       }
       opsLatQuantiles.put(type, latQuantiles);
@@ -94,7 +93,7 @@ public class ContainerMetrics implements Closeable {
   }
 
   public static ContainerMetrics create(ConfigurationSource conf) {
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     // Percentile measurement is off by default, by watching no intervals
     int[] intervals =
         conf.getInts(HddsConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY);
@@ -104,7 +103,7 @@ public class ContainerMetrics implements Closeable {
   }
 
   public static void remove() {
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     ms.unregisterSource(STORAGE_CONTAINER_METRICS);
   }
 
@@ -120,7 +119,7 @@ public class ContainerMetrics implements Closeable {
 
   public void incContainerOpsLatencies(ContainerProtos.Type type, long latencyNs) {
     opsLatency.get(type).add(latencyNs);
-    for (OzoneMutableQuantiles q: opsLatQuantiles.get(type)) {
+    for (MutableQuantiles q: opsLatQuantiles.get(type)) {
       q.add(latencyNs);
     }
   }

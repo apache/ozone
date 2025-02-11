@@ -48,7 +48,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.ha.ConfUtils;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -415,7 +415,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         numOfActiveSCMs = numOfSCMs;
       }
 
-      OzoneMetricsSystem.setMiniClusterMode(true);
+      MetricsSystem.setMiniClusterMode(true);
       DatanodeStoreCache.setMiniClusterMode();
       initializeConfiguration();
       initOMRatisConf();

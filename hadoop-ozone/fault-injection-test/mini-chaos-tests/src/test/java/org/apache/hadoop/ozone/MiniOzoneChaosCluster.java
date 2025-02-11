@@ -35,11 +35,10 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.failure.FailureManager;
 import org.apache.hadoop.ozone.failure.Failures;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -282,7 +281,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
 
     @Override
     public MiniOzoneChaosCluster build() throws IOException {
-      OzoneMetricsSystem.setMiniClusterMode(true);
+      MetricsSystem.setMiniClusterMode(true);
       DatanodeStoreCache.setMiniClusterMode();
 
       initializeConfiguration();

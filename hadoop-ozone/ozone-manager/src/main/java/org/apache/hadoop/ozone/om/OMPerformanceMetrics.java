@@ -17,12 +17,11 @@
 
 package org.apache.hadoop.ozone.om;
 
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.MutableGaugeFloat;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
-import org.apache.hadoop.ozone.metrics.OzoneMutableRate;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
+import org.apache.hadoop.ozone.metrics.MutableRate;
 
 /**
  * Including OM performance related metrics.
@@ -32,125 +31,125 @@ public class OMPerformanceMetrics {
       OMPerformanceMetrics.class.getSimpleName();
 
   public static OMPerformanceMetrics register() {
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     return ms.register(SOURCE_NAME,
             "OzoneManager Request Performance",
             new OMPerformanceMetrics());
   }
 
   public static void unregister() {
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }
 
   @Metric(about = "Overall lookupKey in nanoseconds")
-  private OzoneMutableRate lookupLatencyNs;
+  private MutableRate lookupLatencyNs;
 
   @Metric(about = "Read key info from meta in nanoseconds")
-  private OzoneMutableRate lookupReadKeyInfoLatencyNs;
+  private MutableRate lookupReadKeyInfoLatencyNs;
 
   @Metric(about = "Block token generation latency in nanoseconds")
-  private OzoneMutableRate lookupGenerateBlockTokenLatencyNs;
+  private MutableRate lookupGenerateBlockTokenLatencyNs;
 
   @Metric(about = "Refresh location nanoseconds")
-  private OzoneMutableRate lookupRefreshLocationLatencyNs;
+  private MutableRate lookupRefreshLocationLatencyNs;
 
   @Metric(about = "ACLs check nanoseconds")
-  private OzoneMutableRate lookupAclCheckLatencyNs;
+  private MutableRate lookupAclCheckLatencyNs;
 
   @Metric(about = "resolveBucketLink latency nanoseconds")
-  private OzoneMutableRate lookupResolveBucketLatencyNs;
+  private MutableRate lookupResolveBucketLatencyNs;
 
 
   @Metric(about = "Overall getKeyInfo in nanoseconds")
-  private OzoneMutableRate getKeyInfoLatencyNs;
+  private MutableRate getKeyInfoLatencyNs;
 
   @Metric(about = "Read key info from db in getKeyInfo")
-  private OzoneMutableRate getKeyInfoReadKeyInfoLatencyNs;
+  private MutableRate getKeyInfoReadKeyInfoLatencyNs;
 
   @Metric(about = "Block token generation latency in getKeyInfo")
-  private OzoneMutableRate getKeyInfoGenerateBlockTokenLatencyNs;
+  private MutableRate getKeyInfoGenerateBlockTokenLatencyNs;
 
   @Metric(about = "Refresh location latency in getKeyInfo")
-  private OzoneMutableRate getKeyInfoRefreshLocationLatencyNs;
+  private MutableRate getKeyInfoRefreshLocationLatencyNs;
 
   @Metric(about = "ACLs check in getKeyInfo")
-  private OzoneMutableRate getKeyInfoAclCheckLatencyNs;
+  private MutableRate getKeyInfoAclCheckLatencyNs;
 
   @Metric(about = "Sort datanodes latency in getKeyInfo")
-  private OzoneMutableRate getKeyInfoSortDatanodesLatencyNs;
+  private MutableRate getKeyInfoSortDatanodesLatencyNs;
 
   @Metric(about = "resolveBucketLink latency in getKeyInfo")
-  private OzoneMutableRate getKeyInfoResolveBucketLatencyNs;
+  private MutableRate getKeyInfoResolveBucketLatencyNs;
 
   @Metric(about = "s3VolumeInfo latency nanoseconds")
-  private OzoneMutableRate s3VolumeContextLatencyNs;
+  private MutableRate s3VolumeContextLatencyNs;
 
   @Metric(about = "Client requests forcing container info cache refresh")
-  private OzoneMutableRate forceContainerCacheRefresh;
+  private MutableRate forceContainerCacheRefresh;
 
   @Metric(about = "checkAccess latency in nanoseconds")
-  private OzoneMutableRate checkAccessLatencyNs;
+  private MutableRate checkAccessLatencyNs;
 
   @Metric(about = "listKeys latency in nanoseconds")
-  private OzoneMutableRate listKeysLatencyNs;
+  private MutableRate listKeysLatencyNs;
 
   @Metric(about = "Validate request latency in nano seconds")
-  private OzoneMutableRate validateRequestLatencyNs;
+  private MutableRate validateRequestLatencyNs;
 
   @Metric(about = "Validate response latency in nano seconds")
-  private OzoneMutableRate validateResponseLatencyNs;
+  private MutableRate validateResponseLatencyNs;
 
   @Metric(about = "PreExecute latency in nano seconds")
-  private OzoneMutableRate preExecuteLatencyNs;
+  private MutableRate preExecuteLatencyNs;
 
   @Metric(about = "Ratis latency in nano seconds")
-  private OzoneMutableRate submitToRatisLatencyNs;
+  private MutableRate submitToRatisLatencyNs;
 
   @Metric(about = "Convert om request to ratis request nano seconds")
-  private OzoneMutableRate createRatisRequestLatencyNs;
+  private MutableRate createRatisRequestLatencyNs;
 
   @Metric(about = "Convert ratis response to om response nano seconds")
-  private OzoneMutableRate createOmResponseLatencyNs;
+  private MutableRate createOmResponseLatencyNs;
 
   @Metric(about = "Ratis local command execution latency in nano seconds")
-  private OzoneMutableRate validateAndUpdateCacheLatencyNs;
+  private MutableRate validateAndUpdateCacheLatencyNs;
 
   @Metric(about = "average pagination for listKeys")
-  private OzoneMutableRate listKeysAveragePagination;
+  private MutableRate listKeysAveragePagination;
 
   @Metric(about = "ops per second for listKeys")
   private MutableGaugeFloat listKeysOpsPerSec;
 
   @Metric(about = "ACLs check latency in listKeys")
-  private OzoneMutableRate listKeysAclCheckLatencyNs;
+  private MutableRate listKeysAclCheckLatencyNs;
 
   @Metric(about = "resolveBucketLink latency in listKeys")
-  private OzoneMutableRate listKeysResolveBucketLatencyNs;
+  private MutableRate listKeysResolveBucketLatencyNs;
 
   @Metric(about = "deleteKeyFailure latency in nano seconds")
-  private OzoneMutableRate deleteKeyFailureLatencyNs;
+  private MutableRate deleteKeyFailureLatencyNs;
 
   @Metric(about = "deleteKeySuccess latency in nano seconds")
-  private OzoneMutableRate deleteKeySuccessLatencyNs;
+  private MutableRate deleteKeySuccessLatencyNs;
 
   @Metric(about = "resolveBucketLink latency in deleteKeys")
-  private OzoneMutableRate deleteKeysResolveBucketLatencyNs;
+  private MutableRate deleteKeysResolveBucketLatencyNs;
 
   @Metric(about = "ACLs check latency in deleteKeys")
-  private OzoneMutableRate deleteKeysAclCheckLatencyNs;
+  private MutableRate deleteKeysAclCheckLatencyNs;
 
   @Metric(about = "resolveBucketLink and ACLs check latency in deleteKey")
-  private OzoneMutableRate deleteKeyResolveBucketAndAclCheckLatencyNs;
+  private MutableRate deleteKeyResolveBucketAndAclCheckLatencyNs;
   
   @Metric(about = "readFromRockDb latency in listKeys")
-  private OzoneMutableRate listKeysReadFromRocksDbLatencyNs;
+  private MutableRate listKeysReadFromRocksDbLatencyNs;
 
   @Metric(about = "resolveBucketLink latency in getObjectTagging")
-  private OzoneMutableRate getObjectTaggingResolveBucketLatencyNs;
+  private MutableRate getObjectTaggingResolveBucketLatencyNs;
 
   @Metric(about = "ACLs check in getObjectTagging")
-  private OzoneMutableRate getObjectTaggingAclCheckLatencyNs;
+  private MutableRate getObjectTaggingAclCheckLatencyNs;
 
   @Metric(about = "Latency of each iteration of DirectoryDeletingService in ms")
   private MutableGaugeLong directoryDeletingServiceLatencyMs;
@@ -165,20 +164,20 @@ public class OMPerformanceMetrics {
     lookupLatencyNs.add(latencyInNs);
   }
 
-  OzoneMutableRate getLookupRefreshLocationLatencyNs() {
+  MutableRate getLookupRefreshLocationLatencyNs() {
     return lookupRefreshLocationLatencyNs;
   }
 
 
-  OzoneMutableRate getLookupGenerateBlockTokenLatencyNs() {
+  MutableRate getLookupGenerateBlockTokenLatencyNs() {
     return lookupGenerateBlockTokenLatencyNs;
   }
 
-  OzoneMutableRate getLookupReadKeyInfoLatencyNs() {
+  MutableRate getLookupReadKeyInfoLatencyNs() {
     return lookupReadKeyInfoLatencyNs;
   }
 
-  OzoneMutableRate getLookupAclCheckLatencyNs() {
+  MutableRate getLookupAclCheckLatencyNs() {
     return lookupAclCheckLatencyNs;
   }
 
@@ -186,7 +185,7 @@ public class OMPerformanceMetrics {
     s3VolumeContextLatencyNs.add(latencyInNs);
   }
 
-  OzoneMutableRate getLookupResolveBucketLatencyNs() {
+  MutableRate getLookupResolveBucketLatencyNs() {
     return lookupResolveBucketLatencyNs;
   }
 
@@ -194,27 +193,27 @@ public class OMPerformanceMetrics {
     getKeyInfoLatencyNs.add(value);
   }
 
-  OzoneMutableRate getGetKeyInfoAclCheckLatencyNs() {
+  MutableRate getGetKeyInfoAclCheckLatencyNs() {
     return getKeyInfoAclCheckLatencyNs;
   }
 
-  OzoneMutableRate getGetKeyInfoGenerateBlockTokenLatencyNs() {
+  MutableRate getGetKeyInfoGenerateBlockTokenLatencyNs() {
     return getKeyInfoGenerateBlockTokenLatencyNs;
   }
 
-  OzoneMutableRate getGetKeyInfoReadKeyInfoLatencyNs() {
+  MutableRate getGetKeyInfoReadKeyInfoLatencyNs() {
     return getKeyInfoReadKeyInfoLatencyNs;
   }
 
-  OzoneMutableRate getGetKeyInfoRefreshLocationLatencyNs() {
+  MutableRate getGetKeyInfoRefreshLocationLatencyNs() {
     return getKeyInfoRefreshLocationLatencyNs;
   }
 
-  OzoneMutableRate getGetKeyInfoResolveBucketLatencyNs() {
+  MutableRate getGetKeyInfoResolveBucketLatencyNs() {
     return getKeyInfoResolveBucketLatencyNs;
   }
 
-  OzoneMutableRate getGetKeyInfoSortDatanodesLatencyNs() {
+  MutableRate getGetKeyInfoSortDatanodesLatencyNs() {
     return getKeyInfoSortDatanodesLatencyNs;
   }
 
@@ -230,31 +229,31 @@ public class OMPerformanceMetrics {
     listKeysLatencyNs.add(latencyInNs);
   }
 
-  public OzoneMutableRate getValidateRequestLatencyNs() {
+  public MutableRate getValidateRequestLatencyNs() {
     return validateRequestLatencyNs;
   }
 
-  public OzoneMutableRate getValidateResponseLatencyNs() {
+  public MutableRate getValidateResponseLatencyNs() {
     return validateResponseLatencyNs;
   }
 
-  public OzoneMutableRate getPreExecuteLatencyNs() {
+  public MutableRate getPreExecuteLatencyNs() {
     return preExecuteLatencyNs;
   }
 
-  public OzoneMutableRate getSubmitToRatisLatencyNs() {
+  public MutableRate getSubmitToRatisLatencyNs() {
     return submitToRatisLatencyNs;
   }
 
-  public OzoneMutableRate getCreateRatisRequestLatencyNs() {
+  public MutableRate getCreateRatisRequestLatencyNs() {
     return createRatisRequestLatencyNs;
   }
 
-  public OzoneMutableRate getCreateOmResponseLatencyNs() {
+  public MutableRate getCreateOmResponseLatencyNs() {
     return createOmResponseLatencyNs;
   }
 
-  public OzoneMutableRate getValidateAndUpdateCacheLatencyNs() {
+  public MutableRate getValidateAndUpdateCacheLatencyNs() {
     return validateAndUpdateCacheLatencyNs;
   }
 
@@ -266,11 +265,11 @@ public class OMPerformanceMetrics {
     listKeysOpsPerSec.set(opsPerSec);
   }
 
-  OzoneMutableRate getListKeysAclCheckLatencyNs() {
+  MutableRate getListKeysAclCheckLatencyNs() {
     return listKeysAclCheckLatencyNs;
   }
 
-  OzoneMutableRate getListKeysResolveBucketLatencyNs() {
+  MutableRate getListKeysResolveBucketLatencyNs() {
     return listKeysResolveBucketLatencyNs;
   }
 
@@ -290,7 +289,7 @@ public class OMPerformanceMetrics {
     deleteKeysAclCheckLatencyNs.add(latencyInNs);
   }
 
-  public OzoneMutableRate getDeleteKeyResolveBucketAndAclCheckLatencyNs() {
+  public MutableRate getDeleteKeyResolveBucketAndAclCheckLatencyNs() {
     return deleteKeyResolveBucketAndAclCheckLatencyNs;
   }
     
@@ -298,11 +297,11 @@ public class OMPerformanceMetrics {
     listKeysReadFromRocksDbLatencyNs.add(latencyInNs);
   }
 
-  public OzoneMutableRate getGetObjectTaggingResolveBucketLatencyNs() {
+  public MutableRate getGetObjectTaggingResolveBucketLatencyNs() {
     return getObjectTaggingResolveBucketLatencyNs;
   }
 
-  public OzoneMutableRate getGetObjectTaggingAclCheckLatencyNs() {
+  public MutableRate getGetObjectTaggingAclCheckLatencyNs() {
     return getObjectTaggingAclCheckLatencyNs;
   }
 

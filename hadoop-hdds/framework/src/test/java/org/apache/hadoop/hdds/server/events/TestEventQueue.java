@@ -27,7 +27,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,13 +48,13 @@ public class TestEventQueue {
 
   @BeforeEach
   public void startEventQueue() {
-    OzoneMetricsSystem.initialize(getClass().getSimpleName());
+    MetricsSystem.initialize(getClass().getSimpleName());
     queue = new EventQueue();
   }
 
   @AfterEach
   public void stopEventQueue() {
-    OzoneMetricsSystem.shutdown();
+    MetricsSystem.shutdown();
     queue.close();
   }
 

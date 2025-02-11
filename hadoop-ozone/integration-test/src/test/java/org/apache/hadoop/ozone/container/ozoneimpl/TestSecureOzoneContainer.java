@@ -67,7 +67,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 
 /**
  * Tests ozone containers via secure grpc/netty.
@@ -99,7 +99,7 @@ class TestSecureOzoneContainer {
 
   @BeforeAll
   static void init() {
-    OzoneMetricsSystem.setMiniClusterMode(true);
+    MetricsSystem.setMiniClusterMode(true);
     ExitUtils.disableSystemExit();
   }
 

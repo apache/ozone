@@ -1,31 +1,30 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.metric;
 
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.metrics2.util.Quantile;
-import org.apache.hadoop.ozone.metrics.OzoneSampleQuantiles;
-import org.junit.jupiter.api.Test;
-
-import java.util.Map;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.Map;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.metrics2.util.Quantile;
+import org.apache.hadoop.ozone.metrics.SampleQuantiles;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests for SampleQuantiles.
@@ -38,7 +37,7 @@ class TestSampleQuantiles {
 
   @Test
   void testSnapshotEmptySnaphotReturnEmptyMap() {
-    OzoneSampleQuantiles quantiles = new OzoneSampleQuantiles(QUANTILES);
+    SampleQuantiles quantiles = new SampleQuantiles(QUANTILES);
 
     Map<Quantile, Long> snapshot = quantiles.snapshot();
     assertEquals(0, snapshot.size());
@@ -46,7 +45,7 @@ class TestSampleQuantiles {
 
   @Test
   void testSnapshotHasCorrectQuantilesSize() {
-    OzoneSampleQuantiles quantiles = new OzoneSampleQuantiles(QUANTILES);
+    SampleQuantiles quantiles = new SampleQuantiles(QUANTILES);
 
     insertTenElements(quantiles);
 
@@ -56,7 +55,7 @@ class TestSampleQuantiles {
 
   @Test
   void testClearDontRemoveQuantilesFromSnapshot() {
-    OzoneSampleQuantiles quantiles = new OzoneSampleQuantiles(QUANTILES);
+    SampleQuantiles quantiles = new SampleQuantiles(QUANTILES);
 
     insertTenElements(quantiles);
 
@@ -68,7 +67,7 @@ class TestSampleQuantiles {
 
   @Test
   void testClearResetQuantilesInSnapshot() {
-    OzoneSampleQuantiles quantiles = new OzoneSampleQuantiles(QUANTILES);
+    SampleQuantiles quantiles = new SampleQuantiles(QUANTILES);
 
     insertTenElements(quantiles);
 
@@ -80,7 +79,7 @@ class TestSampleQuantiles {
 
   @Test
   void testGetCount() {
-    OzoneSampleQuantiles quantiles = new OzoneSampleQuantiles(QUANTILES);
+    SampleQuantiles quantiles = new SampleQuantiles(QUANTILES);
 
     insertTenElements(quantiles);
 
@@ -90,7 +89,7 @@ class TestSampleQuantiles {
 
   @Test
   void testGetStateAndClearGetCorrectState() {
-    OzoneSampleQuantiles quantiles = new OzoneSampleQuantiles(QUANTILES);
+    SampleQuantiles quantiles = new SampleQuantiles(QUANTILES);
 
     insertTenElements(quantiles);
     Map<Quantile, Long> snapshot = quantiles.snapshot();
@@ -101,7 +100,7 @@ class TestSampleQuantiles {
 
   @Test
   void testGetStateAndClearResetState() {
-    OzoneSampleQuantiles quantiles = new OzoneSampleQuantiles(QUANTILES);
+    SampleQuantiles quantiles = new SampleQuantiles(QUANTILES);
 
     insertTenElements(quantiles);
 
@@ -110,7 +109,7 @@ class TestSampleQuantiles {
     assertTrue(snapshot.isEmpty());
   }
 
-  private static void insertTenElements(OzoneSampleQuantiles metric) {
+  private static void insertTenElements(SampleQuantiles metric) {
     for (int i = 0; i < 10; i++) {
       metric.insert(i);
     }

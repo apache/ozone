@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -21,11 +20,6 @@ package org.apache.hadoop.ozone.metrics;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.metrics2.MetricsException;
-import org.apache.hadoop.metrics2.util.Quantile;
-import org.apache.hadoop.metrics2.util.QuantileEstimator;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -38,16 +32,21 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.metrics2.MetricsException;
+import org.apache.hadoop.metrics2.util.Quantile;
+import org.apache.hadoop.metrics2.util.QuantileEstimator;
+
 
 /**
  * Non-synchronized version of {@link org.apache.hadoop.metrics2.util.SampleQuantiles}.
  */
-public class OzoneSampleQuantiles implements QuantileEstimator {
+public class SampleQuantiles implements QuantileEstimator {
 
   private static final int BUFFER_SIZE = 500;
 
   private final BlockingQueue<Long> samplesBuffer =
-      new ArrayBlockingQueue<>(BUFFER_SIZE, true);
+      new ArrayBlockingQueue<>(BUFFER_SIZE, false);
 
   /**
    * Array of Quantiles that we care about, along with desired error.
@@ -67,7 +66,7 @@ public class OzoneSampleQuantiles implements QuantileEstimator {
    */
   private final LinkedList<SampleItem> samples;
 
-  public OzoneSampleQuantiles(Quantile[] quantiles) {
+  public SampleQuantiles(Quantile[] quantiles) {
     this.quantiles = Arrays.copyOf(quantiles, quantiles.length);
     this.samples = new LinkedList<>();
   }

@@ -17,13 +17,12 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.metrics2.lib.MutableRate;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 
 /**
  * This class is used to track Volume IO stats for each HDDS Volume.
@@ -79,11 +78,11 @@ public class VolumeIOStats {
   }
 
   public void init() {
-    OzoneMetricsSystem.register(metricsSourceName, "Volume I/O Statistics", this);
+    MetricsSystem.register(metricsSourceName, "Volume I/O Statistics", this);
   }
 
   public void unregister() {
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     ms.unregisterSource(metricsSourceName);
   }
 

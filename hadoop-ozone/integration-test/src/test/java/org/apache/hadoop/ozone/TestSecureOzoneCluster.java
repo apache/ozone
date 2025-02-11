@@ -135,7 +135,7 @@ import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.Storage;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -224,7 +224,7 @@ final class TestSecureOzoneCluster {
       conf.set(OZONE_OM_ADDRESS_KEY,
           InetAddress.getLocalHost().getCanonicalHostName() + ":" + getFreePort());
 
-      OzoneMetricsSystem.setMiniClusterMode(true);
+      MetricsSystem.setMiniClusterMode(true);
       ExitUtils.disableSystemExit();
       final String path = tempDir.getAbsolutePath();
       omMetaDirPath = Paths.get(path, "om-meta");

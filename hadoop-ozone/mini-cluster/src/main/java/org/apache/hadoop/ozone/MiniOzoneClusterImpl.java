@@ -85,7 +85,7 @@ import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.recon.schema.ReconSqlDbConfig;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -397,7 +397,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       stop();
       FileUtils.deleteDirectory(baseDir);
       ContainerCache.getInstance(conf).shutdownCache();
-      OzoneMetricsSystem.shutdown();
+      MetricsSystem.shutdown();
       ManagedRocksObjectMetrics.INSTANCE.assertNoLeaks();
     } catch (Exception e) {
       LOG.error("Exception while shutting down the cluster.", e);
@@ -542,7 +542,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
     @Override
     public MiniOzoneCluster build() throws IOException {
-      OzoneMetricsSystem.setMiniClusterMode(true);
+      MetricsSystem.setMiniClusterMode(true);
       DatanodeStoreCache.setMiniClusterMode();
       initializeConfiguration();
       StorageContainerManager scm = null;

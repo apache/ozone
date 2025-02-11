@@ -76,7 +76,7 @@ import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.minikdc.MiniKdc;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ScmBlockLocationTestingClient;
@@ -157,7 +157,7 @@ public final class TestDelegationToken {
       conf.setInt(OZONE_SCM_SECURITY_SERVICE_PORT_KEY,
           getPort(OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT, 100));
 
-      OzoneMetricsSystem.setMiniClusterMode(true);
+      MetricsSystem.setMiniClusterMode(true);
       final String path = folder.resolve("om-meta").toString();
       Path metaDirPath = Paths.get(path, "om-meta");
       conf.set(OZONE_METADATA_DIRS, metaDirPath.toString());

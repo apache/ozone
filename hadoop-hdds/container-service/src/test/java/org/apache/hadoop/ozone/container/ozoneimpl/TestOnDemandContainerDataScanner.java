@@ -44,7 +44,7 @@ import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -182,10 +182,10 @@ public class TestOnDemandContainerDataScanner extends
   public void testScannerMetricsUnregisters() {
     OnDemandContainerDataScanner.init(conf, controller);
     String metricsName = OnDemandContainerDataScanner.getMetrics().getName();
-    assertNotNull(OzoneMetricsSystem.instance().getSource(metricsName));
+    assertNotNull(MetricsSystem.instance().getSource(metricsName));
     OnDemandContainerDataScanner.shutdown();
     OnDemandContainerDataScanner.scanContainer(healthy);
-    assertNull(OzoneMetricsSystem.instance().getSource(metricsName));
+    assertNull(MetricsSystem.instance().getSource(metricsName));
   }
 
   @Test

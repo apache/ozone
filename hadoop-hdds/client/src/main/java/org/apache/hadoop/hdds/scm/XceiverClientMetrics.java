@@ -26,14 +26,13 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 import org.apache.hadoop.ozone.util.PerformanceMetrics;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
 
 /**
  * The client metrics for the Storage Container protocol.
@@ -77,8 +76,8 @@ public class XceiverClientMetrics implements MetricsSource {
   }
 
   public static XceiverClientMetrics create() {
-    OzoneMetricsSystem.initialize(SOURCE_NAME);
-    return OzoneMetricsSystem.register(SOURCE_NAME, "Storage Container Client Metrics",
+    MetricsSystem.initialize(SOURCE_NAME);
+    return MetricsSystem.register(SOURCE_NAME, "Storage Container Client Metrics",
         new XceiverClientMetrics());
   }
 
@@ -128,7 +127,7 @@ public class XceiverClientMetrics implements MetricsSource {
 
   public void unRegister() {
     IOUtils.closeQuietly(containerOpsLatency.values());
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }
 
