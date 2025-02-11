@@ -51,7 +51,7 @@ public class RocksDBConfiguration {
       defaultValue = "100MB",
       tags = {OM, SCM, DATANODE},
       description = "Maximum size of RocksDB application log file.")
-  private long rocksdbMaxLogFileSize = 100;
+  private long rocksdbMaxLogFileSize = 100MB;
 
   @Config(key = "rocksdb.keep.log.file.num",
       type = ConfigType.INT,
