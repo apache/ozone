@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.server;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
@@ -42,7 +41,6 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.IEventInfo;
-import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReregisterCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
@@ -55,7 +53,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.deleteBlocksCommand;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CONTAINER_ACTIONS;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CONTAINER_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents
@@ -206,29 +203,12 @@ public final class SCMDatanodeHeartbeatDispatcher {
     if (LOG.isDebugEnabled()) {
       StringBuilder allCommands = new StringBuilder();
       for (SCMCommand cmd : commands) {
-        allCommands.append("cmdID: ").append(cmd.getId());
-        allCommands.append(" encodedToken: \"").append(cmd.getEncodedToken()).append("\"");
-        allCommands.append(" term: ").append(cmd.getTerm());
-        allCommands.append(" deadlineMsSinceEpoch: ").append(cmd.getDeadline());
-        if (cmd.getType().equals(deleteBlocksCommand)) {
-          DeleteBlocksCommand delCmd = (DeleteBlocksCommand) cmd;
-          allCommands.append(" deleteBlocksTransactions: {");
-          for (DeletedBlocksTransaction txn : delCmd.blocksTobeDeleted()) {
-            allCommands.append(" txnId:").append(txn.getTxID());
-            allCommands.append(" containerID:").append(txn.getContainerID());
-            allCommands.append(" deleteBlockCount:").append(txn.getLocalIDCount());
-            allCommands.append(" count:").append(txn.getCount());
-            allCommands.append(",");
-          }
-          allCommands.deleteCharAt(allCommands.length() - 1);
-          allCommands.append(" }");
-        } else {
-          allCommands.append(" ").append(cmd.getProto());
-        }
-        allCommands.append(", ");
+        allCommands.append(cmd).append(", ");
       }
       int len = allCommands.length();
-      allCommands.delete(len - 2, len);
+      if (len > 2) {
+        allCommands.delete(len - 2, len);
+      }
       LOG.debug("Heartbeat dispatched: datanode=" + datanodeDetails.getUuid() + ", Commands= [" + allCommands + "]");
     }
 

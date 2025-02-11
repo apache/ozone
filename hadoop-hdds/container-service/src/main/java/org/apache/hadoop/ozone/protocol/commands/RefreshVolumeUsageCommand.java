@@ -54,4 +54,15 @@ public class RefreshVolumeUsageCommand
     Preconditions.checkNotNull(refreshVolumeUsageProto);
     return new RefreshVolumeUsageCommand();
   }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append(getType())
+        .append(": cmdID: ").append(getId())
+        .append(", encodedToken: \"").append(getEncodedToken()).append("\"")
+        .append(", term: ").append(getTerm())
+        .append(", deadlineMsSinceEpoch: ").append(getDeadline());
+    return sb.toString();
+  }
 }
