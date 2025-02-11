@@ -227,42 +227,6 @@ public final class LambdaTestUtils {
   }
 
   /**
-   * Invoke a callable; wrap all checked exceptions with an
-   * AssertionError.
-   * @param closure closure to execute
-   * @param <T> return type of closure
-   * @return the value of the closure
-   * @throws AssertionError if the operation raised an IOE or
-   * other checked exception.
-   */
-  public static <T> T eval(Callable<T> closure) {
-    try {
-      return closure.call();
-    } catch (RuntimeException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new AssertionError(e.toString(), e);
-    }
-  }
-
-  /**
-   * Invoke a callable; wrap all checked exceptions with an
-   * AssertionError.
-   * @param closure closure to execute
-   * @throws AssertionError if the operation raised an IOE or
-   * other checked exception.
-   */
-  public static void eval(VoidCallable closure) {
-    try {
-      closure.call();
-    } catch (RuntimeException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new AssertionError(e.toString(), e);
-    }
-  }
-
-  /**
    * Returns {@code TimeoutException} on a timeout. If
    * there was a inner class passed in, includes it as the
    * inner failure.

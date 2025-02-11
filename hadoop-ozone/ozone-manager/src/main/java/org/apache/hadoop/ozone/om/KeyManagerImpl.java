@@ -2081,21 +2081,18 @@ public class KeyManagerImpl implements KeyManager {
     Table<String, OmDirectoryInfo> dirTable = metadataManager.getDirectoryTable();
     try (TableIterator<String,
         ? extends Table.KeyValue<String, OmDirectoryInfo>>
-        iterator = dirTable.iterator()) {
-      return gatherSubDirsWithIterator(parentInfo,
-          seekDirInDB, countEntries, iterator, remainingBufLimit);
+        iterator = dirTable.iterator(seekDirInDB)) {
+      return gatherSubDirsWithIterator(parentInfo, countEntries, iterator, remainingBufLimit);
     }
 
   }
 
   private DeleteKeysResult gatherSubDirsWithIterator(OmKeyInfo parentInfo,
-       String seekDirInDB,
       long countEntries,
       TableIterator<String,
           ? extends Table.KeyValue<String, OmDirectoryInfo>> iterator, long remainingBufLimit)
       throws IOException {
     List<OmKeyInfo> directories = new ArrayList<>();
-    iterator.seek(seekDirInDB);
     long consumedSize = 0;
     boolean processedSubDirs = false;
 
@@ -2142,9 +2139,7 @@ public class KeyManagerImpl implements KeyManager {
 
     Table fileTable = metadataManager.getFileTable();
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        iterator = fileTable.iterator()) {
-
-      iterator.seek(seekFileInDB);
+        iterator = fileTable.iterator(seekFileInDB)) {
 
       while (iterator.hasNext() && remainingBufLimit > 0) {
         Table.KeyValue<String, OmKeyInfo> entry = iterator.next();

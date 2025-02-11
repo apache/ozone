@@ -52,8 +52,6 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
-import static org.apache.logging.log4j.util.StackLocatorUtil.getCallerClass;
 
 /**
  * Provides some very generic helpers which might be used across the tests.
@@ -94,51 +92,6 @@ public abstract class GenericTestUtils {
   }
 
   /**
-   * Get the (created) base directory for tests.
-   *
-   * @return the absolute directory
-   *
-   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
-   */
-  @Deprecated
-  public static File getTestDir() {
-    String prop =
-        System.getProperty(SYSPROP_TEST_DATA_DIR, DEFAULT_TEST_DATA_DIR);
-    if (prop.isEmpty()) {
-      // corner case: property is there but empty
-      prop = DEFAULT_TEST_DATA_DIR;
-    }
-    File dir = new File(prop).getAbsoluteFile();
-    assertDirCreation(dir);
-    return dir;
-  }
-
-  /**
-   * Get an uncreated directory for tests.
-   *
-   * @return the absolute directory for tests. Caller is expected to create it.
-   *
-   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
-   */
-  @Deprecated
-  public static File getTestDir(String subdir) {
-    return new File(getTestDir(), subdir).getAbsoluteFile();
-  }
-
-  /**
-   * Get an uncreated directory for tests with a randomized alphanumeric
-   * name. This is likely to provide a unique path for tests run in parallel
-   *
-   * @return the absolute directory for tests. Caller is expected to create it.
-   *
-   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
-   */
-  @Deprecated
-  public static File getRandomizedTestDir() {
-    return new File(getRandomizedTempPath());
-  }
-
-  /**
    * Get a temp path. This may or may not be relative; it depends on what the
    * {@link #SYSPROP_TEST_DATA_DIR} is set to. If unset, it returns a path
    * under the relative path {@link #DEFAULT_TEST_DATA_PATH}
@@ -161,30 +114,6 @@ public abstract class GenericTestUtils {
       prop = prop + "/";
     }
     return prop + subpath;
-  }
-
-  /**
-   * Get a temp path. This may or may not be relative; it depends on what the
-   * {@link #SYSPROP_TEST_DATA_DIR} is set to. If unset, it returns a path
-   * under the relative path {@link #DEFAULT_TEST_DATA_PATH}
-   *
-   * @return a string to use in paths
-   *
-   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
-   */
-  @SuppressWarnings("java:S2245") // no need for secure random
-  @Deprecated
-  public static String getRandomizedTempPath() {
-    return getTempPath(getCallerClass(GenericTestUtils.class).getSimpleName()
-        + "-" + randomAlphanumeric(10));
-  }
-
-  /**
-   * Assert that a given dir can be created or it already exists.
-   */
-  public static void assertDirCreation(File f) {
-    Assertions.assertTrue(f.mkdirs() || f.exists(),
-        "Could not create dir " + f + ", nor does it exist");
   }
 
   /**
@@ -294,21 +223,6 @@ public abstract class GenericTestUtils {
     return map.entrySet().stream().flatMap(entry -> entry.getValue().stream()
             .map(v -> Pair.of(v, entry.getKey())))
             .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
-  }
-
-  /***
-   * Removed all files and dirs in the given dir recursively.
-   */
-  public static boolean deleteDirectory(File dir) {
-    File[] allContents = dir.listFiles();
-    if (allContents != null) {
-      for (File content : allContents) {
-        if (!deleteDirectory(content)) {
-          return false;
-        }
-      }
-    }
-    return dir.delete();
   }
 
   /**
