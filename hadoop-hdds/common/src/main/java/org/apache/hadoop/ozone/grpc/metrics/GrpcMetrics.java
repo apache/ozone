@@ -32,12 +32,12 @@ import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.metrics.OzoneMutableQuantiles;
+import org.apache.hadoop.ozone.metrics.MutableQuantiles;
 import org.apache.hadoop.ozone.util.MetricUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
-import org.apache.hadoop.ozone.metrics.OzoneMutableRate;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
+import org.apache.hadoop.ozone.metrics.MutableRate;
 
 /**
  * Class which maintains metrics related to using GRPC.
@@ -69,16 +69,16 @@ public class GrpcMetrics implements MetricsSource {
     grpcQuantileEnable = (intervals.length > 0);
     if (grpcQuantileEnable) {
       grpcQueueTimeMillisQuantiles =
-          new OzoneMutableQuantiles[intervals.length];
+          new MutableQuantiles[intervals.length];
       grpcProcessingTimeMillisQuantiles =
-          new OzoneMutableQuantiles[intervals.length];
+          new MutableQuantiles[intervals.length];
       for (int i = 0; i < intervals.length; i++) {
         int interval = intervals[i];
-        grpcQueueTimeMillisQuantiles[i] = OzoneMetricsSystem
+        grpcQueueTimeMillisQuantiles[i] = MetricsSystem
             .registerNewMutableQuantiles(registry, "grpcQueueTime" + interval
                     + "s", "grpc queue time in millisecond", "ops",
                 "latency", interval);
-        grpcProcessingTimeMillisQuantiles[i] = OzoneMetricsSystem.registerNewMutableQuantiles(registry,
+        grpcProcessingTimeMillisQuantiles[i] = MetricsSystem.registerNewMutableQuantiles(registry,
             "grpcProcessingTime" + interval + "s",
             "grpc processing time in millisecond",
             "ops", "latency", interval);
@@ -94,7 +94,7 @@ public class GrpcMetrics implements MetricsSource {
    */
   public static synchronized GrpcMetrics create(Configuration conf) {
     GrpcMetrics metrics = new GrpcMetrics(conf);
-    return OzoneMetricsSystem.instance().register(SOURCE_NAME,
+    return MetricsSystem.instance().register(SOURCE_NAME,
         "Metrics for using gRPC", metrics);
   }
 
@@ -102,7 +102,7 @@ public class GrpcMetrics implements MetricsSource {
    * Unregister the metrics instance.
    */
   public void unRegister() {
-    OzoneMetricsSystem.instance().unregisterSource(SOURCE_NAME);
+    MetricsSystem.instance().unregisterSource(SOURCE_NAME);
     MetricUtil.stop(grpcProcessingTimeMillisQuantiles);
     MetricUtil.stop(grpcQueueTimeMillisQuantiles);
   }
@@ -127,18 +127,18 @@ public class GrpcMetrics implements MetricsSource {
   private MutableCounterLong unknownMessagesReceived;
 
   @Metric("Queue time")
-  private OzoneMutableRate grpcQueueTime;
+  private MutableRate grpcQueueTime;
 
   // There should be no getter method to avoid
   // exposing internal representation. FindBugs error raised.
-  private OzoneMutableQuantiles[] grpcQueueTimeMillisQuantiles;
+  private MutableQuantiles[] grpcQueueTimeMillisQuantiles;
 
   @Metric("Processsing time")
-  private OzoneMutableRate grpcProcessingTime;
+  private MutableRate grpcProcessingTime;
 
   // There should be no getter method to avoid
   // exposing internal representation. FindBugs error raised.
-  private OzoneMutableQuantiles[] grpcProcessingTimeMillisQuantiles;
+  private MutableQuantiles[] grpcProcessingTimeMillisQuantiles;
 
   @Metric("Number of active clients connected")
   private MutableCounterLong numOpenClientConnections;
@@ -162,7 +162,7 @@ public class GrpcMetrics implements MetricsSource {
   public void addGrpcQueueTime(int queueTime) {
     grpcQueueTime.add(queueTime);
     if (grpcQuantileEnable) {
-      for (OzoneMutableQuantiles q : grpcQueueTimeMillisQuantiles) {
+      for (MutableQuantiles q : grpcQueueTimeMillisQuantiles) {
         if (q != null) {
           q.add(queueTime);
         }
@@ -173,7 +173,7 @@ public class GrpcMetrics implements MetricsSource {
   public void addGrpcProcessingTime(int processingTime) {
     grpcProcessingTime.add(processingTime);
     if (grpcQuantileEnable) {
-      for (OzoneMutableQuantiles q : grpcProcessingTimeMillisQuantiles) {
+      for (MutableQuantiles q : grpcProcessingTimeMillisQuantiles) {
         if (q != null) {
           q.add(processingTime);
         }
@@ -205,11 +205,11 @@ public class GrpcMetrics implements MetricsSource {
     return unknownMessagesReceived.value();
   }
 
-  OzoneMutableRate getGrpcQueueTime() {
+  MutableRate getGrpcQueueTime() {
     return grpcQueueTime;
   }
 
-  OzoneMutableRate getGrpcProcessingTime() {
+  MutableRate getGrpcProcessingTime() {
     return grpcProcessingTime;
   }
 

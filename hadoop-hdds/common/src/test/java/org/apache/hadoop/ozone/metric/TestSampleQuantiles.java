@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.metric;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.metrics2.util.Quantile;
-import org.apache.hadoop.ozone.metrics.OzoneSampleQuantiles;
+import org.apache.hadoop.ozone.metrics.SampleQuantiles;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -38,7 +38,7 @@ class TestSampleQuantiles {
 
   @Test
   void testSnapshotEmptySnaphotReturnEmptyMap() {
-    OzoneSampleQuantiles quantiles = new OzoneSampleQuantiles(QUANTILES);
+    SampleQuantiles quantiles = new SampleQuantiles(QUANTILES);
 
     Map<Quantile, Long> snapshot = quantiles.snapshot();
     assertEquals(0, snapshot.size());
@@ -46,7 +46,7 @@ class TestSampleQuantiles {
 
   @Test
   void testSnapshotHasCorrectQuantilesSize() {
-    OzoneSampleQuantiles quantiles = new OzoneSampleQuantiles(QUANTILES);
+    SampleQuantiles quantiles = new SampleQuantiles(QUANTILES);
 
     insertTenElements(quantiles);
 
@@ -56,7 +56,7 @@ class TestSampleQuantiles {
 
   @Test
   void testClearDontRemoveQuantilesFromSnapshot() {
-    OzoneSampleQuantiles quantiles = new OzoneSampleQuantiles(QUANTILES);
+    SampleQuantiles quantiles = new SampleQuantiles(QUANTILES);
 
     insertTenElements(quantiles);
 
@@ -68,7 +68,7 @@ class TestSampleQuantiles {
 
   @Test
   void testClearResetQuantilesInSnapshot() {
-    OzoneSampleQuantiles quantiles = new OzoneSampleQuantiles(QUANTILES);
+    SampleQuantiles quantiles = new SampleQuantiles(QUANTILES);
 
     insertTenElements(quantiles);
 
@@ -80,7 +80,7 @@ class TestSampleQuantiles {
 
   @Test
   void testGetCount() {
-    OzoneSampleQuantiles quantiles = new OzoneSampleQuantiles(QUANTILES);
+    SampleQuantiles quantiles = new SampleQuantiles(QUANTILES);
 
     insertTenElements(quantiles);
 
@@ -90,7 +90,7 @@ class TestSampleQuantiles {
 
   @Test
   void testGetStateAndClearGetCorrectState() {
-    OzoneSampleQuantiles quantiles = new OzoneSampleQuantiles(QUANTILES);
+    SampleQuantiles quantiles = new SampleQuantiles(QUANTILES);
 
     insertTenElements(quantiles);
     Map<Quantile, Long> snapshot = quantiles.snapshot();
@@ -101,7 +101,7 @@ class TestSampleQuantiles {
 
   @Test
   void testGetStateAndClearResetState() {
-    OzoneSampleQuantiles quantiles = new OzoneSampleQuantiles(QUANTILES);
+    SampleQuantiles quantiles = new SampleQuantiles(QUANTILES);
 
     insertTenElements(quantiles);
 
@@ -110,7 +110,7 @@ class TestSampleQuantiles {
     assertTrue(snapshot.isEmpty());
   }
 
-  private static void insertTenElements(OzoneSampleQuantiles metric) {
+  private static void insertTenElements(SampleQuantiles metric) {
     for (int i = 0; i < 10; i++) {
       metric.insert(i);
     }

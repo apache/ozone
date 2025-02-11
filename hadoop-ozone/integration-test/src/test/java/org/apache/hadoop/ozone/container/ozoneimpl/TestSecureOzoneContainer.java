@@ -51,7 +51,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -101,7 +101,7 @@ class TestSecureOzoneContainer {
 
   @BeforeAll
   static void init() {
-    OzoneMetricsSystem.setMiniClusterMode(true);
+    MetricsSystem.setMiniClusterMode(true);
     ExitUtils.disableSystemExit();
   }
 

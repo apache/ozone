@@ -26,9 +26,8 @@ import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.CommandHandler;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 
 /**
  * This class collects and exposes metrics for CommandHandlerMetrics.
@@ -77,7 +76,7 @@ public final class CommandHandlerMetrics implements MetricsSource {
    */
   public static CommandHandlerMetrics create(
       Map<Type, CommandHandler> handlerMap) {
-    return OzoneMetricsSystem.register(SOURCE_NAME, "CommandHandlerMetrics Metrics",
+    return MetricsSystem.register(SOURCE_NAME, "CommandHandlerMetrics Metrics",
         new CommandHandlerMetrics(handlerMap));
   }
 
@@ -117,7 +116,7 @@ public final class CommandHandlerMetrics implements MetricsSource {
   }
 
   public void unRegister() {
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }
 }

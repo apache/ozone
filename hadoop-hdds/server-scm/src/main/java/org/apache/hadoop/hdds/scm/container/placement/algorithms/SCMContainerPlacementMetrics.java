@@ -21,7 +21,6 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsSource;
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 
@@ -29,7 +28,7 @@ import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 
 /**
  * This class is for maintaining Topology aware container placement statistics.
@@ -61,7 +60,7 @@ public class SCMContainerPlacementMetrics implements MetricsSource {
    * @return A new or existing SCMContainerPlacementMetrics object
    */
   public static SCMContainerPlacementMetrics create() {
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     MetricsSource existingSource = ms.getSource(SOURCE_NAME);
     if (existingSource != null) {
       return (SCMContainerPlacementMetrics)existingSource;
@@ -88,7 +87,7 @@ public class SCMContainerPlacementMetrics implements MetricsSource {
   }
 
   public void unRegister() {
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }
 

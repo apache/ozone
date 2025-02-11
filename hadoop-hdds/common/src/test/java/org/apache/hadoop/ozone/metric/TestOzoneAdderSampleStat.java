@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.metric;
 
-import org.apache.hadoop.ozone.metrics.OzoneAdderSampleStat;
+import org.apache.hadoop.ozone.metrics.SampleStat;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -30,7 +30,7 @@ class TestOzoneAdderSampleStat {
 
   @Test
   void testAddTenElements() {
-    OzoneAdderSampleStat metric = new OzoneAdderSampleStat();
+    SampleStat metric = new SampleStat();
 
     insertTenElements(metric);
 
@@ -43,7 +43,7 @@ class TestOzoneAdderSampleStat {
 
   @Test
   void testAddWithSum() {
-    OzoneAdderSampleStat metric = new OzoneAdderSampleStat();
+    SampleStat metric = new SampleStat();
 
     metric.add(5, 100);
     metric.add(5, 100);
@@ -58,7 +58,7 @@ class TestOzoneAdderSampleStat {
 
   @Test
   void testReset() {
-    OzoneAdderSampleStat metric = new OzoneAdderSampleStat();
+    SampleStat metric = new SampleStat();
 
     insertTenElements(metric);
 
@@ -73,11 +73,11 @@ class TestOzoneAdderSampleStat {
 
   @Test
   void testCopy() {
-    OzoneAdderSampleStat metric = new OzoneAdderSampleStat();
+    SampleStat metric = new SampleStat();
 
     insertTenElements(metric);
 
-    OzoneAdderSampleStat anotherMetric = new OzoneAdderSampleStat();
+    SampleStat anotherMetric = new SampleStat();
     metric.copyTo(anotherMetric);
 
     assertEquals(anotherMetric.numSamples(), metric.numSamples());
@@ -89,7 +89,7 @@ class TestOzoneAdderSampleStat {
     assertEquals(anotherMetric.variance(), metric.variance());
   }
 
-  private static void insertTenElements(OzoneAdderSampleStat metric) {
+  private static void insertTenElements(SampleStat metric) {
     for (int i = 1; i <= 10; i++) {
       metric.add(i);
     }

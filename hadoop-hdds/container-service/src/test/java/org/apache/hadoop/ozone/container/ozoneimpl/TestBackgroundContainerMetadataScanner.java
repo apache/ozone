@@ -105,12 +105,12 @@ public class TestBackgroundContainerMetadataScanner extends
   public void testScannerMetricsUnregisters() {
     String name = scanner.getMetrics().getName();
 
-    assertNotNull(OzoneMetricsSystem.instance().getSource(name));
+    assertNotNull(MetricsSystem.instance().getSource(name));
 
     scanner.shutdown();
     scanner.run();
 
-    assertNull(OzoneMetricsSystem.instance().getSource(name));
+    assertNull(MetricsSystem.instance().getSource(name));
   }
 
   @Test

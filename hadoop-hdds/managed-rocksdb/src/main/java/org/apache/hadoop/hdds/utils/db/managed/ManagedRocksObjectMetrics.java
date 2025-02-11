@@ -23,7 +23,7 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 
 /**
  * Metrics about managed RockObjects.
@@ -38,7 +38,7 @@ public class ManagedRocksObjectMetrics {
       ManagedRocksObjectMetrics.class.getSimpleName();
 
   private static ManagedRocksObjectMetrics create() {
-    return OzoneMetricsSystem.register(SOURCE_NAME,
+    return MetricsSystem.register(SOURCE_NAME,
         "OzoneManager DoubleBuffer Metrics",
         new ManagedRocksObjectMetrics());
   }

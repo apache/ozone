@@ -21,8 +21,7 @@ package org.apache.hadoop.ozone.metrics;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
-import org.apache.hadoop.metrics2.lib.MutableStat;
-import org.apache.hadoop.metrics2.util.SampleStat;
+import org.apache.hadoop.metrics2.lib.MutableMetric;
 import org.apache.hadoop.util.Time;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -34,7 +33,7 @@ import static org.apache.hadoop.metrics2.lib.Interns.info;
  * A convenient mutable metric for throughput measurement.
  * (non-synchronized version of org.apache.hadoop.metrics2.lib.MutableStat)
  */
-public class OzoneMutableStat extends MutableStat {
+public class MutableStat extends MutableMetric {
 
   private final MetricsInfo numInfo;
   private final MetricsInfo avgInfo;
@@ -45,9 +44,9 @@ public class OzoneMutableStat extends MutableStat {
   private final MetricsInfo maxInfo;
   private final MetricsInfo iNumInfo;
 
-  private final OzoneAdderSampleStat intervalStat = new OzoneAdderSampleStat();
-  private final OzoneAdderSampleStat prevStat = new OzoneAdderSampleStat();
-  private final OzoneAdderSampleStat.MinMax minMax = new OzoneAdderSampleStat.MinMax();
+  private final SampleStat intervalStat = new SampleStat();
+  private final SampleStat prevStat = new SampleStat();
+  private final SampleStat.MinMax minMax = new SampleStat.MinMax();
   private volatile long numSamples = 0;
   private long snapshotTimeStamp = 0;
   private final AtomicBoolean extended = new AtomicBoolean();
@@ -68,7 +67,7 @@ public class OzoneMutableStat extends MutableStat {
    * @param sampleName  of the metric (e.g. "Ops")
    * @param valueName   of the metric (e.g. "Time", "Latency")
    */
-  public OzoneMutableStat(String name, String description,
+  public MutableStat(String name, String description,
                      String sampleName, String valueName) {
     this(name, description, sampleName, valueName, false);
   }
@@ -81,10 +80,8 @@ public class OzoneMutableStat extends MutableStat {
    * @param valueName   of the metric (e.g. "Time", "Latency")
    * @param extended    create extended stats (stdev, min/max etc.) by default.
    */
-  public OzoneMutableStat(String name, String description,
+  public MutableStat(String name, String description,
                      String sampleName, String valueName, boolean extended) {
-
-    super(name, description, sampleName, valueName, extended);
 
     String ucName = StringUtils.capitalize(name);
     String usName = StringUtils.capitalize(sampleName);

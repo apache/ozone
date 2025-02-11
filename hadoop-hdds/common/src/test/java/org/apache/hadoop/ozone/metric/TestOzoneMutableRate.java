@@ -18,10 +18,10 @@
 package org.apache.hadoop.ozone.metric;
 
 import org.apache.hadoop.metrics2.AbstractMetric;
-import org.apache.hadoop.metrics2.util.SampleStat;
 import org.apache.hadoop.ozone.metric.util.MetricsRecordBuilderImpl;
-import org.apache.hadoop.ozone.metrics.OzoneMutableRate;
-import org.apache.hadoop.ozone.metrics.OzoneMutableStat;
+import org.apache.hadoop.ozone.metrics.MutableRate;
+import org.apache.hadoop.ozone.metrics.MutableStat;
+import org.apache.hadoop.ozone.metrics.SampleStat;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -38,7 +38,7 @@ class TestOzoneMutableRate {
 
   @Test
   void testOzoneMutableStatHasEmptyMetricsAfterCreationExtended() {
-    OzoneMutableRate metric = createMutableStat();
+    MutableRate metric = createMutableStat();
     metric.setExtended(true);
     MetricsRecordBuilderImpl metricsRecordBuilder = getMetricsRecordBuilder();
     metric.snapshot(metricsRecordBuilder);
@@ -48,7 +48,7 @@ class TestOzoneMutableRate {
 
   @Test
   void testOzoneMutableStatMetricsSizeAfterInsertElementsExtended() {
-    OzoneMutableRate metric = createMutableStat();
+    MutableRate metric = createMutableStat();
     metric.setExtended(true);
     MetricsRecordBuilderImpl metricsRecordBuilder = getMetricsRecordBuilder();
     insertTenElements(metric);
@@ -60,7 +60,7 @@ class TestOzoneMutableRate {
 
   @Test
   void testOzoneMutableStatMetricsValuesAfterInsertElementsExtended() {
-    OzoneMutableRate metric = createMutableStat();
+    MutableRate metric = createMutableStat();
     metric.setExtended(true);
     MetricsRecordBuilderImpl metricsRecordBuilder = getMetricsRecordBuilder();
 
@@ -79,7 +79,7 @@ class TestOzoneMutableRate {
 
   @Test
   void testOzoneMutableStatMetricsSizeAfterInsertWithSumElementsExtended() {
-    OzoneMutableRate metric = createMutableStat();
+    MutableRate metric = createMutableStat();
     metric.setExtended(true);
     MetricsRecordBuilderImpl metricsRecordBuilder = getMetricsRecordBuilder();
     metric.add(5, 100);
@@ -93,7 +93,7 @@ class TestOzoneMutableRate {
 
   @Test
   void testOzoneMutableStatMetricsValuesAfterInsertWithSumElementsExtended() {
-    OzoneMutableRate metric = createMutableStat();
+    MutableRate metric = createMutableStat();
     metric.setExtended(true);
     MetricsRecordBuilderImpl metricsRecordBuilder = getMetricsRecordBuilder();
 
@@ -114,7 +114,7 @@ class TestOzoneMutableRate {
 
   @Test
   void testOzoneMutableStatHasEmptyMetricsAfterCreationNotExtended() {
-    OzoneMutableRate metric = createMutableStat();
+    MutableRate metric = createMutableStat();
     metric.setExtended(false);
     MetricsRecordBuilderImpl metricsRecordBuilder = getMetricsRecordBuilder();
     metric.snapshot(metricsRecordBuilder);
@@ -124,7 +124,7 @@ class TestOzoneMutableRate {
 
   @Test
   void testOzoneMutableStatMetricsSizeAfterInsertElementsNotExtended() {
-    OzoneMutableRate metric = createMutableStat();
+    MutableRate metric = createMutableStat();
     metric.setExtended(false);
     MetricsRecordBuilderImpl metricsRecordBuilder = getMetricsRecordBuilder();
     insertTenElements(metric);
@@ -136,7 +136,7 @@ class TestOzoneMutableRate {
 
   @Test
   void testOzoneMutableStatMetricsValuesAfterInsertElementsNotExtended() {
-    OzoneMutableRate metric = createMutableStat();
+    MutableRate metric = createMutableStat();
     metric.setExtended(false);
     MetricsRecordBuilderImpl metricsRecordBuilder = getMetricsRecordBuilder();
 
@@ -150,7 +150,7 @@ class TestOzoneMutableRate {
 
   @Test
   void testOzoneMutableStatMetricsSizeAfterInsertWithSumElementsNotExtended() {
-    OzoneMutableRate metric = createMutableStat();
+    MutableRate metric = createMutableStat();
     metric.setExtended(false);
     MetricsRecordBuilderImpl metricsRecordBuilder = getMetricsRecordBuilder();
     metric.add(5, 100);
@@ -164,7 +164,7 @@ class TestOzoneMutableRate {
 
   @Test
   void testOzoneMutableStatMetricsValuesAfterInsertWithSumElementsNotExtended() {
-    OzoneMutableRate metric = createMutableStat();
+    MutableRate metric = createMutableStat();
     metric.setExtended(false);
     MetricsRecordBuilderImpl metricsRecordBuilder = getMetricsRecordBuilder();
 
@@ -180,7 +180,7 @@ class TestOzoneMutableRate {
 
   @Test
   void testOzoneMutableStatChangedWhenElementsAdded() {
-    OzoneMutableRate metric = createMutableStat();
+    MutableRate metric = createMutableStat();
 
     insertTenElements(metric);
     assertTrue(metric.changed());
@@ -188,14 +188,14 @@ class TestOzoneMutableRate {
 
   @Test
   void testOzoneMutableStatNotChangedWhenNoElementsAdded() {
-    OzoneMutableRate metric = createMutableStat();
+    MutableRate metric = createMutableStat();
 
     assertFalse(metric.changed());
   }
 
   @Test
   void testGetLastStatWithAddMethod() {
-    OzoneMutableRate metric = createMutableStat();
+    MutableRate metric = createMutableStat();
 
     insertTenElements(metric);
 
@@ -209,7 +209,7 @@ class TestOzoneMutableRate {
 
   @Test
   void testGetLastStatWithAddSumMethod() {
-    OzoneMutableRate metric = createMutableStat();
+    MutableRate metric = createMutableStat();
     metric.add(5, 100);
     metric.add(5, 100);
     metric.add(5, 100);
@@ -224,14 +224,14 @@ class TestOzoneMutableRate {
 
   @Test
   void testOzoneMutableStatMetricsSizeAfterInsertElements1() {
-    OzoneMutableRate metric = createMutableStat();
+    MutableRate metric = createMutableStat();
     metric.setUpdateTimeStamp(true);
     assertEquals(0, metric.getSnapshotTimeStamp());
   }
 
   @Test
   void testOzoneMutableStatMetricsSizeAfterInsertElements2() {
-    OzoneMutableRate metric = createMutableStat();
+    MutableRate metric = createMutableStat();
     metric.setUpdateTimeStamp(true);
     MetricsRecordBuilderImpl metricsRecordBuilder = getMetricsRecordBuilder();
 
@@ -242,14 +242,14 @@ class TestOzoneMutableRate {
     assertTrue(metric.getSnapshotTimeStamp() > 0);
   }
 
-  private static void insertTenElements(OzoneMutableStat metric) {
+  private static void insertTenElements(MutableStat metric) {
     for (int i = 1; i <= 10; i++) {
       metric.add(i);
     }
   }
 
-  private static OzoneMutableRate createMutableStat() {
-    return new OzoneMutableRate(
+  private static MutableRate createMutableStat() {
+    return new MutableRate(
         "Test_name",
         "Test_description",
         false);

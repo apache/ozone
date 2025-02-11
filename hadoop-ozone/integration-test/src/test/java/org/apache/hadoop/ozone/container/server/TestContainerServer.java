@@ -70,7 +70,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
@@ -91,7 +91,7 @@ public class TestContainerServer {
 
   @BeforeAll
   public static void setup() {
-    OzoneMetricsSystem.setMiniClusterMode(true);
+    MetricsSystem.setMiniClusterMode(true);
     CONF.set(HddsConfigKeys.HDDS_METADATA_DIR_NAME, testDir.toString());
     CONF.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, false);
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
