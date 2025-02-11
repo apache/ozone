@@ -18,20 +18,25 @@
 package org.apache.hadoop.ozone.shell;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import picocli.CommandLine;
 
 import java.io.File;
 import java.util.HashMap;
@@ -55,6 +60,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 @Timeout(100)
 public class TestReplicationConfigPreference {
 
+  private static OzoneConfiguration conf = null;
   private static MiniOzoneCluster cluster;
   private static OzoneClient client;
   private static String omServiceId;
@@ -69,20 +75,23 @@ public class TestReplicationConfigPreference {
   private static final String EC_KEY = "eckey";
   private static String[] bucketList;
   private static String[] keyList;
+  private static int numOfOMs = 3;
   private static final ReplicationConfig RATIS_REPL_CONF =
       ReplicationConfig.fromProtoTypeAndFactor(RATIS, THREE);
   private static final ReplicationConfig EC_REPL_CONF = new ECReplicationConfig(
       3, 2, ECReplicationConfig.EcCodec.RS, (int) OzoneConsts.MB);
 
-  protected static void startCluster(OzoneConfiguration ozoneConf)
+  protected static void startCluster()
       throws Exception {
-    cluster = MiniOzoneCluster.newBuilder(ozoneConf)
-        .setNumDatanodes(5)
-        .build();
+    omServiceId = "om-service-test1";
+    MiniOzoneHAClusterImpl.Builder builder =
+        MiniOzoneCluster.newHABuilder(conf);
+    builder.setOMServiceId(omServiceId)
+        .setNumOfOzoneManagers(numOfOMs)
+        .setNumDatanodes(5);
+    cluster = builder.build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
-    omServiceId = cluster.getOzoneManager().getHostname() + ":" +
-        cluster.getOzoneManager().getRpcPort();
   }
 
   @BeforeAll
@@ -105,32 +114,101 @@ public class TestReplicationConfigPreference {
     }
   }
 
-  protected static void createAllKeys(OzoneShell ozoneShell,
-                                      String volumeName, String bucketName) {
-    ozoneShell.execute(new String[] {"key", "put", "o3://" + omServiceId
+  private String getSetConfStringFromConf(String key) {
+    return String.format("--set=%s=%s", key, conf.get(key));
+  }
+
+  private String generateSetConfString(String key, String value) {
+    return String.format("--set=%s=%s", key, value);
+  }
+
+  /**
+   * Helper function to get a String array to be fed into OzoneShell.
+   * @param numOfArgs Additional number of arguments after the HA conf string,
+   *                  this translates into the number of empty array elements
+   *                  after the HA conf string.
+   * @return String array.
+   */
+  private String[] getHASetConfStrings(int numOfArgs) {
+    assert (numOfArgs >= 0);
+    String[] res = new String[1 + 1 + numOfOMs + numOfArgs];
+    final int indexOmServiceIds = 0;
+    final int indexOmNodes = 1;
+    final int indexOmAddressStart = 2;
+
+    res[indexOmServiceIds] = getSetConfStringFromConf(
+        OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY);
+
+    String omNodesKey = ConfUtils.addKeySuffixes(
+        OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
+    String omNodesVal = conf.get(omNodesKey);
+    res[indexOmNodes] = generateSetConfString(omNodesKey, omNodesVal);
+
+    String[] omNodesArr = omNodesVal.split(",");
+    // Sanity check
+    assert (omNodesArr.length == numOfOMs);
+    for (int i = 0; i < numOfOMs; i++) {
+      res[indexOmAddressStart + i] =
+          getSetConfStringFromConf(ConfUtils.addKeySuffixes(
+              OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omNodesArr[i]));
+    }
+
+    return res;
+  }
+
+  /**
+   * Helper function to create a new set of arguments that contains HA configs.
+   * @param existingArgs Existing arguments to be fed into OzoneShell command.
+   * @return String array.
+   */
+  private String[] getHASetConfStrings(String[] existingArgs) {
+    // Get a String array populated with HA configs first
+    String[] res = getHASetConfStrings(existingArgs.length);
+
+    int indexCopyStart = res.length - existingArgs.length;
+    // Then copy the existing args to the returned String array
+    for (int i = 0; i < existingArgs.length; i++) {
+      res[indexCopyStart + i] = existingArgs[i];
+    }
+    return res;
+  }
+
+  private void execute(GenericCli shell, String[] args) {
+    CommandLine cmd = shell.getCmd();
+
+    // Since there is no elegant way to pass Ozone config to the shell,
+    // the idea is to use 'set' to place those OM HA configs.
+    String[] argsWithHAConf = getHASetConfStrings(args);
+
+    cmd.execute(argsWithHAConf);
+  }
+
+  protected void createAllKeys(OzoneShell ozoneShell,
+      String volumeName, String bucketName) {
+    execute(ozoneShell, new String[] {"key", "put", "o3://" + omServiceId
           + "/" + volumeName + "/" + bucketName + "/" + DEFAULT_KEY,
         testFile.getPath()});
-    ozoneShell.execute(new String[] {"key", "put", "o3://" + omServiceId
+    execute(ozoneShell, new String[] {"key", "put", "o3://" + omServiceId
           + "/" + volumeName + "/" + bucketName + "/" + RATIS_KEY,
         testFile.getPath(),
         "--type=" + RATIS_REPL_CONF.getReplicationType().name(),
         "--replication=" + RATIS_REPL_CONF.getReplication()});
-    ozoneShell.execute(new String[] {"key", "put", "o3://" + omServiceId
+    execute(ozoneShell, new String[] {"key", "put", "o3://" + omServiceId
           + "/" + volumeName + "/" + bucketName + "/" + EC_KEY,
         testFile.getPath(),
         "--type=" + EC_REPL_CONF.getReplicationType().name(),
         "--replication=" + EC_REPL_CONF.getReplication()});
   }
 
-  protected static void createAllBucketsAndKeys(Map<String, String> clientConf,
+  protected void createAllBucketsAndKeys(Map<String, String> clientConf,
                                                 String volumeName) {
     OzoneShell ozoneShell = new OzoneShell();
     if (clientConf != null) {
       ozoneShell.setConfigurationOverrides(clientConf);
     }
-    ozoneShell.execute(new String[] {"volume", "create", "o3://" + omServiceId
+    execute(ozoneShell, new String[] {"volume", "create", "o3://" + omServiceId
           + "/" + volumeName});
-    ozoneShell.execute(new String[] {"bucket", "create", "o3://" + omServiceId
+    execute(ozoneShell, new String[] {"bucket", "create", "o3://" + omServiceId
           + "/" + volumeName + "/" + DEFAULT_BUCKET});
     createAllKeys(ozoneShell, volumeName, DEFAULT_BUCKET);
 
@@ -138,7 +216,7 @@ public class TestReplicationConfigPreference {
     if (clientConf != null) {
       ozoneShell.setConfigurationOverrides(clientConf);
     }
-    ozoneShell.execute(new String[] {"bucket", "create", "o3://" + omServiceId
+    execute(ozoneShell, new String[] {"bucket", "create", "o3://" + omServiceId
           + "/" + volumeName + "/" + RATIS_BUCKET,
         "--type=" + RATIS_REPL_CONF.getReplicationType().name(),
         "--replication=" + RATIS_REPL_CONF.getReplication()});
@@ -148,7 +226,7 @@ public class TestReplicationConfigPreference {
     if (clientConf != null) {
       ozoneShell.setConfigurationOverrides(clientConf);
     }
-    ozoneShell.execute(new String[] {"bucket", "create", "o3://" + omServiceId
+    execute(ozoneShell, new String[] {"bucket", "create", "o3://" + omServiceId
           + "/" + volumeName + "/" + EC_BUCKET,
         "--type=" + EC_REPL_CONF.getReplicationType().name(),
         "--replication=" + EC_REPL_CONF.getReplication()});
@@ -228,7 +306,8 @@ public class TestReplicationConfigPreference {
   public void testReplicationOrderDefaultRatisCluster() throws Exception {
     // Starting a cluster with server default replication type RATIS/THREE.
     shutdown();
-    startCluster(new OzoneConfiguration());
+    conf = new OzoneConfiguration();
+    startCluster();
 
     // Replication configs are not set in Client configuration.
     String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
@@ -255,12 +334,12 @@ public class TestReplicationConfigPreference {
   public void testReplicationOrderDefaultECCluster() throws Exception {
     // Starting a cluster with server default replication type EC.
     shutdown();
-    OzoneConfiguration conf = new OzoneConfiguration();
+    conf = new OzoneConfiguration();
     conf.set(OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY,
         EC_REPL_CONF.getReplicationType().name());
     conf.set(OZONE_SERVER_DEFAULT_REPLICATION_KEY,
         EC_REPL_CONF.getReplication());
-    startCluster(conf);
+    startCluster();
 
     // Replication configs are not set in Client configuration.
     String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
