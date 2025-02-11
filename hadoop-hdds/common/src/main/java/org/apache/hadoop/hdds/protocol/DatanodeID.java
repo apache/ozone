@@ -18,12 +18,13 @@
 
 package org.apache.hadoop.hdds.protocol;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeIDProto;
-
+import com.google.protobuf.ByteString;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeIDProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.util.StringWithByteString;
 
 /**
  * DatanodeID is the primary identifier of the Datanode.
@@ -36,11 +37,11 @@ public final class DatanodeID implements Comparable<DatanodeID> {
   private static final ConcurrentMap<UUID, DatanodeID> CACHE = new ConcurrentHashMap<>();
 
   private final UUID uuid;
-  private final String uuidString;
+  private final StringWithByteString uuidByteString;
 
   private DatanodeID(final UUID uuid) {
     this.uuid = uuid;
-    this.uuidString = uuid.toString();
+    this.uuidByteString = StringWithByteString.valueOf(uuid.toString());
   }
 
   // Mainly used for JSON conversion
@@ -66,7 +67,16 @@ public final class DatanodeID implements Comparable<DatanodeID> {
 
   @Override
   public String toString() {
-    return uuidString;
+    return uuidByteString.getString();
+  }
+
+  /**
+   * This will be removed once the proto structure is refactored 
+   * to remove deprecated fields.
+   */
+  @Deprecated
+  public ByteString getByteString() {
+    return uuidByteString.getBytes();
   }
 
   public DatanodeIDProto toProto() {

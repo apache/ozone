@@ -522,7 +522,7 @@ public class DatanodeDetails extends NodeImpl implements
     builder.setId(idProto);
     // Both are deprecated.
     builder.setUuid128(idProto.getUuid());
-    builder.setUuid(id.toString());
+    builder.setUuidBytes(id.getByteString());
 
     if (ipAddress != null) {
       builder.setIpAddressBytes(ipAddress.getBytes());
