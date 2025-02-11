@@ -55,7 +55,7 @@ public abstract class ReconOmTaskMetrics implements MetricsSource {
    * Update the number of reprocess() method calls by the task.
    */
   public void incrTaskReprocessCount() {
-   this.reprocessCount.incr();
+    this.reprocessCount.incr();
   }
 
   /**
