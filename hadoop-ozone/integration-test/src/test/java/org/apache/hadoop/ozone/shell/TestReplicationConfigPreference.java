@@ -60,7 +60,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 @Timeout(100)
 public class TestReplicationConfigPreference {
 
-  private static OzoneConfiguration conf = null;
+  private OzoneConfiguration conf = null;
   private static MiniOzoneCluster cluster;
   private static OzoneClient client;
   private static String omServiceId;
