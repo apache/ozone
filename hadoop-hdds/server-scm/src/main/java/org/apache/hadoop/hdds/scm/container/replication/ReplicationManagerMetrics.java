@@ -30,7 +30,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.hadoop.ozone.metrics.OzoneMutableRate;
+import org.apache.hadoop.ozone.metrics.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 import java.util.Collections;
@@ -39,7 +39,7 @@ import java.util.Map;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 
 /**
  * Class contains metrics related to ReplicationManager.
@@ -143,10 +143,10 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   private MutableCounterLong deletionBytesCompletedTotal;
 
   @Metric("Time elapsed for replication")
-  private OzoneMutableRate replicationTime;
+  private MutableRate replicationTime;
 
   @Metric("Time elapsed for deletion")
-  private OzoneMutableRate deletionTime;
+  private MutableRate deletionTime;
 
   @Metric("Number of inflight replication skipped" +
       " due to the configured limit.")
@@ -234,9 +234,9 @@ public final class ReplicationManagerMetrics implements MetricsSource {
 
   public static ReplicationManagerMetrics create(ReplicationManager manager) {
     ReplicationManagerMetrics replicationManagerMetrics = (ReplicationManagerMetrics)
-        OzoneMetricsSystem.instance().getSource(METRICS_SOURCE_NAME);
+        MetricsSystem.instance().getSource(METRICS_SOURCE_NAME);
     if (replicationManagerMetrics == null) {
-      return OzoneMetricsSystem.instance().register(METRICS_SOURCE_NAME,
+      return MetricsSystem.instance().register(METRICS_SOURCE_NAME,
           "SCM Replication manager (closed container replication) related "
               + "metrics",
           new ReplicationManagerMetrics(manager));
@@ -295,7 +295,7 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   }
 
   public void unRegister() {
-    OzoneMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
+    MetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
   }
 
   public void incrReplicationCmdsSentTotal() {

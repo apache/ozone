@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.metric;
 
 import org.apache.hadoop.metrics2.AbstractMetric;
 import org.apache.hadoop.ozone.metric.util.MetricsRecordBuilderImpl;
-import org.apache.hadoop.ozone.metrics.OzoneMutableQuantiles;
+import org.apache.hadoop.ozone.metrics.MutableQuantiles;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -34,7 +34,7 @@ class TestMutableQuantiles {
 
   @Test
   void testIsChangedAfterTaskStart() throws InterruptedException {
-    OzoneMutableQuantiles quantiles = getMutableQuantiles();
+    MutableQuantiles quantiles = getMutableQuantiles();
     insertTenElements(quantiles);
     Thread.sleep(1100L);
     quantiles.stop();
@@ -43,7 +43,7 @@ class TestMutableQuantiles {
 
   @Test
   void testSnapshotHasCorrectQuantilesSize() throws InterruptedException {
-    OzoneMutableQuantiles quantiles = getMutableQuantiles();
+    MutableQuantiles quantiles = getMutableQuantiles();
     MetricsRecordBuilderImpl metricsRecordBuilder = getMetricsRecordBuilder();
     insertTenElements(quantiles);
 
@@ -60,7 +60,7 @@ class TestMutableQuantiles {
 
   @Test
   void testMetrics() throws InterruptedException {
-    OzoneMutableQuantiles quantiles = getMutableQuantiles();
+    MutableQuantiles quantiles = getMutableQuantiles();
     MetricsRecordBuilderImpl metricsRecordBuilder = getMetricsRecordBuilder();
     insertTenElements(quantiles);
 
@@ -80,15 +80,15 @@ class TestMutableQuantiles {
     assertEquals(8L, metrics.get(5).value());
   }
 
-  private static OzoneMutableQuantiles getMutableQuantiles() {
-    return new OzoneMutableQuantiles("Test_name",
+  private static MutableQuantiles getMutableQuantiles() {
+    return new MutableQuantiles("Test_name",
         "Test_description",
         "Test_sample_name",
         "Test_value_name",
         1);
   }
 
-  private static void insertTenElements(OzoneMutableQuantiles metric) {
+  private static void insertTenElements(MutableQuantiles metric) {
     for (int i = 0; i < 10; i++) {
       metric.add(i);
     }

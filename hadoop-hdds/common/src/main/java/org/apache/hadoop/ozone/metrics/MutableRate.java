@@ -20,9 +20,9 @@ package org.apache.hadoop.ozone.metrics;
 /**
  * Non-synchronized version of {@link org.apache.hadoop.metrics2.lib.MutableRate}.
  */
-public class OzoneMutableRate extends OzoneMutableStat {
+public class MutableRate extends MutableStat {
 
-  public OzoneMutableRate(String name, String description, boolean extended) {
+  public MutableRate(String name, String description, boolean extended) {
     super(name, description, "Ops", "Time", extended);
   }
 }

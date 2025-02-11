@@ -31,7 +31,7 @@ import org.apache.hadoop.http.HttpConfig;
 
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 
 import org.junit.jupiter.api.AfterAll;
@@ -89,7 +89,7 @@ public class TestStorageContainerManagerHttpServer {
 
     StorageContainerManagerHttpServer server = null;
     try {
-      OzoneMetricsSystem.initialize("TestStorageContainerManagerHttpServer");
+      MetricsSystem.initialize("TestStorageContainerManagerHttpServer");
       server = new StorageContainerManagerHttpServer(conf, null);
       server.start();
 

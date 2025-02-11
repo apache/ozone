@@ -19,8 +19,7 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.PrometheusMetricsSink;
-import org.apache.hadoop.metrics2.MetricsSystem;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,12 +36,12 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_DATANODE_IO_METRICS_PE
  * Test PrometheusMetricSink regarding VolumeIOStats.
  */
 public class TestVolumeIOStatsWithPrometheusSink {
-  private MetricsSystem metrics;
+  private org.apache.hadoop.metrics2.MetricsSystem metrics;
   private PrometheusMetricsSink sink;
 
   @BeforeEach
   public void init() {
-    metrics = OzoneMetricsSystem.instance();
+    metrics = MetricsSystem.instance();
     metrics.init("test");
     sink = new PrometheusMetricsSink("random");
     metrics.register("Prometheus", "Prometheus", sink);

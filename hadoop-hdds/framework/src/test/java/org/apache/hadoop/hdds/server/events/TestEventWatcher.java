@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.hadoop.hdds.HddsIdFactory;
 import org.apache.hadoop.ozone.lease.LeaseManager;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,7 +48,7 @@ public class TestEventWatcher {
 
   @BeforeEach
   public void startLeaseManager() {
-    OzoneMetricsSystem.instance();
+    MetricsSystem.instance();
     leaseManager = new LeaseManager<>("Test", 2000L);
     leaseManager.start();
   }
@@ -56,7 +56,7 @@ public class TestEventWatcher {
   @AfterEach
   public void stopLeaseManager() {
     leaseManager.shutdown();
-    OzoneMetricsSystem.shutdown();
+    MetricsSystem.shutdown();
   }
 
   @Test
@@ -148,7 +148,7 @@ public class TestEventWatcher {
   @Test
   public void testMetrics() throws InterruptedException {
 //    OzoneMetricsSystem.shutdown();
-    OzoneMetricsSystem.initialize("test");
+    MetricsSystem.initialize("test");
 
     EventQueue queue = new EventQueue();
 
@@ -211,7 +211,7 @@ public class TestEventWatcher {
         .withFailMessage("At least two events should be timed out.")
         .isGreaterThanOrEqualTo(2);
 
-    OzoneMetricsSystem.shutdown();
+    MetricsSystem.shutdown();
   }
 
   private EventWatcher<UnderreplicatedEvent, ReplicationCompletedEvent>

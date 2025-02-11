@@ -29,7 +29,7 @@ import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 
 
 /**
@@ -72,11 +72,11 @@ public class VolumeInfoMetrics implements MetricsSource {
   }
 
   public void init() {
-    OzoneMetricsSystem.register(metricsSourceName, "Volume Info Statistics", this);
+    MetricsSystem.register(metricsSourceName, "Volume Info Statistics", this);
   }
 
   public void unregister() {
-    OzoneMetricsSystem.unregisterSource(metricsSourceName);
+    MetricsSystem.unregisterSource(metricsSourceName);
   }
 
   @Metric("Metric to return the Storage Type")

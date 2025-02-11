@@ -18,13 +18,12 @@
 
 package org.apache.hadoop.ozone.om.ratis;
 
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeFloat;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
-import org.apache.hadoop.ozone.metrics.OzoneMutableStat;
-import org.apache.hadoop.ozone.metrics.OzoneMutableRate;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
+import org.apache.hadoop.ozone.metrics.MutableStat;
+import org.apache.hadoop.ozone.metrics.MutableRate;
 
 /**
  * Class which maintains metrics related to OzoneManager DoubleBuffer.
@@ -51,20 +50,20 @@ public class OzoneManagerDoubleBufferMetrics {
 
   @Metric(about = "DoubleBuffer flushTime. This metrics particularly captures" +
       " rocksdb batch commit time.")
-  private OzoneMutableRate flushTime;
+  private MutableRate flushTime;
 
   @Metric(about = "Average number of transactions flushed in a single " +
       "iteration")
   private MutableGaugeFloat avgFlushTransactionsInOneIteration;
 
   @Metric(about = "DoubleBuffer queue size.", valueName = "Size")
-  private OzoneMutableStat queueSize;
+  private MutableStat queueSize;
 
   public static synchronized OzoneManagerDoubleBufferMetrics create() {
     if (instance != null) {
       return instance;
     } else {
-      MetricsSystem ms = OzoneMetricsSystem.instance();
+      org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
       OzoneManagerDoubleBufferMetrics omDoubleBufferMetrics =
           ms.register(SOURCE_NAME,
               "OzoneManager DoubleBuffer Metrics",
@@ -112,7 +111,7 @@ public class OzoneManagerDoubleBufferMetrics {
     flushTime.add(time);
   }
 
-  OzoneMutableRate getFlushTime() {
+  MutableRate getFlushTime() {
     return flushTime;
   }
 
@@ -139,12 +138,12 @@ public class OzoneManagerDoubleBufferMetrics {
     updateQueueSize(flushedTransactionsInOneIteration);
   }
 
-  OzoneMutableStat getQueueSize() {
+  MutableStat getQueueSize() {
     return queueSize;
   }
 
   public void unRegister() {
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }
 }

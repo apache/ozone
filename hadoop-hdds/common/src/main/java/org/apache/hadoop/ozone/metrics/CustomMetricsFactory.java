@@ -29,11 +29,11 @@ import java.lang.reflect.Field;
 /**
  * Custom factory to create the objects to measure cluster metrics.
  */
-public class OzoneMetricsFactory
+public class CustomMetricsFactory
     extends MutableMetricsFactory {
 
   private static final MutableMetricsFactory INSTANCE =
-      new OzoneMetricsFactory();
+      new CustomMetricsFactory();
 
   /**
    * Get {@link MutableMetricsFactory} instance.
@@ -54,17 +54,17 @@ public class OzoneMetricsFactory
   protected MutableMetric newForField(Field field, Metric annotation) {
     MetricsInfo info = getInfo(annotation, field);
     final Class<?> cls = field.getType();
-    if (cls == OzoneMutableStat.class) {
-      return new OzoneMutableStat(info.name(), info.description(), annotation.sampleName(), annotation.valueName(),
+    if (cls == MutableStat.class) {
+      return new MutableStat(info.name(), info.description(), annotation.sampleName(), annotation.valueName(),
           annotation.always());
     }
 
-    if (cls == OzoneMutableRate.class) {
-      return new OzoneMutableRate(info.name(), info.description(),
+    if (cls == MutableRate.class) {
+      return new MutableRate(info.name(), info.description(),
           annotation.always());
     }
-    if (cls == OzoneMutableQuantiles.class) {
-      return new OzoneMutableQuantiles(info.name(), annotation.about(),
+    if (cls == MutableQuantiles.class) {
+      return new MutableQuantiles(info.name(), annotation.about(),
           annotation.sampleName(), annotation.valueName(),
           annotation.interval());
     }

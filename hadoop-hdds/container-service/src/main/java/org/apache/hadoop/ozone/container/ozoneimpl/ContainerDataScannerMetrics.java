@@ -18,11 +18,10 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.ozone.metrics.OzoneMutableRate;
-import org.apache.hadoop.ozone.metrics.OzoneMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MutableRate;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -35,7 +34,7 @@ public final class ContainerDataScannerMetrics
     extends AbstractContainerScannerMetrics {
 
   @Metric("disk bandwidth used by the container data scanner per volume")
-  private OzoneMutableRate numBytesScanned;
+  private MutableRate numBytesScanned;
 
   private String storageDirectory;
 
@@ -55,13 +54,13 @@ public final class ContainerDataScannerMetrics
     numBytesScanned.add(bytes);
   }
 
-  private ContainerDataScannerMetrics(String name, MetricsSystem ms) {
+  private ContainerDataScannerMetrics(String name, org.apache.hadoop.metrics2.MetricsSystem ms) {
     super(name, ms);
   }
 
   @SuppressWarnings("java:S2245") // no need for secure random
   public static ContainerDataScannerMetrics create(final String volumeName) {
-    MetricsSystem ms = OzoneMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     String name = "ContainerDataScannerMetrics-" + (volumeName.isEmpty()
         ? "UndefinedDataNodeVolume" + ThreadLocalRandom.current().nextInt()
         : volumeName.replace(':', '-'));

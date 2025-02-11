@@ -42,12 +42,12 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 /**
  * Non-synchronized version of {@link org.apache.hadoop.metrics2.util.SampleQuantiles}.
  */
-public class OzoneSampleQuantiles implements QuantileEstimator {
+public class SampleQuantiles implements QuantileEstimator {
 
   private static final int BUFFER_SIZE = 500;
 
   private final BlockingQueue<Long> samplesBuffer =
-      new ArrayBlockingQueue<>(BUFFER_SIZE, true);
+      new ArrayBlockingQueue<>(BUFFER_SIZE, false);
 
   /**
    * Array of Quantiles that we care about, along with desired error.
@@ -67,7 +67,7 @@ public class OzoneSampleQuantiles implements QuantileEstimator {
    */
   private final LinkedList<SampleItem> samples;
 
-  public OzoneSampleQuantiles(Quantile[] quantiles) {
+  public SampleQuantiles(Quantile[] quantiles) {
     this.quantiles = Arrays.copyOf(quantiles, quantiles.length);
     this.samples = new LinkedList<>();
   }

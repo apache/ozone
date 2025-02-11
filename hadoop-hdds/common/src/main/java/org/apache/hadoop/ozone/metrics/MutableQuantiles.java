@@ -38,7 +38,7 @@ import static org.apache.hadoop.metrics2.lib.Interns.info;
 /**
  * Non-synchronized version of {@link org.apache.hadoop.metrics2.lib.MutableQuantiles}.
  */
-public class OzoneMutableQuantiles extends MutableMetric {
+public class MutableQuantiles extends MutableMetric {
 
   private static final Quantile[] QUANTILES = {new Quantile(0.50, 0.050),
       new Quantile(0.75, 0.025), new Quantile(0.90, 0.010),
@@ -55,7 +55,7 @@ public class OzoneMutableQuantiles extends MutableMetric {
    */
   private final int interval;
 
-  private OzoneSampleQuantiles estimator;
+  private SampleQuantiles estimator;
   private long previousCount = 0;
   private ScheduledFuture<?> scheduledTask;
 
@@ -70,7 +70,7 @@ public class OzoneMutableQuantiles extends MutableMetric {
   private final ReentrantReadWriteLock.WriteLock writeLock = lock.writeLock();
 
   /**
-   * Instantiates a new {@link OzoneMutableQuantiles} for a metric that rolls itself
+   * Instantiates a new {@link MutableQuantiles} for a metric that rolls itself
    * over on the specified time interval.
    *
    * @param name
@@ -84,8 +84,8 @@ public class OzoneMutableQuantiles extends MutableMetric {
    * @param interval
    *          rollover interval (in seconds) of the estimator
    */
-  public OzoneMutableQuantiles(String name, String description, String sampleName,
-                               String valueName, int interval) {
+  public MutableQuantiles(String name, String description, String sampleName,
+                          String valueName, int interval) {
     String ucName = StringUtils.capitalize(name);
     String usName = StringUtils.capitalize(sampleName);
     String uvName = StringUtils.capitalize(valueName);
@@ -106,7 +106,7 @@ public class OzoneMutableQuantiles extends MutableMetric {
           String.format(descTemplate, percentile));
     }
 
-    estimator = new OzoneSampleQuantiles(QUANTILES);
+    estimator = new SampleQuantiles(QUANTILES);
 
     this.interval = interval;
     scheduledTask = SCHEDULER.scheduleWithFixedDelay(new RolloverSample(this),
@@ -176,13 +176,13 @@ public class OzoneMutableQuantiles extends MutableMetric {
 
   /**
    * Runnable used to periodically roll over the internal
-   * {@link OzoneSampleQuantiles} every interval.
+   * {@link SampleQuantiles} every interval.
    */
   private static class RolloverSample implements Runnable {
 
-    private final OzoneMutableQuantiles parent;
+    private final MutableQuantiles parent;
 
-    RolloverSample(OzoneMutableQuantiles parent) {
+    RolloverSample(MutableQuantiles parent) {
       this.parent = parent;
     }
 
