@@ -17,8 +17,7 @@
  */
 package org.apache.hadoop.hdds.utils;
 
-
-import org.apache.hadoop.fs.FileUtil;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.ozone.test.tag.Native;
 import org.junit.jupiter.api.io.TempDir;
@@ -107,7 +106,7 @@ public class TestNativeLibraryLoader {
             .isFile();
         dependencies.forEach(dep -> assertThat(new File(libPath[0], dep)).isFile());
       } finally {
-        FileUtil.fullyDelete(libPath[0]);
+        FileUtils.deleteQuietly(libPath[0]);
       }
     }
   }
