@@ -112,6 +112,7 @@ public class OmTableInsightTask implements ReconOmTask {
    */
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
+    init();
     for (String tableName : tables) {
       Table table = omMetadataManager.getTable(tableName);
 
