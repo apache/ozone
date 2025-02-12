@@ -107,7 +107,7 @@ public class TestReplicationConfigPreference {
    * shutdown MiniOzoneCluster.
    */
   @AfterAll
-  public static void shutdown() {
+  public void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
