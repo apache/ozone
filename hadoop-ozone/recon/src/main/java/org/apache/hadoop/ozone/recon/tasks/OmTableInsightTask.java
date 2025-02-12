@@ -85,6 +85,20 @@ public class OmTableInsightTask implements ReconOmTask {
   }
 
   /**
+   * Initialize the OM table insight task with first time initialization of resources.
+   */
+  @Override
+  public void init() {
+    ReconOmTask.super.init();
+    tables = getTaskTables();
+
+    // Initialize maps to store count and size information
+    objectCountMap = initializeCountMap();
+    unReplicatedSizeMap = initializeSizeMap(false);
+    replicatedSizeMap = initializeSizeMap(true);
+  }
+
+  /**
    * Iterates the rows of each table in the OM snapshot DB and calculates the
    * counts and sizes for table data.
    *
@@ -98,13 +112,6 @@ public class OmTableInsightTask implements ReconOmTask {
    */
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
-    tables = getTaskTables();
-
-    // Initialize maps to store count and size information
-    objectCountMap = initializeCountMap();
-    unReplicatedSizeMap = initializeSizeMap(false);
-    replicatedSizeMap = initializeSizeMap(true);
-
     for (String tableName : tables) {
       Table table = omMetadataManager.getTable(tableName);
 
@@ -176,18 +183,15 @@ public class OmTableInsightTask implements ReconOmTask {
       try {
         switch (omdbUpdateEvent.getAction()) {
         case PUT:
-          handlePutEvent(omdbUpdateEvent, tableName
-          );
+          handlePutEvent(omdbUpdateEvent, tableName);
           break;
 
         case DELETE:
-          handleDeleteEvent(omdbUpdateEvent, tableName
-          );
+          handleDeleteEvent(omdbUpdateEvent, tableName);
           break;
 
         case UPDATE:
-          handleUpdateEvent(omdbUpdateEvent, tableName
-          );
+          handleUpdateEvent(omdbUpdateEvent, tableName);
           break;
 
         default:
