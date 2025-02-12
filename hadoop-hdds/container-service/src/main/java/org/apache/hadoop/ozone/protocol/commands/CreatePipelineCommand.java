@@ -155,4 +155,20 @@ public class CreatePipelineCommand
   public ReplicationFactor getFactor() {
     return factor;
   }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append(getType())
+        .append(": cmdID: ").append(getId())
+        .append(", encodedToken: \"").append(getEncodedToken()).append("\"")
+        .append(", term: ").append(getTerm())
+        .append(", deadlineMsSinceEpoch: ").append(getDeadline())
+        .append(", pipelineID: ").append(getPipelineID())
+        .append(", replicationFactor: ").append(factor)
+        .append(", replicationType: ").append(type)
+        .append(", nodelist: ").append(nodelist)
+        .append(", priorityList: ").append(priorityList);
+    return sb.toString();
+  }
 }

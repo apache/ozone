@@ -132,7 +132,11 @@ public class ReconstructECContainersCommand
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append(getType())
-        .append(": containerID: ").append(containerID)
+        .append(": cmdID: ").append(getId())
+        .append(", encodedToken: \"").append(getEncodedToken()).append("\"")
+        .append(", term: ").append(getTerm())
+        .append(", deadlineMsSinceEpoch: ").append(getDeadline())
+        .append(", containerID: ").append(containerID)
         .append(", replicationConfig: ").append(ecReplicationConfig)
         .append(", sources: [").append(getSources().stream()
             .map(a -> a.dnDetails

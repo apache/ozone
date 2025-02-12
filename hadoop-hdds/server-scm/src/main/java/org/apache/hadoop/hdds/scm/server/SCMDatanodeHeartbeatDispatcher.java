@@ -200,6 +200,9 @@ public final class SCMDatanodeHeartbeatDispatcher {
         }
       }
     }
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Heartbeat dispatched: datanode=" + datanodeDetails.getUuid() + ", Commands= " + commands);
+    }
 
     return commands;
   }

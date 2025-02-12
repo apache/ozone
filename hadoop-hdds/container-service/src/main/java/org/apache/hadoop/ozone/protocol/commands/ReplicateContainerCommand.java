@@ -164,7 +164,11 @@ public final class ReplicateContainerCommand
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append(getType());
-    sb.append(": containerId=").append(getContainerID());
+    sb.append(": cmdID: ").append(getId())
+        .append(", encodedToken: \"").append(getEncodedToken()).append("\"")
+        .append(", term: ").append(getTerm())
+        .append(", deadlineMsSinceEpoch: ").append(getDeadline());
+    sb.append(", containerId=").append(getContainerID());
     sb.append(", replicaIndex=").append(getReplicaIndex());
     if (targetDatanode != null) {
       sb.append(", targetNode=").append(targetDatanode);
