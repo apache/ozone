@@ -162,7 +162,8 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       openKeyInfo.setModificationTime(keyArgs.getModificationTime());
 
       // Set the UpdateID to current transactionLogIndex
-      openKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+//      openKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+      openKeyInfo.setWriteUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       // Add to cache.
       addOpenTableCacheEntry(trxnLogIndex, omMetadataManager, openKeyName, keyName,

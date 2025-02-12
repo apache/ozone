@@ -93,10 +93,10 @@ public class OzoneBucketStateMachine extends BaseStateMachine {
 
   public OzoneBucketStateMachine(XbeiverServerRatis ratisServer, OzoneManager ozoneManager) {
     this.isTracingEnabled = false;
+    this.ozoneManager = ozoneManager;
     this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
     this.ratisServer = ratisServer;
     stateMachineHealthy = new AtomicBoolean(true);
-    this.ozoneManager = ozoneManager;
     this.handler = new OzoneManagerRequestHandler(ozoneManager);
 
     this.threadPrefix = ozoneManager.getThreadNamePrefix();
