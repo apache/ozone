@@ -88,8 +88,7 @@ public class PutKeyHandler extends KeyHandler {
       try (InputStream stream = Files.newInputStream(dataFile.toPath())) {
         String hash = DigestUtils.sha256Hex(stream);
         out().printf("File sha256 checksum : %s%n", hash);
-      }
-      catch (FileSystemException e) {
+      } catch (FileSystemException e) {
         out().println(GenericCli.handleFileSystemException(e, dataFile));
       }
     }
@@ -129,8 +128,7 @@ public class PutKeyHandler extends KeyHandler {
     try (InputStream input = Files.newInputStream(dataFile.toPath());
          OutputStream output = createOrReplaceKey(bucket, keyName, dataFile.length(), keyMetadata, replicationConfig)) {
       IOUtils.copyBytes(input, output, chunkSize);
-    }
-    catch (FileSystemException e) {
+    } catch (FileSystemException e) {
       out().println(GenericCli.handleFileSystemException(e, dataFile));
     }
   }
@@ -177,8 +175,7 @@ public class PutKeyHandler extends KeyHandler {
         off += writeLen;
         len -= writeLen;
       }
-    }
-    catch (FileSystemException e) {
+    } catch (FileSystemException e) {
       out().println(GenericCli.handleFileSystemException(e, dataFile));
     }
   }
