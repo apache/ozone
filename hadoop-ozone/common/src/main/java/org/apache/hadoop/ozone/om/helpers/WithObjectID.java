@@ -26,6 +26,7 @@ public abstract class WithObjectID extends WithMetadata {
 
   private long objectID;
   private long updateID;
+  private long writeUpdateID;
 
   protected WithObjectID() {
     super();
@@ -35,6 +36,15 @@ public abstract class WithObjectID extends WithMetadata {
     super(b);
     objectID = b.objectID;
     updateID = b.updateID;
+    writeUpdateID = b.writeUpdateID;
+  }
+
+  public long getWriteUpdateID() {
+    return writeUpdateID;
+  }
+
+  public void setWriteUpdateID(long writeUpdateID) {
+    this.writeUpdateID = writeUpdateID;
   }
 
   protected WithObjectID(WithObjectID other) {
@@ -52,14 +62,6 @@ public abstract class WithObjectID extends WithMetadata {
   }
 
   /**
-   * UpdateIDs are monotonically increasing values which are updated
-   * each time there is an update.
-   */
-  public final long getUpdateID() {
-    return updateID;
-  }
-
-  /**
    * Set the Object ID.
    * There is a reason why we cannot use the final here. The object
    * ({@link OmVolumeArgs}/ {@link OmBucketInfo}/ {@link OmKeyInfo}) is
@@ -71,9 +73,58 @@ public abstract class WithObjectID extends WithMetadata {
   public final void setObjectID(long obId) {
     if (this.objectID != 0 && obId != OBJECT_ID_RECLAIM_BLOCKS) {
       throw new UnsupportedOperationException("Attempt to modify object ID " +
-          "which is not zero. Current Object ID is " + this.objectID);
+                                              "which is not zero. Current Object ID is " + this.objectID);
     }
     this.objectID = obId;
+  }
+
+  /**
+   * UpdateIDs are monotonically increasing values which are updated
+   * each time there is an update.
+   */
+  public final long getUpdateID() {
+    return updateID;
+  }
+
+  public final void setUpdateID(long updateID) {
+    this.updateID = updateID;
+  }
+
+  public final void setWriteUpdateID(long updateId, boolean isRatisEnabled) {
+
+    // Because in non-HA, we have multiple rpc handler threads and
+    // transactionID is generated in OzoneManagerServerSideTranslatorPB.
+
+    // Lets take T1 -> Set Bucket Property
+    // T2 -> Set Bucket Acl
+
+    // Now T2 got lock first, so updateID will be set to 2. Now when T1 gets
+    // executed we will hit the precondition exception. So for OM non-HA with
+    // out ratis we should not have this check.
+
+    // Same can happen after OM restart also.
+
+    // OM Start
+    // T1 -> Create Bucket
+    // T2 -> Set Bucket Property
+
+    // OM restart
+    // T1 -> Set Bucket Acl
+
+    // So when T1 is executing, Bucket will have updateID 2 which is set by T2
+    // execution before restart.
+
+    // Main reason, in non-HA transaction Index after restart starts from 0.
+    // And also because of this same reason we don't do replay checks in non-HA.
+
+    if (isRatisEnabled && updateId < this.getWriteUpdateID()) {
+      throw new IllegalArgumentException(String.format(
+          "Trying to set updateID to %d which is not greater than the " +
+          "current value of %d for %s", updateId, this.getUpdateID(),
+          getObjectInfo()));
+    } else {
+      this.setWriteUpdateID(updateId);
+    }
   }
 
   /**
@@ -111,14 +162,16 @@ public abstract class WithObjectID extends WithMetadata {
     if (newValue < currentValue) {
       throw new IllegalArgumentException(String.format(
           "Trying to set updateID to %d which is not greater than the " +
-              "current value of %d for %s", newValue, currentValue,
+          "current value of %d for %s", newValue, currentValue,
           getObjectInfo()));
+    } else {
+      updateID = newValue;
     }
-
-    updateID = newValue;
   }
 
-  /** Hook method, customized in subclasses. */
+  /**
+   * Hook method, customized in subclasses.
+   */
   public String getObjectInfo() {
     return this.toString();
   }
@@ -127,6 +180,7 @@ public abstract class WithObjectID extends WithMetadata {
   public static class Builder extends WithMetadata.Builder {
     private long objectID;
     private long updateID;
+    private long writeUpdateID;
 
     protected Builder() {
       super();
@@ -136,6 +190,11 @@ public abstract class WithObjectID extends WithMetadata {
       super(obj);
       objectID = obj.getObjectID();
       updateID = obj.getUpdateID();
+      writeUpdateID = obj.getWriteUpdateID();
+    }
+
+    public long getObjectID() {
+      return objectID;
     }
 
     /**
@@ -148,6 +207,10 @@ public abstract class WithObjectID extends WithMetadata {
       return this;
     }
 
+    public long getUpdateID() {
+      return updateID;
+    }
+
     /**
      * Sets the update ID for this Object. Update IDs are monotonically
      * increasing values which are updated each time there is an update.
@@ -157,12 +220,13 @@ public abstract class WithObjectID extends WithMetadata {
       return this;
     }
 
-    public long getObjectID() {
-      return objectID;
+    public long getWriteUpdateID() {
+      return writeUpdateID;
     }
 
-    public long getUpdateID() {
-      return updateID;
+    public Builder setWriteUpdateID(long id) {
+      this.writeUpdateID = id;
+      return this;
     }
   }
 }
