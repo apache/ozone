@@ -156,10 +156,10 @@ public abstract class WithObjectID extends WithMetadata {
     // And also because of this same reason we don't do replay checks in non-HA.
 
     if (isRatisEnabled && updateId < this.getUpdateID()) {
-      throw new IllegalArgumentException(String.format(
-          "Trying to set updateID to %d which is not greater than the " +
-          "current value of %d for %s", updateId, this.getUpdateID(),
-          getObjectInfo()));
+//      throw new IllegalArgumentException(String.format(
+//          "Trying to set updateID to %d which is not greater than the " +
+//          "current value of %d for %s", updateId, this.getUpdateID(),
+//          getObjectInfo()));
     } else {
       this.setUpdateID(updateId);
     }
