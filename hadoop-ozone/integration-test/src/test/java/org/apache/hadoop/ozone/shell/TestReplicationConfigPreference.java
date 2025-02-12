@@ -81,7 +81,7 @@ public class TestReplicationConfigPreference {
   private static final ReplicationConfig EC_REPL_CONF = new ECReplicationConfig(
       3, 2, ECReplicationConfig.EcCodec.RS, (int) OzoneConsts.MB);
 
-  protected static void startCluster()
+  protected void startCluster()
       throws Exception {
     omServiceId = "om-service-test1";
     MiniOzoneHAClusterImpl.Builder builder =
