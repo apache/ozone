@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
 import org.apache.hadoop.ozone.recon.common.CommonUtils;
+import org.apache.hadoop.ozone.recon.metrics.impl.NSSummaryTaskMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -393,7 +394,7 @@ public class TestNSSummaryEndpointWithFSO {
     populateOMDB();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
         new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, ozoneConfiguration);
+            reconOMMetadataManager, ozoneConfiguration, mock(NSSummaryTaskMetrics.class));
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
     commonUtils = new CommonUtils();
   }

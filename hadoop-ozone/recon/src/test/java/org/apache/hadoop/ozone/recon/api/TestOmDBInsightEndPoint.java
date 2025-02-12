@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.api.types.ListKeysResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
+import org.apache.hadoop.ozone.recon.metrics.impl.NSSummaryTaskMetrics;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -323,13 +324,13 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     setUpOmData();
     nSSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
         reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconOMMetadataManager, ozoneConfiguration, mock(NSSummaryTaskMetrics.class));
     nsSummaryTaskWithOBS  = new NSSummaryTaskWithOBS(
         reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconOMMetadataManager, ozoneConfiguration, mock(NSSummaryTaskMetrics.class));
     nsSummaryTaskWithFSO  = new NSSummaryTaskWithFSO(
         reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconOMMetadataManager, ozoneConfiguration, mock(NSSummaryTaskMetrics.class));
     reconNamespaceSummaryManager.clearNSSummaryTable();
     nSSummaryTaskWithLegacy.reprocessWithLegacy(reconOMMetadataManager);
     nsSummaryTaskWithOBS.reprocessWithOBS(reconOMMetadataManager);

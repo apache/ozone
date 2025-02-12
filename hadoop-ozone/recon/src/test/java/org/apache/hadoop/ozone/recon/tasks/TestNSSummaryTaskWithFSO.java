@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.metrics.impl.NSSummaryTaskMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -54,6 +55,7 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NS
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.mock;
 
 /**
  * Test for NSSummaryTaskWithFSO.
@@ -146,7 +148,7 @@ public final class TestNSSummaryTaskWithFSO {
 
     nSSummaryTaskWithFso = new NSSummaryTaskWithFSO(
         reconNamespaceSummaryManager, reconOMMetadataManager,
-        ozoneConfiguration);
+        ozoneConfiguration, mock(NSSummaryTaskMetrics.class));
   }
 
   /**

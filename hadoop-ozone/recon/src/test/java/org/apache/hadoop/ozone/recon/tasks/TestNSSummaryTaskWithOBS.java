@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.metrics.impl.NSSummaryTaskMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
@@ -55,6 +56,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOz
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.mock;
 
 /**
  * Unit test for NSSummaryTaskWithOBS.
@@ -132,7 +134,7 @@ public final class TestNSSummaryTaskWithOBS implements Serializable {
 
     nSSummaryTaskWithOBS = new NSSummaryTaskWithOBS(
         reconNamespaceSummaryManager,
-        reconOMMetadataManager, omConfiguration);
+        reconOMMetadataManager, omConfiguration, mock(NSSummaryTaskMetrics.class));
   }
 
   /**

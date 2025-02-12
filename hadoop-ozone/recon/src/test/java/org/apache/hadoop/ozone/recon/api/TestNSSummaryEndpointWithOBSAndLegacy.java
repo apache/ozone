@@ -58,6 +58,7 @@ import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.api.types.VolumeObjectDBInfo;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
 import org.apache.hadoop.ozone.recon.common.CommonUtils;
+import org.apache.hadoop.ozone.recon.metrics.impl.NSSummaryTaskMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -386,11 +387,11 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
     populateOMDB();
     NSSummaryTaskWithOBS nsSummaryTaskWithOBS =
         new NSSummaryTaskWithOBS(reconNamespaceSummaryManager,
-            reconOMMetadataManager, conf);
+            reconOMMetadataManager, conf, mock(NSSummaryTaskMetrics.class));
     nsSummaryTaskWithOBS.reprocessWithOBS(reconOMMetadataManager);
     NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy =
         new NSSummaryTaskWithLegacy(reconNamespaceSummaryManager,
-            reconOMMetadataManager, conf);
+            reconOMMetadataManager, conf, mock(NSSummaryTaskMetrics.class));
     nsSummaryTaskWithLegacy.reprocessWithLegacy(reconOMMetadataManager);
     commonUtils = new CommonUtils();
   }

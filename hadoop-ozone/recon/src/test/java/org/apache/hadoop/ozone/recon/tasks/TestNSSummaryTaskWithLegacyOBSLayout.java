@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.metrics.impl.NSSummaryTaskMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
@@ -54,6 +55,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestRe
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.mock;
 
 /**
  * Test for NSSummaryTaskWithLegacy focusing on the OBS (Object Store) layout.
@@ -137,7 +139,7 @@ public final class TestNSSummaryTaskWithLegacyOBSLayout {
 
     nSSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
         reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconOMMetadataManager, ozoneConfiguration, mock(NSSummaryTaskMetrics.class));
   }
 
   /**

@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
+import org.apache.hadoop.ozone.recon.metrics.impl.NSSummaryTaskMetrics;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -122,7 +123,7 @@ public class TestOpenKeysSearchEndpoint extends AbstractReconSqlDBTest {
     populateOMDB();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
         new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, ozoneConfiguration);
+            reconOMMetadataManager, ozoneConfiguration, mock(NSSummaryTaskMetrics.class));
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
   }
 
