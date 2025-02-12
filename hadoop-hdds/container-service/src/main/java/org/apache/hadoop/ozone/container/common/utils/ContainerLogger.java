@@ -51,7 +51,7 @@ public final class ContainerLogger {
    * @param containerData The container that was created and opened.
    */
   public static void logOpen(ContainerData containerData) {
-    LOG.info(getMessage(containerData,"CommandType=CreateContainer"));
+    LOG.info(getMessage(containerData, "CommandType=CreateContainer"));
   }
 
   /**
@@ -80,7 +80,7 @@ public final class ContainerLogger {
    * @param containerData The container that was closed.
    */
   public static void logClosed(ContainerData containerData) {
-    LOG.info(getMessage(containerData,"CommandType=CloseContainer"));
+    LOG.info(getMessage(containerData, "CommandType=CloseContainer"));
   }
 
   /**
@@ -128,7 +128,7 @@ public final class ContainerLogger {
    * @param containerData The container that was imported to this datanode.
    */
   public static void logImported(ContainerData containerData) {
-    LOG.info(getMessage(containerData,"action=Imported"));
+    LOG.info(getMessage(containerData, "action=Imported"));
   }
 
   /**
@@ -137,7 +137,7 @@ public final class ContainerLogger {
    * @param containerData The container that was exported from this datanode.
    */
   public static void logExported(ContainerData containerData) {
-    LOG.info(getMessage(containerData,"action=Exported"));
+    LOG.info(getMessage(containerData, "action=Exported"));
   }
 
   /**
@@ -146,7 +146,7 @@ public final class ContainerLogger {
    * @param containerData The container that was recovered on this datanode.
    */
   public static void logRecovered(ContainerData containerData) {
-    LOG.info(getMessage(containerData,"action=Recovered"));
+    LOG.info(getMessage(containerData, "action=Recovered"));
   }
 
   private static String getMessage(ContainerData containerData,
