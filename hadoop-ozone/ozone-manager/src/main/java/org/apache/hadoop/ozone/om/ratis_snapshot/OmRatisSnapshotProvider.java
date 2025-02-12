@@ -144,7 +144,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
     URL omCheckpointUrl = leader.getOMDBCheckpointEndpointUrl(
         httpPolicy.isHttpEnabled(), true);
     LOG.info("Downloading latest checkpoint from Leader OM {}. Checkpoint: {} " + "URL: {}",
-             leaderNodeID, targetFile.getName() , omCheckpointUrl);
+             leaderNodeID, targetFile.getName(), omCheckpointUrl);
     SecurityUtil.doAsCurrentUser(() -> {
       HttpURLConnection connection = (HttpURLConnection)
           connectionFactory.openConnection(omCheckpointUrl, spnegoEnabled);
