@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.pipeline.TestSCMPipelineMetrics;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestCpuMetrics;
 import org.apache.hadoop.ozone.admin.om.lease.TestLeaseRecoverer;
+import org.apache.hadoop.ozone.client.rpc.TestCloseContainerHandlingByClient;
 import org.apache.hadoop.ozone.client.rpc.TestDiscardPreallocatedBlocks;
 import org.apache.hadoop.ozone.om.TestBucketLayoutWithOlderClient;
 import org.apache.hadoop.ozone.om.TestListKeys;
@@ -208,6 +209,14 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
 
   @Nested
   class SCMPipelineMetrics extends TestSCMPipelineMetrics {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class CloseContainerHandlingByClient extends TestCloseContainerHandlingByClient {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
