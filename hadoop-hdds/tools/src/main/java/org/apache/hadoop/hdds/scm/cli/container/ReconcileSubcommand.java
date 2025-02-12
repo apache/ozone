@@ -26,6 +26,7 @@ import java.util.Iterator;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.SequenceWriter;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -132,7 +133,8 @@ public class ReconcileSubcommand extends ScmSubcommand {
   /**
    * Used to json serialize the container and replica information for output.
    */
-  private static class ContainerWrapper {
+  @VisibleForTesting
+  static class ContainerWrapper {
     private final long containerID;
     private final HddsProtos.LifeCycleState state;
     private final ReplicationConfig replicationConfig;
@@ -177,7 +179,8 @@ public class ReconcileSubcommand extends ScmSubcommand {
     }
   }
 
-  private static class ReplicaWrapper {
+  @VisibleForTesting
+  static class ReplicaWrapper {
     private final DatanodeWrapper datanode;
     private final String state;
     private final int replicaIndex;
@@ -212,7 +215,8 @@ public class ReconcileSubcommand extends ScmSubcommand {
     }
   }
 
-  private static class DatanodeWrapper {
+  @VisibleForTesting
+  static class DatanodeWrapper {
     private final String hostname;
     private final String uuid;
 

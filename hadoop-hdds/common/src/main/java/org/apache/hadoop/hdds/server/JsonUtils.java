@@ -114,6 +114,10 @@ public final class JsonUtils {
     return MAPPER.readValue(reader, valueType);
   }
 
+  public static ObjectMapper getDefaultMapper() {
+    return MAPPER;
+  }
+
   /**
    * Utility to sequentially write a large collection of items to a file.
    */
