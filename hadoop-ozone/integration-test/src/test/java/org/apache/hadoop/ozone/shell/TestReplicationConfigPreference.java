@@ -61,9 +61,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 public class TestReplicationConfigPreference {
 
   private OzoneConfiguration conf = null;
-  private static MiniOzoneCluster cluster;
-  private static OzoneClient client;
-  private static String omServiceId;
+  private MiniOzoneCluster cluster;
+  private OzoneClient client;
+  private String omServiceId;
   @TempDir
   private static java.nio.file.Path path;
   private static File testFile;
