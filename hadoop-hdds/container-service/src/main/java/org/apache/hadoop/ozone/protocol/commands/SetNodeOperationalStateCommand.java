@@ -95,9 +95,6 @@ public class SetNodeOperationalStateCommand
         .append(", encodedToken: \"").append(getEncodedToken()).append("\"")
         .append(", term: ").append(getTerm())
         .append(", deadlineMsSinceEpoch: ").append(getDeadline())
-        .append(", encodedToken: \"").append(getEncodedToken()).append("\"")
-        .append(", term: ").append(getTerm())
-        .append(", deadlineMsSinceEpoch: ").append(getDeadline())
         .append(", opState: ").append(opState)
         .append(", stateExpiryEpochSeconds: ").append(stateExpiryEpochSeconds);
     return sb.toString();
