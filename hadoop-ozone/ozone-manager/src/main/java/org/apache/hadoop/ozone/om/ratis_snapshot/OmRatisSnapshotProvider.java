@@ -18,7 +18,10 @@
 
 package org.apache.hadoop.ozone.om.ratis_snapshot;
 
-import java.io.*;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.List;
@@ -142,7 +145,6 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
         httpPolicy.isHttpEnabled(), true);
     LOG.info("Downloading latest checkpoint from Leader OM {}. Checkpoint: {} " + "URL: {}",
              leaderNodeID, targetFile.getName() , omCheckpointUrl);
-
     SecurityUtil.doAsCurrentUser(() -> {
       HttpURLConnection connection = (HttpURLConnection)
           connectionFactory.openConnection(omCheckpointUrl, spnegoEnabled);
