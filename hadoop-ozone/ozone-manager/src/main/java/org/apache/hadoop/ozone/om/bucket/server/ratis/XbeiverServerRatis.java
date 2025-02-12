@@ -312,6 +312,7 @@ public class XbeiverServerRatis implements XbeiverServerSpi {
           .map(RaftPeer::getPriority)
           .collect(Collectors.toList());
       if (!isExist(raftGroupId)) {
+        activePipelines.putIfAbsent(raftGroupId, new ActivePipelineContext(true, false) );
         final RaftGroup group = RatisHelper.newRawRaftGroup(raftGroupId, peers, priorityList);
         RaftPeerId currentNodeRaftPeerId = ozoneManager.getOmRatisServer().getRaftPeerId();
 
@@ -550,6 +551,7 @@ public class XbeiverServerRatis implements XbeiverServerSpi {
     LOG.debug("Received addGroup request for group {}", groupId);
 
     try {
+      LOG.info("Adding group {}", groupId);
       reply = server.groupManagement(request);
     } catch (Exception e) {
       throw new IOException(e.getMessage(), e);

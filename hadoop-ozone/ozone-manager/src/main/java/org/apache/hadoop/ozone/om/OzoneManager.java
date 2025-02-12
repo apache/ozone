@@ -1509,7 +1509,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // This will help to catch if some one has changed service id later on.
     File[] ratisDirFiles = omRatisDir.listFiles();
     if (ratisDirFiles != null) {
+      LOG.error("Ratis dirs {}", ratisDirFiles);
       for (File ratisGroupDir : ratisDirFiles) {
+
         if (ratisGroupDir.isDirectory()) {
           if (!ratisGroupDir.getName().equals(groupIDfromServiceID)) {
             throw new IOException("Ratis group Dir on disk "

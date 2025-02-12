@@ -160,10 +160,10 @@ public abstract class WithObjectID extends WithMetadata {
 
     final long currentValue = getUpdateID();
     if (newValue < currentValue) {
-      throw new IllegalArgumentException(String.format(
-          "Trying to set updateID to %d which is not greater than the " +
-          "current value of %d for %s", newValue, currentValue,
-          getObjectInfo()));
+//      throw new IllegalArgumentException(String.format(
+//          "Trying to set updateID to %d which is not greater than the " +
+//          "current value of %d for %s", newValue, currentValue,
+//          getObjectInfo()));
     } else {
       updateID = newValue;
     }
