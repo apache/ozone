@@ -201,15 +201,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
       }
     }
     if (LOG.isDebugEnabled()) {
-      StringBuilder allCommands = new StringBuilder();
-      for (SCMCommand cmd : commands) {
-        allCommands.append(cmd).append(", ");
-      }
-      int len = allCommands.length();
-      if (len > 2) {
-        allCommands.delete(len - 2, len);
-      }
-      LOG.debug("Heartbeat dispatched: datanode=" + datanodeDetails.getUuid() + ", Commands= [" + allCommands + "]");
+      LOG.debug("Heartbeat dispatched: datanode=" + datanodeDetails.getUuid() + ", Commands= " + commands);
     }
 
     return commands;

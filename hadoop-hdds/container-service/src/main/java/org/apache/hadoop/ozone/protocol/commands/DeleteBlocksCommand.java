@@ -79,13 +79,15 @@ public class DeleteBlocksCommand extends
         .append(", deadlineMsSinceEpoch: ").append(getDeadline())
         .append(", deletedBlocksTransaction: [");
     for (DeletedBlocksTransaction txn : blocksTobeDeleted) {
-      sb.append(" txnID:").append(txn.getTxID())
-          .append(",containerID:").append(txn.getContainerID())
-          .append(",deleteBlockCount:").append(txn.getLocalIDCount())
-          .append(",count:").append(txn.getCount())
-          .append(",");
+      sb.append("{ txnID: ").append(txn.getTxID())
+          .append(", containerID: ").append(txn.getContainerID())
+          .append(", deleteBlockCount: ").append(txn.getLocalIDCount())
+          .append(", count: ").append(txn.getCount())
+          .append("}, ");
     }
-    sb.deleteCharAt(sb.length() - 1);
+    if (!blocksTobeDeleted.isEmpty()) {
+      sb.delete(sb.length() - 2, sb.length());
+    }
     sb.append("]");
     return sb.toString();
   }
