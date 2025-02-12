@@ -49,7 +49,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
@@ -321,7 +321,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
           DELETED_DIR_TABLE, PUT, null));
     }
     OMUpdateEventBatch putEventBatch = new OMUpdateEventBatch(putEvents, 0L);
-    omTableInsightTask.process(putEventBatch, new HashMap<>());
+    omTableInsightTask.process(putEventBatch, Collections.emptyMap());
     assertEquals(5, getCountForTable(DELETED_DIR_TABLE));
 
 
@@ -335,7 +335,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
         getOmKeyInfo("vol1", "bucket1", DIR_ONE, 3L, false), DELETED_DIR_TABLE,
         DELETE, null));
     OMUpdateEventBatch deleteEventBatch = new OMUpdateEventBatch(deleteEvents, 0L);
-    omTableInsightTask.process(deleteEventBatch, new HashMap<>());
+    omTableInsightTask.process(deleteEventBatch, Collections.emptyMap());
     assertEquals(3, getCountForTable(DELETED_DIR_TABLE));
   }
 
@@ -471,7 +471,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
 
     // Processing the initial batch of events
     OMUpdateEventBatch initialBatch = new OMUpdateEventBatch(initialEvents, 0L);
-    omTableInsightTask.process(initialBatch, new HashMap<>());
+    omTableInsightTask.process(initialBatch, Collections.emptyMap());
 
     // Verifying the count in each table
     for (String tableName : omTableInsightTask.getTaskTables()) {
@@ -500,7 +500,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     // Processing the additional events
     OMUpdateEventBatch additionalBatch =
         new OMUpdateEventBatch(additionalEvents, 0L);
-    omTableInsightTask.process(additionalBatch, new HashMap<>());
+    omTableInsightTask.process(additionalBatch, Collections.emptyMap());
     // Verifying the final count in each table
     for (String tableName : omTableInsightTask.getTaskTables()) {
       if (tableName.equals(DELETED_TABLE)) {
@@ -529,7 +529,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     }
 
     OMUpdateEventBatch putEventBatch = new OMUpdateEventBatch(putEvents, 0L);
-    omTableInsightTask.process(putEventBatch, new HashMap<>());
+    omTableInsightTask.process(putEventBatch, Collections.emptyMap());
 
     // After 5 PUTs, size should be 5 * 1000 = 5000
     for (String tableName : new ArrayList<>(
@@ -547,7 +547,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
         getOMUpdateEvent("item0", omKeyInfo, OPEN_FILE_TABLE, DELETE, null));
 
     OMUpdateEventBatch deleteEventBatch = new OMUpdateEventBatch(deleteEvents, 0L);
-    omTableInsightTask.process(deleteEventBatch, new HashMap<>());
+    omTableInsightTask.process(deleteEventBatch, Collections.emptyMap());
 
     // After deleting "item0", size should be 4 * 1000 = 4000
     for (String tableName : new ArrayList<>(
@@ -570,7 +570,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     }
 
     OMUpdateEventBatch updateEventBatch = new OMUpdateEventBatch(updateEvents, 0L);
-    omTableInsightTask.process(updateEventBatch, new HashMap<>());
+    omTableInsightTask.process(updateEventBatch, Collections.emptyMap());
 
     // After updating "item1", size should be 4000 - 1000 + 2000 = 5000
     //  presentValue - oldValue + newValue = updatedValue
@@ -607,7 +607,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
               null));
     }
     OMUpdateEventBatch putEventBatch = new OMUpdateEventBatch(putEvents, 0L);
-    omTableInsightTask.process(putEventBatch, new HashMap<>());
+    omTableInsightTask.process(putEventBatch, Collections.emptyMap());
     // Each of the 5 RepeatedOmKeyInfo object has 5 OmKeyInfo obj,
     // so total deleted keys should be 5 * 5 = 25
     assertEquals(25L, getCountForTable(DELETED_TABLE));
@@ -623,7 +623,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
         getOMUpdateEvent("item0", repeatedOmKeyInfo, DELETED_TABLE, DELETE,
             null));
     OMUpdateEventBatch deleteEventBatch = new OMUpdateEventBatch(deleteEvents, 0L);
-    omTableInsightTask.process(deleteEventBatch, new HashMap<>());
+    omTableInsightTask.process(deleteEventBatch, Collections.emptyMap());
     // After deleting "item0" total deleted keys should be 20
     assertEquals(20L, getCountForTable(DELETED_TABLE));
     // After deleting "item0", size should be 4 * 1000 = 4000

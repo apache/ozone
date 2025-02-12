@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TA
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,8 +38,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -101,26 +100,26 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   public synchronized void consumeOMEvents(OMUpdateEventBatch events, OMMetadataManager omMetadataManager) {
     if (!events.isEmpty()) {
       Collection<NamedCallableTask<ReconOmTask.TaskResult>> tasks = new ArrayList<>();
-      List<Pair<String, Map<String, Integer>>> failedTasks = new ArrayList<>();
+      List<ReconOmTask.TaskResult> failedTasks = new ArrayList<>();
       for (Map.Entry<String, ReconOmTask> taskEntry :
           reconOmTasks.entrySet()) {
         ReconOmTask task = taskEntry.getValue();
         ReconTaskStatusUpdater taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(task.getTaskName());
         taskStatusUpdater.recordRunStart();
         // events passed to process method is no longer filtered
-        tasks.add(new NamedCallableTask<>(task.getTaskName(), () -> task.process(events, new HashMap<>())));
+        tasks.add(new NamedCallableTask<>(task.getTaskName(), () -> task.process(events, Collections.emptyMap())));
       }
       processTasks(tasks, events, failedTasks);
 
       // Retry processing failed tasks
-      List<Pair<String, Map<String, Integer>>> retryFailedTasks = new ArrayList<>();
+      List<ReconOmTask.TaskResult> retryFailedTasks = new ArrayList<>();
       if (!failedTasks.isEmpty()) {
         tasks.clear();
-        for (Pair<String, Map<String, Integer>> taskPair : failedTasks) {
-          ReconOmTask task = reconOmTasks.get(taskPair.getLeft());
+        for (ReconOmTask.TaskResult taskResult : failedTasks) {
+          ReconOmTask task = reconOmTasks.get(taskResult.getTaskName());
           // events passed to process method is no longer filtered
           tasks.add(new NamedCallableTask<>(task.getTaskName(),
-              () -> task.process(events, taskPair.getRight())));
+              () -> task.process(events, taskResult.getSubTaskSeekPositions())));
         }
         processTasks(tasks, events, retryFailedTasks);
       }
@@ -128,11 +127,11 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       // Reprocess the failed tasks.
       if (!retryFailedTasks.isEmpty()) {
         tasks.clear();
-        for (Pair<String, Map<String, Integer>> taskPair : failedTasks) {
-          ReconOmTask task = reconOmTasks.get(taskPair.getLeft());
+        for (ReconOmTask.TaskResult taskResult : failedTasks) {
+          ReconOmTask task = reconOmTasks.get(taskResult.getTaskName());
           tasks.add(new NamedCallableTask<>(task.getTaskName(), () -> task.reprocess(omMetadataManager)));
         }
-        List<Pair<String, Map<String, Integer>>> reprocessFailedTasks = new ArrayList<>();
+        List<ReconOmTask.TaskResult> reprocessFailedTasks = new ArrayList<>();
         processTasks(tasks, events, reprocessFailedTasks);
         // Here the assumption is that even if full re-process of task also fails,
         // then there is something wrong in recon rocks DB got from OM and needs to be
@@ -146,9 +145,9 @@ public class ReconTaskControllerImpl implements ReconTaskController {
    * Ignore tasks that failed reprocess step more than threshold times.
    * @param failedTasks list of failed tasks.
    */
-  private void ignoreFailedTasks(List<Pair<String, Map<String, Integer>>> failedTasks) {
-    for (Pair<String, Map<String, Integer>> taskPair : failedTasks) {
-      String taskName = taskPair.getLeft();
+  private void ignoreFailedTasks(List<ReconOmTask.TaskResult> failedTasks) {
+    for (ReconOmTask.TaskResult taskResult : failedTasks) {
+      String taskName = taskResult.getTaskName();
       LOG.info("Reprocess step failed for task {}.", taskName);
       if (taskFailureCounter.get(taskName).incrementAndGet() >
           TASK_FAILURE_THRESHOLD) {
@@ -248,7 +247,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
    */
   private void processTasks(
       Collection<NamedCallableTask<ReconOmTask.TaskResult>> tasks,
-      OMUpdateEventBatch events, List<Pair<String, Map<String, Integer>>> failedTasks) {
+      OMUpdateEventBatch events, List<ReconOmTask.TaskResult> failedTasks) {
     List<CompletableFuture<Void>> futures = tasks.stream()
         .map(task -> CompletableFuture.supplyAsync(() -> {
           try {
@@ -266,7 +265,10 @@ public class ReconTaskControllerImpl implements ReconTaskController {
               taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
           if (!result.isTaskSuccess()) {
             LOG.error("Task {} failed", taskName);
-            failedTasks.add(new ImmutablePair<>(taskName, result.getSubTaskSeekPositions()));
+            failedTasks.add(new ReconOmTask.TaskResult.Builder()
+                .setTaskName(taskName)
+                .setSubTaskSeekPositions(result.getSubTaskSeekPositions())
+                .build());
             taskStatusUpdater.setLastTaskRunStatus(-1);
           } else {
             taskFailureCounter.get(taskName).set(0);

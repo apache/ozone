@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.DELETE;
@@ -196,7 +196,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
 
     OMUpdateEventBatch omUpdateEventBatch =
         new OMUpdateEventBatch(Arrays.asList(event, event2), 0L);
-    fileSizeCountTask.process(omUpdateEventBatch, new HashMap<>());
+    fileSizeCountTask.process(omUpdateEventBatch, Collections.emptyMap());
 
     // Verify 2 keys are in correct bins.
     assertEquals(2, fileCountBySizeDao.count());
@@ -251,7 +251,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
 
     omUpdateEventBatch = new OMUpdateEventBatch(
         Arrays.asList(updateEvent, putEvent, deleteEvent), 0L);
-    fileSizeCountTask.process(omUpdateEventBatch, new HashMap<>());
+    fileSizeCountTask.process(omUpdateEventBatch, Collections.emptyMap());
 
     assertEquals(4, fileCountBySizeDao.count());
     recordToFind.value3(1024L);
@@ -389,7 +389,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
 
     OMUpdateEventBatch omUpdateEventBatch =
         new OMUpdateEventBatch(omDbEventList, 0L);
-    fileSizeCountTask.process(omUpdateEventBatch, new HashMap<>());
+    fileSizeCountTask.process(omUpdateEventBatch, Collections.emptyMap());
 
     // Verify 2 keys are in correct bins.
     assertEquals(10000, fileCountBySizeDao.count());
@@ -465,7 +465,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     }
 
     omUpdateEventBatch = new OMUpdateEventBatch(omDbEventList, 0L);
-    fileSizeCountTask.process(omUpdateEventBatch, new HashMap<>());
+    fileSizeCountTask.process(omUpdateEventBatch, Collections.emptyMap());
 
     assertEquals(10000, fileCountBySizeDao.count());
     recordToFind = dslContext
