@@ -91,17 +91,16 @@ public class AuthorizationV4QueryParser implements SignatureParser {
     validateSignedHeaders();
     validateSignature();
 
-    return new SignatureInfo(
-        Version.V4,
-        credential.getDate(),
-        queryParameters.get("X-Amz-Date"),
-        credential.getAccessKeyID(),
-        queryParameters.get("X-Amz-Signature"),
-        queryParameters.get("X-Amz-SignedHeaders"),
-        credential.createScope(),
-        queryParameters.get("X-Amz-Algorithm"),
-        false
-    );
+    return new SignatureInfo.Builder(Version.V4)
+        .setDate(credential.getDate())
+        .setDateTime(queryParameters.get("X-Amz-Date"))
+        .setAwsAccessId(credential.getAccessKeyID())
+        .setSignature(queryParameters.get("X-Amz-Signature"))
+        .setSignedHeaders(queryParameters.get("X-Amz-SignedHeaders"))
+        .setCredentialScope(credential.createScope())
+        .setAlgorithm(queryParameters.get("X-Amz-Algorithm"))
+        .setSignPayload(false)
+        .build();
   }
 
   /**
