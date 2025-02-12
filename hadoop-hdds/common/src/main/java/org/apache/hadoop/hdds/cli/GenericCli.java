@@ -16,8 +16,13 @@
  */
 package org.apache.hadoop.hdds.cli;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.file.AccessDeniedException;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.FileSystemException;
+import java.nio.file.NoSuchFileException;
 import java.util.Map;
 
 import com.google.common.base.Strings;
@@ -122,5 +127,21 @@ public abstract class GenericCli implements GenericParentCommand {
 
   protected PrintWriter err() {
     return cmd.getErr();
+  }
+
+  public static String handleFileSystemException(FileSystemException e, File dataFile) {
+    String message = e.getMessage();
+    String errorMessage;
+    if (e instanceof NoSuchFileException) {
+      errorMessage = String.format("Error: File not found: %s", dataFile.getPath());
+    } else if (e instanceof AccessDeniedException) {
+      errorMessage = String.format("Error: Access denied to file: %s", dataFile.getPath());
+    } else if (e instanceof FileAlreadyExistsException) {
+      errorMessage = String.format("Error: File already exists: %s", dataFile.getPath());
+    } else {
+      errorMessage = String.format("Error with file: %s. Details: %s", dataFile.getPath(), message);
+    }
+
+    return errorMessage;
   }
 }

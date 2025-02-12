@@ -23,15 +23,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
-import java.io.FileNotFoundException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.io.IOUtils;
@@ -82,14 +83,14 @@ public class PutKeyHandler extends KeyHandler {
     String keyName = address.getKeyName();
 
     File dataFile = new File(fileName);
-    if (!dataFile.exists()) {
-      throw new FileNotFoundException("Error: File not found: " + fileName);
-    }
 
     if (isVerbose()) {
       try (InputStream stream = Files.newInputStream(dataFile.toPath())) {
         String hash = DigestUtils.sha256Hex(stream);
         out().printf("File sha256 checksum : %s%n", hash);
+      }
+      catch (FileSystemException e) {
+        out().println(GenericCli.handleFileSystemException(e, dataFile));
       }
     }
 
@@ -128,6 +129,9 @@ public class PutKeyHandler extends KeyHandler {
     try (InputStream input = Files.newInputStream(dataFile.toPath());
          OutputStream output = createOrReplaceKey(bucket, keyName, dataFile.length(), keyMetadata, replicationConfig)) {
       IOUtils.copyBytes(input, output, chunkSize);
+    }
+    catch (FileSystemException e) {
+      out().println(GenericCli.handleFileSystemException(e, dataFile));
     }
   }
 
@@ -173,6 +177,9 @@ public class PutKeyHandler extends KeyHandler {
         off += writeLen;
         len -= writeLen;
       }
+    }
+    catch (FileSystemException e) {
+      out().println(GenericCli.handleFileSystemException(e, dataFile));
     }
   }
 }
