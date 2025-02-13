@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.upgrade;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -30,7 +31,10 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Properties;
 
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_HA;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_ID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -53,6 +57,8 @@ public class TestScmStartupSlvLessThanMlv {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS,
         tempDir.toAbsolutePath().toString());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
+        tempDir.toAbsolutePath().toString());
 
     // Set metadata layout version larger then software layout version.
     int largestSlv = 0;
@@ -61,9 +67,15 @@ public class TestScmStartupSlvLessThanMlv {
     }
     int mlv = largestSlv + 1;
 
+    Properties properties = new Properties();
+    properties.setProperty(SCM_ID, "scm");
+    properties.setProperty(SCM_HA, "true");
+
     // Create version file with MLV > SLV, which should fail the SCM
     // construction.
-    UpgradeTestUtils.createVersionFile(scmSubdir, HddsProtos.NodeType.SCM, mlv);
+    UpgradeTestUtils.createVersionFile(scmSubdir, HddsProtos.NodeType.SCM, mlv,
+        properties);
+
 
     Throwable t = assertThrows(IOException.class,
         () -> new StorageContainerManager(conf));
