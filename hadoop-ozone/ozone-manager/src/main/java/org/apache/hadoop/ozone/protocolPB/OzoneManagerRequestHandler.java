@@ -147,8 +147,6 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 import com.google.common.collect.Lists;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVER_LIST_MAX_SIZE;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVER_LIST_MAX_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.HBASE_SUPPORT;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
@@ -188,11 +186,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   public OzoneManagerRequestHandler(OzoneManager om) {
     this.impl = om;
-    this.maxKeyListSize = om.getConfiguration().getLong(OZONE_OM_SERVER_LIST_MAX_SIZE,
-      OZONE_OM_SERVER_LIST_MAX_SIZE_DEFAULT);
-    if (this.maxKeyListSize <= 0) {
-      this.maxKeyListSize = OZONE_OM_SERVER_LIST_MAX_SIZE_DEFAULT;
-    }
+    this.maxKeyListSize = om.getConfig().getMaxListSize();
   }
 
   //TODO simplify it to make it shorter
