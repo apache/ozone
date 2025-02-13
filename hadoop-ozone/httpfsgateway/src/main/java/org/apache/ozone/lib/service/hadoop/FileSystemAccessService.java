@@ -81,7 +81,7 @@ public class FileSystemAccessService extends BaseService
   private static final String[] HADOOP_CONF_FILES
       = {"core-site.xml", "hdfs-site.xml"};
 
-  private static final String FILE_SYSTEM_SERVICE_CREATED
+  public static final String FILE_SYSTEM_SERVICE_CREATED
       = "FileSystemAccessService.created";
 
   private static class CachedFileSystem {
