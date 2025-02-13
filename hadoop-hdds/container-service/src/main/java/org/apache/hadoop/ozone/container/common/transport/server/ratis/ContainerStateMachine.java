@@ -66,6 +66,7 @@ import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel;
@@ -940,7 +941,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       ContainerCommandRequestProto request, DispatcherContext context,
       Consumer<Throwable> exceptionHandler) {
     final long containerId = request.getContainerID();
-    final CheckedSupplier<ContainerCommandResponseProto, Exception> task
+     final CheckedSupplier<ContainerCommandResponseProto, Exception> task
         = () -> {
           try {
             try {
@@ -953,7 +954,15 @@ public class ContainerStateMachine extends BaseStateMachine {
             metrics.recordQueueingDelay(request.getCmdType(), queueingDelay);
             // TODO: add a counter to track number of executing applyTransaction
             // and queue size
-            return dispatchCommand(request, context);
+            if (!this.isStateMachineHealthy()) {
+              System.out.println(request);
+              System.out.println(this.getId().toString() + "Swaminathan1 \t " + this.containerController.getContainer(containerId).getContainerState() +"\t" + this.containerController.getContainer(containerId).getContainerData().getBlockCommitSequenceId());
+            }
+            ContainerCommandResponseProto resp = dispatchCommand(request, context);
+            if (!this.isStateMachineHealthy()) {
+              System.out.println(this.getId().toString() + "Swaminathan2 \t " + this.containerController.getContainer(containerId).getContainerState() +"\t" + this.containerController.getContainer(containerId).getContainerData().getBlockCommitSequenceId());
+            }
+            return resp;
           } catch (Exception e) {
             exceptionHandler.accept(e);
             throw e;
@@ -1182,8 +1191,15 @@ public class ContainerStateMachine extends BaseStateMachine {
     for (Long cid : container2BCSIDMap.keySet()) {
       try {
         containerController.markContainerForClose(cid);
-        containerController.quasiCloseContainer(cid,
-            "Ratis group removed. Group id: " + getGroupId());
+        if (!stateMachineHealthy.get() && containerController.getContainer(cid).getContainerState() ==
+            ContainerProtos.ContainerDataProto.State.CLOSING) {
+          System.out.println("Marking container Unhealthy for cid " + cid);
+          containerController.markContainerUnhealthy(cid, Container.ScanResult.unhealthy(
+              Container.ScanResult.FailureType.WRITE_FAILURE, new File("ContainerStateMachine"), null));
+        } else {
+          containerController.quasiCloseContainer(cid, "Ratis group removed. Group id: " + getGroupId());
+        }
+
       } catch (IOException e) {
         LOG.debug("Failed to quasi-close container {}", cid);
       }

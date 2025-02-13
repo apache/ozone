@@ -181,7 +181,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   private final StorageContainerManager scm;
 
   private OzoneProtocolMessageDispatcher<ScmContainerLocationRequest,
-      ScmContainerLocationResponse, ProtocolMessageEnum>
+      ScmContainerLocationResponse, ProtocolMessageEnum, String>
       dispatcher;
 
   /**
@@ -232,7 +232,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     }
     ScmContainerLocationResponse response = dispatcher
         .processRequest(request, this::processRequest, request.getCmdType(),
-            request.getTraceID());
+            request.getTraceID(), "");
     if (checkResponseForECRepConfig) {
       try {
         switch (response.getCmdType()) {
