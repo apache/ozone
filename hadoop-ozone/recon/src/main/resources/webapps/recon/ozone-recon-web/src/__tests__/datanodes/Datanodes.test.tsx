@@ -28,9 +28,9 @@ import { vi } from 'vitest';
 
 import Datanodes from '@/v2/pages/datanodes/datanodes';
 import * as commonUtils from '@/utils/common';
-import { datanodeServer } from '@/__tests__/mocks/datanodeMocks/datanodeServer';
-import { datanodeLocators, searchInputLocator } from '@/__tests__/locators/locators';
-import { waitForDNTable } from '@/__tests__/utils/datanodes.utils';
+import { datanodeServer } from '@tests/mocks/datanodeMocks/datanodeServer';
+import { datanodeLocators, searchInputLocator } from '@tests//locators/locators';
+import { waitForDNTable } from '@tests/utils/datanodes.utils';
 
 // Mock utility functions
 vi.spyOn(commonUtils, 'showDataFetchError');
