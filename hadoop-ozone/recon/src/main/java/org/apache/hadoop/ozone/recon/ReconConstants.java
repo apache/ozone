@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.recon;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 /**
  * Recon Server constants file.
  */
@@ -90,4 +92,15 @@ public final class ReconConstants {
       (double) MAX_CONTAINER_SIZE_UPPER_BOUND /
           MIN_CONTAINER_SIZE_UPPER_BOUND) /
       Math.log(2)) + 1;
+
+  // For file-size count reprocessing: ensure only one task truncates the table.
+  public static final AtomicBoolean TABLE_TRUNCATED = new AtomicBoolean(false);
+
+  /**
+   * Resets the table-truncated flag. This should be called once per reprocess cycle,
+   * for example by the OM task controller, before the tasks run.
+   */
+  public static void resetTableTruncatedFlag() {
+    TABLE_TRUNCATED.set(false);
+  }
 }

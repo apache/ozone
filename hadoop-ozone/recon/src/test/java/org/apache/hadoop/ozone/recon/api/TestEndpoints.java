@@ -87,7 +87,7 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
-import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
+import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTaskFSO;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.ozone.test.LambdaTestUtils;
@@ -169,7 +169,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private VolumeEndpoint volumeEndpoint;
   private BucketEndpoint bucketEndpoint;
   private ReconOMMetadataManager reconOMMetadataManager;
-  private FileSizeCountTask fileSizeCountTask;
+  private FileSizeCountTaskFSO fileSizeCountTask;
   private ContainerSizeCountTask containerSizeCountTask;
   private OmTableInsightTask omTableInsightTask;
   private ReconStorageContainerManagerFacade reconScm;
@@ -312,9 +312,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         fileCountBySizeDao,
         containerCountBySizeDao,
         utilizationSchemaDefinition);
-    ExecutorService executor = Executors.newFixedThreadPool(2);
     fileSizeCountTask =
-        new FileSizeCountTask(fileCountBySizeDao, utilizationSchemaDefinition, executor);
+        new FileSizeCountTaskFSO(fileCountBySizeDao, utilizationSchemaDefinition);
     omTableInsightTask =
         new OmTableInsightTask(globalStatsDao, sqlConfiguration,
             reconOMMetadataManager);

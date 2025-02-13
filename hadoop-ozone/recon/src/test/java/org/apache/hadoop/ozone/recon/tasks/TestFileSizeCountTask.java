@@ -59,7 +59,7 @@ import static org.mockito.Mockito.when;
 public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
 
   private FileCountBySizeDao fileCountBySizeDao;
-  private FileSizeCountTask fileSizeCountTask;
+  private FileSizeCountTaskFSO fileSizeCountTask;
   private DSLContext dslContext;
 
   public TestFileSizeCountTask() {
@@ -71,8 +71,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     fileCountBySizeDao = getDao(FileCountBySizeDao.class);
     UtilizationSchemaDefinition utilizationSchemaDefinition =
         getSchemaDefinition(UtilizationSchemaDefinition.class);
-    ExecutorService executor = Executors.newFixedThreadPool(2);
-    fileSizeCountTask = new FileSizeCountTask(fileCountBySizeDao, utilizationSchemaDefinition, executor);
+    fileSizeCountTask = new FileSizeCountTaskFSO(fileCountBySizeDao, utilizationSchemaDefinition);
     dslContext = utilizationSchemaDefinition.getDSLContext();
     // Truncate table before running each test
     dslContext.truncate(FILE_COUNT_BY_SIZE);

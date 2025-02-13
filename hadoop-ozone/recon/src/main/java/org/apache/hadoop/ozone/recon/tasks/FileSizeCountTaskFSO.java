@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
@@ -42,12 +43,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Arrays;
-
-import java.util.concurrent.Future;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
@@ -58,22 +53,19 @@ import static org.hadoop.ozone.recon.schema.tables.FileCountBySizeTable.FILE_COU
  * files binned into ranges (1KB, 2Kb..,4MB,.., 1TB,..1PB) to the Recon
  * fileSize DB.
  */
-public class FileSizeCountTask implements ReconOmTask {
+public class FileSizeCountTaskFSO implements ReconOmTask {
   private static final Logger LOG =
-      LoggerFactory.getLogger(FileSizeCountTask.class);
+      LoggerFactory.getLogger(FileSizeCountTaskFSO.class);
 
   private FileCountBySizeDao fileCountBySizeDao;
   private DSLContext dslContext;
-  private final ConcurrentHashMap<FileSizeCountKey, Long> sharedFileSizeCountMap = new ConcurrentHashMap<>();
-  private final ExecutorService executorService;
 
   @Inject
-  public FileSizeCountTask(FileCountBySizeDao fileCountBySizeDao,
-                           UtilizationSchemaDefinition utilizationSchemaDefinition,
-                           ExecutorService executorService) {
+  public FileSizeCountTaskFSO(FileCountBySizeDao fileCountBySizeDao,
+                              UtilizationSchemaDefinition
+                                  utilizationSchemaDefinition) {
     this.fileCountBySizeDao = fileCountBySizeDao;
     this.dslContext = utilizationSchemaDefinition.getDSLContext();
-    this.executorService = executorService;
   }
 
   /**
@@ -85,98 +77,64 @@ public class FileSizeCountTask implements ReconOmTask {
    */
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
-    LOG.info("Starting reprocess of FileSizeCountTask...");
-    long startTime = System.currentTimeMillis();
+    Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
+    long startTime = System.currentTimeMillis(); // Start time for execution
 
-    // Truncate table first
-    int execute = dslContext.delete(FILE_COUNT_BY_SIZE).execute();
-    LOG.debug("Cleared {} existing records from {}", execute, FILE_COUNT_BY_SIZE);
-
-    List<Future<Boolean>> futures = Arrays.asList(
-        submitReprocessTask("FSO", BucketLayout.FILE_SYSTEM_OPTIMIZED, omMetadataManager),
-        submitReprocessTask("LEGACY", BucketLayout.LEGACY, omMetadataManager)
-    );
-
-    boolean allSuccess = true;
-    try {
-      for (Future<Boolean> future : futures) {
-        if (!future.get()) {
-          allSuccess = false;
-        }
-      }
-    } catch (InterruptedException | ExecutionException e) {
-      LOG.error("Parallel processing failed: ", e);
-      allSuccess = false;
-      Thread.currentThread().interrupt();
+    // Use the shared atomic flag to ensure only one task truncates the table.
+    if (ReconConstants.TABLE_TRUNCATED.compareAndSet(false, true)) {
+      int execute = dslContext.delete(FILE_COUNT_BY_SIZE).execute();
+      LOG.info("Deleted {} records from {}", execute, FILE_COUNT_BY_SIZE);
+    } else {
+      LOG.info("Table already truncated by another task; skipping deletion.");
     }
 
-    // Write any remaining entries to the database
-    if (!sharedFileSizeCountMap.isEmpty()) {
-      writeCountsToDB(sharedFileSizeCountMap);
-      sharedFileSizeCountMap.clear();
+    // Process only the FILE_SYSTEM_OPTIMIZED bucket layout using the FILE_TABLE.
+    boolean status = reprocessBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED, omMetadataManager, fileSizeCountMap);
+    if (!status) {
+      return new ImmutablePair<>(getTaskName(), false);
     }
-
-    LOG.info("Reprocess completed. Success: {}. Time taken: {} ms",
-        allSuccess, (System.currentTimeMillis() - startTime));
-    return new ImmutablePair<>(getTaskName(), allSuccess);
+    writeCountsToDB(fileSizeCountMap);
+    long endTime = System.currentTimeMillis(); // End time for execution
+    LOG.info("FileSizeCountFSOTask completed Reprocess in {} ms.", (endTime - startTime));
+    return new ImmutablePair<>(getTaskName(), true);
   }
 
-  /**
-   * Submits a reprocess task with proper thread naming.
-   */
-  private Future<Boolean> submitReprocessTask(String bucketType, BucketLayout layout,
-                                              OMMetadataManager omMetadataManager) {
-    return executorService.submit(() -> {
-      Thread currentThread = Thread.currentThread();
-      String originalName = currentThread.getName();
-      try {
-        currentThread.setName("FileSizeCountTask-" + bucketType + "-" + originalName);
-        return reprocessBucketLayout(layout, omMetadataManager);
-      } finally {
-        currentThread.setName(originalName); // Restore original name after execution
-      }
-    });
-  }
+  private boolean reprocessBucketLayout(BucketLayout bucketLayout,
+                                        OMMetadataManager omMetadataManager,
+                                        Map<FileSizeCountKey, Long> fileSizeCountMap) {
+    Table<String, OmKeyInfo> omKeyInfoTable =
+        omMetadataManager.getKeyTable(bucketLayout);
+    int totalKeysProcessed = 0;
 
-  private Boolean reprocessBucketLayout(BucketLayout bucketLayout,
-                                      OMMetadataManager omMetadataManager) {
-    long keysProcessed = 0;
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+             keyIter = omKeyInfoTable.iterator()) {
+      while (keyIter.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
+        handlePutKeyEvent(kv.getValue(), fileSizeCountMap);
+        totalKeysProcessed++; // Increment key count
 
-    try {
-      Table<String, OmKeyInfo> omKeyInfoTable =
-          omMetadataManager.getKeyTable(bucketLayout);
-      try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-               keyIter = omKeyInfoTable.iterator()) {
-        while (keyIter.hasNext()) {
-          Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
-          FileSizeCountKey key = getFileSizeCountKey(kv.getValue());
-
-          // Atomically update the count in the shared map
-          sharedFileSizeCountMap.merge(key, 1L, Long::sum);
-          keysProcessed++;
-
-          // Periodically write to the database to avoid memory overflow
-          if (sharedFileSizeCountMap.size() >= 100_000) {
-            writeCountsToDB(sharedFileSizeCountMap);
-            sharedFileSizeCountMap.clear();
-          }
+        //  The time complexity of .size() method is constant time, O(1)
+        if (fileSizeCountMap.size() >= 100000) {
+          writeCountsToDB(fileSizeCountMap);
+          fileSizeCountMap.clear();
         }
       }
     } catch (IOException ioEx) {
-      LOG.error("Failed to process {} layout: ", bucketLayout, ioEx);
+      LOG.error("Unable to populate File Size Count for " + bucketLayout +
+          " in Recon DB. ", ioEx);
       return false;
     }
+    LOG.info("Reprocessed {} keys for {} bucket layout.", totalKeysProcessed, bucketLayout);
     return true;
   }
 
   @Override
   public String getTaskName() {
-    return "FileSizeCountTask";
+    return "FileSizeCountTaskFSO";
   }
 
   public Collection<String> getTaskTables() {
     List<String> taskTables = new ArrayList<>();
-    taskTables.add(KEY_TABLE);
     taskTables.add(FILE_TABLE);
     return taskTables;
   }
@@ -243,9 +201,7 @@ public class FileSizeCountTask implements ReconOmTask {
             value.getClass().getName(), updatedKey);
       }
     }
-    if (!fileSizeCountMap.isEmpty()) {
-      writeCountsToDB(fileSizeCountMap);
-    }
+    writeCountsToDB(fileSizeCountMap);
     LOG.debug("{} successfully processed in {} milliseconds",
         getTaskName(), (System.currentTimeMillis() - startTime));
     return new ImmutablePair<>(getTaskName(), true);
@@ -261,39 +217,38 @@ public class FileSizeCountTask implements ReconOmTask {
     List<FileCountBySize> insertToDb = new ArrayList<>();
     List<FileCountBySize> updateInDb = new ArrayList<>();
     boolean isDbTruncated = isFileCountBySizeTableEmpty(); // Check if table is empty
-    fileSizeCountMap.forEach((key, count) -> {
+
+    fileSizeCountMap.keySet().forEach((FileSizeCountKey key) -> {
       FileCountBySize newRecord = new FileCountBySize();
       newRecord.setVolume(key.volume);
       newRecord.setBucket(key.bucket);
       newRecord.setFileSize(key.fileSizeUpperBound);
-      newRecord.setCount(count);
-
+      newRecord.setCount(fileSizeCountMap.get(key));
       if (!isDbTruncated) {
-        // Get the current count from the database and update
+        // Get the current count from database and update
         Record3<String, String, Long> recordToFind =
             dslContext.newRecord(
-                FILE_COUNT_BY_SIZE.VOLUME,
-                FILE_COUNT_BY_SIZE.BUCKET,
-                FILE_COUNT_BY_SIZE.FILE_SIZE)
+                    FILE_COUNT_BY_SIZE.VOLUME,
+                    FILE_COUNT_BY_SIZE.BUCKET,
+                    FILE_COUNT_BY_SIZE.FILE_SIZE)
                 .value1(key.volume)
                 .value2(key.bucket)
                 .value3(key.fileSizeUpperBound);
         FileCountBySize fileCountRecord =
             fileCountBySizeDao.findById(recordToFind);
         if (fileCountRecord == null && newRecord.getCount() > 0L) {
-          // Insert new row only for non-zero counts.
+          // insert new row only for non-zero counts.
           insertToDb.add(newRecord);
         } else if (fileCountRecord != null) {
-          newRecord.setCount(fileCountRecord.getCount() + count);
+          newRecord.setCount(fileCountRecord.getCount() +
+              fileSizeCountMap.get(key));
           updateInDb.add(newRecord);
         }
       } else if (newRecord.getCount() > 0) {
-        // Insert new row only for non-zero counts.
+        // insert new row only for non-zero counts.
         insertToDb.add(newRecord);
       }
     });
-
-    // Perform batch inserts and updates
     fileCountBySizeDao.insert(insertToDb);
     fileCountBySizeDao.update(updateInDb);
   }
@@ -301,7 +256,7 @@ public class FileSizeCountTask implements ReconOmTask {
   private FileSizeCountKey getFileSizeCountKey(OmKeyInfo omKeyInfo) {
     return new FileSizeCountKey(omKeyInfo.getVolumeName(),
         omKeyInfo.getBucketName(),
-            ReconUtils.getFileSizeUpperBound(omKeyInfo.getDataSize()));
+        ReconUtils.getFileSizeUpperBound(omKeyInfo.getDataSize()));
   }
 
   /**
@@ -351,16 +306,6 @@ public class FileSizeCountTask implements ReconOmTask {
    */
   private boolean isFileCountBySizeTableEmpty() {
     return dslContext.fetchCount(FILE_COUNT_BY_SIZE) == 0;
-  }
-
-  private static class BucketLayoutProcessResult {
-    private final boolean success;
-    private final long keysProcessed;
-
-    BucketLayoutProcessResult(boolean success, long keysProcessed) {
-      this.success = success;
-      this.keysProcessed = keysProcessed;
-    }
   }
 
   private static class FileSizeCountKey {

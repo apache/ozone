@@ -49,7 +49,8 @@ import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
-import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
+import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTaskFSO;
+import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTaskOBS;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
@@ -132,7 +133,8 @@ public class ReconControllerModule extends AbstractModule {
       Multibinder<ReconOmTask> taskBinder =
           Multibinder.newSetBinder(binder(), ReconOmTask.class);
       taskBinder.addBinding().to(ContainerKeyMapperTask.class);
-      taskBinder.addBinding().to(FileSizeCountTask.class);
+      taskBinder.addBinding().to(FileSizeCountTaskFSO.class);
+      taskBinder.addBinding().to(FileSizeCountTaskOBS.class);
       taskBinder.addBinding().to(OmTableInsightTask.class);
       taskBinder.addBinding().to(NSSummaryTask.class);
     }
