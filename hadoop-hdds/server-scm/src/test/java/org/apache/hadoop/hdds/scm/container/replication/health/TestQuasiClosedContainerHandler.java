@@ -256,8 +256,7 @@ public class TestQuasiClosedContainerHandler {
 
     assertFalse(quasiClosedContainerHandler.handle(request));
     assertFalse(quasiClosedContainerHandler.handle(readRequest));
-    // verify close command was sent for replicas with sequence ID 1001, that
-    // is dnTwo and dnThree
+    // verify no close commands are sent as the container cannot be closed.
     verify(replicationManager, times(0))
         .sendCloseContainerReplicaCommand(eq(containerInfo), any(), anyBoolean());
   }
