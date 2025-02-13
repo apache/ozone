@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -427,15 +428,14 @@ public class OMKeyCreateRequest extends OMKeyRequest {
   )
   public static OMRequest blockCreateKeyWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
-    if (req.getCreateKeyRequest().hasKeyArgs()) {
-      KeyArgs keyArgs = req.getCreateKeyRequest().getKeyArgs();
+    final KeyArgs keyArgs = req.getCreateKeyRequest().getKeyArgs();
 
-      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
-        BucketLayout bucketLayout = ctx.getBucketLayout(
-            keyArgs.getVolumeName(), keyArgs.getBucketName());
-        bucketLayout.validateSupportedOperation();
-      }
-    }
+    OMClientRequestUtils.validateVolumeName(keyArgs.getVolumeName());
+    OMClientRequestUtils.validateBucketName(keyArgs.getBucketName());
+
+    final BucketLayout bucketLayout = ctx.getBucketLayout(
+        keyArgs.getVolumeName(), keyArgs.getBucketName());
+    bucketLayout.validateSupportedOperation();
     return req;
   }
 

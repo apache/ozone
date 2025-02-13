@@ -58,10 +58,12 @@ public class OMVolumeRemoveAclRequest extends OMVolumeAclRequest {
         = getOmRequest().getRemoveAclRequest().toBuilder()
             .setModificationTime(modificationTime);
 
-    return getOmRequest().toBuilder()
+    OMRequest omRequest = getOmRequest().toBuilder()
         .setRemoveAclRequest(removeAclRequestBuilder)
         .setUserInfo(getUserInfo())
         .build();
+    setOmRequest(omRequest);
+    return super.preExecute(ozoneManager);
   }
 
   private final List<OzoneAcl> ozoneAcls;
