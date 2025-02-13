@@ -187,26 +187,27 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
    */
   public static void downloadFileWithProgress(InputStream inputStream, File targetFile)
           throws IOException {
-    FileOutputStream outputStream = new FileOutputStream(targetFile);
-    byte[] buffer = new byte[8 * 1024];
-    long totalBytesRead = 0;
-    int bytesRead;
-    long lastLoggedTime = System.currentTimeMillis();
+    try (FileOutputStream outputStream = new FileOutputStream(targetFile)) {
+      byte[] buffer = new byte[8 * 1024];
+      long totalBytesRead = 0;
+      int bytesRead;
+      long lastLoggedTime = System.currentTimeMillis();
 
-    while ((bytesRead = inputStream.read(buffer)) != -1) {
-      outputStream.write(buffer, 0, bytesRead);
-      totalBytesRead += bytesRead;
+      while ((bytesRead = inputStream.read(buffer)) != -1) {
+        outputStream.write(buffer, 0, bytesRead);
+        totalBytesRead += bytesRead;
 
-      // Log progress every 30 seconds
-      if (System.currentTimeMillis() - lastLoggedTime >= 30000) {
-        LOG.info("Downloading '{}': {} KB downloaded so far...",
-                targetFile.getName(), totalBytesRead / (1024));
-        lastLoggedTime = System.currentTimeMillis();
+        // Log progress every 30 seconds
+        if (System.currentTimeMillis() - lastLoggedTime >= 30000) {
+          LOG.info("Downloading '{}': {} KB downloaded so far...",
+                  targetFile.getName(), totalBytesRead / (1024));
+          lastLoggedTime = System.currentTimeMillis();
+        }
       }
-    }
 
-    LOG.info("Download completed for '{}'. Total size: {} KB",
-            targetFile.getName(), totalBytesRead / (1024));
+      LOG.info("Download completed for '{}'. Total size: {} KB",
+              targetFile.getName(), totalBytesRead / (1024));
+    }
   }
 
   /**
