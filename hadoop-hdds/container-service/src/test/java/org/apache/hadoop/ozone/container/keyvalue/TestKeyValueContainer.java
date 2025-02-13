@@ -31,11 +31,13 @@ import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.FaultInjectorImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
+import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
@@ -50,9 +52,13 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
+import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
 import org.apache.hadoop.util.DiskChecker;
 
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -334,6 +340,145 @@ public class TestKeyValueContainer {
     assertEquals(numberOfKeysToWrite, keyValueContainerData.getBlockCount());
   }
 
+  /**
+   * Schema V3 container import failure due to sst metadata file load failure.
+   */
+  @Test
+  public void testSchemaV3ContainerImportMetaLoadFailureCleanup() throws Exception {
+    init(new ContainerTestVersionInfo(OzoneConsts.SCHEMA_V3, ContainerLayoutVersion.DEFAULT_LAYOUT));
+    long containerId = keyValueContainer.getContainerData().getContainerID();
+    createContainer();
+    long numberOfKeysToWrite = 12;
+    closeContainer();
+    populate(numberOfKeysToWrite);
+
+    //destination path
+    File folderToExport = Files.createFile(
+        folder.toPath().resolve("export-" + System.nanoTime() + ".tar")).toFile();
+    CopyContainerCompression compr = CopyContainerCompression.NO_COMPRESSION;
+    TarContainerPacker packer = new TarContainerPacker(compr);
+
+    //export the container
+    try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
+      keyValueContainer
+          .exportContainerData(fos, packer);
+    }
+
+    //delete the original one
+    KeyValueContainerUtil.removeContainer(
+        keyValueContainer.getContainerData(), CONF);
+    keyValueContainer.delete();
+
+    //create a new one
+    KeyValueContainerData containerData =
+        new KeyValueContainerData(containerId,
+            keyValueContainerData.getLayoutVersion(),
+            keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
+            datanodeId.toString());
+    containerData.setSchemaVersion(keyValueContainerData.getSchemaVersion());
+    KeyValueContainer container = new KeyValueContainer(containerData, CONF);
+
+    HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
+        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
+    container.populatePathFields(scmId, containerVolume);
+
+    FaultInjectorImpl injector = new FaultInjectorImpl();
+    DatanodeStoreSchemaThreeImpl.setInjector(injector);
+    IOException ioe = new IOException("KV operation failure");
+    injector.setException(ioe);
+    injector.setTag("loadKVContainerData");
+
+    Logger.getLogger(KeyValueContainer.class).setLevel(Level.DEBUG);
+    assertThrows(IOException.class, () -> {
+      try (FileInputStream fis = new FileInputStream(folderToExport)) {
+        container.importContainerData(fis, packer);
+      } finally {
+        // directory under containerDir should be cleaned up
+        File directory = new File(containerData.getContainerPath());
+        assertFalse(directory.exists());
+        // RocksDB should not have this container's metadata
+        try (DBHandle db = BlockUtils.getDB(containerData, CONF)) {
+          try (BlockIterator<BlockData> iterator = db.getStore().getBlockIterator(containerId)) {
+            assertFalse(iterator.hasNext());
+          }
+        }
+        // directory under containerDir should be cleaned up
+        Path tmpDir = ContainerImporter.getUntarDirectory(containerVolume).resolve(String.valueOf(containerId));
+        assertFalse(tmpDir.toFile().exists());
+      }
+    });
+    DatanodeStoreSchemaThreeImpl.setInjector(null);
+  }
+
+  /**
+   * Schema V3 container import failure due to human made failure.
+   */
+  @Test
+  public void testSchemaV3ContainerImportFailureCleanup() throws Exception {
+    init(new ContainerTestVersionInfo(OzoneConsts.SCHEMA_V3, ContainerLayoutVersion.DEFAULT_LAYOUT));
+    long containerId = keyValueContainer.getContainerData().getContainerID();
+    createContainer();
+    long numberOfKeysToWrite = 12;
+    closeContainer();
+    populate(numberOfKeysToWrite);
+
+    //destination path
+    File folderToExport = Files.createFile(
+        folder.toPath().resolve("export-" + System.nanoTime() + ".tar")).toFile();
+    CopyContainerCompression compr = CopyContainerCompression.NO_COMPRESSION;
+    TarContainerPacker packer = new TarContainerPacker(compr);
+
+    //export the container
+    try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
+      keyValueContainer
+          .exportContainerData(fos, packer);
+    }
+
+    //delete the original one
+    KeyValueContainerUtil.removeContainer(
+        keyValueContainer.getContainerData(), CONF);
+    keyValueContainer.delete();
+
+    //create a new one
+    KeyValueContainerData containerData =
+        new KeyValueContainerData(containerId,
+            keyValueContainerData.getLayoutVersion(),
+            keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
+            datanodeId.toString());
+    containerData.setSchemaVersion(keyValueContainerData.getSchemaVersion());
+    KeyValueContainer container = new KeyValueContainer(containerData, CONF);
+
+    HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
+        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
+    container.populatePathFields(scmId, containerVolume);
+
+    FaultInjectorImpl injector = new FaultInjectorImpl();
+    KeyValueContainer.setInjector(injector);
+    IOException ioe = new IOException("human made failure");
+    injector.setException(ioe);
+
+    Logger.getLogger(KeyValueContainer.class).setLevel(Level.DEBUG);
+    assertThrows(IOException.class, () -> {
+      try (FileInputStream fis = new FileInputStream(folderToExport)) {
+        container.importContainerData(fis, packer);
+      } finally {
+        // directory under containerDir should not exist
+        File directory = new File(containerData.getContainerPath());
+        assertFalse(directory.exists());
+        // RocksDB should not have this container's metadata
+        try (DBHandle db = BlockUtils.getDB(containerData, CONF)) {
+          try (BlockIterator<BlockData> iterator = db.getStore().getBlockIterator(containerId)) {
+            assertFalse(iterator.hasNext());
+          }
+        }
+        // directory under containerDir should be cleaned up
+        Path tmpDir = ContainerImporter.getUntarDirectory(containerVolume).resolve(String.valueOf(containerId));
+        assertFalse(tmpDir.toFile().exists());
+      }
+    });
+    KeyValueContainer.setInjector(null);
+  }
+
   @ContainerTestVersionInfo.ContainerTest
   public void testContainerImportExport(ContainerTestVersionInfo versionInfo)
       throws Exception {
@@ -394,7 +539,7 @@ public class TestKeyValueContainer {
 
       //Can't overwrite existing container
       KeyValueContainer finalContainer = container;
-      assertThrows(IOException.class, () -> {
+      assertThrows(StorageContainerException.class, () -> {
         try (FileInputStream fis = new FileInputStream(folderToExport)) {
           finalContainer.importContainerData(fis, packer);
         }

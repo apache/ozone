@@ -59,4 +59,13 @@ public abstract class FaultInjector {
   public ContainerProtos.Type getType() {
     return null;
   }
+
+  @VisibleForTesting
+  public void setTag(String tag) {
+  }
+
+  @VisibleForTesting
+  public String getTag() {
+    return null;
+  }
 }

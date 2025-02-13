@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.io.nativeio.NativeIO;
@@ -114,6 +115,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   private Set<Long> pendingPutBlockCache;
 
   private boolean bCheckChunksFilePath;
+  private static FaultInjector injector;
 
   public KeyValueContainer(KeyValueContainerData containerData,
       ConfigurationSource ozoneConfig) {
@@ -627,12 +629,16 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
           (KeyValueContainerData) ContainerDataYaml
               .readContainer(descriptorContent);
       importContainerData(originalContainerData);
+      if (getInjector() != null && getInjector().getException() != null) {
+        throw (IOException) getInjector().getException();
+      }
     } catch (Exception ex) {
       // clean data under tmp directory
       try {
         Path containerUntarDir = tmpDir.resolve(String.valueOf(containerId));
         if (containerUntarDir.toFile().exists()) {
           FileUtils.deleteDirectory(containerUntarDir.toFile());
+          LOG.debug("Container directory {} is deleted", containerUntarDir);
         }
       } catch (Exception deleteex) {
         LOG.error(
@@ -649,17 +655,28 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
       // delete all other temporary data in case of any exception.
       try {
-        if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
-          BlockUtils.removeContainerFromDB(containerData, config);
+        File destDir = destContainerDir.toFile();
+        if (destDir.exists()) {
+          Path containerTempDir = tmpDir.resolve(String.valueOf(containerId) + System.nanoTime());
+          Files.move(destContainerDir, containerTempDir,
+              StandardCopyOption.ATOMIC_MOVE,
+              StandardCopyOption.REPLACE_EXISTING);
+          FileUtils.deleteDirectory(containerTempDir.toFile());
+          LOG.debug("Container directory {} is moved to {} and is deleted", destDir, containerTempDir);
         }
-        FileUtils.deleteDirectory(new File(containerData.getMetadataPath()));
-        FileUtils.deleteDirectory(new File(containerData.getChunksPath()));
-        FileUtils.deleteDirectory(
-            new File(getContainerData().getContainerPath()));
       } catch (Exception deleteex) {
         LOG.error(
-            "Can not cleanup destination directories after a container import"
-                + " error (cid: {}", containerId, deleteex);
+            "Can not cleanup container directory after a container import"
+                + " error (cid: {})", containerId, deleteex);
+      } finally {
+        if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
+          try {
+            BlockUtils.removeContainerFromDB(containerData, config);
+            LOG.debug("Container {} metadata is removed from DB", containerId);
+          } catch (IOException e) {
+            LOG.error("Can not remove container metadata from DB (cid: {})", containerId, e);
+          }
+        }
       }
       throw ex;
     } finally {
@@ -1015,5 +1032,15 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     } else {
       packer.pack(this, destination);
     }
+  }
+
+  @VisibleForTesting
+  public static FaultInjector getInjector() {
+    return injector;
+  }
+
+  @VisibleForTesting
+  public static void setInjector(FaultInjector instance) {
+    injector = instance;
   }
 }
