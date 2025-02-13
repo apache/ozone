@@ -108,7 +108,7 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
       boolean isDirectory = keyStatus.isDirectory();
       operationResult = true;
       apply(omKeyInfo);
-      omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+      omKeyInfo.setUpdateID(trxnLogIndex);
 
       // update cache.
       if (isDirectory) {

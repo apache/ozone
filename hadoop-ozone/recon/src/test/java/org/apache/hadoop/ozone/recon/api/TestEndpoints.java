@@ -786,7 +786,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
           (ClusterStateResponse) response1.getEntity();
       return (clusterStateResponse1.getContainers() == 1);
     });
-
+    omTableInsightTask.init();
     // check volume, bucket and key count after running table count task
     Pair<String, Boolean> result =
         omTableInsightTask.reprocess(reconOMMetadataManager);

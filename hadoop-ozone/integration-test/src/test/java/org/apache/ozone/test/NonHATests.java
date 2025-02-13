@@ -179,7 +179,39 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
+  class OzoneManagerListVolumes extends org.apache.hadoop.ozone.om.TestOzoneManagerListVolumes {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
   class OzoneManagerRestInterface extends org.apache.hadoop.ozone.om.TestOzoneManagerRestInterface {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class DatanodeReconfiguration extends org.apache.hadoop.ozone.reconfig.TestDatanodeReconfiguration {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class OmReconfiguration extends org.apache.hadoop.ozone.reconfig.TestOmReconfiguration {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class ScmReconfiguration extends org.apache.hadoop.ozone.reconfig.TestScmReconfiguration {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();

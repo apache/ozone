@@ -70,4 +70,16 @@ public class ClosePipelineCommand
   public PipelineID getPipelineID() {
     return pipelineID;
   }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append(getType())
+        .append(": cmdID: ").append(getId())
+        .append(", encodedToken: \"").append(getEncodedToken()).append("\"")
+        .append(", term: ").append(getTerm())
+        .append(", deadlineMsSinceEpoch: ").append(getDeadline())
+        .append(", pipelineID: ").append(getPipelineID());
+    return sb.toString();
+  }
 }

@@ -52,7 +52,6 @@ public class S3MultipartUploadCommitPartResponseWithFSO
    * @param omMultipartKeyInfo
    * @param oldPartKeyInfo
    * @param openPartKeyInfoToBeDeleted
-   * @param isRatisEnabled
    * @param omBucketInfo
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -60,11 +59,11 @@ public class S3MultipartUploadCommitPartResponseWithFSO
       @Nonnull OMResponse omResponse, String multipartKey, String openKey,
       @Nullable OmMultipartKeyInfo omMultipartKeyInfo,
       @Nullable OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo,
-      @Nullable OmKeyInfo openPartKeyInfoToBeDeleted, boolean isRatisEnabled,
+      @Nullable OmKeyInfo openPartKeyInfoToBeDeleted,
       @Nonnull OmBucketInfo omBucketInfo, @Nonnull BucketLayout bucketLayout) {
 
     super(omResponse, multipartKey, openKey, omMultipartKeyInfo,
-            oldPartKeyInfo, openPartKeyInfoToBeDeleted, isRatisEnabled,
+            oldPartKeyInfo, openPartKeyInfoToBeDeleted,
             omBucketInfo, bucketLayout);
   }
 }

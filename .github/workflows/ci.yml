@@ -37,7 +37,7 @@ env:
 
 jobs:
   build-info:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     env:
       GITHUB_CONTEXT: ${{ toJson(github) }}
     outputs:
@@ -137,7 +137,7 @@ jobs:
       matrix:
         java: [ 11, 17, 21 ]
         include:
-          - os: ubuntu-20.04
+          - os: ubuntu-24.04
           - java: 8
             os: macos-13
       fail-fast: false
@@ -246,6 +246,7 @@ jobs:
     uses: ./.github/workflows/check.yml
     secrets: inherit
     with:
+      java-version: 11 # Hadoop may not work with newer Java
       needs-ozone-binary-tarball: true
       ratis-args: ${{ inputs.ratis_args }}
       script: acceptance
@@ -299,7 +300,7 @@ jobs:
       fail-fast: false
 
   coverage:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     if: github.event_name == 'push'
     needs:

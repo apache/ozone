@@ -280,6 +280,30 @@ public class SCMDatanodeProtocolServer implements
     return cmd.getProtoBufMessage();
   }
 
+  private String constructCommandAuditMap(List<SCMCommandProto> cmds) {
+    StringBuilder auditMap = new StringBuilder();
+    auditMap.append("[");
+    for (SCMCommandProto cmd : cmds) {
+      if (cmd.getCommandType().equals(deleteBlocksCommand)) {
+        auditMap.append("commandType: ").append(cmd.getCommandType());
+        auditMap.append(" deleteTransactionsCount: ")
+            .append(cmd.getDeleteBlocksCommandProto().getDeletedBlocksTransactionsCount());
+        auditMap.append(" cmdID: ").append(cmd.getDeleteBlocksCommandProto().getCmdId());
+        auditMap.append(" encodedToken: \"").append(cmd.getEncodedToken()).append("\"");
+        auditMap.append(" deadlineMsSinceEpoch: ").append(cmd.getDeadlineMsSinceEpoch());
+      } else {
+        auditMap.append(cmd);
+      }
+      auditMap.append(", ");
+    }
+    int len = auditMap.length();
+    if (len > 2) {
+      auditMap.delete(len - 2, len);
+    }
+    auditMap.append("]");
+    return auditMap.toString();
+  }
+
   @Override
   public SCMHeartbeatResponseProto sendHeartbeat(
       SCMHeartbeatRequestProto heartbeat) throws IOException, TimeoutException {
@@ -291,7 +315,7 @@ public class SCMDatanodeProtocolServer implements
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("datanodeUUID", heartbeat.getDatanodeDetails().getUuid());
-    auditMap.put("command", flatten(cmdResponses.toString()));
+    auditMap.put("command", flatten(constructCommandAuditMap(cmdResponses)));
     term.ifPresent(t -> auditMap.put("term", String.valueOf(t)));
     try {
       SCMHeartbeatResponseProto.Builder builder =

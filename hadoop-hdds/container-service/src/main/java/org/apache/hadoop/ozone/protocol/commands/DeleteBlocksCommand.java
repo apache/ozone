@@ -68,4 +68,27 @@ public class DeleteBlocksCommand extends
         .setCmdId(getId())
         .addAllDeletedBlocksTransactions(blocksTobeDeleted).build();
   }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append(getType())
+        .append(": cmdID: ").append(getId())
+        .append(", encodedToken: \"").append(getEncodedToken()).append("\"")
+        .append(", term: ").append(getTerm())
+        .append(", deadlineMsSinceEpoch: ").append(getDeadline())
+        .append(", deletedBlocksTransaction: [");
+    for (DeletedBlocksTransaction txn : blocksTobeDeleted) {
+      sb.append("{ txnID: ").append(txn.getTxID())
+          .append(", containerID: ").append(txn.getContainerID())
+          .append(", deleteBlockCount: ").append(txn.getLocalIDCount())
+          .append(", count: ").append(txn.getCount())
+          .append("}, ");
+    }
+    if (!blocksTobeDeleted.isEmpty()) {
+      sb.delete(sb.length() - 2, sb.length());
+    }
+    sb.append("]");
+    return sb.toString();
+  }
 }

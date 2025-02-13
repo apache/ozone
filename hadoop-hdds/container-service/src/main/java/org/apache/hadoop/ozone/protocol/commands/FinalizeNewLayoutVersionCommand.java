@@ -77,4 +77,17 @@ public class FinalizeNewLayoutVersionCommand
         finalizeProto.getFinalizeNewLayoutVersion(),
         finalizeProto.getDataNodeLayoutVersion(), finalizeProto.getCmdId());
   }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append(getType())
+        .append(": cmdID: ").append(getId())
+        .append(", encodedToken: \"").append(getEncodedToken()).append("\"")
+        .append(", term: ").append(getTerm())
+        .append(", deadlineMsSinceEpoch: ").append(getDeadline())
+        .append(", finalizeUpgrade: ").append(finalizeUpgrade)
+        .append(", layoutInfo: ").append(layoutInfo);
+    return sb.toString();
+  }
 }

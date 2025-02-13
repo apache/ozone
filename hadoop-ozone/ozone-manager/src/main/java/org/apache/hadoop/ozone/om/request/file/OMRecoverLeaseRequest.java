@@ -238,7 +238,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
             KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD);
       }
       openKeyInfo.getMetadata().put(OzoneConsts.LEASE_RECOVERY, "true");
-      openKeyInfo.setUpdateID(transactionLogIndex, ozoneManager.isRatisEnabled());
+      openKeyInfo.setUpdateID(transactionLogIndex);
       openKeyInfo.setModificationTime(Time.now());
       // add to cache.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(

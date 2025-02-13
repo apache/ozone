@@ -44,6 +44,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NODE_ADDRESS_UPDATE_HANDLER_TRIGGERED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NEW_NODE_HANDLER_TRIGGERED;
@@ -132,6 +133,8 @@ public class BackgroundPipelineCreator implements SCMService {
         .setUncaughtExceptionHandler((Thread t, Throwable ex) -> {
           String message = "Terminate SCM, encounter uncaught exception"
               + " in " + threadName;
+          LOG.error("BackgroundPipelineCreator thread encountered an error. "
+                  + "Thread: {}", t.toString(), ex);
           scmContext.getScm().shutDown(message);
         })
         .build()
@@ -217,8 +220,16 @@ public class BackgroundPipelineCreator implements SCMService {
       if (factor == ReplicationFactor.ZERO) {
         continue; // Ignore it.
       }
-      final ReplicationConfig replicationConfig =
-          ReplicationConfig.fromProtoTypeAndFactor(type, factor);
+      final ReplicationConfig replicationConfig;
+      if (type != EC) {
+        replicationConfig =
+            ReplicationConfig.fromProtoTypeAndFactor(type, factor);
+      } else if (factor == ReplicationFactor.ONE) {
+        replicationConfig =
+            ReplicationConfig.fromProtoTypeAndFactor(RATIS, factor);
+      } else {
+        continue;
+      }
       if (skipCreation(replicationConfig, autoCreateFactorOne)) {
         // Skip this iteration for creating pipeline
         continue;
