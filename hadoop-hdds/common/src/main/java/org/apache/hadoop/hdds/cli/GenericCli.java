@@ -93,7 +93,7 @@ public abstract class GenericCli implements GenericParentCommand {
     if (error instanceof FileSystemException) {
       String errorMessage = handleFileSystemException((FileSystemException) error);
       cmd.getErr().println(errorMessage);
-    }else {
+    } else {
       //message could be null in case of NPE. This is unexpected so we can
       //print out the stack trace.
       if (verbose || Strings.isNullOrEmpty(error.getMessage())) {
