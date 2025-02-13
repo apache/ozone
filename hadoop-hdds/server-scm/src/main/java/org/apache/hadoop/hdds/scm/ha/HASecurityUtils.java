@@ -23,13 +23,15 @@ import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultCAServer;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.RootCAServer;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.SubCAServer;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultCAProfile;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.PKIProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.conf.RaftProperties;
@@ -49,6 +51,7 @@ import java.net.InetAddress;
 import java.security.cert.X509Certificate;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
@@ -80,22 +83,37 @@ public final class  HASecurityUtils {
     LOG.info("Initializing secure StorageContainerManager.");
 
     SecurityConfig securityConfig = new SecurityConfig(conf);
-    SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
-        getScmSecurityClientWithFixedDuration(conf);
-    try (CertificateClient certClient =
-        new SCMCertificateClient(securityConfig, scmSecurityClient,
-            scmStorageConfig.getScmId(), scmStorageConfig.getClusterID(),
-            scmStorageConfig.getScmCertSerialId(), scmHostname, primaryscm,
-            certIDString -> {
-              try {
-                scmStorageConfig.setScmCertSerialId(certIDString);
-              } catch (IOException e) {
-                LOG.error("Failed to set new certificate ID", e);
-                throw new RuntimeException("Failed to set new certificate ID");
-              }
-            })) {
-      certClient.initWithRecovery();
+    String subject = SCM_ROOT_CA_PREFIX +
+        InetAddress.getLocalHost().getHostName();
+    Consumer<String> saveCertIdCallBack = getStorageConfigCallback(scmStorageConfig);
+    if (primaryscm) {
+      RootCAServer rootCAServer = new RootCAServer(subject,
+          scmStorageConfig.getClusterID(),
+          scmStorageConfig.getScmId(), null, new DefaultCAProfile(), BigInteger.ONE, saveCertIdCallBack);
+
+      rootCAServer.init(securityConfig);
+      SubCAServer subCAServer = new SubCAServer(subject, scmStorageConfig.getClusterID(), scmStorageConfig.getScmId(),
+          null, new DefaultProfile(), saveCertIdCallBack, scmHostname, rootCAServer);
+      subCAServer.init(securityConfig);
+    } else {
+      SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
+          getScmSecurityClientWithFixedDuration(conf);
+      SubCAServer subCAServer = new SubCAServer(subject, scmStorageConfig.getClusterID(), scmStorageConfig.getScmId(),
+          null, new DefaultProfile(), saveCertIdCallBack, scmHostname, scmSecurityClient);
+      subCAServer.init(securityConfig);
     }
+  }
+
+  private static Consumer<String> getStorageConfigCallback(SCMStorageConfig scmStorageConfig) {
+    Consumer<String> saveCertIdCallBack = certIDString -> {
+      try {
+        scmStorageConfig.setScmCertSerialId(certIDString);
+      } catch (IOException e) {
+        LOG.error("Failed to set new certificate ID", e);
+        throw new RuntimeException("Failed to set new certificate ID");
+      }
+    };
+    return saveCertIdCallBack;
   }
 
   /**
@@ -116,12 +134,12 @@ public final class  HASecurityUtils {
     String subject = SCM_ROOT_CA_PREFIX +
         InetAddress.getLocalHost().getHostName();
 
-    DefaultCAServer rootCAServer = new DefaultCAServer(subject,
+    DefaultCAServer rootCAServer = new RootCAServer(subject,
         scmStorageConfig.getClusterID(),
-        scmStorageConfig.getScmId(), scmCertStore, rootCertId, pkiProfile,
-        component);
+        scmStorageConfig.getScmId(), scmCertStore, pkiProfile, component,
+        rootCertId, null);
 
-    rootCAServer.init(config, CAType.ROOT);
+    rootCAServer.init(config);
 
     return rootCAServer;
   }
