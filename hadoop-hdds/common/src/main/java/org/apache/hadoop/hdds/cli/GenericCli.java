@@ -133,26 +133,23 @@ public abstract class GenericCli implements GenericParentCommand {
     return cmd.getErr();
   }
 
-  private String handleFileSystemException(FileSystemException e) {
-    String errorMessage = e.getClass().getSimpleName() + ": ";
+  private static String handleFileSystemException(FileSystemException e) {
+    String errorMessage = e.getMessage();
 
     // If reason is set, return the exception's message as it is.
-    if (e.getReason() != null) {
-      return errorMessage + e.getMessage();
-    }
-
     // Otherwise, construct a custom message based on the type of exception
-    if (e instanceof NoSuchFileException) {
-      errorMessage += "File not found ";
-    } else if (e instanceof AccessDeniedException) {
-      errorMessage += "Access denied to file ";
-    } else if (e instanceof FileAlreadyExistsException) {
-      errorMessage += "File already exists ";
-    } else {
-      errorMessage += "Error with file ";
+    if (e.getReason() == null) {
+      if (e instanceof NoSuchFileException) {
+        errorMessage = "File not found: " + errorMessage;
+      } else if (e instanceof AccessDeniedException) {
+        errorMessage = "Access denied: " + errorMessage;
+      } else if (e instanceof FileAlreadyExistsException) {
+        errorMessage = "File already exists: " + errorMessage;
+      } else {
+        errorMessage = e.getClass().getSimpleName() + ": " + errorMessage;
+      }
     }
 
-    errorMessage += e.getMessage();
-    return errorMessage;
+    return "Error: " + errorMessage;
   }
 }
