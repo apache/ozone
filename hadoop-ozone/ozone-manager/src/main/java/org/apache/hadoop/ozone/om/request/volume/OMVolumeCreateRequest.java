@@ -131,8 +131,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
       // ID will be set to transactionID each time we update the object.
       omVolumeArgs.setObjectID(
           ozoneManager.getObjectIdFromTxId(transactionLogIndex));
-      omVolumeArgs.setUpdateID(transactionLogIndex,
-          ozoneManager.isRatisEnabled());
+      omVolumeArgs.setUpdateID(transactionLogIndex);
 
 
       auditMap = omVolumeArgs.toAuditMap();

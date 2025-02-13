@@ -114,7 +114,6 @@ public class TestS3MultipartRequest {
     OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
     when(lvm.getMetadataLayoutVersion()).thenReturn(0);
     when(ozoneManager.getVersionManager()).thenReturn(lvm);
-    when(ozoneManager.isRatisEnabled()).thenReturn(true);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
   }
 

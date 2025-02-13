@@ -56,7 +56,7 @@ public class S3MultipartUploadAbortRequestWithFSO
     OMClientResponse omClientResp = new S3MultipartUploadAbortResponseWithFSO(
         omResponse.setAbortMultiPartUploadResponse(
             MultipartUploadAbortResponse.newBuilder()).build(), multipartKey,
-        multipartOpenKey, multipartKeyInfo, ozoneManager.isRatisEnabled(),
+        multipartOpenKey, multipartKeyInfo,
         omBucketInfo.copyObject(), getBucketLayout());
     return omClientResp;
   }

@@ -4239,14 +4239,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Return if Ratis is enabled or not.
-   */
-  // TODO remove in HDDS-12161
-  public boolean isRatisEnabled() {
-    return true;
-  }
-
-  /**
    * @return true if Ozone filesystem snapshot is enabled, false otherwise.
    */
   public boolean isFilesystemSnapshotEnabled() {

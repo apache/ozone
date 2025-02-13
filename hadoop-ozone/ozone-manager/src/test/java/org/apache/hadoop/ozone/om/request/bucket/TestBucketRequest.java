@@ -71,7 +71,6 @@ public class TestBucketRequest {
         ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
-    when(ozoneManager.isRatisEnabled()).thenReturn(true);
     when(ozoneManager.getOMDefaultBucketLayout()).thenReturn(
         BucketLayout.fromString(
             OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT));
