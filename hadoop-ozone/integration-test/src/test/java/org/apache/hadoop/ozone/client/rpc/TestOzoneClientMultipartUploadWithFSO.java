@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.client.rpc;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.stream.Collectors;
 
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -81,6 +83,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 
@@ -96,6 +99,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This test verifies all the S3 multipart client apis - prefix layout.
@@ -113,6 +119,8 @@ public class TestOzoneClientMultipartUploadWithFSO {
   private String keyName;
   private OzoneVolume volume;
   private OzoneBucket bucket;
+
+  private static final Logger LOG = LoggerFactory.getLogger(TestOzoneClientMultipartUploadWithFSO.class);
 
   /**
    * Create a MiniOzoneCluster for testing.
@@ -846,7 +854,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     uploadPart(bucket, key2, uploadID2, 1, "data".getBytes(UTF_8));
     uploadPart(bucket, key3, uploadID3, 1, "data".getBytes(UTF_8));
 
-    OzoneMultipartUploadList listMPUs = bucket.listMultipartUploads("dir1");
+    OzoneMultipartUploadList listMPUs = bucket.listMultipartUploads("dir1", "", "", 1000);
     assertEquals(3, listMPUs.getUploads().size());
     List<String> expectedList = new ArrayList<>(keys);
     for (OzoneMultipartUpload mpu : listMPUs.getUploads()) {
@@ -854,7 +862,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     }
     assertEquals(0, expectedList.size());
 
-    listMPUs = bucket.listMultipartUploads("dir1/dir2");
+    listMPUs = bucket.listMultipartUploads("dir1/dir2", "", "", 1000);
     assertEquals(2, listMPUs.getUploads().size());
     expectedList = new ArrayList<>();
     expectedList.add(key2);
@@ -864,7 +872,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     }
     assertEquals(0, expectedList.size());
 
-    listMPUs = bucket.listMultipartUploads("dir1/dir2/dir3");
+    listMPUs = bucket.listMultipartUploads("dir1/dir2/dir3", "", "", 1000);
     assertEquals(1, listMPUs.getUploads().size());
     expectedList = new ArrayList<>();
     expectedList.add(key3);
@@ -874,7 +882,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     assertEquals(0, expectedList.size());
 
     // partial key
-    listMPUs = bucket.listMultipartUploads("d");
+    listMPUs = bucket.listMultipartUploads("d", "", "", 1000);
     assertEquals(3, listMPUs.getUploads().size());
     expectedList = new ArrayList<>(keys);
     for (OzoneMultipartUpload mpu : listMPUs.getUploads()) {
@@ -883,13 +891,77 @@ public class TestOzoneClientMultipartUploadWithFSO {
     assertEquals(0, expectedList.size());
 
     // partial key
-    listMPUs = bucket.listMultipartUploads("");
+    listMPUs = bucket.listMultipartUploads("", "", "", 1000);
     assertEquals(3, listMPUs.getUploads().size());
     expectedList = new ArrayList<>(keys);
     for (OzoneMultipartUpload mpu : listMPUs.getUploads()) {
       expectedList.remove(mpu.getKeyName());
     }
     assertEquals(0, expectedList.size());
+  }
+
+  @Test
+  public void testListMultipartUploadsPagination() throws Exception {
+    int numOfKeys = 25;
+    List<String> keys = new ArrayList<>();
+    Map<String, String> keyToUploadId = new HashMap<>();
+
+    // Generate keys
+    for (int i = 0; i < numOfKeys; i++) {
+      StringBuilder key = new StringBuilder();
+      int depth = 1 + i % 3; // Creates varying depth (1-3 levels)
+      for (int j = 0; j < depth; j++) {
+        key.append("dir").append(j + 1).append("/");
+      }
+      key.append("file").append(i);
+      keys.add(key.toString());
+    }
+
+    for (String key : keys) {
+      String uploadId = initiateMultipartUploadWithAsserts(bucket, key, RATIS, ONE);
+      keyToUploadId.put(key, uploadId);
+      uploadPart(bucket, key, uploadId, 1, "data".getBytes(UTF_8));
+    }
+
+    // Test full pagination process
+    final int maxUploads = 10;
+    final int expectedTruncated = 2;
+    int truncatedCount = 0;
+    String keyMarker = "";
+    String uploadIdMarker = "";
+    Set<String> retrievedKeys = new HashSet<>();
+    boolean hasMore = true;
+
+    while (hasMore) {
+      OzoneMultipartUploadList result = bucket.listMultipartUploads(
+          "dir", keyMarker, uploadIdMarker, maxUploads);
+
+      assertThat(result.getUploads())
+          .as("Number of uploads should not exceed maxUploads")
+          .hasSizeLessThanOrEqualTo(maxUploads);
+
+      assertEquals(result.getUploads().size(), result.getMaxUploads());
+
+      for (OzoneMultipartUpload upload : result.getUploads()) {
+        String key = upload.getKeyName();
+        retrievedKeys.add(key);
+
+        assertEquals(keyToUploadId.get(key), upload.getUploadId());
+      }
+
+      // Update markers for next iteration
+      keyMarker = result.getNextKeyMarker();
+      uploadIdMarker = result.getNextUploadIdMarker();
+      hasMore = result.isTruncated();
+
+      truncatedCount += result.isTruncated() ? 1 : 0;
+    }
+
+    assertEquals(keys.size(), retrievedKeys.size());
+    assertEquals(expectedTruncated, truncatedCount);
+    assertThat(retrievedKeys.stream().sorted().collect(Collectors.toList()))
+        .as("Retrieved keys should match expected keys in order")
+        .isEqualTo(keys.stream().sorted().collect(Collectors.toList()));
   }
 
   @Test
