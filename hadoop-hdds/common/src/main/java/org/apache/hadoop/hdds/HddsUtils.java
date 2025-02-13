@@ -360,7 +360,7 @@ public final class HddsUtils {
    * @param conf Configuration
    *
    * @return the hostname (NB: may not be a FQDN)
-   * @throws UnknownHostException if the dfs.datanode.dns.interface
+   * @throws UnknownHostException if the hdds.datanode.dns.interface
    *    option is used and the hostname can not be determined
    */
   public static String getHostName(ConfigurationSource conf)
