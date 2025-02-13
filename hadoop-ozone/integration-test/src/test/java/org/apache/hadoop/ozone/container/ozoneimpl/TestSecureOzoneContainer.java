@@ -136,7 +136,7 @@ class TestSecureOzoneContainer {
 
       DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
       container = new OzoneContainer(null, dn, conf, ContainerTestUtils
-          .getMockContext(dn, conf), caClient, secretKeyClient);
+          .getMockContext(dn, conf), caClient, secretKeyClient, null);
       MutableVolumeSet volumeSet = container.getVolumeSet();
       StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
           .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempFolder.toFile()));

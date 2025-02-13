@@ -18,9 +18,12 @@ package org.apache.hadoop.ozone.protocolPB;
 
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos
     .ExtendedDatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeStateRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeStateResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
@@ -50,6 +53,7 @@ import org.apache.hadoop.ozone.protocol.StorageContainerDatanodeProtocol;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
@@ -177,5 +181,19 @@ public class StorageContainerDatanodeProtocolClientSideTranslatorPB
     return submitRequest(Type.Register,
         (builder) -> builder.setRegisterRequest(req))
         .getRegisterResponse();
+  }
+
+  public HddsProtos.NodeState getNodeState(UUID datanodeUuid) throws IOException {
+    NodeStateRequestProto request = NodeStateRequestProto.newBuilder()
+        .setDatanodeUUID(datanodeUuid.toString())
+        .build();
+    return getNodeState(request).getNodeState();
+
+  }
+
+  @Override
+  public NodeStateResponseProto getNodeState(NodeStateRequestProto request) throws IOException {
+    return submitRequest(Type.NodePreviousState, builder -> builder.setNodeStateRequest(request))
+        .getNodeStateResponse();
   }
 }
