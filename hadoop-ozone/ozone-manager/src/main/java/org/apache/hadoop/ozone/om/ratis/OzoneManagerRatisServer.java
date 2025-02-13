@@ -177,6 +177,7 @@ public final class OzoneManagerRatisServer {
     this.server = RaftServer.newBuilder()
         .setServerId(this.raftPeerId)
         .setGroup(this.raftGroup)
+//        .setStateMachineRegistry()
         .setProperties(serverProperties)
         .setParameters(parameters)
         .setStateMachine(omStateMachine)
@@ -328,6 +329,7 @@ public final class OzoneManagerRatisServer {
   private RaftClientReply submitRequestToRatisImpl(
       RaftClientRequest raftClientRequest) throws ServiceException {
     try {
+//      server.getGroupInfo()
       return server.submitClientRequestAsync(raftClientRequest)
           .get();
     } catch (ExecutionException | IOException ex) {
