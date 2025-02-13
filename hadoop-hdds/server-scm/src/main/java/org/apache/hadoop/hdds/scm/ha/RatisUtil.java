@@ -236,7 +236,7 @@ public final class RatisUtil {
   }
 
   public static void checkRatisException(IOException e, String port,
-      String scmId) throws ServiceException {
+      String scmId, String hostname) throws ServiceException {
     if (SCMHAUtils.isNonRetriableException(e)) {
       throw new ServiceException(new NonRetriableException(e));
     } else if (SCMHAUtils.isRetriableWithNoFailoverException(e)) {
@@ -246,7 +246,7 @@ public final class RatisUtil {
           (NotLeaderException) SCMHAUtils.getNotLeaderException(e);
       throw new ServiceException(ServerNotLeaderException
           .convertToNotLeaderException(nle,
-              SCMRatisServerImpl.getSelfPeerId(scmId), port));
+              SCMRatisServerImpl.getSelfPeerId(scmId), port, hostname));
     } else if (e instanceof SCMSecurityException) {
       // For NOT_A_PRIMARY_SCM error client needs to retry on next SCM.
       // GetSCMCertificate call can happen on non-leader SCM and only an
