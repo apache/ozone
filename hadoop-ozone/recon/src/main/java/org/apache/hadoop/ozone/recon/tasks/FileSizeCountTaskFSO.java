@@ -45,7 +45,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 import static org.hadoop.ozone.recon.schema.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
 
 /**
@@ -62,8 +61,7 @@ public class FileSizeCountTaskFSO implements ReconOmTask {
 
   @Inject
   public FileSizeCountTaskFSO(FileCountBySizeDao fileCountBySizeDao,
-                              UtilizationSchemaDefinition
-                                  utilizationSchemaDefinition) {
+                              UtilizationSchemaDefinition utilizationSchemaDefinition) {
     this.fileCountBySizeDao = fileCountBySizeDao;
     this.dslContext = utilizationSchemaDefinition.getDSLContext();
   }
@@ -100,8 +98,8 @@ public class FileSizeCountTaskFSO implements ReconOmTask {
   }
 
   private boolean reprocessBucketLayout(BucketLayout bucketLayout,
-                                        OMMetadataManager omMetadataManager,
-                                        Map<FileSizeCountKey, Long> fileSizeCountMap) {
+                               OMMetadataManager omMetadataManager,
+                               Map<FileSizeCountKey, Long> fileSizeCountMap) {
     Table<String, OmKeyInfo> omKeyInfoTable =
         omMetadataManager.getKeyTable(bucketLayout);
     int totalKeysProcessed = 0;
@@ -228,9 +226,9 @@ public class FileSizeCountTaskFSO implements ReconOmTask {
         // Get the current count from database and update
         Record3<String, String, Long> recordToFind =
             dslContext.newRecord(
-                    FILE_COUNT_BY_SIZE.VOLUME,
-                    FILE_COUNT_BY_SIZE.BUCKET,
-                    FILE_COUNT_BY_SIZE.FILE_SIZE)
+                FILE_COUNT_BY_SIZE.VOLUME,
+                FILE_COUNT_BY_SIZE.BUCKET,
+                FILE_COUNT_BY_SIZE.FILE_SIZE)
                 .value1(key.volume)
                 .value2(key.bucket)
                 .value3(key.fileSizeUpperBound);
@@ -256,7 +254,7 @@ public class FileSizeCountTaskFSO implements ReconOmTask {
   private FileSizeCountKey getFileSizeCountKey(OmKeyInfo omKeyInfo) {
     return new FileSizeCountKey(omKeyInfo.getVolumeName(),
         omKeyInfo.getBucketName(),
-        ReconUtils.getFileSizeUpperBound(omKeyInfo.getDataSize()));
+            ReconUtils.getFileSizeUpperBound(omKeyInfo.getDataSize()));
   }
 
   /**
