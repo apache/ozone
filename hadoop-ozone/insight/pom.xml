@@ -110,18 +110,6 @@
       <groupId>org.glassfish.jaxb</groupId>
       <artifactId>jaxb-runtime</artifactId>
     </dependency>
-
-    <!-- Test dependencies -->
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-hadoop-dependency-test</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-test-utils</artifactId>
-      <scope>test</scope>
-    </dependency>
   </dependencies>
   <build>
     <plugins>

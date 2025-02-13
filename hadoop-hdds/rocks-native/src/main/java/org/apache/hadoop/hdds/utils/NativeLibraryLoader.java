@@ -19,8 +19,8 @@
 package org.apache.hadoop.hdds.utils;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -201,7 +201,7 @@ public class NativeLibraryLoader {
         dependentFiles.add(file);
       }
       ShutdownHookManager.get().addShutdownHook(
-          () -> FileUtil.fullyDelete(tempDir),
+          () -> FileUtils.deleteQuietly(tempDir),
           LIBRARY_SHUTDOWN_HOOK_PRIORITY);
       return Pair.of(Optional.of(libFile), dependentFiles);
     } finally {

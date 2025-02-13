@@ -29,13 +29,4 @@
     <module>mini-chaos-tests</module>
     <module>network-tests</module>
   </modules>
-
-  <dependencies>
-    <dependency>
-      <groupId>org.mockito</groupId>
-      <artifactId>mockito-inline</artifactId>
-      <scope>test</scope>
-    </dependency>
-  </dependencies>
-
 </project>
