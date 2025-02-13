@@ -187,7 +187,7 @@ Test key handling
     ${result} =     Execute             ozone sh key get --force ${protocol}${server}/${volume}/bb1/key1 /tmp/NOTICE.txt.1
                     Should Not Contain  ${result}       NOTICE.txt.1 exists
     ${result} =     Execute and checkrc    ozone sh key put ${protocol}${server}/${volume}/bb1/key1 sample.txt          255
-                    Should Contain         ${result}       File not found sample.txt
+                    Should Contain         ${result}       File not found: sample.txt
     ${result} =     Execute             ozone sh key info ${protocol}${server}/${volume}/bb1/key1 | jq -r '. | select(.name=="key1")'
                     Should contain      ${result}       creationTime
                     Should not contain  ${result}       ETag
