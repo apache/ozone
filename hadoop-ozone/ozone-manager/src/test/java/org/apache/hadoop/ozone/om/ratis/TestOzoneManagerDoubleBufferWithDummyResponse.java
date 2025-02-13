@@ -64,6 +64,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
   private OzoneManagerDoubleBuffer doubleBuffer;
   private final AtomicLong trxId = new AtomicLong(0);
   private long term = 1L;
+  private AtomicLong currentCommitIndex = new AtomicLong();
   @TempDir
   private Path folder;
 
@@ -78,6 +79,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
         .setOmMetadataManager(omMetadataManager)
         .setMaxUnFlushedTransactionCount(10000)
         .enableRatis(true)
+        .setUpdateOmCommitIndex((x, y) -> currentCommitIndex.set(y))
         .build()
         .start();
   }
@@ -133,6 +135,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     assertNotNull(transactionInfo);
     assertEquals(bucketCount, transactionInfo.getTransactionIndex());
     assertEquals(term, transactionInfo.getTerm());
+    assertEquals(currentCommitIndex.get(), transactionInfo.getTermIndex().getIndex());
   }
 
   /**
