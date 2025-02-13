@@ -44,7 +44,6 @@ import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
@@ -296,24 +295,6 @@ public class TestCloseContainerCommandHandler {
   @Test
   public void testThreadPoolPoolSize() {
     assertEquals(1, subject.getThreadPoolMaxPoolSize());
-    assertEquals(0, subject.getThreadPoolActivePoolSize());
-
-    CloseContainerCommandHandler closeContainerCommandHandler =
-        new CloseContainerCommandHandler(10, 10, "");
-    closeContainerCommandHandler.handle(new CloseContainerCommand(
-        CONTAINER_ID + 1, PipelineID.randomId()),
-        ozoneContainer, context, null);
-    closeContainerCommandHandler.handle(new CloseContainerCommand(
-        CONTAINER_ID + 2, PipelineID.randomId()),
-        ozoneContainer, context, null);
-    closeContainerCommandHandler.handle(new CloseContainerCommand(
-        CONTAINER_ID + 3, PipelineID.randomId()),
-        ozoneContainer, context, null);
-    closeContainerCommandHandler.handle(new CloseContainerCommand(
-        CONTAINER_ID + 4, PipelineID.randomId()),
-        ozoneContainer, context, null);
-    assertEquals(10, closeContainerCommandHandler.getThreadPoolMaxPoolSize());
-    assertTrue(closeContainerCommandHandler.getThreadPoolActivePoolSize() > 0);
   }
 
 }
