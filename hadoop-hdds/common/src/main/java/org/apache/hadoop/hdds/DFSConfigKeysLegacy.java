@@ -58,20 +58,8 @@ public final class DFSConfigKeysLegacy {
   public static final String NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY =
       "net.topology.node.switch.mapping.impl";
 
-  public static final String DFS_CLIENT_HTTPS_KEYSTORE_RESOURCE_KEY =
-      "hdds.client.https.keystore.resource";
-
-  public static final String DFS_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY =
-      "hdds.https.server.keystore.resource";
-
-  public static final String DFS_HTTP_POLICY_KEY = "hdds.http.policy";
-
   public static final String DFS_DATANODE_KERBEROS_PRINCIPAL_KEY =
       "hdds.datanode.kerberos.principal";
-
-  @Deprecated
-  public static final String DFS_DATANODE_KEYTAB_FILE_KEY =
-      "hdds.datanode.keytab.file";
 
   public static final String DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY =
       "hdds.datanode.kerberos.keytab.file";
