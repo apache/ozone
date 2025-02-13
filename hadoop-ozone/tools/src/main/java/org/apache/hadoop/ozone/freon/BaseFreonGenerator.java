@@ -80,7 +80,7 @@ public class BaseFreonGenerator implements FreonSubcommand {
   private static final Logger LOG =
       LoggerFactory.getLogger(BaseFreonGenerator.class);
 
-  private static final int CHECK_INTERVAL_MILLIS = 1000;
+  private static final int CHECK_INTERVAL_MILLIS = 100;
 
   private static final String DIGEST_ALGORITHM = "MD5";
 
