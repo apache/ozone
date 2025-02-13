@@ -118,7 +118,7 @@ import org.slf4j.LoggerFactory;
 @InterfaceAudience.Private
 public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(MiniOzoneClusterImpl.class);
 
   private static final String[] NO_ARGS = new String[0];
@@ -664,6 +664,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         }
         stopSCM(scm);
         removeConfiguration();
+
+        LOG.warn("Unable to build MiniOzoneCluster", ex);
 
         if (ex instanceof IOException) {
           throw (IOException) ex;
