@@ -175,6 +175,40 @@ public class TestContainerHealthStatus {
     assertEquals(0, status.misReplicatedDelta());
   }
 
+  @Test
+  public void testSameDataChecksumContainer() {
+    Set<ContainerReplica> replicas = generateSameDataChecksumReplicas(container,
+            ContainerReplicaProto.State.CLOSED,
+            ContainerReplicaProto.State.CLOSED,
+            ContainerReplicaProto.State.CLOSED);
+    ContainerHealthStatus status =
+            new ContainerHealthStatus(container, replicas, placementPolicy,
+                    reconContainerMetadataManager, CONF);
+    assertTrue(status.isHealthilyReplicated());
+    assertFalse(status.isMissing());
+    assertFalse(status.isUnderReplicated());
+    assertFalse(status.isOverReplicated());
+    assertFalse(status.isMisReplicated());
+    assertFalse(status.isDataChecksumMismatched());
+  }
+
+  @Test
+  public void testDataChecksumMismatchContainer() {
+    Set<ContainerReplica> replicas = generateDataChecksumMismatchedReplicas(container,
+            ContainerReplicaProto.State.CLOSED,
+            ContainerReplicaProto.State.CLOSED,
+            ContainerReplicaProto.State.CLOSED);
+    ContainerHealthStatus status =
+            new ContainerHealthStatus(container, replicas, placementPolicy,
+                    reconContainerMetadataManager, CONF);
+    assertTrue(status.isHealthilyReplicated());
+    assertFalse(status.isMissing());
+    assertFalse(status.isUnderReplicated());
+    assertFalse(status.isOverReplicated());
+    assertFalse(status.isMisReplicated());
+    assertTrue(status.isDataChecksumMismatched());
+  }
+
   /**
    * Starting with a ContainerHealthStatus of 1 over-replicated container
    * replica and then updating a datanode to one of the out-of-service states.
@@ -384,6 +418,36 @@ public class TestContainerHealthStatus {
           .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
           .setContainerState(s)
           .build());
+    }
+    return replicas;
+  }
+
+  private Set<ContainerReplica> generateDataChecksumMismatchedReplicas(ContainerInfo cont,
+                                                                       ContainerReplicaProto.State...states) {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    long dataChecksum = 10L;
+    for (ContainerReplicaProto.State s : states) {
+      replicas.add(new ContainerReplica.ContainerReplicaBuilder()
+              .setContainerID(cont.containerID())
+              .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
+              .setContainerState(s)
+              .setDataChecksum(dataChecksum)
+              .build());
+      dataChecksum++;
+    }
+    return replicas;
+  }
+
+  private Set<ContainerReplica> generateSameDataChecksumReplicas(ContainerInfo cont,
+                                                                 ContainerReplicaProto.State...states) {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    for (ContainerReplicaProto.State s : states) {
+      replicas.add(new ContainerReplica.ContainerReplicaBuilder()
+              .setContainerID(cont.containerID())
+              .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
+              .setContainerState(s)
+              .setDataChecksum(10L)
+              .build());
     }
     return replicas;
   }

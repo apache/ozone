@@ -362,6 +362,38 @@ public class TestContainerHealthTaskRecordGenerator {
     logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
     initializeUnhealthyContainerStateStatsMap(unhealthyContainerStateStatsMap);
 
+    // Data checksum mismatch
+    replicas = generateDataChecksumMismatchedReplicas(container, CLOSED, CLOSED, CLOSED);
+    status =
+            new ContainerHealthStatus(container, replicas, placementPolicy,
+                    reconContainerMetadataManager, CONF);
+    records = ContainerHealthTask.ContainerHealthRecords
+            .generateUnhealthyRecords(status, (long) 1234567,
+                    unhealthyContainerStateStatsMap);
+    assertEquals(1, records.size());
+    assertEquals(1, unhealthyContainerStateStatsMap.get(
+                    UnHealthyContainerStates.DATA_CHECKSUM_MISMATCH)
+            .getOrDefault(CONTAINER_COUNT, 0L));
+
+    logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
+    initializeUnhealthyContainerStateStatsMap(unhealthyContainerStateStatsMap);
+
+    // Same data checksum replicas
+    replicas = generateSameDataChecksumReplicas(container, CLOSED, CLOSED, CLOSED);
+    status =
+            new ContainerHealthStatus(container, replicas, placementPolicy,
+                    reconContainerMetadataManager, CONF);
+    records = ContainerHealthTask.ContainerHealthRecords
+            .generateUnhealthyRecords(status, (long) 1234567,
+                    unhealthyContainerStateStatsMap);
+    assertEquals(0, records.size());
+    assertEquals(0, unhealthyContainerStateStatsMap.get(
+                    UnHealthyContainerStates.DATA_CHECKSUM_MISMATCH)
+            .getOrDefault(CONTAINER_COUNT, 0L));
+
+    logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
+    initializeUnhealthyContainerStateStatsMap(unhealthyContainerStateStatsMap);
+
     // Under and Mis Replicated - expect 2 records - mis and under replicated
     replicas =
         generateReplicas(container, CLOSED, CLOSED);
@@ -617,6 +649,36 @@ public class TestContainerHealthTaskRecordGenerator {
     return replicas;
   }
 
+  private Set<ContainerReplica> generateDataChecksumMismatchedReplicas(ContainerInfo cont,
+                                                                       ContainerReplicaProto.State...states) {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    long dataChecksum = 10L;
+    for (ContainerReplicaProto.State s : states) {
+      replicas.add(new ContainerReplica.ContainerReplicaBuilder()
+              .setContainerID(cont.containerID())
+              .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
+              .setContainerState(s)
+              .setDataChecksum(dataChecksum)
+              .build());
+      dataChecksum++;
+    }
+    return replicas;
+  }
+
+  private Set<ContainerReplica> generateSameDataChecksumReplicas(ContainerInfo cont,
+                                                                       ContainerReplicaProto.State...states) {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    for (ContainerReplicaProto.State s : states) {
+      replicas.add(new ContainerReplica.ContainerReplicaBuilder()
+              .setContainerID(cont.containerID())
+              .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
+              .setContainerState(s)
+              .setDataChecksum(10L)
+              .build());
+    }
+    return replicas;
+  }
+
   private void initializeUnhealthyContainerStateStatsMap(
       Map<UnHealthyContainerStates, Map<String, Long>>
           unhealthyContainerStateStatsMap) {
@@ -632,6 +694,8 @@ public class TestContainerHealthTaskRecordGenerator {
         UnHealthyContainerStates.MIS_REPLICATED, new HashMap<>());
     unhealthyContainerStateStatsMap.put(
         UnHealthyContainerStates.NEGATIVE_SIZE, new HashMap<>());
+    unhealthyContainerStateStatsMap.put(
+        UnHealthyContainerStates.DATA_CHECKSUM_MISMATCH, new HashMap<>());
   }
 
   private void logUnhealthyContainerStats(
