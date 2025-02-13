@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -30,7 +31,6 @@ import static org.mockito.Mockito.verify;
 
 import java.util.HashSet;
 
-import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
@@ -83,8 +83,8 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
   @Test
   public void testConsumeOMEvents() throws Exception {
     ReconOmTask reconOmTaskMock = getMockTask("MockTask");
-    when(reconOmTaskMock.process(any(OMUpdateEventBatch.class)))
-        .thenReturn(new ImmutablePair<>("MockTask", true));
+    when(reconOmTaskMock.process(any(OMUpdateEventBatch.class), anyMap()))
+        .thenReturn(new ReconOmTask.TaskResult.Builder().setTaskName("MockTask").setTaskSuccess(true).build());
     reconTaskController.registerTask(reconOmTaskMock);
     OMUpdateEventBatch omUpdateEventBatchMock = mock(OMUpdateEventBatch.class);
     when(omUpdateEventBatchMock.getLastSequenceNumber()).thenReturn(100L);
@@ -96,7 +96,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
         mock(OMMetadataManager.class));
 
     verify(reconOmTaskMock, times(1))
-        .process(any());
+        .process(any(), anyMap());
     long endTime = System.currentTimeMillis();
 
     ReconTaskStatus reconTaskStatus = reconTaskStatusDao.findById("MockTask");
@@ -113,7 +113,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     OMUpdateEventBatch omUpdateEventBatchMock = mock(OMUpdateEventBatch.class);
 
     // Throw exception when trying to run task
-    when(reconOmTaskMock.process(any(OMUpdateEventBatch.class)))
+    when(reconOmTaskMock.process(any(OMUpdateEventBatch.class), anyMap()))
         .thenThrow(new RuntimeException("Mock Failure"));
     reconTaskController.registerTask(reconOmTaskMock);
     when(omUpdateEventBatchMock.getLastSequenceNumber()).thenReturn(100L);
@@ -125,7 +125,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
         mock(OMMetadataManager.class));
 
     verify(reconOmTaskMock, times(1))
-        .process(any());
+        .process(any(), anyMap());
     long endTime = System.currentTimeMillis();
 
     ReconTaskStatus reconTaskStatus = reconTaskStatusDao.findById("MockTask");
@@ -211,7 +211,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     ReconOmTask reconOmTaskMock =
         getMockTask("MockTask2");
     when(reconOmTaskMock.reprocess(omMetadataManagerMock))
-        .thenReturn(new ImmutablePair<>("MockTask2", true));
+        .thenReturn(new ReconOmTask.TaskResult.Builder().setTaskName("MockTask2").setTaskSuccess(true).build());
     when(omMetadataManagerMock.getLastSequenceNumberFromDB()
     ).thenReturn(100L);
 

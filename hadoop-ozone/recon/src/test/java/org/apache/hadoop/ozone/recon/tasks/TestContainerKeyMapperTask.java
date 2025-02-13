@@ -339,7 +339,7 @@ public class TestContainerKeyMapperTask {
     assertEquals(1, reconContainerMetadataManager.getKeyCountForContainer(3L));
 
     // Process PUT & DELETE event.
-    containerKeyMapperTask.process(omUpdateEventBatch);
+    containerKeyMapperTask.process(omUpdateEventBatch, Collections.emptyMap());
 
     keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(1);
@@ -430,7 +430,7 @@ public class TestContainerKeyMapperTask {
         }, 0L);
 
     // Process PUT event for both the keys
-    containerKeyMapperTask.process(omUpdateEventBatch);
+    containerKeyMapperTask.process(omUpdateEventBatch, Collections.emptyMap());
 
     keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(1);
@@ -463,7 +463,7 @@ public class TestContainerKeyMapperTask {
         }, 0L);
 
     // Process DELETE event for key2
-    containerKeyMapperTask.process(omUpdateEventBatch2);
+    containerKeyMapperTask.process(omUpdateEventBatch2, Collections.emptyMap());
 
     keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(1);
