@@ -25,7 +25,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -49,13 +49,13 @@ public class TestEventQueue {
 
   @BeforeEach
   public void startEventQueue() {
-    DefaultMetricsSystem.initialize(getClass().getSimpleName());
+    MetricsSystem.initialize(getClass().getSimpleName());
     queue = new EventQueue();
   }
 
   @AfterEach
   public void stopEventQueue() {
-    DefaultMetricsSystem.shutdown();
+    MetricsSystem.shutdown();
     queue.close();
   }
 

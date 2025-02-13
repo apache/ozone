@@ -21,9 +21,9 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -109,12 +109,12 @@ public class TestBackgroundContainerDataScanner extends
   public void testScannerMetricsUnregisters() {
     String name = scanner.getMetrics().getName();
 
-    assertNotNull(DefaultMetricsSystem.instance().getSource(name));
+    assertNotNull(MetricsSystem.instance().getSource(name));
 
     scanner.shutdown();
     scanner.run();
 
-    assertNull(DefaultMetricsSystem.instance().getSource(name));
+    assertNull(MetricsSystem.instance().getSource(name));
   }
 
   @Test

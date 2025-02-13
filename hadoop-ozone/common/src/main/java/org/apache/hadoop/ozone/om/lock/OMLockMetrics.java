@@ -21,12 +21,12 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
-import org.apache.hadoop.metrics2.lib.MutableStat;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
+import org.apache.hadoop.ozone.metrics.MutableStat;
 
 /**
  * This class is for maintaining the various Ozone Manager Lock Metrics.
@@ -45,16 +45,24 @@ public final class OMLockMetrics implements MetricsSource {
 
   private OMLockMetrics() {
     registry = new MetricsRegistry(SOURCE_NAME);
-    readLockWaitingTimeMsStat = registry.newStat("ReadLockWaitingTime",
-        "Time (in milliseconds) spent waiting for acquiring the read lock",
+
+    readLockWaitingTimeMsStat = MetricsSystem.registerNewMutableStat(registry,
+            "ReadLockWaitingTime",
+            "Time (in milliseconds) spent waiting for acquiring the read lock",
         "Ops", "Time", true);
-    readLockHeldTimeMsStat = registry.newStat("ReadLockHeldTime",
-        "Time (in milliseconds) spent holding the read lock",
+
+    readLockHeldTimeMsStat = MetricsSystem.registerNewMutableStat(registry,
+            "ReadLockHeldTime",
+            "Time (in milliseconds) spent holding the read lock",
         "Ops", "Time", true);
-    writeLockWaitingTimeMsStat = registry.newStat("WriteLockWaitingTime",
-        "Time (in milliseconds) spent waiting for acquiring the write lock",
+
+    writeLockWaitingTimeMsStat = MetricsSystem.registerNewMutableStat(registry,
+            "WriteLockWaitingTime",
+            "Time (in milliseconds) spent waiting for acquiring the write lock",
         "Ops", "Time", true);
-    writeLockHeldTimeMsStat = registry.newStat("WriteLockHeldTime",
+
+    writeLockHeldTimeMsStat = MetricsSystem.registerNewMutableStat(registry,
+            "WriteLockHeldTime",
         "Time (in milliseconds) spent holding the write lock",
         "Ops", "Time", true);
   }
@@ -65,7 +73,7 @@ public final class OMLockMetrics implements MetricsSource {
    * @return OMLockMetrics object
    */
   public static OMLockMetrics create() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     return ms.register(SOURCE_NAME, "Ozone Manager Lock Metrics",
         new OMLockMetrics());
   }
@@ -74,7 +82,7 @@ public final class OMLockMetrics implements MetricsSource {
    * Unregisters OMLockMetrics source.
    */
   public void unRegister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }
 

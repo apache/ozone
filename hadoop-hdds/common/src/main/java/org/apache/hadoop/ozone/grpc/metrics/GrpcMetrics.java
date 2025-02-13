@@ -28,14 +28,14 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
-import org.apache.hadoop.metrics2.lib.MutableQuantiles;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.metrics.MutableQuantiles;
 import org.apache.hadoop.ozone.util.MetricUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
+import org.apache.hadoop.ozone.metrics.MutableRate;
 
 /**
  * Class which maintains metrics related to using GRPC.
@@ -72,11 +72,11 @@ public class GrpcMetrics implements MetricsSource {
           new MutableQuantiles[intervals.length];
       for (int i = 0; i < intervals.length; i++) {
         int interval = intervals[i];
-        grpcQueueTimeMillisQuantiles[i] = registry
-            .newQuantiles("grpcQueueTime" + interval
+        grpcQueueTimeMillisQuantiles[i] = MetricsSystem
+            .registerNewMutableQuantiles(registry, "grpcQueueTime" + interval
                     + "s", "grpc queue time in millisecond", "ops",
                 "latency", interval);
-        grpcProcessingTimeMillisQuantiles[i] = registry.newQuantiles(
+        grpcProcessingTimeMillisQuantiles[i] = MetricsSystem.registerNewMutableQuantiles(registry,
             "grpcProcessingTime" + interval + "s",
             "grpc processing time in millisecond",
             "ops", "latency", interval);
@@ -92,7 +92,7 @@ public class GrpcMetrics implements MetricsSource {
    */
   public static synchronized GrpcMetrics create(Configuration conf) {
     GrpcMetrics metrics = new GrpcMetrics(conf);
-    return DefaultMetricsSystem.instance().register(SOURCE_NAME,
+    return MetricsSystem.instance().register(SOURCE_NAME,
         "Metrics for using gRPC", metrics);
   }
 
@@ -100,7 +100,7 @@ public class GrpcMetrics implements MetricsSource {
    * Unregister the metrics instance.
    */
   public void unRegister() {
-    DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
+    MetricsSystem.instance().unregisterSource(SOURCE_NAME);
     MetricUtil.stop(grpcProcessingTimeMillisQuantiles);
     MetricUtil.stop(grpcQueueTimeMillisQuantiles);
   }
@@ -202,7 +202,7 @@ public class GrpcMetrics implements MetricsSource {
   public long getUnknownMessagesReceived() {
     return unknownMessagesReceived.value();
   }
-  
+
   MutableRate getGrpcQueueTime() {
     return grpcQueueTime;
   }

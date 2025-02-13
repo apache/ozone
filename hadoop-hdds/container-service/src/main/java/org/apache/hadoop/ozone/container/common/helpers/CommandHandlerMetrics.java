@@ -23,9 +23,8 @@ import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
-import org.apache.hadoop.metrics2.MetricsSystem;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.CommandHandler;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -78,7 +77,7 @@ public final class CommandHandlerMetrics implements MetricsSource {
 
   /**
    * Creates a new instance of CommandHandlerMetrics and
-   * registers it to the DefaultMetricsSystem.
+   * registers it to the OzoneMetricsSystem.
    *
    * @param handlerMap the map of command types to their
    *                  corresponding command handlers
@@ -86,8 +85,7 @@ public final class CommandHandlerMetrics implements MetricsSource {
    */
   public static CommandHandlerMetrics create(
       Map<Type, CommandHandler> handlerMap) {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME, "CommandHandlerMetrics Metrics",
+    return MetricsSystem.register(SOURCE_NAME, "CommandHandlerMetrics Metrics",
         new CommandHandlerMetrics(handlerMap));
   }
 
@@ -127,7 +125,7 @@ public final class CommandHandlerMetrics implements MetricsSource {
   }
 
   public void unRegister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }
 }

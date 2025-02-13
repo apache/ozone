@@ -23,14 +23,14 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.hadoop.metrics2.lib.MutableQuantiles;
-import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.metrics.MutableQuantiles;
+import org.apache.hadoop.ozone.metrics.MutableRate;
 import org.apache.hadoop.ozone.util.MetricUtil;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 
 import java.util.Map;
 import java.util.UUID;
@@ -85,7 +85,7 @@ public final class ContainerClientMetrics {
   public static synchronized ContainerClientMetrics acquire() {
     if (instance == null) {
       instanceCount++;
-      instance = DefaultMetricsSystem.instance().register(
+      instance = MetricsSystem.instance().register(
           SOURCE_NAME + instanceCount,
           "Ozone Client Metrics", new ContainerClientMetrics());
     }
@@ -100,7 +100,7 @@ public final class ContainerClientMetrics {
     referenceCount--;
     if (referenceCount == 0) {
       instance.stop();
-      DefaultMetricsSystem.instance().unregisterSource(
+      MetricsSystem.instance().unregisterSource(
           SOURCE_NAME + instanceCount);
       instance = null;
     }
@@ -123,36 +123,37 @@ public final class ContainerClientMetrics {
     int[] intervals = {60, 300, 900};
     for (int i = 0; i < intervals.length; i++) {
       int interval = intervals[i];
-      listBlockLatency[i] = registry
-          .newQuantiles("listBlockLatency" + interval
+      listBlockLatency[i] = MetricsSystem.registerNewMutableQuantiles(registry,
+          "listBlockLatency" + interval
                   + "s", "ListBlock latency in microseconds", "ops",
               "latency", interval);
-      getBlockLatency[i] = registry
-          .newQuantiles("getBlockLatency" + interval
+      getBlockLatency[i] = MetricsSystem.registerNewMutableQuantiles(registry,
+          "getBlockLatency" + interval
                   + "s", "GetBlock latency in microseconds", "ops",
               "latency", interval);
-      getCommittedBlockLengthLatency[i] = registry
-          .newQuantiles("getCommittedBlockLengthLatency" + interval
+      getCommittedBlockLengthLatency[i] = MetricsSystem.registerNewMutableQuantiles(registry,
+          "getCommittedBlockLengthLatency" + interval
                   + "s", "GetCommittedBlockLength latency in microseconds",
               "ops", "latency", interval);
-      readChunkLatency[i] = registry
-          .newQuantiles("readChunkLatency" + interval
+      readChunkLatency[i] = MetricsSystem.registerNewMutableQuantiles(registry,
+          "readChunkLatency" + interval
                   + "s", "ReadChunk latency in microseconds", "ops",
               "latency", interval);
-      getSmallFileLatency[i] = registry
-          .newQuantiles("getSmallFileLatency" + interval
+      getSmallFileLatency[i] = MetricsSystem.registerNewMutableQuantiles(registry,
+          "getSmallFileLatency" + interval
                   + "s", "GetSmallFile latency in microseconds", "ops",
               "latency", interval);
-      hsyncLatencyNs[i] = registry
-          .newQuantiles("hsyncLatency" + interval
+      hsyncLatencyNs[i] = MetricsSystem.registerNewMutableQuantiles(registry,
+          "hsyncLatency" + interval
                   + "s", "client hsync latency in nanoseconds", "ops",
               "latency", interval);
-      omHsyncLatencyNs[i] = registry
-          .newQuantiles("omHsyncLatency" + interval
+      omHsyncLatencyNs[i] = MetricsSystem.registerNewMutableQuantiles(registry,
+          "omHsyncLatency" + interval
                   + "s", "client hsync latency to OM in nanoseconds", "ops",
               "latency", interval);
-      datanodeHsyncLatencyNs[i] = registry
-          .newQuantiles("dnHsyncLatency" + interval
+      datanodeHsyncLatencyNs[i] = MetricsSystem.registerNewMutableQuantiles(
+          registry,
+          "dnHsyncLatency" + interval
                   + "s", "client hsync latency to DN in nanoseconds", "ops",
               "latency", interval);
     }

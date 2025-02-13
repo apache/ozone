@@ -22,14 +22,13 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.hadoop.metrics2.lib.MutableQuantiles;
-import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.metrics.MutableQuantiles;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
+import org.apache.hadoop.ozone.metrics.MutableRate;
 import org.apache.hadoop.ozone.util.MetricUtil;
 
 import java.io.Closeable;
@@ -80,20 +79,23 @@ public class ContainerMetrics implements Closeable {
           "num" + type, "number of " + type + " ops", (long) 0));
       opsBytesArray.put(type, registry.newCounter(
           "bytes" + type, "bytes used by " + type + "op", (long) 0));
-      opsLatency.put(type, registry.newRate("latencyNs" + type, type + " op"));
+      opsLatency.put(
+          type,
+          MetricsSystem.registerNewMutableRate(registry, "latencyNs" + type, type + " op")
+      );
 
       for (int j = 0; j < len; j++) {
         int interval = intervals[j];
         String quantileName = type + "Nanos" + interval + "s";
-        latQuantiles[j] = registry.newQuantiles(quantileName,
-            "latency of Container ops", "ops", "latencyNs", interval);
+        latQuantiles[j] = MetricsSystem.registerNewMutableQuantiles(registry,
+            quantileName, "latency of Container ops", "ops", "latencyNs", interval);
       }
       opsLatQuantiles.put(type, latQuantiles);
     }
   }
 
   public static ContainerMetrics create(ConfigurationSource conf) {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     // Percentile measurement is off by default, by watching no intervals
     int[] intervals =
         conf.getInts(DFSConfigKeysLegacy.DFS_METRICS_PERCENTILES_INTERVALS_KEY);
@@ -103,7 +105,7 @@ public class ContainerMetrics implements Closeable {
   }
 
   public static void remove() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     ms.unregisterSource(STORAGE_CONTAINER_METRICS);
   }
 

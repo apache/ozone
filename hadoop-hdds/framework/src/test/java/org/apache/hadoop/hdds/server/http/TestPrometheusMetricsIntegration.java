@@ -29,12 +29,11 @@ import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsSource;
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.MetricsTag;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,7 +44,7 @@ import org.junit.jupiter.api.Test;
  */
 public class TestPrometheusMetricsIntegration {
 
-  private MetricsSystem metrics;
+  private org.apache.hadoop.metrics2.MetricsSystem metrics;
   private PrometheusMetricsSink sink;
 
   private static final MetricsInfo PORT_INFO = new MetricsInfo() {
@@ -77,7 +76,7 @@ public class TestPrometheusMetricsIntegration {
 
   @BeforeEach
   public void init() {
-    metrics = DefaultMetricsSystem.instance();
+    metrics = MetricsSystem.instance();
 
     metrics.init("test");
     sink = new PrometheusMetricsSink("random");
