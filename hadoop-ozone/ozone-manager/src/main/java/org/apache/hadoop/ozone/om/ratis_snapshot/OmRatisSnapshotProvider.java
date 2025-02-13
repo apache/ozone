@@ -200,13 +200,13 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
         // Log progress every 30 seconds
         if (System.currentTimeMillis() - lastLoggedTime >= 30000) {
           LOG.info("Downloading '{}': {} KB downloaded so far...",
-                  targetFile.getName(), totalBytesRead / (1024));
+              targetFile.getName(), totalBytesRead / (1024));
           lastLoggedTime = System.currentTimeMillis();
         }
       }
 
       LOG.info("Download completed for '{}'. Total size: {} KB",
-              targetFile.getName(), totalBytesRead / (1024));
+          targetFile.getName(), totalBytesRead / (1024));
     }
   }
 
