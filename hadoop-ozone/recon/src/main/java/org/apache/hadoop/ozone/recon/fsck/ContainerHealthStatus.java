@@ -47,6 +47,7 @@ public class ContainerHealthStatus {
 
   private final ContainerInfo container;
   private final int replicaDelta;
+  private final Set<ContainerReplica> replicas;
   private final Set<ContainerReplica> healthyReplicas;
   private final Set<ContainerReplica> healthyAvailReplicas;
   private final ContainerPlacementStatus placementStatus;
@@ -64,6 +65,7 @@ public class ContainerHealthStatus {
     this.reconContainerMetadataManager = reconContainerMetadataManager;
     this.container = container;
     int repFactor = container.getReplicationConfig().getRequiredNodes();
+    this.replicas = replicas;
     this.healthyReplicas = replicas
         .stream()
         .filter(r -> !r.getState()
@@ -158,6 +160,13 @@ public class ContainerHealthStatus {
 
   public boolean isEmpty() {
     return numKeys == 0;
+  }
+
+  public boolean isDataChecksumMismatched() {
+    return replicas.stream()
+            .map(ContainerReplica::getDataChecksum)
+            .distinct()
+            .count() != 1;
   }
 
   private ContainerPlacementStatus getPlacementStatus(
