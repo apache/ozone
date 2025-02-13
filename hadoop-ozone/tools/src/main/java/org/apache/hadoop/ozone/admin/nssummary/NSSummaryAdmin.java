@@ -17,25 +17,14 @@
  */
 package org.apache.hadoop.ozone.admin.nssummary;
 
-import org.apache.hadoop.fs.ozone.OzoneClientUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.hdds.cli.AdminSubcommand;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
-import org.apache.hadoop.ozone.OFSPath;
-import org.apache.hadoop.ozone.client.ObjectStore;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
-
-import java.io.IOException;
-import java.util.HashSet;
 
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_DEFAULT;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
