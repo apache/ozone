@@ -186,7 +186,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
    * Writes data from the given InputStream to the target file while logging download progress every 30 seconds.
    */
   public static void downloadFileWithProgress(InputStream inputStream, File targetFile)
-          throws IOException{
+          throws IOException {
     FileOutputStream outputStream = new FileOutputStream(targetFile);
     byte[] buffer = new byte[8 * 1024];
     long totalBytesRead = 0;
