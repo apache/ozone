@@ -90,12 +90,17 @@ public abstract class GenericCli implements GenericParentCommand {
   }
 
   protected void printError(Throwable error) {
-    //message could be null in case of NPE. This is unexpected so we can
-    //print out the stack trace.
-    if (verbose || Strings.isNullOrEmpty(error.getMessage())) {
-      error.printStackTrace(cmd.getErr());
-    } else {
-      cmd.getErr().println(error.getMessage().split("\n")[0]);
+    if (error instanceof FileSystemException) {
+      String errorMessage = handleFileSystemException((FileSystemException) error);
+      cmd.getErr().println(errorMessage);
+    }else {
+      //message could be null in case of NPE. This is unexpected so we can
+      //print out the stack trace.
+      if (verbose || Strings.isNullOrEmpty(error.getMessage())) {
+        error.printStackTrace(cmd.getErr());
+      } else {
+        cmd.getErr().println(error.getMessage().split("\n")[0]);
+      }
     }
   }
 
@@ -129,17 +134,22 @@ public abstract class GenericCli implements GenericParentCommand {
     return cmd.getErr();
   }
 
-  public static String handleFileSystemException(FileSystemException e, File dataFile) {
-    String message = e.getMessage();
+  private String handleFileSystemException(FileSystemException e) {
+    // If reason is set, return the exception's message as it is.
+    if (e.getReason() != null) {
+      return e.getMessage();
+    }
+
+    // Otherwise, construct a custom message based on the type of exception
     String errorMessage;
     if (e instanceof NoSuchFileException) {
-      errorMessage = String.format("Error: File not found: %s", dataFile.getPath());
+      errorMessage = String.format("Error: File not found: %s", e.getFile());
     } else if (e instanceof AccessDeniedException) {
-      errorMessage = String.format("Error: Access denied to file: %s", dataFile.getPath());
+      errorMessage = String.format("Error: Access denied to file: %s", e.getFile());
     } else if (e instanceof FileAlreadyExistsException) {
-      errorMessage = String.format("Error: File already exists: %s", dataFile.getPath());
+      errorMessage = String.format("Error: File already exists: %s", e.getFile());
     } else {
-      errorMessage = String.format("Error with file: %s. Details: %s", dataFile.getPath(), message);
+      errorMessage = String.format("Error with file: %s. Details: %s", e.getFile(), e.getMessage());
     }
 
     return errorMessage;
