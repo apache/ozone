@@ -110,7 +110,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private final float containerCloseThreshold;
   private final ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics;
   private OzoneProtocolMessageDispatcher<ContainerCommandRequestProto,
-      ContainerCommandResponseProto, ProtocolMessageEnum> dispatcher;
+      ContainerCommandResponseProto, ProtocolMessageEnum, DispatcherContext> dispatcher;
   private String clusterId;
   private ContainerMetrics metrics;
   private final TokenVerifier tokenVerifier;
@@ -197,10 +197,21 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       return dispatcher.processRequest(msg,
           req -> dispatchRequest(msg, dispatcherContext),
           msg.getCmdType(),
-          msg.getTraceID());
+          msg.getTraceID(), dispatcherContext);
     } catch (ServiceException ex) {
       throw new RuntimeException(ex);
     }
+  }
+
+  public void setDispatcher(
+      OzoneProtocolMessageDispatcher<ContainerCommandRequestProto,
+          ContainerCommandResponseProto, ProtocolMessageEnum, DispatcherContext> dispatcher) {
+    this.dispatcher = dispatcher;
+  }
+
+  public OzoneProtocolMessageDispatcher<ContainerCommandRequestProto,
+      ContainerCommandResponseProto, ProtocolMessageEnum, DispatcherContext> getDispatcher() {
+    return dispatcher;
   }
 
   @SuppressWarnings("methodlength")

@@ -36,7 +36,7 @@ import java.util.function.UnaryOperator;
  * It logs the message type/content on DEBUG/TRACING log for insight and create
  * a new span based on the tracing information.
  */
-public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
+public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE, CONTEXT> {
 
   private final String serviceName;
 
@@ -69,7 +69,7 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
       REQUEST request,
       CheckedFunction<REQUEST, RESPONSE, ServiceException> methodCall,
       TYPE type,
-      String traceId) throws ServiceException {
+      String traceId, CONTEXT context) throws ServiceException {
     Span span = TracingUtil.importAndCreateSpan(type.toString(), traceId);
     try {
       if (logger.isTraceEnabled()) {

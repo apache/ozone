@@ -29,6 +29,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERV
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose;
 import static org.apache.hadoop.ozone.container.TestHelper.waitForReplicaCount;
+import static org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.Op.APPLY_TRANSACTION;
 import static org.apache.ozone.test.GenericTestUtils.setLogLevel;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -47,8 +48,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.function.Supplier;
 
@@ -66,6 +70,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.Repli
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackAware;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -75,13 +80,17 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -127,7 +136,94 @@ class TestContainerReplication {
     setLogLevel(SCMContainerPlacementRandom.LOG, Level.DEBUG);
   }
 
-  @ParameterizedTest
+  @Test
+  void testContainerReplication() throws Exception {
+
+    OzoneConfiguration conf = createConfiguration(false);
+    try (MiniOzoneCluster cluster = newCluster(conf)) {
+      cluster.waitForClusterToBeReady();
+      try (OzoneClient client = cluster.newClient()) {
+        ObjectStore objectStore = client.getObjectStore();
+        objectStore.createVolume(VOLUME);
+        OzoneVolume volume = objectStore.getVolume(VOLUME);
+        volume.createBucket(BUCKET);
+
+        OzoneBucket bucket = volume.getBucket(BUCKET);
+        final UUID leaderId;
+        final long containerId;
+        AtomicBoolean leaderDone = new AtomicBoolean(false);
+        AtomicBoolean leaderShutdown = new AtomicBoolean(false);
+        try (OzoneOutputStream out = bucket.createKey(KEY, 0,
+            RatisReplicationConfig.getInstance(THREE), emptyMap())) {
+          containerId = out.getKeyOutputStream().getStreamEntries().get(0).getBlockID().getContainerID();
+          Pipeline pipeline = out.getKeyOutputStream().getStreamEntries().get(0).getPipeline();
+           leaderId = pipeline.getLeaderId();
+          for (DatanodeDetails dn: pipeline.getNodes()) {
+            HddsDispatcher dispatcher =
+                (HddsDispatcher) cluster.getHddsDatanode(dn).getDatanodeStateMachine().getContainer().getDispatcher();
+            dispatcher.setDispatcher(Mockito.spy(dispatcher.getDispatcher()));
+            Mockito.doAnswer(i -> {
+              ContainerProtos.ContainerCommandResponseProto response;
+              DispatcherContext dispatcherContext = i.getArgument(4);
+              if (DispatcherContext.op(dispatcherContext) != APPLY_TRANSACTION) {
+                return i.callRealMethod();
+              }
+              if (leaderId.equals(dn.getUuid())) {
+                response = (ContainerProtos.ContainerCommandResponseProto) i.callRealMethod();
+                leaderDone.set(true);
+              } else {
+                while (!leaderDone.get() || !leaderShutdown.get()) {
+                  Thread.sleep(1000);
+                }
+                response = ContainerProtos.ContainerCommandResponseProto.newBuilder()
+                        .setResult(ContainerProtos.Result.IO_EXCEPTION).build();
+              }
+              return response;
+            }).when(dispatcher.getDispatcher()).processRequest(Mockito.any(), Mockito.any(), Mockito.any(),
+                Mockito.anyString(), Mockito.any());
+          }
+          out.write("Hello".getBytes(UTF_8));
+        }
+        DatanodeDetails leaderDN =
+            cluster.getHddsDatanodes().stream().filter(i -> i.getDatanodeDetails().getUuid().equals(leaderId))
+            .findAny().get().getDatanodeDetails();
+        cluster.shutdownHddsDatanode(leaderDN);
+        leaderShutdown.set(true);
+
+        while (true) {
+          int cnt = 0;
+          for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
+            if (!dn.getDatanodeDetails().getUuid().equals(leaderId)) {
+              cnt += dn.getDatanodeStateMachine().getContainer().getContainerSet().getContainer(containerId).getContainerState() == ContainerProtos.ContainerDataProto.State.CLOSED ? 1 : 0;
+            }
+          }
+          if (cnt == 2) {
+            break;
+          }
+        }
+        cluster.shutdownHddsDatanodes();
+        cluster.restartStorageContainerManager(false);
+        cluster.restartHddsDatanode(leaderDN, false);
+        GenericTestUtils.waitFor(() -> {
+          try {
+            return cluster.getHddsDatanode(leaderDN).getDatanodeStateMachine().getContainer().getContainerSet().getContainer(containerId).getContainerState() == ContainerProtos.ContainerDataProto.State.QUASI_CLOSED;
+          } catch (Exception e) {
+            return false;
+          }
+        }, 1000, 30000);
+        for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
+          Container<?> container =
+              cluster.getHddsDatanode(dn.getDatanodeDetails()).getDatanodeStateMachine().getContainer().getContainerSet().getContainer(containerId);
+          System.out.println("Swaminathan \t" + container.getContainerState() + "\t" +
+              container.getContainerData().getBlockCommitSequenceId());
+        }
+
+      }
+    }
+  }
+
+
+        @ParameterizedTest
   @MethodSource("containerReplicationArguments")
   void testContainerReplication(
       String placementPolicyClass, boolean legacyEnabled) throws Exception {
@@ -168,7 +264,7 @@ class TestContainerReplication {
   private static MiniOzoneCluster newCluster(OzoneConfiguration conf)
       throws IOException {
     return MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(5)
+        .setNumDatanodes(3)
         .build();
   }
 

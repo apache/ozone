@@ -67,7 +67,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   private final RequestHandler handler;
   private final OzoneManager ozoneManager;
   private final OzoneProtocolMessageDispatcher<OMRequest, OMResponse,
-      ProtocolMessageEnum> dispatcher;
+      ProtocolMessageEnum, String> dispatcher;
   private final RequestValidations requestValidations;
   private final OMPerformanceMetrics perfMetrics;
 
@@ -117,7 +117,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     }
 
     OMResponse response = dispatcher.processRequest(validatedRequest,
-        this::processRequest, request.getCmdType(), request.getTraceID());
+        this::processRequest, request.getCmdType(), request.getTraceID(), "");
 
     return captureLatencyNs(perfMetrics.getValidateResponseLatencyNs(),
         () -> requestValidations.validateResponse(request, response));
