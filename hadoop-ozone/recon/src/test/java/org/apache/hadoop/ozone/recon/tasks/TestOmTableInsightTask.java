@@ -44,6 +44,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -127,6 +129,9 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   @Mock
   private Table<Long, NSSummary> nsSummaryTable;
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestOmTableInsightTask.class);
+
   public TestOmTableInsightTask() {
     super();
   }
@@ -154,6 +159,11 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
         reconNamespaceSummaryManager, reconOMMetadataManager,
         ozoneConfiguration);
     dslContext = getDslContext();
+
+    omTableInsightTask.setTables(omTableInsightTask.getTaskTables());
+    omTableInsightTask.setObjectCountMap(omTableInsightTask.initializeCountMap());
+    omTableInsightTask.setUnReplicatedSizeMap(omTableInsightTask.initializeSizeMap(false));
+    omTableInsightTask.setReplicatedSizeMap(omTableInsightTask.initializeSizeMap(true));
   }
 
   @BeforeEach
