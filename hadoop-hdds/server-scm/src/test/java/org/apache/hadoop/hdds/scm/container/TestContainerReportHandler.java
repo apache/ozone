@@ -169,7 +169,7 @@ public class TestContainerReportHandler {
                Map<DatanodeDetails, Integer> expectedReplicaMap) {
     final ContainerReportsProto containerReport = getContainerReportsProto(
             container.containerID(), ContainerReplicaProto.State.CLOSED,
-            dn.getUuidString(), 2000000000L, 100000000L, replicaIndex);
+            dn.getUuidString(), 2000000000L, 100000000L, 10000L, replicaIndex);
     final ContainerReportFromDatanode containerReportFromDatanode =
             new ContainerReportFromDatanode(dn, containerReport);
     final ContainerReportHandler reportHandler = new ContainerReportHandler(
@@ -604,7 +604,7 @@ public class TestContainerReportHandler {
 
   @Test
   public void testClosingToQuasiClosed()
-      throws NodeNotFoundException, IOException, TimeoutException {
+      throws NodeNotFoundException, IOException {
     /*
      * The container is in CLOSING state and all the replicas are in
      * OPEN/CLOSING state.
@@ -671,7 +671,7 @@ public class TestContainerReportHandler {
 
   @Test
   public void testQuasiClosedToClosed()
-      throws NodeNotFoundException, IOException, TimeoutException {
+      throws NodeNotFoundException, IOException {
     /*
      * The container is in QUASI_CLOSED state.
      *  - One of the replica is in QUASI_CLOSED state
@@ -738,6 +738,70 @@ public class TestContainerReportHandler {
     reportHandler.onMessage(containerReportFromDatanode, publisher);
 
     assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(containerOne.containerID()).getState());
+  }
+
+  @Test
+  public void testQuasiClosedToClosedAttemptWithMismatchingBCSID()
+      throws NodeNotFoundException, IOException {
+    /*
+     * Negative test. When a replica with a (lower) mismatching bcsId gets reported,
+     * expect the ContainerReportHandler thread to not throw uncaught exception
+     * (which could lead to ContainerReportHandler thread crash before HDDS-12150)
+     */
+
+    final ContainerReportHandler reportHandler = new ContainerReportHandler(nodeManager, containerManager);
+    final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
+        NodeStatus.inServiceHealthy()).iterator();
+
+    final DatanodeDetails datanodeOne = nodeIterator.next();
+    final DatanodeDetails datanodeTwo = nodeIterator.next();
+    final DatanodeDetails datanodeThree = nodeIterator.next();
+
+    final ContainerInfo containerOne = getContainer(LifeCycleState.QUASI_CLOSED);
+    final ContainerInfo containerTwo = getContainer(LifeCycleState.CLOSED);
+
+    final Set<ContainerID> containerIDSet = Stream.of(
+            containerOne.containerID(), containerTwo.containerID())
+        .collect(Collectors.toSet());
+    final Set<ContainerReplica> containerOneReplicas = getReplicas(
+        containerOne.containerID(), ContainerReplicaProto.State.QUASI_CLOSED,
+        10000L,  // sequenceId
+        datanodeOne);
+    containerOneReplicas.addAll(getReplicas(
+        containerOne.containerID(), ContainerReplicaProto.State.CLOSING,
+        10000L,
+        datanodeTwo, datanodeThree));
+    final Set<ContainerReplica> containerTwoReplicas = getReplicas(
+        containerTwo.containerID(), ContainerReplicaProto.State.CLOSED,
+        10000L,
+        datanodeOne, datanodeTwo, datanodeThree);
+
+    nodeManager.setContainers(datanodeOne, containerIDSet);
+    nodeManager.setContainers(datanodeTwo, containerIDSet);
+    nodeManager.setContainers(datanodeThree, containerIDSet);
+
+    containerStateManager.addContainer(containerOne.getProtobuf());
+    containerStateManager.addContainer(containerTwo.getProtobuf());
+
+    containerOneReplicas.forEach(r ->
+        containerStateManager.updateContainerReplica(
+            containerTwo.containerID(), r));
+
+    containerTwoReplicas.forEach(r ->
+        containerStateManager.updateContainerReplica(
+            containerTwo.containerID(), r));
+
+
+    final ContainerReportsProto containerReport = getContainerReportsProto(
+        containerOne.containerID(), ContainerReplicaProto.State.CLOSED,
+        datanodeOne.getUuidString(),
+        2000L);
+
+    final ContainerReportFromDatanode containerReportFromDatanode =
+        new ContainerReportFromDatanode(datanodeOne, containerReport);
+    reportHandler.onMessage(containerReportFromDatanode, publisher);
+
+    assertEquals(LifeCycleState.QUASI_CLOSED, containerManager.getContainer(containerOne.containerID()).getState());
   }
 
   @Test
@@ -1095,7 +1159,7 @@ public class TestContainerReportHandler {
       DatanodeDetails dn, long bytesUsed, long keyCount, int replicaIndex) {
     ContainerReportsProto containerReport = getContainerReportsProto(
         containerId, state, dn.getUuidString(), bytesUsed, keyCount,
-        replicaIndex);
+        10000L, replicaIndex);
 
     return new ContainerReportFromDatanode(dn, containerReport);
   }
@@ -1104,20 +1168,34 @@ public class TestContainerReportHandler {
       final ContainerID containerId, final ContainerReplicaProto.State state,
       final String originNodeId) {
     return getContainerReportsProto(containerId, state, originNodeId,
-        2000000000L, 100000000L, 0);
+        2000000000L, 100000000L, 10000L, 0);
+  }
+
+  protected static ContainerReportsProto getContainerReportsProto(
+      final ContainerID containerId, final ContainerReplicaProto.State state,
+      final String originNodeId, final long bcsId) {
+    return getContainerReportsProto(containerId, state, originNodeId,
+        2000000000L, 100000000L, bcsId, 0);
   }
 
   protected static ContainerReportsProto getContainerReportsProto(
       final ContainerID containerId, final ContainerReplicaProto.State state,
       final String originNodeId, int replicaIndex) {
     return getContainerReportsProto(containerId, state, originNodeId,
-        2000000000L, 100000000L, replicaIndex);
+        2000000000L, 100000000L, 10000L, replicaIndex);
+  }
+
+  protected static ContainerReportsProto getContainerReportsProto(
+      final ContainerID containerId, final ContainerReplicaProto.State state,
+      final String originNodeId, final long bcsId, int replicaIndex) {
+    return getContainerReportsProto(containerId, state, originNodeId,
+        2000000000L, 100000000L, bcsId, replicaIndex);
   }
 
   protected static ContainerReportsProto getContainerReportsProto(
       final ContainerID containerId, final ContainerReplicaProto.State state,
       final String originNodeId, final long usedBytes, final long keyCount,
-      final int replicaIndex) {
+      final long bcsId, final int replicaIndex) {
     final ContainerReportsProto.Builder crBuilder =
         ContainerReportsProto.newBuilder();
     final ContainerReplicaProto replicaProto =
@@ -1133,7 +1211,7 @@ public class TestContainerReportHandler {
             .setWriteCount(100000000L)
             .setReadBytes(2000000000L)
             .setWriteBytes(2000000000L)
-            .setBlockCommitSequenceId(10000L)
+            .setBlockCommitSequenceId(bcsId)
             .setDeleteTransactionId(0)
             .setReplicaIndex(replicaIndex)
             .build();
