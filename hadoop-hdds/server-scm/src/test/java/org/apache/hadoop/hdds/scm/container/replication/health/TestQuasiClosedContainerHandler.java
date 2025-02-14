@@ -176,6 +176,90 @@ public class TestQuasiClosedContainerHandler {
   }
 
   /**
+   * When a container is QUASI_CLOSED with some unhealthy and all 3 are reported with unique
+   * origins, it should be forced closed.
+   */
+  @Test
+  public void testQuasiClosedWithAllUniqueOriginAndUnhealthySendsForceClose() {
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        ratisReplicationConfig, 1, QUASI_CLOSED);
+    // These 3 replicas will have the same BCSID and unique origin node ids
+    Set<ContainerReplica> containerReplicas = ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(),
+            State.QUASI_CLOSED, 0, 0);
+    containerReplicas.addAll(ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(),
+            State.UNHEALTHY, 0));
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .build();
+    ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .setReadOnly(true)
+        .build();
+
+    Assertions.assertFalse(quasiClosedContainerHandler.handle(request));
+    Assertions.assertFalse(quasiClosedContainerHandler.handle(readRequest));
+    Mockito.verify(replicationManager, times(2))
+        .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
+  }
+
+  /**
+   * If it's possible to force close replicas then only replicas with the
+   * highest Sequence ID (also known as BCSID) should be closed.
+   */
+  @Test
+  public void testQuasiClosedWithUnhealthyHavingHighestSeq() {
+    final ContainerInfo containerInfo =
+        getContainer(HddsProtos.LifeCycleState.QUASI_CLOSED);
+    containerInfo.setUsedBytes(99);
+    final ContainerID id = containerInfo.containerID();
+
+    // create replicas with unique origin DNs
+    DatanodeDetails dnOne = randomDatanodeDetails();
+    DatanodeDetails dnTwo = randomDatanodeDetails();
+    DatanodeDetails dnThree = randomDatanodeDetails();
+
+    // 1001 is the highest sequence id
+    final ContainerReplica replicaOne = getReplicas(
+        id, State.QUASI_CLOSED, 1000L, dnOne.getUuid(), dnOne);
+    final ContainerReplica replicaTwo = getReplicas(
+        id, State.QUASI_CLOSED, 1000L, dnTwo.getUuid(), dnTwo);
+    final ContainerReplica replicaThree = getReplicas(
+        id, State.UNHEALTHY, 1001L, dnThree.getUuid(), dnThree);
+    Set<ContainerReplica> containerReplicas = new HashSet<>();
+    containerReplicas.add(replicaOne);
+    containerReplicas.add(replicaTwo);
+    containerReplicas.add(replicaThree);
+
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .build();
+    ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .setReadOnly(true)
+        .build();
+
+    Assertions.assertFalse(quasiClosedContainerHandler.handle(request));
+    Assertions.assertFalse(quasiClosedContainerHandler.handle(readRequest));
+    // verify no close commands are sent as the container cannot be closed.
+    Mockito.verify(replicationManager, times(0))
+        .sendCloseContainerReplicaCommand(eq(containerInfo), any(), anyBoolean());
+  }
+
+  /**
    * The replicas are QUASI_CLOSED, but all of them have the same origin node
    * id. Since all replicas must have unique origin node ids, the handler
    * should not force close it.
