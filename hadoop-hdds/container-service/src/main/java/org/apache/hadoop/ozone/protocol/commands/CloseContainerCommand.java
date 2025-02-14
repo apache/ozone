@@ -90,7 +90,11 @@ public class CloseContainerCommand
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append(getType())
-        .append(": containerID: ").append(getContainerID())
+        .append(": cmdID: ").append(getId())
+        .append(", encodedToken: \"").append(getEncodedToken()).append("\"")
+        .append(", term: ").append(getTerm())
+        .append(", deadlineMsSinceEpoch: ").append(getDeadline())
+        .append(", containerID: ").append(getContainerID())
         .append(", pipelineID: ").append(getPipelineID())
         .append(", force: ").append(force);
     return sb.toString();

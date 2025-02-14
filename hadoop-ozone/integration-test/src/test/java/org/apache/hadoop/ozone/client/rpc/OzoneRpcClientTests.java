@@ -182,7 +182,6 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.REA
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assumptions.assumeThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -4999,8 +4998,6 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @Test
   public void testParallelDeleteBucketAndCreateKey() throws IOException,
       InterruptedException, TimeoutException {
-    assumeThat(getCluster().getOzoneManager().isRatisEnabled()).isTrue();
-
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 

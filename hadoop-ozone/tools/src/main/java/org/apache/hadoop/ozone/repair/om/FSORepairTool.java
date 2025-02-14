@@ -401,7 +401,7 @@ public class FSORepairTool extends RepairTool {
 
         RepeatedOmKeyInfo originalRepeatedKeyInfo = deletedTable.get(fileKey);
         RepeatedOmKeyInfo updatedRepeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-            fileInfo, fileInfo.getUpdateID(), true);
+            fileInfo, fileInfo.getUpdateID());
         // NOTE: The FSO code seems to write the open key entry with the whole
         // path, using the object's names instead of their ID. This would only
         // be possible when the file is deleted explicitly, and not part of a

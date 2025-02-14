@@ -35,6 +35,10 @@ public abstract class WithMetadata {
     metadata = b.metadata;
   }
 
+  protected WithMetadata(WithMetadata other) {
+    metadata = new ConcurrentHashMap<>(other.getMetadata());
+  }
+
   /**
    * Custom key value metadata.
    */

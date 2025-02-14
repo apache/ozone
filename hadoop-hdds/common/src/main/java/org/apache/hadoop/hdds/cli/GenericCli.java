@@ -18,6 +18,10 @@ package org.apache.hadoop.hdds.cli;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.file.AccessDeniedException;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.FileSystemException;
+import java.nio.file.NoSuchFileException;
 import java.util.Map;
 
 import com.google.common.base.Strings;
@@ -90,7 +94,12 @@ public abstract class GenericCli implements GenericParentCommand {
     if (verbose || Strings.isNullOrEmpty(error.getMessage())) {
       error.printStackTrace(cmd.getErr());
     } else {
-      cmd.getErr().println(error.getMessage().split("\n")[0]);
+      if (error instanceof FileSystemException) {
+        String errorMessage = handleFileSystemException((FileSystemException) error);
+        cmd.getErr().println(errorMessage);
+      } else {
+        cmd.getErr().println(error.getMessage().split("\n")[0]);
+      }
     }
   }
 
@@ -122,5 +131,25 @@ public abstract class GenericCli implements GenericParentCommand {
 
   protected PrintWriter err() {
     return cmd.getErr();
+  }
+
+  private static String handleFileSystemException(FileSystemException e) {
+    String errorMessage = e.getMessage();
+
+    // If reason is set, return the exception's message as it is.
+    // Otherwise, construct a custom message based on the type of exception
+    if (e.getReason() == null) {
+      if (e instanceof NoSuchFileException) {
+        errorMessage = "File not found: " + errorMessage;
+      } else if (e instanceof AccessDeniedException) {
+        errorMessage = "Access denied: " + errorMessage;
+      } else if (e instanceof FileAlreadyExistsException) {
+        errorMessage = "File already exists: " + errorMessage;
+      } else {
+        errorMessage = e.getClass().getSimpleName() + ": " + errorMessage;
+      }
+    }
+
+    return "Error: " + errorMessage;
   }
 }
