@@ -149,4 +149,52 @@ public class HttpFSServerMetrics {
   public void shutdown() {
     DefaultMetricsSystem.shutdown();
   }
+
+  public long getBytesWritten() {
+    return bytesWritten.value();
+  }
+
+  public long getBytesRead() {
+    return bytesRead.value();
+  }
+
+  public long getOpsCreate() {
+    return opsCreate.value();
+  }
+
+  public long getOpsAppend() {
+    return opsAppend.value();
+  }
+
+  public long getOpsTruncate() {
+    return opsTruncate.value();
+  }
+
+  public long getOpsDelete() {
+    return opsDelete.value();
+  }
+
+  public long getOpsRename() {
+    return opsRename.value();
+  }
+
+  public long getOpsMkdir() {
+    return opsMkdir.value();
+  }
+
+  public long getOpsOpen() {
+    return opsOpen.value();
+  }
+
+  public long getOpsListing() {
+    return opsListing.value();
+  }
+
+  public long getOpsStat() {
+    return opsStat.value();
+  }
+
+  public long getOpsCheckAccess() {
+    return opsCheckAccess.value();  
+  }
 }
