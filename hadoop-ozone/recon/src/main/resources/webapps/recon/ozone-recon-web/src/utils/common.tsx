@@ -66,6 +66,33 @@ export const byteToSize = (bytes: number, decimals: number) => {
   return isNaN(i) ? `Not Defined` : `${Number.parseFloat((bytes / (k ** i)).toFixed(dm))} ${sizes[i]}`;
 };
 
+/**
+ * This method converts a number to the respective closest value in words
+ * Ex:
+ *    (num: 1234, digits: 1) = 1.2k
+ *    (num: 1234, digits: 2) = 1.23k
+ * 
+ * In case it reaches 1e18 i.e more than 18 digits present, it will give the nearest value
+ * Ex (if it was going upto a thousand, i.e K is the largest prefix it can provide)
+ *    (num: 12300000, digits: 1) = 12300k
+ * 
+ * Similarly for something exceeding billions, it will give to the closest billionth value
+ * @param num: The number to convert
+ * @param digits: The number of digits after decimal 
+ */
+export function numberToWord(num: number, digits: number) {
+  const matcherTable = [
+    { value: 1, symbol: "" },
+    { value: 1e3, symbol: "K" },
+    { value: 1e6, symbol: "M" },
+    { value: 1e9, symbol: "B" }
+  ]
+
+  const regexp = /\.0+$|(?<=\.[0-9]*[1-9])0+$/;
+  const item = matcherTable.slice().reverse().find(item => num >= item.value);
+  return item ? (num / item.value).toFixed(digits).replace(regexp, "").concat(item.symbol) : "0";
+}
+
 export const nullAwareLocaleCompare = (a: string, b: string) => {
   if (!a && !b) {
     return 0;
