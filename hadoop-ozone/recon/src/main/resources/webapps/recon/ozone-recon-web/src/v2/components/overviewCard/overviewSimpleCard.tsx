@@ -30,7 +30,7 @@ import {
   InboxOutlined,
   QuestionCircleOutlined
 } from '@ant-design/icons';
-import { numberToWord } from '@/utils/common';
+import { numberToWord, numberWithCommas } from '@/utils/common';
 
 
 // ------------- Types -------------- //
@@ -139,7 +139,7 @@ const OverviewSimpleCard: React.FC<OverviewCardProps> = ({
           <IconSelector iconType={icon} style={iconStyle} />
         </Col>
         <Col style={dataColStyle}>
-          {numberToWord(data, 1)}
+          {numberWithCommas(data)}
         </Col>
       </Row>
     </Card>
