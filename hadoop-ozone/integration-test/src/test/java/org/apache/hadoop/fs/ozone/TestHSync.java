@@ -96,6 +96,7 @@ import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
@@ -834,6 +835,7 @@ public class TestHSync {
 
   @ParameterizedTest
   @MethodSource("concurrentExceptionHandling")
+  @Unhealthy("HDDS-12313")
   public void testConcurrentExceptionHandling(int syncerThreads, int errors) throws Exception {
     final String rootPath = String.format("%s://%s/", OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
     CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
