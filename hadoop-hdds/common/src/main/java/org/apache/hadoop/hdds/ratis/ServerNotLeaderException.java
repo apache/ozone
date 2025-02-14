@@ -35,8 +35,8 @@ public class ServerNotLeaderException extends IOException {
       Pattern.compile(".*Suggested leader is Server:([^:]*)(:[0-9]+).*",
           Pattern.DOTALL);
 
-  public ServerNotLeaderException(RaftPeerId currentPeerId, String hostname
-      , String roleType) {
+  public ServerNotLeaderException(RaftPeerId currentPeerId, String hostname,
+                                  String roleType) {
     super(roleType + " Server:" + currentPeerId + "(" + hostname + ") is not the leader. Could not " +
         "determine the leader node.");
     this.leader = null;
