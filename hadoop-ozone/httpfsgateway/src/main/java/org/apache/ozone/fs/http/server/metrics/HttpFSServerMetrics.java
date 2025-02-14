@@ -29,8 +29,6 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.source.JvmMetrics;
 
-import com.google.common.annotations.VisibleForTesting;
-
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -152,62 +150,50 @@ public class HttpFSServerMetrics {
     DefaultMetricsSystem.shutdown();
   }
 
-  @VisibleForTesting
   public long getBytesWritten() {
     return bytesWritten.value();
   }
 
-  @VisibleForTesting
   public long getBytesRead() {
     return bytesRead.value();
   }
 
-  @VisibleForTesting
   public long getOpsCreate() {
     return opsCreate.value();
   }
 
-  @VisibleForTesting
   public long getOpsAppend() {
     return opsAppend.value();
   }
 
-  @VisibleForTesting
   public long getOpsTruncate() {
     return opsTruncate.value();
   }
 
-  @VisibleForTesting
   public long getOpsDelete() {
     return opsDelete.value();
   }
 
-  @VisibleForTesting
   public long getOpsRename() {
     return opsRename.value();
   }
 
-  @VisibleForTesting
   public long getOpsMkdir() {
     return opsMkdir.value();
   }
 
-  @VisibleForTesting
   public long getOpsOpen() {
     return opsOpen.value();
   }
 
-  @VisibleForTesting
   public long getOpsListing() {
     return opsListing.value();
   }
 
-  @VisibleForTesting
   public long getOpsStat() {
     return opsStat.value();
   }
 
-  @VisibleForTesting
   public long getOpsCheckAccess() {
     return opsCheckAccess.value();  
   }
