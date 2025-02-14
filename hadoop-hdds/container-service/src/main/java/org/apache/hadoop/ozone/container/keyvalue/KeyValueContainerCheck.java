@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -266,7 +265,7 @@ public class KeyValueContainerCheck {
               } else {
                 // If schema V3 and container details not in DB or
                 // if containerDBPath is removed
-                if ((onDiskContainerData.hasSchema(OzoneConsts.SCHEMA_V3) &&
+                if ((onDiskContainerData.sharedDB() &&
                     db.getStore().getMetadataTable().get(
                       onDiskContainerData.getBcsIdKey()) == null)  ||
                     !new File(onDiskContainerData.getDbFile()

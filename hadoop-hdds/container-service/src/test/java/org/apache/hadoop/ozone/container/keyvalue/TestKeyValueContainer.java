@@ -21,7 +21,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED;
-import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_SCHEMA_V4_ENABLED;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSharedDBVersion;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -582,7 +583,7 @@ public class TestKeyValueContainer {
     assertFalse(keyValueContainer.getContainerFile().exists(),
         "Container File still exists");
 
-    if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
+    if (isSharedDBVersion(schemaVersion)) {
       assertTrue(keyValueContainer.getContainerDBFile().exists());
     } else {
       assertFalse(keyValueContainer.getContainerDBFile().exists(),
@@ -766,7 +767,7 @@ public class TestKeyValueContainer {
     }
 
     // DBOtions should be different, except SCHEMA-V3
-    if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
+    if (isSharedDBVersion(schemaVersion)) {
       assertEquals(
           outProfile1.getDBOptions().compactionReadaheadSize(),
           outProfile2.getDBOptions().compactionReadaheadSize());
@@ -810,7 +811,7 @@ public class TestKeyValueContainer {
   void testAutoCompactionSmallSstFile(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
-    assumeTrue(isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3));
+    assumeTrue(isSharedDBVersion(schemaVersion));
     // Create a new HDDS volume
     String volumeDirPath =
         Files.createDirectory(folder.toPath().resolve("volumeDir")).toFile()
@@ -1032,6 +1033,7 @@ public class TestKeyValueContainer {
       boolean schemaV3Enabled) throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     final String dir1 = dir + (schemaV3Enabled ? "/v3" : "/v2");
+    conf.setBoolean(CONTAINER_SCHEMA_V4_ENABLED, false);
 
     // create HddsVolume
     HddsVolume hddsVolume1 = new HddsVolume.Builder(dir1)

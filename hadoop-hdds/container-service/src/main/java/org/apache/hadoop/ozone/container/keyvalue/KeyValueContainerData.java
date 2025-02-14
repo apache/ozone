@@ -31,8 +31,10 @@ import static org.apache.hadoop.ozone.OzoneConsts.PENDING_DELETE_BLOCK_COUNT;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V4;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_VERSION;
 import static org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix;
+import static org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.isFinalized;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.base.Preconditions;
@@ -46,12 +48,14 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
+    .ContainerDataProto;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.yaml.snakeyaml.nodes.Tag;
@@ -68,6 +72,8 @@ public class KeyValueContainerData extends ContainerData {
 
   // Fields need to be stored in .container file.
   private static final List<String> KV_YAML_FIELDS;
+  // Fields need to be stored in .container file for Schema V4;
+  private static final List<String> KV_YAML_FIELDS_SCHEMA_V4;
 
   // Path to Container metadata Level DB/RocksDB Store and .container file.
   private String metadataPath;
@@ -98,6 +104,11 @@ public class KeyValueContainerData extends ContainerData {
     KV_YAML_FIELDS.add(CHUNKS_PATH);
     KV_YAML_FIELDS.add(CONTAINER_DB_TYPE);
     KV_YAML_FIELDS.add(SCHEMA_VERSION);
+
+    KV_YAML_FIELDS_SCHEMA_V4 = Lists.newArrayList();
+    KV_YAML_FIELDS_SCHEMA_V4.addAll(YAML_FIELDS);
+    KV_YAML_FIELDS_SCHEMA_V4.add(CONTAINER_DB_TYPE);
+    KV_YAML_FIELDS_SCHEMA_V4.add(SCHEMA_VERSION);
   }
 
   /**
@@ -150,7 +161,7 @@ public class KeyValueContainerData extends ContainerData {
    * @throws UnsupportedOperationException If no valid schema version is found.
    */
   public String getSupportedSchemaVersionOrDefault() {
-    String[] versions = {SCHEMA_V1, SCHEMA_V2, SCHEMA_V3};
+    String[] versions = {SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4};
 
     for (String version : versions) {
       if (this.hasSchema(version)) {
@@ -336,7 +347,11 @@ public class KeyValueContainerData extends ContainerData {
   }
 
   public static List<String> getYamlFields() {
-    return Collections.unmodifiableList(KV_YAML_FIELDS);
+    if (isFinalized(HDDSLayoutFeature.DATANODE_SCHEMA_V4)) {
+      return KV_YAML_FIELDS_SCHEMA_V4;
+    } else {
+      return Collections.unmodifiableList(KV_YAML_FIELDS);
+    }
   }
 
   /**
@@ -426,7 +441,7 @@ public class KeyValueContainerData extends ContainerData {
    * for other schemas just return null.
    */
   public String startKeyEmpty() {
-    if (hasSchema(SCHEMA_V3)) {
+    if (sharedDB()) {
       return getContainerKeyPrefix(getContainerID());
     }
     return null;
@@ -437,7 +452,7 @@ public class KeyValueContainerData extends ContainerData {
    * for other schemas just return null.
    */
   public String containerPrefix() {
-    if (hasSchema(SCHEMA_V3)) {
+    if (sharedDB()) {
       return getContainerKeyPrefix(getContainerID());
     }
     return "";
@@ -451,7 +466,7 @@ public class KeyValueContainerData extends ContainerData {
    * @return formatted key
    */
   private String formatKey(String key) {
-    if (hasSchema(SCHEMA_V3)) {
+    if (sharedDB()) {
       key = getContainerKeyPrefix(getContainerID()) + key;
     }
     return key;
@@ -461,4 +476,8 @@ public class KeyValueContainerData extends ContainerData {
     return KeyValueContainerUtil.isSameSchemaVersion(schemaVersion, version);
   }
 
+  public boolean sharedDB() {
+    return KeyValueContainerUtil.isSameSchemaVersion(schemaVersion, SCHEMA_V3) ||
+        KeyValueContainerUtil.isSameSchemaVersion(schemaVersion, SCHEMA_V4);
+  }
 }

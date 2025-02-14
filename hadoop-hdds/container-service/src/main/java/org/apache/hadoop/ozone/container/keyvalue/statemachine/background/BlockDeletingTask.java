@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.container.keyvalue.statemachine.background;
 
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
-import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 
 import java.io.File;
 import java.io.IOException;
@@ -147,7 +146,7 @@ public class BlockDeletingTask implements BackgroundTask {
         crr = deleteViaSchema1(meta, container, dataDir, startTime);
       } else if (containerData.hasSchema(SCHEMA_V2)) {
         crr = deleteViaSchema2(meta, container, dataDir, startTime);
-      } else if (containerData.hasSchema(SCHEMA_V3)) {
+      } else if (containerData.sharedDB()) {
         crr = deleteViaSchema3(meta, container, dataDir, startTime);
       } else {
         throw new UnsupportedOperationException(

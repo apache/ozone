@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.container.ContainerTestHelper.getChunk;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getData;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.setDataChecksum;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSharedDBVersion;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -258,7 +259,7 @@ public class TestContainerPersistence {
     initSchemaAndVersionInfo(versionInfo);
     // With schema v3, we don't have a container dedicated db,
     // so skip check the behaviors related to it.
-    assumeFalse(isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3));
+    assumeFalse(isSharedDBVersion(schemaVersion));
 
     long testContainerID = getTestContainerID();
     Thread.sleep(100);

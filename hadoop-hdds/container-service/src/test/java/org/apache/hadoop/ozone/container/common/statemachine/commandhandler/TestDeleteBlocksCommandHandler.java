@@ -21,6 +21,7 @@ import static java.util.Collections.emptyList;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V4;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.BLOCK_DELETE_COMMAND_WORKER_INTERVAL;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler.DeleteBlockTransactionExecutionResult;
@@ -135,10 +136,12 @@ public class TestDeleteBlocksCommandHandler {
     TestSchemaHandler testSchemaHandler1 = spy(new TestSchemaHandler());
     TestSchemaHandler testSchemaHandler2 = spy(new TestSchemaHandler());
     TestSchemaHandler testSchemaHandler3 = spy(new TestSchemaHandler());
+    TestSchemaHandler testSchemaHandler4 = spy(new TestSchemaHandler());
 
     handler.getSchemaHandlers().put(SCHEMA_V1, testSchemaHandler1);
     handler.getSchemaHandlers().put(SCHEMA_V2, testSchemaHandler2);
     handler.getSchemaHandlers().put(SCHEMA_V3, testSchemaHandler3);
+    handler.getSchemaHandlers().put(SCHEMA_V4, testSchemaHandler4);
   }
 
   @AfterEach

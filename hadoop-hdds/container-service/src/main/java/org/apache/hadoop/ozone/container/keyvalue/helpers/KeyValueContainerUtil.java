@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.container.keyvalue.helpers;
 
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V4;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
@@ -104,8 +106,8 @@ public final class KeyValueContainerUtil {
     } else if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V2)) {
       store = new DatanodeStoreSchemaTwoImpl(conf, dbFile.getAbsolutePath(),
           false);
-    } else if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
-      // We don't create per-container store for schema v3 containers,
+    } else if (isSharedDBVersion(schemaVersion)) {
+      // We don't create per-container store for schema v3/v4 containers,
       // they should use per-volume db store.
       return;
     } else {
@@ -142,7 +144,7 @@ public final class KeyValueContainerUtil {
   public static void removeContainerDB(
       KeyValueContainerData containerData, ConfigurationSource conf)
       throws IOException {
-    if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
+    if (containerData.sharedDB()) {
       // DB failure is catastrophic, the disk needs to be replaced.
       // In case of an exception, LOG the message and rethrow the exception.
       try {
@@ -230,7 +232,7 @@ public final class KeyValueContainerUtil {
         config.getObject(DatanodeConfiguration.class);
     boolean bCheckChunksFilePath = dnConf.getCheckEmptyContainerDir();
 
-    if (kvContainerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
+    if (kvContainerData.sharedDB()) {
       try (DBHandle db = BlockUtils.getDB(kvContainerData, config)) {
         populateContainerMetadata(kvContainerData,
             db.getStore(), bCheckChunksFilePath);
@@ -433,6 +435,12 @@ public final class KeyValueContainerUtil {
     String effective2 = other != null ? other : SCHEMA_V1;
     return effective1.equals(effective2);
   }
+
+  public static boolean isSharedDBVersion(String schema) {
+    String effective = schema != null ? schema : SCHEMA_V1;
+    return effective.equals(SCHEMA_V3) || effective.equals(SCHEMA_V4);
+  }
+
 
   /**
    * Moves container directory to a new location

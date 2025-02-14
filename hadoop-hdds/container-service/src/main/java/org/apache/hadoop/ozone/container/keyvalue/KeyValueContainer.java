@@ -28,6 +28,8 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IO_EXCEPTION;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V4;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -176,7 +178,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
               containerVolume, clusterId);
           // Set schemaVersion before the dbFile since we have to
           // choose the dbFile location based on schema version.
-          String schemaVersion = VersionedDatanodeFeatures.SchemaV3
+          String schemaVersion = VersionedDatanodeFeatures.SchemaV4
               .chooseSchemaVersion(config);
           containerData.setSchemaVersion(schemaVersion);
 
@@ -655,8 +657,17 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
             new File(getContainerData().getContainerPath()));
       } catch (Exception deleteex) {
         LOG.error(
-            "Can not cleanup destination directories after a container import"
-                + " error (cid: {}", containerId, deleteex);
+            "Can not cleanup container directory after a container import"
+                + " error (cid: {})", containerId, deleteex);
+      } finally {
+        if (containerData.sharedDB()) {
+          try {
+            BlockUtils.removeContainerFromDB(containerData, config);
+            LOG.debug("Container {} metadata is removed from DB", containerId);
+          } catch (IOException e) {
+            LOG.error("Can not remove container metadata from DB (cid: {})", containerId, e);
+          }
+        }
       }
       throw ex;
     } finally {
@@ -669,12 +680,18 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     containerData.setState(originalContainerData.getState());
     containerData
         .setContainerDBType(originalContainerData.getContainerDBType());
-    containerData.setSchemaVersion(originalContainerData.getSchemaVersion());
+    // migrate V3 to V4 on container import
+    if (VersionedDatanodeFeatures.SchemaV4.isFinalizedAndEnabled(config) &&
+        originalContainerData.hasSchema(SCHEMA_V3)) {
+      containerData.setSchemaVersion(SCHEMA_V4);
+    } else {
+      containerData.setSchemaVersion(originalContainerData.getSchemaVersion());
+    }
 
     //rewriting the yaml file with new checksum calculation.
     update(originalContainerData.getMetadata(), true);
 
-    if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
+    if (containerData.sharedDB()) {
       // load metadata from received dump files before we try to parse kv
       BlockUtils.loadKVContainerDataFromFiles(containerData, config);
     }
@@ -702,7 +719,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       }
 
       try {
-        if (!containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
+        if (!containerData.sharedDB()) {
           compactDB();
           // Close DB (and remove from cache) to avoid concurrent modification
           // while packing it.
@@ -1000,7 +1017,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   private void packContainerToDestination(OutputStream destination,
       ContainerPacker<KeyValueContainerData> packer)
       throws IOException {
-    if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
+    if (containerData.sharedDB()) {
       // Synchronize the dump and pack operation,
       // so concurrent exports don't get dump files overwritten.
       // We seldom got concurrent exports for a container,

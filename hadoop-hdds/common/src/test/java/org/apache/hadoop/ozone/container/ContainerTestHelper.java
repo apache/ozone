@@ -316,6 +316,7 @@ public final class ContainerTestHelper {
     request.setCreateContainer(
         ContainerProtos.CreateContainerRequestProto.getDefaultInstance().toBuilder().setState(state).build());
     request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
+    request.setPipelineID(pipeline.getId().getId().toString());
 
     return request;
   }

@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSharedDBVersion;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -292,7 +293,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
           (DatanodeStoreSchemaTwoImpl) store;
       pendingDelete =
           countPendingDeletesSchemaV2(schemaTwoStore, containerData);
-    } else if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
+    } else if (isSharedDBVersion(schemaVersion)) {
       DatanodeStoreSchemaThreeImpl schemaThreeStore =
           (DatanodeStoreSchemaThreeImpl) store;
       pendingDelete =
