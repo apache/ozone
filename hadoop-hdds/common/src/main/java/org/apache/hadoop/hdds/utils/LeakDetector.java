@@ -71,7 +71,7 @@ public class LeakDetector {
     Thread t = new Thread(this::run);
     t.setName(LeakDetector.class.getSimpleName() + "-" + name);
     t.setDaemon(true);
-    LOG.info("Starting leak detector thread {}.", name);
+    LOG.debug("Starting leak detector thread {}.", name);
     t.start();
   }
 
