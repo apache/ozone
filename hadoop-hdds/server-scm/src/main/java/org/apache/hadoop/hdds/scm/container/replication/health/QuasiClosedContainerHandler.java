@@ -99,17 +99,33 @@ public class QuasiClosedContainerHandler extends AbstractCheck {
       final Set<ContainerReplica> replicas) {
     final int replicationFactor =
         container.getReplicationConfig().getRequiredNodes();
-    final long uniqueQuasiClosedReplicaCount = replicas.stream()
-        .filter(r -> r.getState() == State.QUASI_CLOSED)
+
+    final long uniqueQuasiClosedOrUnhealthyReplicaCount = replicas.stream()
+        .filter(r -> r.getState() == State.QUASI_CLOSED || r.getState() == State.UNHEALTHY)
         .map(ContainerReplica::getOriginDatanodeId)
         .distinct()
         .count();
+
+    long maxQCSeq = -1;
+    long maxUnhealthySeq = -1;
+    for (ContainerReplica r : replicas) {
+      if (r.getState() == State.QUASI_CLOSED) {
+        maxQCSeq = Math.max(maxQCSeq, r.getSequenceId());
+      } else if (r.getState() == State.UNHEALTHY) {
+        maxUnhealthySeq = Math.max(maxUnhealthySeq, r.getSequenceId());
+      }
+    }
+
     // We can only force close the container if we have seen all the replicas from unique origins.
     // Due to unexpected behavior when writing to ratis containers, it is possible for blocks to be committed
     // on the ratis leader, but not on the followers. A failure on the leader can result in two replicas
     // without the latest transactions, which are then force closed. This can result in data loss.
     // Note that if the 3rd replica is permanently lost, the container will be stuck in QUASI_CLOSED state forever.
-    return uniqueQuasiClosedReplicaCount >= replicationFactor;
+    // It is possible to CLOSE a container that has one QC and the remaining UNHEALTHY, provided the QC is one of the
+    // replicas with the highest sequence ID. If an UNHEALTHY replica has a higher sequence ID, the container will
+    // remain in QUASI_CLOSED state.
+    return maxQCSeq > -1 && maxQCSeq >= maxUnhealthySeq
+        && uniqueQuasiClosedOrUnhealthyReplicaCount >= replicationFactor;
   }
 
   /**
