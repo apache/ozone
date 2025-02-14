@@ -25,7 +25,7 @@ import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
-import org.apache.hadoop.ozone.utils.FormattingCLIUtils;
+import org.apache.hadoop.hdds.utils.FormattingCLIUtils;
 import picocli.CommandLine;
 
 import java.io.IOException;
