@@ -211,7 +211,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         && !ADMIN_COMMAND_TYPE.contains(request.getCmdType())) {
       RatisUtil.checkRatisException(
           scm.getScmHAManager().getRatisServer().triggerNotLeaderException(),
-          scm.getClientRpcPort(), scm.getScmId(), scm.getHostname());
+          scm.getClientRpcPort(), scm.getScmId(), scm.getHostname(), "SCM");
     }
     // After the request interceptor (now validator) framework is extended to
     // this server interface, this should be removed and solved via new
@@ -737,7 +737,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       }
     } catch (IOException e) {
       RatisUtil
-          .checkRatisException(e, scm.getClientRpcPort(), scm.getScmId(), scm.getHostname());
+          .checkRatisException(e, scm.getClientRpcPort(), scm.getScmId(), scm.getHostname(), "SCM");
       throw new ServiceException(e);
     }
   }

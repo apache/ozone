@@ -111,7 +111,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     if (!scm.checkLeader()) {
       RatisUtil.checkRatisException(
           scm.getScmHAManager().getRatisServer().triggerNotLeaderException(),
-          scm.getBlockProtocolRpcPort(), scm.getScmId(), scm.getHostname());
+          scm.getBlockProtocolRpcPort(), scm.getScmId(), scm.getHostname(), "SCM");
     }
     return dispatcher.processRequest(
         request,
@@ -173,7 +173,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
       }
     } catch (IOException e) {
       RatisUtil.checkRatisException(e, scm.getBlockProtocolRpcPort(),
-          scm.getScmId(), scm.getHostname());
+          scm.getScmId(), scm.getHostname(), "SCM");
       response.setSuccess(false);
       response.setStatus(exceptionToResponseStatus(e));
       if (e.getMessage() != null) {
