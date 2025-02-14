@@ -366,6 +366,8 @@ public class ObjectEndpoint extends EndpointBase {
         throw os3Exception;
       } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
+      } else if (ex.getResult() == ResultCodes.QUOTA_EXCEEDED) {
+        throw newError(S3ErrorTable.QUOTA_EXCEEDED, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
       } else if (ex.getResult() == ResultCodes.FILE_ALREADY_EXISTS) {
