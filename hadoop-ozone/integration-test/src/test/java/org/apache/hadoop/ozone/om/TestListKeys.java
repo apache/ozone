@@ -19,22 +19,23 @@ package org.apache.hadoop.ozone.om;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
@@ -55,35 +56,28 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * Test covers listKeys(keyPrefix, startKey, shallow) combinations
  * in a legacy/OBS bucket layout type.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(1200)
-public class TestListKeys {
+public abstract class TestListKeys implements NonHATests.TestCase {
 
-  private static MiniOzoneCluster cluster = null;
+  private OzoneBucket legacyOzoneBucket;
+  private OzoneBucket obsOzoneBucket;
+  private OzoneClient client;
 
-  private static OzoneConfiguration conf;
+  private long originalMaxListSize;
 
-  private static OzoneBucket legacyOzoneBucket;
-
-  private static OzoneBucket obsOzoneBucket;
-  private static OzoneClient client;
-
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   *
-   * @throws IOException
-   */
   @BeforeAll
-  public static void init() throws Exception {
-    conf = new OzoneConfiguration();
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
+  void init() throws Exception {
+    OmConfig omConfig = cluster().getOzoneManager().getConfig();
+    originalMaxListSize = omConfig.getMaxListSize();
+    omConfig.setMaxListSize(2);
+
+    OzoneConfiguration conf = new OzoneConfiguration(cluster().getConf());
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 3);
     conf.setInt(OZONE_CLIENT_LIST_CACHE_SIZE, 3);
-    conf.setInt(OmConfig.Keys.SERVER_LIST_MAX_SIZE, 2);
-    cluster = MiniOzoneCluster.newBuilder(conf).build();
-    cluster.waitForClusterToBeReady();
-    client = cluster.newClient();
+
+    client = OzoneClientFactory.getRpcClient(conf);
 
     // create a volume and a LEGACY bucket
     legacyOzoneBucket = TestDataUtil
@@ -97,14 +91,12 @@ public class TestListKeys {
   }
 
   @AfterAll
-  public static void teardownClass() {
+  void cleanup() {
     IOUtils.closeQuietly(client);
-    if (cluster != null) {
-      cluster.shutdown();
-    }
+    cluster().getOzoneManager().getConfig().setMaxListSize(originalMaxListSize);
   }
 
-  private static void initFSNameSpace() throws Exception {
+  private void initFSNameSpace() throws Exception {
     buildNameSpaceTree(legacyOzoneBucket);
     buildNameSpaceTree(obsOzoneBucket);
   }
@@ -354,7 +346,7 @@ public class TestListKeys {
         bucket.listKeys(keyPrefix, startKey, true);
     ReplicationConfig expectedReplication =
         Optional.ofNullable(bucket.getReplicationConfig())
-            .orElse(cluster.getOzoneManager().getDefaultReplicationConfig());
+            .orElse(cluster().getOzoneManager().getDefaultReplicationConfig());
 
     List <String> keyLists = new ArrayList<>();
     while (ozoneKeyIterator.hasNext()) {
