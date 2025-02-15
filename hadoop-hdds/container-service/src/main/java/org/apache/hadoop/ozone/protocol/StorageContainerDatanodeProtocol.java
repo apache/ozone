@@ -18,6 +18,8 @@ package org.apache.hadoop.ozone.protocol;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtendedDatanodeDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeStateRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeStateResponseProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -88,5 +90,7 @@ public interface StorageContainerDatanodeProtocol {
       ContainerReportsProto containerReportsRequestProto,
       PipelineReportsProto pipelineReports,
       LayoutVersionProto layoutInfo) throws IOException;
+
+  NodeStateResponseProto getNodeState(NodeStateRequestProto request) throws IOException;
 
 }

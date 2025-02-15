@@ -26,6 +26,8 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto
         .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeStateRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeStateResponseProto;
 import org.apache.hadoop.hdds.protocol.proto
         .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -253,6 +255,12 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
         .setDatanodeUUID(datanodeDetailsProto.getUuid()).setErrorCode(
             StorageContainerDatanodeProtocolProtos
                 .SCMRegisteredResponseProto.ErrorCode.success).build();
+  }
+
+  @Override
+  public NodeStateResponseProto getNodeState(
+      NodeStateRequestProto request) throws IOException {
+    return null;
   }
 
   /**
