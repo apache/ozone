@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
@@ -68,8 +68,8 @@ public class NSSummaryAdmin implements AdminSubcommand {
 
   private boolean isObjectStoreBucket(OzoneBucket bucket, ObjectStore objectStore) {
     boolean enableFileSystemPaths = getOzoneConfig()
-        .getBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-            OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
+        .getBoolean(OmConfig.Keys.ENABLE_FILESYSTEM_PATHS,
+            OmConfig.Defaults.ENABLE_FILESYSTEM_PATHS);
     try {
       // Resolve the bucket layout in case this is a Link Bucket.
       BucketLayout resolvedBucketLayout =

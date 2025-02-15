@@ -342,12 +342,12 @@ public final class OMConfigKeys {
   public static final boolean OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT =
           false;
 
-  // This config needs to be enabled, when S3G created objects used via
-  // FileSystem API.
+  @Deprecated
   public static final String OZONE_OM_ENABLE_FILESYSTEM_PATHS =
-      "ozone.om.enable.filesystem.paths";
+      OmConfig.Keys.ENABLE_FILESYSTEM_PATHS;
+  @Deprecated
   public static final boolean OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT =
-      false;
+      OmConfig.Defaults.ENABLE_FILESYSTEM_PATHS;
 
   public static final String OZONE_SERVER_DEFAULT_REPLICATION_KEY =
       "ozone.server.default.replication";
