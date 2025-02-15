@@ -163,6 +163,14 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
+  class ListKeysWithFSO extends org.apache.hadoop.ozone.om.TestListKeysWithFSO {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
   class ObjectStoreWithFSO extends org.apache.hadoop.ozone.om.TestObjectStoreWithFSO {
     @Override
     public MiniOzoneCluster cluster() {
