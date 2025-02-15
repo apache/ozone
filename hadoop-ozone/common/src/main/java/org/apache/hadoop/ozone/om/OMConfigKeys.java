@@ -177,10 +177,6 @@ public final class OMConfigKeys {
   /**
    * OM Ratis related configurations.
    */
-  public static final String OZONE_OM_RATIS_ENABLE_KEY
-      = "ozone.om.ratis.enable";
-  public static final boolean OZONE_OM_RATIS_ENABLE_DEFAULT
-      = true;
   public static final String OZONE_OM_RATIS_PORT_KEY
       = "ozone.om.ratis.port";
   public static final int OZONE_OM_RATIS_PORT_DEFAULT
@@ -414,12 +410,10 @@ public final class OMConfigKeys {
   public static final String
       OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT_DEFAULT = "300s";
 
-  public static final String OZONE_PATH_DELETING_LIMIT_PER_TASK =
-      "ozone.path.deleting.limit.per.task";
-  // default is 6000 taking account of 32MB buffer size, and assuming
-  // 4KB size (considering acls, key/file name, and other meata)  * 6000
-  // resulting 24MB
-  public static final int OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT = 6000;
+  public static final String OZONE_THREAD_NUMBER_DIR_DELETION =
+      "ozone.thread.number.dir.deletion";
+
+  public static final int OZONE_THREAD_NUMBER_DIR_DELETION_DEFAULT = 10;
 
   public static final String SNAPSHOT_SST_DELETING_LIMIT_PER_TASK =
       "ozone.snapshot.filtering.limit.per.task";

@@ -62,10 +62,12 @@ import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
+import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.junit.jupiter.api.BeforeEach;
@@ -121,6 +123,7 @@ public class TestContainerEndpoint {
       LoggerFactory.getLogger(TestContainerEndpoint.class);
 
   private OzoneStorageContainerManager ozoneStorageContainerManager;
+  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private ReconContainerManager reconContainerManager;
   private ContainerStateManager containerStateManager;
   private ReconPipelineManager reconPipelineManager;
@@ -198,6 +201,8 @@ public class TestContainerEndpoint {
     containerEndpoint = reconTestInjector.getInstance(ContainerEndpoint.class);
     containerHealthSchemaManager =
         reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
+    this.reconNamespaceSummaryManager =
+        reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
 
     pipeline = getRandomPipeline();
     pipelineID = pipeline.getId();
@@ -472,6 +477,10 @@ public class TestContainerEndpoint {
     // Now to check if the ContainerEndpoint also reads the File table
     // Set up test data for FSO keys
     setUpFSOData();
+    NSSummaryTaskWithFSO nSSummaryTaskWithFso =
+        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
+            reconOMMetadataManager, new OzoneConfiguration());
+    nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
     // Reprocess the container key mapper to ensure the latest mapping is used
     reprocessContainerKeyMapper();
     response = containerEndpoint.getKeysForContainer(20L, -1, "");
@@ -556,6 +565,10 @@ public class TestContainerEndpoint {
     setUpFSOData();
     // Reprocess the container key mapper to ensure the latest mapping is used
     reprocessContainerKeyMapper();
+    NSSummaryTaskWithFSO nSSummaryTaskWithFso =
+        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
+            reconOMMetadataManager, new OzoneConfiguration());
+    nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
     response = containerEndpoint.getKeysForContainer(20L, -1, "/0/1/2/file7");
 
     // Ensure that the expected number of keys is returned

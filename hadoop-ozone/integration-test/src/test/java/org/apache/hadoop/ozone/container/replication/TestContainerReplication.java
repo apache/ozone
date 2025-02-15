@@ -137,7 +137,7 @@ class TestContainerReplication {
     long containerID = createNewClosedContainer(source);
     DatanodeDetails invalidPort = new DatanodeDetails(source);
     invalidPort.setPort(Port.Name.REPLICATION,
-        source.getPort(Port.Name.STANDALONE).getValue());
+        source.getStandalonePort().getValue());
     ReplicateContainerCommand cmd =
         ReplicateContainerCommand.fromSources(containerID,
             ImmutableList.of(invalidPort));

@@ -108,11 +108,14 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_L
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_MAX_OPEN_FILES;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_MAX_OPEN_FILES_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.om.service.SnapshotDeletingService.isBlockLocationInfoSame;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotDirExist;
@@ -308,7 +311,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table snapshotRenamedTable;
   private Table compactionLogTable;
 
-  private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
   private Table deletedDirTable;
 
@@ -339,23 +341,14 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    */
   public OmMetadataManagerImpl(OzoneConfiguration conf,
       OzoneManager ozoneManager) throws IOException {
-    this(conf, ozoneManager, null);
-  }
-
-  public OmMetadataManagerImpl(OzoneConfiguration conf,
-                               OzoneManager ozoneManager,
-                               OMPerformanceMetrics perfMetrics)
-      throws IOException {
     this.ozoneManager = ozoneManager;
-    this.perfMetrics = perfMetrics;
+    if (this.ozoneManager == null) {
+      this.perfMetrics = null;
+    } else {
+      this.perfMetrics = this.ozoneManager.getPerfMetrics();
+    }
     this.lock = new OzoneManagerLock(conf);
-    // TODO: This is a temporary check. Once fully implemented, all OM state
-    //  change should go through Ratis - be it standalone (for non-HA) or
-    //  replicated (for HA).
-    isRatisEnabled = conf.getBoolean(
-        OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
-        OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
-    this.omEpoch = OmUtils.getOMEpoch(isRatisEnabled);
+    this.omEpoch = OmUtils.getOMEpoch();
     // For test purpose only
     ignorePipelineinKey = conf.getBoolean(
         "ozone.om.ignore.pipeline", Boolean.TRUE);
@@ -401,8 +394,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       throws IOException {
     lock = new OmReadOnlyLock();
     omEpoch = 0;
-    setStore(loadDB(conf, dir, name, true,
-        java.util.Optional.of(Boolean.TRUE), Optional.empty()));
+    int maxOpenFiles = conf.getInt(OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES, OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT);
+
+    setStore(loadDB(conf, dir, name, true, Optional.of(Boolean.TRUE), maxOpenFiles, false, false));
     initializeOmTables(CacheType.PARTIAL_CACHE, false);
     perfMetrics = null;
   }
@@ -435,8 +429,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         checkSnapshotDirExist(checkpoint);
       }
       setStore(loadDB(conf, metaDir, dbName, false,
-          java.util.Optional.of(Boolean.TRUE),
-          Optional.of(maxOpenFiles), false, false));
+          java.util.Optional.of(Boolean.TRUE), maxOpenFiles, false, false));
       initializeOmTables(CacheType.PARTIAL_CACHE, false);
     } catch (IOException e) {
       stop();
@@ -570,15 +563,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       // enabled, ratis log provides us this guaranty. This check is needed
       // until HA code path becomes default in OM.
 
-      // When ratis is not enabled override and set the sync.
-      if (!isRatisEnabled) {
-        rocksDBConfiguration.setSyncOption(true);
-      }
-
       int maxOpenFiles = configuration.getInt(OZONE_OM_DB_MAX_OPEN_FILES,
           OZONE_OM_DB_MAX_OPEN_FILES_DEFAULT);
 
-      this.store = loadDB(configuration, metaDir, Optional.of(maxOpenFiles));
+      this.store = loadDB(configuration, metaDir, maxOpenFiles);
 
       initializeOmTables(CacheType.FULL_CACHE, true);
     }
@@ -586,33 +574,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     snapshotChainManager = new SnapshotChainManager(this);
   }
 
-  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir)
-      throws IOException {
-    return loadDB(configuration, metaDir, Optional.empty());
-  }
-
-  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir, Optional<Integer> maxOpenFiles)
-      throws IOException {
-    return loadDB(configuration, metaDir, OM_DB_NAME, false,
-        java.util.Optional.empty(), maxOpenFiles, true, true);
-  }
-
-  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
-                               String dbName, boolean readOnly,
-                               java.util.Optional<Boolean>
-                                       disableAutoCompaction,
-                               java.util.Optional<Integer> maxOpenFiles)
-          throws IOException {
-    return loadDB(configuration, metaDir, dbName, readOnly,
-        disableAutoCompaction, maxOpenFiles, true, true);
+  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir, int maxOpenFiles) throws IOException {
+    return loadDB(configuration, metaDir, OM_DB_NAME, false, java.util.Optional.empty(), maxOpenFiles, true, true);
   }
 
   @SuppressWarnings("checkstyle:parameternumber")
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
                                String dbName, boolean readOnly,
-                               java.util.Optional<Boolean>
-                                   disableAutoCompaction,
-                               java.util.Optional<Integer> maxOpenFiles,
+                               java.util.Optional<Boolean> disableAutoCompaction,
+                               int maxOpenFiles,
                                boolean enableCompactionDag,
                                boolean createCheckpointDirs)
       throws IOException {
@@ -626,10 +596,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .setPath(Paths.get(metaDir.getPath()))
         .setMaxFSSnapshots(maxFSSnapshots)
         .setEnableCompactionDag(enableCompactionDag)
-        .setCreateCheckpointDirs(createCheckpointDirs);
+        .setCreateCheckpointDirs(createCheckpointDirs)
+        .setMaxNumberOfOpenFiles(maxOpenFiles);
     disableAutoCompaction.ifPresent(
             dbStoreBuilder::disableDefaultCFAutoCompaction);
-    maxOpenFiles.ifPresent(dbStoreBuilder::setMaxNumberOfOpenFiles);
     return addOMTablesAndCodecs(dbStoreBuilder).build();
   }
 
@@ -920,11 +890,26 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     final long volumeId = getVolumeId(volume);
     final long bucketId = getBucketId(volume,
             bucket);
-    long parentId =
-            OMFileRequest.getParentID(volumeId, bucketId, key, this);
+    long parentId;
+    try {
+      parentId = OMFileRequest.getParentID(volumeId, bucketId, key, this);
+    } catch (final Exception e) {
+      // It is possible we miss directories and exception is thrown.
+      // see https://issues.apache.org/jira/browse/HDDS-11784
+      LOG.warn("Got exception when finding parent id for {}/{}/{}. Use another way to get it",
+          volumeId, bucketId, key, e);
+      final String multipartKey =
+          getMultipartKey(volume, bucket, key, uploadId);
+      final OmMultipartKeyInfo multipartKeyInfo =
+          getMultipartInfoTable().get(multipartKey);
+      if (multipartKeyInfo == null) {
+        LOG.error("Could not find multipartKeyInfo for {}", multipartKey);
+        throw new OMException(NO_SUCH_MULTIPART_UPLOAD_ERROR);
+      }
+      parentId = multipartKeyInfo.getParentID();
+    }
 
-    String fileName = OzoneFSUtils.getFileName(key);
-
+    final String fileName = OzoneFSUtils.getFileName(key);
     return getMultipartKey(volumeId, bucketId, parentId,
             fileName, uploadId);
   }
@@ -1976,19 +1961,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       }
     }
 
+    // prefixed iterator will only iterate until keys match the prefix
     try (TableIterator<String, ? extends KeyValue<String, OmMultipartKeyInfo>>
-        iterator = getMultipartInfoTable().iterator()) {
-      iterator.seek(prefixKey);
+        iterator = getMultipartInfoTable().iterator(prefixKey)) {
 
       while (iterator.hasNext()) {
         KeyValue<String, OmMultipartKeyInfo> entry = iterator.next();
-        if (entry.getKey().startsWith(prefixKey)) {
-          // If it is marked for abort, skip it.
-          if (!aborted.contains(entry.getKey())) {
-            response.add(entry.getKey());
-          }
-        } else {
-          break;
+        // If it is marked for abort, skip it.
+        if (!aborted.contains(entry.getKey())) {
+          response.add(entry.getKey());
         }
       }
     }

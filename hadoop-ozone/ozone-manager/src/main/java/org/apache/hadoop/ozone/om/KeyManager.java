@@ -39,6 +39,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Handles key level commands.
@@ -178,6 +179,17 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
       Duration expireThreshold, int maxParts) throws IOException;
 
   /**
+   * Look up an existing key from the OM table and retrieve the tags from
+   * the key info.
+   *
+   * @param args the args of the key provided by client.
+   * @param bucket the resolved parent bucket of the key.
+   * @return Map of the tag set associated with the key.
+   * @throws IOException
+   */
+  Map<String, String> getObjectTagging(OmKeyArgs args, ResolvedBucket bucket) throws IOException;
+
+  /**
    * Returns the metadataManager.
    * @return OMMetadataManager.
    */
@@ -265,23 +277,21 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * Returns all sub directories under the given parent directory.
    *
    * @param parentInfo
-   * @param numEntries
    * @return list of dirs
    * @throws IOException
    */
-  List<OmKeyInfo> getPendingDeletionSubDirs(long volumeId, long bucketId,
-      OmKeyInfo parentInfo, long numEntries) throws IOException;
+  DeleteKeysResult getPendingDeletionSubDirs(long volumeId, long bucketId,
+      OmKeyInfo parentInfo, long remainingBufLimit) throws IOException;
 
   /**
    * Returns all sub files under the given parent directory.
    *
    * @param parentInfo
-   * @param numEntries
    * @return list of files
    * @throws IOException
    */
-  List<OmKeyInfo> getPendingDeletionSubFiles(long volumeId,
-      long bucketId, OmKeyInfo parentInfo, long numEntries)
+  DeleteKeysResult getPendingDeletionSubFiles(long volumeId,
+      long bucketId, OmKeyInfo parentInfo, long remainingBufLimit)
           throws IOException;
 
   /**

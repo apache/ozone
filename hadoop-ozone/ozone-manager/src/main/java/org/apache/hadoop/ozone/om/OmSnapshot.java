@@ -47,6 +47,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -183,6 +184,11 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   public List<OzoneAcl> getAcl(OzoneObj obj) throws IOException {
     // TODO: [SNAPSHOT] handle denormalization
     return omMetadataReader.getAcl(normalizeOzoneObj(obj));
+  }
+
+  @Override
+  public Map<String, String> getObjectTagging(OmKeyArgs args) throws IOException {
+    return omMetadataReader.getObjectTagging(normalizeOmKeyArgs(args));
   }
 
   private OzoneObj normalizeOzoneObj(OzoneObj o) {

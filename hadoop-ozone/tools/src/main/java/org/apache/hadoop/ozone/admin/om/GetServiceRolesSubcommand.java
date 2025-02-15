@@ -22,7 +22,6 @@ import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.JsonUtils;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
@@ -94,8 +93,6 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
       } else {
         printOmServerRoles(ozoneManagerClient.getServiceList());
       }
-    } catch (OzoneClientException ex) {
-      System.out.printf("Error: %s", ex.getMessage());
     } finally {
       if (ozoneManagerClient != null) {
         ozoneManagerClient.close();

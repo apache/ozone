@@ -44,7 +44,6 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -70,6 +69,7 @@ import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -78,6 +78,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
@@ -437,15 +438,22 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   @Override
   public List<FileStatusAdapter> listStatus(String keyName, boolean recursive,
       String startKey, long numEntries, URI uri,
-      Path workingDir, String username) throws IOException {
+      Path workingDir, String username, boolean lite) throws IOException {
     try {
       incrementCounter(Statistic.OBJECTS_LIST, 1);
-      List<OzoneFileStatus> statuses = bucket
-          .listStatus(keyName, recursive, startKey, numEntries);
-
       List<FileStatusAdapter> result = new ArrayList<>();
-      for (OzoneFileStatus status : statuses) {
-        result.add(toFileStatusAdapter(status, username, uri, workingDir));
+      if (lite) {
+        List<OzoneFileStatusLight> statuses = bucket
+            .listStatusLight(keyName, recursive, startKey, numEntries);
+        for (OzoneFileStatusLight status : statuses) {
+          result.add(toFileStatusAdapter(status, username, uri, workingDir));
+        }
+      } else {
+        List<OzoneFileStatus> statuses = bucket
+            .listStatus(keyName, recursive, startKey, numEntries);
+        for (OzoneFileStatus status : statuses) {
+          result.add(toFileStatusAdapter(status, username, uri, workingDir));
+        }
       }
       return result;
     } catch (OMException e) {
@@ -550,6 +558,31 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     );
   }
 
+  private FileStatusAdapter toFileStatusAdapter(OzoneFileStatusLight status,
+                                                String owner, URI defaultUri, Path workingDir) {
+    BasicOmKeyInfo keyInfo = status.getKeyInfo();
+    short replication = (short) keyInfo.getReplicationConfig()
+        .getRequiredNodes();
+    return new FileStatusAdapter(
+        keyInfo.getDataSize(),
+        keyInfo.getReplicatedSize(),
+        new Path(OZONE_URI_DELIMITER + keyInfo.getKeyName())
+            .makeQualified(defaultUri, workingDir),
+        status.isDirectory(),
+        replication,
+        status.getBlockSize(),
+        keyInfo.getModificationTime(),
+        keyInfo.getModificationTime(),
+        status.isDirectory() ? (short) 00777 : (short) 00666,
+        StringUtils.defaultIfEmpty(keyInfo.getOwnerName(), owner),
+        owner,
+        null,
+        getBlockLocations(null),
+        false,
+        OzoneClientUtils.isKeyErasureCode(keyInfo)
+    );
+  }
+
   /**
    * Helper method to get List of BlockLocation from OM Key info.
    * @param fileStatus Ozone key file status.
@@ -586,8 +619,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       omKeyLocationInfo.getPipeline().getNodes()
           .forEach(dn -> {
             hostList.add(dn.getHostName());
-            int port = dn.getPort(
-                DatanodeDetails.Port.Name.STANDALONE).getValue();
+            int port = dn.getStandalonePort().getValue();
             if (port == 0) {
               port = configuredDnPort;
             }
@@ -615,11 +647,13 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       throws IOException {
     OzoneClientConfig.ChecksumCombineMode combineMode =
         config.getObject(OzoneClientConfig.class).getChecksumCombineMode();
-
+    if (combineMode == null) {
+      return null;
+    }
     return OzoneClientUtils.getFileChecksumWithCombineMode(
         volume, bucket, keyName,
-        length, combineMode, ozoneClient.getObjectStore().getClientProxy());
-
+        length, combineMode,
+        ozoneClient.getObjectStore().getClientProxy());
   }
 
   @Override

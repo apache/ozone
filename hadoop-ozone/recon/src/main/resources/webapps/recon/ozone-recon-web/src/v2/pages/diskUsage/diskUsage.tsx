@@ -19,15 +19,15 @@
 import React, { useRef, useState } from 'react';
 import { AxiosError } from 'axios';
 import {
-  Alert
+  Alert, Button, Tooltip
 } from 'antd';
 import {
-  InfoCircleFilled
+  InfoCircleFilled, ReloadOutlined,
 } from '@ant-design/icons';
 import { ValueType } from 'react-select';
 
 import DUMetadata from '@/v2/components/duMetadata/duMetadata';
-import DUPieChart from '@/v2/components/duPieChart/duPieChart';
+import DUPieChart from '@/v2/components/plots/duPieChart';
 import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
 import DUBreadcrumbNav from '@/v2/components/duBreadcrumbNav/duBreadcrumbNav';
 import { showDataFetchError } from '@/utils/common';
@@ -113,10 +113,23 @@ const DiskUsage: React.FC<{}> = () => {
           showIcon={true}
           closable={false} />
         <div className='content-div'>
-          <DUBreadcrumbNav
-            path={duResponse.path}
-            subPaths={duResponse.subPaths}
-            updateHandler={loadData} />
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+            }}>
+            <DUBreadcrumbNav
+              path={duResponse.path}
+              subPaths={duResponse.subPaths}
+              updateHandler={loadData} />
+            <Tooltip
+              title="Click to reload Disk Usage data">
+              <Button
+                type='primary'
+                icon={<ReloadOutlined />}
+                onClick={() => loadData(duResponse.path)} />
+            </Tooltip>
+          </div>
           <div className='du-table-header-section'>
             <SingleSelect
               options={LIMIT_OPTIONS}

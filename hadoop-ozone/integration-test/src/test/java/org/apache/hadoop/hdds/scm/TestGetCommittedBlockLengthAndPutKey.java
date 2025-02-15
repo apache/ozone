@@ -26,18 +26,18 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,34 +53,26 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 /**
  * Test Container calls.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(300)
-public class TestGetCommittedBlockLengthAndPutKey {
+public abstract class TestGetCommittedBlockLengthAndPutKey implements NonHATests.TestCase {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestGetCommittedBlockLengthAndPutKey.class);
-  private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration ozoneConfig;
-  private static StorageContainerLocationProtocolClientSideTranslatorPB
+  private OzoneConfiguration ozoneConfig;
+  private StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
-  private static XceiverClientManager xceiverClientManager;
+  private XceiverClientManager xceiverClientManager;
 
   @BeforeAll
-  public static void init() throws Exception {
-    ozoneConfig = new OzoneConfiguration();
-    ozoneConfig.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
-        SCMContainerPlacementCapacity.class, PlacementPolicy.class);
-    cluster =
-        MiniOzoneCluster.newBuilder(ozoneConfig).setNumDatanodes(3).build();
-    cluster.waitForClusterToBeReady();
+  void init() throws Exception {
+    ozoneConfig = cluster().getConf();
     storageContainerLocationClient =
-        cluster.getStorageContainerLocationClient();
+        cluster().getStorageContainerLocationClient();
     xceiverClientManager = new XceiverClientManager(ozoneConfig);
   }
 
   @AfterAll
-  public static void shutdown() throws InterruptedException {
-    if (cluster != null) {
-      cluster.shutdown();
-    }
+  void cleanup() {
     IOUtils.cleanupWithLogger(null, storageContainerLocationClient);
   }
 

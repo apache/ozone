@@ -65,7 +65,6 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.mockRemoteUser;
@@ -106,6 +105,8 @@ public class TestRangerBGSyncService {
 
   @TempDir
   private Path folder;
+  @TempDir
+  private String path;
 
   private MultiTenantAccessController accessController;
   private OMRangerBGSyncService bgSync;
@@ -181,8 +182,6 @@ public class TestRangerBGSyncService {
     // Run as alice, so that Server.getRemoteUser() won't return null.
     mockRemoteUser(ugiAlice);
 
-    String omID = UUID.randomUUID().toString();
-    final String path = GenericTestUtils.getTempPath(omID);
     Path metaDirPath = Paths.get(path, "om-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
 
@@ -194,7 +193,6 @@ public class TestRangerBGSyncService {
     omMetadataManager = new OmMetadataManagerImpl(conf, ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
-    when(ozoneManager.isRatisEnabled()).thenReturn(true);
     auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     doNothing().when(auditLogger).logWrite(any(AuditMessage.class));

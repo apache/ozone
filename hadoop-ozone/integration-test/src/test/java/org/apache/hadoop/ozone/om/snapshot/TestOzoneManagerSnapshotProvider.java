@@ -65,7 +65,6 @@ public class TestOzoneManagerSnapshotProvider {
     conf = new OzoneConfiguration();
     omServiceId = "om-service-test1";
     conf.setBoolean(OMConfigKeys.OZONE_OM_HTTP_ENABLED_KEY, true);
-    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
     cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)

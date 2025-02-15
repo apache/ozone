@@ -18,12 +18,10 @@
 package org.apache.hadoop.hdds.scm;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.security.exception.SCMSecretKeyException;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.minikdc.MiniKdc;
@@ -67,7 +65,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBER
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
-import static org.apache.hadoop.hdds.security.exception.SCMSecretKeyException.ErrorCode.SECRET_KEY_NOT_ENABLED;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getSecretKeyClientForDatanode;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
@@ -121,7 +118,6 @@ public final class TestSecretKeysApi {
     if (cluster != null) {
       cluster.stop();
     }
-    DefaultConfigManager.clearDefaultConfigs();
   }
 
   private void createCredentialsInKDC() throws Exception {
@@ -245,24 +241,14 @@ public final class TestSecretKeysApi {
   }
 
   /**
-   * Verify API behavior when block token is not enable.
+   * Verify API behavior.
    */
   @Test
-  public void testSecretKeyApiNotEnabled() throws Exception {
+  public void testSecretKeyApi() throws Exception {
     startCluster(1);
     SecretKeyProtocol secretKeyProtocol = getSecretKeyProtocol();
-
-    SCMSecretKeyException ex = assertThrows(SCMSecretKeyException.class,
-            secretKeyProtocol::getCurrentSecretKey);
-    assertEquals(SECRET_KEY_NOT_ENABLED, ex.getErrorCode());
-
-    ex = assertThrows(SCMSecretKeyException.class,
-        () -> secretKeyProtocol.getSecretKey(UUID.randomUUID()));
-    assertEquals(SECRET_KEY_NOT_ENABLED, ex.getErrorCode());
-
-    ex = assertThrows(SCMSecretKeyException.class,
-        secretKeyProtocol::getAllSecretKeys);
-    assertEquals(SECRET_KEY_NOT_ENABLED, ex.getErrorCode());
+    assertNull(secretKeyProtocol.getSecretKey(UUID.randomUUID()));
+    assertEquals(1, secretKeyProtocol.getAllSecretKeys().size());
   }
 
   /**

@@ -94,11 +94,9 @@ public class TrashOzoneFileSystem extends FileSystem {
   private void submitRequest(OzoneManagerProtocolProtos.OMRequest omRequest)
       throws Exception {
     ozoneManager.getMetrics().incNumTrashWriteRequests();
-    if (ozoneManager.isRatisEnabled()) {
-      // perform preExecute as ratis submit do no perform preExecute
-      OMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
-      omRequest = omClientRequest.preExecute(ozoneManager);
-    }
+    // perform preExecute as ratis submit do no perform preExecute
+    OMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
+    omRequest = omClientRequest.preExecute(ozoneManager);
     OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, CLIENT_ID, runCount.getAndIncrement());
   }
 

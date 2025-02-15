@@ -18,15 +18,18 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyRenameResponse;
@@ -84,6 +87,29 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
     OMRequest omRequest = createSnapshotRequest(getVolumeName(),
         getBucketName(), snapshotName);
     doPreExecute(omRequest);
+  }
+
+  @ValueSource(strings = {
+      // '-' is allowed.
+      "9cdf0e8a-6946-41ad-a2d1-9eb724fab126",
+      // 3 chars name is allowed.
+      "sn1",
+      // less than or equal to 63 chars are allowed.
+      "snap75795657617173401188448010125899089001363595171500499231286"
+  })
+  @ParameterizedTest
+  public void testPreExecuteWithLinkedBucket(String snapshotName) throws Exception {
+    when(getOzoneManager().isOwner(any(), any())).thenReturn(true);
+    String resolvedBucketName = getBucketName() + "1";
+    String resolvedVolumeName = getVolumeName() + "1";
+    when(getOzoneManager().resolveBucketLink(any(Pair.class), any(OMClientRequest.class)))
+        .thenAnswer(i -> new ResolvedBucket(i.getArgument(0), Pair.of(resolvedVolumeName, resolvedBucketName),
+            "owner", BucketLayout.FILE_SYSTEM_OPTIMIZED));
+    OMRequest omRequest = createSnapshotRequest(getVolumeName(),
+        getBucketName(), snapshotName);
+    OMSnapshotCreateRequest omSnapshotCreateRequest = doPreExecute(omRequest);
+    assertEquals(resolvedVolumeName, omSnapshotCreateRequest.getOmRequest().getCreateSnapshotRequest().getVolumeName());
+    assertEquals(resolvedBucketName, omSnapshotCreateRequest.getOmRequest().getCreateSnapshotRequest().getBucketName());
   }
 
   @ValueSource(strings = {

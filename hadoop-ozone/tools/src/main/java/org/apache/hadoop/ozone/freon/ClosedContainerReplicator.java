@@ -25,15 +25,19 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerT
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStoreImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
@@ -42,7 +46,11 @@ import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.container.replication.ReplicationTask;
 import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -69,6 +77,7 @@ import java.util.stream.Stream;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 public class ClosedContainerReplicator extends BaseFreonGenerator implements
     Callable<Void> {
 
@@ -82,11 +91,25 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
   private ContainerReplicator replicator;
 
   private Timer timer;
+  private WitnessedContainerMetadataStore witnessedContainerMetadataStore;
 
   private List<ReplicationTask> replicationTasks;
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ClosedContainerReplicator.class);
+
   @Override
   public Void call() throws Exception {
+    try {
+      return replicate();
+    } finally {
+      if (witnessedContainerMetadataStore != null) {
+        witnessedContainerMetadataStore.close();
+      }
+    }
+  }
+
+  public Void replicate() throws Exception {
 
     OzoneConfiguration conf = createOzoneConfiguration();
 
@@ -109,16 +132,9 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     replicationTasks = new ArrayList<>();
 
     for (ContainerInfo container : containerInfos) {
-
-      final ContainerWithPipeline containerWithPipeline =
-          containerOperationClient
-              .getContainerWithPipeline(container.getContainerID());
-
       if (container.getState() == LifeCycleState.CLOSED) {
-
-        final List<DatanodeDetails> datanodesWithContainer =
-            containerWithPipeline.getPipeline().getNodes();
-
+        final Pipeline pipeline = containerOperationClient.getPipeline(container.getPipelineID().getProtobuf());
+        final List<DatanodeDetails> datanodesWithContainer = pipeline.getNodes();
         final List<String> datanodeUUIDs =
             datanodesWithContainer
                 .stream().map(DatanodeDetails::getUuidString)
@@ -168,18 +184,36 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
 
   private void initializeReplicationSupervisor(
       ConfigurationSource conf, int queueSize) throws IOException {
+    String scmID = UUID.randomUUID().toString();
+    String clusterID = UUID.randomUUID().toString();
     String fakeDatanodeUuid = datanode;
 
     if (fakeDatanodeUuid.isEmpty()) {
       fakeDatanodeUuid = UUID.randomUUID().toString();
     }
-
-    ContainerSet containerSet = new ContainerSet(1000);
+    WitnessedContainerMetadataStore referenceCountedDS =
+        WitnessedContainerMetadataStoreImpl.get(conf);
+    this.witnessedContainerMetadataStore = referenceCountedDS;
+    ContainerSet containerSet = new ContainerSet(referenceCountedDS.getContainerIdsTable(), 1000);
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);
 
     MutableVolumeSet volumeSet = new MutableVolumeSet(fakeDatanodeUuid, conf,
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
+
+    if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
+      MutableVolumeSet dbVolumeSet =
+          HddsServerUtil.getDatanodeDbDirs(conf).isEmpty() ? null :
+          new MutableVolumeSet(fakeDatanodeUuid, conf, null,
+              StorageVolume.VolumeType.DB_VOLUME, null);
+      // load rocksDB with readOnly mode, otherwise it will fail.
+      HddsVolumeUtil.loadAllHddsVolumeDbStore(
+          volumeSet, dbVolumeSet, false, LOG);
+
+      for (StorageVolume volume : volumeSet.getVolumesList()) {
+        StorageVolumeUtil.checkVolume(volume, scmID, clusterID, conf, LOG, dbVolumeSet);
+      }
+    }
 
     Map<ContainerType, Handler> handlers = new HashMap<>();
 
@@ -194,7 +228,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
               metrics,
               containerReplicaProto -> {
               });
-      handler.setClusterID(UUID.randomUUID().toString());
+      handler.setClusterID(clusterID);
       handlers.put(containerType, handler);
     }
 
@@ -221,6 +255,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     timer.time(() -> {
       final ReplicationTask replicationTask =
           replicationTasks.get((int) counter);
+      supervisor.initCounters(replicationTask);
       supervisor.new TaskRunner(replicationTask).run();
       return null;
     });

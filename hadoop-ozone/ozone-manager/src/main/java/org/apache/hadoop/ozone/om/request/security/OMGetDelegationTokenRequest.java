@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.security;
 
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -129,7 +129,7 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
 
     UpdateGetDelegationTokenRequest updateGetDelegationTokenRequest =
         getOmRequest().getUpdateGetDelegationTokenRequest();
@@ -180,7 +180,7 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
      // Update Cache.
       omMetadataManager.getDelegationTokenTable().addCacheEntry(
           new CacheKey<>(ozoneTokenIdentifier),
-          CacheValue.get(termIndex.getIndex(), renewTime));
+          CacheValue.get(context.getIndex(), renewTime));
 
       omClientResponse =
           new OMGetDelegationTokenResponse(ozoneTokenIdentifier, renewTime,

@@ -30,7 +30,6 @@ OZONE-SITE.XML_ozone.om.address.omservice.om3=om3
 OZONE-SITE.XML_ozone.om.http-address.omservice.om1=om1
 OZONE-SITE.XML_ozone.om.http-address.omservice.om2=om2
 OZONE-SITE.XML_ozone.om.http-address.omservice.om3=om3
-OZONE-SITE.XML_ozone.om.ratis.enable=true
 
 OZONE-SITE.XML_ozone.scm.service.ids=scmservice
 OZONE-SITE.XML_ozone.scm.primordial.node.id=scm1
@@ -38,7 +37,6 @@ OZONE-SITE.XML_ozone.scm.nodes.scmservice=scm1,scm2,scm3
 OZONE-SITE.XML_ozone.scm.address.scmservice.scm1=scm1.org
 OZONE-SITE.XML_ozone.scm.address.scmservice.scm2=scm2.org
 OZONE-SITE.XML_ozone.scm.address.scmservice.scm3=scm3.org
-OZONE-SITE.XML_ozone.scm.ratis.enable=true
 OZONE-SITE.XML_ozone.scm.close.container.wait.duration=5s
 
 OZONE-SITE.XML_ozone.om.volume.listall.allowed=false
@@ -47,7 +45,7 @@ OZONE-SITE.XML_ozone.scm.container.size=1GB
 OZONE-SITE.XML_ozone.scm.datanode.ratis.volume.free-space.min=10MB
 OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
 OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
-OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data
+OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data/metadata
 OZONE-SITE.XML_ozone.scm.block.client.address=scm
 OZONE-SITE.XML_ozone.metadata.dirs=/data/metadata
 OZONE-SITE.XML_ozone.handler.type=distributed

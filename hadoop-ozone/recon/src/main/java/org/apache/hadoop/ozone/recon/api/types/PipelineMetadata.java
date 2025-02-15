@@ -133,7 +133,6 @@ public final class PipelineMetadata {
   /**
    * Builder for PipelineMetadata.
    */
-  @SuppressWarnings("checkstyle:hiddenfield")
   public static class Builder {
     private UUID pipelineId;
     private PipelineState status;

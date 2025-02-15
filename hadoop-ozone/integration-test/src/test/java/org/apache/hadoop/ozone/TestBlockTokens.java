@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -46,12 +45,12 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -109,9 +108,10 @@ public final class TestBlockTokens {
   private static final int EXPIRY_DURATION_IN_MS = 10000;
   private static final int ROTATION_CHECK_DURATION_IN_MS = 100;
 
+  @TempDir
+  private static File workDir;
   private static MiniKdc miniKdc;
   private static OzoneConfiguration conf;
-  private static File workDir;
   private static File ozoneKeytab;
   private static File spnegoKeytab;
   private static File testUserKeytab;
@@ -128,9 +128,6 @@ public final class TestBlockTokens {
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
 
     ExitUtils.disableSystemExit();
-
-    workDir =
-        GenericTestUtils.getTestDir(TestBlockTokens.class.getSimpleName());
 
     startMiniKdc();
     setSecureConfig();
@@ -159,7 +156,6 @@ public final class TestBlockTokens {
     if (cluster != null) {
       cluster.stop();
     }
-    DefaultConfigManager.clearDefaultConfigs();
   }
 
   @Test

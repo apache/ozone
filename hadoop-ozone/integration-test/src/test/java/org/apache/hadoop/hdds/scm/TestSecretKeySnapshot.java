@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -137,7 +136,6 @@ public final class TestSecretKeySnapshot {
     if (cluster != null) {
       cluster.stop();
     }
-    DefaultConfigManager.clearDefaultConfigs();
   }
 
   private void createCredentialsInKDC() throws Exception {

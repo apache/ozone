@@ -81,6 +81,7 @@ public class TestListKeysWithFSO {
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 3);
     conf.setInt(OZONE_CLIENT_LIST_CACHE_SIZE, 3);
+    conf.setInt(OmConfig.Keys.SERVER_LIST_MAX_SIZE, 2);
     cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();

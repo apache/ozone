@@ -46,4 +46,8 @@ public interface OmMetadataReaderMetrics {
   void incNumKeyListFails();
 
   void incNumGetAcl();
+
+  void incNumGetObjectTagging();
+
+  void incNumGetObjectTaggingFails();
 }

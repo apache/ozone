@@ -24,6 +24,10 @@ const Datanodes = lazy(() => import('@/v2/pages/datanodes/datanodes'));
 const Pipelines = lazy(() => import('@/v2/pages/pipelines/pipelines'));
 const DiskUsage = lazy(() => import('@/v2/pages/diskUsage/diskUsage'));
 const Containers = lazy(() => import('@/v2/pages/containers/containers'));
+const Insights = lazy(() => import('@/v2/pages/insights/insights'));
+const OMDBInsights = lazy(() => import('@/v2/pages/insights/omInsights'));
+const Heatmap = lazy(() => import('@/v2/pages/heatmap/heatmap'));
+
 
 export const routesV2 = [
   {
@@ -53,5 +57,17 @@ export const routesV2 = [
   {
     path: '/Containers',
     component: Containers
+  },
+  {
+    path: '/Insights',
+    component: Insights
+  },
+  {
+    path: '/Om',
+    component: OMDBInsights
+  },
+  {
+    path: '/Heatmap',
+    component: Heatmap
   }
 ];

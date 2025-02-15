@@ -300,6 +300,7 @@ Apache License 2.0
    com.nimbusds:nimbus-jose-jwt
    com.squareup.okhttp3:okhttp
    com.squareup.okio:okio
+   com.squareup.okio:okio-jvm
    commons-beanutils:commons-beanutils
    commons-cli:commons-cli
    commons-codec:commons-codec
@@ -314,6 +315,7 @@ Apache License 2.0
    commons-validator:commons-validator
    commons-fileupload:commons-fileupload
    info.picocli:picocli
+   info.picocli:picocli-shell-jline3
    io.dropwizard.metrics:metrics-core
    io.grpc:grpc-api
    io.grpc:grpc-context
@@ -431,6 +433,8 @@ Apache License 2.0
    org.jetbrains:annotations
    org.jetbrains.kotlin:kotlin-stdlib
    org.jetbrains.kotlin:kotlin-stdlib-common
+   org.jetbrains.kotlin:kotlin-stdlib-jdk7
+   org.jetbrains.kotlin:kotlin-stdlib-jdk8
    org.jboss.weld.servlet:weld-servlet-shaded
    org.jheaps:jheaps
    org.jooq:jooq
@@ -476,6 +480,7 @@ BSD 3-Clause
    com.google.re2j:re2j
    com.jcraft:jsch
    com.thoughtworks.paranamer:paranamer
+   org.jline:jline3
    org.ow2.asm:asm
    org.ow2.asm:asm-analysis
    org.ow2.asm:asm-commons

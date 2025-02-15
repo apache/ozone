@@ -22,7 +22,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -69,8 +68,8 @@ public class S3InitiateMultipartUploadRequestWithFSO
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long transactionLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long transactionLogIndex = context.getIndex();
     MultipartInfoInitiateRequest multipartInfoInitiateRequest =
         getOmRequest().getInitiateMultiPartUploadRequest();
 
@@ -121,8 +120,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
           volumeName, bucketName);
 
       // add all missing parents to dir table
-      missingParentInfos = OMDirectoryCreateRequestWithFSO
-          .getAllMissingParentDirInfo(ozoneManager, keyArgs, bucketInfo,
+      missingParentInfos = getAllMissingParentDirInfo(ozoneManager, keyArgs, bucketInfo,
               pathInfoFSO, transactionLogIndex);
 
       // We are adding uploadId to key, because if multiple users try to
@@ -185,7 +183,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
           .setOmKeyLocationInfos(Collections.singletonList(
               new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
           .setAcls(getAclsForKey(keyArgs, bucketInfo, pathInfoFSO,
-              ozoneManager.getPrefixManager()))
+              ozoneManager.getPrefixManager(), ozoneManager.getConfiguration()))
           .setObjectID(pathInfoFSO.getLeafNodeObjectId())
           .setUpdateID(transactionLogIndex)
           .setFileEncryptionInfo(keyArgs.hasFileEncryptionInfo() ?

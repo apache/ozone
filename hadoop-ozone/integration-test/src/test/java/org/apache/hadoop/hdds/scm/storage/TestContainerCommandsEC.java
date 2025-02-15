@@ -70,6 +70,7 @@ import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionExcepti
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECContainerOperationClient;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionMetrics;
@@ -320,8 +321,10 @@ public class TestContainerCommandsEC {
                 .setTxID(1L)
                 .setCount(10)
                 .build()));
-    dn2Service.getDatanodeStateMachine().getContext()
-        .addCommand(deleteBlocksCommand);
+    StateContext context = dn2Service.getDatanodeStateMachine().getContext();
+    deleteBlocksCommand.setTerm(context.getTermOfLeaderSCM().isPresent() ?
+            context.getTermOfLeaderSCM().getAsLong() : 0);
+    context.addCommand(deleteBlocksCommand);
 
     try (XceiverClientGrpc client = new XceiverClientGrpc(
         createSingleNodePipeline(orphanPipeline, dn2, 1), cluster.getConf())) {
@@ -460,7 +463,7 @@ public class TestContainerCommandsEC {
       int replicaIndex = 4;
       XceiverClientSpi dnClient = xceiverClientManager.acquireClient(
           createSingleNodePipeline(newPipeline, newPipeline.getNodes().get(0),
-              replicaIndex));
+              2));
       try {
         // To create the actual situation, container would have been in closed
         // state at SCM.

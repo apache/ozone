@@ -41,4 +41,13 @@ public class RootedOzFs extends DelegateToFileSystem {
     super(theUri, new RootedOzoneFileSystem(), conf,
         OzoneConsts.OZONE_OFS_URI_SCHEME, false);
   }
+
+  /**
+   * Close the file system; the FileContext API doesn't have an explicit close.
+   */
+  @Override
+  protected void finalize() throws Throwable {
+    fsImpl.close();
+    super.finalize();
+  }
 }

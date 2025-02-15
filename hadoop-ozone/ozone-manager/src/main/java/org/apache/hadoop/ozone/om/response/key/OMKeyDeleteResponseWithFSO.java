@@ -52,9 +52,9 @@ public class OMKeyDeleteResponseWithFSO extends OMKeyDeleteResponse {
   @SuppressWarnings("parameternumber")
   public OMKeyDeleteResponseWithFSO(@Nonnull OMResponse omResponse,
       @Nonnull String keyName, @Nonnull OmKeyInfo omKeyInfo,
-      boolean isRatisEnabled, @Nonnull OmBucketInfo omBucketInfo,
+      @Nonnull OmBucketInfo omBucketInfo,
       @Nonnull boolean isDeleteDirectory, @Nonnull long volumeId, OmKeyInfo deletedOpenKeyInfo) {
-    super(omResponse, omKeyInfo, isRatisEnabled, omBucketInfo, deletedOpenKeyInfo);
+    super(omResponse, omKeyInfo, omBucketInfo, deletedOpenKeyInfo);
     this.keyName = keyName;
     this.isDeleteDirectory = isDeleteDirectory;
     this.volumeId = volumeId;

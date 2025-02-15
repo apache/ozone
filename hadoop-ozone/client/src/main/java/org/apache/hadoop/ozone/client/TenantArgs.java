@@ -59,14 +59,13 @@ public final class TenantArgs {
    *
    * @return Builder
    */
-  public static TenantArgs.Builder newBuilder() {
-    return new TenantArgs.Builder();
+  public static Builder newBuilder() {
+    return new Builder();
   }
 
   /**
    * Builder for TenantArgs.
    */
-  @SuppressWarnings("checkstyle:hiddenfield")
   public static class Builder {
     private String volumeName;
     private boolean forceCreationWhenVolumeExists;
@@ -77,12 +76,12 @@ public final class TenantArgs {
     public Builder() {
     }
 
-    public TenantArgs.Builder setVolumeName(String volumeName) {
+    public Builder setVolumeName(String volumeName) {
       this.volumeName = volumeName;
       return this;
     }
 
-    public TenantArgs.Builder setForceCreationWhenVolumeExists(
+    public Builder setForceCreationWhenVolumeExists(
         boolean forceCreationWhenVolumeExists) {
       this.forceCreationWhenVolumeExists = forceCreationWhenVolumeExists;
       return this;

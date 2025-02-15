@@ -96,7 +96,6 @@ const VolumesTable: React.FC<VolumesTableProps> = ({
 
   React.useEffect(() => {
     // On table mount add the actions column
-    console.log("Adding new column");
     const actionsColumn: ColumnType<Volume> = {
       title: 'Actions',
       key: 'actions',

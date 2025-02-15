@@ -12,10 +12,7 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-    https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0     https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
@@ -24,13 +21,18 @@
   </parent>
   <artifactId>ozone-interface-storage</artifactId>
   <version>2.0.0-SNAPSHOT</version>
-  <description>Apache Ozone Storage Interface</description>
-  <name>Apache Ozone Storage Interface</name>
   <packaging>jar</packaging>
-  <properties>
-  </properties>
+  <name>Apache Ozone Storage Interface</name>
+  <description>Apache Ozone Storage Interface</description>
   <dependencies>
-
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.google.protobuf</groupId>
+      <artifactId>protobuf-java</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-common</artifactId>
@@ -41,35 +43,23 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-server-framework</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-interface-client</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>rocksdb-checkpoint-differ</artifactId>
     </dependency>
-
     <dependency>
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-common</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>com.google.guava</groupId>
-      <artifactId>guava</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.google.protobuf</groupId>
-      <artifactId>protobuf-java</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-interface-client</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-server-framework</artifactId>
     </dependency>
 
     <!-- Test dependencies -->
@@ -83,16 +73,6 @@
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-server-scm</artifactId>
       <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-hadoop-dependency-test</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-test-utils</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -119,7 +99,8 @@
         <artifactId>maven-enforcer-plugin</artifactId>
         <executions>
           <execution>
-            <id>ban-annotations</id> <!-- override default restriction from root POM -->
+            <id>ban-annotations</id>
+            <!-- override default restriction from root POM -->
             <configuration>
               <rules>
                 <restrictImports>
@@ -149,9 +130,7 @@
             </goals>
             <configuration>
               <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
-              <protocArtifact>
-                com.google.protobuf:protoc:${proto2.hadooprpc.protobuf.version}:exe:${os.detected.classifier}
-              </protocArtifact>
+              <protocArtifact>com.google.protobuf:protoc:${proto2.hadooprpc.protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
             </configuration>
           </execution>
         </executions>
@@ -161,6 +140,13 @@
         <artifactId>spotbugs-maven-plugin</artifactId>
         <configuration>
           <excludeFilterFile>${basedir}/dev-support/findbugsExcludeFile.xml</excludeFilterFile>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <configuration>
+          <suppressionsLocation>${basedir}/../../hadoop-hdds/dev-support/checkstyle/suppressions-skip-imports.xml</suppressionsLocation>
         </configuration>
       </plugin>
     </plugins>

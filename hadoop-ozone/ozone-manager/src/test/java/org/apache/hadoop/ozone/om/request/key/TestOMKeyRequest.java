@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataReader;
@@ -60,6 +61,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import org.apache.hadoop.hdds.client.ContainerBlockID;
@@ -85,6 +87,10 @@ import org.slf4j.event.Level;
 
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.setupReplicationConfigValidation;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyLong;
@@ -114,6 +120,7 @@ public class TestOMKeyRequest {
   protected ScmBlockLocationProtocol scmBlockLocationProtocol;
   protected StorageContainerLocationProtocol scmContainerLocationProtocol;
   protected OMPerformanceMetrics metrics;
+  protected DeletingServiceMetrics delMetrics;
 
   protected static final long CONTAINER_ID = 1000L;
   protected static final long LOCAL_ID = 100L;
@@ -134,6 +141,7 @@ public class TestOMKeyRequest {
     ozoneManager = mock(OzoneManager.class);
     omMetrics = OMMetrics.create();
     metrics = OMPerformanceMetrics.register();
+    delMetrics = DeletingServiceMetrics.create();
     OzoneConfiguration ozoneConfiguration = getOzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.toAbsolutePath().toString());
@@ -145,12 +153,12 @@ public class TestOMKeyRequest {
         ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getPerfMetrics()).thenReturn(metrics);
+    when(ozoneManager.getDeletionMetrics()).thenReturn(delMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
     when(lvm.isAllowed(anyString())).thenReturn(true);
     when(ozoneManager.getVersionManager()).thenReturn(lvm);
-    when(ozoneManager.isRatisEnabled()).thenReturn(true);
     when(ozoneManager.isFilesystemSnapshotEnabled()).thenReturn(true);
     auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
@@ -320,6 +328,23 @@ public class TestOMKeyRequest {
         omMetadataManager.getSnapshotInfoTable().get(key);
     assertNotNull(snapshotInfo);
     return snapshotInfo;
+  }
+
+  @Test
+  public void testValidateKeyArgs() {
+    OMKeyRequest.ValidateKeyArgs validateKeyArgs1 = new OMKeyRequest.ValidateKeyArgs.Builder()
+        .setKeyName("tmpKey").setSnapshotReservedWord("tmpSnapshotReservedWord").build();
+    assertEquals("tmpSnapshotReservedWord", validateKeyArgs1.getSnapshotReservedWord());
+    assertEquals("tmpKey", validateKeyArgs1.getKeyName());
+    assertTrue(validateKeyArgs1.isValidateKeyName());
+    assertTrue(validateKeyArgs1.isValidateSnapshotReserved());
+
+    OMKeyRequest.ValidateKeyArgs validateKeyArgs2 = new OMKeyRequest.ValidateKeyArgs.Builder()
+        .setKeyName("tmpKey2").build();
+    assertNull(validateKeyArgs2.getSnapshotReservedWord());
+    assertEquals("tmpKey2", validateKeyArgs2.getKeyName());
+    assertTrue(validateKeyArgs2.isValidateKeyName());
+    assertFalse(validateKeyArgs2.isValidateSnapshotReserved());
   }
 
 }

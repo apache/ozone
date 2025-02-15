@@ -27,6 +27,7 @@ import com.amazonaws.services.s3.model.CanonicalGrantee;
 import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
 import com.amazonaws.services.s3.model.CompleteMultipartUploadResult;
 import com.amazonaws.services.s3.model.CreateBucketRequest;
+import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.Grantee;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadResult;
@@ -50,6 +51,7 @@ import com.amazonaws.services.s3.model.PutObjectResult;
 import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectInputStream;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
+import com.amazonaws.services.s3.model.SetObjectAclRequest;
 import com.amazonaws.services.s3.model.Tag;
 import com.amazonaws.services.s3.model.UploadPartRequest;
 import com.amazonaws.services.s3.model.UploadPartResult;
@@ -220,7 +222,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
 
   @Test
   public void testBucketACLOperations() {
-    // TODO: Uncomment assertions when bucket S3 ACL logic has been fixed
+    // TODO HDDS-11738: Uncomment assertions when bucket S3 ACL logic has been fixed
     final String bucketName = getBucketName();
 
     AccessControlList aclList = new AccessControlList();
@@ -235,15 +237,12 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
 
     s3Client.createBucket(createBucketRequest);
 
-//    AccessControlList retrievedAclList = s3.getBucketAcl(bucketName);
-//    assertEquals(aclList, retrievedAclList);
+    //assertEquals(aclList, s3Client.getBucketAcl(bucketName));
 
-//    aclList.grantPermission(grantee, Permission.Write);
-//    s3.setBucketAcl(bucketName, aclList);
+    aclList.grantPermission(grantee, Permission.Write);
+    s3Client.setBucketAcl(bucketName, aclList);
 
-//    retrievedAclList = s3.getBucketAcl(bucketName);
-//    assertEquals(aclList, retrievedAclList);
-
+    //assertEquals(aclList, s3Client.getBucketAcl(bucketName));
   }
 
   @Test
@@ -376,6 +375,50 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
 
     PutObjectResult putObjectResult = s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
     assertEquals("d41d8cd98f00b204e9800998ecf8427e", putObjectResult.getETag());
+  }
+
+  @Test
+  public void testPutObjectACL() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    final byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
+    s3Client.createBucket(bucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+
+    PutObjectResult putObjectResult = s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
+    String originalObjectETag = putObjectResult.getETag();
+    assertTrue(s3Client.doesObjectExist(bucketName, keyName));
+
+    AccessControlList aclList = new AccessControlList();
+    Owner owner = new Owner("owner", "owner");
+    aclList.withOwner(owner);
+    Grantee grantee = new CanonicalGrantee("testGrantee");
+    aclList.grantPermission(grantee, Permission.Read);
+
+    SetObjectAclRequest setObjectAclRequest = new SetObjectAclRequest(bucketName, keyName, aclList);
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.setObjectAcl(setObjectAclRequest));
+    assertEquals("NotImplemented", ase.getErrorCode());
+    assertEquals(501, ase.getStatusCode());
+    assertEquals(ErrorType.Service, ase.getErrorType());
+
+    // Ensure that the object content remains unchanged
+    ObjectMetadata updatedObjectMetadata = s3Client.getObjectMetadata(bucketName, keyName);
+    assertEquals(originalObjectETag, updatedObjectMetadata.getETag());
+    S3Object updatedObject = s3Client.getObject(bucketName, keyName);
+
+    try (S3ObjectInputStream s3is = updatedObject.getObjectContent();
+         ByteArrayOutputStream bos = new ByteArrayOutputStream(contentBytes.length)) {
+      byte[] readBuf = new byte[1024];
+      int readLen = 0;
+      while ((readLen = s3is.read(readBuf)) > 0) {
+        bos.write(readBuf, 0, readLen);
+      }
+      assertEquals(content, bos.toString("UTF-8"));
+    }
   }
 
   @Test
@@ -692,6 +735,65 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
       assertEquals(partETags.get(i).getPartNumber(), listPartETags.get(i).getPartNumber());
       assertEquals(partETags.get(i).getETag(), listPartETags.get(i).getETag());
     }
+  }
+
+  @Test
+  public void testGetParticularPart(@TempDir Path tempDir) throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+
+    s3Client.createBucket(bucketName);
+
+    File multipartUploadFile = Files.createFile(tempDir.resolve("multipartupload.txt")).toFile();
+
+    createFile(multipartUploadFile, (int) (15 * MB));
+
+    multipartUpload(bucketName, keyName, multipartUploadFile, 5 * MB, null, null, null);
+
+    GetObjectRequest getObjectRequestAll = new GetObjectRequest(bucketName, keyName);
+    getObjectRequestAll.setPartNumber(0);
+    S3Object s3ObjectAll = s3Client.getObject(getObjectRequestAll);
+    long allPartContentLength = s3ObjectAll.getObjectMetadata().getContentLength();
+
+    GetObjectRequest getObjectRequestOne = new GetObjectRequest(bucketName, keyName);
+    getObjectRequestOne.setPartNumber(1);
+    S3Object s3ObjectOne = s3Client.getObject(getObjectRequestOne);
+    long partOneContentLength = s3ObjectOne.getObjectMetadata().getContentLength();
+    assertEquals(allPartContentLength / 3, partOneContentLength);
+
+    GetObjectRequest getObjectRequestTwo = new GetObjectRequest(bucketName, keyName);
+    getObjectRequestTwo.setPartNumber(2);
+    S3Object s3ObjectTwo = s3Client.getObject(getObjectRequestTwo);
+    long partTwoContentLength = s3ObjectTwo.getObjectMetadata().getContentLength();
+    assertEquals(allPartContentLength / 3, partTwoContentLength);
+
+    GetObjectRequest getObjectRequestThree = new GetObjectRequest(bucketName, keyName);
+    getObjectRequestThree.setPartNumber(1);
+    S3Object s3ObjectThree = s3Client.getObject(getObjectRequestTwo);
+    long partThreeContentLength = s3ObjectThree.getObjectMetadata().getContentLength();
+    assertEquals(allPartContentLength / 3, partThreeContentLength);
+
+    assertEquals(allPartContentLength, (partOneContentLength + partTwoContentLength + partThreeContentLength));
+  }
+
+  @Test
+  public void testGetNotExistedPart(@TempDir Path tempDir) throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+
+    s3Client.createBucket(bucketName);
+
+    File multipartUploadFile = Files.createFile(tempDir.resolve("multipartupload.txt")).toFile();
+
+    createFile(multipartUploadFile, (int) (15 * MB));
+
+    multipartUpload(bucketName, keyName, multipartUploadFile, 5 * MB, null, null, null);
+
+    GetObjectRequest getObjectRequestOne = new GetObjectRequest(bucketName, keyName);
+    getObjectRequestOne.setPartNumber(4);
+    S3Object s3ObjectOne = s3Client.getObject(getObjectRequestOne);
+    long partOneContentLength = s3ObjectOne.getObjectMetadata().getContentLength();
+    assertEquals(0, partOneContentLength);
   }
 
   @Test

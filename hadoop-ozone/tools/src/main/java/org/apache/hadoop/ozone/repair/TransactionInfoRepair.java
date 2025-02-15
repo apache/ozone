@@ -21,14 +21,16 @@
  */
 package org.apache.hadoop.ozone.repair;
 
+import jakarta.annotation.Nonnull;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
-import org.kohsuke.MetaInfServices;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
@@ -37,99 +39,97 @@ import picocli.CommandLine;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Callable;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_TABLE;
-
 
 /**
- * Tool to update the highest term-index in transactionInfoTable.
+ * Tool to update the highest term-index in transaction info table.
  */
 @CommandLine.Command(
     name = "update-transaction",
-    description = "CLI to update the highest index in transactionInfoTable. Currently it is only supported for OM.",
+    description = "CLI to update the highest index in transaction info table.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
-@MetaInfServices(SubcommandWithParent.class)
-public class TransactionInfoRepair
-    implements Callable<Void>, SubcommandWithParent  {
+public class TransactionInfoRepair extends RepairTool {
 
-  @CommandLine.Spec
-  private static CommandLine.Model.CommandSpec spec;
-
-  @CommandLine.ParentCommand
-  private RDBRepair parent;
+  @CommandLine.Option(names = {"--db"},
+      required = true,
+      description = "Database File Path")
+  private String dbPath;
 
   @CommandLine.Option(names = {"--term"},
       required = true,
-      description = "Highest term of transactionInfoTable. The input should be non-zero long integer.")
+      description = "Highest term to set. The input should be non-zero long integer.")
   private long highestTransactionTerm;
 
   @CommandLine.Option(names = {"--index"},
       required = true,
-      description = "Highest index of transactionInfoTable. The input should be non-zero long integer.")
+      description = "Highest index to set. The input should be non-zero long integer.")
   private long highestTransactionIndex;
 
-
-  protected void setHighestTransactionTerm(
-      long highestTransactionTerm) {
-    this.highestTransactionTerm = highestTransactionTerm;
-  }
-
-  protected void setHighestTransactionIndex(
-      long highestTransactionIndex) {
-    this.highestTransactionIndex = highestTransactionIndex;
-  }
-
-
   @Override
-  public Void call() throws Exception {
+  public void execute() throws Exception {
     List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
-    String dbPath = getParent().getDbPath();
     List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(
         dbPath);
+    String columnFamilyName = getColumnFamily(serviceToBeOffline()).getName();
 
     try (ManagedRocksDB db = ManagedRocksDB.open(dbPath, cfDescList, cfHandleList)) {
-      ColumnFamilyHandle transactionInfoCfh = RocksDBUtils.getColumnFamilyHandle(TRANSACTION_INFO_TABLE, cfHandleList);
+      ColumnFamilyHandle transactionInfoCfh = RocksDBUtils.getColumnFamilyHandle(columnFamilyName, cfHandleList);
       if (transactionInfoCfh == null) {
-        throw new IllegalArgumentException(TRANSACTION_INFO_TABLE +
+        throw new IllegalArgumentException(columnFamilyName +
             " is not in a column family in DB for the given path.");
       }
       TransactionInfo originalTransactionInfo =
           RocksDBUtils.getValue(db, transactionInfoCfh, TRANSACTION_INFO_KEY, TransactionInfo.getCodec());
 
-      System.out.println("The original highest transaction Info was " + originalTransactionInfo.getTermIndex());
+      info("The original highest transaction Info was %s", originalTransactionInfo.getTermIndex());
 
       TransactionInfo transactionInfo = TransactionInfo.valueOf(highestTransactionTerm, highestTransactionIndex);
 
       byte[] transactionInfoBytes = TransactionInfo.getCodec().toPersistedFormat(transactionInfo);
-      db.get()
-          .put(transactionInfoCfh, StringCodec.get().toPersistedFormat(TRANSACTION_INFO_KEY), transactionInfoBytes);
+      byte[] key = StringCodec.get().toPersistedFormat(TRANSACTION_INFO_KEY);
 
-      System.out.println("The highest transaction info has been updated to: " +
-          RocksDBUtils.getValue(db, transactionInfoCfh, TRANSACTION_INFO_KEY,
-              TransactionInfo.getCodec()).getTermIndex());
+      info("Updating transaction info to %s", transactionInfo.getTermIndex());
+
+      if (!isDryRun()) {
+        db.get().put(transactionInfoCfh, key, transactionInfoBytes);
+
+        info("The highest transaction info has been updated to: %s",
+            RocksDBUtils.getValue(db, transactionInfoCfh, TRANSACTION_INFO_KEY,
+                TransactionInfo.getCodec()).getTermIndex());
+      }
     } catch (RocksDBException exception) {
-      System.err.println("Failed to update the RocksDB for the given path: " + dbPath);
-      System.err.println(
-          "Make sure that Ozone entity (OM) is not running for the give database path and current host.");
+      error("Failed to update the RocksDB for the given path: %s", dbPath);
       throw new IOException("Failed to update RocksDB.", exception);
     } finally {
       IOUtils.closeQuietly(cfHandleList);
     }
-
-    return null;
-  }
-
-  protected RDBRepair getParent() {
-    return parent;
   }
 
   @Override
-  public Class<?> getParentType() {
-    return RDBRepair.class;
+  @Nonnull
+  protected Component serviceToBeOffline() {
+    final String parent = spec().parent().name();
+    switch (parent) {
+    case "om":
+      return Component.OM;
+    case "scm":
+      return Component.SCM;
+    default:
+      throw new IllegalStateException("Unknown component: " + parent);
+    }
   }
 
+  public static DBColumnFamilyDefinition<String, TransactionInfo> getColumnFamily(Component component) {
+    switch (component) {
+    case OM:
+      return OMDBDefinition.TRANSACTION_INFO_TABLE;
+    case SCM:
+      return SCMDBDefinition.TRANSACTIONINFO;
+    default:
+      throw new IllegalStateException("This tool does not support component: " + component);
+    }
+  }
 }

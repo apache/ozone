@@ -131,7 +131,10 @@ public class TestOMMultiTenantManager {
 
     final OzoneManager ozoneManager = mock(OzoneManager.class);
     doCallRealMethod().when(ozoneManager).checkS3MultiTenancyEnabled();
-
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    when(ozoneManager.getConfiguration()).thenReturn(conf);
+    final OmConfig omConfig = conf.getObject(OmConfig.class);
+    when(ozoneManager.getConfig()).thenReturn(omConfig);
     when(ozoneManager.isS3MultiTenancyEnabled()).thenReturn(false);
 
     final String tenantId = "test-tenant";

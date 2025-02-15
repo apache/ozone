@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.om.request.file;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -68,8 +68,8 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long trxnLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long trxnLogIndex = context.getIndex();
 
     CreateFileRequest createFileRequest = getOmRequest().getCreateFileRequest();
     KeyArgs keyArgs = createFileRequest.getKeyArgs();
@@ -153,9 +153,8 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
           omMetadataManager.getBucketKey(volumeName, bucketName));
       // add all missing parents to dir table
 
-      missingParentInfos =
-          OMDirectoryCreateRequestWithFSO.getAllMissingParentDirInfo(
-              ozoneManager, keyArgs, bucketInfo, pathInfoFSO, trxnLogIndex);
+      missingParentInfos = getAllMissingParentDirInfo(
+          ozoneManager, keyArgs, bucketInfo, pathInfoFSO, trxnLogIndex);
 
       // total number of keys created.
       numKeysCreated = missingParentInfos.size();
@@ -171,7 +170,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
               getFileEncryptionInfo(keyArgs), ozoneManager.getPrefixManager(),
               bucketInfo, pathInfoFSO, trxnLogIndex,
               pathInfoFSO.getLeafNodeObjectId(),
-              ozoneManager.isRatisEnabled(), repConfig);
+          repConfig, ozoneManager.getConfiguration());
       validateEncryptionKeyInfo(bucketInfo, keyArgs);
 
       long openVersion = omFileInfo.getLatestVersionLocations().getVersion();

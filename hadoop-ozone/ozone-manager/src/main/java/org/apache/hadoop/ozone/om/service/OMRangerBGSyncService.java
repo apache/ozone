@@ -258,8 +258,7 @@ public class OMRangerBGSyncService extends BackgroundService {
       // OzoneManager can be null for testing
       return true;
     }
-    if (ozoneManager.isRatisEnabled() &&
-        (ozoneManager.getOmRatisServer() == null)) {
+    if (ozoneManager.getOmRatisServer() == null) {
       LOG.warn("OzoneManagerRatisServer is not initialized yet");
       return false;
     }
@@ -390,7 +389,7 @@ public class OMRangerBGSyncService extends BackgroundService {
       OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, CLIENT_ID, runCount.get());
     } catch (ServiceException e) {
       LOG.error("SetRangerServiceVersion request failed. "
-          + "Will retry at next run.");
+          + "Will retry at next run.", e);
       throw e;
     }
   }

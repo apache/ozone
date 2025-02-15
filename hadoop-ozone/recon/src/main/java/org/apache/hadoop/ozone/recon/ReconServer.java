@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
+import org.apache.hadoop.ozone.recon.upgrade.ReconLayoutVersionManager;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
@@ -55,6 +56,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.hdds.ratis.RatisHelper.newJvmPauseMonitor;
@@ -69,7 +71,7 @@ import static org.apache.hadoop.util.ExitUtil.terminate;
 /**
  * Recon server main class that stops and starts recon services.
  */
-public class ReconServer extends GenericCli {
+public class ReconServer extends GenericCli implements Callable<Void> {
 
   private static final Logger LOG = LoggerFactory.getLogger(ReconServer.class);
   private Injector injector;
@@ -100,10 +102,11 @@ public class ReconServer extends GenericCli {
     String[] originalArgs = getCmd().getParseResult().originalArgs()
         .toArray(new String[0]);
 
-    configuration = createOzoneConfiguration();
+    configuration = getOzoneConf();
     HddsServerUtil.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
             ReconServer.class, originalArgs, LOG, configuration);
     ConfigurationProvider.setConfiguration(configuration);
+
 
     injector = Guice.createInjector(new ReconControllerModule(),
         new ReconRestServletModule(configuration),
@@ -136,8 +139,11 @@ public class ReconServer extends GenericCli {
       this.reconNamespaceSummaryManager =
           injector.getInstance(ReconNamespaceSummaryManager.class);
 
+      ReconContext reconContext = injector.getInstance(ReconContext.class);
+
       ReconSchemaManager reconSchemaManager =
           injector.getInstance(ReconSchemaManager.class);
+
       LOG.info("Creating Recon Schema.");
       reconSchemaManager.createReconSchema();
       LOG.debug("Recon schema creation done.");
@@ -152,6 +158,17 @@ public class ReconServer extends GenericCli {
 
       this.reconTaskStatusMetrics =
           injector.getInstance(ReconTaskStatusMetrics.class);
+
+      // Handle Recon Schema Versioning
+      ReconSchemaVersionTableManager versionTableManager =
+          injector.getInstance(ReconSchemaVersionTableManager.class);
+
+      ReconLayoutVersionManager layoutVersionManager =
+          new ReconLayoutVersionManager(versionTableManager, reconContext);
+      // Run the upgrade framework to finalize layout features if needed
+      ReconStorageContainerManagerFacade reconStorageContainerManagerFacade =
+          (ReconStorageContainerManagerFacade) this.getReconStorageContainerManager();
+      layoutVersionManager.finalizeLayoutFeatures(reconStorageContainerManagerFacade);
 
       LOG.info("Initializing support of Recon Features...");
       FeatureProvider.initFeatureSupport(configuration);

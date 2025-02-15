@@ -42,7 +42,7 @@ public class OzoneDataStreamOutputStub extends OzoneDataStreamOutput {
   public OzoneDataStreamOutputStub(
       ByteBufferStreamOutput byteBufferStreamOutput,
       String partName) {
-    super(byteBufferStreamOutput);
+    super(byteBufferStreamOutput, byteBufferStreamOutput);
     this.partName = partName;
   }
 

@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -66,8 +65,8 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long trxnLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long trxnLogIndex = context.getIndex();
 
     OzoneManagerProtocolProtos.CreateKeyRequest createKeyRequest =
             getOmRequest().getCreateKeyRequest();
@@ -138,9 +137,8 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
               omMetadataManager.getBucketKey(volumeName, bucketName));
 
       // add all missing parents to dir table
-      missingParentInfos =
-          OMDirectoryCreateRequestWithFSO.getAllMissingParentDirInfo(
-              ozoneManager, keyArgs, bucketInfo, pathInfoFSO, trxnLogIndex);
+      missingParentInfos = getAllMissingParentDirInfo(
+          ozoneManager, keyArgs, bucketInfo, pathInfoFSO, trxnLogIndex);
 
       // total number of keys created.
       numKeysCreated = missingParentInfos.size();
@@ -156,7 +154,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
               getFileEncryptionInfo(keyArgs), ozoneManager.getPrefixManager(),
               bucketInfo, pathInfoFSO, trxnLogIndex,
               pathInfoFSO.getLeafNodeObjectId(),
-              ozoneManager.isRatisEnabled(), repConfig);
+              repConfig, ozoneManager.getConfiguration());
 
       validateEncryptionKeyInfo(bucketInfo, keyArgs);
 

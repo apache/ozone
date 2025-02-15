@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,34 +13,9 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
+
 package org.apache.hadoop.hdds.security.x509.certificate.client;
-
-import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
-import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
-import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
-import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.security.KeyPair;
-import java.security.cert.X509Certificate;
-import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse;
@@ -51,6 +25,30 @@ import static org.apache.hadoop.hdds.security.x509.certificate.client.Certificat
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.KeyPair;
+import java.security.cert.X509Certificate;
+import java.util.stream.Stream;
+import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
+import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
+import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Test class for {@link DNCertificateClient}.
@@ -64,7 +62,7 @@ public class TestDnCertificateClientInit {
   @TempDir
   private Path metaDirPath;
   private SecurityConfig securityConfig;
-  private KeyCodec dnKeyCodec;
+  private KeyStorage dnKeyStorage;
   private X509Certificate x509Certificate;
   private static final String DN_COMPONENT = DNCertificateClient.COMPONENT_NAME;
 
@@ -94,7 +92,7 @@ public class TestDnCertificateClientInit {
     dnCertificateClient =
         new DNCertificateClient(
             securityConfig, null, dn, certSerialId, null, null);
-    dnKeyCodec = new KeyCodec(securityConfig, DN_COMPONENT);
+    dnKeyStorage = new KeyStorage(securityConfig, DN_COMPONENT);
 
     Files.createDirectories(securityConfig.getKeyLocation(DN_COMPONENT));
   }
@@ -111,7 +109,7 @@ public class TestDnCertificateClientInit {
   public void testInitDatanode(boolean pvtKeyPresent, boolean pubKeyPresent,
       boolean certPresent, InitResponse expectedResult) throws Exception {
     if (pvtKeyPresent) {
-      dnKeyCodec.writePrivateKey(keyPair.getPrivate());
+      dnKeyStorage.storePrivateKey(keyPair.getPrivate());
     } else {
       FileUtils.deleteQuietly(Paths.get(
           securityConfig.getKeyLocation(DN_COMPONENT).toString(),
@@ -120,7 +118,7 @@ public class TestDnCertificateClientInit {
 
     if (pubKeyPresent) {
       if (dnCertificateClient.getPublicKey() == null) {
-        dnKeyCodec.writePublicKey(keyPair.getPublic());
+        dnKeyStorage.storePublicKey(keyPair.getPublic());
       }
     } else {
       FileUtils.deleteQuietly(

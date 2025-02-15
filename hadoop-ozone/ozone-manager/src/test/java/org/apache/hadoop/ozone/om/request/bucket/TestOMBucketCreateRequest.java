@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -41,6 +42,7 @@ import org.apache.hadoop.util.Time;
 
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newBucketInfoBuilder;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newCreateBucketRequest;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -336,7 +338,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
     assertNull(omMetadataManager.getBucketTable().get(bucketKey));
     OMBucketCreateRequest omBucketCreateRequest =
         new OMBucketCreateRequest(modifiedRequest);
-
+    omBucketCreateRequest.setUGI(UserGroupInformation.getCurrentUser());
 
     OMClientResponse omClientResponse =
         omBucketCreateRequest.validateAndUpdateCache(ozoneManager, 1);
@@ -355,8 +357,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
         dbBucketInfo.getCreationTime());
     assertEquals(bucketInfoFromProto.getModificationTime(),
         dbBucketInfo.getModificationTime());
-    assertEquals(bucketInfoFromProto.getAcls(),
-        dbBucketInfo.getAcls());
+    assertTrue(dbBucketInfo.getAcls().containsAll(bucketInfoFromProto.getAcls()));
     assertEquals(bucketInfoFromProto.getIsVersionEnabled(),
         dbBucketInfo.getIsVersionEnabled());
     assertEquals(bucketInfoFromProto.getStorageType(),

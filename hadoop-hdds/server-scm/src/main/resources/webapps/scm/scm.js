@@ -24,7 +24,7 @@
         require: {
             overview: "^overview"
         },
-        controller: function ($http,$scope) {
+        controller: function ($http,$scope,$sce) {
             var ctrl = this;
             $scope.reverse = false;
             $scope.columnName = "hostname";
@@ -139,6 +139,14 @@
                     $scope.totalItems = nodeStatusCopy.length;
                     $scope.lastIndex = Math.ceil(nodeStatusCopy.length / $scope.RecordsToDisplay);
                     $scope.nodeStatus = nodeStatusCopy.slice(0, $scope.RecordsToDisplay);
+
+                    $scope.formatValue = function(value) {
+                        if (value && value.includes(';')) {
+                            return $sce.trustAsHtml(value.replace('/;/g', '<br>'));
+                        } else {
+                            return $sce.trustAsHtml(value);
+                        }
+                    };
 
                     ctrl.nodemanagermetrics.NodeStatistics.forEach(({key, value}) => {
                         if(key == "Min") {

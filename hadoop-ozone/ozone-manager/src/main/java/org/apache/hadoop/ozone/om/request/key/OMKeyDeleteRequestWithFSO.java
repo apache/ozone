@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -71,13 +71,13 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long trxnLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long trxnLogIndex = context.getIndex();
     DeleteKeyRequest deleteKeyRequest = getOmRequest().getDeleteKeyRequest();
 
     OzoneManagerProtocolProtos.KeyArgs keyArgs =
         deleteKeyRequest.getKeyArgs();
-    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
+    Map<String, String> auditMap = buildLightKeyArgsAuditMap(keyArgs);
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
@@ -122,7 +122,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       omKeyInfo.setKeyName(fileName);
 
       // Set the UpdateID to current transactionLogIndex
-      omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+      omKeyInfo.setUpdateID(trxnLogIndex);
 
       final long volumeId = omMetadataManager.getVolumeId(volumeName);
       final long bucketId = omMetadataManager.getBucketId(volumeName,
@@ -175,9 +175,14 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
         }
       }
 
+      if (keyStatus.isFile()) {
+        auditMap.put(OzoneConsts.DATA_SIZE, String.valueOf(omKeyInfo.getDataSize()));
+        auditMap.put(OzoneConsts.REPLICATION_CONFIG, omKeyInfo.getReplicationConfig().toString());
+      }
+
       omClientResponse = new OMKeyDeleteResponseWithFSO(omResponse
           .setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
-          keyName, omKeyInfo, ozoneManager.isRatisEnabled(),
+          keyName, omKeyInfo,
           omBucketInfo.copyObject(), keyStatus.isDirectory(), volumeId, deletedOpenKeyInfo);
 
       result = Result.SUCCESS;

@@ -1,23 +1,28 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container;
 
+import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import com.google.common.base.Preconditions;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
@@ -25,8 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
-
-import jakarta.annotation.Nonnull;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -47,14 +50,8 @@ import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.security.token.Token;
-
-import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Helpers for container tests.
@@ -293,18 +290,31 @@ public final class ContainerTestHelper {
    */
   public static ContainerCommandRequestProto getCreateContainerRequest(
       long containerID, Pipeline pipeline) throws IOException {
+    return getCreateContainerRequest(containerID, pipeline, ContainerProtos.ContainerDataProto.State.OPEN);
+  }
+
+
+  /**
+   * Returns a create container command for test purposes. There are a bunch of
+   * tests where we need to just send a request and get a reply.
+   *
+   * @return ContainerCommandRequestProto.
+   */
+  public static ContainerCommandRequestProto getCreateContainerRequest(
+      long containerID, Pipeline pipeline, ContainerProtos.ContainerDataProto.State state) throws IOException {
     LOG.trace("addContainer: {}", containerID);
-    return getContainerCommandRequestBuilder(containerID, pipeline).build();
+    return getContainerCommandRequestBuilder(containerID, pipeline, state)
+        .build();
   }
 
   private static Builder getContainerCommandRequestBuilder(long containerID,
-      Pipeline pipeline) throws IOException {
+          Pipeline pipeline, ContainerProtos.ContainerDataProto.State state) throws IOException {
     Builder request =
         ContainerCommandRequestProto.newBuilder();
     request.setCmdType(ContainerProtos.Type.CreateContainer);
     request.setContainerID(containerID);
     request.setCreateContainer(
-        ContainerProtos.CreateContainerRequestProto.getDefaultInstance());
+        ContainerProtos.CreateContainerRequestProto.getDefaultInstance().toBuilder().setState(state).build());
     request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
 
     return request;
@@ -320,7 +330,8 @@ public final class ContainerTestHelper {
       long containerID, Pipeline pipeline, Token<?> token) throws IOException {
     LOG.trace("addContainer: {}", containerID);
 
-    Builder request = getContainerCommandRequestBuilder(containerID, pipeline);
+    Builder request = getContainerCommandRequestBuilder(containerID, pipeline,
+        ContainerProtos.ContainerDataProto.State.OPEN);
     if (token != null) {
       request.setEncodedToken(token.encodeToUrlString());
     }

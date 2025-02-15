@@ -18,9 +18,8 @@
 
 package org.apache.hadoop.ozone.debug;
 
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.kohsuke.MetaInfServices;
@@ -36,9 +35,9 @@ import java.io.IOException;
     name = "print-log-dag",
     aliases = "pld",
     description = "Create an image of the current compaction log DAG in OM.")
-@MetaInfServices(SubcommandWithParent.class)
+@MetaInfServices(DebugSubcommand.class)
 public class CompactionLogDagPrinter extends Handler
-    implements SubcommandWithParent {
+    implements DebugSubcommand {
 
   @CommandLine.Option(names = {"-f", "--file-name-prefix"},
       description = "Prefix to be use in image file name. (optional)")
@@ -57,13 +56,8 @@ public class CompactionLogDagPrinter extends Handler
   private String graphType;
 
   @Override
-  public Class<?> getParentType() {
-    return OzoneDebug.class;
-  }
-
-  @Override
   protected void execute(OzoneClient client, OzoneAddress address)
-      throws IOException, OzoneClientException {
+      throws IOException {
     String message = client.getObjectStore()
         .printCompactionLogDag(fileNamePrefix, graphType);
     System.out.println(message);

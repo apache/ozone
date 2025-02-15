@@ -17,14 +17,13 @@
 
 package org.apache.hadoop.ozone.debug;
 
-import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -61,8 +60,8 @@ import static java.util.Collections.emptyMap;
 @CommandLine.Command(name = "read-replicas",
     description = "Reads every replica for all the blocks associated with a " +
         "given key.")
-@MetaInfServices(SubcommandWithParent.class)
-public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
+@MetaInfServices(DebugSubcommand.class)
+public class ReadReplicas extends KeyHandler implements DebugSubcommand {
 
   @CommandLine.Option(names = {"--outputDir", "-o", "--output-dir"},
       description = "Destination where the directory will be created" +
@@ -84,13 +83,8 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
   private static final String JSON_PROPERTY_REPLICA_EXCEPTION = "exception";
 
   @Override
-  public Class<?> getParentType() {
-    return OzoneDebug.class;
-  }
-
-  @Override
   protected void execute(OzoneClient client, OzoneAddress address)
-      throws IOException, OzoneClientException {
+      throws IOException {
 
     address.ensureKeyAddress();
 
@@ -115,8 +109,11 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
       String volumeName = address.getVolumeName();
       String bucketName = address.getBucketName();
       String keyName = address.getKeyName();
+      // Multilevel keys will have a '/' in their names. This interferes with
+      // directory and file creation process. Flatten the keys to fix this.
+      String sanitizedKeyName = address.getKeyName().replace("/", "_");
 
-      File dir = createDirectory(volumeName, bucketName, keyName);
+      File dir = createDirectory(volumeName, bucketName, sanitizedKeyName);
 
       OzoneKeyDetails keyInfoDetails
           = checksumClient.getKeyDetails(volumeName, bucketName, keyName);
@@ -134,13 +131,13 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
       result.put(JSON_PROPERTY_FILE_SIZE, keyInfoDetails.getDataSize());
 
       ArrayNode blocks = JsonUtils.createArrayNode();
-      downloadReplicasAndCreateManifest(keyName, replicas,
+      downloadReplicasAndCreateManifest(sanitizedKeyName, replicas,
           replicasWithoutChecksum, dir, blocks);
       result.set(JSON_PROPERTY_FILE_BLOCKS, blocks);
 
       String prettyJson = JsonUtils.toJsonStringWithDefaultPrettyPrinter(result);
 
-      String manifestFileName = keyName + "_manifest";
+      String manifestFileName = sanitizedKeyName + "_manifest";
       System.out.println("Writing manifest file : " + manifestFileName);
       File manifestFile
           = new File(dir, manifestFileName);

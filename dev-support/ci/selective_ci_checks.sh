@@ -87,7 +87,6 @@ function set_outputs_run_everything_and_exit() {
                        | cut -f1 -d'.')
     compile_needed=true
     compose_tests_needed=true
-    dependency_check_needed=true
     integration_tests_needed=true
     kubernetes_tests_needed=true
 
@@ -99,7 +98,6 @@ function set_outputs_run_everything_and_exit() {
 function set_output_skip_all_tests_and_exit() {
     BASIC_CHECKS=""
     compose_tests_needed=false
-    dependency_check_needed=false
     integration_tests_needed=false
     kubernetes_tests_needed=false
 
@@ -247,6 +245,7 @@ function get_count_doc_files() {
     local pattern_array=(
         "^hadoop-hdds/docs"
         "^hadoop-ozone/dev-support/checks/docs.sh"
+        "^hadoop-ozone/dev-support/checks/install/hugo.sh"
     )
     filter_changed_files true
     COUNT_DOC_CHANGED_FILES=${match_count}
@@ -278,6 +277,8 @@ function get_count_kubernetes_files() {
     start_end::group_start "Count kubernetes files"
     local pattern_array=(
         "^hadoop-ozone/dev-support/checks/kubernetes.sh"
+        "^hadoop-ozone/dev-support/checks/install/flekszible.sh"
+        "^hadoop-ozone/dev-support/checks/install/k3s.sh"
         "^hadoop-ozone/dist"
     )
     local ignore_array=(
@@ -306,6 +307,9 @@ function check_needs_build() {
     start_end::group_start "Check if build is needed"
     local pattern_array=(
         "^hadoop-ozone/dev-support/checks/build.sh"
+        "^hadoop-ozone/dev-support/checks/dependency.sh"
+        "^hadoop-ozone/dist/src/main/license/update-jar-report.sh"
+        "^hadoop-ozone/dist/src/main/license/jar-report.txt"
         "src/main/java"
         "src/main/resources"
     )
@@ -330,7 +334,6 @@ function check_needs_compile() {
 
     if [[ ${match_count} != "0" ]]; then
         compile_needed=true
-        dependency_check_needed=true
     fi
 
     start_end::group_end
@@ -356,7 +359,7 @@ function check_needs_bats() {
     local pattern_array=(
         "\.bash$"
         "\.bats$"
-        "\.sh$" # includes hadoop-ozone/dev-support/checks/bats.sh
+        "\.sh$" # includes hadoop-ozone/dev-support/checks/bats.sh and hadoop-ozone/dev-support/checks/install/bats.sh
     )
     filter_changed_files
 
@@ -394,28 +397,11 @@ function check_needs_docs() {
     fi
 }
 
-function check_needs_dependency() {
-    start_end::group_start "Check if dependency is needed"
-    local pattern_array=(
-        "^hadoop-ozone/dev-support/checks/dependency.sh"
-        "^hadoop-ozone/dist/src/main/license/update-jar-report.sh"
-        "^hadoop-ozone/dist/src/main/license/jar-report.txt"
-        "pom.xml"
-    )
-    filter_changed_files
-
-    dependency_check_needed=false
-    if [[ ${match_count} != "0" ]]; then
-        dependency_check_needed=true
-    fi
-
-    start_end::group_end
-}
-
 function check_needs_findbugs() {
     start_end::group_start "Check if findbugs is needed"
     local pattern_array=(
         "^hadoop-ozone/dev-support/checks/findbugs.sh"
+        "^hadoop-ozone/dev-support/checks/install/spotbugs.sh"
         "findbugsExcludeFile.xml"
         "pom.xml"
         "src/..../java"
@@ -452,7 +438,6 @@ function check_needs_native() {
             "^hadoop-hdds/common"
             "^hadoop-hdds/config"
             "^hadoop-hdds/hadoop-dependency-client"
-            "^hadoop-hdds/hadoop-dependency-test"
             "^hadoop-hdds/managed-rocksdb"
             "^hadoop-hdds/test-utils"
             "^pom.xml"
@@ -521,7 +506,6 @@ function calculate_test_types_to_run() {
         echo "Looks like ${COUNT_CORE_OTHER_CHANGED_FILES} core files changed, running all tests."
         echo
         compose_tests_needed=true
-        dependency_check_needed=true
         integration_tests_needed=true
         kubernetes_tests_needed=true
     else
@@ -529,14 +513,12 @@ function calculate_test_types_to_run() {
         echo
         if [[ ${COUNT_COMPOSE_CHANGED_FILES} != "0" ]] || [[ ${COUNT_ROBOT_CHANGED_FILES} != "0" ]]; then
             compose_tests_needed="true"
-            dependency_check_needed=true
         fi
         if [[ ${COUNT_INTEGRATION_CHANGED_FILES} != "0" ]]; then
             integration_tests_needed="true"
         fi
         if [[ ${COUNT_KUBERNETES_CHANGED_FILES} != "0" ]] || [[ ${COUNT_ROBOT_CHANGED_FILES} != "0" ]]; then
             kubernetes_tests_needed="true"
-            dependency_check_needed=true
         fi
     fi
     start_end::group_end
@@ -557,7 +539,6 @@ function set_outputs() {
     initialization::ga_output needs-build "${build_needed:-false}"
     initialization::ga_output needs-compile "${compile_needed}"
     initialization::ga_output needs-compose-tests "${compose_tests_needed}"
-    initialization::ga_output needs-dependency-check "${dependency_check_needed}"
     initialization::ga_output needs-integration-tests "${integration_tests_needed}"
     initialization::ga_output needs-kubernetes-tests "${kubernetes_tests_needed}"
 }
@@ -594,7 +575,6 @@ get_count_robot_files
 get_count_misc_files
 
 check_needs_build
-check_needs_dependency
 check_needs_compile
 
 # calculate basic checks to run

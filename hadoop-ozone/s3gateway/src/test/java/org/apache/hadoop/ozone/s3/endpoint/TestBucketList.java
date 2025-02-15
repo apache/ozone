@@ -24,6 +24,7 @@ import java.io.IOException;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.commontypes.EncodingTypeObject;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
@@ -49,11 +50,11 @@ public class TestBucketList {
   @Test
   public void listRoot() throws OS3Exception, IOException {
 
-    BucketEndpoint getBucket = new BucketEndpoint();
-
     OzoneClient client = createClientWithKeys("file1", "dir1/file2");
 
-    getBucket.setClient(client);
+    BucketEndpoint getBucket = EndpointBuilder.newBucketEndpointBuilder()
+        .setClient(client)
+        .build();
 
     ListObjectResponse getBucketResponse =
         (ListObjectResponse) getBucket.get("b1", "/", null, null, 100, "",
@@ -78,6 +79,7 @@ public class TestBucketList {
     OzoneClient client = createClientWithKeys("dir1/file2", "dir1/dir2/file2");
 
     getBucket.setClient(client);
+    getBucket.setRequestIdentifier(new RequestIdentifier());
 
     ListObjectResponse getBucketResponse =
         (ListObjectResponse) getBucket.get("b1", "/", null, null, 100,
@@ -101,7 +103,7 @@ public class TestBucketList {
             "dir1bha/file2");
 
     getBucket.setClient(ozoneClient);
-
+    getBucket.setRequestIdentifier(new RequestIdentifier());
     ListObjectResponse getBucketResponse =
         (ListObjectResponse) getBucket
             .get("b1", "/", null, null, 100, "dir1/", null,
@@ -138,6 +140,7 @@ public class TestBucketList {
     bucket.createKey("key2", 0).close();
 
     getBucket.setClient(client);
+    getBucket.setRequestIdentifier(new RequestIdentifier());
     ListObjectResponse getBucketResponse =
         (ListObjectResponse) getBucket.get("b1", "/", null, null, 100,
             "key", null, null, null, null, null).getEntity();
@@ -160,6 +163,7 @@ public class TestBucketList {
             "dir1bha/file2", "file2");
 
     getBucket.setClient(ozoneClient);
+    getBucket.setRequestIdentifier(new RequestIdentifier());
 
     ListObjectResponse getBucketResponse =
         (ListObjectResponse) getBucket.get("b1", "/", null, null, 100,
@@ -179,6 +183,7 @@ public class TestBucketList {
             "dir1bha/file2", "file2");
 
     getBucket.setClient(ozoneClient);
+    getBucket.setRequestIdentifier(new RequestIdentifier());
 
     ListObjectResponse getBucketResponse =
         (ListObjectResponse) getBucket.get("b1", "/", null, null, 100,
@@ -200,7 +205,7 @@ public class TestBucketList {
             "dir1bha/file2", "file2");
 
     getBucket.setClient(ozoneClient);
-
+    getBucket.setRequestIdentifier(new RequestIdentifier());
     ListObjectResponse getBucketResponse =
         (ListObjectResponse) getBucket.get("b1", "/", null, null, 100, "dir1bh",
             null, "dir1/dir2/file2", null, null, null).getEntity();
@@ -219,7 +224,7 @@ public class TestBucketList {
           "dir1/dir2/file2");
 
     getBucket.setClient(ozoneClient);
-
+    getBucket.setRequestIdentifier(new RequestIdentifier());
     // Should behave the same if delimiter is null
     ListObjectResponse getBucketResponse =
         (ListObjectResponse) getBucket.get("b1", "", null, null, 100, "dir1/",
@@ -248,7 +253,7 @@ public class TestBucketList {
             "dir1bha/file2", "file2");
 
     getBucket.setClient(ozoneClient);
-
+    getBucket.setRequestIdentifier(new RequestIdentifier());
     int maxKeys = 2;
     // As we have 5 keys, with max keys 2 we should call list 3 times.
 
@@ -299,6 +304,7 @@ public class TestBucketList {
             "test/file8");
 
     getBucket.setClient(ozoneClient);
+    getBucket.setRequestIdentifier(new RequestIdentifier());
 
     int maxKeys = 2;
 
@@ -342,6 +348,7 @@ public class TestBucketList {
             "dir1bha/file1", "dir0/file1", "dir2/file1");
 
     getBucket.setClient(ozoneClient);
+    getBucket.setRequestIdentifier(new RequestIdentifier());
 
     int maxKeys = 2;
     // As we have 5 keys, with max keys 2 we should call list 3 times.
@@ -383,6 +390,7 @@ public class TestBucketList {
             "dir1bha/file2", "dir1", "dir2", "dir3");
 
     getBucket.setClient(ozoneClient);
+    getBucket.setRequestIdentifier(new RequestIdentifier());
 
     OS3Exception e = assertThrows(OS3Exception.class, () -> getBucket.get("b1",
         "/", null, null, 2, "dir", "random", null, null, null, null)
@@ -401,6 +409,7 @@ public class TestBucketList {
             "dir1bha/file1", "dir0/file1", "dir2/file1");
 
     getBucket.setClient(ozoneClient);
+    getBucket.setRequestIdentifier(new RequestIdentifier());
 
     ListObjectResponse getBucketResponse =
         (ListObjectResponse) getBucket.get("b1", null, null, null, 1000,
@@ -460,6 +469,7 @@ public class TestBucketList {
     OzoneClient ozoneClient =
         createClientWithKeys("data=1970", "data==1970");
     getBucket.setClient(ozoneClient);
+    getBucket.setRequestIdentifier(new RequestIdentifier());
 
     String delimiter = "=";
     String prefix = "data=";
@@ -508,7 +518,7 @@ public class TestBucketList {
     OzoneClient client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket("b1");
     getBucket.setClient(client);
-
+    getBucket.setRequestIdentifier(new RequestIdentifier());
     OS3Exception e = assertThrows(OS3Exception.class, () -> getBucket.get(
         "b1", null, "unSupportType", null, 1000, null,
         null, null, null, null, null).getEntity());

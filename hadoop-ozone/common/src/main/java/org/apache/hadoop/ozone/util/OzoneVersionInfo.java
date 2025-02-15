@@ -69,8 +69,6 @@ public final class OzoneVersionInfo {
     System.out.println(
         "Source code repository " + OZONE_VERSION_INFO.getUrl() + " -r " +
             OZONE_VERSION_INFO.getRevision());
-    System.out.println("Compiled by " + OZONE_VERSION_INFO.getUser() + " on "
-        + OZONE_VERSION_INFO.getDate());
     System.out.println(
         "Compiled with protoc " + OZONE_VERSION_INFO.getHadoopProtoc2Version() +
             ", " + OZONE_VERSION_INFO.getGrpcProtocVersion() +

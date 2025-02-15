@@ -23,9 +23,9 @@ import java.util.HashMap;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.request.util.OmKeyHSyncUtil;
 import org.apache.hadoop.util.Time;
-import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -76,8 +76,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long trxnLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long trxnLogIndex = context.getIndex();
 
     CommitKeyRequest commitKeyRequest = getOmRequest().getCommitKeyRequest();
 
@@ -205,7 +205,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
             omMetadataManager, dbOpenKeyToDeleteKey, keyName);
         openKeyToDelete.getMetadata().put(OzoneConsts.OVERWRITTEN_HSYNC_KEY, "true");
         openKeyToDelete.setModificationTime(Time.now());
-        openKeyToDelete.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+        openKeyToDelete.setUpdateID(trxnLogIndex);
         OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
             dbOpenKeyToDeleteKey, openKeyToDelete, keyName, fileName, trxnLogIndex);
       }
@@ -230,7 +230,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
           omKeyInfo.updateLocationInfoList(locationInfoList, false);
 
       // Set the UpdateID to current transactionLogIndex
-      omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+      omKeyInfo.setUpdateID(trxnLogIndex);
 
       // If bucket versioning is turned on during the update, between key
       // creation and key commit, old versions will be just overwritten and
@@ -253,7 +253,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         // Subtract the size of blocks to be overwritten.
         correctedSpace -= keyToDelete.getReplicatedSize();
         RepeatedOmKeyInfo oldVerKeyInfo = getOldVersionsToCleanUp(
-            keyToDelete, trxnLogIndex, ozoneManager.isRatisEnabled());
+            keyToDelete, trxnLogIndex);
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
             correctedSpace);
         String delKeyName = omMetadataManager

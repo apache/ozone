@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.google.common.collect.Lists;
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -133,9 +133,9 @@ public class OMBucketAddAclRequest extends OMBucketAclRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     ozoneManager.getMetrics().incNumAddAcl();
-    return super.validateAndUpdateCache(ozoneManager, termIndex);
+    return super.validateAndUpdateCache(ozoneManager, context);
   }
 }
 

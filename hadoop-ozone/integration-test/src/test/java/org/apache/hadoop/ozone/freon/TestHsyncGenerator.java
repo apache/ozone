@@ -94,14 +94,13 @@ public class TestHsyncGenerator {
       OzoneVolume volume = store.getVolume(volumeName);
       volume.createBucket(bucketName);
 
-      String rootPath = String.format("%s://%s/%s/%s/",
-          OZONE_OFS_URI_SCHEME, cluster.getConf().get(OZONE_OM_ADDRESS_KEY),
-          volumeName, bucketName);
+      String rootPath = String.format("%s://%s/%s/%s/", OZONE_OFS_URI_SCHEME,
+          cluster.getConf().get(OZONE_OM_ADDRESS_KEY), volumeName, bucketName);
 
       int exitCode = cmd.execute(
           "--path", rootPath,
-          "--bytes-per-write", "1024",
-          "--number-of-files", "2",
+          "--bytes-per-write", "8",
+          "--writes-per-transaction", "64",
           "-t", "5",
           "-n", "100");
       assertEquals(0, exitCode);

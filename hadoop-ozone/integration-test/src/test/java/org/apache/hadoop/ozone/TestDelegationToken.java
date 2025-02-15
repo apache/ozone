@@ -39,7 +39,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
-import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
+import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -119,10 +119,11 @@ public final class TestDelegationToken {
 
   @TempDir
   private Path folder;
+  @TempDir
+  private File workDir;
 
   private MiniKdc miniKdc;
   private OzoneConfiguration conf;
-  private File workDir;
   private File scmKeytab;
   private File spnegoKeytab;
   private File omKeyTab;
@@ -165,8 +166,6 @@ public final class TestDelegationToken {
       conf.set(OZONE_METADATA_DIRS, metaDirPath.toString());
       conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
       conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.name());
-
-      workDir = GenericTestUtils.getTestDir(getClass().getSimpleName());
 
       startMiniKdc();
       setSecureConfig();
@@ -415,8 +414,8 @@ public final class TestDelegationToken {
     SecurityConfig securityConfig = new SecurityConfig(conf);
     HDDSKeyGenerator keyGenerator = new HDDSKeyGenerator(securityConfig);
     KeyPair keyPair = keyGenerator.generateKey();
-    KeyCodec pemWriter = new KeyCodec(securityConfig, COMPONENT);
-    pemWriter.writeKey(keyPair, true);
+    KeyStorage keyStorage = new KeyStorage(securityConfig, COMPONENT);
+    keyStorage.storeKeyPair(keyPair);
   }
 
   private void setupOm(OzoneConfiguration config) throws Exception {

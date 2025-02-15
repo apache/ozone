@@ -19,7 +19,6 @@
  */
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
@@ -54,10 +53,11 @@ public class TestAbortMultipartUpload {
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
 
-    ObjectEndpoint rest = new ObjectEndpoint();
-    rest.setHeaders(headers);
-    rest.setClient(client);
-    rest.setOzoneConfiguration(new OzoneConfiguration());
+    ObjectEndpoint rest = EndpointBuilder.newObjectEndpointBuilder()
+        .setHeaders(headers)
+        .setClient(client)
+        .build();
+
 
     Response response = rest.initializeMultipartUpload(bucket, key);
 
@@ -69,13 +69,13 @@ public class TestAbortMultipartUpload {
 
 
     // Abort multipart upload
-    response = rest.delete(bucket, key, uploadID);
+    response = rest.delete(bucket, key, uploadID, null);
 
     assertEquals(204, response.getStatus());
 
     // test with unknown upload Id.
     try {
-      rest.delete(bucket, key, "random");
+      rest.delete(bucket, key, "random", null);
     } catch (OS3Exception ex) {
       assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getCode(), ex.getCode());
       assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getErrorMessage(),

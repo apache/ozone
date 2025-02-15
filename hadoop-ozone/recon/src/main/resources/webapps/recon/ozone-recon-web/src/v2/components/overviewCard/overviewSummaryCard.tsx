@@ -39,6 +39,7 @@ type OverviewTableCardProps = {
   data?: string | React.ReactElement;
   linkToUrl?: string;
   showHeader?: boolean;
+  state?: Record<string, any>;
 }
 
 // ------------- Styles -------------- //
@@ -63,15 +64,18 @@ const OverviewSummaryCard: React.FC<OverviewTableCardProps> = ({
   columns = [],
   tableData = [],
   linkToUrl = '',
-  showHeader = false
+  showHeader = false,
+  state
 }) => {
-
   const titleElement = (linkToUrl)
     ? (
       <div className='card-title-div'>
         {title}
         <Link
-          to={linkToUrl}
+          to={{
+            pathname: linkToUrl,
+            state: state
+          }}
           style={{
             fontWeight: 400
           }}>View Insights</Link>

@@ -12,9 +12,7 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
@@ -22,11 +20,12 @@
     <version>2.0.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone-filesystem-hadoop3</artifactId>
-  <name>Apache Ozone FS Hadoop 3.x compatibility</name>
-  <packaging>jar</packaging>
   <version>2.0.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+  <name>Apache Ozone FS Hadoop 3.x compatibility</name>
   <properties>
-    <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
+    <!-- no tests in this module so far -->
+    <maven.test.skip>true</maven.test.skip>
     <shaded.prefix>org.apache.hadoop.ozone.shaded</shaded.prefix>
   </properties>
   <dependencies>
@@ -36,8 +35,8 @@
       <optional>true</optional>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-common</artifactId>
+      <groupId>ch.qos.reload4j</groupId>
+      <artifactId>reload4j</artifactId>
       <scope>provided</scope>
     </dependency>
     <dependency>
@@ -51,8 +50,8 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>ch.qos.reload4j</groupId>
-      <artifactId>reload4j</artifactId>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
       <scope>provided</scope>
     </dependency>
     <dependency>
@@ -76,10 +75,10 @@
         <executions>
           <execution>
             <id>include-dependencies</id>
-            <phase>prepare-package</phase>
             <goals>
               <goal>unpack</goal>
             </goals>
+            <phase>prepare-package</phase>
             <configuration>
               <skip>${maven.shade.skip}</skip>
               <excludes>META-INF/versions/**/*.*</excludes>
@@ -100,6 +99,13 @@
         <artifactId>spotbugs-maven-plugin</artifactId>
         <configuration>
           <onlyAnalyze>org.apache.hadoop.fs.ozone.*</onlyAnalyze>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <configuration>
+          <suppressionsLocation>${basedir}/../../hadoop-hdds/dev-support/checkstyle/suppressions-skip-imports.xml</suppressionsLocation>
         </configuration>
       </plugin>
     </plugins>

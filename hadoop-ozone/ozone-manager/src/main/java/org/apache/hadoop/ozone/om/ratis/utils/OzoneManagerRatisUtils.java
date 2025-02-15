@@ -340,6 +340,16 @@ public final class OzoneManagerRatisUtils {
       return new S3ExpiredMultipartUploadsAbortRequest(omRequest);
     case QuotaRepair:
       return new OMQuotaRepairRequest(omRequest);
+    case PutObjectTagging:
+      keyArgs = omRequest.getPutObjectTaggingRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
+    case DeleteObjectTagging:
+      keyArgs = omRequest.getDeleteObjectTaggingRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     default:
       throw new OMException("Unrecognized write command type request "
           + cmdType, OMException.ResultCodes.INVALID_REQUEST);
@@ -510,10 +520,6 @@ public final class OzoneManagerRatisUtils {
 
   public static OzoneManagerProtocolProtos.OMResponse submitRequest(
       OzoneManager om, OMRequest omRequest, ClientId clientId, long callId) throws ServiceException {
-    if (om.isRatisEnabled()) {
-      return om.getOmRatisServer().submitRequest(omRequest, clientId, callId);
-    } else {
-      return om.getOmServerProtocol().submitRequest(NULL_RPC_CONTROLLER, omRequest);
-    }
+    return om.getOmRatisServer().submitRequest(omRequest, clientId, callId);
   }
 }

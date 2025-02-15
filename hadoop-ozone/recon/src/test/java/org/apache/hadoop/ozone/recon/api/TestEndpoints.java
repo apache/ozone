@@ -378,7 +378,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .setDatanodeDetails(datanodeDetailsProto)
             .setVersion("0.6.0")
             .setSetupTime(1596347628802L)
-            .setBuildDate("2020-08-01T08:50Z")
             .setRevision("3346f493fa1690358add7bb9f3e5b52545993f36")
             .build();
     StorageReportProto storageReportProto1 =
@@ -409,7 +408,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .setDatanodeDetails(datanodeDetailsProto2)
             .setVersion("0.6.0")
             .setSetupTime(1596347636802L)
-            .setBuildDate("2020-08-01T08:50Z")
             .setRevision("3346f493fa1690358add7bb9f3e5b52545993f36")
             .build();
     StorageReportProto storageReportProto3 =
@@ -441,7 +439,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .setDatanodeDetails(datanodeDetailsProto3)
             .setVersion("0.6.0")
             .setSetupTime(1596347628802L)
-            .setBuildDate("2020-08-01T08:50Z")
             .setRevision("3346f493fa1690358add7bb9f3e5b52545993f36")
             .build();
     StorageReportProto storageReportProto5 =
@@ -789,7 +786,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
           (ClusterStateResponse) response1.getEntity();
       return (clusterStateResponse1.getContainers() == 1);
     });
-
+    omTableInsightTask.init();
     // check volume, bucket and key count after running table count task
     Pair<String, Boolean> result =
         omTableInsightTask.reprocess(reconOMMetadataManager);
@@ -945,7 +942,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     containers.add(omContainerInfo2);
 
     // Process the list of containers through the container size count task
-    containerSizeCountTask.process(containers);
+    containerSizeCountTask.processContainers(containers);
 
     // Test fetching all container counts
     Response response = utilizationEndpoint.getContainerCounts(0L);

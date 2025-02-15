@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
-import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.HashMap;
@@ -43,6 +42,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -60,7 +60,6 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.ozone.test.GenericTestUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
@@ -75,6 +74,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
@@ -91,7 +91,6 @@ public class TestDeleteWithInAdequateDN {
   private static ObjectStore objectStore;
   private static String volumeName;
   private static String bucketName;
-  private static String path;
   private static XceiverClientManager xceiverClientManager;
   private static final int FACTOR_THREE_PIPELINE_COUNT = 1;
 
@@ -105,10 +104,6 @@ public class TestDeleteWithInAdequateDN {
     final int numOfDatanodes = 3;
 
     conf = new OzoneConfiguration();
-    path = GenericTestUtils
-        .getTempPath(TestContainerStateMachineFailures.class.getSimpleName());
-    File baseDir = new File(path);
-    baseDir.mkdirs();
 
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 100,
         TimeUnit.MILLISECONDS);
@@ -288,6 +283,7 @@ public class TestDeleteWithInAdequateDN {
     //cluster.getOzoneManager().deleteKey(keyArgs);
     client.getObjectStore().getVolume(volumeName).getBucket(bucketName).
         deleteKey("ratis");
+    OzoneTestUtils.flushAndWaitForDeletedBlockLog(cluster.getStorageContainerManager());
     // make sure the chunk was never deleted on the leader even though
     // deleteBlock handler is invoked
 

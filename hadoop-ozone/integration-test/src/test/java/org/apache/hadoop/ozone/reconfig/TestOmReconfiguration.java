@@ -22,27 +22,32 @@ import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphabetic;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests for OM reconfiguration.
  */
-class TestOmReconfiguration extends ReconfigurationTestBase {
+public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
 
   @Override
   ReconfigurationHandler getSubject() {
-    return getCluster().getOzoneManager().getReconfigurationHandler();
+    return cluster().getOzoneManager().getReconfigurationHandler();
   }
 
   @Test
   void reconfigurableProperties() {
     assertProperties(getSubject(),
         ImmutableSet.of(OZONE_ADMINISTRATORS, OZONE_READONLY_ADMINISTRATORS,
+            OZONE_OM_VOLUME_LISTALL_ALLOWED,
             OZONE_KEY_DELETING_LIMIT_PER_TASK));
   }
 
@@ -54,7 +59,7 @@ class TestOmReconfiguration extends ReconfigurationTestBase {
 
     assertEquals(
         ImmutableSet.of(newValue, getCurrentUser()),
-        getCluster().getOzoneManager().getOmAdminUsernames());
+        cluster().getOzoneManager().getOmAdminUsernames());
   }
 
   @Test
@@ -66,19 +71,37 @@ class TestOmReconfiguration extends ReconfigurationTestBase {
 
     assertEquals(
         ImmutableSet.of(newValue),
-        getCluster().getOzoneManager().getOmReadOnlyAdminUsernames());
+        cluster().getOzoneManager().getOmReadOnlyAdminUsernames());
   }
 
   @Test
   public void keyDeletingLimitPerTask() throws ReconfigurationException {
-    int originLimit = getCluster().getOzoneManager()
+    int originLimit = cluster().getOzoneManager()
         .getKeyManager().getDeletingService().getKeyLimitPerTask();
 
     getSubject().reconfigurePropertyImpl(OZONE_KEY_DELETING_LIMIT_PER_TASK,
         String.valueOf(originLimit + 1));
 
-    assertEquals(originLimit + 1, getCluster().getOzoneManager()
+    assertEquals(originLimit + 1, cluster().getOzoneManager()
         .getKeyManager().getDeletingService().getKeyLimitPerTask());
+  }
+
+  @Test
+  void allowListAllVolumes() throws ReconfigurationException {
+    final boolean newValue = !cluster().getOzoneManager().getAllowListAllVolumes();
+
+    getSubject().reconfigurePropertyImpl(OZONE_OM_VOLUME_LISTALL_ALLOWED,
+        String.valueOf(newValue));
+
+    assertEquals(newValue, cluster().getOzoneManager().getAllowListAllVolumes());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "invalid"})
+  void unsetAllowListAllVolumes(String newValue) throws ReconfigurationException {
+    getSubject().reconfigurePropertyImpl(OZONE_OM_VOLUME_LISTALL_ALLOWED, newValue);
+
+    assertEquals(OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT, cluster().getOzoneManager().getAllowListAllVolumes());
   }
 
 }

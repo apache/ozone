@@ -32,4 +32,4 @@ source "$COMPOSE_DIR/../testlib.sh"
 
 start_docker_env
 
-execute_robot_test ${OM} -v REPLICATION:THREE -v TYPE:RATIS -v KEYS:3 -v LOWER_LIMIT:3 -v UPPER_LIMIT:3.5 -N ozone-balancer-RATIS balancer/testBalancer.robot
+execute_robot_test ${OM} -v REPLICATION:THREE -v TYPE:RATIS -v LOWER_LIMIT:3 -v UPPER_LIMIT:3.5 -N ozone-balancer-RATIS balancer/testBalancer.robot

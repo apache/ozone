@@ -26,7 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Manages records in the OpenKey Table, updating counts and sizes of
@@ -44,20 +44,16 @@ public class OpenKeysInsightHandler implements OmTableHandler {
   @Override
   public void handlePutEvent(OMDBUpdateEvent<String, Object> event,
                              String tableName,
-                             HashMap<String, Long> objectCountMap,
-                             HashMap<String, Long> unReplicatedSizeMap,
-                             HashMap<String, Long> replicatedSizeMap) {
-
-    String countKey = getTableCountKeyFromTable(tableName);
-    String unReplicatedSizeKey = getUnReplicatedSizeKeyFromTable(tableName);
-    String replicatedSizeKey = getReplicatedSizeKeyFromTable(tableName);
+                             Map<String, Long> objectCountMap,
+                             Map<String, Long> unReplicatedSizeMap,
+                             Map<String, Long> replicatedSizeMap) {
 
     if (event.getValue() != null) {
       OmKeyInfo omKeyInfo = (OmKeyInfo) event.getValue();
-      objectCountMap.computeIfPresent(countKey, (k, count) -> count + 1L);
-      unReplicatedSizeMap.computeIfPresent(unReplicatedSizeKey,
+      objectCountMap.computeIfPresent(getTableCountKeyFromTable(tableName), (k, count) -> count + 1L);
+      unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
           (k, size) -> size + omKeyInfo.getDataSize());
-      replicatedSizeMap.computeIfPresent(replicatedSizeKey,
+      replicatedSizeMap.computeIfPresent(getReplicatedSizeKeyFromTable(tableName),
           (k, size) -> size + omKeyInfo.getReplicatedSize());
     } else {
       LOG.warn("Put event does not have the Key Info for {}.",
@@ -72,22 +68,18 @@ public class OpenKeysInsightHandler implements OmTableHandler {
   @Override
   public void handleDeleteEvent(OMDBUpdateEvent<String, Object> event,
                                 String tableName,
-                                HashMap<String, Long> objectCountMap,
-                                HashMap<String, Long> unReplicatedSizeMap,
-                                HashMap<String, Long> replicatedSizeMap) {
-
-    String countKey = getTableCountKeyFromTable(tableName);
-    String unReplicatedSizeKey = getUnReplicatedSizeKeyFromTable(tableName);
-    String replicatedSizeKey = getReplicatedSizeKeyFromTable(tableName);
+                                Map<String, Long> objectCountMap,
+                                Map<String, Long> unReplicatedSizeMap,
+                                Map<String, Long> replicatedSizeMap) {
 
     if (event.getValue() != null) {
       OmKeyInfo omKeyInfo = (OmKeyInfo) event.getValue();
-      objectCountMap.computeIfPresent(countKey,
+      objectCountMap.computeIfPresent(getTableCountKeyFromTable(tableName),
           (k, count) -> count > 0 ? count - 1L : 0L);
-      unReplicatedSizeMap.computeIfPresent(unReplicatedSizeKey,
+      unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
           (k, size) -> size > omKeyInfo.getDataSize() ?
               size - omKeyInfo.getDataSize() : 0L);
-      replicatedSizeMap.computeIfPresent(replicatedSizeKey,
+      replicatedSizeMap.computeIfPresent(getReplicatedSizeKeyFromTable(tableName),
           (k, size) -> size > omKeyInfo.getReplicatedSize() ?
               size - omKeyInfo.getReplicatedSize() : 0L);
     } else {
@@ -103,9 +95,9 @@ public class OpenKeysInsightHandler implements OmTableHandler {
   @Override
   public void handleUpdateEvent(OMDBUpdateEvent<String, Object> event,
                                 String tableName,
-                                HashMap<String, Long> objectCountMap,
-                                HashMap<String, Long> unReplicatedSizeMap,
-                                HashMap<String, Long> replicatedSizeMap) {
+                                Map<String, Long> objectCountMap,
+                                Map<String, Long> unReplicatedSizeMap,
+                                Map<String, Long> replicatedSizeMap) {
 
     if (event.getValue() != null) {
       if (event.getOldValue() == null) {
@@ -113,17 +105,15 @@ public class OpenKeysInsightHandler implements OmTableHandler {
             event.getKey());
         return;
       }
-      String unReplicatedSizeKey = getUnReplicatedSizeKeyFromTable(tableName);
-      String replicatedSizeKey = getReplicatedSizeKeyFromTable(tableName);
 
       // In Update event the count for the open table will not change. So we
       // don't need to update the count.
       OmKeyInfo oldKeyInfo = (OmKeyInfo) event.getOldValue();
       OmKeyInfo newKeyInfo = (OmKeyInfo) event.getValue();
-      unReplicatedSizeMap.computeIfPresent(unReplicatedSizeKey,
+      unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
           (k, size) -> size - oldKeyInfo.getDataSize() +
               newKeyInfo.getDataSize());
-      replicatedSizeMap.computeIfPresent(replicatedSizeKey,
+      replicatedSizeMap.computeIfPresent(getReplicatedSizeKeyFromTable(tableName),
           (k, size) -> size - oldKeyInfo.getReplicatedSize() +
               newKeyInfo.getReplicatedSize());
     } else {

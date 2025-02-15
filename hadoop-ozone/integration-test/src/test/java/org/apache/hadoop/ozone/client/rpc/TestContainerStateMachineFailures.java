@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.rpc;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -32,6 +33,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -40,6 +42,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
@@ -50,6 +53,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -262,6 +266,57 @@ public class TestContainerStateMachineFailures {
               .getContainerState().equals(QUASI_CLOSED)));
     }
     key.close();
+  }
+
+
+  @Test
+  public void testContainerStateMachineRestartWithDNChangePipeline()
+      throws Exception {
+    try (OzoneOutputStream key = objectStore.getVolume(volumeName).getBucket(bucketName)
+        .createKey("testDNRestart", 1024, ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+            ReplicationFactor.THREE), new HashMap<>())) {
+      key.write("ratis".getBytes(UTF_8));
+      key.flush();
+
+      KeyOutputStream groupOutputStream = (KeyOutputStream) key.
+          getOutputStream();
+      List<OmKeyLocationInfo> locationInfoList =
+          groupOutputStream.getLocationInfoList();
+      assertEquals(1, locationInfoList.size());
+
+      OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
+      Pipeline pipeline = omKeyLocationInfo.getPipeline();
+      List<HddsDatanodeService> datanodes =
+          new ArrayList<>(TestHelper.getDatanodeServices(cluster,
+              pipeline));
+
+      DatanodeDetails dn = datanodes.get(0).getDatanodeDetails();
+
+      // Delete all data volumes.
+      cluster.getHddsDatanode(dn).getDatanodeStateMachine().getContainer().getVolumeSet().getVolumesList()
+          .stream().forEach(v -> {
+            try {
+              FileUtils.deleteDirectory(v.getStorageDir());
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+          });
+
+      // Delete datanode.id datanodeIdFile.
+      File datanodeIdFile = new File(HddsServerUtil.getDatanodeIdFilePath(cluster.getHddsDatanode(dn).getConf()));
+      boolean deleted = datanodeIdFile.delete();
+      assertTrue(deleted);
+      cluster.restartHddsDatanode(dn, false);
+      GenericTestUtils.waitFor(() -> {
+        try {
+          key.write("ratis".getBytes(UTF_8));
+          key.flush();
+          return groupOutputStream.getLocationInfoList().size() > 1;
+        } catch (IOException e) {
+          throw new UncheckedIOException(e);
+        }
+      }, 1000, 30000);
+    }
   }
 
   @Test

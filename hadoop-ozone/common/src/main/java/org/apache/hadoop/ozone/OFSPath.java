@@ -302,6 +302,19 @@ public class OFSPath {
   }
 
   /**
+   * If the path is a snapshot path get the snapshot name from the key name.
+   */
+  public String getSnapshotName() {
+    if (keyName.startsWith(OM_SNAPSHOT_INDICATOR)) {
+      if (!bucketName.isEmpty() && !volumeName.isEmpty()) {
+        String[] keyNames = keyName.split(OZONE_URI_DELIMITER);
+        return keyNames.length > 1 ? keyNames[1] : null;
+      }
+    }
+    return null;
+  }
+
+  /**
    * If key name is not empty, the given path is a key.
    * e.g. /volume1/bucket2/key3 is a key.
    */

@@ -63,6 +63,7 @@ grep -A1 'Crashed tests' "${REPORT_DIR}/output.log" \
 cat "${crashes}" >> "${tempfile}"
 
 # Check for tests that started but were not finished
+timeouts=${REPORT_DIR}/timeouts.txt
 if grep -q 'There was a timeout.*in the fork' "${REPORT_DIR}/output.log"; then
   diff -uw \
     <(grep -e 'Running org' "${REPORT_DIR}/output.log" \
@@ -75,7 +76,8 @@ if grep -q 'There was a timeout.*in the fork' "${REPORT_DIR}/output.log"; then
       | sort -u -k2) \
     | grep '^- ' \
     | awk '{ print $3 }' \
-    >> "${tempfile}"
+    > "${timeouts}"
+  cat "${timeouts}" >> "${tempfile}"
 fi
 
 sort -u "${tempfile}" | tee "${REPORT_DIR}/summary.txt"
@@ -117,6 +119,12 @@ if [[ -s "${crashes}" ]]; then
   cat "${crashes}" | sed 's/^/ * /' >> "$SUMMARY_FILE"
 fi
 rm -f "${crashes}"
+
+if [[ -s "${timeouts}" ]]; then
+  printf "# Fork Timeout\n\n" >> "$SUMMARY_FILE"
+  cat "${timeouts}" | sed 's/^/ * /' >> "$SUMMARY_FILE"
+fi
+rm -f "${timeouts}"
 
 ## generate counter
 wc -l "$REPORT_DIR/summary.txt" | awk '{print $1}'> "$REPORT_DIR/failures"

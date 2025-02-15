@@ -12,10 +12,7 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
@@ -24,29 +21,30 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   </parent>
   <artifactId>hdds-interface-server</artifactId>
   <version>2.0.0-SNAPSHOT</version>
-  <description>Apache Ozone Distributed Data Store Server interface
-  </description>
-  <name>Apache Ozone HDDS Server Interface</name>
   <packaging>jar</packaging>
+  <name>Apache Ozone HDDS Server Interface</name>
+  <description>Apache Ozone Distributed Data Store Server interface</description>
 
   <properties>
-    <maven.test.skip>true</maven.test.skip> <!-- no testable code in this module -->
+    <!-- no testable code in this module -->
+    <maven.test.skip>true</maven.test.skip>
+    <!-- only generated code in this module -->
+    <spotbugs.skip>true</spotbugs.skip>
   </properties>
 
   <dependencies>
     <dependency>
-      <groupId>org.apache.ratis</groupId>
-      <artifactId>ratis-thirdparty-misc</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
-      <scope>compile</scope>
     </dependency>
     <!-- required to use common hdds.proto -->
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-interface-client</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ratis</groupId>
+      <artifactId>ratis-thirdparty-misc</artifactId>
     </dependency>
   </dependencies>
   <build>
@@ -77,9 +75,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
               <goal>test-compile-custom</goal>
             </goals>
             <configuration>
-              <protocArtifact>
-                com.google.protobuf:protoc:${grpc.protobuf-compile.version}:exe:${os.detected.classifier}
-              </protocArtifact>
+              <protocArtifact>com.google.protobuf:protoc:${grpc.protobuf-compile.version}:exe:${os.detected.classifier}</protocArtifact>
               <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
               <includes>
                 <include>InterSCMProtocol.proto</include>
@@ -88,9 +84,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
               <outputDirectory>target/generated-sources/java</outputDirectory>
               <clearOutputDirectory>false</clearOutputDirectory>
               <pluginId>grpc-java</pluginId>
-              <pluginArtifact>
-                io.grpc:protoc-gen-grpc-java:${io.grpc.version}:exe:${os.detected.classifier}
-              </pluginArtifact>
+              <pluginArtifact>io.grpc:protoc-gen-grpc-java:${io.grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
             </configuration>
           </execution>
           <execution>
@@ -100,9 +94,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
               <goal>test-compile</goal>
             </goals>
             <configuration>
-              <protocArtifact>
-                com.google.protobuf:protoc:${proto2.hadooprpc.protobuf.version}:exe:${os.detected.classifier}
-              </protocArtifact>
+              <protocArtifact>com.google.protobuf:protoc:${proto2.hadooprpc.protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
               <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
               <excludes>
                 <exclude>InterSCMProtocol.proto</exclude>
@@ -115,39 +107,23 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         </executions>
       </plugin>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-antrun-plugin</artifactId>
-        <version>${maven-antrun-plugin.version}</version>
         <executions>
           <execution>
-            <phase>generate-sources</phase>
-            <configuration>
-              <target>
-                <replace token="com.google.protobuf"
-                         value="org.apache.ratis.thirdparty.com.google.protobuf"
-                         dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/scm/proto">
-                </replace>
-                <replace token="io.grpc"
-                         value="org.apache.ratis.thirdparty.io.grpc"
-                         dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/scm/proto">
-                </replace>
-                <replace token="com.google.common"
-                         value="org.apache.ratis.thirdparty.com.google.common"
-                         dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/scm/proto">
-                </replace>
-              </target>
-            </configuration>
             <goals>
               <goal>run</goal>
             </goals>
+            <phase>generate-sources</phase>
+            <configuration>
+              <target>
+                <replace dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/scm/proto" token="com.google.protobuf" value="org.apache.ratis.thirdparty.com.google.protobuf" />
+                <replace dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/scm/proto" token="io.grpc" value="org.apache.ratis.thirdparty.io.grpc" />
+                <replace dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/scm/proto" token="com.google.common" value="org.apache.ratis.thirdparty.com.google.common" />
+              </target>
+            </configuration>
           </execution>
         </executions>
-      </plugin>
-      <plugin>
-        <groupId>com.github.spotbugs</groupId>
-        <artifactId>spotbugs-maven-plugin</artifactId>
-        <configuration>
-          <excludeFilterFile>${basedir}/dev-support/findbugsExcludeFile.xml</excludeFilterFile>
-        </configuration>
       </plugin>
     </plugins>
   </build>

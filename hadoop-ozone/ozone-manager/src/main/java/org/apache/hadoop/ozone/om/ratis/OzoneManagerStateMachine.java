@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
@@ -215,8 +216,15 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       RaftProtos.RaftConfigurationProto newRaftConfiguration) {
     List<RaftProtos.RaftPeerProto> newPeers =
         newRaftConfiguration.getPeersList();
-    LOG.info("Received Configuration change notification from Ratis. New Peer" +
-        " list:\n{}", newPeers);
+    final StringBuilder logBuilder = new StringBuilder(1024)
+        .append("notifyConfigurationChanged from Ratis: term=").append(term)
+        .append(", index=").append(index)
+        .append(", New Peer list: ");
+    newPeers.forEach(peer -> logBuilder.append(peer.getId().toStringUtf8())
+        .append("(")
+        .append(peer.getAddress())
+        .append("), "));
+    LOG.info(logBuilder.substring(0, logBuilder.length() - 2));
 
     List<String> newPeerIds = new ArrayList<>();
     for (RaftProtos.RaftPeerProto raftPeerProto : newPeers) {
@@ -455,7 +463,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .setMaxUnFlushedTransactionCount(maxUnFlushedTransactionCount)
         .setThreadPrefix(threadPrefix)
         .setS3SecretManager(ozoneManager.getS3SecretManager())
-        .enableRatis(true)
         .enableTracing(isTracingEnabled)
         .build()
         .start();
@@ -548,8 +555,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   private OMResponse runCommand(OMRequest request, TermIndex termIndex) {
     try {
+      ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
       final OMClientResponse omClientResponse = handler.handleWriteRequest(
-          request, termIndex, ozoneManagerDoubleBuffer);
+          request, context, ozoneManagerDoubleBuffer);
       OMLockDetails omLockDetails = omClientResponse.getOmLockDetails();
       OMResponse omResponse = omClientResponse.getOMResponse();
       if (omLockDetails != null) {
