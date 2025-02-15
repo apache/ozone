@@ -38,7 +38,7 @@ env:
   OZONE_WITH_COVERAGE: ${{ github.event_name == 'push' }}
 jobs:
   build-info:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     env:
       GITHUB_CONTEXT: ${{ toJson(github) }}
     outputs:
@@ -108,7 +108,7 @@ jobs:
   build:
     needs:
       - build-info
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     if: needs.build-info.outputs.needs-build == 'true'
     steps:
@@ -192,7 +192,7 @@ jobs:
       matrix:
         java: [ 11, 17, 21 ]
         include:
-          - os: ubuntu-20.04
+          - os: ubuntu-24.04
           - java: 8
             os: macos-13
       fail-fast: false
@@ -247,7 +247,7 @@ jobs:
   basic:
     needs:
       - build-info
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     if: needs.build-info.outputs.needs-basic-check == 'true'
     strategy:
@@ -306,7 +306,7 @@ jobs:
     needs:
       - build-info
       - basic
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 150
     if: needs.build-info.outputs.needs-native-check == 'true'
     steps:
@@ -353,7 +353,7 @@ jobs:
     needs:
       - build-info
       - build
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Checkout project
@@ -392,7 +392,7 @@ jobs:
     needs:
       - build-info
       - build
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Checkout project
@@ -440,7 +440,7 @@ jobs:
       - basic
       - dependency
       - license
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Checkout project
@@ -497,7 +497,7 @@ jobs:
       - basic
       - dependency
       - license
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 150
     if: needs.build-info.outputs.needs-compose-tests == 'true'
     strategy:
@@ -527,6 +527,11 @@ jobs:
           mkdir -p hadoop-ozone/dist/target
           tar xzvf ozone*.tar.gz -C hadoop-ozone/dist/target
           rm ozone*.tar.gz
+      - name: Setup java 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 11 # Hadoop may not work with newer Java
       - name: Execute tests
         run: |
           ./hadoop-ozone/dev-support/checks/acceptance.sh
@@ -550,7 +555,7 @@ jobs:
       - basic
       - dependency
       - license
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     if: needs.build-info.outputs.needs-kubernetes-tests == 'true'
     steps:
@@ -592,7 +597,7 @@ jobs:
     needs:
       - build-info
       - basic
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 150
     if: needs.build-info.outputs.needs-integration-tests == 'true'
     strategy:
@@ -645,7 +650,7 @@ jobs:
           path: target/integration
         continue-on-error: true
   coverage:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     if: github.event_name == 'push'
     needs:

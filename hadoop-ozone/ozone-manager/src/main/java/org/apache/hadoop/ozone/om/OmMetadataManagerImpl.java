@@ -341,15 +341,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    */
   public OmMetadataManagerImpl(OzoneConfiguration conf,
       OzoneManager ozoneManager) throws IOException {
-    this(conf, ozoneManager, null);
-  }
-
-  public OmMetadataManagerImpl(OzoneConfiguration conf,
-                               OzoneManager ozoneManager,
-                               OMPerformanceMetrics perfMetrics)
-      throws IOException {
     this.ozoneManager = ozoneManager;
-    this.perfMetrics = perfMetrics;
+    if (this.ozoneManager == null) {
+      this.perfMetrics = null;
+    } else {
+      this.perfMetrics = this.ozoneManager.getPerfMetrics();
+    }
     this.lock = new OzoneManagerLock(conf);
     this.omEpoch = OmUtils.getOMEpoch();
     // For test purpose only

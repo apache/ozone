@@ -28,6 +28,16 @@ public final class InsufficientDatanodesException extends IOException {
   private final int required;
   private final int available;
 
+  /**
+   * Required for Unwrapping {@code RemoteException}. Used by
+   * {@link org.apache.hadoop.ipc.RemoteException#unwrapRemoteException()}
+   */
+  public InsufficientDatanodesException(String message) {
+    super(message);
+    this.required = 0;
+    this.available = 0;
+  }
+
   public InsufficientDatanodesException(int required, int available,
       String message) {
     super(message);

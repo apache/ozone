@@ -264,7 +264,6 @@ public class TestS3MultipartResponse {
     String multipartKey = omMetadataManager
         .getMultipartKey(volumeName, bucketName, keyName, multipartUploadID);
 
-    boolean isRatisEnabled = true;
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
             omMetadataManager.getBucketTable().get(bucketKey);
@@ -291,7 +290,7 @@ public class TestS3MultipartResponse {
 
     return new S3MultipartUploadCommitPartResponseWithFSO(omResponse,
         multipartKey, openKey, multipartKeyInfo, oldPartKeyInfo,
-        openPartKeyInfoToBeDeleted, isRatisEnabled, omBucketInfo,
+        openPartKeyInfoToBeDeleted, omBucketInfo,
         getBucketLayout());
   }
 
@@ -342,7 +341,7 @@ public class TestS3MultipartResponse {
       OmMultipartKeyInfo omMultipartKeyInfo, OmBucketInfo omBucketInfo,
       OMResponse omResponse) {
     return new S3MultipartUploadAbortResponse(omResponse, multipartKey,
-        multipartOpenKey, omMultipartKeyInfo, true, omBucketInfo,
+        multipartOpenKey, omMultipartKeyInfo, omBucketInfo,
         getBucketLayout());
   }
 

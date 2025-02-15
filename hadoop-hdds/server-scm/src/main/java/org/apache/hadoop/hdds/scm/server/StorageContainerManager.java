@@ -251,7 +251,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private PipelineManager pipelineManager;
   private ContainerManager containerManager;
   private BlockManager scmBlockManager;
-  private final SCMStorageConfig scmStorageConfig;
+  private SCMStorageConfig scmStorageConfig;
   private NodeDecommissionManager scmDecommissionManager;
   private WritableContainerFactory writableContainerFactory;
   private FinalizationManager finalizationManager;
@@ -381,6 +381,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       LOG.error(errMsg + ".");
       throw new SCMException("SCM not initialized due to storage config " +
           "failure.", ResultCodes.SCM_NOT_INITIALIZED);
+    }
+
+    // Initialize Ratis if needed.
+    // This is for the clusters which got upgraded from older version of Ozone.
+    // We enable Ratis by default.
+    if (!scmStorageConfig.isSCMHAEnabled()) {
+      // Since we have initialized Ratis, we have to reload StorageConfig
+      scmStorageConfig = initializeRatis(conf);
     }
 
     threadNamePrefix = getScmNodeDetails().threadNamePrefix();
@@ -1253,15 +1261,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     StorageState state = scmStorageConfig.getState();
     final SCMHANodeDetails haDetails = SCMHANodeDetails.loadSCMHAConfig(conf,
         scmStorageConfig);
-    String primordialSCM = SCMHAUtils.getPrimordialSCM(conf);
+    final String primordialSCM = SCMHAUtils.getPrimordialSCM(conf);
     final String selfNodeId = haDetails.getLocalNodeDetails().getNodeId();
     final String selfHostName = haDetails.getLocalNodeDetails().getHostName();
-    if (primordialSCM != null && SCMHAUtils.isSCMHAEnabled(conf)
-        && !SCMHAUtils.isPrimordialSCM(conf, selfNodeId, selfHostName)) {
-      LOG.info(
-          "SCM init command can only be executed in Primordial SCM {}, "
-              + "self id {} "
-              + "Ignoring it.", primordialSCM, selfNodeId);
+    if (primordialSCM != null &&
+        !SCMHAUtils.isPrimordialSCM(conf, selfNodeId, selfHostName)) {
+      LOG.info("SCM init command can only be executed on Primordial SCM. " +
+          "Primordial SCM ID: {}. Self ID: {}.", primordialSCM, selfNodeId);
       return true;
     }
     if (state != StorageState.INITIALIZED) {
@@ -1291,16 +1297,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
         scmStorageConfig.setPrimaryScmNodeId(scmStorageConfig.getScmId());
         scmStorageConfig.initialize();
-
-        if (SCMHAUtils.isSCMHAEnabled(conf)) {
-          SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
-              scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(),
-              conf);
-          scmStorageConfig = new SCMStorageConfig(conf);
-          scmStorageConfig.setSCMHAFlag(true);
-          // Do force initialize to persist SCM_HA flag.
-          scmStorageConfig.forceInitialize();
-        }
+        scmStorageConfig = initializeRatis(conf);
 
         LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
                 + "; cid={}; layoutVersion={}; scmId={}",
@@ -1312,26 +1309,19 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         return false;
       }
     } else {
-      clusterId = scmStorageConfig.getClusterID();
-      final boolean isSCMHAEnabled = scmStorageConfig.isSCMHAEnabled();
 
       // Initialize security if security is enabled later.
       initializeSecurityIfNeeded(conf, scmStorageConfig, selfHostName, true);
 
-      if (SCMHAUtils.isSCMHAEnabled(conf) && !isSCMHAEnabled) {
-        SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
-            scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(),
-            conf);
-        scmStorageConfig.setSCMHAFlag(true);
-        scmStorageConfig.setPrimaryScmNodeId(scmStorageConfig.getScmId());
-        scmStorageConfig.forceInitialize();
+      // Enable Ratis if it's not already enabled.
+      if (!scmStorageConfig.isSCMHAEnabled()) {
+        scmStorageConfig = initializeRatis(conf);
 
         /*
-         * Since Ratis is initialized on an existing cluster, we have to
+         * Since Ratis can be initialized on an existing cluster, we have to
          * trigger Ratis snapshot so that this SCM can send the latest scm.db
          * to the bootstrapping SCMs later.
          */
-
         try {
           SCMHAUtils.setRatisEnabled(true);
           StorageContainerManager scm = createSCM(conf);
@@ -1342,16 +1332,27 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         } catch (AuthenticationException e) {
           throw new IOException(e);
         }
-        LOG.info("Enabled SCM HA");
       }
 
       LOG.info("SCM already initialized. Reusing existing cluster id for sd={}"
               + ";cid={}; layoutVersion={}; HAEnabled={}",
-          scmStorageConfig.getStorageDir(), clusterId,
-          scmStorageConfig.getLayoutVersion(),
-          scmStorageConfig.isSCMHAEnabled());
+          scmStorageConfig.getStorageDir(), scmStorageConfig.getClusterID(),
+          scmStorageConfig.getLayoutVersion(), scmStorageConfig.isSCMHAEnabled());
       return true;
     }
+  }
+
+  private static SCMStorageConfig initializeRatis(OzoneConfiguration conf)
+      throws IOException {
+    final SCMStorageConfig storageConfig = new SCMStorageConfig(conf);
+    final SCMHANodeDetails haDetails = SCMHANodeDetails.loadSCMHAConfig(conf, storageConfig);
+    SCMRatisServerImpl.initialize(storageConfig.getClusterID(),
+        storageConfig.getScmId(), haDetails.getLocalNodeDetails(), conf);
+    storageConfig.setSCMHAFlag(true);
+    storageConfig.setPrimaryScmNodeId(storageConfig.getScmId());
+    storageConfig.forceInitialize();
+    LOG.info("Enabled Ratis!");
+    return storageConfig;
   }
 
   private static InetSocketAddress getScmAddress(SCMHANodeDetails haDetails,

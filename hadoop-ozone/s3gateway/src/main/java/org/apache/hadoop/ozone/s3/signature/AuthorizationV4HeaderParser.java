@@ -91,17 +91,16 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
     Credential credentialObj = parseCredentials(split[0]);
     String signedHeaders = parseSignedHeaders(split[1]);
     String signature = parseSignature(split[2]);
-    return new SignatureInfo(
-        Version.V4,
-        credentialObj.getDate(),
-        dateHeader,
-        credentialObj.getAccessKeyID(),
-        signature,
-        signedHeaders,
-        credentialObj.createScope(),
-        algorithm,
-        true
-    );
+    return new SignatureInfo.Builder(Version.V4)
+        .setDate(credentialObj.getDate())
+        .setDateTime(dateHeader)
+        .setAwsAccessId(credentialObj.getAccessKeyID())
+        .setSignature(signature)
+        .setSignedHeaders(signedHeaders)
+        .setCredentialScope(credentialObj.createScope())
+        .setAlgorithm(algorithm)
+        .setSignPayload(true)
+        .build();
   }
 
   /**

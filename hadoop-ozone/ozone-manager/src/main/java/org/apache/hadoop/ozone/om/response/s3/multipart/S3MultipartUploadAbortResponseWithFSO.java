@@ -40,11 +40,11 @@ public class S3MultipartUploadAbortResponseWithFSO
 
   public S3MultipartUploadAbortResponseWithFSO(@Nonnull OMResponse omResponse,
       String multipartKey, String multipartOpenKey,
-      @Nonnull OmMultipartKeyInfo omMultipartKeyInfo, boolean isRatisEnabled,
+      @Nonnull OmMultipartKeyInfo omMultipartKeyInfo,
       @Nonnull OmBucketInfo omBucketInfo, @Nonnull BucketLayout bucketLayout) {
 
     super(omResponse, multipartKey, multipartOpenKey, omMultipartKeyInfo,
-        isRatisEnabled, omBucketInfo, bucketLayout);
+        omBucketInfo, bucketLayout);
   }
 
   /**

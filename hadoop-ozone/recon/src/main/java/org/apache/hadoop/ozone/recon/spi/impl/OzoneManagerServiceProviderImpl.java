@@ -69,6 +69,7 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdatesHandler;
 import org.apache.hadoop.ozone.recon.tasks.OMUpdateEventBatch;
+import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
@@ -266,6 +267,10 @@ public class OzoneManagerServiceProviderImpl
             ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY,
             OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT),
         TimeUnit.MILLISECONDS);
+    // Initialize recon om tasks for any first time initialization of resources.
+    reconTaskController.getRegisteredTasks()
+        .values()
+        .forEach(ReconOmTask::init);
     startSyncDataFromOM(initialDelay);
   }
 
@@ -454,7 +459,7 @@ public class OzoneManagerServiceProviderImpl
   Long getAndApplyDeltaUpdatesFromOM(
       long fromSequenceNumber, OMDBUpdatesHandler omdbUpdatesHandler)
       throws IOException, RocksDBException {
-    LOG.info("OriginalFromSequenceNumber : {} ", fromSequenceNumber);
+    LOG.debug("OriginalFromSequenceNumber : {} ", fromSequenceNumber);
     ImmutablePair<Boolean, Long> dbUpdatesLatestSeqNumOfOMDB =
         innerGetAndApplyDeltaUpdatesFromOM(fromSequenceNumber, omdbUpdatesHandler);
     if (!dbUpdatesLatestSeqNumOfOMDB.getLeft()) {
@@ -466,7 +471,6 @@ public class OzoneManagerServiceProviderImpl
               fromSequenceNumber);
     }
     omdbUpdatesHandler.setLatestSequenceNumber(getCurrentOMDBSequenceNumber());
-    LOG.info("Delta updates received from OM : {} records", getCurrentOMDBSequenceNumber() - fromSequenceNumber);
     return dbUpdatesLatestSeqNumOfOMDB.getRight();
   }
 
@@ -514,11 +518,10 @@ public class OzoneManagerServiceProviderImpl
     long lag = latestSequenceNumberOfOM == -1 ? 0 :
         latestSequenceNumberOfOM - getCurrentOMDBSequenceNumber();
     metrics.setSequenceNumberLag(lag);
-    LOG.info("Number of updates received from OM : {}, " +
-            "SequenceNumber diff: {}, SequenceNumber Lag from OM {}, " +
-            "isDBUpdateSuccess: {}", numUpdates, getCurrentOMDBSequenceNumber()
-            - fromSequenceNumber, lag,
-        null != dbUpdates && dbUpdates.isDBUpdateSuccess());
+    LOG.info("From Sequence Number:{}, Recon DB Sequence Number: {}, Number of updates received from OM : {}, " +
+            "SequenceNumber diff: {}, SequenceNumber Lag from OM {}, isDBUpdateSuccess: {}",
+        fromSequenceNumber, getCurrentOMDBSequenceNumber(), numUpdates,
+        getCurrentOMDBSequenceNumber() - fromSequenceNumber, lag, null != dbUpdates && dbUpdates.isDBUpdateSuccess());
     return new ImmutablePair<>(null != dbUpdates && dbUpdates.isDBUpdateSuccess(), lag);
   }
 
@@ -540,9 +543,8 @@ public class OzoneManagerServiceProviderImpl
     ReconTaskStatusUpdater reconTaskUpdater;
     if (isSyncDataFromOMRunning.compareAndSet(false, true)) {
       try {
-        LOG.info("Syncing data from Ozone Manager.");
         long currentSequenceNumber = getCurrentOMDBSequenceNumber();
-        LOG.debug("Seq number of Recon's OM DB : {}", currentSequenceNumber);
+        LOG.info("Seq number of Recon's OM DB : {}", currentSequenceNumber);
         boolean fullSnapshot = false;
 
         if (currentSequenceNumber <= 0) {
@@ -551,29 +553,27 @@ public class OzoneManagerServiceProviderImpl
           reconTaskUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(
               OmSnapshotTaskName.OmDeltaRequest.name());
 
-          try (OMDBUpdatesHandler omdbUpdatesHandler =
-              new OMDBUpdatesHandler(omMetadataManager)) {
-            LOG.info("Obtaining delta updates from Ozone Manager");
+          // Get updates from OM and apply to local Recon OM DB and update task status in table
+          reconTaskUpdater.recordRunStart();
+          int loopCount = 0;
+          long fromSequenceNumber = currentSequenceNumber;
+          long diffBetweenOMDbAndReconDBSeqNumber = deltaUpdateLimit + 1;
+          /**
+           * This loop will continue to fetch and apply OM DB updates and with every
+           * OM DB fetch request, it will fetch {@code deltaUpdateLimit} count of DB updates.
+           * It continues to fetch from OM till the lag, between OM DB WAL sequence number
+           * and Recon OM DB snapshot WAL sequence number, is less than this lag threshold value.
+           * In high OM write TPS cluster, this simulates continuous pull from OM without any delay.
+           */
+          while (diffBetweenOMDbAndReconDBSeqNumber > omDBLagThreshold) {
+            try (OMDBUpdatesHandler omdbUpdatesHandler =
+                     new OMDBUpdatesHandler(omMetadataManager)) {
 
-            // If interrupt was previously signalled,
-            // we should check for it before starting delta update sync.
-            if (Thread.currentThread().isInterrupted()) {
-              throw new InterruptedException("Thread interrupted during delta update.");
-            }
-
-            // Get updates from OM and apply to local Recon OM DB and update task status in table
-            reconTaskUpdater.recordRunStart();
-            int loopCount = 0;
-            long fromSequenceNumber = currentSequenceNumber;
-            long diffBetweenOMDbAndReconDBSeqNumber = deltaUpdateLimit + 1;
-            /**
-            * This loop will continue to fetch and apply OM DB updates and with every
-            * OM DB fetch request, it will fetch {@code deltaUpdateLimit} count of DB updates.
-            * It continues to fetch from OM till the lag, between OM DB WAL sequence number
-            * and Recon OM DB snapshot WAL sequence number, is less than this lag threshold value.
-            * In high OM write TPS cluster, this simulates continuous pull from OM without any delay.
-            */
-            while (diffBetweenOMDbAndReconDBSeqNumber > omDBLagThreshold) {
+              // If interrupt was previously signalled,
+              // we should check for it before starting delta update sync.
+              if (Thread.currentThread().isInterrupted()) {
+                throw new InterruptedException("Thread interrupted during delta update.");
+              }
               diffBetweenOMDbAndReconDBSeqNumber =
                   getAndApplyDeltaUpdatesFromOM(currentSequenceNumber, omdbUpdatesHandler);
               reconTaskUpdater.setLastTaskRunStatus(0);
@@ -585,25 +585,30 @@ public class OzoneManagerServiceProviderImpl
               currentSequenceNumber = getCurrentOMDBSequenceNumber();
               LOG.debug("Updated current sequence number: {}", currentSequenceNumber);
               loopCount++;
+            } catch (InterruptedException intEx) {
+              LOG.error("OM DB Delta update sync thread was interrupted and delta sync failed.");
+              // We are updating the table even if it didn't run i.e. got interrupted beforehand
+              // to indicate that a task was supposed to run, but it didn't.
+              reconTaskUpdater.setLastTaskRunStatus(-1);
+              reconTaskUpdater.recordRunCompletion();
+              Thread.currentThread().interrupt();
+              // Since thread is interrupted, we do not fall back to snapshot sync.
+              // Return with sync failed status.
+              return false;
+            } catch (Exception e) {
+              metrics.incrNumDeltaRequestsFailed();
+              reconTaskUpdater.setLastTaskRunStatus(-1);
+              reconTaskUpdater.recordRunCompletion();
+              LOG.warn("Unable to get and apply delta updates from OM: {}, falling back to full snapshot",
+                  e.getMessage());
+              fullSnapshot = true;
             }
-            LOG.info("Delta updates received from OM : {} loops, {} records", loopCount,
-                getCurrentOMDBSequenceNumber() - fromSequenceNumber);
-          } catch (InterruptedException intEx) {
-            LOG.error("OM DB Delta update sync thread was interrupted.");
-            // We are updating the table even if it didn't run i.e. got interrupted beforehand
-            // to indicate that a task was supposed to run, but it didn't.
-            reconTaskUpdater.setLastTaskRunStatus(-1);
-            reconTaskUpdater.recordRunCompletion();
-            Thread.currentThread().interrupt();
-            // Since thread is interrupted, we do not fall back to snapshot sync. Return with sync failed status.
-            return false;
-          } catch (Exception e) {
-            metrics.incrNumDeltaRequestsFailed();
-            reconTaskUpdater.setLastTaskRunStatus(-1);
-            reconTaskUpdater.recordRunCompletion();
-            LOG.warn("Unable to get and apply delta updates from OM: {}", e.getMessage());
-            fullSnapshot = true;
+            if (fullSnapshot) {
+              break;
+            }
           }
+          LOG.info("Delta updates received from OM : {} loops, {} records", loopCount,
+              getCurrentOMDBSequenceNumber() - fromSequenceNumber);
         }
 
         if (fullSnapshot) {

@@ -116,8 +116,8 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
       }
 
       omClientResponse = new S3ExpiredMultipartUploadsAbortResponse(
-          omResponse.build(), abortedMultipartUploads,
-          ozoneManager.isRatisEnabled());
+          omResponse.build(), abortedMultipartUploads
+      );
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -230,8 +230,7 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
             omMetadataManager.getMultipartInfoTable().get(expiredMPUKeyName);
 
         if (omMultipartKeyInfo != null) {
-          if (ozoneManager.isRatisEnabled() &&
-              trxnLogIndex < omMultipartKeyInfo.getUpdateID()) {
+          if (trxnLogIndex < omMultipartKeyInfo.getUpdateID()) {
             LOG.warn("Transaction log index {} is smaller than " +
                     "the current updateID {} of MPU key {}, skipping deletion.",
                 trxnLogIndex, omMultipartKeyInfo.getUpdateID(),
@@ -240,8 +239,7 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
           }
 
           // Set the UpdateID to current transactionLogIndex
-          omMultipartKeyInfo.setUpdateID(trxnLogIndex,
-              ozoneManager.isRatisEnabled());
+          omMultipartKeyInfo.setUpdateID(trxnLogIndex);
 
           // Parse the multipart upload components (e.g. volume, bucket, key)
           // from the multipartInfoTable db key
