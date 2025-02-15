@@ -32,6 +32,14 @@ public class BadDataLocationException extends IOException {
   private final List<DatanodeDetails> failedLocations = new ArrayList<>();
   private int failedLocationIndex;
 
+  /**
+   * Required for Unwrapping {@code RemoteException}. Used by
+   * {@link org.apache.hadoop.ipc.RemoteException#unwrapRemoteException()}
+   */
+  public BadDataLocationException(String message) {
+    super(message);
+  }
+
   public BadDataLocationException(DatanodeDetails dn) {
     super();
     failedLocations.add(dn);

@@ -24,6 +24,15 @@ import java.io.IOException;
  */
 public class NonRetriableException extends IOException {
 
+  /**
+   * Constructs a {@code NonRetriableException} with the given detailed message. <p>
+   * Required for Unwrapping {@code RemoteException}. Used by
+   * {@link org.apache.hadoop.ipc.RemoteException#unwrapRemoteException()}
+   */
+  public NonRetriableException(String message) {
+    super(message);
+  }
+
   public NonRetriableException(IOException exception) {
     super(exception);
   }
