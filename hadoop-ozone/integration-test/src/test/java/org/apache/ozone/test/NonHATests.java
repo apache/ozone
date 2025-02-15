@@ -147,6 +147,14 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
+  class ListStatus extends org.apache.hadoop.ozone.om.TestListStatus {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
   class ObjectStore extends org.apache.hadoop.ozone.om.TestObjectStore {
     @Override
     public MiniOzoneCluster cluster() {
