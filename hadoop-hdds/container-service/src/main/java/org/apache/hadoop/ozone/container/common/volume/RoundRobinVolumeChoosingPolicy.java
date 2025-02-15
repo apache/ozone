@@ -26,6 +26,7 @@ import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.container.common.volume.VolumeChoosingUtil.logIfSomeVolumesOutOfSpace;
 import static org.apache.hadoop.ozone.container.common.volume.VolumeChoosingUtil.throwDiskOutOfSpace;
@@ -51,6 +52,10 @@ public class RoundRobinVolumeChoosingPolicy implements VolumeChoosingPolicy {
       throw new DiskOutOfSpaceException("No more available volumes");
     }
 
+    List<HddsVolume> volumesWithWriteAllowed =
+        volumes.stream().filter(k -> k.getStorageState() != StorageVolume.VolumeState.READ_ONLY)
+            .collect(Collectors.toList());
+
     AvailableSpaceFilter filter = new AvailableSpaceFilter(maxContainerSize);
 
     // since volumes could've been removed because of the failure
@@ -61,7 +66,7 @@ public class RoundRobinVolumeChoosingPolicy implements VolumeChoosingPolicy {
     int startVolumeIndex = currentVolumeIndex;
 
     while (true) {
-      final HddsVolume volume = volumes.get(currentVolumeIndex);
+      final HddsVolume volume = volumesWithWriteAllowed.get(currentVolumeIndex);
       // adjust for remaining capacity in Open containers
       boolean hasEnoughSpace = filter.test(volume);
 

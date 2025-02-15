@@ -25,6 +25,7 @@ import java.io.File;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -44,21 +45,21 @@ public class TestDiskCheckUtil {
     assertTrue(testDir.canRead());
     assertTrue(testDir.canWrite());
     assertTrue(testDir.canExecute());
-    assertTrue(DiskCheckUtil.checkPermissions(testDir));
+    assertSame(DiskCheckUtil.checkPermissions(testDir), DiskCheckUtil.ReadWriteStatus.READ_WRITE_OK);
 
     // Test failure without read permissiosns.
     assertTrue(testDir.setReadable(false));
-    assertFalse(DiskCheckUtil.checkPermissions(testDir));
+    assertSame(DiskCheckUtil.checkPermissions(testDir), DiskCheckUtil.ReadWriteStatus.READ_FAIL);
     assertTrue(testDir.setReadable(true));
 
     // Test failure without write permissiosns.
     assertTrue(testDir.setWritable(false));
-    assertFalse(DiskCheckUtil.checkPermissions(testDir));
+    assertSame(DiskCheckUtil.checkPermissions(testDir), DiskCheckUtil.ReadWriteStatus.WRITE_FAIL);
     assertTrue(testDir.setWritable(true));
 
     // Test failure without execute permissiosns.
     assertTrue(testDir.setExecutable(false));
-    assertFalse(DiskCheckUtil.checkPermissions(testDir));
+    assertSame(DiskCheckUtil.checkPermissions(testDir), DiskCheckUtil.ReadWriteStatus.READ_FAIL);
     assertTrue(testDir.setExecutable(true));
   }
 
@@ -74,7 +75,8 @@ public class TestDiskCheckUtil {
 
   @Test
   public void testReadWrite() {
-    assertTrue(DiskCheckUtil.checkReadWrite(testDir, testDir, 10));
+    assertSame(DiskCheckUtil.checkReadWrite(testDir, testDir, 10),
+        DiskCheckUtil.ReadWriteStatus.READ_WRITE_OK);
 
     // Test file should have been deleted.
     File[] children = testDir.listFiles();
