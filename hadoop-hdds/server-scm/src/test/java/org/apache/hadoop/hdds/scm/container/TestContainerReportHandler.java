@@ -67,6 +67,7 @@ import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainerReports;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doAnswer;
@@ -670,6 +671,11 @@ public class TestContainerReportHandler {
   }
 
   @Test
+  public void testClosingToQuasiClosedWithMismatchingBCSID()
+      throws NodeNotFoundException, IOException {
+  }
+
+  @Test
   public void testQuasiClosedToClosed()
       throws NodeNotFoundException, IOException {
     /*
@@ -748,60 +754,40 @@ public class TestContainerReportHandler {
      * expect the ContainerReportHandler thread to not throw uncaught exception
      * (which could lead to ContainerReportHandler thread crash before HDDS-12150)
      */
+    final ContainerReportHandler reportHandler =
+        new ContainerReportHandler(nodeManager, containerManager);
+    final Iterator<DatanodeDetails> nodeIterator =
+        nodeManager.getNodes(NodeStatus.inServiceHealthy()).iterator();
 
-    final ContainerReportHandler reportHandler = new ContainerReportHandler(nodeManager, containerManager);
-    final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
-        NodeStatus.inServiceHealthy()).iterator();
+    final DatanodeDetails dn1 = nodeIterator.next();
+    final DatanodeDetails dn2 = nodeIterator.next();
+    final DatanodeDetails dn3 = nodeIterator.next();
 
-    final DatanodeDetails datanodeOne = nodeIterator.next();
-    final DatanodeDetails datanodeTwo = nodeIterator.next();
-    final DatanodeDetails datanodeThree = nodeIterator.next();
+    final ContainerInfo container1 = getContainer(LifeCycleState.QUASI_CLOSED);
 
-    final ContainerInfo containerOne = getContainer(LifeCycleState.QUASI_CLOSED);
-    final ContainerInfo containerTwo = getContainer(LifeCycleState.CLOSED);
+    nodeManager.addContainer(dn1, container1.containerID());
+    nodeManager.addContainer(dn2, container1.containerID());
+    nodeManager.addContainer(dn3, container1.containerID());
 
-    final Set<ContainerID> containerIDSet = Stream.of(
-            containerOne.containerID(), containerTwo.containerID())
-        .collect(Collectors.toSet());
-    final Set<ContainerReplica> containerOneReplicas = getReplicas(
-        containerOne.containerID(), ContainerReplicaProto.State.QUASI_CLOSED,
-        10000L,  // sequenceId
-        datanodeOne);
-    containerOneReplicas.addAll(getReplicas(
-        containerOne.containerID(), ContainerReplicaProto.State.CLOSING,
-        10000L,
-        datanodeTwo, datanodeThree));
-    final Set<ContainerReplica> containerTwoReplicas = getReplicas(
-        containerTwo.containerID(), ContainerReplicaProto.State.CLOSED,
-        10000L,
-        datanodeOne, datanodeTwo, datanodeThree);
-
-    nodeManager.setContainers(datanodeOne, containerIDSet);
-    nodeManager.setContainers(datanodeTwo, containerIDSet);
-    nodeManager.setContainers(datanodeThree, containerIDSet);
-
-    containerStateManager.addContainer(containerOne.getProtobuf());
-    containerStateManager.addContainer(containerTwo.getProtobuf());
-
-    containerOneReplicas.forEach(r ->
-        containerStateManager.updateContainerReplica(
-            containerTwo.containerID(), r));
-
-    containerTwoReplicas.forEach(r ->
-        containerStateManager.updateContainerReplica(
-            containerTwo.containerID(), r));
-
+    containerStateManager.addContainer(container1.getProtobuf());
 
     final ContainerReportsProto containerReport = getContainerReportsProto(
-        containerOne.containerID(), ContainerReplicaProto.State.CLOSED,
-        datanodeOne.getUuidString(),
+        container1.containerID(), ContainerReplicaProto.State.CLOSED,
+        dn1.getUuidString(),
         2000L);
 
     final ContainerReportFromDatanode containerReportFromDatanode =
-        new ContainerReportFromDatanode(datanodeOne, containerReport);
-    reportHandler.onMessage(containerReportFromDatanode, publisher);
+        new ContainerReportFromDatanode(dn1, containerReport);
 
-    assertEquals(LifeCycleState.QUASI_CLOSED, containerManager.getContainer(containerOne.containerID()).getState());
+    // Handler should NOT throw IllegalArgumentException
+    try {
+      reportHandler.onMessage(containerReportFromDatanode, publisher);
+    } catch (IllegalArgumentException iaEx) {
+      fail("Handler should not throw IllegalArgumentException: " + iaEx.getMessage());
+    }
+
+    // Because the container report is ignored, the container remains in QUASI_CLOSED for SCM
+    assertEquals(LifeCycleState.QUASI_CLOSED, containerManager.getContainer(container1.containerID()).getState());
   }
 
   @Test
