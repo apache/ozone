@@ -171,6 +171,14 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
+  class ObjectStoreWithLegacyFS extends org.apache.hadoop.ozone.om.TestObjectStoreWithLegacyFS {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
   class OmBlockVersioning extends org.apache.hadoop.ozone.om.TestOmBlockVersioning {
     @Override
     public MiniOzoneCluster cluster() {
