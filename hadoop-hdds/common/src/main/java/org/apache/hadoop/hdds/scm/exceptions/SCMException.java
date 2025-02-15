@@ -26,7 +26,7 @@ public class SCMException extends IOException {
   private final ResultCodes result;
 
   /**
-   * Constructs an {@code IOException} with {@code null}
+   * Constructs an {@code SCMException} with {@code null}
    * as its result code. <p>
    * Required for Unwrapping {@code RemoteException}. Used by
    * {@link org.apache.hadoop.ipc.RemoteException#unwrapRemoteException()}
