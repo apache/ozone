@@ -19,6 +19,6 @@
  * State machine class is used by the container to denote various states a
  * container can be in and also is used for command processing.
  * Container has the following states.
- * Start - > getVersion -> Register -> Running  -> Shutdown
+ * Start -&gt; GetVersion -&gt; Register -&gt; Running  -&gt; Shutdown
  */
 package org.apache.hadoop.ozone.container.common.statemachine;

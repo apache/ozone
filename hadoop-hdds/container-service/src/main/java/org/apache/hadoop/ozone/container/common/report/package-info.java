@@ -19,52 +19,51 @@
  * Datanode Reports: As part of heartbeat, datanode has to share its current
  * state with SCM. The state of datanode is split into multiple reports which
  * are sent along with heartbeat in a configured frequency.
- *
+ * <p/>
  * This package contains code which is responsible for sending reports from
  * datanode to SCM.
- *
+ * <p/>
  * ReportPublisherFactory: Given a report this constructs corresponding
  * {@link org.apache.hadoop.ozone.container.common.report.ReportPublisher}.
- *
+ * <p/>
  * ReportManager: Manages and initializes all the available ReportPublishers.
- *
+ * <p/>
  * ReportPublisher: Abstract class responsible for scheduling the reports
  * based on the configured interval. All the ReportPublishers should extend
  * {@link org.apache.hadoop.ozone.container.common.report.ReportPublisher}
  *
  * How to add new report:
- *
- * 1. Create a new ReportPublisher class which extends
- * {@link org.apache.hadoop.ozone.container.common.report.ReportPublisher}.
- *
- * 2. Add a mapping Report to ReportPublisher entry in ReportPublisherFactory.
- *
- * 3. In DatanodeStateMachine add the report to ReportManager instance.
- *
- *
- *
+ * <p/>
+ * <ol>
+ * <li>Create a new ReportPublisher class which extends
+ * {@link org.apache.hadoop.ozone.container.common.report.ReportPublisher}.</li>
+ * <li>Add a mapping Report to ReportPublisher entry in ReportPublisherFactory.</li>
+ * <li>In DatanodeStateMachine add the report to ReportManager instance.</li>
+ * </ol>
+ * <p/>
  * Datanode Reports State Diagram:
  *
+ * <pre>
  *   DatanodeStateMachine  ReportManager  ReportPublisher           SCM
  *            |                  |              |                    |
  *            |                  |              |                    |
  *            |    construct     |              |                    |
- *            |----------------->|              |                    |
+ *            |-----------------&gt;|              |                    |
  *            |                  |              |                    |
  *            |     init         |              |                    |
- *            |----------------->|              |                    |
+ *            |-----------------&gt;|              |                    |
  *            |                  |     init     |                    |
- *            |                  |------------->|                    |
+ *            |                  |-------------&gt;|                    |
  *            |                  |              |                    |
  *   +--------+------------------+--------------+--------------------+------+
  *   |loop    |                  |              |                    |      |
  *   |        |                  |   publish    |                    |      |
- *   |        |<-----------------+--------------|                    |      |
+ *   |        |&lt;-----------------+--------------|                    |      |
  *   |        |                  |   report     |                    |      |
  *   |        |                  |              |                    |      |
  *   |        |                  |              |                    |      |
  *   |        |   heartbeat(rpc) |              |                    |      |
- *   |        |------------------+--------------+------------------->|      |
+ *   |        |------------------+--------------+-------------------&gt;|      |
  *   |        |                  |              |                    |      |
  *   |        |                  |              |                    |      |
  *   +--------+------------------+--------------+--------------------+------+
@@ -72,9 +71,10 @@
  *            |                  |              |                    |
  *            |                  |              |                    |
  *            |     shutdown     |              |                    |
- *            |----------------->|              |                    |
+ *            |-----------------&gt;|              |                    |
  *            |                  |              |                    |
  *            |                  |              |                    |
  *            -                  -              -                    -
+ * </pre>
  */
 package org.apache.hadoop.ozone.container.common.report;

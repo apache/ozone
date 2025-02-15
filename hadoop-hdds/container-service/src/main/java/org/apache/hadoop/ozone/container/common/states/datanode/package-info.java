@@ -15,5 +15,6 @@
  * limitations under the License.
  */
 
-/** This package contains files that guide the state transitions from Init->Running->Shutdown for the datanode. */
+/** This package contains files that guide the state transitions
+ * from Init-&gt;Running-&gt;Shutdown for the datanode. */
 package org.apache.hadoop.ozone.container.common.states.datanode;
