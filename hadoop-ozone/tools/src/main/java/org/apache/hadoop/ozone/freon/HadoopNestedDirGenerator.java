@@ -22,6 +22,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
@@ -37,6 +38,7 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 @SuppressWarnings("java:S2245") // no need for secure random
 public class HadoopNestedDirGenerator extends HadoopBaseFreonGenerator
     implements Callable<Void> {

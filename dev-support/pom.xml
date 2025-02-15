@@ -12,18 +12,16 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
   <parent>
-    <artifactId>ozone-main</artifactId>
     <groupId>org.apache.ozone</groupId>
+    <artifactId>ozone-main</artifactId>
     <version>2.0.0-SNAPSHOT</version>
   </parent>
-  <modelVersion>4.0.0</modelVersion>
   <artifactId>ozone-dev-support</artifactId>
-  <description>Helper module for sharing resources among projects</description>
   <name>Apache Ozone Dev Support</name>
+  <description>Helper module for sharing resources among projects</description>
 
   <properties>
     <failIfNoTests>false</failIfNoTests>
@@ -31,8 +29,8 @@
   <build>
     <resources>
       <resource>
-        <directory>${project.build.directory}/extra-resources</directory>
         <targetPath>META-INF</targetPath>
+        <directory>${project.build.directory}/extra-resources</directory>
         <includes>
           <include>LICENSE.txt</include>
           <include>NOTICE.txt</include>
@@ -54,10 +52,10 @@
         <executions>
           <execution>
             <id>copy-resources</id>
-            <phase>validate</phase>
             <goals>
               <goal>copy-resources</goal>
             </goals>
+            <phase>validate</phase>
             <configuration>
               <outputDirectory>${project.build.directory}/extra-resources</outputDirectory>
               <resources>
@@ -77,14 +75,6 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-remote-resources-plugin</artifactId>
-        <executions>
-          <execution>
-            <phase>process-resources</phase>
-            <goals>
-              <goal>bundle</goal>
-            </goals>
-          </execution>
-        </executions>
         <configuration>
           <resourcesDirectory>${project.build.outputDirectory}</resourcesDirectory>
           <includes>
@@ -92,6 +82,14 @@
             <include>META-INF/NOTICE.txt</include>
           </includes>
         </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>bundle</goal>
+            </goals>
+            <phase>process-resources</phase>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

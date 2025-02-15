@@ -55,6 +55,7 @@
             <th>Node ID</th>
             <th>Ratis Port</th>
             <th>Role</th>
+            <th>Leader Readiness</th>
         </tr>
         </thead>
         <tbody ng-repeat="roles in $ctrl.overview.jmx.RatisRoles">
@@ -63,12 +64,14 @@
             <td>{{roles[1]}}</td>
             <td>{{roles[2]}}</td>
             <td>{{roles[3]}}</td>
+            <td>{{roles[4]}}</td>
         </tr>
         <tr ng-if="$ctrl.role.Id != roles[1]">
             <td>{{roles[0]}}</td>
             <td>{{roles[1]}}</td>
             <td>{{roles[2]}}</td>
             <td>{{roles[3]}}</td>
+            <td>{{roles[4]}}</td>
         </tr>
         </tbody>
     </table>

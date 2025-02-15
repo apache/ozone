@@ -90,10 +90,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
       }
     }
     if (signatureInfo == null) {
-      signatureInfo = new SignatureInfo(
-          Version.NONE,
-          "", "", "", "", "", "", "", false
-      );
+      signatureInfo = new SignatureInfo.Builder(Version.NONE).build();
     }
     signatureInfo.setUnfilteredURI(
         context.getUriInfo().getRequestUri().getPath());

@@ -28,8 +28,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -98,8 +98,8 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long transactionLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long transactionLogIndex = context.getIndex();
 
     CreateVolumeRequest createVolumeRequest =
         getOmRequest().getCreateVolumeRequest();
@@ -131,8 +131,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
       // ID will be set to transactionID each time we update the object.
       omVolumeArgs.setObjectID(
           ozoneManager.getObjectIdFromTxId(transactionLogIndex));
-      omVolumeArgs.setUpdateID(transactionLogIndex,
-          ozoneManager.isRatisEnabled());
+      omVolumeArgs.setUpdateID(transactionLogIndex);
 
 
       auditMap = omVolumeArgs.toAuditMap();

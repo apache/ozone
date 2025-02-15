@@ -20,7 +20,7 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -73,8 +73,8 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long trxnLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long trxnLogIndex = context.getIndex();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumExpiredMPUAbortRequests();
@@ -116,8 +116,8 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
       }
 
       omClientResponse = new S3ExpiredMultipartUploadsAbortResponse(
-          omResponse.build(), abortedMultipartUploads,
-          ozoneManager.isRatisEnabled());
+          omResponse.build(), abortedMultipartUploads
+      );
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -230,8 +230,7 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
             omMetadataManager.getMultipartInfoTable().get(expiredMPUKeyName);
 
         if (omMultipartKeyInfo != null) {
-          if (ozoneManager.isRatisEnabled() &&
-              trxnLogIndex < omMultipartKeyInfo.getUpdateID()) {
+          if (trxnLogIndex < omMultipartKeyInfo.getUpdateID()) {
             LOG.warn("Transaction log index {} is smaller than " +
                     "the current updateID {} of MPU key {}, skipping deletion.",
                 trxnLogIndex, omMultipartKeyInfo.getUpdateID(),
@@ -240,8 +239,7 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
           }
 
           // Set the UpdateID to current transactionLogIndex
-          omMultipartKeyInfo.setUpdateID(trxnLogIndex,
-              ozoneManager.isRatisEnabled());
+          omMultipartKeyInfo.setUpdateID(trxnLogIndex);
 
           // Parse the multipart upload components (e.g. volume, bucket, key)
           // from the multipartInfoTable db key

@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -52,7 +53,6 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
-import org.apache.ratis.server.protocol.TermIndex;
 
 /**
  * Changes snapshot name.
@@ -111,8 +111,7 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
 
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-                                                 TermIndex termIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     boolean acquiredBucketLock = false;
     boolean acquiredSnapshotOldLock = false;
     boolean acquiredSnapshotNewLock = false;
@@ -188,11 +187,11 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
 
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(
           new CacheKey<>(snapshotOldTableKey),
-          CacheValue.get(termIndex.getIndex()));
+          CacheValue.get(context.getIndex()));
 
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(
           new CacheKey<>(snapshotNewTableKey),
-          CacheValue.get(termIndex.getIndex(), snapshotOldInfo));
+          CacheValue.get(context.getIndex(), snapshotOldInfo));
 
       omMetadataManager.getSnapshotChainManager().updateSnapshot(snapshotOldInfo);
 

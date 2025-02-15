@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.common.Checksum;
 import com.codahale.metrics.Timer;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
@@ -62,6 +63,7 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 @SuppressWarnings("java:S2245") // no need for secure random
 public class DatanodeChunkGenerator extends BaseFreonGenerator implements
     Callable<Void> {

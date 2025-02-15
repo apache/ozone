@@ -29,7 +29,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -133,8 +133,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long trxnLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long trxnLogIndex = context.getIndex();
 
     CommitKeyRequest commitKeyRequest = getOmRequest().getCommitKeyRequest();
 
@@ -278,7 +278,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         openKeyToDelete = omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKeyToDeleteKey);
         openKeyToDelete.getMetadata().put(OzoneConsts.OVERWRITTEN_HSYNC_KEY, "true");
         openKeyToDelete.setModificationTime(Time.now());
-        openKeyToDelete.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+        openKeyToDelete.setUpdateID(trxnLogIndex);
         omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
             dbOpenKeyToDeleteKey, openKeyToDelete, trxnLogIndex);
       }
@@ -310,7 +310,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           omKeyInfo.updateLocationInfoList(locationInfoList, false);
 
       // Set the UpdateID to current transactionLogIndex
-      omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+      omKeyInfo.setUpdateID(trxnLogIndex);
 
       Map<String, RepeatedOmKeyInfo> oldKeyVersionsToDeleteMap = null;
       long correctedSpace = omKeyInfo.getReplicatedSize();
@@ -324,7 +324,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         // Subtract the size of blocks to be overwritten.
         correctedSpace -= keyToDelete.getReplicatedSize();
         RepeatedOmKeyInfo oldVerKeyInfo = getOldVersionsToCleanUp(
-            keyToDelete, trxnLogIndex, ozoneManager.isRatisEnabled());
+            keyToDelete, trxnLogIndex);
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
             correctedSpace);
         // using pseudoObjId as objectId can be same in case of overwrite key

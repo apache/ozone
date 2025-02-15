@@ -66,16 +66,9 @@ public class AuthorizationV2HeaderParser implements SignatureParser {
     if (isBlank(accessKeyID) || isBlank(signature)) {
       throw new MalformedResourceException(authHeader);
     }
-    return new SignatureInfo(
-        Version.V2,
-        "",
-        "",
-        accessKeyID,
-        signature,
-        "",
-        "",
-        "",
-        false
-    );
+    return new SignatureInfo.Builder(Version.V2)
+        .setAwsAccessId(accessKeyID)
+        .setSignature(signature)
+        .build();
   }
 }

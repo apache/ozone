@@ -100,7 +100,6 @@ public final class OmUtils {
   public static final long EPOCH_ID_SHIFT = 62; // 64 - 2
   public static final long REVERSE_EPOCH_ID_SHIFT = 2; // 64 - EPOCH_ID_SHIFT
   public static final long MAX_TRXN_ID = (1L << 54) - 2;
-  public static final int EPOCH_WHEN_RATIS_NOT_ENABLED = 1;
   public static final int EPOCH_WHEN_RATIS_ENABLED = 2;
 
   private OmUtils() {
@@ -512,7 +511,7 @@ public final class OmUtils {
    * @return {@link RepeatedOmKeyInfo}
    */
   public static RepeatedOmKeyInfo prepareKeyForDelete(OmKeyInfo keyInfo,
-      long trxnLogIndex, boolean isRatisEnabled) {
+      long trxnLogIndex) {
     // If this key is in a GDPR enforced bucket, then before moving
     // KeyInfo to deletedTable, remove the GDPR related metadata and
     // FileEncryptionInfo from KeyInfo.
@@ -526,7 +525,7 @@ public final class OmUtils {
     }
 
     // Set the updateID
-    keyInfo.setUpdateID(trxnLogIndex, isRatisEnabled);
+    keyInfo.setUpdateID(trxnLogIndex);
 
     //The key doesn't exist in deletedTable, so create a new instance.
     return new RepeatedOmKeyInfo(keyInfo);
@@ -601,9 +600,8 @@ public final class OmUtils {
     return configuration.getObject(OMClientConfig.class).getRpcTimeOut();
   }
 
-  public static int getOMEpoch(boolean isRatisEnabled) {
-    return isRatisEnabled ? EPOCH_WHEN_RATIS_ENABLED :
-        EPOCH_WHEN_RATIS_NOT_ENABLED;
+  public static int getOMEpoch() {
+    return EPOCH_WHEN_RATIS_ENABLED;
   }
 
   /**
@@ -923,7 +921,7 @@ public final class OmUtils {
   }
   
   public static List<List<String>> format(
-          List<ServiceInfo> nodes, int port, String leaderId) {
+          List<ServiceInfo> nodes, int port, String leaderId, String leaderReadiness) {
     List<List<String>> omInfoList = new ArrayList<>();
     // Ensuring OM's are printed in correct order
     List<ServiceInfo> omNodes = nodes.stream()
@@ -940,6 +938,7 @@ public final class OmUtils {
         omInfo.add(info.getOmRoleInfo().getNodeId());
         omInfo.add(String.valueOf(port));
         omInfo.add(role);
+        omInfo.add(leaderReadiness);
         omInfoList.add(omInfo);
       }
     }

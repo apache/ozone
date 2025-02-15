@@ -53,29 +53,14 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
     DELETED_TABLE, MULTIPARTINFO_TABLE, BUCKET_TABLE})
 public abstract class AbstractS3MultipartAbortResponse extends OmKeyResponse {
 
-  private boolean isRatisEnabled;
-
   public AbstractS3MultipartAbortResponse(
-      @Nonnull OMResponse omResponse, boolean isRatisEnabled) {
+      @Nonnull OMResponse omResponse) {
     super(omResponse);
-    this.isRatisEnabled = isRatisEnabled;
   }
 
-  public AbstractS3MultipartAbortResponse(
-      @Nonnull OMResponse omResponse, boolean isRatisEnabled,
-      BucketLayout bucketLayout) {
-    super(omResponse, bucketLayout);
-    this.isRatisEnabled =  isRatisEnabled;
-  }
-
-  /**
-   * For when the request is not successful.
-   * For a successful request, the other constructor should be used.
-   */
   public AbstractS3MultipartAbortResponse(@Nonnull OMResponse omResponse,
         BucketLayout bucketLayout) {
     super(omResponse, bucketLayout);
-    checkStatusNotOK();
   }
 
   /**
@@ -112,8 +97,8 @@ public abstract class AbstractS3MultipartAbortResponse extends OmKeyResponse {
         //  deletedTable if it does.
 
         RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-            currentKeyPartInfo, omMultipartKeyInfo.getUpdateID(),
-            isRatisEnabled);
+            currentKeyPartInfo, omMultipartKeyInfo.getUpdateID()
+        );
 
         // multi-part key format is volumeName/bucketName/keyName/uploadId
         String deleteKey = omMetadataManager.getOzoneDeletePathKey(

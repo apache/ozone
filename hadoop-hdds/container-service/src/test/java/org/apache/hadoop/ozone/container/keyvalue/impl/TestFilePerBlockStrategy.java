@@ -1,43 +1,43 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.keyvalue.impl;
-
-import org.apache.commons.codec.binary.Hex;
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.common.ChunkBuffer;
-import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
-import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
-import org.junit.jupiter.api.Test;
-
-import java.nio.ByteBuffer;
-import java.security.MessageDigest;
 
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getChunk;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.setDataChecksum;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import java.nio.ByteBuffer;
+import java.security.MessageDigest;
+import org.apache.commons.codec.binary.Hex;
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
+import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test for FilePerBlockStrategy.
@@ -92,7 +92,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     // Request to read the whole data in a single go.
     ChunkInfo largeChunk = getChunk(blockID.getLocalID(), 0, 0,
         datalen * chunkCount);
-    ChunkBuffer chunk =
+    final ChunkBufferToByteString chunk =
         subject.readChunk(container, blockID, largeChunk,
             null);
     ByteBuffer newdata = chunk.toByteString().asReadOnlyByteBuffer();
@@ -119,18 +119,16 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     ChunkManager subject = createTestSubject();
     subject.writeChunk(container, blockID, info, data, WRITE_STAGE);
 
-    ChunkBuffer readData = subject.readChunk(container, blockID, info, null);
+    final ChunkBufferToByteString readData = subject.readChunk(container, blockID, info, null);
     // data will be ChunkBufferImplWithByteBuffer and readData will return
     // ChunkBufferImplWithByteBufferList. Hence, convert both ByteStrings
     // before comparing.
-    assertEquals(data.rewind().toByteString(),
-        readData.rewind().toByteString());
+    assertEquals(data.rewind().toByteString(), readData.toByteString());
 
     ChunkInfo info2 = getChunk(blockID.getLocalID(), 0, start, length);
-    ChunkBuffer readData2 = subject.readChunk(container, blockID, info2, null);
+    final ChunkBufferToByteString readData2 = subject.readChunk(container, blockID, info2, null);
     assertEquals(length, info2.getLen());
-    assertEquals(data.rewind().toByteString().substring(start, start + length),
-        readData2.rewind().toByteString());
+    assertEquals(data.rewind().toByteString().substring(start, start + length), readData2.toByteString());
   }
 
   @Override
