@@ -95,7 +95,7 @@ public class FileSizeCountTask implements ReconOmTask {
     if (!statusFSO && !statusOBS) {
       return new ImmutablePair<>(getTaskName(), false);
     }
-    writeCountsToDB(true, fileSizeCountMap);
+    writeCountsToDB(fileSizeCountMap);
     LOG.debug("Completed a 'reprocess' run of FileSizeCountTask.");
     return new ImmutablePair<>(getTaskName(), true);
   }
@@ -112,7 +112,7 @@ public class FileSizeCountTask implements ReconOmTask {
         handlePutKeyEvent(kv.getValue(), fileSizeCountMap);
         //  The time complexity of .size() method is constant time, O(1)
         if (fileSizeCountMap.size() >= 100000) {
-          writeCountsToDB(true, fileSizeCountMap);
+          writeCountsToDB(fileSizeCountMap);
           fileSizeCountMap.clear();
         }
       }
@@ -149,6 +149,7 @@ public class FileSizeCountTask implements ReconOmTask {
     Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
     final Collection<String> taskTables = getTaskTables();
 
+    long startTime = System.currentTimeMillis();
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, Object> omdbUpdateEvent = eventIterator.next();
       // Filter event inside process method to avoid duping
@@ -197,8 +198,9 @@ public class FileSizeCountTask implements ReconOmTask {
             value.getClass().getName(), updatedKey);
       }
     }
-    writeCountsToDB(false, fileSizeCountMap);
-    LOG.debug("Completed a 'process' run of FileSizeCountTask.");
+    writeCountsToDB(fileSizeCountMap);
+    LOG.debug("{} successfully processed in {} milliseconds",
+        getTaskName(), (System.currentTimeMillis() - startTime));
     return new ImmutablePair<>(getTaskName(), true);
   }
 
@@ -207,10 +209,11 @@ public class FileSizeCountTask implements ReconOmTask {
    * using the dao.
    *
    */
-  private void writeCountsToDB(boolean isDbTruncated,
-                               Map<FileSizeCountKey, Long> fileSizeCountMap) {
+  private void writeCountsToDB(Map<FileSizeCountKey, Long> fileSizeCountMap) {
+
     List<FileCountBySize> insertToDb = new ArrayList<>();
     List<FileCountBySize> updateInDb = new ArrayList<>();
+    boolean isDbTruncated = isFileCountBySizeTableEmpty(); // Check if table is empty
 
     fileSizeCountMap.keySet().forEach((FileSizeCountKey key) -> {
       FileCountBySize newRecord = new FileCountBySize();
@@ -291,6 +294,15 @@ public class FileSizeCountTask implements ReconOmTask {
           fileSizeCountMap.get(countKey) - 1L : -1L;
       fileSizeCountMap.put(countKey, count);
     }
+  }
+
+  /**
+   * Checks if the FILE_COUNT_BY_SIZE table is empty.
+   *
+   * @return true if the table is empty, false otherwise.
+   */
+  private boolean isFileCountBySizeTableEmpty() {
+    return dslContext.fetchCount(FILE_COUNT_BY_SIZE) == 0;
   }
 
   private static class FileSizeCountKey {

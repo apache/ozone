@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -162,6 +163,7 @@ public class TestOzoneContainer {
   }
 
   @Test
+  @Flaky("HDDS-11924")
   public void testOzoneContainerWithMissingContainer() throws Exception {
     MiniOzoneCluster cluster = null;
     try {

@@ -50,7 +50,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -158,59 +157,8 @@ public class TestDirectoryDeletingService {
         (DirectoryDeletingService) keyManager.getDirDeletingService();
     GenericTestUtils.waitFor(
         () -> dirDeletingService.getMovedFilesCount() >= 1000
-            && dirDeletingService.getMovedFilesCount() < 2000,
+            && dirDeletingService.getMovedFilesCount() <= 2000,
         500, 60000);
     assertThat(dirDeletingService.getRunCount().get()).isGreaterThanOrEqualTo(1);
-  }
-
-  @Test
-  public void testDeleteDirectoryFlatDirsHavingNoChilds() throws Exception {
-    OzoneConfiguration conf = createConfAndInitValues();
-    OmTestManagers omTestManagers
-        = new OmTestManagers(conf);
-    KeyManager keyManager = omTestManagers.getKeyManager();
-    writeClient = omTestManagers.getWriteClient();
-    om = omTestManagers.getOzoneManager();
-
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        om.getMetadataManager(), BucketLayout.FILE_SYSTEM_OPTIMIZED);
-    String bucketKey = om.getMetadataManager().getBucketKey(volumeName, bucketName);
-    OmBucketInfo bucketInfo = om.getMetadataManager().getBucketTable().get(bucketKey);
-
-    int dirCreatesCount = OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT * 2 + 100;
-    long parentId = 1;
-    OmDirectoryInfo baseDir = new OmDirectoryInfo.Builder().setName("dir_base")
-        .setCreationTime(Time.now()).setModificationTime(Time.now())
-        .setObjectID(parentId).setParentObjectID(bucketInfo.getObjectID())
-        .setUpdateID(0).build();
-    OMRequestTestUtils.addDirKeyToDirTable(true, baseDir, volumeName, bucketName,
-        1L, om.getMetadataManager());
-    for (int i = 0; i < dirCreatesCount; ++i) {
-      OmDirectoryInfo dir1 = new OmDirectoryInfo.Builder().setName("dir" + i)
-          .setCreationTime(Time.now()).setModificationTime(Time.now()).setParentObjectID(parentId)
-          .setObjectID(i + 100).setUpdateID(i).build();
-      OMRequestTestUtils.addDirKeyToDirTable(true, dir1, volumeName, bucketName,
-          1L, om.getMetadataManager());
-    }
-
-    DirectoryDeletingService dirDeletingService = keyManager.getDirDeletingService();
-    long[] delDirCnt = new long[2];
-    delDirCnt[0] = dirDeletingService.getDeletedDirsCount();
-
-    OmKeyArgs delArgs = new OmKeyArgs.Builder()
-        .setVolumeName(volumeName).setBucketName(bucketName).setKeyName("dir_base")
-        .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
-        .setDataSize(0).setRecursive(true).build();
-    writeClient.deleteKey(delArgs);
-
-    // check if difference between each run should not cross the directory deletion limit
-    // and wait till all dir is removed
-    GenericTestUtils.waitFor(() -> {
-      delDirCnt[1] = dirDeletingService.getDeletedDirsCount();
-      assertTrue(delDirCnt[1] - delDirCnt[0] <= OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT,
-          "base: " + delDirCnt[0] + ", new: " + delDirCnt[1]);
-      delDirCnt[0] =  delDirCnt[1];
-      return dirDeletingService.getDeletedDirsCount() >= dirCreatesCount;
-    }, 500, 300000);
   }
 }

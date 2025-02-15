@@ -63,13 +63,6 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
   @Override
   public void filter(ContainerRequestContext requestContext) throws
       IOException {
-    // Skip this filter if the uri is hitting S3Secret generation or
-    // revocation endpoint.
-    if (requestContext.getUriInfo().getRequestUri().getPath()
-        .startsWith("/secret")) {
-      return;
-    }
-
     domains = conf.getTrimmedStrings(OZONE_S3G_DOMAIN_NAME);
 
     if (domains.length == 0) {

@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.common.ChecksumData;
 
 import com.codahale.metrics.Timer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
+import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
@@ -49,6 +50,7 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 public class DatanodeChunkValidator extends BaseFreonGenerator
     implements Callable<Void> {
 

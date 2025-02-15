@@ -51,10 +51,10 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
   public OMKeysDeleteResponseWithFSO(
       @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse,
       @Nonnull List<OmKeyInfo> keyDeleteList,
-      @Nonnull List<OmKeyInfo> dirDeleteList, boolean isRatisEnabled,
+      @Nonnull List<OmKeyInfo> dirDeleteList,
       @Nonnull OmBucketInfo omBucketInfo, @Nonnull long volId,
       @Nonnull Map<String, OmKeyInfo> openKeyInfoMap) {
-    super(omResponse, keyDeleteList, isRatisEnabled, omBucketInfo, openKeyInfoMap);
+    super(omResponse, keyDeleteList, omBucketInfo, openKeyInfoMap);
     this.dirsList = dirDeleteList;
     this.volumeId = volId;
   }

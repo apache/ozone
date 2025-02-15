@@ -18,6 +18,7 @@
 package org.apache.hadoop.fs.ozone;
 
 import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.client.io.ByteBufferOutputStream;
 
 import java.io.IOException;
@@ -76,5 +77,20 @@ public class OzoneFSDataStreamOutput extends ByteBufferOutputStream {
   @Override
   public void close() throws IOException {
     byteBufferStreamOutput.close();
+  }
+
+  @Override
+  public void hflush() throws IOException {
+    hsync();
+  }
+
+  @Override
+  public void hsync() throws IOException {
+    TracingUtil.executeInNewSpan("OzoneFSDataStreamOutput.hsync",
+        byteBufferStreamOutput::hsync);
+  }
+
+  protected ByteBufferStreamOutput getByteBufferStreamOutput() {
+    return byteBufferStreamOutput;
   }
 }

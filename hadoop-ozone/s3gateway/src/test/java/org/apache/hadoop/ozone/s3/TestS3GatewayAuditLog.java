@@ -24,13 +24,13 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.s3.endpoint.BucketEndpoint;
+import org.apache.hadoop.ozone.s3.endpoint.EndpointBuilder;
 import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.RootEndpoint;
 import org.junit.jupiter.api.Test;
@@ -69,14 +69,15 @@ public class TestS3GatewayAuditLog {
   private ObjectEndpoint keyEndpoint;
   private OzoneBucket bucket;
   private Map<String, String> parametersMap = new HashMap<>();
+  private RequestIdentifier requestIdentifier;
 
   @BeforeEach
   public void setup() throws Exception {
-
     parametersMap.clear();
     clientStub = new OzoneClientStub();
     clientStub.getObjectStore().createS3Bucket(bucketName);
     bucket = clientStub.getObjectStore().getS3Bucket(bucketName);
+    requestIdentifier = new RequestIdentifier();
 
     bucketEndpoint = new BucketEndpoint() {
       @Override
@@ -84,10 +85,16 @@ public class TestS3GatewayAuditLog {
         return parametersMap;
       }
     };
-    bucketEndpoint.setClient(clientStub);
+    bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
+        .setBase(bucketEndpoint)
+        .setClient(clientStub)
+        .setRequestId(requestIdentifier)
+        .build();
 
-    rootEndpoint = new RootEndpoint();
-    rootEndpoint.setClient(clientStub);
+    rootEndpoint = EndpointBuilder.newRootEndpointBuilder()
+        .setClient(clientStub)
+        .setRequestId(requestIdentifier)
+        .build();
 
     keyEndpoint = new ObjectEndpoint() {
       @Override
@@ -95,9 +102,11 @@ public class TestS3GatewayAuditLog {
         return parametersMap;
       }
     };
-    keyEndpoint.setClient(clientStub);
-    keyEndpoint.setOzoneConfiguration(new OzoneConfiguration());
-
+    keyEndpoint = EndpointBuilder.newObjectEndpointBuilder()
+        .setBase(keyEndpoint)
+        .setClient(clientStub)
+        .setRequestId(requestIdentifier)
+        .build();
   }
 
   @AfterAll
@@ -116,8 +125,11 @@ public class TestS3GatewayAuditLog {
     parametersMap.put("bucket", "[bucket]");
 
     bucketEndpoint.head(bucketName);
+
     String expected = "INFO  | S3GAudit | ? | user=null | ip=null | " +
-        "op=HEAD_BUCKET {bucket=[bucket]} | ret=SUCCESS";
+        "op=HEAD_BUCKET {bucket=[bucket], x-amz-request-id=" + 
+        requestIdentifier.getRequestId() + ", x-amz-id-2=" + 
+        requestIdentifier.getAmzId() + "} | ret=SUCCESS";
     verifyLog(expected);
   }
 
@@ -126,7 +138,9 @@ public class TestS3GatewayAuditLog {
 
     rootEndpoint.get().getEntity();
     String expected = "INFO  | S3GAudit | ? | user=null | ip=null | " +
-        "op=LIST_S3_BUCKETS {} | ret=SUCCESS";
+        "op=LIST_S3_BUCKETS {x-amz-request-id=" + 
+        requestIdentifier.getRequestId() + ", x-amz-id-2=" + 
+        requestIdentifier.getAmzId() + "} | ret=SUCCESS";
     verifyLog(expected);
   }
 
@@ -145,9 +159,10 @@ public class TestS3GatewayAuditLog {
 
     keyEndpoint.head(bucketName, "key1");
     String expected = "INFO  | S3GAudit | ? | user=null | ip=null | " +
-        "op=HEAD_KEY {bucket=[bucket], path=[key1]} | ret=SUCCESS";
+        "op=HEAD_KEY {bucket=[bucket], path=[key1], x-amz-request-id=" + 
+        requestIdentifier.getRequestId() + ", x-amz-id-2=" + 
+        requestIdentifier.getAmzId() + "} | ret=SUCCESS";
     verifyLog(expected);
-
   }
 
   private void verifyLog(String expectedString) throws IOException {

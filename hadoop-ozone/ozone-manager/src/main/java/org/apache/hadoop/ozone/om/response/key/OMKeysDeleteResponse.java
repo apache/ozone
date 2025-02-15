@@ -51,9 +51,9 @@ public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
 
   public OMKeysDeleteResponse(@Nonnull OMResponse omResponse,
       @Nonnull List<OmKeyInfo> keyDeleteList,
-      boolean isRatisEnabled, @Nonnull OmBucketInfo omBucketInfo,
+      @Nonnull OmBucketInfo omBucketInfo,
       @Nonnull Map<String, OmKeyInfo> openKeyInfoMap) {
-    super(omResponse, isRatisEnabled);
+    super(omResponse);
     this.omKeyInfoList = keyDeleteList;
     this.omBucketInfo = omBucketInfo;
     this.openKeyInfoMap = openKeyInfoMap;
@@ -66,6 +66,7 @@ public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
   public OMKeysDeleteResponse(@Nonnull OMResponse omResponse, @Nonnull
                               BucketLayout bucketLayout) {
     super(omResponse, bucketLayout);
+    checkStatusNotOK();
   }
 
   @Override

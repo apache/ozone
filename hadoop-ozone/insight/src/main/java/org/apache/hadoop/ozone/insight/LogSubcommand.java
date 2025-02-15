@@ -72,7 +72,7 @@ public class LogSubcommand extends BaseInsightSubCommand
   @Override
   public Void call() {
     OzoneConfiguration conf =
-        getInsightCommand().createOzoneConfiguration();
+        getInsightCommand().getOzoneConf();
     InsightPoint insight =
         getInsight(conf, insightName);
 

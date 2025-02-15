@@ -25,9 +25,9 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SOCKET_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SOCKET_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT;
 import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmDeltaRequest;
 import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmSnapshotRequest;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.slf4j.event.Level.INFO;
@@ -106,8 +106,7 @@ public class TestReconWithOzoneManager {
             OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT),
         TimeUnit.MILLISECONDS
     );
-    conf.setLong(RECON_OM_DELTA_UPDATE_LIMIT, 2);
-    conf.setLong(RECON_OM_DELTA_UPDATE_LOOP_LIMIT, 10);
+    conf.setLong(RECON_OM_DELTA_UPDATE_LIMIT, 10);
 
     RequestConfig config = RequestConfig.custom()
         .setConnectTimeout(socketTimeout)
@@ -255,8 +254,7 @@ public class TestReconWithOzoneManager {
             "lastUpdatedTimestamp");
 
     // verify only Delta updates were added to recon after restart.
-    assertEquals(beforeRestartSnapShotTimeStamp,
-        afterRestartSnapShotTimeStamp);
+    assertThat(afterRestartSnapShotTimeStamp).isGreaterThanOrEqualTo(beforeRestartSnapShotTimeStamp);
 
     //verify sequence number after Delta Updates
     assertEquals(omLatestSeqNumber, reconLatestSeqNumber);

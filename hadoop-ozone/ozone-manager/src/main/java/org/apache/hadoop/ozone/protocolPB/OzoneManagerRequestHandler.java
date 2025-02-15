@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetObjectTaggingRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetObjectTaggingResponse;
 import org.apache.hadoop.ozone.util.PayloadUtils;
@@ -146,8 +147,6 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 import com.google.common.collect.Lists;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVER_LIST_MAX_SIZE;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVER_LIST_MAX_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.HBASE_SUPPORT;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
@@ -170,7 +169,6 @@ import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
-import org.apache.ratis.server.protocol.TermIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -188,11 +186,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   public OzoneManagerRequestHandler(OzoneManager om) {
     this.impl = om;
-    this.maxKeyListSize = om.getConfiguration().getLong(OZONE_OM_SERVER_LIST_MAX_SIZE,
-      OZONE_OM_SERVER_LIST_MAX_SIZE_DEFAULT);
-    if (this.maxKeyListSize <= 0) {
-      this.maxKeyListSize = OZONE_OM_SERVER_LIST_MAX_SIZE_DEFAULT;
-    }
+    this.maxKeyListSize = om.getConfig().getMaxListSize();
   }
 
   //TODO simplify it to make it shorter
@@ -420,19 +414,20 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @Override
-  public OMClientResponse handleWriteRequestImpl(OMRequest omRequest, TermIndex termIndex) throws IOException {
+  public OMClientResponse handleWriteRequestImpl(OMRequest omRequest, ExecutionContext context) throws IOException {
     injectPause();
     OMClientRequest omClientRequest =
         OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
     try {
       OMClientResponse omClientResponse = captureLatencyNs(
           impl.getPerfMetrics().getValidateAndUpdateCacheLatencyNs(),
-          () -> Objects.requireNonNull(omClientRequest.validateAndUpdateCache(getOzoneManager(), termIndex),
+          () -> Objects.requireNonNull(omClientRequest.validateAndUpdateCache(getOzoneManager(), context),
               "omClientResponse returned by validateAndUpdateCache cannot be null"));
-      OMAuditLogger.log(omClientRequest.getAuditBuilder(), termIndex);
+      OMAuditLogger.log(omClientRequest.getAuditBuilder(), context.getTermIndex());
       return omClientResponse;
     } catch (Throwable th) {
-      OMAuditLogger.log(omClientRequest.getAuditBuilder(), omClientRequest, getOzoneManager(), termIndex, th);
+      OMAuditLogger.log(omClientRequest.getAuditBuilder(), omClientRequest, getOzoneManager(), context.getTermIndex(),
+          th);
       throw th;
     }
   }
@@ -659,6 +654,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setHeadOp(keyArgs.getHeadOp())
         .setForceUpdateContainerCacheFromSCM(
             keyArgs.getForceUpdateContainerCacheFromSCM())
+        .setMultipartUploadPartNumber(keyArgs.getMultipartNumber())
         .build();
     KeyInfoWithVolumeContext keyInfo = impl.getKeyInfo(omKeyArgs,
         request.getAssumeS3Context());

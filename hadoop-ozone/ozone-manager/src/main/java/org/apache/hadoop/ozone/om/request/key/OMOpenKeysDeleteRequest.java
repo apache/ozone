@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.request.key;
 
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -60,8 +60,8 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long trxnLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long trxnLogIndex = context.getIndex();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumOpenKeyDeleteRequests();
@@ -97,7 +97,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
       }
 
       omClientResponse = new OMOpenKeysDeleteResponse(omResponse.build(),
-          deletedOpenKeys, ozoneManager.isRatisEnabled(), getBucketLayout());
+          deletedOpenKeys, getBucketLayout());
 
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {
@@ -161,8 +161,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
             omMetadataManager.getOpenKeyTable(getBucketLayout())
                 .get(fullKeyName);
         if (omKeyInfo != null) {
-          if (ozoneManager.isRatisEnabled() &&
-              trxnLogIndex < omKeyInfo.getUpdateID()) {
+          if (trxnLogIndex < omKeyInfo.getUpdateID()) {
             LOG.warn("Transaction log index {} is smaller than " +
                 "the current updateID {} of key {}, skipping deletion.",
                 trxnLogIndex, omKeyInfo.getUpdateID(), fullKeyName);
@@ -170,7 +169,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
           }
 
           // Set the UpdateID to current transactionLogIndex
-          omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+          omKeyInfo.setUpdateID(trxnLogIndex);
           deletedOpenKeys.put(fullKeyName, omKeyInfo);
 
           // Update openKeyTable cache.

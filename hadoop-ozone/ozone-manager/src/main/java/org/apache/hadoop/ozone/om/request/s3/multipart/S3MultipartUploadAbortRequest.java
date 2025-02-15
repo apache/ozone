@@ -23,7 +23,7 @@ import java.nio.file.InvalidPathException;
 import java.util.Map;
 
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
@@ -100,8 +100,8 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long trxnLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long trxnLogIndex = context.getIndex();
 
     MultipartUploadAbortRequest multipartUploadAbortRequest = getOmRequest()
         .getAbortMultiPartUploadRequest();
@@ -164,7 +164,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
 
       multipartKeyInfo = omMetadataManager.getMultipartInfoTable()
           .get(multipartKey);
-      multipartKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+      multipartKeyInfo.setUpdateID(trxnLogIndex);
 
       // When abort uploaded key, we need to subtract the PartKey length from
       // the volume usedBytes.
@@ -244,7 +244,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
     OMClientResponse omClientResponse = new S3MultipartUploadAbortResponse(
         omResponse.setAbortMultiPartUploadResponse(
             MultipartUploadAbortResponse.newBuilder()).build(), multipartKey,
-        multipartOpenKey, multipartKeyInfo, ozoneManager.isRatisEnabled(),
+        multipartOpenKey, multipartKeyInfo,
         omBucketInfo.copyObject(), getBucketLayout());
     return omClientResponse;
   }

@@ -115,6 +115,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.om.service.SnapshotDeletingService.isBlockLocationInfoSame;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotDirExist;
@@ -310,7 +311,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table snapshotRenamedTable;
   private Table compactionLogTable;
 
-  private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
   private Table deletedDirTable;
 
@@ -341,23 +341,14 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    */
   public OmMetadataManagerImpl(OzoneConfiguration conf,
       OzoneManager ozoneManager) throws IOException {
-    this(conf, ozoneManager, null);
-  }
-
-  public OmMetadataManagerImpl(OzoneConfiguration conf,
-                               OzoneManager ozoneManager,
-                               OMPerformanceMetrics perfMetrics)
-      throws IOException {
     this.ozoneManager = ozoneManager;
-    this.perfMetrics = perfMetrics;
+    if (this.ozoneManager == null) {
+      this.perfMetrics = null;
+    } else {
+      this.perfMetrics = this.ozoneManager.getPerfMetrics();
+    }
     this.lock = new OzoneManagerLock(conf);
-    // TODO: This is a temporary check. Once fully implemented, all OM state
-    //  change should go through Ratis - be it standalone (for non-HA) or
-    //  replicated (for HA).
-    isRatisEnabled = conf.getBoolean(
-        OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
-        OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
-    this.omEpoch = OmUtils.getOMEpoch(isRatisEnabled);
+    this.omEpoch = OmUtils.getOMEpoch();
     // For test purpose only
     ignorePipelineinKey = conf.getBoolean(
         "ozone.om.ignore.pipeline", Boolean.TRUE);
@@ -571,11 +562,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       // avoid those kind of failures we need to enable sync. When Ratis is
       // enabled, ratis log provides us this guaranty. This check is needed
       // until HA code path becomes default in OM.
-
-      // When ratis is not enabled override and set the sync.
-      if (!isRatisEnabled) {
-        rocksDBConfiguration.setSyncOption(true);
-      }
 
       int maxOpenFiles = configuration.getInt(OZONE_OM_DB_MAX_OPEN_FILES,
           OZONE_OM_DB_MAX_OPEN_FILES_DEFAULT);
@@ -904,11 +890,26 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     final long volumeId = getVolumeId(volume);
     final long bucketId = getBucketId(volume,
             bucket);
-    long parentId =
-            OMFileRequest.getParentID(volumeId, bucketId, key, this);
+    long parentId;
+    try {
+      parentId = OMFileRequest.getParentID(volumeId, bucketId, key, this);
+    } catch (final Exception e) {
+      // It is possible we miss directories and exception is thrown.
+      // see https://issues.apache.org/jira/browse/HDDS-11784
+      LOG.warn("Got exception when finding parent id for {}/{}/{}. Use another way to get it",
+          volumeId, bucketId, key, e);
+      final String multipartKey =
+          getMultipartKey(volume, bucket, key, uploadId);
+      final OmMultipartKeyInfo multipartKeyInfo =
+          getMultipartInfoTable().get(multipartKey);
+      if (multipartKeyInfo == null) {
+        LOG.error("Could not find multipartKeyInfo for {}", multipartKey);
+        throw new OMException(NO_SUCH_MULTIPART_UPLOAD_ERROR);
+      }
+      parentId = multipartKeyInfo.getParentID();
+    }
 
-    String fileName = OzoneFSUtils.getFileName(key);
-
+    final String fileName = OzoneFSUtils.getFileName(key);
     return getMultipartKey(volumeId, bucketId, parentId,
             fileName, uploadId);
   }
@@ -1960,19 +1961,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       }
     }
 
+    // prefixed iterator will only iterate until keys match the prefix
     try (TableIterator<String, ? extends KeyValue<String, OmMultipartKeyInfo>>
-        iterator = getMultipartInfoTable().iterator()) {
-      iterator.seek(prefixKey);
+        iterator = getMultipartInfoTable().iterator(prefixKey)) {
 
       while (iterator.hasNext()) {
         KeyValue<String, OmMultipartKeyInfo> entry = iterator.next();
-        if (entry.getKey().startsWith(prefixKey)) {
-          // If it is marked for abort, skip it.
-          if (!aborted.contains(entry.getKey())) {
-            response.add(entry.getKey());
-          }
-        } else {
-          break;
+        // If it is marked for abort, skip it.
+        if (!aborted.contains(entry.getKey())) {
+          response.add(entry.getKey());
         }
       }
     }

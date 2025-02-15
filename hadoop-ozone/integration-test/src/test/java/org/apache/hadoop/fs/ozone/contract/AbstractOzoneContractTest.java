@@ -29,25 +29,18 @@ import org.apache.hadoop.fs.contract.AbstractContractRootDirectoryTest;
 import org.apache.hadoop.fs.contract.AbstractContractSeekTest;
 import org.apache.hadoop.fs.contract.AbstractContractUnbufferTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
-import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.tools.contract.AbstractContractDistCpTest;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
 import java.io.IOException;
-import java.time.Duration;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.cleanup;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.assertj.core.api.Assumptions.assumeThat;
@@ -62,11 +55,9 @@ import static org.assertj.core.api.Assumptions.assumeThat;
  * but can tweak configuration by also overriding {@link #createOzoneConfig()}.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-abstract class AbstractOzoneContractTest {
+abstract class AbstractOzoneContractTest extends ClusterForTests<MiniOzoneCluster> {
 
   private static final String CONTRACT_XML = "contract/ozone.xml";
-
-  private MiniOzoneCluster cluster;
 
   /**
    * This must be implemented by all subclasses.
@@ -74,55 +65,18 @@ abstract class AbstractOzoneContractTest {
    */
   abstract AbstractFSContract createOzoneContract(Configuration conf);
 
-  /**
-   * Creates the base configuration for contract tests.  This can be tweaked
-   * in subclasses by overriding {@link #createOzoneConfig()}.
-   */
-  protected static OzoneConfiguration createBaseConfiguration() {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    DatanodeRatisServerConfig ratisServerConfig =
-        conf.getObject(DatanodeRatisServerConfig.class);
-    ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));
-    ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(10));
-    conf.setFromObject(ratisServerConfig);
-
-    RatisClientConfig.RaftConfig raftClientConfig =
-        conf.getObject(RatisClientConfig.RaftConfig.class);
-    raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
-    raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(10));
-    conf.setFromObject(raftClientConfig);
-
+  @Override
+  protected OzoneConfiguration createOzoneConfig() {
+    OzoneConfiguration conf = createBaseConfiguration();
     conf.addResource(CONTRACT_XML);
-
-    conf.setBoolean(OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
-    conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
-    conf.setBoolean(OZONE_FS_HSYNC_ENABLED, true);
-
     return conf;
   }
 
-  /**
-   * Hook method that allows tweaking the configuration.
-   */
-  OzoneConfiguration createOzoneConfig() {
-    return createBaseConfiguration();
-  }
-
-  MiniOzoneCluster getCluster() {
-    return cluster;
-  }
-
-  @BeforeAll
-  void setup() throws Exception {
-    cluster = MiniOzoneCluster.newBuilder(createOzoneConfig())
+  @Override
+  protected MiniOzoneCluster createCluster() throws Exception {
+    return MiniOzoneCluster.newBuilder(createOzoneConfig())
         .setNumDatanodes(5)
         .build();
-    cluster.waitForClusterToBeReady();
-  }
-
-  @AfterAll
-  void teardown() {
-    IOUtils.closeQuietly(cluster);
   }
 
   @Nested

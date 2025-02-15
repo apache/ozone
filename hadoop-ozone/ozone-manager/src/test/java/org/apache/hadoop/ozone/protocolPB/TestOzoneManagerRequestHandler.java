@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.protocolPB;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
@@ -40,8 +41,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVER_LIST_MAX_SIZE;
-
 /**
  * Test class to test out OzoneManagerRequestHandler.
  */
@@ -49,10 +48,10 @@ public class TestOzoneManagerRequestHandler {
 
 
   private OzoneManagerRequestHandler getRequestHandler(int limitListKeySize) {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(OZONE_OM_SERVER_LIST_MAX_SIZE, limitListKeySize);
+    OmConfig config = OzoneConfiguration.newInstanceOf(OmConfig.class);
+    config.setMaxListSize(limitListKeySize);
     OzoneManager ozoneManager = Mockito.mock(OzoneManager.class);
-    Mockito.when(ozoneManager.getConfiguration()).thenReturn(conf);
+    Mockito.when(ozoneManager.getConfig()).thenReturn(config);
     return new OzoneManagerRequestHandler(ozoneManager);
   }
 
