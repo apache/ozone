@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -44,6 +45,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,6 +57,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.DELETED_HSYNC_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_EMPTY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 /**
  * Handles DeleteKey request - prefix layout.
@@ -86,6 +89,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumKeyDeletes();
+    OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
@@ -98,6 +102,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
     OMClientResponse omClientResponse = null;
     Result result = null;
     OmBucketInfo omBucketInfo = null;
+    long startNanos = Time.monotonicNowNanos();
     try {
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
@@ -186,11 +191,15 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
           omBucketInfo.copyObject(), keyStatus.isDirectory(), volumeId, deletedOpenKeyInfo);
 
       result = Result.SUCCESS;
+      long endNanosDeleteKeySuccessLatencyNs = Time.monotonicNowNanos();
+      perfMetrics.setDeleteKeySuccessLatencyNs(endNanosDeleteKeySuccessLatencyNs - startNanos);
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new OMKeyDeleteResponseWithFSO(
           createErrorOMResponse(omResponse, exception), getBucketLayout());
+      long endNanosDeleteKeyFailureLatencyNs = Time.monotonicNowNanos();
+      perfMetrics.setDeleteKeyFailureLatencyNs(endNanosDeleteKeyFailureLatencyNs - startNanos);
     } finally {
       if (acquiredLock) {
         mergeOmLockDetails(omMetadataManager.getLock()
@@ -230,7 +239,9 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       OzoneManager ozoneManager,
       OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs)
       throws IOException {
-    return resolveBucketAndCheckKeyAclsWithFSO(newKeyArgs.build(),
-        ozoneManager, IAccessAuthorizer.ACLType.DELETE);
+    return captureLatencyNs(
+        ozoneManager.getPerfMetrics().getDeleteKeyResolveBucketAndAclCheckLatencyNs(),
+        () -> resolveBucketAndCheckKeyAclsWithFSO(newKeyArgs.build(),
+            ozoneManager, IAccessAuthorizer.ACLType.DELETE));
   }
 }
