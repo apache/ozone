@@ -69,6 +69,7 @@ import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
 import org.apache.hadoop.ozone.client.io.ECBlockInputStreamProxy;
 import org.apache.hadoop.ozone.client.io.ECBlockReconstructedStripeInputStream;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.security.token.Token;
@@ -114,6 +115,7 @@ public class ECReconstructionCoordinator implements Closeable {
   private final ECReconstructionMetrics metrics;
   private final StateContext context;
   private final OzoneClientConfig ozoneClientConfig;
+  private final ECValidator ecValidator;
 
   public ECReconstructionCoordinator(
       ConfigurationSource conf, CertificateClient certificateClient,
@@ -139,6 +141,7 @@ public class ECReconstructionCoordinator implements Closeable {
     tokenHelper = new TokenHelper(new SecurityConfig(conf), secretKeyClient);
     this.clientMetrics = ContainerClientMetrics.acquire();
     this.metrics = metrics;
+    ecValidator = new ECValidator(ozoneClientConfig);
   }
 
   public void reconstructECContainerGroup(long containerID,
@@ -266,6 +269,7 @@ public class ECReconstructionCoordinator implements Closeable {
         this.blockInputStreamFactory, byteBufferPool,
         this.ecReconstructReadExecutor,
         clientConfig)) {
+      ecValidator.setBlockLength(blockLocationInfo.getLength());
 
       ECBlockOutputStream[] targetBlockStreams =
           new ECBlockOutputStream[toReconstructIndexes.size()];
@@ -290,8 +294,10 @@ public class ECReconstructionCoordinator implements Closeable {
         }
 
         if (toReconstructIndexes.size() > 0) {
-          sis.setRecoveryIndexes(toReconstructIndexes.stream().map(i -> (i - 1))
-              .collect(Collectors.toSet()));
+          Set<Integer> recoveryIndexes = toReconstructIndexes.stream().map(i -> (i - 1))
+            .collect(Collectors.toSet());
+          sis.setRecoveryIndexes(recoveryIndexes);
+          ecValidator.setReconstructionIndexes(recoveryIndexes);
           long length = safeBlockGroupLength;
           while (length > 0) {
             int readLen;
@@ -336,6 +342,7 @@ public class ECReconstructionCoordinator implements Closeable {
         List<ECBlockOutputStream> allStreams = new ArrayList<>(Arrays.asList(targetBlockStreams));
         allStreams.addAll(Arrays.asList(emptyBlockStreams));
         for (ECBlockOutputStream targetStream : allStreams) {
+          ecValidator.validateChecksum(targetStream, blockDataGroup);
           targetStream.executePutBlock(true, true, blockLocationInfo.getLength(), blockDataGroup);
           checkFailures(targetStream, targetStream.getCurrentPutBlkResponseFuture());
         }
