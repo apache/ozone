@@ -141,10 +141,6 @@ public class MultipartUploadCleanupService extends BackgroundService {
     return !suspended.get() && ozoneManager.isLeaderReady();
   }
 
-  private boolean isRatisEnabled() {
-    return ozoneManager.isRatisEnabled();
-  }
-
   private class MultipartUploadCleanupTask implements BackgroundTask {
 
     @Override

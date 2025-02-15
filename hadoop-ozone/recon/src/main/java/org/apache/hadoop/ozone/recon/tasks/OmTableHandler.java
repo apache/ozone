@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Interface for handling PUT, DELETE and UPDATE events for size-related
@@ -43,9 +43,9 @@ public interface OmTableHandler {
    */
   void handlePutEvent(OMDBUpdateEvent<String, Object> event,
                       String tableName,
-                      HashMap<String, Long> objectCountMap,
-                      HashMap<String, Long> unReplicatedSizeMap,
-                      HashMap<String, Long> replicatedSizeMap);
+                      Map<String, Long> objectCountMap,
+                      Map<String, Long> unReplicatedSizeMap,
+                      Map<String, Long> replicatedSizeMap);
 
 
   /**
@@ -60,9 +60,9 @@ public interface OmTableHandler {
    */
   void handleDeleteEvent(OMDBUpdateEvent<String, Object> event,
                          String tableName,
-                         HashMap<String, Long> objectCountMap,
-                         HashMap<String, Long> unReplicatedSizeMap,
-                         HashMap<String, Long> replicatedSizeMap);
+                         Map<String, Long> objectCountMap,
+                         Map<String, Long> unReplicatedSizeMap,
+                         Map<String, Long> replicatedSizeMap);
 
 
   /**
@@ -77,9 +77,9 @@ public interface OmTableHandler {
    */
   void handleUpdateEvent(OMDBUpdateEvent<String, Object> event,
                          String tableName,
-                         HashMap<String, Long> objectCountMap,
-                         HashMap<String, Long> unReplicatedSizeMap,
-                         HashMap<String, Long> replicatedSizeMap);
+                         Map<String, Long> objectCountMap,
+                         Map<String, Long> unReplicatedSizeMap,
+                         Map<String, Long> replicatedSizeMap);
 
 
   /**

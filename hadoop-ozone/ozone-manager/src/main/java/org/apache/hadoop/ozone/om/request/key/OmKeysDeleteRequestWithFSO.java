@@ -107,7 +107,7 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
               .getOzonePathKey(volumeId, bucketId, parentId, fileName)),
           CacheValue.get(trxnLogIndex));
 
-      omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+      omKeyInfo.setUpdateID(trxnLogIndex);
       quotaReleased += sumBlockLengths(omKeyInfo);
 
       // If omKeyInfo has hsync metadata, delete its corresponding open key as well
@@ -139,7 +139,7 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
                   omKeyInfo.getFileName())),
           CacheValue.get(trxnLogIndex));
 
-      omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+      omKeyInfo.setUpdateID(trxnLogIndex);
       quotaReleased += sumBlockLengths(omKeyInfo);
     }
     return quotaReleased;
@@ -164,7 +164,7 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
             OzoneManagerProtocolProtos.DeleteKeysResponse.newBuilder()
                 .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys).addAllErrors(deleteKeyErrors))
         .setStatus(deleteStatus ? OK : PARTIAL_DELETE).setSuccess(deleteStatus)
-        .build(), omKeyInfoList, dirList, ozoneManager.isRatisEnabled(),
+        .build(), omKeyInfoList, dirList,
         omBucketInfo.copyObject(), volumeId, openKeyInfoMap);
     return omClientResponse;
   }

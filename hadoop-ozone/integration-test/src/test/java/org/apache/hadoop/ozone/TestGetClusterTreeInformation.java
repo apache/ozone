@@ -20,9 +20,10 @@ package org.apache.hadoop.ozone;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
+import org.apache.ozone.test.HATests;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
@@ -31,7 +32,6 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import java.io.IOException;
-import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -41,34 +41,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * This class is to test the serialization/deserialization of cluster tree
  * information from SCM.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(300)
-public class TestGetClusterTreeInformation {
+public abstract class TestGetClusterTreeInformation implements HATests.TestCase {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(TestGetClusterTreeInformation.class);
-  private static int numOfDatanodes = 3;
-  private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
-  private static StorageContainerManager scm;
+  private OzoneConfiguration conf;
+  private StorageContainerManager scm;
 
   @BeforeAll
-  public static void init() throws IOException, TimeoutException,
-      InterruptedException {
-    conf = new OzoneConfiguration();
-    cluster = MiniOzoneCluster.newHABuilder(conf)
-        .setNumOfOzoneManagers(3)
-        .setNumOfStorageContainerManagers(3)
-        .setNumDatanodes(numOfDatanodes)
-        .build();
-    cluster.waitForClusterToBeReady();
-    scm = cluster.getStorageContainerManager();
-  }
-
-  @AfterAll
-  public static void shutdown() {
-    if (cluster != null) {
-      cluster.shutdown();
-    }
+  void init() {
+    conf = cluster().getConf();
+    scm = cluster().getStorageContainerManager();
   }
 
   @Test

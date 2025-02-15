@@ -42,7 +42,6 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
@@ -280,7 +279,6 @@ final class TestSecureOzoneCluster {
     } catch (Exception e) {
       LOG.error("Failed to stop TestSecureOzoneCluster", e);
     }
-    DefaultConfigManager.clearDefaultConfigs();
   }
 
   private void createCredentialsInKDC() throws Exception {

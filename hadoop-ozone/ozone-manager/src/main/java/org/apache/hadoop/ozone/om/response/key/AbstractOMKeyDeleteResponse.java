@@ -43,30 +43,14 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 @CleanupTableInfo(cleanupTables = {DELETED_TABLE})
 public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
 
-  private boolean isRatisEnabled;
-
   public AbstractOMKeyDeleteResponse(
-      @Nonnull OMResponse omResponse, boolean isRatisEnabled) {
-
+      @Nonnull OMResponse omResponse) {
     super(omResponse);
-    this.isRatisEnabled = isRatisEnabled;
   }
 
-  public AbstractOMKeyDeleteResponse(@Nonnull OMResponse omResponse,
-      boolean isRatisEnabled, BucketLayout bucketLayout) {
-
-    super(omResponse, bucketLayout);
-    this.isRatisEnabled = isRatisEnabled;
-  }
-
-  /**
-   * For when the request is not successful.
-   * For a successful request, the other constructor should be used.
-   */
   public AbstractOMKeyDeleteResponse(@Nonnull OMResponse omResponse,
                                      @Nonnull BucketLayout bucketLayout) {
     super(omResponse, bucketLayout);
-    checkStatusNotOK();
   }
 
   /**
@@ -99,8 +83,8 @@ public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
       // if it is not null, then we simply add to the list and store this
       // instance in deletedTable.
       RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-          omKeyInfo, omKeyInfo.getUpdateID(),
-          isRatisEnabled);
+          omKeyInfo, omKeyInfo.getUpdateID()
+      );
       String delKeyName = omMetadataManager.getOzoneDeletePathKey(
           omKeyInfo.getObjectID(), keyName);
       omMetadataManager.getDeletedTable().putWithBatch(
@@ -142,8 +126,8 @@ public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
       // if it is not null, then we simply add to the list and store this
       // instance in deletedTable.
       RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-          omKeyInfo, omKeyInfo.getUpdateID(),
-          isRatisEnabled);
+          omKeyInfo, omKeyInfo.getUpdateID()
+      );
       omMetadataManager.getDeletedTable().putWithBatch(
           batchOperation, deleteKeyName, repeatedOmKeyInfo);
     }

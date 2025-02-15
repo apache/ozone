@@ -32,6 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
@@ -54,7 +55,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
   private PrefixManager prefixManager;
   private Predicate<UserGroupInformation> adminCheck = NO_ADMIN;
   private Predicate<UserGroupInformation> readOnlyAdminCheck = NO_ADMIN;
-  private boolean allowListAllVolumes;
+  private BooleanSupplier allowListAllVolumes = () -> false;
 
   public OzoneNativeAuthorizer() {
     // required for instantiation in OmMetadataReader#getACLAuthorizerInstance
@@ -222,12 +223,12 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     readOnlyAdminCheck = Objects.requireNonNull(check, "read-only admin check");
   }
 
-  public void setAllowListAllVolumes(boolean allowListAllVolumes) {
-    this.allowListAllVolumes = allowListAllVolumes;
+  public void setAllowListAllVolumes(BooleanSupplier allowListAllVolumes) {
+    this.allowListAllVolumes = Objects.requireNonNull(allowListAllVolumes, "allowListAllVolumes");
   }
 
   public boolean getAllowListAllVolumes() {
-    return allowListAllVolumes;
+    return allowListAllVolumes.getAsBoolean();
   }
 
   private static boolean isOwner(UserGroupInformation ugi, String ownerName) {

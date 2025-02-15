@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,17 +17,7 @@
 
 package org.apache.ozone.rocksdb.util;
 
-import org.apache.hadoop.hdds.StringUtils;
-import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReaderIterator;
-import org.apache.hadoop.ozone.util.ClosableIterator;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
-import org.rocksdb.RocksDBException;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -41,8 +30,17 @@ import java.util.Spliterators;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
+import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReaderIterator;
+import org.apache.hadoop.ozone.util.ClosableIterator;
+import org.rocksdb.RocksDBException;
 
 /**
  * Provides an abstraction layer using which we can iterate over multiple
