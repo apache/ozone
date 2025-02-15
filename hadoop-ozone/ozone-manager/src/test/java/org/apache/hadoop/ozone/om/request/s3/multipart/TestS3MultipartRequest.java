@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
@@ -113,7 +114,7 @@ public class TestS3MultipartRequest {
     OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
     when(lvm.getMetadataLayoutVersion()).thenReturn(0);
     when(ozoneManager.getVersionManager()).thenReturn(lvm);
-    when(ozoneManager.isRatisEnabled()).thenReturn(true);
+    when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
   }
 
 
@@ -353,21 +354,27 @@ public class TestS3MultipartRequest {
   }
 
   protected S3MultipartUploadCompleteRequest getS3MultipartUploadCompleteReq(
-      OMRequest omRequest) {
-    return new S3MultipartUploadCompleteRequest(omRequest,
+      OMRequest omRequest) throws IOException {
+    S3MultipartUploadCompleteRequest request = new S3MultipartUploadCompleteRequest(omRequest,
         BucketLayout.DEFAULT);
+    request.setUGI(UserGroupInformation.getCurrentUser());
+    return request;
   }
 
   protected S3MultipartUploadCommitPartRequest getS3MultipartUploadCommitReq(
-      OMRequest omRequest) {
-    return new S3MultipartUploadCommitPartRequest(omRequest,
+      OMRequest omRequest) throws IOException {
+    S3MultipartUploadCommitPartRequest request = new S3MultipartUploadCommitPartRequest(omRequest,
         BucketLayout.DEFAULT);
+    request.setUGI(UserGroupInformation.getCurrentUser());
+    return request;
   }
 
   protected S3InitiateMultipartUploadRequest getS3InitiateMultipartUploadReq(
-      OMRequest initiateMPURequest) {
-    return new S3InitiateMultipartUploadRequest(initiateMPURequest,
+      OMRequest initiateMPURequest) throws IOException {
+    S3InitiateMultipartUploadRequest request = new S3InitiateMultipartUploadRequest(initiateMPURequest,
         BucketLayout.DEFAULT);
+    request.setUGI(UserGroupInformation.getCurrentUser());
+    return request;
   }
 
   protected S3MultipartUploadAbortRequest getS3MultipartUploadAbortReq(

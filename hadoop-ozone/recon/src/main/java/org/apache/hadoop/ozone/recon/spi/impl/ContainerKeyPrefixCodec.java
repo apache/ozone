@@ -18,9 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
-import static org.apache.commons.compress.utils.CharsetNames.UTF_8;
-
-import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.apache.commons.lang3.ArrayUtils;
@@ -30,6 +27,8 @@ import org.apache.hadoop.hdds.utils.db.Codec;
 
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Codec to serialize/deserialize {@link ContainerKeyPrefix}.
@@ -51,8 +50,12 @@ public final class ContainerKeyPrefixCodec
   }
 
   @Override
-  public byte[] toPersistedFormat(ContainerKeyPrefix containerKeyPrefix)
-      throws IOException {
+  public Class<ContainerKeyPrefix> getTypeClass() {
+    return ContainerKeyPrefix.class;
+  }
+
+  @Override
+  public byte[] toPersistedFormat(ContainerKeyPrefix containerKeyPrefix) {
     Preconditions.checkNotNull(containerKeyPrefix,
             "Null object can't be converted to byte array.");
     byte[] containerIdBytes = Longs.toByteArray(containerKeyPrefix
@@ -76,9 +79,7 @@ public final class ContainerKeyPrefixCodec
   }
 
   @Override
-  public ContainerKeyPrefix fromPersistedFormat(byte[] rawData)
-      throws IOException {
-
+  public ContainerKeyPrefix fromPersistedFormat(byte[] rawData) {
     // First 8 bytes is the containerId.
     long containerIdFromDB = ByteBuffer.wrap(ArrayUtils.subarray(
         rawData, 0, Long.BYTES)).getLong();

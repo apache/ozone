@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RoundRobinPipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
@@ -107,6 +108,7 @@ public class TestOzoneClientRetriesOnExceptions {
     conf.set(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "2s");
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "2s");
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");
+    conf.set("hdds.scm.pipeline.choose.policy.impl", RoundRobinPipelineChoosePolicy.class.getName());
     conf.setQuietMode(false);
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
@@ -216,7 +218,7 @@ public class TestOzoneClientRetriesOnExceptions {
                 .getPipeline(container.getPipelineID());
         XceiverClientSpi xceiverClient =
             xceiverClientManager.acquireClient(pipeline);
-        Assumptions.assumeFalse(containerList.contains(containerID));
+        assertThat(containerList.contains(containerID));
         containerList.add(containerID);
         xceiverClient.sendCommand(ContainerTestHelper
             .getCreateContainerRequest(containerID, pipeline));

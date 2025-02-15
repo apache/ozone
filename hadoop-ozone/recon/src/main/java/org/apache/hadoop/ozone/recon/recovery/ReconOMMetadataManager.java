@@ -23,9 +23,12 @@ import java.io.IOException;
 import java.util.List;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfoProtoWrapper;
 
 /**
  * Interface for the OM Metadata Manager + DB store maintained by
@@ -109,8 +112,17 @@ public interface ReconOMMetadataManager extends OMMetadataManager {
 
   /**
    * Return the OzoneConfiguration instance used by Recon.
-   * @return
+   * @return OzoneConfiguration
    */
   OzoneConfiguration getOzoneConfiguration();
+
+  /**
+   * A lighter weight version of the getKeyTable method that only returns the KeyEntityInfo wrapper object. This
+   * avoids creating a full OMKeyInfo object for each key if it is not needed.
+   * @param bucketLayout The Bucket layout to use for the key table.
+   * @return A table of keys and their metadata.
+   * @throws IOException
+   */
+  Table<String, KeyEntityInfoProtoWrapper> getKeyTableLite(BucketLayout bucketLayout) throws IOException;
 
 }

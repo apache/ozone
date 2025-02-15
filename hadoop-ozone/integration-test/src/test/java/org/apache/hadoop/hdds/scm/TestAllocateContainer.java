@@ -21,43 +21,37 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 
 /**
  * Test allocate container calls.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(300)
-public class TestAllocateContainer {
+public abstract class TestAllocateContainer implements NonHATests.TestCase {
 
-  private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
-  private static StorageContainerLocationProtocolClientSideTranslatorPB
+  private OzoneConfiguration conf;
+  private StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
-  private static XceiverClientManager xceiverClientManager;
 
   @BeforeAll
-  public static void init() throws Exception {
-    conf = new OzoneConfiguration();
-    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
-    cluster.waitForClusterToBeReady();
+  void init() throws Exception {
+    conf = cluster().getConf();
     storageContainerLocationClient =
-        cluster.getStorageContainerLocationClient();
-    xceiverClientManager = new XceiverClientManager(conf);
+        cluster().getStorageContainerLocationClient();
   }
 
   @AfterAll
-  public static void shutdown() throws InterruptedException {
-    if (cluster != null) {
-      cluster.shutdown();
-    }
+  void cleanup() {
     IOUtils.cleanupWithLogger(null, storageContainerLocationClient);
   }
 

@@ -20,23 +20,24 @@ package org.apache.hadoop.ozone.freon;
 import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
-import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
-import org.apache.hadoop.hdds.utils.HAUtils;
-import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.apache.hadoop.ozone.util.PayloadUtils;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.XceiverClientCreator;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
+import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.util.PayloadUtils;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -59,6 +60,7 @@ import static org.apache.hadoop.hdds.client.ReplicationConfig.getLegacyFactor;
         versionProvider = HddsVersionProvider.class,
         mixinStandardHelpOptions = true,
         showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 public class DNRPCLoadGenerator extends BaseFreonGenerator
         implements Callable<Void> {
   private static final Logger LOG =
@@ -111,7 +113,7 @@ public class DNRPCLoadGenerator extends BaseFreonGenerator
   private Freon freon;
 
   // empy constructor for picocli
-  DNRPCLoadGenerator() {
+  public DNRPCLoadGenerator() {
   }
 
   @VisibleForTesting
@@ -127,7 +129,7 @@ public class DNRPCLoadGenerator extends BaseFreonGenerator
             "OM echo response payload size should be positive value or zero.");
 
     if (configuration == null) {
-      configuration = freon.createOzoneConfiguration();
+      configuration = freon.getOzoneConf();
     }
     ContainerOperationClient scmClient = new ContainerOperationClient(configuration);
     ContainerInfo containerInfo = scmClient.getContainer(containerID);
@@ -150,13 +152,15 @@ public class DNRPCLoadGenerator extends BaseFreonGenerator
     }
     encodedContainerToken = scmClient.getEncodedContainerToken(containerID);
     XceiverClientFactory xceiverClientManager;
+    OzoneManagerProtocolClientSideTranslatorPB omClient;
     if (OzoneSecurityUtil.isSecurityEnabled(configuration)) {
-      CACertificateProvider caCerts = () -> HAUtils.buildCAX509List(null, configuration);
-      xceiverClientManager = new XceiverClientManager(configuration,
-          configuration.getObject(XceiverClientManager.ScmClientConfig.class),
+      omClient = createOmClient(configuration, null);
+      CACertificateProvider caCerts = () -> omClient.getServiceInfo().provideCACerts();
+      xceiverClientManager = new XceiverClientCreator(configuration,
           new ClientTrustManager(caCerts, null));
     } else {
-      xceiverClientManager = new XceiverClientManager(configuration);
+      omClient = null;
+      xceiverClientManager = new XceiverClientCreator(configuration);
     }
     clients = new ArrayList<>(numClients);
     for (int i = 0; i < numClients; i++) {
@@ -170,6 +174,9 @@ public class DNRPCLoadGenerator extends BaseFreonGenerator
     try {
       runTests(this::sendRPCReq);
     } finally {
+      if (omClient != null) {
+        omClient.close();
+      }
       for (XceiverClientSpi client : clients) {
         xceiverClientManager.releaseClient(client, false);
       }

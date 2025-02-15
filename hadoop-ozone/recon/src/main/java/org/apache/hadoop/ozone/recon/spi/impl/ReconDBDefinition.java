@@ -46,44 +46,34 @@ public class ReconDBDefinition extends DBDefinition.WithMap {
       CONTAINER_KEY =
       new DBColumnFamilyDefinition<>(
           "containerKeyTable",
-          ContainerKeyPrefix.class,
           ContainerKeyPrefixCodec.get(),
-          Integer.class,
           IntegerCodec.get());
 
   public static final DBColumnFamilyDefinition<KeyPrefixContainer, Integer>
       KEY_CONTAINER =
       new DBColumnFamilyDefinition<>(
           "keyContainerTable",
-          KeyPrefixContainer.class,
           KeyPrefixContainerCodec.get(),
-          Integer.class,
           IntegerCodec.get());
 
   public static final DBColumnFamilyDefinition<Long, Long>
       CONTAINER_KEY_COUNT =
       new DBColumnFamilyDefinition<>(
           "containerKeyCountTable",
-          Long.class,
           LongCodec.get(),
-          Long.class,
           LongCodec.get());
 
   public static final DBColumnFamilyDefinition
       <Long, ContainerReplicaHistoryList> REPLICA_HISTORY =
       new DBColumnFamilyDefinition<Long, ContainerReplicaHistoryList>(
           "replica_history",
-          Long.class,
           LongCodec.get(),
-          ContainerReplicaHistoryList.class,
           ContainerReplicaHistoryList.getCodec());
 
   public static final DBColumnFamilyDefinition<Long, NSSummary>
       NAMESPACE_SUMMARY = new DBColumnFamilyDefinition<Long, NSSummary>(
           "namespaceSummaryTable",
-          Long.class,
           LongCodec.get(),
-          NSSummary.class,
           NSSummaryCodec.get());
 
   // Container Replica History with bcsId tracking.
@@ -91,9 +81,7 @@ public class ReconDBDefinition extends DBDefinition.WithMap {
       <Long, ContainerReplicaHistoryList> REPLICA_HISTORY_V2 =
       new DBColumnFamilyDefinition<Long, ContainerReplicaHistoryList>(
           "replica_history_v2",
-          Long.class,
           LongCodec.get(),
-          ContainerReplicaHistoryList.class,
           ContainerReplicaHistoryList.getCodec());
 
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>

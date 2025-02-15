@@ -80,7 +80,7 @@ public interface S3SecretManager {
   /**
    * Default implementation of secret check method.
    * @param kerberosId kerberos principal.
-   * @return true if exist associated s3 secret for given {@param kerberosId},
+   * @return true if exist associated s3 secret for given {@code kerberosId},
    * false if not.
    */
   default boolean hasS3Secret(String kerberosId) throws IOException {

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm;
 
+import org.apache.ozone.test.NonHATests;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -27,22 +28,18 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
-import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Iterator;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 
 import javax.management.openmbean.CompositeData;
 import javax.management.openmbean.TabularData;
@@ -56,33 +53,18 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  *
  * This class is to test JMX management interface for scm information.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(300)
-public class TestSCMMXBean {
+public abstract class TestSCMMXBean implements NonHATests.TestCase {
 
   public static final Logger LOG = LoggerFactory.getLogger(TestSCMMXBean.class);
-  private static int numOfDatanodes = 3;
-  private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
-  private static StorageContainerManager scm;
-  private static MBeanServer mbs;
+  private StorageContainerManager scm;
+  private MBeanServer mbs;
 
   @BeforeAll
-  public static void init() throws IOException, TimeoutException,
-      InterruptedException {
-    conf = new OzoneConfiguration();
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(numOfDatanodes)
-        .build();
-    cluster.waitForClusterToBeReady();
-    scm = cluster.getStorageContainerManager();
+  void init() {
+    scm = cluster().getStorageContainerManager();
     mbs = ManagementFactory.getPlatformMBeanServer();
-  }
-
-  @AfterAll
-  public static void shutdown() {
-    if (cluster != null) {
-      cluster.shutdown();
-    }
   }
 
   @Test
@@ -119,8 +101,8 @@ public class TestSCMMXBean {
             + "component=ServerRuntime");
     TabularData data = (TabularData) mbs.getAttribute(
         bean, "ContainerStateCount");
-    Map<String, Integer> containerStateCount = scm.getContainerStateCount();
-    verifyEquals(data, containerStateCount);
+    final Map<String, Integer> originalContainerStateCount = scm.getContainerStateCount();
+    verifyEquals(data, originalContainerStateCount);
 
     // Do some changes like allocate containers and change the container states
     ContainerManager scmContainerManager = scm.getContainerManager();
@@ -154,23 +136,16 @@ public class TestSCMMXBean {
 
     }
 
+    final String closing = HddsProtos.LifeCycleState.CLOSING.name();
+    final String closed = HddsProtos.LifeCycleState.CLOSED.name();
+    final Map<String, Integer> containerStateCount = scm.getContainerStateCount();
+    assertThat(containerStateCount.get(closing))
+        .isGreaterThanOrEqualTo(originalContainerStateCount.getOrDefault(closing, 0) + 5);
+    assertThat(containerStateCount.get(closed))
+        .isGreaterThanOrEqualTo(originalContainerStateCount.getOrDefault(closed, 0) + 5);
     data = (TabularData) mbs.getAttribute(
         bean, "ContainerStateCount");
-    containerStateCount = scm.getContainerStateCount();
-
-    containerStateCount.forEach((k, v) -> {
-      if (k.equals(HddsProtos.LifeCycleState.CLOSING.toString())) {
-        assertEquals(5, (int)v);
-      } else if (k.equals(HddsProtos.LifeCycleState.CLOSED.toString())) {
-        assertEquals(5, (int)v);
-      } else  {
-        // Remaining all container state count should be zero.
-        assertEquals(0, (int)v);
-      }
-    });
-
     verifyEquals(data, containerStateCount);
-
   }
 
 

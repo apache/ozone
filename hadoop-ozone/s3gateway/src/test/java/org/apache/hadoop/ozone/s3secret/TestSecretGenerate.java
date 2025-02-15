@@ -92,7 +92,7 @@ class TestSecretGenerate {
     hasNoSecretYet();
 
     S3SecretResponse response =
-            (S3SecretResponse) endpoint.generate().getEntity();
+        (S3SecretResponse) endpoint.generate().getEntity();
 
     assertEquals(USER_SECRET, response.getAwsSecret());
     assertEquals(USER_NAME, response.getAwsAccessKey());
@@ -115,7 +115,7 @@ class TestSecretGenerate {
     hasNoSecretYet();
 
     S3SecretResponse response =
-            (S3SecretResponse) endpoint.generate(OTHER_USER_NAME).getEntity();
+        (S3SecretResponse) endpoint.generate(OTHER_USER_NAME).getEntity();
     assertEquals(USER_SECRET, response.getAwsSecret());
     assertEquals(OTHER_USER_NAME, response.getAwsAccessKey());
   }

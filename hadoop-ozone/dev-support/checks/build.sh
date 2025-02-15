@@ -13,20 +13,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+set -u -o pipefail
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-cd "$DIR/../../.." || exit 1
 
-: ${OZONE_WITH_COVERAGE:="false"}
-
-MAVEN_OPTIONS='-V -B -Dmaven.javadoc.skip=true -DskipTests -DskipDocs --no-transfer-progress'
-
-if [[ "${OZONE_WITH_COVERAGE}" == "true" ]]; then
-  MAVEN_OPTIONS="${MAVEN_OPTIONS} -Pcoverage"
-else
-  MAVEN_OPTIONS="${MAVEN_OPTIONS} -Djacoco.skip"
-fi
-
-export MAVEN_OPTS="-Xmx4096m $MAVEN_OPTS"
-echo "${MAVEN_OPTIONS}"
-mvn ${MAVEN_OPTIONS} clean install "$@"
-exit $?
+source "${DIR}"/_build.sh install "$@"

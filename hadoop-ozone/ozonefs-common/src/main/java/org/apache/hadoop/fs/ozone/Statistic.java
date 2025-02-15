@@ -77,8 +77,10 @@ public enum Statistic {
       "Calls of setTimes()"),
   INVOCATION_IS_FILE_CLOSED("op_is_file_closed",
       "Calls of isFileClosed()"),
-  INVOCATION_RECOVER_LEASE("op_recover_lease",
-      "Calls of recoverLease()"),
+  INVOCATION_RECOVER_FILE_PREPARE("op_recover_file_prepare",
+      "Calls of recoverFilePrepare()"),
+  INVOCATION_RECOVER_FILE("op_recover_file", "Calls of recoverFile()"),
+  INVOCATION_FINALIZE_BLOCK("op_finalize_block", "Calls of finalizeBlock()"),
   INVOCATION_SET_SAFE_MODE("op_set_safe_mode",
       "Calls of setSafeMode()");
 

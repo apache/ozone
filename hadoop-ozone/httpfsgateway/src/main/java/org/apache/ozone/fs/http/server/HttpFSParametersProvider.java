@@ -34,7 +34,6 @@ import org.apache.ozone.lib.wsrs.ShortParam;
 import org.apache.ozone.lib.wsrs.StringParam;
 import org.apache.hadoop.util.StringUtils;
 
-import javax.ws.rs.ext.Provider;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -42,9 +41,7 @@ import java.util.regex.Pattern;
 /**
  * HttpFS ParametersProvider.
  */
-@Provider
 @InterfaceAudience.Private
-@SuppressWarnings("unchecked")
 public class HttpFSParametersProvider extends ParametersProvider {
 
   private static final Map<Enum, Class<Param<?>>[]> PARAMS_DEF

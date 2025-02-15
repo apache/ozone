@@ -29,7 +29,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.XceiverClientCreator;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
@@ -38,6 +39,7 @@ import org.apache.hadoop.ozone.common.Checksum;
 
 import com.codahale.metrics.Timer;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
@@ -54,6 +56,7 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 @SuppressWarnings("java:S2245") // no need for secure random
 public class DatanodeBlockPutter extends BaseFreonGenerator implements
     Callable<Void> {
@@ -99,8 +102,8 @@ public class DatanodeBlockPutter extends BaseFreonGenerator implements
       Pipeline pipeline =
           findPipelineForTest(pipelineId, scmLocationClient, LOG);
 
-      try (XceiverClientManager xceiverClientManager =
-               new XceiverClientManager(ozoneConf)) {
+      try (XceiverClientFactory xceiverClientManager =
+               new XceiverClientCreator(ozoneConf)) {
         client = xceiverClientManager.acquireClient(pipeline);
 
         timer = getMetrics().timer("put-block");

@@ -196,6 +196,8 @@ public class TestDeleteContainerHandler {
     // Delete key, which will make isEmpty flag to true in containerData
     objectStore.getVolume(volumeName)
         .getBucket(bucketName).deleteKey(keyName);
+    OzoneTestUtils.flushAndWaitForDeletedBlockLog(cluster.getStorageContainerManager());
+    OzoneTestUtils.waitBlockDeleted(cluster.getStorageContainerManager());
 
     // Ensure isEmpty flag is true when key is deleted and container is empty
     GenericTestUtils.waitFor(() -> getContainerfromDN(
@@ -313,6 +315,8 @@ public class TestDeleteContainerHandler {
     // Delete key, which will make isEmpty flag to true in containerData
     objectStore.getVolume(volumeName)
         .getBucket(bucketName).deleteKey(keyName);
+    OzoneTestUtils.flushAndWaitForDeletedBlockLog(cluster.getStorageContainerManager());
+    OzoneTestUtils.waitBlockDeleted(cluster.getStorageContainerManager());
 
     // Ensure isEmpty flag is true when key is deleted and container is empty
     GenericTestUtils.waitFor(() -> getContainerfromDN(
@@ -557,23 +561,32 @@ public class TestDeleteContainerHandler {
              = BlockUtils.getDB(
         (KeyValueContainerData) container.getContainerData(),
         conf)) {
-      List<? extends Table.KeyValue<String, BlockData>>
-          blocks = dbHandle.getStore().getBlockDataTable().getRangeKVs(
-          ((KeyValueContainerData) container.getContainerData()).
-              startKeyEmpty(),
-          Integer.MAX_VALUE,
-          ((KeyValueContainerData) container.getContainerData()).
-              containerPrefix(),
-          ((KeyValueContainerData) container.getContainerData()).
-              getUnprefixedKeyFilter());
-      try (BatchOperation batch = dbHandle.getStore().getBatchHandler()
-          .initBatchOperation()) {
-        for (Table.KeyValue<String, BlockData> kv : blocks) {
-          String blk = kv.getKey();
-          dbHandle.getStore().getBlockDataTable().deleteWithBatch(batch, blk);
-        }
-        dbHandle.getStore().getBatchHandler().commitBatchOperation(batch);
+      Table<String, BlockData> table = dbHandle.getStore().getBlockDataTable();
+      clearTable(dbHandle, table, container);
+
+      table = dbHandle.getStore().getLastChunkInfoTable();
+      clearTable(dbHandle, table, container);
+    }
+  }
+
+  private void clearTable(DBHandle dbHandle, Table<String, BlockData> table, Container container)
+      throws IOException {
+    List<? extends Table.KeyValue<String, BlockData>>
+        blocks = table.getRangeKVs(
+            ((KeyValueContainerData) container.getContainerData()).
+                startKeyEmpty(),
+        Integer.MAX_VALUE,
+        ((KeyValueContainerData) container.getContainerData()).
+            containerPrefix(),
+        ((KeyValueContainerData) container.getContainerData()).
+            getUnprefixedKeyFilter());
+    try (BatchOperation batch = dbHandle.getStore().getBatchHandler()
+        .initBatchOperation()) {
+      for (Table.KeyValue<String, BlockData> kv : blocks) {
+        String blk = kv.getKey();
+        table.deleteWithBatch(batch, blk);
       }
+      dbHandle.getStore().getBatchHandler().commitBatchOperation(batch);
     }
   }
 
@@ -643,6 +656,8 @@ public class TestDeleteContainerHandler {
     // Delete key, which will make isEmpty flag to true in containerData
     objectStore.getVolume(volumeName)
         .getBucket(bucketName).deleteKey(keyName);
+    OzoneTestUtils.flushAndWaitForDeletedBlockLog(cluster.getStorageContainerManager());
+    OzoneTestUtils.waitBlockDeleted(cluster.getStorageContainerManager());
 
     // Ensure isEmpty flag is true when key is deleted
     GenericTestUtils.waitFor(() -> getContainerfromDN(

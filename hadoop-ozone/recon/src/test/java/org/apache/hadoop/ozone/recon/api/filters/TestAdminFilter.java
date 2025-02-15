@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.recon.api.MetricsProxyEndpoint;
 import org.apache.hadoop.ozone.recon.api.NodeEndpoint;
 import org.apache.hadoop.ozone.recon.api.PipelineEndpoint;
 import org.apache.hadoop.ozone.recon.api.TaskStatusService;
-import org.apache.hadoop.ozone.recon.api.TriggerDBSyncEndpoint;
 import org.apache.hadoop.ozone.recon.api.UtilizationEndpoint;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
@@ -70,8 +69,14 @@ public class TestAdminFilter {
 
     assertThat(allEndpoints).isNotEmpty();
 
-    // If an endpoint is added, it must be explicitly added to this set or be
-    // marked with @AdminOnly for this test to pass.
+    // If an endpoint is added, it must either require admin privileges by being
+    // marked with the `@AdminOnly` annotation, or be added to this set to exclude it.
+    // - Any endpoint that displays information related to the filesystem namespace
+    //   (including aggregate counts), user information, or allows modification to the
+    //   cluster's state should be marked as `@AdminOnly`.
+    // - Read-only endpoints that only return information about node status or
+    //   cluster state do not require the `@AdminOnly` annotation and can be excluded
+    //   from admin requirements by adding them to this set.
     Set<Class<?>> nonAdminEndpoints = new HashSet<>();
     nonAdminEndpoints.add(UtilizationEndpoint.class);
     nonAdminEndpoints.add(ClusterStateEndpoint.class);
@@ -79,7 +84,6 @@ public class TestAdminFilter {
     nonAdminEndpoints.add(NodeEndpoint.class);
     nonAdminEndpoints.add(PipelineEndpoint.class);
     nonAdminEndpoints.add(TaskStatusService.class);
-    nonAdminEndpoints.add(TriggerDBSyncEndpoint.class);
 
     assertThat(allEndpoints).containsAll(nonAdminEndpoints);
 

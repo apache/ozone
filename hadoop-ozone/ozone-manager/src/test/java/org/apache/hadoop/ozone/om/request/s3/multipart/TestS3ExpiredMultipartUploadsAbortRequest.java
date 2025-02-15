@@ -45,7 +45,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -53,6 +52,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Expired
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadsExpiredAbortRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -164,7 +164,7 @@ public class TestS3ExpiredMultipartUploadsAbortRequest
    * Tests removing MPUs from the multipart info table cache that have higher
    * updateID than the transactionID. Those MPUs should be ignored.
    * It is OK if updateID equals to or less than transactionID.
-   * See {@link WithObjectID#setUpdateID(long, boolean)}.
+   * See {@link #setUpdateID(long)}.
    *
    * @throws Exception
    */
@@ -447,6 +447,7 @@ public class TestS3ExpiredMultipartUploadsAbortRequest
       S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
           new S3InitiateMultipartUploadRequestWithFSO(initiateMPURequest,
               BucketLayout.FILE_SYSTEM_OPTIMIZED);
+      s3InitiateMultipartUploadRequest.setUGI(UserGroupInformation.getLoginUser());
 
       OMClientResponse omClientResponse = s3InitiateMultipartUploadRequest
           .validateAndUpdateCache(ozoneManager, trxnLogIndex);

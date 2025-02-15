@@ -47,6 +47,7 @@ public class SnapshotDiffReportOzone
       Proto2Codec.get(DiffReportEntryProto.getDefaultInstance()),
       SnapshotDiffReportOzone::fromProtobufDiffReportEntry,
       SnapshotDiffReportOzone::toProtobufDiffReportEntry,
+      DiffReportEntry.class,
       DelegatedCodec.CopyType.SHALLOW);
 
   public static Codec<DiffReportEntry> getDiffReportEntryCodec() {
@@ -87,6 +88,14 @@ public class SnapshotDiffReportOzone
 
   public List<DiffReportEntry> getDiffList() {
     return super.getDiffList();
+  }
+
+  public String getVolumeName() {
+    return volumeName;
+  }
+
+  public String getBucketName() {
+    return bucketName;
   }
 
   public String getToken() {

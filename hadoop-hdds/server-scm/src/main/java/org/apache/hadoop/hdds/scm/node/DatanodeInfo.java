@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,25 +20,21 @@ package org.apache.hadoop.hdds.scm.node;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
-import org.apache.hadoop.util.Time;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class extends the primary identifier of a Datanode with ephemeral
@@ -228,6 +223,19 @@ public class DatanodeInfo extends DatanodeDetails {
   }
 
   /**
+   * Returns count of failed volumes reported by the data node.
+   * @return count of failed volumes
+   */
+  public int getFailedVolumeCount() {
+    try {
+      lock.readLock().lock();
+      return failedVolumeCount;
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
+  /**
    * Returns count of healthy metadata volumes reported from datanode.
    * @return count of healthy metdata log volumes
    */
@@ -333,7 +341,7 @@ public class DatanodeInfo extends DatanodeDetails {
    * Retrieve the number of queued commands of the given type, as reported by
    * the datanode at the last heartbeat.
    * @param cmd The command for which to receive the queued command count
-   * @return -1 if we have no information about the count, or an integer >= 0
+   * @return -1 if we have no information about the count, or an integer &gt;= 0
    *         indicating the command count at the last heartbeat.
    */
   public int getCommandCount(SCMCommandProto.Type cmd) {

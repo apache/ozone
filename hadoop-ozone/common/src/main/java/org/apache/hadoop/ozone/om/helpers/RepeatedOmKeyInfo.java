@@ -34,7 +34,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 /**
  * Args for deleted keys. This is written to om metadata deletedTable.
  * Once a key is deleted, it is moved to om metadata deletedTable. Having a
- * {label: List<OMKeyInfo>} ensures that if users create & delete keys with
+ * label: {@code List<OMKeyInfo>} ensures that if users create and delete keys with
  * exact same uri multiple times, all the delete instances are bundled under
  * the same key name. This is useful as part of GDPR compliance where an
  * admin wants to confirm if a given key is deleted from deletedTable metadata.
@@ -47,7 +47,8 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
     return new DelegatedCodec<>(
         Proto2Codec.get(RepeatedKeyInfo.getDefaultInstance()),
         RepeatedOmKeyInfo::getFromProto,
-        k -> k.getProto(ignorePipeline, ClientVersion.CURRENT_VERSION));
+        k -> k.getProto(ignorePipeline, ClientVersion.CURRENT_VERSION),
+        RepeatedOmKeyInfo.class);
   }
 
   public static Codec<RepeatedOmKeyInfo> getCodec(boolean ignorePipeline) {
@@ -110,9 +111,7 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
   }
 
   /**
-   *
-   * @param compact, true for persistence, false for network transmit
-   * @return
+   * @param compact true for persistence, false for network transmit
    */
   public RepeatedKeyInfo getProto(boolean compact, int clientVersion) {
     List<KeyInfo> list = new ArrayList<>();

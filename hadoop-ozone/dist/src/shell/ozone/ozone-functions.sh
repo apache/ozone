@@ -1412,6 +1412,14 @@ function ozone_java_setup
   # Extract the major version number
   JAVA_MAJOR_VERSION=$(echo "$JAVA_VERSION_STRING" | sed -E -n 's/.* version "([^.-]*).*"/\1/p' | cut -d' ' -f1)
 
+  # Add JVM parameter (org.apache.ratis.thirdparty.io.netty.tryReflectionSetAccessible=true)
+  # to allow netty unsafe memory allocation in Java 9+.
+  RATIS_OPTS="${RATIS_OPTS:-}"
+
+  if [[ "${JAVA_MAJOR_VERSION}" -ge 9 ]]; then
+    RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.tryReflectionSetAccessible=true ${RATIS_OPTS}"
+  fi
+
   ozone_set_module_access_args
 }
 
@@ -2808,14 +2816,6 @@ function ozone_assemble_classpath() {
     ozone_add_classpath "$jar"
   done
   ozone_add_classpath "${OZONE_HOME}/share/ozone/web"
-
-  #We need to add the artifact manually as it's not part the generated classpath desciptor
-  local MAIN_ARTIFACT
-  MAIN_ARTIFACT=$(find "$HDDS_LIB_JARS_DIR" -name "${OZONE_RUN_ARTIFACT_NAME}-*.jar")
-  if [[ -z "$MAIN_ARTIFACT" ]] || [[ ! -e "$MAIN_ARTIFACT" ]]; then
-    echo "ERROR: Component jar file $MAIN_ARTIFACT is missing from ${HDDS_LIB_JARS_DIR}"
-  fi
-  ozone_add_classpath "${MAIN_ARTIFACT}"
 
   #Add optional jars to the classpath
   local OPTIONAL_CLASSPATH_DIR

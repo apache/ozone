@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -68,6 +69,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doNothing;
@@ -97,6 +99,7 @@ public class TestOMDirectoryCreateRequest {
         folder.toAbsolutePath().toString());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
+    when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     AuditLogger auditLogger = mock(AuditLogger.class);
@@ -182,7 +185,7 @@ public class TestOMDirectoryCreateRequest {
 
     omDirectoryCreateRequest =
         new OMDirectoryCreateRequest(modifiedOmRequest, getBucketLayout());
-
+    omDirectoryCreateRequest.setUGI(UserGroupInformation.getCurrentUser());
     OMClientResponse omClientResponse =
         omDirectoryCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
 
@@ -221,6 +224,7 @@ public class TestOMDirectoryCreateRequest {
 
     omDirectoryCreateRequest =
         new OMDirectoryCreateRequest(modifiedOmRequest, getBucketLayout());
+    omDirectoryCreateRequest.setUGI(UserGroupInformation.getCurrentUser());
     OMClientResponse omClientResponse =
         omDirectoryCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
 
@@ -309,7 +313,7 @@ public class TestOMDirectoryCreateRequest {
 
     omDirectoryCreateRequest =
         new OMDirectoryCreateRequest(modifiedOmRequest, getBucketLayout());
-
+    omDirectoryCreateRequest.setUGI(UserGroupInformation.getCurrentUser());
     OMClientResponse omClientResponse =
         omDirectoryCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
 
@@ -429,6 +433,7 @@ public class TestOMDirectoryCreateRequest {
 
     omDirectoryCreateRequest =
         new OMDirectoryCreateRequest(modifiedOmRequest, getBucketLayout());
+    omDirectoryCreateRequest.setUGI(UserGroupInformation.getCurrentUser());
 
     assertEquals(0L, omMetrics.getNumKeys());
     OMClientResponse omClientResponse =
@@ -479,7 +484,7 @@ public class TestOMDirectoryCreateRequest {
 
     omDirectoryCreateRequest =
         new OMDirectoryCreateRequest(modifiedOmRequest, getBucketLayout());
-
+    omDirectoryCreateRequest.setUGI(UserGroupInformation.getCurrentUser());
     OMClientResponse omClientResponse =
         omDirectoryCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
 
@@ -509,7 +514,7 @@ public class TestOMDirectoryCreateRequest {
 
       List<OzoneAcl> omKeyAcls = omKeyInfo.getAcls();
 
-      assertEquals(expectedInheritAcls, omKeyAcls, "Failed to inherit parent acls!,");
+      assertTrue(omKeyAcls.containsAll(expectedInheritAcls), "Failed to inherit parent acls!,");
 
       prefix = dirName + OZONE_URI_DELIMITER;
       expectedInheritAcls = omKeyAcls;

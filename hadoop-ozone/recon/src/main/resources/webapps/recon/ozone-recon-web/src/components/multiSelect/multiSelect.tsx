@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React, {PureComponent} from 'react';
+import React, { PureComponent } from 'react';
 import {
   ActionMeta,
   default as ReactSelect,
@@ -49,7 +49,7 @@ const defaultProps = {
 export class MultiSelect extends PureComponent<IMultiSelectProps> {
   static defaultProps = defaultProps;
   render() {
-    const {allowSelectAll, allOption, options, maxShowValues = 5, onChange} = this.props;
+    const { allowSelectAll, allOption, options, maxShowValues = 5, onChange } = this.props;
     if (allowSelectAll) {
       const Option = (props: OptionProps<IOption>) => {
         return (
@@ -66,7 +66,7 @@ export class MultiSelect extends PureComponent<IMultiSelectProps> {
         );
       };
 
-      const ValueContainer = ({children, ...props}: ValueContainerProps<IOption>) => {
+      const ValueContainer = ({ children, ...props }: ValueContainerProps<IOption>) => {
         const currentValues: IOption[] = props.getValue() as IOption[];
         let toBeRendered = children;
         if (currentValues.some(val => val.value === allOption!.value) && children) {
@@ -96,7 +96,7 @@ export class MultiSelect extends PureComponent<IMultiSelectProps> {
             const selectedValues = selected as IOption[];
             if (selectedValues && selectedValues.length > 0) {
               if (selectedValues[selectedValues.length - 1].value === allOption!.value) {
-                return onChange!([allOption!, ...options], {action: 'select-option'});
+                return onChange!([allOption!, ...options], { action: 'select-option' });
               }
 
               let result: IOption[] = [];
@@ -109,16 +109,16 @@ export class MultiSelect extends PureComponent<IMultiSelectProps> {
                   result = [allOption!, ...options];
                 }
 
-                return onChange!(result, {action: 'select-option'});
+                return onChange!(result, { action: 'select-option' });
               }
             }
 
-            return onChange!(selected, {action: 'select-option'});
+            return onChange!(selected, { action: 'select-option' });
           }}
         />
       );
     }
 
-    return <ReactSelect {...this.props}/>;
+    return <ReactSelect {...this.props} />;
   }
 }

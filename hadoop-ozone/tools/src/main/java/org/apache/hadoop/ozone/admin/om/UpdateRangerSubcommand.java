@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.admin.om;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import picocli.CommandLine;
 
@@ -86,9 +85,6 @@ public class UpdateRangerSubcommand implements Callable<Void> {
         System.err.println("Operation completed with errors. "
             + "Check OM log for details");
       }
-
-    } catch (OzoneClientException ex) {
-      System.err.printf("Error: %s", ex.getMessage());
     }
     return null;
   }

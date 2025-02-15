@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -56,6 +56,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_UNDER_LEASE_RECOVERY;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
@@ -72,8 +73,8 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long trxnLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long trxnLogIndex = context.getIndex();
 
     AllocateBlockRequest allocateBlockRequest =
             getOmRequest().getAllocateBlockRequest();
@@ -125,7 +126,15 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
         throw new OMException("Open Key not found " + openKeyName,
                 KEY_NOT_FOUND);
       }
-
+      if (openKeyInfo.getMetadata().containsKey(OzoneConsts.LEASE_RECOVERY)) {
+        throw new OMException("Open Key " + openKeyName + " is under lease recovery",
+            KEY_UNDER_LEASE_RECOVERY);
+      }
+      if (openKeyInfo.getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY) ||
+          openKeyInfo.getMetadata().containsKey(OzoneConsts.OVERWRITTEN_HSYNC_KEY)) {
+        throw new OMException("Open Key " + openKeyName + " is already deleted/overwritten",
+            KEY_NOT_FOUND);
+      }
       List<OmKeyLocationInfo> newLocationList = Collections.singletonList(
               OmKeyLocationInfo.getFromProtobuf(blockLocation));
 
@@ -153,10 +162,10 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       openKeyInfo.setModificationTime(keyArgs.getModificationTime());
 
       // Set the UpdateID to current transactionLogIndex
-      openKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+      openKeyInfo.setUpdateID(trxnLogIndex);
 
       // Add to cache.
-      addOpenTableCacheEntry(trxnLogIndex, omMetadataManager, openKeyName,
+      addOpenTableCacheEntry(trxnLogIndex, omMetadataManager, openKeyName, keyName,
               openKeyInfo);
 
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
@@ -184,7 +193,7 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       }
     }
 
-    auditLog(auditLogger, buildAuditMessage(OMAction.ALLOCATE_BLOCK, auditMap,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.ALLOCATE_BLOCK, auditMap,
             exception, getOmRequest().getUserInfo()));
 
     return omClientResponse;
@@ -211,11 +220,11 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
   }
 
   private void addOpenTableCacheEntry(long trxnLogIndex,
-      OMMetadataManager omMetadataManager, String openKeyName,
+      OMMetadataManager omMetadataManager, String openKeyName, String keyName,
       OmKeyInfo openKeyInfo) {
     String fileName = openKeyInfo.getFileName();
     OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager, openKeyName,
-            openKeyInfo, fileName, trxnLogIndex);
+            openKeyInfo, fileName, keyName, trxnLogIndex);
   }
 
   @Nonnull

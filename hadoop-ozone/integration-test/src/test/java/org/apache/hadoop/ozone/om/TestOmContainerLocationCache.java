@@ -18,10 +18,11 @@
 
 package org.apache.hadoop.ozone.om;
 
-import org.apache.commons.io.FileUtils;
+import com.google.common.collect.ImmutableMap;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -61,6 +62,7 @@ import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
@@ -69,7 +71,6 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.StatusException;
@@ -81,6 +82,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -89,8 +91,11 @@ import org.mockito.ArgumentMatcher;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -131,12 +136,12 @@ import static org.mockito.Mockito.when;
  */
 @Timeout(300)
 public class TestOmContainerLocationCache {
-
+  @TempDir
+  private static File dir;
   private static ScmBlockLocationProtocol mockScmBlockLocationProtocol;
   private static StorageContainerLocationProtocol mockScmContainerClient;
   private static OzoneConfiguration conf;
   private static OMMetadataManager metadataManager;
-  private static File dir;
   private static final String BUCKET_NAME = "bucket1";
   private static final String VERSIONED_BUCKET_NAME = "versionedBucket1";
   private static final String VOLUME_NAME = "vol1";
@@ -145,19 +150,25 @@ public class TestOmContainerLocationCache {
   private static ObjectStore objectStore;
   private static XceiverClientGrpc mockDn1Protocol;
   private static XceiverClientGrpc mockDn2Protocol;
+  private static XceiverClientGrpc mockDnEcProtocol;
   private static final DatanodeDetails DN1 =
       MockDatanodeDetails.createDatanodeDetails(UUID.randomUUID());
   private static final DatanodeDetails DN2 =
       MockDatanodeDetails.createDatanodeDetails(UUID.randomUUID());
+  private static final DatanodeDetails DN3 =
+      MockDatanodeDetails.createDatanodeDetails(UUID.randomUUID());
+  private static final DatanodeDetails DN4 =
+      MockDatanodeDetails.createDatanodeDetails(UUID.randomUUID());
+  private static final DatanodeDetails DN5 =
+      MockDatanodeDetails.createDatanodeDetails(UUID.randomUUID());
   private static final AtomicLong CONTAINER_ID = new AtomicLong(1);
-
+  private static OzoneClient ozoneClient;
 
   @BeforeAll
   public static void setUp() throws Exception {
     ExitUtils.disableSystemExit();
 
     conf = new OzoneConfiguration();
-    dir = GenericTestUtils.getRandomizedTestDir();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
     conf.set(OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY, "true");
     conf.setLong(OZONE_KEY_PREALLOCATION_BLOCKS_MAX, 10);
@@ -172,6 +183,7 @@ public class TestOmContainerLocationCache {
     OmTestManagers omTestManagers = new OmTestManagers(conf,
         mockScmBlockLocationProtocol, mockScmContainerClient);
     om = omTestManagers.getOzoneManager();
+    ozoneClient = omTestManagers.getRpcClient();
     metadataManager = omTestManagers.getMetadataManager();
 
     rpcClient = new RpcClient(conf, null) {
@@ -192,14 +204,16 @@ public class TestOmContainerLocationCache {
 
   @AfterAll
   public static void cleanup() throws Exception {
+    ozoneClient.close();
     om.stop();
-    FileUtils.deleteDirectory(dir);
   }
 
   private static XceiverClientManager mockDataNodeClientFactory()
       throws IOException {
     mockDn1Protocol = spy(new XceiverClientGrpc(createPipeline(DN1), conf));
     mockDn2Protocol = spy(new XceiverClientGrpc(createPipeline(DN2), conf));
+    mockDnEcProtocol = spy(new XceiverClientGrpc(createEcPipeline(
+        ImmutableMap.of(DN1, 1, DN2, 2, DN3, 3, DN4, 4, DN5, 5)), conf));
     XceiverClientManager manager = mock(XceiverClientManager.class);
     when(manager.acquireClient(argThat(matchEmptyPipeline())))
         .thenCallRealMethod();
@@ -217,6 +231,11 @@ public class TestOmContainerLocationCache {
         .thenReturn(mockDn2Protocol);
     when(manager.acquireClientForReadData(argThat(matchPipeline(DN2))))
         .thenReturn(mockDn2Protocol);
+
+    when(manager.acquireClient(argThat(matchEcPipeline())))
+        .thenReturn(mockDnEcProtocol);
+    when(manager.acquireClientForReadData(argThat(matchEcPipeline())))
+        .thenReturn(mockDnEcProtocol);
     return manager;
   }
 
@@ -229,6 +248,11 @@ public class TestOmContainerLocationCache {
   private static ArgumentMatcher<Pipeline> matchPipeline(DatanodeDetails dn) {
     return argument -> argument != null && !argument.getNodes().isEmpty()
         && argument.getNodes().get(0).getUuid().equals(dn.getUuid());
+  }
+
+  private static ArgumentMatcher<Pipeline> matchEcPipeline() {
+    return argument -> argument != null && !argument.getNodes().isEmpty()
+        && argument.getReplicationConfig() instanceof ECReplicationConfig;
   }
 
   private static void createBucket(String volumeName, String bucketName,
@@ -256,12 +280,14 @@ public class TestOmContainerLocationCache {
   public void beforeEach() throws IOException {
     CONTAINER_ID.getAndIncrement();
     reset(mockScmBlockLocationProtocol, mockScmContainerClient,
-        mockDn1Protocol, mockDn2Protocol);
+        mockDn1Protocol, mockDn2Protocol, mockDnEcProtocol);
     InnerNode.Factory factory = InnerNodeImpl.FACTORY;
     when(mockScmBlockLocationProtocol.getNetworkTopology()).thenReturn(
         factory.newInnerNode("", "", null, NetConstants.ROOT_LEVEL, 1));
     when(mockDn1Protocol.getPipeline()).thenReturn(createPipeline(DN1));
     when(mockDn2Protocol.getPipeline()).thenReturn(createPipeline(DN2));
+    when(mockDnEcProtocol.getPipeline()).thenReturn(createEcPipeline(
+        ImmutableMap.of(DN1, 1, DN2, 2, DN3, 3, DN4, 4, DN5, 5)));
   }
 
   /**
@@ -575,6 +601,48 @@ public class TestOmContainerLocationCache {
         .getContainerWithPipelineBatch(newHashSet(CONTAINER_ID.get()));
   }
 
+  @Test
+  public void containerRefreshedOnInsufficientEcPipelines() throws Exception {
+    int chunkSize = 1024 * 1024;
+    int dataBlocks = 3;
+    int parityBlocks = 2;
+    int inputSize = chunkSize * dataBlocks;
+    byte[][] inputChunks = new byte[dataBlocks][chunkSize];
+
+    mockScmAllocationEcPipeline(CONTAINER_ID.get(), 1L);
+    mockWriteChunkResponse(mockDnEcProtocol);
+    mockPutBlockResponse(mockDnEcProtocol, CONTAINER_ID.get(), 1L, null);
+
+    OzoneBucket bucket = objectStore.getVolume(VOLUME_NAME).getBucket(BUCKET_NAME);
+
+    String keyName = "ecKey";
+    try (OzoneOutputStream os = bucket.createKey(keyName, inputSize,
+        new ECReplicationConfig(dataBlocks, parityBlocks, ECReplicationConfig.EcCodec.RS,
+            chunkSize), new HashMap<>())) {
+      for (int i = 0; i < dataBlocks; i++) {
+        os.write(inputChunks[i]);
+      }
+    }
+
+    // case1: pipeline replicaIndexes missing some data indexes, should not cache
+    mockScmGetContainerEcPipeline(CONTAINER_ID.get(), ImmutableMap.of(DN1, 1, DN2, 2, DN4, 4));
+    bucket.getKey(keyName);
+    verify(mockScmContainerClient, times(1))
+        .getContainerWithPipelineBatch(newHashSet(CONTAINER_ID.get()));
+    bucket.getKey(keyName);
+    verify(mockScmContainerClient, times(2))
+        .getContainerWithPipelineBatch(newHashSet(CONTAINER_ID.get()));
+
+    // case2: pipeline replicaIndexes contain all data indexes, should cache
+    mockScmGetContainerEcPipeline(CONTAINER_ID.get(), ImmutableMap.of(DN1, 1, DN2, 2, DN3, 3, DN4, 4));
+    bucket.getKey(keyName);
+    verify(mockScmContainerClient, times(3))
+        .getContainerWithPipelineBatch(newHashSet(CONTAINER_ID.get()));
+    bucket.getKey(keyName);
+    verify(mockScmContainerClient, times(3))
+        .getContainerWithPipelineBatch(newHashSet(CONTAINER_ID.get()));
+  }
+
   private void mockPutBlockResponse(XceiverClientSpi mockDnProtocol,
                                     long containerId, long localId,
                                     byte[] data)
@@ -607,16 +675,38 @@ public class TestOmContainerLocationCache {
 
   private void mockWriteChunkResponse(XceiverClientSpi mockDnProtocol)
       throws IOException, ExecutionException, InterruptedException {
-    ContainerCommandResponseProto writeResponse =
-        ContainerCommandResponseProto.newBuilder()
-            .setWriteChunk(WriteChunkResponseProto.newBuilder().build())
-            .setResult(Result.SUCCESS)
-            .setCmdType(Type.WriteChunk)
-            .build();
     doAnswer(invocation ->
-        new XceiverClientReply(completedFuture(writeResponse)))
+        new XceiverClientReply(
+            completedFuture(
+                createWriteChunkResponse(
+                    (ContainerCommandRequestProto)invocation.getArgument(0)))))
         .when(mockDnProtocol)
         .sendCommandAsync(argThat(matchCmd(Type.WriteChunk)));
+  }
+
+  ContainerCommandResponseProto createWriteChunkResponse(
+      ContainerCommandRequestProto request) {
+    ContainerProtos.WriteChunkRequestProto writeChunk = request.getWriteChunk();
+
+    WriteChunkResponseProto.Builder builder =
+        WriteChunkResponseProto.newBuilder();
+    if (writeChunk.hasBlock()) {
+      ContainerProtos.BlockData
+          blockData = writeChunk.getBlock().getBlockData();
+
+      GetCommittedBlockLengthResponseProto response =
+          GetCommittedBlockLengthResponseProto.newBuilder()
+          .setBlockID(blockData.getBlockID())
+          .setBlockLength(blockData.getSize())
+          .build();
+
+      builder.setCommittedBlockLength(response);
+    }
+    return ContainerCommandResponseProto.newBuilder()
+        .setWriteChunk(builder.build())
+        .setResult(Result.SUCCESS)
+        .setCmdType(Type.WriteChunk)
+        .build();
   }
 
   private ArgumentMatcher<ContainerCommandRequestProto> matchCmd(Type type) {
@@ -633,6 +723,22 @@ public class TestOmContainerLocationCache {
     when(mockScmBlockLocationProtocol
         .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class),
+            anyString(),
+            any(ExcludeList.class),
+            anyString()))
+        .thenReturn(Collections.singletonList(block));
+  }
+
+  private void mockScmAllocationEcPipeline(long containerID, long localId)
+      throws IOException {
+    ContainerBlockID blockId = new ContainerBlockID(containerID, localId);
+    AllocatedBlock block = new AllocatedBlock.Builder()
+        .setPipeline(createEcPipeline(ImmutableMap.of(DN1, 1, DN2, 2, DN3, 3, DN4, 4, DN5, 5)))
+        .setContainerBlockID(blockId)
+        .build();
+    when(mockScmBlockLocationProtocol
+        .allocateBlock(anyLong(), anyInt(),
+            any(ECReplicationConfig.class),
             anyString(),
             any(ExcludeList.class),
             anyString()))
@@ -657,6 +763,20 @@ public class TestOmContainerLocationCache {
   private void mockScmGetContainerPipelineEmpty(long containerId)
       throws IOException {
     Pipeline pipeline = createPipeline(Collections.emptyList());
+    ContainerInfo containerInfo = new ContainerInfo.Builder()
+        .setContainerID(containerId)
+        .setPipelineID(pipeline.getId()).build();
+    List<ContainerWithPipeline> containerWithPipelines =
+        Collections.singletonList(
+            new ContainerWithPipeline(containerInfo, pipeline));
+
+    when(mockScmContainerClient.getContainerWithPipelineBatch(
+        newHashSet(containerId))).thenReturn(containerWithPipelines);
+  }
+
+  private void mockScmGetContainerEcPipeline(long containerId, Map<DatanodeDetails, Integer> indexes)
+      throws IOException {
+    Pipeline pipeline = createEcPipeline(indexes);
     ContainerInfo containerInfo = new ContainerInfo.Builder()
         .setContainerID(containerId)
         .setPipelineID(pipeline.getId()).build();
@@ -764,6 +884,16 @@ public class TestOmContainerLocationCache {
         .setReplicationConfig(
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setNodes(nodes)
+        .build();
+  }
+
+  private static Pipeline createEcPipeline(Map<DatanodeDetails, Integer> indexes) {
+    return Pipeline.newBuilder()
+        .setState(Pipeline.PipelineState.OPEN)
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(new ECReplicationConfig(3, 2))
+        .setReplicaIndexes(indexes)
+        .setNodes(new ArrayList<>(indexes.keySet()))
         .build();
   }
 }

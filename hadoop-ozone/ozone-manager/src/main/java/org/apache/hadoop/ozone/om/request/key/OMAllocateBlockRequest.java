@@ -26,7 +26,7 @@ import java.util.Map;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
@@ -65,6 +65,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_UNDER_LEASE_RECOVERY;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
@@ -106,7 +107,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     //  BlockOutputStreamEntryPool, so we are fine for now. But if one some
     //  one uses direct omclient we might be in trouble.
 
-    UserInfo userInfo = getUserInfo();
+    UserInfo userInfo = getUserIfNotExists(ozoneManager);
     ReplicationConfig repConfig = ReplicationConfig.fromProto(keyArgs.getType(),
         keyArgs.getFactor(), keyArgs.getEcReplicationConfig());
     // To allocate atleast one block passing requested size and scmBlockSize
@@ -149,8 +150,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long trxnLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long trxnLogIndex = context.getIndex();
 
     OzoneManagerProtocolProtos.AllocateBlockRequest allocateBlockRequest =
         getOmRequest().getAllocateBlockRequest();
@@ -203,6 +204,15 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
             KEY_NOT_FOUND);
       }
 
+      if (openKeyInfo.getMetadata().containsKey(OzoneConsts.LEASE_RECOVERY)) {
+        throw new OMException("Open Key " + openKeyName + " is under lease recovery",
+            KEY_UNDER_LEASE_RECOVERY);
+      }
+      if (openKeyInfo.getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY) ||
+          openKeyInfo.getMetadata().containsKey(OzoneConsts.OVERWRITTEN_HSYNC_KEY)) {
+        throw new OMException("Open Key " + openKeyName + " is already deleted/overwritten",
+            KEY_NOT_FOUND);
+      }
       List<OmKeyLocationInfo> newLocationList = Collections.singletonList(
           OmKeyLocationInfo.getFromProtobuf(blockLocation));
 
@@ -229,7 +239,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       openKeyInfo.setModificationTime(keyArgs.getModificationTime());
 
       // Set the UpdateID to current transactionLogIndex
-      openKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+      openKeyInfo.setUpdateID(trxnLogIndex);
 
       // Add to cache.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
@@ -261,7 +271,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       }
     }
 
-    auditLog(auditLogger, buildAuditMessage(OMAction.ALLOCATE_BLOCK, auditMap,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.ALLOCATE_BLOCK, auditMap,
         exception, getOmRequest().getUserInfo()));
 
     return omClientResponse;

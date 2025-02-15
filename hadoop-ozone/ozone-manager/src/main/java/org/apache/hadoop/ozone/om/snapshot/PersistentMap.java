@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.om.snapshot;
 import java.util.Map;
 import java.util.Optional;
 
-import org.apache.hadoop.util.ClosableIterator;
+import org.apache.hadoop.ozone.util.ClosableIterator;
 
 /**
  * Define an interface for persistent map.

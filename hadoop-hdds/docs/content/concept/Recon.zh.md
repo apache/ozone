@@ -35,7 +35,7 @@ Recon 充当 Ozone 的管理和监视控制台。它提供了 Ozone 的鸟瞰图
 
 在较高的层次上，Recon 收集和汇总来自 Ozone Manager（OM）、Storage Container Manager（SCM）和数据节点（DN）的元数据，并充当中央管理和监视控制台。Ozone 管理员可以使用 Recon 查询系统的当前状态，而不会使 OM  或 SCM 过载。
 
-Recon 维护多个数据库，以支持批处理，更快的查询和持久化聚合信息。它维护 OM DB 和 SCM DB 的本地副本，以及用于持久存储聚合信息的 SQL 数据库。
+Recon 维护多个数据库，以支持批处理，更快地查询和持久化聚合信息。它维护 OM DB 和 SCM DB 的本地副本，以及用于持久存储聚合信息的 SQL 数据库。
 
 Recon 还与 Prometheus 集成，提供一个 HTTP 端点来查询 Prometheus 的 Ozone 指标，并在网页用户界面（Web UI）中显示一些关键时间点的指标。
 

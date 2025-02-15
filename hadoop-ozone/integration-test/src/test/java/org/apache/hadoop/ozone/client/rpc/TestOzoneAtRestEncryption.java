@@ -112,6 +112,7 @@ import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
@@ -124,7 +125,7 @@ class TestOzoneAtRestEncryption {
   private static OzoneManager ozoneManager;
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
-
+  @TempDir
   private static File testDir;
   private static OzoneConfiguration conf;
   private static final String TEST_KEY = "key1";
@@ -140,9 +141,6 @@ class TestOzoneAtRestEncryption {
 
   @BeforeAll
   static void init() throws Exception {
-    testDir = GenericTestUtils.getTestDir(
-        TestSecureOzoneRpcClient.class.getSimpleName());
-
     File kmsDir = new File(testDir, UUID.randomUUID().toString());
     assertTrue(kmsDir.mkdirs());
     MiniKMS.Builder miniKMSBuilder = new MiniKMS.Builder();
@@ -177,12 +175,6 @@ class TestOzoneAtRestEncryption {
         cluster.getStorageContainerLocationClient();
     ozoneManager = cluster.getOzoneManager();
     ozoneManager.setMinMultipartUploadPartSize(MPU_PART_MIN_SIZE);
-    TestOzoneRpcClient.setCluster(cluster);
-    TestOzoneRpcClient.setOzClient(ozClient);
-    TestOzoneRpcClient.setOzoneManager(ozoneManager);
-    TestOzoneRpcClient.setStorageContainerLocationClient(
-        storageContainerLocationClient);
-    TestOzoneRpcClient.setStore(store);
 
     // create test key
     createKey(TEST_KEY, cluster.getOzoneManager().getKmsProvider(), conf);
@@ -216,8 +208,6 @@ class TestOzoneAtRestEncryption {
   static void reInitClient() throws IOException {
     ozClient = OzoneClientFactory.getRpcClient(conf);
     store = ozClient.getObjectStore();
-    TestOzoneRpcClient.setOzClient(ozClient);
-    TestOzoneRpcClient.setStore(store);
   }
 
 

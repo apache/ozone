@@ -29,18 +29,11 @@ import org.junit.jupiter.api.Timeout;
 
 
 /**
- * This class is to test all the public facing APIs of Ozone Client.
+ * Test Ozone Client with OM Ratis enabled.
  */
 @Timeout(300)
-public class TestOzoneRpcClient extends TestOzoneRpcClientAbstract {
+class TestOzoneRpcClient extends OzoneRpcClientTests {
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -51,9 +44,6 @@ public class TestOzoneRpcClient extends TestOzoneRpcClientAbstract {
     startCluster(conf);
   }
 
-  /**
-   * Close OzoneClient and shutdown MiniOzoneCluster.
-   */
   @AfterAll
   public static void shutdown() throws IOException {
     shutdownCluster();

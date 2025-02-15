@@ -29,7 +29,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
@@ -45,16 +47,16 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
   private List<OmKeyInfo> omKeyInfoList;
   private OmBucketInfo omBucketInfo;
-  private List<String> dbOpenKeys;
+  private Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
 
   public OMKeysDeleteResponse(@Nonnull OMResponse omResponse,
       @Nonnull List<OmKeyInfo> keyDeleteList,
-      boolean isRatisEnabled, @Nonnull OmBucketInfo omBucketInfo,
-      @Nonnull List<String> dbOpenKeys) {
-    super(omResponse, isRatisEnabled);
+      @Nonnull OmBucketInfo omBucketInfo,
+      @Nonnull Map<String, OmKeyInfo> openKeyInfoMap) {
+    super(omResponse);
     this.omKeyInfoList = keyDeleteList;
     this.omBucketInfo = omBucketInfo;
-    this.dbOpenKeys = dbOpenKeys;
+    this.openKeyInfoMap = openKeyInfoMap;
   }
 
   /**
@@ -64,6 +66,7 @@ public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
   public OMKeysDeleteResponse(@Nonnull OMResponse omResponse, @Nonnull
                               BucketLayout bucketLayout) {
     super(omResponse, bucketLayout);
+    checkStatusNotOK();
   }
 
   @Override
@@ -100,9 +103,11 @@ public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
         omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
             omBucketInfo.getBucketName()), omBucketInfo);
 
-    for (String dbOpenKey : dbOpenKeys) {
-      omMetadataManager.getOpenKeyTable(getBucketLayout()).deleteWithBatch(
-          batchOperation, dbOpenKey);
+    if (!openKeyInfoMap.isEmpty()) {
+      for (Map.Entry<String, OmKeyInfo> entry : openKeyInfoMap.entrySet()) {
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(
+            batchOperation, entry.getKey(), entry.getValue());
+      }
     }
   }
 
@@ -114,7 +119,7 @@ public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
     return omBucketInfo;
   }
 
-  public List<String> getDbOpenKeys() {
-    return dbOpenKeys;
+  protected Map<String, OmKeyInfo> getOpenKeyInfoMap() {
+    return openKeyInfoMap;
   }
 }

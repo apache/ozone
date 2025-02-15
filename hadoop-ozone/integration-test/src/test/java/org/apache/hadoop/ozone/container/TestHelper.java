@@ -41,8 +41,10 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.io.BlockDataStreamOutputEntry;
@@ -329,14 +331,17 @@ public final class TestHelper {
       Long... containerIdList)
       throws ContainerNotFoundException, PipelineNotFoundException,
       TimeoutException, InterruptedException {
+    StorageContainerManager scm;
+    if (cluster instanceof MiniOzoneHAClusterImpl) {
+      MiniOzoneHAClusterImpl haCluster = (MiniOzoneHAClusterImpl) cluster;
+      scm = haCluster.getScmLeader();
+    } else {
+      scm = cluster.getStorageContainerManager();
+    }
     List<Pipeline> pipelineList = new ArrayList<>();
     for (long containerID : containerIdList) {
-      ContainerInfo container =
-          cluster.getStorageContainerManager().getContainerManager()
-              .getContainer(ContainerID.valueOf(containerID));
-      Pipeline pipeline =
-          cluster.getStorageContainerManager().getPipelineManager()
-              .getPipeline(container.getPipelineID());
+      ContainerInfo container = scm.getContainerManager().getContainer(ContainerID.valueOf(containerID));
+      Pipeline pipeline = scm.getPipelineManager().getPipeline(container.getPipelineID());
       pipelineList.add(pipeline);
       List<DatanodeDetails> datanodes = pipeline.getNodes();
 
@@ -352,9 +357,7 @@ public final class TestHelper {
         // make sure the container gets created first
         assertFalse(isContainerClosed(cluster, containerID, details));
         // send the order to close the container
-        cluster.getStorageContainerManager().getEventQueue()
-            .fireEvent(SCMEvents.CLOSE_CONTAINER,
-                ContainerID.valueOf(containerID));
+        scm.getEventQueue().fireEvent(SCMEvents.CLOSE_CONTAINER, ContainerID.valueOf(containerID));
       }
     }
     int index = 0;

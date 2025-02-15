@@ -1,0 +1,112 @@
+/**
+* Licensed to the Apache Software Foundation (ASF) under one or more
+* contributor license agreements.  See the NOTICE file distributed with
+* this work for additional information regarding copyright ownership.
+* The ASF licenses this file to You under the Apache License, Version 2.0
+* (the "License"); you may not use this file except in compliance with
+* the License.  You may obtain a copy of the License at
+
+* http://www.apache.org/licenses/LICENSE-2.0
+
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
+
+{
+    "extends": [
+      "eslint:recommended",
+      "plugin:react/recommended",
+      "plugin:react/jsx-runtime",
+      "plugin:@typescript-eslint/recommended",
+      "plugin:import/typescript",
+      "prettier"
+    ],
+    "plugins": ["react", "@typescript-eslint", "prettier"],
+    "rules": {
+      "camelcase": "off",
+      "space-infix-ops": "warn",
+      "quotes": [
+        "warn",
+        "single",
+        {
+          "avoidEscape": true,
+          "allowTemplateLiterals": true
+        }
+      ],
+      "no-unused-vars": [
+        "warn",
+        {
+          "argsIgnorePattern": "^_\\w*",
+          "varsIgnorePattern": "^_\\w*"
+        }
+      ],
+      "object-curly-spacing": [
+        "warn",
+        "always"
+      ],
+      "object-property-newline": "warn",
+      "no-return-assign": "off",
+      "indent": [
+        "warn",
+        2,
+        {
+          "SwitchCase": 1
+        }
+      ],
+      "constructor-super": "warn",
+      "import/no-unassigned-import": "off",
+      "import/no-unused-modules": [
+        1,
+        {
+          "unusedExports": true
+        }
+      ],
+      "import/no-extraneous-dependencies": [
+        "error",
+        {
+          "devDependencies": true,
+          "optionalDependencies": true,
+          "peerDependencies": true
+        }
+      ],
+      "react/state-in-constructor": "off",
+      "react/require-default-props": "off",
+      "react/default-props-match-prop-types": "off",
+      "react/no-array-index-key": "off",
+      "promise/prefer-await-to-then": "warn",
+      "@typescript-eslint/explicit-function-return-type": "off",
+      "@typescript-eslint/prefer-readonly-parameter-types": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "warn", {
+          "argsIgnorePattern": "^_\\w*",
+          "varsIgnorePattern": "^_\\w*"
+        }
+      ],
+      "@typescript-eslint/no-non-null-assertion": "off",
+      "@typescript-eslint/interface-name-prefix": ["warn", { "prefixWithI": "always" }]
+    },
+    "settings": {
+      "import/parsers": {
+        "@typescript-eslint/parser": [
+          ".ts",
+          ".tsx"
+        ]
+      },
+      "import/resolver": {
+        "typescript": {}
+      },
+      "react": {
+        "version": "16.8.6",
+        "pragma": "React",
+        "fragment": "Fragment"
+      }
+    },
+    "env": {
+        "browser": true,
+        "node": true
+    }
+  }
+  

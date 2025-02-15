@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
@@ -46,6 +47,8 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.util.List;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
@@ -68,14 +71,17 @@ public class ClusterStateEndpoint {
   private ReconPipelineManager pipelineManager;
   private ReconContainerManager containerManager;
   private GlobalStatsDao globalStatsDao;
-
+  private OzoneConfiguration ozoneConfiguration;
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
+
+
 
   @Inject
   ClusterStateEndpoint(OzoneStorageContainerManager reconSCM,
                        GlobalStatsDao globalStatsDao,
                        ContainerHealthSchemaManager
-                           containerHealthSchemaManager) {
+                           containerHealthSchemaManager,
+                       OzoneConfiguration ozoneConfiguration) {
     this.nodeManager =
         (ReconNodeManager) reconSCM.getScmNodeManager();
     this.pipelineManager = (ReconPipelineManager) reconSCM.getPipelineManager();
@@ -83,6 +89,7 @@ public class ClusterStateEndpoint {
         (ReconContainerManager) reconSCM.getContainerManager();
     this.globalStatsDao = globalStatsDao;
     this.containerHealthSchemaManager = containerHealthSchemaManager;
+    this.ozoneConfiguration = ozoneConfiguration;
   }
 
   /**
@@ -182,6 +189,8 @@ public class ClusterStateEndpoint {
         .setHealthyDatanodes(healthyDatanodes)
         .setOpenContainers(containerStateCounts.getOpenContainersCount())
         .setDeletedContainers(containerStateCounts.getDeletedContainersCount())
+        .setScmServiceId(ozoneConfiguration.get(OZONE_SCM_SERVICE_IDS_KEY))
+        .setOmServiceId(ozoneConfiguration.get(OZONE_OM_SERVICE_IDS_KEY))
         .build();
     return Response.ok(response).build();
   }

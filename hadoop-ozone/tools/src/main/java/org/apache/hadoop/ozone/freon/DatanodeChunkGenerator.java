@@ -36,7 +36,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.XceiverClientCreator;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -47,6 +48,7 @@ import org.apache.hadoop.ozone.common.Checksum;
 import com.codahale.metrics.Timer;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
@@ -61,6 +63,7 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 @SuppressWarnings("java:S2245") // no need for secure random
 public class DatanodeChunkGenerator extends BaseFreonGenerator implements
     Callable<Void> {
@@ -117,8 +120,8 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
 
     try (StorageContainerLocationProtocol scmLocationClient =
                createStorageContainerLocationClient(ozoneConf);
-         XceiverClientManager xceiverClientManager =
-             new XceiverClientManager(ozoneConf)) {
+         XceiverClientFactory xceiverClientManager =
+             new XceiverClientCreator(ozoneConf)) {
       List<Pipeline> pipelinesFromSCM = scmLocationClient.listPipelines();
       Pipeline firstPipeline;
       init();
@@ -246,8 +249,7 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
       if (async) {
         XceiverClientReply xceiverClientReply =
             xceiverClientSpi.sendCommandAsync(request);
-        xceiverClientSpi
-            .watchForCommit(xceiverClientReply.getLogIndex());
+        xceiverClientSpi.watchForCommit(xceiverClientReply.getLogIndex()).get();
 
       } else {
         xceiverClientSpi.sendCommand(request);

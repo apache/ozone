@@ -1,21 +1,30 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.common;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_TIMEOUT;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -27,7 +36,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -42,23 +50,14 @@ import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManage
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.ozone.container.common.states.datanode.InitDatanodeState;
 import org.apache.hadoop.ozone.container.common.states.datanode.RunningDatanodeState;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
-
-import com.google.common.collect.Maps;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_TIMEOUT;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests the datanode state machine class and its states.
@@ -198,8 +197,7 @@ public class TestDatanodeStateMachine {
         OzoneConsts.OZONE_SCM_DATANODE_ID_FILE_DEFAULT);
     idPath.delete();
     DatanodeDetails datanodeDetails = getNewDatanodeDetails();
-    DatanodeDetails.Port port = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.STANDALONE,
+    DatanodeDetails.Port port = DatanodeDetails.newStandalonePort(
         OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
     datanodeDetails.setPort(port);
     ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, idPath, conf);
@@ -325,8 +323,7 @@ public class TestDatanodeStateMachine {
         OzoneConsts.OZONE_SCM_DATANODE_ID_FILE_DEFAULT);
     idPath.delete();
     DatanodeDetails datanodeDetails = getNewDatanodeDetails();
-    DatanodeDetails.Port port = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.STANDALONE,
+    DatanodeDetails.Port port = DatanodeDetails.newStandalonePort(
         OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
     datanodeDetails.setPort(port);
 
@@ -408,12 +405,9 @@ public class TestDatanodeStateMachine {
   }
 
   private DatanodeDetails getNewDatanodeDetails() {
-    DatanodeDetails.Port containerPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.STANDALONE, 0);
-    DatanodeDetails.Port ratisPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.RATIS, 0);
-    DatanodeDetails.Port restPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.REST, 0);
+    DatanodeDetails.Port containerPort = DatanodeDetails.newStandalonePort(0);
+    DatanodeDetails.Port ratisPort = DatanodeDetails.newRatisPort(0);
+    DatanodeDetails.Port restPort = DatanodeDetails.newRestPort(0);
     DatanodeDetails.Port streamPort = DatanodeDetails.newPort(
         DatanodeDetails.Port.Name.RATIS_DATASTREAM, 0);
     return DatanodeDetails.newBuilder()

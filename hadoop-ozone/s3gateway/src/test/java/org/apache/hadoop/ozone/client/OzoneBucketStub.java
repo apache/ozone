@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts.PartInfo;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -151,6 +152,38 @@ public final class OzoneBucketStub extends OzoneBucket {
                 () -> readKey(key), true,
                 UserGroupInformation.getCurrentUser().getShortUserName(),
                 tags
+            ));
+            super.close();
+          }
+        };
+
+    return new OzoneOutputStream(byteArrayOutputStream, null);
+  }
+
+  @Override
+  public OzoneOutputStream rewriteKey(String keyName, long size, long existingKeyGeneration,
+      ReplicationConfig rConfig, Map<String, String> metadata) throws IOException {
+    final ReplicationConfig repConfig;
+    if (rConfig == null) {
+      repConfig = getReplicationConfig();
+    } else {
+      repConfig = rConfig;
+    }
+    ReplicationConfig finalReplicationCon = repConfig;
+    ByteArrayOutputStream byteArrayOutputStream =
+        new KeyMetadataAwareOutputStream(metadata) {
+          @Override
+          public void close() throws IOException {
+            keyContents.put(keyName, toByteArray());
+            keyDetails.put(keyName, new OzoneKeyDetails(
+                getVolumeName(),
+                getName(),
+                keyName,
+                size,
+                System.currentTimeMillis(),
+                System.currentTimeMillis(),
+                new ArrayList<>(), finalReplicationCon, metadata, null,
+                () -> readKey(keyName), true, null, null
             ));
             super.close();
           }
@@ -359,6 +392,17 @@ public final class OzoneBucketStub extends OzoneBucket {
   }
 
   @Override
+  public Map<String, ErrorInfo> deleteKeys(List<String> keyList, boolean quiet) throws IOException {
+    Map<String, ErrorInfo> keyErrorMap = new HashMap<>();
+    for (String key : keyList) {
+      if (keyDetails.remove(key) == null) {
+        keyErrorMap.put(key, new ErrorInfo("KEY_NOT_FOUND", "Key does not exist"));
+      }
+    }
+    return keyErrorMap;
+  }
+
+  @Override
   public void renameKey(String fromKeyName, String toKeyName)
       throws IOException {
     throw new UnsupportedOperationException();
@@ -552,6 +596,37 @@ public final class OzoneBucketStub extends OzoneBucket {
     return aclList.addAll(acls);
   }
 
+  @Override
+  public Map<String, String> getObjectTagging(String keyName) throws IOException {
+    if (keyDetails.containsKey(keyName)) {
+      OzoneKeyDetails ozoneKeyDetails = keyDetails.get(keyName);
+      return ozoneKeyDetails.getTags();
+    } else {
+      throw new OMException(ResultCodes.KEY_NOT_FOUND);
+    }
+  }
+
+  @Override
+  public void putObjectTagging(String keyName, Map<String, String> tags) throws IOException {
+    if (keyDetails.containsKey(keyName)) {
+      OzoneKeyDetails ozoneKeyDetails = keyDetails.get(keyName);
+      ozoneKeyDetails.getTags().clear();
+      ozoneKeyDetails.getTags().putAll(tags);
+    } else {
+      throw new OMException(ResultCodes.KEY_NOT_FOUND);
+    }
+  }
+
+  @Override
+  public void deleteObjectTagging(String keyName) throws IOException {
+    if (keyDetails.containsKey(keyName)) {
+      OzoneKeyDetails ozoneKeyDetails = keyDetails.get(keyName);
+      ozoneKeyDetails.getTags().clear();
+    } else {
+      throw new OMException(ResultCodes.KEY_NOT_FOUND);
+    }
+  }
+
   /**
    * Class used to hold part information in a upload part request.
    */
@@ -664,6 +739,16 @@ public final class OzoneBucketStub extends OzoneBucket {
 
     @Override
     public void close() throws IOException {
+
+    }
+
+    @Override
+    public void hflush() {
+
+    }
+
+    @Override
+    public void hsync() throws IOException {
 
     }
 

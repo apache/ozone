@@ -17,7 +17,10 @@
 
 package org.apache.hadoop.ozone.om.request.upgrade;
 
-import org.apache.ratis.server.protocol.TermIndex;
+import java.util.HashMap;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.OMAction;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
@@ -63,18 +66,21 @@ public class OMPrepareRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long transactionLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long transactionLogIndex = context.getIndex();
 
-    LOG.info("OM {} Received prepare request with log {}", ozoneManager.getOMNodeId(), termIndex);
+    LOG.info("OM {} Received prepare request with log {}", ozoneManager.getOMNodeId(), context.getTermIndex());
 
     OMRequest omRequest = getOmRequest();
+    AuditLogger auditLogger = ozoneManager.getAuditLogger();
+    OzoneManagerProtocolProtos.UserInfo userInfo = omRequest.getUserInfo();
     OzoneManagerProtocolProtos.PrepareRequestArgs args =
         omRequest.getPrepareRequest().getArgs();
     OMResponse.Builder responseBuilder =
         OmResponseUtil.getOMResponseBuilder(omRequest);
     responseBuilder.setCmdType(Type.Prepare);
     OMClientResponse response = null;
+    Exception exception = null;
 
     // Allow double buffer this many seconds to flush all transactions before
     // returning an error to the caller.
@@ -98,7 +104,7 @@ public class OMPrepareRequest extends OMClientRequest {
       // the snapshot index in the prepared state.
       OzoneManagerDoubleBuffer doubleBuffer =
           ozoneManager.getOmRatisServer().getOmStateMachine().getOzoneManagerDoubleBuffer();
-      doubleBuffer.add(response, termIndex);
+      doubleBuffer.add(response, context.getTermIndex());
 
       OzoneManagerRatisServer omRatisServer = ozoneManager.getOmRatisServer();
       final RaftServer.Division division = omRatisServer.getServerDivision();
@@ -123,6 +129,7 @@ public class OMPrepareRequest extends OMClientRequest {
           "log index {}", ozoneManager.getOMNodeId(), transactionLogIndex,
           omResponse, omResponse.getTxnID());
     } catch (OMException e) {
+      exception = e;
       LOG.error("Prepare Request Apply failed in {}. ",
           ozoneManager.getOMNodeId(), e);
       response = new OMPrepareResponse(
@@ -130,6 +137,7 @@ public class OMPrepareRequest extends OMClientRequest {
     } catch (InterruptedException | IOException e) {
       // Set error code so that prepare failure does not cause the OM to
       // terminate.
+      exception = e;
       LOG.error("Prepare Request Apply failed in {}. ",
           ozoneManager.getOMNodeId(), e);
       response = new OMPrepareResponse(
@@ -149,6 +157,8 @@ public class OMPrepareRequest extends OMClientRequest {
       }
     }
 
+    markForAudit(auditLogger, buildAuditMessage(OMAction.UPGRADE_PREPARE,
+        new HashMap<>(), exception, userInfo));
     return response;
   }
 

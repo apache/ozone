@@ -84,16 +84,16 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
     configurationPropsToSkipCompare.addAll(Arrays.asList(
         HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA,
         HddsConfigKeys.HDDS_GRPC_TLS_TEST_CERT,
-        HddsConfigKeys.HDDS_X509_CRL_NAME, // HDDS-2873
         HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED,
         OMConfigKeys.OZONE_OM_NODES_KEY,
         OMConfigKeys.OZONE_OM_DECOMMISSIONED_NODES_KEY,
         ScmConfigKeys.OZONE_SCM_NODES_KEY,
         ScmConfigKeys.OZONE_SCM_ADDRESS_KEY,
-        ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
+        ScmConfigKeys.OZONE_CHUNK_READ_NETTY_CHUNKED_NIO_FILE_KEY,
         OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY,
         OMConfigKeys.OZONE_FS_TRASH_CHECKPOINT_INTERVAL_KEY,
         OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_ENABLED,
+        OMConfigKeys.OZONE_OM_FEATURES_DISABLED,
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE,
         OzoneConfigKeys.OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY,
         OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_WORKERS,
@@ -126,6 +126,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY,
         OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER,
         OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD,
+        OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION,
         ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY,
         ScmConfigKeys.OZONE_SCM_HA_PREFIX,
         S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
@@ -136,3 +137,4 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
     ));
   }
 }
+

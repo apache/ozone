@@ -89,6 +89,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOz
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.anyLong;
@@ -791,8 +792,9 @@ public class TestNSSummaryEndpointWithFSO {
         .setParentObjectID(DIR_TWO_OBJECT_ID)
         .build();
     // Call constructFullPath and verify the result
-    fullPath = ReconUtils.constructFullPath(keyInfo,
-        reconNamespaceSummaryManager, reconOMMetadataManager);
+    OmKeyInfo finalKeyInfo = keyInfo;
+    assertThrows(ServiceNotReadyException.class, () -> ReconUtils.constructFullPath(finalKeyInfo,
+        reconNamespaceSummaryManager, reconOMMetadataManager));
   }
 
   @Test
@@ -813,8 +815,8 @@ public class TestNSSummaryEndpointWithFSO {
         .setParentObjectID(dirOneObjectId)
         .build();
 
-    String result = ReconUtils.constructFullPath(keyInfo, mockSummaryManager, mockMetadataManager);
-    assertEquals("", result, "Expected an empty string return due to rebuild trigger");
+    assertThrows(ServiceNotReadyException.class, () ->
+        ReconUtils.constructFullPath(keyInfo, mockSummaryManager, mockMetadataManager));
   }
 
   @Test
@@ -836,7 +838,8 @@ public class TestNSSummaryEndpointWithFSO {
         .setParentObjectID(1L)
         .build();
 
-    ReconUtils.constructFullPath(keyInfo, mockManager, null);
+    assertThrows(ServiceNotReadyException.class, () ->
+        ReconUtils.constructFullPath(keyInfo, mockManager, null));
 
     // Assert
     ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);

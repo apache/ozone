@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
 import com.google.common.base.Preconditions;
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
@@ -212,8 +212,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long transactionLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long transactionLogIndex = context.getIndex();
 
     final OMMultiTenantManager multiTenantManager =
         ozoneManager.getMultiTenantManager();
@@ -287,8 +287,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         omVolumeArgs.setQuotaInNamespace(OzoneConsts.QUOTA_RESET);
         omVolumeArgs.setObjectID(
             ozoneManager.getObjectIdFromTxId(transactionLogIndex));
-        omVolumeArgs.setUpdateID(transactionLogIndex,
-            ozoneManager.isRatisEnabled());
+        omVolumeArgs.setUpdateID(transactionLogIndex);
 
         omVolumeArgs.incRefCount();
         // Remove this check when vol ref count is also used by other features
@@ -375,12 +374,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     // Perform audit logging
     auditMap.put(OzoneConsts.TENANT, tenantId);
     // Note auditMap contains volume creation info
-    auditLog(ozoneManager.getAuditLogger(),
+    markForAudit(ozoneManager.getAuditLogger(),
         buildAuditMessage(OMAction.CREATE_TENANT, auditMap, exception,
-            getOmRequest().getUserInfo()));
-    // Log CREATE_VOLUME as well since a volume is created
-    auditLog(ozoneManager.getAuditLogger(),
-        buildAuditMessage(OMAction.CREATE_VOLUME, auditMap, exception,
             getOmRequest().getUserInfo()));
 
     if (exception == null) {

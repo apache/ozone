@@ -19,8 +19,7 @@ package org.apache.hadoop.ozone;
 
 import com.google.common.collect.Maps;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.cli.OzoneAdmin;
-import org.apache.hadoop.hdds.conf.DefaultConfigManager;
+import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
@@ -33,6 +32,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,10 +86,12 @@ import org.junit.jupiter.api.Timeout;
 public final class TestBlockTokensCLI {
   private static final Logger LOG = LoggerFactory
       .getLogger(TestBlockTokensCLI.class);
+
+  @TempDir
+  private static File workDir;
   private static MiniKdc miniKdc;
   private static OzoneAdmin ozoneAdmin;
   private static OzoneConfiguration conf;
-  private static File workDir;
   private static File ozoneKeytab;
   private static File spnegoKeytab;
   private static String host;
@@ -100,13 +102,12 @@ public final class TestBlockTokensCLI {
 
   @BeforeAll
   public static void init() throws Exception {
-    conf = new OzoneConfiguration();
+    ozoneAdmin = new OzoneAdmin();
+    conf = ozoneAdmin.getOzoneConf();
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
 
     ExitUtils.disableSystemExit();
 
-    workDir =
-        GenericTestUtils.getTestDir(TestBlockTokens.class.getSimpleName());
     omServiceId = "om-service-test";
     scmServiceId = "scm-service-test";
 
@@ -116,7 +117,6 @@ public final class TestBlockTokensCLI {
     setSecretKeysConfig();
     startCluster();
     client = cluster.newClient();
-    ozoneAdmin = new OzoneAdmin(conf);
   }
 
   @AfterAll
@@ -126,7 +126,6 @@ public final class TestBlockTokensCLI {
     if (cluster != null) {
       cluster.stop();
     }
-    DefaultConfigManager.clearDefaultConfigs();
   }
 
   private SecretKeyManager getScmSecretKeyManager() {
@@ -303,7 +302,7 @@ public final class TestBlockTokensCLI {
    * format.
    */
   private String[] createArgsForCommand(String[] additionalArgs) {
-    OzoneConfiguration defaultConf = ozoneAdmin.createOzoneConfiguration();
+    OzoneConfiguration defaultConf = ozoneAdmin.getOzoneConf();
     Map<String, String> diff = Maps.difference(defaultConf.getOzoneProperties(),
         conf.getOzoneProperties()).entriesOnlyOnRight();
     String[] args = new String[diff.size() + additionalArgs.length];

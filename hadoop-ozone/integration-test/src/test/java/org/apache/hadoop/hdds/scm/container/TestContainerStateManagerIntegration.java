@@ -252,9 +252,8 @@ public class TestContainerStateManagerIntegration {
 
     // make sure pipeline has has numContainerPerOwnerInPipeline number of
     // containers.
-    assertEquals(scm.getPipelineManager()
-            .getNumberOfContainers(container1.getPipeline().getId()),
-        numContainerPerOwnerInPipeline);
+    assertEquals(numContainerPerOwnerInPipeline, scm.getPipelineManager()
+            .getNumberOfContainers(container1.getPipeline().getId()));
     Thread.sleep(5000);
     long threshold = 2000;
     // check the way the block allocations are distributed in the different

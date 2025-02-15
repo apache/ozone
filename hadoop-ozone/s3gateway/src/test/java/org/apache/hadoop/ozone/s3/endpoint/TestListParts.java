@@ -18,13 +18,12 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import javax.ws.rs.core.HttpHeaders;
@@ -47,11 +46,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 public class TestListParts {
 
 
-  private static final ObjectEndpoint REST = new ObjectEndpoint();
-  private static String uploadID;
+  private ObjectEndpoint rest;
+  private String uploadID;
 
-  @BeforeAll
-  public static void setUp() throws Exception {
+  @BeforeEach
+  public void setUp() throws Exception {
 
     OzoneClient client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket(OzoneConsts.S3_BUCKET);
@@ -60,11 +59,12 @@ public class TestListParts {
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
 
-    REST.setHeaders(headers);
-    REST.setClient(client);
-    REST.setOzoneConfiguration(new OzoneConfiguration());
+    rest = EndpointBuilder.newObjectEndpointBuilder()
+        .setHeaders(headers)
+        .setClient(client)
+        .build();
 
-    Response response = REST.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
+    Response response = rest.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
         OzoneConsts.KEY);
     MultipartUploadInitiateResponse multipartUploadInitiateResponse =
         (MultipartUploadInitiateResponse) response.getEntity();
@@ -76,26 +76,26 @@ public class TestListParts {
     String content = "Multipart Upload";
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
-    response = REST.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
-        content.length(), 1, uploadID, body);
+    response = rest.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
+        content.length(), 1, uploadID, null, null, body);
 
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
-    response = REST.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
-        content.length(), 2, uploadID, body);
+    response = rest.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
+        content.length(), 2, uploadID, null, null, body);
 
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
-    response = REST.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
-        content.length(), 3, uploadID, body);
+    response = rest.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
+        content.length(), 3, uploadID, null, null, body);
 
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
   }
 
   @Test
   public void testListParts() throws Exception {
-    Response response = REST.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 0,
-        uploadID, 3, "0");
+    Response response = rest.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 0,
+        uploadID, 3, "0", null);
 
     ListPartsResponse listPartsResponse =
         (ListPartsResponse) response.getEntity();
@@ -107,8 +107,8 @@ public class TestListParts {
 
   @Test
   public void testListPartsContinuation() throws Exception {
-    Response response = REST.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 0,
-        uploadID, 2, "0");
+    Response response = rest.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 0,
+        uploadID, 2, "0", null);
     ListPartsResponse listPartsResponse =
         (ListPartsResponse) response.getEntity();
 
@@ -116,8 +116,8 @@ public class TestListParts {
     assertEquals(2, listPartsResponse.getPartList().size());
 
     // Continue
-    response = REST.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 0, uploadID, 2,
-        Integer.toString(listPartsResponse.getNextPartNumberMarker()));
+    response = rest.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 0, uploadID, 2,
+        Integer.toString(listPartsResponse.getNextPartNumberMarker()), null);
     listPartsResponse = (ListPartsResponse) response.getEntity();
 
     assertFalse(listPartsResponse.getTruncated());
@@ -128,8 +128,8 @@ public class TestListParts {
   @Test
   public void testListPartsWithUnknownUploadID() throws Exception {
     try {
-      REST.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 0,
-          uploadID, 2, "0");
+      rest.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 0,
+          uploadID, 2, "0", null);
     } catch (OS3Exception ex) {
       assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getErrorMessage(),
           ex.getErrorMessage());

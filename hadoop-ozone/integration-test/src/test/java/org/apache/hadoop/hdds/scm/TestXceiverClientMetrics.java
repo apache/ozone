@@ -22,9 +22,9 @@ import static org.apache.ozone.test.MetricsAsserts.assertCounter;
 import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.ArrayList;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 
@@ -41,10 +41,12 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * This class tests the metrics of XceiverClient.
@@ -76,11 +78,10 @@ public class TestXceiverClientMetrics {
   }
 
   @Test
-  public void testMetrics() throws Exception {
+  @Flaky("HDDS-11646")
+  public void testMetrics(@TempDir Path metaDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    String metaDir = GenericTestUtils.getTempPath(
-        TestXceiverClientManager.class.getName() + UUID.randomUUID());
-    conf.set(HDDS_METADATA_DIR_NAME, metaDir);
+    conf.set(HDDS_METADATA_DIR_NAME, metaDir.toString());
 
     try (XceiverClientManager clientManager = new XceiverClientManager(conf)) {
 

@@ -18,7 +18,6 @@
 package org.apache.ozone.hdfs.web;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.io.Text;
 
 /**
@@ -36,17 +35,4 @@ public final class WebHdfsConstants {
   private WebHdfsConstants() {
   }
 
-  enum PathType {
-    FILE, DIRECTORY, SYMLINK;
-
-    static PathType valueOf(HdfsFileStatus status) {
-      if (status.isDirectory()) {
-        return DIRECTORY;
-      }
-      if (status.isSymlink()) {
-        return SYMLINK;
-      }
-      return FILE;
-    }
-  }
 }

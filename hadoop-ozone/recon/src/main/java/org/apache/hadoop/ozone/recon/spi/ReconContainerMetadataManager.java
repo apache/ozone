@@ -70,7 +70,7 @@ public interface ReconContainerMetadataManager {
                                      Integer count) throws IOException;
 
   /**
-   * Store the containerID -> no. of keys count into the container DB store.
+   * Store the containerID -&gt; no. of keys count into the container DB store.
    *
    * @param containerID the containerID.
    * @param count count of the keys within the given containerID.
@@ -80,7 +80,7 @@ public interface ReconContainerMetadataManager {
   void storeContainerKeyCount(Long containerID, Long count) throws IOException;
 
   /**
-   * Store the containerID -> no. of keys count into a batch.
+   * Store the containerID -&gt; no. of keys count into a batch.
    *
    * @param batch the batch operation we store into
    * @param containerID the containerID.
@@ -91,7 +91,7 @@ public interface ReconContainerMetadataManager {
                                     Long count) throws IOException;
 
   /**
-   * Store the containerID -> ContainerReplicaWithTimestamp mapping to the
+   * Store the containerID -&gt; ContainerReplicaWithTimestamp mapping to the
    * container DB store.
    *
    * @param containerID the containerID.
@@ -159,7 +159,7 @@ public interface ReconContainerMetadataManager {
    * Get the stored key prefixes for the given containerId.
    *
    * @param containerId the given containerId.
-   * @return Map of Key prefix -> count.
+   * @return Map of Key prefix -&gt; count.
    */
   Map<ContainerKeyPrefix, Integer> getKeyPrefixesForContainer(
       long containerId) throws IOException;
@@ -170,19 +170,19 @@ public interface ReconContainerMetadataManager {
    *
    * @param containerId the given containerId.
    * @param prevKeyPrefix the key prefix to seek to and start scanning.
-   * @return Map of Key prefix -> count.
+   * @return Map of Key prefix -&gt; count.
    */
   Map<ContainerKeyPrefix, Integer> getKeyPrefixesForContainer(
       long containerId, String prevKeyPrefix) throws IOException;
 
   /**
    * Get a Map of containerID, containerMetadata of Containers only for the
-   * given limit. If the limit is -1 or any integer <0, then return all
+   * given limit. If the limit is -1 or any integer &lt; 0, then return all
    * the containers without any limit.
    *
    * @param limit the no. of containers to fetch.
    * @param prevContainer containerID after which the results are returned.
-   * @return Map of containerID -> containerMetadata.
+   * @return Map of containerID -&gt; containerMetadata.
    * @throws IOException
    */
   Map<Long, ContainerMetadata> getContainers(int limit, long prevContainer)
@@ -256,7 +256,7 @@ public interface ReconContainerMetadataManager {
    *
    * @param prevKeyPrefix the key prefix to seek to and start scanning.
    * @param keyVersion the key version to seek
-   * @return Map of Key prefix -> count.
+   * @return Map of Key prefix -&gt; count.
    */
   Map<KeyPrefixContainer, Integer> getContainerForKeyPrefixes(
       String prevKeyPrefix, long keyVersion) throws IOException;

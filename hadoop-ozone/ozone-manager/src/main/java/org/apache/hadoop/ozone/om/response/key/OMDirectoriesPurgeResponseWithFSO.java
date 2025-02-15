@@ -48,31 +48,36 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
 
 /**
  * Response for {@link OMDirectoriesPurgeRequestWithFSO} request.
  */
 @CleanupTableInfo(cleanupTables = {DELETED_TABLE, DELETED_DIR_TABLE,
-    DIRECTORY_TABLE, FILE_TABLE})
+    DIRECTORY_TABLE, FILE_TABLE, SNAPSHOT_INFO_TABLE})
 public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDirectoriesPurgeResponseWithFSO.class);
 
   private List<OzoneManagerProtocolProtos.PurgePathRequest> paths;
-  private boolean isRatisEnabled;
   private Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap;
   private SnapshotInfo fromSnapshotInfo;
+  private Map<String, OmKeyInfo> openKeyInfoMap;
 
   public OMDirectoriesPurgeResponseWithFSO(@Nonnull OMResponse omResponse,
       @Nonnull List<OzoneManagerProtocolProtos.PurgePathRequest> paths,
-      boolean isRatisEnabled, @Nonnull BucketLayout bucketLayout,
+      @Nonnull BucketLayout bucketLayout,
       Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap,
-      SnapshotInfo fromSnapshotInfo) {
+      SnapshotInfo fromSnapshotInfo, Map<String, OmKeyInfo> openKeyInfoMap) {
     super(omResponse, bucketLayout);
     this.paths = paths;
-    this.isRatisEnabled = isRatisEnabled;
     this.volBucketInfoMap = volBucketInfoMap;
     this.fromSnapshotInfo = fromSnapshotInfo;
+    this.openKeyInfoMap = openKeyInfoMap;
+  }
+
+  public OMDirectoriesPurgeResponseWithFSO(OMResponse omResponse) {
+    super(omResponse);
   }
 
   @Override
@@ -84,10 +89,7 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
               .getOzoneManager().getOmSnapshotManager();
 
       try (ReferenceCounted<OmSnapshot>
-          rcFromSnapshotInfo = omSnapshotManager.getSnapshot(
-              fromSnapshotInfo.getVolumeName(),
-              fromSnapshotInfo.getBucketName(),
-              fromSnapshotInfo.getName())) {
+          rcFromSnapshotInfo = omSnapshotManager.getSnapshot(fromSnapshotInfo.getSnapshotId())) {
         OmSnapshot fromSnapshot = rcFromSnapshotInfo.get();
         DBStore fromSnapshotStore = fromSnapshot.getMetadataManager()
             .getStore();
@@ -98,6 +100,7 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
           fromSnapshotStore.commitBatchOperation(writeBatch);
         }
       }
+      metadataManager.getSnapshotInfoTable().putWithBatch(batchOp, fromSnapshotInfo.getTableKey(), fromSnapshotInfo);
     } else {
       processPaths(metadataManager, batchOp);
     }
@@ -153,7 +156,7 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
         }
 
         RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-            keyInfo, keyInfo.getUpdateID(), isRatisEnabled);
+            keyInfo, keyInfo.getUpdateID());
 
         String deletedKey = omMetadataManager
             .getOzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
@@ -163,6 +166,13 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
 
         omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
             deletedKey, repeatedOmKeyInfo);
+      }
+
+      if (!openKeyInfoMap.isEmpty()) {
+        for (Map.Entry<String, OmKeyInfo> entry : openKeyInfoMap.entrySet()) {
+          omMetadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(
+              batchOperation, entry.getKey(), entry.getValue());
+        }
       }
 
       // Delete the visited directory from deleted directory table

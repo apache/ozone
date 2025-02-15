@@ -1,21 +1,55 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.security;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ACK_TIMEOUT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_TIME_OF_DAY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_EXPIRED_CERTIFICATE_CHECK_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.slf4j.event.Level.INFO;
+
+import java.io.File;
+import java.io.IOException;
+import java.math.BigInteger;
+import java.security.KeyPair;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -35,45 +69,10 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils;
-import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-
-import java.io.File;
-import java.io.IOException;
-import java.math.BigInteger;
-import java.security.KeyPair;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
-import java.time.Duration;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeParseException;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.UUID;
-import java.util.concurrent.TimeoutException;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ACK_TIMEOUT;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ENABLED;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_TIME_OF_DAY;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_EXPIRED_CERTIFICATE_CHECK_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyString;
-import static org.slf4j.event.Level.INFO;
 
 /**
  * Test for root CA rotation manager.
@@ -260,7 +259,7 @@ public class TestRootCARotationManager {
     scmCertClient.setCACertificate(cert);
     CertificateCodec certCodec = new CertificateCodec(securityConfig,
         "scm/sub-ca");
-    certCodec.writeCertificate(CertificateCodec.getCertificateHolder(cert));
+    certCodec.writeCertificate(cert);
     rootCARotationManager = new RootCARotationManager(scm);
     rootCARotationManager.setRootCARotationHandler(handler);
     GenericTestUtils.LogCapturer logs =
@@ -316,7 +315,7 @@ public class TestRootCARotationManager {
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
     LocalDateTime start = startDate == null ? LocalDateTime.now() : startDate;
     LocalDateTime end = start.plus(certLifetime);
-    return new JcaX509CertificateConverter().getCertificate(
+    return
         SelfSignedCertificate.newBuilder()
             .setBeginDate(start)
             .setEndDate(end)
@@ -326,6 +325,6 @@ public class TestRootCARotationManager {
             .setConfiguration(new SecurityConfig(conf))
             .setKey(keyPair)
             .makeCA(certID)
-            .build());
+            .build();
   }
 }

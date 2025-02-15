@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.request.bucket;
 
 import com.google.common.base.Preconditions;
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -77,8 +77,8 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long transactionLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long transactionLogIndex = context.getIndex();
     SetBucketPropertyRequest setBucketPropertyRequest =
         getOmRequest().getSetBucketPropertyRequest();
     Preconditions.checkNotNull(setBucketPropertyRequest);
@@ -155,8 +155,7 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
       omBucketInfo.setModificationTime(
           setBucketPropertyRequest.getModificationTime());
       // Set the updateID to current transaction log index
-      omBucketInfo.setUpdateID(transactionLogIndex,
-          ozoneManager.isRatisEnabled());
+      omBucketInfo.setUpdateID(transactionLogIndex);
 
       // Update table cache.
       omMetadataManager.getBucketTable().addCacheEntry(
@@ -183,7 +182,7 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
     }
 
     // Performing audit logging outside of the lock.
-    auditLog(auditLogger, buildAuditMessage(OMAction.SET_OWNER,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.SET_OWNER,
         omBucketArgs.toAuditMap(), exception, userInfo));
 
     // return response.

@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,19 +14,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.ratis.conf;
 
+import static org.apache.hadoop.hdds.conf.ConfigTag.CLIENT;
+import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
+import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
+
+import java.time.Duration;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.ratis.client.RaftClientConfigKeys;
-
-import java.time.Duration;
-
-import static org.apache.hadoop.hdds.conf.ConfigTag.CLIENT;
-import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
-import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
 
 /**
  * Configuration related to Ratis Client. This is the config used in creating
@@ -86,7 +85,9 @@ public class RatisClientConfig {
         description =
         "The timeout duration for ratis client watch request. "
             + "Timeout for the watch API in Ratis client to acknowledge a "
-            + "particular request getting replayed to all servers.")
+            + "particular request getting replayed to all servers. "
+            + "It is highly recommended for the timeout duration to be strictly longer than "
+            + "Ratis server watch timeout (hdds.ratis.raft.server.watch.timeout)")
     private Duration rpcWatchRequestTimeout = Duration.ofSeconds(180);
 
     public Duration getRpcWatchRequestTimeout() {
@@ -96,6 +97,24 @@ public class RatisClientConfig {
     public void setRpcWatchRequestTimeout(Duration duration) {
       rpcWatchRequestTimeout = duration;
     }
+  }
+
+  @Config(key = "client.request.watch.type",
+      defaultValue = "ALL_COMMITTED",
+      type = ConfigType.STRING,
+      tags = { OZONE, CLIENT, PERFORMANCE },
+      description = "Desired replication level when Ozone client's Raft client calls watch(), " +
+          "ALL_COMMITTED or MAJORITY_COMMITTED. MAJORITY_COMMITTED increases write performance by reducing watch() " +
+          "latency when an Ozone datanode is slow in a pipeline, at the cost of potential read latency increasing " +
+          "due to read retries to different datanodes.")
+  private String watchType;
+
+  public String getWatchType() {
+    return watchType;
+  }
+
+  public void setWatchType(String type) {
+    watchType = type;
   }
 
   @Config(key = "client.request.write.timeout",
@@ -181,6 +200,21 @@ public class RatisClientConfig {
 
   public void setExponentialPolicyMaxSleep(Duration duration) {
     exponentialPolicyMaxSleep = duration;
+  }
+
+  @Config(key = "client.exponential.backoff.max.retries",
+      defaultValue =  "2147483647",
+      type = ConfigType.INT,
+      tags = { OZONE, CLIENT, PERFORMANCE },
+      description = "Client's max retry value for the exponential backoff policy.")
+  private int exponentialPolicyMaxRetries = Integer.MAX_VALUE;
+
+  public int getExponentialPolicyMaxRetries() {
+    return exponentialPolicyMaxRetries;
+  }
+
+  public void setExponentialPolicyMaxRetries(int retry) {
+    exponentialPolicyMaxRetries = retry;
   }
 
   @Config(key = "client.retrylimited.retry.interval",

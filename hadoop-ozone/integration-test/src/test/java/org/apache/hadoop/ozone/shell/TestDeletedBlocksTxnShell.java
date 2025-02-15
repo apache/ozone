@@ -21,7 +21,6 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -93,7 +92,6 @@ public class TestDeletedBlocksTxnShell {
     conf = new OzoneConfiguration();
     scmServiceId = "scm-service-test1";
 
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     conf.setInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
 
     cluster = MiniOzoneCluster.newHABuilder(conf)
@@ -259,5 +257,27 @@ public class TestDeletedBlocksTxnShell {
     currentValidTxnNum = deletedBlockLog.getNumOfValidTransactions();
     LOG.info("Valid num of txns: {}", currentValidTxnNum);
     assertEquals(30, currentValidTxnNum);
+
+    // Fail first 20 txns be failed
+    // increment retry count than threshold, count will be set to -1
+    for (int i = 0; i < maxRetry + 1; i++) {
+      deletedBlockLog.incrementCount(txIds);
+    }
+    flush();
+
+    GetFailedDeletedBlocksTxnSubcommand getFailedBlockCommand =
+        new GetFailedDeletedBlocksTxnSubcommand();
+    outContent.reset();
+    cmd = new CommandLine(getFailedBlockCommand);
+    // set start transaction as 15
+    cmd.parseArgs("-c", "5", "-s", "15");
+    getFailedBlockCommand.execute(scmClient);
+    matchCount = 0;
+    p = Pattern.compile("\"txID\" : \\d+", Pattern.MULTILINE);
+    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    while (m.find()) {
+      matchCount += 1;
+    }
+    assertEquals(5, matchCount);
   }
 }

@@ -69,30 +69,36 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
   }
 
   @Override
-  protected String addKeyToOpenKeyTable(List<OmKeyLocationInfo> locationList)
+  protected String addKeyToOpenKeyTable(List<OmKeyLocationInfo> locationList, OmKeyInfo keyInfo)
       throws Exception {
     // need to initialize parentID
     if (getParentDir() == null) {
       parentID = getBucketID();
     } else {
       parentID = OMRequestTestUtils.addParentsToDirTable(volumeName,
-              bucketName, getParentDir(), omMetadataManager);
+          bucketName, getParentDir(), omMetadataManager);
     }
+    keyInfo.setParentObjectID(parentID);
+    keyInfo.appendNewBlocks(locationList, false);
+
+    String fileName = OzoneFSUtils.getFileName(keyName);
+    return OMRequestTestUtils.addFileToKeyTable(true, false,
+        fileName, keyInfo, clientID, txnLogId, omMetadataManager);
+
+  }
+
+  @Override
+  protected String addKeyToOpenKeyTable(List<OmKeyLocationInfo> locationList)
+      throws Exception {
     long objectId = 100;
 
     OmKeyInfo omKeyInfoFSO =
         OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
                 RatisReplicationConfig.getInstance(ONE), new OmKeyLocationInfoGroup(version, new ArrayList<>(), false))
             .setObjectID(objectId)
-            .setParentObjectID(parentID)
             .setUpdateID(100L)
             .build();
-    omKeyInfoFSO.appendNewBlocks(locationList, false);
-
-    String fileName = OzoneFSUtils.getFileName(keyName);
-    return OMRequestTestUtils.addFileToKeyTable(true, false,
-            fileName, omKeyInfoFSO, clientID, txnLogId, omMetadataManager);
-
+    return addKeyToOpenKeyTable(locationList, omKeyInfoFSO);
   }
 
   @Nonnull

@@ -1,25 +1,41 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p/>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p/>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_PREFIX;
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CERTIFICATE_FAILED;
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_DN_CERTIFICATE_FAILED;
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_OM_CERTIFICATE_FAILED;
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_SCM_CERTIFICATE_FAILED;
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.NOT_A_PRIMARY_SCM;
+import static org.apache.ratis.server.RaftServerConfigKeys.Log;
+import static org.apache.ratis.server.RaftServerConfigKeys.RetryCache;
+import static org.apache.ratis.server.RaftServerConfigKeys.Rpc;
+import static org.apache.ratis.server.RaftServerConfigKeys.Snapshot;
+
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
+import java.io.File;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.RatisConfUtils;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
@@ -32,22 +48,6 @@ import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.util.SizeInBytes;
 import org.apache.ratis.util.TimeDuration;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.Collections;
-import java.util.concurrent.TimeUnit;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_PREFIX;
-import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CERTIFICATE_FAILED;
-import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_DN_CERTIFICATE_FAILED;
-import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_OM_CERTIFICATE_FAILED;
-import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_SCM_CERTIFICATE_FAILED;
-import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.NOT_A_PRIMARY_SCM;
-import static org.apache.ratis.server.RaftServerConfigKeys.Log;
-import static org.apache.ratis.server.RaftServerConfigKeys.RetryCache;
-import static org.apache.ratis.server.RaftServerConfigKeys.Rpc;
-import static org.apache.ratis.server.RaftServerConfigKeys.Snapshot;
 
 /**
  * Ratis Util for SCM HA.
@@ -69,8 +69,9 @@ public final class RatisUtil {
     // TODO: Check the default values.
     final RaftProperties properties = new RaftProperties();
     setRaftStorageDir(properties, conf);
-    setRaftRpcProperties(properties, conf);
-    setRaftLogProperties(properties, conf);
+
+    final int logAppenderBufferByteLimit = setRaftLogProperties(properties, conf);
+    setRaftRpcProperties(properties, conf, logAppenderBufferByteLimit);
     setRaftRetryCacheProperties(properties, conf);
     setRaftSnapshotProperties(properties, conf);
     setRaftLeadElectionProperties(properties, conf);
@@ -100,15 +101,14 @@ public final class RatisUtil {
    * @param ozoneConf ConfigurationSource
    */
   private static void setRaftRpcProperties(final RaftProperties properties,
-      ConfigurationSource ozoneConf) {
+      ConfigurationSource ozoneConf, int logAppenderBufferByteLimit) {
     RatisHelper.setRpcType(properties,
         RpcType.valueOf(ozoneConf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_RPC_TYPE,
                 ScmConfigKeys.OZONE_SCM_HA_RATIS_RPC_TYPE_DEFAULT)));
     GrpcConfigKeys.Server.setPort(properties, ozoneConf
         .getInt(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY,
             ScmConfigKeys.OZONE_SCM_RATIS_PORT_DEFAULT));
-    GrpcConfigKeys.setMessageSizeMax(properties,
-        SizeInBytes.valueOf("32m"));
+    RatisConfUtils.Grpc.setMessageSizeMax(properties, logAppenderBufferByteLimit);
     long ratisRequestTimeout = ozoneConf.getTimeDuration(
             ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT,
             ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT_DEFAULT,
@@ -161,7 +161,7 @@ public final class RatisUtil {
    * @param properties RaftProperties instance which will be updated
    * @param ozoneConf ConfigurationSource
    */
-  private static void setRaftLogProperties(final RaftProperties properties,
+  private static int setRaftLogProperties(final RaftProperties properties,
       final ConfigurationSource ozoneConf) {
     Log.setSegmentSizeMax(properties, SizeInBytes.valueOf((long)
         ozoneConf.getStorageSize(
@@ -195,6 +195,7 @@ public final class RatisUtil {
             ozoneConf.getInt(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP,
                     ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP_DEFAULT));
     Log.setSegmentCacheNumMax(properties, 2);
+    return logAppenderQueueByteLimit;
   }
 
   /**

@@ -39,3 +39,4 @@ dev-support/ci/bats-assert
 dev-support/ci/bats-support
 
 .mvn/.gradle-enterprise/
+.mvn/.develocity/

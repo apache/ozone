@@ -43,10 +43,15 @@ public final class TokenIdentifierCodec implements Codec<OzoneTokenIdentifier> {
   }
 
   @Override
-  public byte[] toPersistedFormat(OzoneTokenIdentifier object) {
+  public Class<OzoneTokenIdentifier> getTypeClass() {
+    return OzoneTokenIdentifier.class;
+  }
+
+  @Override
+  public byte[] toPersistedFormat(OzoneTokenIdentifier object) throws IOException {
     Preconditions
         .checkNotNull(object, "Null object can't be converted to byte array.");
-    return object.toUniqueSerializedKey();
+    return object.toProtoBuf().toByteArray();
   }
 
   @Override
@@ -55,11 +60,11 @@ public final class TokenIdentifierCodec implements Codec<OzoneTokenIdentifier> {
     Preconditions.checkNotNull(rawData,
         "Null byte array can't converted to real object.");
     try {
-      OzoneTokenIdentifier object = OzoneTokenIdentifier.newInstance();
-      return object.fromUniqueSerializedKey(rawData);
+      return OzoneTokenIdentifier.readProtoBuf(rawData);
     } catch (IOException ex) {
       try {
-        return OzoneTokenIdentifier.readProtoBuf(rawData);
+        OzoneTokenIdentifier object = OzoneTokenIdentifier.newInstance();
+        return object.fromUniqueSerializedKey(rawData);
       } catch (InvalidProtocolBufferException e) {
         throw new IllegalArgumentException(
             "Can't encode the the raw data from the byte array", e);

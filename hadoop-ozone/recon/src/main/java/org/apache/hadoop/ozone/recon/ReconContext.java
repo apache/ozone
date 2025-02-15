@@ -125,7 +125,13 @@ public final class ReconContext {
         Arrays.asList("Recon health")),
     GET_OM_DB_SNAPSHOT_FAILED(
         "OM DB Snapshot sync failed !!!",
-        Arrays.asList("Overview (OM Data)", "OM DB Insights"));
+        Arrays.asList("Overview (OM Data)", "OM DB Insights")),
+    GET_SCM_DB_SNAPSHOT_FAILED(
+        "SCM DB Snapshot sync failed !!!",
+        Arrays.asList("Containers", "Pipelines")),
+    UPGRADE_FAILURE(
+        "Schema upgrade failed. Recon encountered an issue while finalizing the layout upgrade.",
+        Arrays.asList("Recon startup", "Metadata Layout Version"));
 
     private final String message;
     private final List<String> impacts;

@@ -18,10 +18,8 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.AfterEach;
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -30,46 +28,36 @@ import javax.management.MBeanServer;
 import javax.management.ObjectName;
 import javax.management.openmbean.CompositeData;
 import javax.management.openmbean.TabularData;
-import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.util.Map;
-import java.util.concurrent.TimeoutException;
 
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-
 
 /**
  * Test cases to verify the metrics exposed by SCMPipelineManager via MXBean.
  */
 @Timeout(3000)
-public class TestPipelineManagerMXBean {
+public abstract class TestPipelineManagerMXBean implements NonHATests.TestCase {
 
-  private MiniOzoneCluster cluster;
   private MBeanServer mbs;
 
   @BeforeEach
-  public void init()
-      throws IOException, TimeoutException, InterruptedException {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    cluster = MiniOzoneCluster.newBuilder(conf).build();
-    cluster.waitForClusterToBeReady();
+  void init() {
     mbs = ManagementFactory.getPlatformMBeanServer();
   }
 
   /**
    * Verifies SCMPipelineManagerInfo metrics.
-   *
-   * @throws Exception
    */
   @Test
   public void testPipelineInfo() throws Exception {
     ObjectName bean = new ObjectName(
         "Hadoop:service=SCMPipelineManager,name=SCMPipelineManagerInfo");
-    Map<String, Integer> pipelineStateCount = cluster
-        .getStorageContainerManager().getPipelineManager().getPipelineInfo();
 
     GenericTestUtils.waitFor(() -> {
       try {
+        Map<String, Integer> pipelineStateCount = cluster()
+            .getStorageContainerManager().getPipelineManager().getPipelineInfo();
         final TabularData data = (TabularData) mbs.getAttribute(
             bean, "PipelineInfo");
         for (Map.Entry<String, Integer> entry : pipelineStateCount.entrySet()) {
@@ -94,10 +82,5 @@ public class TestPipelineManagerMXBean {
       }
     }
     return null;
-  }
-
-  @AfterEach
-  public void teardown() {
-    cluster.shutdown();
   }
 }

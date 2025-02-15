@@ -229,11 +229,9 @@ public class ReconContainerManager extends ContainerManagerImpl {
     try {
       if (containerInfo.getState().equals(HddsProtos.LifeCycleState.OPEN)) {
         PipelineID pipelineID = containerWithPipeline.getPipeline().getId();
-        // Check if the pipeline is present in Recon
-        if (!pipelineManager.containsPipeline(pipelineID)) {
-          // Pipeline is not present, add it first.
-          LOG.info("Adding new pipeline {} from SCM.", pipelineID);
-          reconPipelineManager.addPipeline(containerWithPipeline.getPipeline());
+        // Check if the pipeline is present in Recon if not add it.
+        if (reconPipelineManager.addPipeline(containerWithPipeline.getPipeline())) {
+          LOG.info("Added new pipeline {} to Recon pipeline metadata from SCM.", pipelineID);
         }
 
         getContainerStateManager().addContainer(containerInfo.getProtobuf());

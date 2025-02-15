@@ -21,26 +21,37 @@ package org.apache.hadoop.ozone.om.upgrade;
 
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.QUOTA;
-import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FIRST_UPGRADE_START;
+import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
 
 /**
- * Quota repair for usages action to be triggered during first upgrade.
+ * Quota repair for usages action to be triggered after upgrade.
  */
-@UpgradeActionOm(type = ON_FIRST_UPGRADE_START, feature =
-    QUOTA)
+@UpgradeActionOm(type = ON_FINALIZE, feature = QUOTA)
 public class QuotaRepairUpgradeAction implements OmUpgradeAction {
+  private static final Logger LOG = LoggerFactory.getLogger(QuotaRepairUpgradeAction.class);
   @Override
   public void execute(OzoneManager arg) throws Exception {
     boolean enabled = arg.getConfiguration().getBoolean(
         OMConfigKeys.OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE,
         OMConfigKeys.OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE_DEFAULT);
     if (enabled) {
-      QuotaRepairTask quotaRepairTask = new QuotaRepairTask(
-          arg.getMetadataManager());
-      quotaRepairTask.repair();
+      // just trigger quota repair and status can be checked via CLI
+      try {
+        arg.checkLeaderStatus();
+        QuotaRepairTask quotaRepairTask = new QuotaRepairTask(arg);
+        quotaRepairTask.repair();
+      } catch (OMNotLeaderException | OMLeaderNotReadyException ex) {
+        // on leader node, repair will be triggered where finalize is called. For other nodes, it will be ignored.
+        // This can be triggered on need basis via CLI tool.
+        LOG.warn("Skip quota repair operation during upgrade on the node as this is not a leader node.");
+      }
     }
   }
 }

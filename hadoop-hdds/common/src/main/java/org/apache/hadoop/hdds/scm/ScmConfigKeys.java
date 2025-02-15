@@ -1,28 +1,27 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm;
 
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
 import org.apache.ratis.util.TimeDuration;
-
-import java.util.concurrent.TimeUnit;
 
 /**
  * This class contains constants for configuration keys used in SCM.
@@ -131,6 +130,11 @@ public final class ScmConfigKeys {
       "hdds.ratis.snapshot.threshold";
   public static final long HDDS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT = 100000;
 
+  public static final String OZONE_SCM_CONTAINER_LIST_MAX_COUNT =
+      "ozone.scm.container.list.max.count";
+
+  public static final int OZONE_SCM_CONTAINER_LIST_MAX_COUNT_DEFAULT = 4096;
+
   // TODO : this is copied from OzoneConsts, may need to move to a better place
   public static final String OZONE_SCM_CHUNK_SIZE_KEY = "ozone.scm.chunk.size";
   // 4 MB by default
@@ -144,6 +148,13 @@ public final class ScmConfigKeys {
       "ozone.chunk.read.mapped.buffer.threshold";
   public static final String OZONE_CHUNK_READ_MAPPED_BUFFER_THRESHOLD_DEFAULT =
       "32KB";
+  public static final String OZONE_CHUNK_READ_MAPPED_BUFFER_MAX_COUNT_KEY =
+      "ozone.chunk.read.mapped.buffer.max.count";
+  // this max_count could not be greater than Linux platform max_map_count which by default is 65530.
+  public static final int OZONE_CHUNK_READ_MAPPED_BUFFER_MAX_COUNT_DEFAULT = 0;
+  public static final String OZONE_CHUNK_READ_NETTY_CHUNKED_NIO_FILE_KEY =
+      "ozone.chunk.read.netty.ChunkedNioFile";
+  public static final boolean OZONE_CHUNK_READ_NETTY_CHUNKED_NIO_FILE_DEFAULT = false;
 
   public static final String OZONE_SCM_CONTAINER_LAYOUT_KEY =
       "ozone.scm.container.layout";
@@ -228,15 +239,27 @@ public final class ScmConfigKeys {
       "ozone.scm.handler.count.key";
   public static final String OZONE_SCM_CLIENT_HANDLER_COUNT_KEY =
       "ozone.scm.client.handler.count.key";
+  public static final String OZONE_SCM_CLIENT_READ_THREADPOOL_KEY =
+      "ozone.scm.client.read.threadpool";
+  public static final int OZONE_SCM_CLIENT_READ_THREADPOOL_DEFAULT = 10;
   public static final String OZONE_SCM_BLOCK_HANDLER_COUNT_KEY =
       "ozone.scm.block.handler.count.key";
+  public static final String OZONE_SCM_BLOCK_READ_THREADPOOL_KEY =
+      "ozone.scm.block.read.threadpool";
+  public static final int OZONE_SCM_BLOCK_READ_THREADPOOL_DEFAULT = 10;
   public static final String OZONE_SCM_DATANODE_HANDLER_COUNT_KEY =
       "ozone.scm.datanode.handler.count.key";
+  public static final String OZONE_SCM_DATANODE_READ_THREADPOOL_KEY =
+      "ozone.scm.datanode.read.threadpool";
+  public static final int OZONE_SCM_DATANODE_READ_THREADPOOL_DEFAULT = 10;
   public static final int OZONE_SCM_HANDLER_COUNT_DEFAULT = 100;
 
   public static final String OZONE_SCM_SECURITY_HANDLER_COUNT_KEY =
       "ozone.scm.security.handler.count.key";
   public static final int OZONE_SCM_SECURITY_HANDLER_COUNT_DEFAULT = 2;
+  public static final String OZONE_SCM_SECURITY_READ_THREADPOOL_KEY =
+      "ozone.scm.security.read.threadpool";
+  public static final int OZONE_SCM_SECURITY_READ_THREADPOOL_DEFAULT = 1;
 
   public static final String OZONE_SCM_DEADNODE_INTERVAL =
       "ozone.scm.dead.node.interval";
@@ -456,14 +479,6 @@ public final class ScmConfigKeys {
   public static final String HDDS_TRACING_ENABLED = "hdds.tracing.enabled";
   public static final boolean HDDS_TRACING_ENABLED_DEFAULT = false;
 
-  // SCM Ratis related
-  public static final String OZONE_SCM_HA_ENABLE_KEY
-      = "ozone.scm.ratis.enable";
-  /** Default Value would be Overriden based on the current state of Ratis.
-   {@link org.apache.hadoop.hdds.conf.DefaultConfigManager}
-   */
-  public static final boolean OZONE_SCM_HA_ENABLE_DEFAULT
-      = true;
   public static final String OZONE_SCM_RATIS_PORT_KEY
       = "ozone.scm.ratis.port";
   public static final int OZONE_SCM_RATIS_PORT_DEFAULT

@@ -34,7 +34,7 @@ public class CancelSnapshotDiffResponse {
 
   @Override
   public String toString() {
-    return message + "\n";
+    return message;
   }
 
   /**

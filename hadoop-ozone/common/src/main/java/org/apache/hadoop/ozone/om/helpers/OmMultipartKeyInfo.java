@@ -42,7 +42,8 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
   private static final Codec<OmMultipartKeyInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(MultipartKeyInfo.getDefaultInstance()),
       OmMultipartKeyInfo::getFromProto,
-      OmMultipartKeyInfo::getProto);
+      OmMultipartKeyInfo::getProto,
+      OmMultipartKeyInfo.class);
 
   public static Codec<OmMultipartKeyInfo> getCodec() {
     return CODEC;
@@ -173,6 +174,7 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
 
   /** Copy constructor. */
   private OmMultipartKeyInfo(OmMultipartKeyInfo b) {
+    super(b);
     this.uploadID = b.uploadID;
     this.creationTime = b.creationTime;
     this.replicationConfig = b.replicationConfig;
@@ -180,8 +182,6 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
     // is added, it returns a new shallow copy of the PartKeyInfoMap Object
     // so here we can directly pass in partKeyInfoMap
     this.partKeyInfoMap = b.partKeyInfoMap;
-    setObjectID(b.getObjectID());
-    setUpdateID(b.getUpdateID());
     this.parentID = b.parentID;
   }
 

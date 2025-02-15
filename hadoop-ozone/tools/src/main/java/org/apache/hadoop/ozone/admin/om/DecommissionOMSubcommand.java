@@ -156,8 +156,8 @@ public class DecommissionOMSubcommand implements Callable<Void> {
   private void verifyConfigUpdatedOnAllOMs() throws IOException {
     String decommNodesKey = ConfUtils.addKeySuffixes(
         OZONE_OM_DECOMMISSIONED_NODES_KEY, omServiceId);
-    Collection<String> decommNodes = ozoneConf.getTrimmedStringCollection(
-        decommNodesKey);
+    Collection<String> decommNodes =
+        OmUtils.getDecommissionedNodeIds(ozoneConf, decommNodesKey);
     if (!decommNodes.contains(decommNodeId)) {
       throw new IOException("Please add the to be decommissioned OM "
           + decommNodeId + " to the " + decommNodesKey + " config in " +

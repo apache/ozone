@@ -48,16 +48,22 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
   private Map<Integer, String> tablesNames;
   private OMMetadataManager omMetadataManager;
   private List<OMDBUpdateEvent> omdbUpdateEvents = new ArrayList<>();
-  private Map<Object, OMDBUpdateEvent> omdbLatestUpdateEvents
-      = new HashMap<>();
-  private OMDBDefinition omdbDefinition;
-  private OmUpdateEventValidator omUpdateEventValidator;
+  private Map<String, Map<Object, OMDBUpdateEvent>> omdbLatestUpdateEvents = new HashMap<>();
+  private final OMDBDefinition omdbDefinition = OMDBDefinition.get();
+  private final OmUpdateEventValidator omUpdateEventValidator = new OmUpdateEventValidator(omdbDefinition);
+  private long batchSequenceNumber; // Store the current sequence number for the batch
 
   public OMDBUpdatesHandler(OMMetadataManager metadataManager) {
     omMetadataManager = metadataManager;
     tablesNames = metadataManager.getStore().getTableNames();
-    omdbDefinition = new OMDBDefinition();
-    omUpdateEventValidator = new OmUpdateEventValidator(omdbDefinition);
+  }
+
+  public void setLatestSequenceNumber(long sequenceNumber) {
+    this.batchSequenceNumber = sequenceNumber;
+  }
+
+  public long getLatestSequenceNumber() {
+    return this.batchSequenceNumber;
   }
 
   @Override
@@ -112,6 +118,10 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
       final Object key = cf.getKeyCodec().fromPersistedFormat(keyBytes);
       builder.setKey(key);
 
+      // Initialize table-specific event map if it does not exist
+      omdbLatestUpdateEvents.putIfAbsent(tableName, new HashMap<>());
+      Map<Object, OMDBUpdateEvent> tableEventsMap = omdbLatestUpdateEvents.get(tableName);
+
       // Handle the event based on its type:
       // - PUT with a new key: Insert the new value.
       // - PUT with an existing key: Update the existing value.
@@ -120,7 +130,7 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
       // necessary.
       Table table = omMetadataManager.getTable(tableName);
 
-      OMDBUpdateEvent latestEvent = omdbLatestUpdateEvents.get(key);
+      OMDBUpdateEvent latestEvent = tableEventsMap.get(key);
       Object oldValue;
       if (latestEvent != null) {
         oldValue = latestEvent.getValue();
@@ -165,7 +175,7 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
                     "event is on {} table which is not useful for Recon to " +
                     "capture.", tableName);
           }
-          LOG.warn("Old Value of Key: {} in table: {} should not be null " +
+          LOG.debug("Old Value of Key: {} in table: {} should not be null " +
               "for DELETE event ", keyStr, tableName);
           return;
         }
@@ -184,7 +194,7 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
                 "action = %s", tableName, action));
       }
       omdbUpdateEvents.add(event);
-      omdbLatestUpdateEvents.put(key, event);
+      tableEventsMap.put(key, event);
     } else {
       // Log and ignore events if key or value types are undetermined.
       if (LOG.isWarnEnabled()) {

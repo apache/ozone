@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
@@ -38,6 +39,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -69,6 +73,10 @@ public class SstFilteringService extends BackgroundService
   // multiple times.
   private static final int SST_FILTERING_CORE_POOL_SIZE = 1;
 
+  public static final String SST_FILTERED_FILE = "sstFiltered";
+  private static final byte[] SST_FILTERED_FILE_CONTENT = StringUtils.string2Bytes("This file holds information " +
+      "if a particular snapshot has filtered out the relevant sst files or not.\nDO NOT add, change or delete " +
+      "any files in this directory unless you know what you are doing.\n");
   private final OzoneManager ozoneManager;
 
   // Number of files to be batched in an iteration.
@@ -77,6 +85,12 @@ public class SstFilteringService extends BackgroundService
   private AtomicLong snapshotFilteredCount;
 
   private AtomicBoolean running;
+
+  public static boolean isSstFiltered(OzoneConfiguration ozoneConfiguration, SnapshotInfo snapshotInfo) {
+    Path sstFilteredFile = Paths.get(OmSnapshotManager.getSnapshotPath(ozoneConfiguration,
+        snapshotInfo), SST_FILTERED_FILE);
+    return snapshotInfo.isSstFiltered() || sstFilteredFile.toFile().exists();
+  }
 
   public SstFilteringService(long interval, TimeUnit unit, long serviceTimeout,
       OzoneManager ozoneManager, OzoneConfiguration configuration) {
@@ -112,33 +126,35 @@ public class SstFilteringService extends BackgroundService
 
   private class SstFilteringTask implements BackgroundTask {
 
+    private boolean isSnapshotDeleted(SnapshotInfo snapshotInfo) {
+      return snapshotInfo == null || snapshotInfo.getSnapshotStatus() == SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED;
+    }
+
 
     /**
-     * Marks the SSTFiltered flag corresponding to the snapshot.
-     * @param volume Volume name of the snapshot
-     * @param bucket Bucket name of the snapshot
-     * @param snapshotName Snapshot name
+     * Marks the snapshot as SSTFiltered by creating a file in snapshot directory.
+     * @param snapshotInfo snapshotInfo
      * @throws IOException
      */
-    private void markSSTFilteredFlagForSnapshot(String volume, String bucket,
-        String snapshotName) throws IOException {
+    private void markSSTFilteredFlagForSnapshot(SnapshotInfo snapshotInfo) throws IOException {
+      // Acquiring read lock to avoid race condition with the snapshot directory deletion occurring
+      // in OmSnapshotPurgeResponse. Any operation apart from delete can run in parallel along with this operation.
+      //TODO. Revisit other SNAPSHOT_LOCK and see if we can change write locks to read locks to further optimize it.
       OMLockDetails omLockDetails = ozoneManager.getMetadataManager().getLock()
-              .acquireWriteLock(SNAPSHOT_LOCK, volume, bucket, snapshotName);
+          .acquireReadLock(SNAPSHOT_LOCK, snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(),
+              snapshotInfo.getName());
       boolean acquiredSnapshotLock = omLockDetails.isLockAcquired();
       if (acquiredSnapshotLock) {
-        Table<String, SnapshotInfo> snapshotInfoTable =
-            ozoneManager.getMetadataManager().getSnapshotInfoTable();
+        String snapshotDir = OmSnapshotManager.getSnapshotPath(ozoneManager.getConfiguration(), snapshotInfo);
         try {
-          // mark the snapshot as filtered by writing to the file
-          String snapshotTableKey = SnapshotInfo.getTableKey(volume, bucket,
-              snapshotName);
-          SnapshotInfo snapshotInfo = snapshotInfoTable.get(snapshotTableKey);
-
-          snapshotInfo.setSstFiltered(true);
-          snapshotInfoTable.put(snapshotTableKey, snapshotInfo);
+          // mark the snapshot as filtered by creating a file.
+          if (Files.exists(Paths.get(snapshotDir))) {
+            Files.write(Paths.get(snapshotDir, SST_FILTERED_FILE), SST_FILTERED_FILE_CONTENT);
+          }
         } finally {
           ozoneManager.getMetadataManager().getLock()
-              .releaseWriteLock(SNAPSHOT_LOCK, volume, bucket, snapshotName);
+              .releaseReadLock(SNAPSHOT_LOCK, snapshotInfo.getVolumeName(),
+                  snapshotInfo.getBucketName(), snapshotInfo.getName());
         }
       }
     }
@@ -163,12 +179,11 @@ public class SstFilteringService extends BackgroundService
         long snapshotLimit = snapshotLimitPerTask;
 
         while (iterator.hasNext() && snapshotLimit > 0 && running.get()) {
+          Table.KeyValue<String, SnapshotInfo> keyValue = iterator.next();
+          String snapShotTableKey = keyValue.getKey();
+          SnapshotInfo snapshotInfo = keyValue.getValue();
           try {
-            Table.KeyValue<String, SnapshotInfo> keyValue = iterator.next();
-            String snapShotTableKey = keyValue.getKey();
-            SnapshotInfo snapshotInfo = keyValue.getValue();
-
-            if (snapshotInfo.isSstFiltered()) {
+            if (isSstFiltered(ozoneManager.getConfiguration(), snapshotInfo)) {
               continue;
             }
 
@@ -194,6 +209,9 @@ public class SstFilteringService extends BackgroundService
                   .lock()) {
                 db.deleteFilesNotMatchingPrefix(columnFamilyNameToPrefixMap);
               }
+              markSSTFilteredFlagForSnapshot(snapshotInfo);
+              snapshotLimit--;
+              snapshotFilteredCount.getAndIncrement();
             } catch (OMException ome) {
               // FILE_NOT_FOUND is obtained when the snapshot is deleted
               // In this case, get the snapshotInfo from the db, check if
@@ -202,20 +220,22 @@ public class SstFilteringService extends BackgroundService
                 SnapshotInfo snapshotInfoToCheck =
                     ozoneManager.getMetadataManager().getSnapshotInfoTable()
                         .get(snapShotTableKey);
-                if (snapshotInfoToCheck.getSnapshotStatus() ==
-                    SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED) {
+                if (isSnapshotDeleted(snapshotInfoToCheck)) {
                   LOG.info("Snapshot with name: '{}', id: '{}' has been " +
                           "deleted.", snapshotInfo.getName(), snapshotInfo
                       .getSnapshotId());
                 }
               }
             }
-            markSSTFilteredFlagForSnapshot(snapshotInfo.getVolumeName(),
-                snapshotInfo.getBucketName(), snapshotInfo.getName());
-            snapshotLimit--;
-            snapshotFilteredCount.getAndIncrement();
           } catch (RocksDBException | IOException e) {
-            LOG.error("Exception encountered while filtering a snapshot", e);
+            if (isSnapshotDeleted(snapshotInfoTable.get(snapShotTableKey))) {
+              LOG.info("Exception encountered while filtering a snapshot: {} since it was deleted midway",
+                  snapShotTableKey, e);
+            } else {
+              LOG.error("Exception encountered while filtering a snapshot", e);
+            }
+
+
           }
         }
       } catch (IOException e) {

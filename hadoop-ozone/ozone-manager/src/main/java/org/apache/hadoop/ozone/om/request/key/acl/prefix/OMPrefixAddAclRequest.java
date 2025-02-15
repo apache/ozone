@@ -120,7 +120,7 @@ public class OMPrefixAddAclRequest extends OMPrefixAclRequest {
     if (ozoneAcl != null) {
       auditMap.put(OzoneConsts.ACL, ozoneAcl.toString());
     }
-    auditLog(auditLogger, buildAuditMessage(OMAction.ADD_ACL, auditMap,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.ADD_ACL, auditMap,
         exception, getOmRequest().getUserInfo()));
   }
 

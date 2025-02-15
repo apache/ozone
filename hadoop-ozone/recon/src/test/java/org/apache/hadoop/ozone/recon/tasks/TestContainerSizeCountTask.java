@@ -25,8 +25,10 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QU
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
 import static org.hadoop.ozone.recon.schema.tables.ContainerCountBySizeTable.CONTAINER_COUNT_BY_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -37,6 +39,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
@@ -52,8 +56,8 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
 
   private ContainerManager containerManager;
   private StorageContainerServiceProvider scmClient;
-  private ReconTaskStatusDao reconTaskStatusDao;
   private ReconTaskConfig reconTaskConfig;
+  private ReconTaskStatusUpdaterManager reconTaskStatusUpdaterManager;
   private ContainerCountBySizeDao containerCountBySizeDao;
   private UtilizationSchemaDefinition utilizationSchemaDefinition;
   private ContainerSizeCountTask task;
@@ -69,18 +73,20 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
         getSchemaDefinition(UtilizationSchemaDefinition.class);
     dslContext = utilizationSchemaDefinition.getDSLContext();
     containerCountBySizeDao = getDao(ContainerCountBySizeDao.class);
-    reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
     reconTaskConfig = new ReconTaskConfig();
     reconTaskConfig.setContainerSizeCountTaskInterval(Duration.ofSeconds(1));
+    reconTaskStatusUpdaterManager = mock(ReconTaskStatusUpdaterManager.class);
+    when(reconTaskStatusUpdaterManager.getTaskStatusUpdater(anyString())).thenReturn(new ReconTaskStatusUpdater(
+        getDao(ReconTaskStatusDao.class), "mockedTask-" + System.currentTimeMillis()));
     containerManager = mock(ContainerManager.class);
     scmClient = mock(StorageContainerServiceProvider.class);
     task = new ContainerSizeCountTask(
         containerManager,
         scmClient,
-        reconTaskStatusDao,
         reconTaskConfig,
         containerCountBySizeDao,
-        utilizationSchemaDefinition);
+        utilizationSchemaDefinition,
+        reconTaskStatusUpdaterManager);
     // Truncate table before running each test
     dslContext.truncate(CONTAINER_COUNT_BY_SIZE);
   }
@@ -111,7 +117,7 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
     containers.add(omContainerInfo1);
     containers.add(omContainerInfo2);
 
-    task.process(containers);
+    task.processContainers(containers);
 
     // Verify 3 containers are in correct bins.
     assertEquals(3, containerCountBySizeDao.count());
@@ -143,7 +149,7 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
     given(omContainerInfo2.containerID()).willReturn(new ContainerID(2));
     given(omContainerInfo2.getUsedBytes()).willReturn(50000L); // 50KB
 
-    task.process(containers);
+    task.processContainers(containers);
 
     // Total size groups added to the database
     assertEquals(5, containerCountBySizeDao.count());
@@ -166,7 +172,7 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
 
     // Remove the container having size 1.5GB and upperbound 2147483648L
     containers.remove(omContainerInfo1);
-    task.process(containers);
+    task.processContainers(containers);
     recordToFind.value1(2147483648L);
     assertEquals(0, containerCountBySizeDao
         .findById(recordToFind.value1())
@@ -222,7 +228,7 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
     containers.add(negativeSizeDeletedContainer);
     containers.add(validSizeContainer);
 
-    task.process(containers);
+    task.processContainers(containers);
 
     // Verify that only the valid containers are counted
     assertEquals(3, containerCountBySizeDao.count());

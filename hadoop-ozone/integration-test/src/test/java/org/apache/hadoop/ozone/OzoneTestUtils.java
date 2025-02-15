@@ -156,9 +156,42 @@ public final class OzoneTestUtils {
       throws IOException, TimeoutException, InterruptedException {
     Pipeline pipeline = scm.getPipelineManager()
         .getPipeline(container.getPipelineID());
-    scm.getPipelineManager().closePipeline(pipeline, false);
+    scm.getPipelineManager().closePipeline(pipeline, true);
     GenericTestUtils.waitFor(() ->
             container.getState() == HddsProtos.LifeCycleState.CLOSED,
         200, 30000);
+  }
+
+  /**
+   * Flush deleted block log & wait till something was flushed.
+   */
+  public static void flushAndWaitForDeletedBlockLog(StorageContainerManager scm)
+      throws InterruptedException, TimeoutException {
+    GenericTestUtils.waitFor(() -> {
+      try {
+        scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
+        if (scm.getScmBlockManager().getDeletedBlockLog().getNumOfValidTransactions() > 0) {
+          return true;
+        }
+      } catch (IOException e) {
+      }
+      return false;
+    }, 100, 3000);
+  }
+
+  /**
+   * Wait till all blocks are removed.
+   */
+  public static void waitBlockDeleted(StorageContainerManager scm)
+      throws InterruptedException, TimeoutException {
+    GenericTestUtils.waitFor(() -> {
+      try {
+        if (scm.getScmBlockManager().getDeletedBlockLog().getNumOfValidTransactions() == 0) {
+          return true;
+        }
+      } catch (IOException e) {
+      }
+      return false;
+    }, 1000, 60000);
   }
 }

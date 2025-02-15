@@ -38,8 +38,9 @@ import static javax.ws.rs.core.Response.Status.NOT_FOUND;
 /**
  * Endpoint to manage S3 secret.
  */
-@Path("/secret")
+@Path("/")
 @S3SecretEnabled
+@S3AdminEndpoint
 public class S3SecretManagementEndpoint extends S3SecretEndpointBase {
   private static final Logger LOG =
       LoggerFactory.getLogger(S3SecretManagementEndpoint.class);

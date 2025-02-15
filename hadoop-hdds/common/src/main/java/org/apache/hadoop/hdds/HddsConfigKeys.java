@@ -1,19 +1,20 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds;
 
 /**
@@ -38,10 +39,6 @@ public final class HddsConfigKeys {
       "hdds.container.report.interval";
   public static final String HDDS_CONTAINER_REPORT_INTERVAL_DEFAULT =
       "60m";
-  public static final String HDDS_CRL_STATUS_REPORT_INTERVAL =
-      "hdds.crl.status.report.interval";
-  public static final String HDDS_CRL_STATUS_REPORT_INTERVAL_DEFAULT =
-      "60s";
   public static final String HDDS_PIPELINE_REPORT_INTERVAL =
       "hdds.pipeline.report.interval";
   public static final String HDDS_PIPELINE_REPORT_INTERVAL_DEFAULT =
@@ -183,9 +180,6 @@ public final class HddsConfigKeys {
   public static final String HDDS_X509_DIR_NAME_DEFAULT = "certs";
   public static final String HDDS_X509_FILE_NAME = "hdds.x509.file.name";
   public static final String HDDS_X509_FILE_NAME_DEFAULT = "certificate.crt";
-
-  public static final String HDDS_X509_CRL_NAME = "hdds.x509.CRL.name";
-  public static final String HDDS_X509_CRL_NAME_DEFAULT = "scm.crl";
 
   /**
    * Default duration of certificates issued by SCM CA. The formats accepted are
@@ -373,7 +367,10 @@ public final class HddsConfigKeys {
   public static final int HDDS_DATANODE_CLIENT_PORT_DEFAULT = 19864;
   public static final String HDDS_DATANODE_HANDLER_COUNT_KEY =
       "hdds.datanode.handler.count";
-  public static final int HDDS_DATANODE_HANDLER_COUNT_DEFAULT = 1;
+  public static final int HDDS_DATANODE_HANDLER_COUNT_DEFAULT = 10;
+  public static final String HDDS_DATANODE_READ_THREADPOOL_KEY =
+      "hdds.datanode.read.threadpool";
+  public static final int HDDS_DATANODE_READ_THREADPOOL_DEFAULT = 10;
   public static final String HDDS_DATANODE_HTTP_BIND_HOST_DEFAULT = "0.0.0.0";
   public static final int HDDS_DATANODE_HTTP_BIND_PORT_DEFAULT = 9882;
   public static final int HDDS_DATANODE_HTTPS_BIND_PORT_DEFAULT = 9883;
@@ -405,4 +402,7 @@ public final class HddsConfigKeys {
       "hdds.datanode.slow.op.warning.threshold";
   public static final String HDDS_DATANODE_SLOW_OP_WARNING_THRESHOLD_DEFAULT =
       "500ms";
+
+  public static final String OZONE_DATANODE_IO_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY =
+      "ozone.volume.io.percentiles.intervals.seconds";
 }

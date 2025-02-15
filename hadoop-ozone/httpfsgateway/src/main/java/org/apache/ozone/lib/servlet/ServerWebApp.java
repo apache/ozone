@@ -18,8 +18,6 @@
 
 package org.apache.ozone.lib.servlet;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.ozone.lib.server.Server;
 import org.apache.ozone.lib.server.ServerException;
@@ -46,34 +44,11 @@ public abstract class ServerWebApp
   private static final String TEMP_DIR = ".temp.dir";
   private static final String HTTP_HOSTNAME = ".http.hostname";
   private static final String HTTP_PORT = ".http.port";
-  public static final String SSL_ENABLED = ".ssl.enabled";
 
   private static final ThreadLocal<String> HOME_DIR_TL =
       new ThreadLocal<String>();
 
   private InetSocketAddress authority;
-
-  /**
-   * Method for testing purposes.
-   */
-  public static void setHomeDirForCurrentThread(String homeDir) {
-    HOME_DIR_TL.set(homeDir);
-  }
-
-  /**
-   * Constructor for testing purposes.
-   */
-  protected ServerWebApp(String name, String homeDir, String configDir,
-                         String logDir, String tempDir, Configuration config) {
-    super(name, homeDir, configDir, logDir, tempDir, config);
-  }
-
-  /**
-   * Constructor for testing purposes.
-   */
-  protected ServerWebApp(String name, String homeDir, Configuration config) {
-    super(name, homeDir, config);
-  }
 
   /**
    * Constructor. Subclasses must have a default constructor specifying
@@ -220,26 +195,5 @@ public abstract class ServerWebApp
       }
     }
     return authority;
-  }
-
-  /**
-   * Sets an alternate hostname:port InetSocketAddress to use.
-   * <p>
-   * For testing purposes.
-   * 
-   * @param authority alterante authority.
-   */
-  @VisibleForTesting
-  public void setAuthority(InetSocketAddress authority) {
-    this.authority = authority;
-  }
-
-
-  /**
-   *
-   */
-  public boolean isSslEnabled() {
-    return Boolean.parseBoolean(
-      System.getProperty(getName() + SSL_ENABLED, "false"));
   }
 }

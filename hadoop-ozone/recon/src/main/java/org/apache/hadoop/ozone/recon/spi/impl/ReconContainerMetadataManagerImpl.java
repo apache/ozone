@@ -191,7 +191,7 @@ public class ReconContainerMetadataManagerImpl
   }
 
   /**
-   * Store the containerID -> no. of keys count into the container DB store.
+   * Store the containerID -&gt; no. of keys count into the container DB store.
    *
    * @param containerID the containerID.
    * @param count count of the keys within the given containerID.
@@ -204,7 +204,7 @@ public class ReconContainerMetadataManagerImpl
   }
 
   /**
-   * Store the containerID -> no. of keys count into a batch.
+   * Store the containerID -&gt; no. of keys count into a batch.
    *
    * @param batch the batch we store into
    * @param containerID the containerID.
@@ -219,7 +219,7 @@ public class ReconContainerMetadataManagerImpl
   }
 
   /**
-   * Store the ContainerID -> ContainerReplicaHistory (container first and last
+   * Store the ContainerID -&gt; ContainerReplicaHistory (container first and last
    * seen time) mapping to the container DB store.
    *
    * @param containerID the containerID.
@@ -417,16 +417,16 @@ public class ReconContainerMetadataManagerImpl
   }
 
   /**
-   * Iterate the DB to construct a Map of containerID -> containerMetadata
+   * Iterate the DB to construct a Map of containerID -&gt; containerMetadata
    * only for the given limit from the given start key. The start containerID
    * is skipped from the result.
    *
-   * Return all the containers if limit < 0.
+   * Return all the containers if limit &lt; 0.
    *
    * @param limit No of containers to get.
    * @param prevContainer containerID after which the
    *                      list of containers are scanned.
-   * @return Map of containerID -> containerMetadata.
+   * @return Map of containerID -&gt; containerMetadata.
    * @throws IOException on failure.
    */
   @Override

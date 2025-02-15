@@ -32,13 +32,11 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
@@ -75,10 +73,6 @@ public class TestBCSID {
    */
   @BeforeAll
   public static void init() throws Exception {
-    String path = GenericTestUtils
-        .getTempPath(TestBCSID.class.getSimpleName());
-    File baseDir = new File(path);
-    baseDir.mkdirs();
 
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);

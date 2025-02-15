@@ -28,14 +28,12 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.ratis.server.protocol.TermIndex;
-import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
-import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
@@ -93,14 +91,14 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
 
-    // Verify key name
-    OmUtils.verifyKeyNameWithSnapshotReservedWord(keyArgs.getKeyName());
-    final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
-         .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
-                 OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
-    if (checkKeyNameEnabled) {
-      OmUtils.validateKeyName(keyArgs.getKeyName());
+    if (keyArgs.hasExpectedDataGeneration()) {
+      ozoneManager.checkFeatureEnabled(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
     }
+
+    ValidateKeyArgs validateArgs = new ValidateKeyArgs.Builder()
+        .setSnapshotReservedWord(keyArgs.getKeyName())
+        .setKeyName(keyArgs.getKeyName()).build();
+    validateKey(ozoneManager, validateArgs);
 
     String keyPath = keyArgs.getKeyName();
     keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
@@ -188,8 +186,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long trxnLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long trxnLogIndex = context.getIndex();
     CreateKeyRequest createKeyRequest = getOmRequest().getCreateKeyRequest();
 
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
@@ -231,6 +229,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           keyName);
       OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
           .getIfExist(dbKeyName);
+      validateAtomicRewrite(dbKeyInfo, keyArgs);
 
       OmBucketInfo bucketInfo =
           getBucketInfo(omMetadataManager, volumeName, bucketName);
@@ -261,9 +260,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
                 " as there is already file in the given path", NOT_A_FILE);
           }
 
-        missingParentInfos = OMDirectoryCreateRequest
-            .getAllParentInfo(ozoneManager, keyArgs,
-                pathInfo.getMissingParents(), bucketInfo,
+        missingParentInfos = getAllParentInfo(ozoneManager, keyArgs,
+            pathInfo.getMissingParents(), bucketInfo,
                 pathInfo, trxnLogIndex);
 
         numMissingParents = missingParentInfos.size();
@@ -279,7 +277,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           keyArgs.getDataSize(), locations, getFileEncryptionInfo(keyArgs),
           ozoneManager.getPrefixManager(), bucketInfo, pathInfo, trxnLogIndex,
           ozoneManager.getObjectIdFromTxId(trxnLogIndex),
-          ozoneManager.isRatisEnabled(), replicationConfig);
+          replicationConfig, ozoneManager.getConfiguration());
 
       validateEncryptionKeyInfo(bucketInfo, keyArgs);
 
@@ -354,7 +352,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     }
 
     // Audit Log outside the lock
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.ALLOCATE_KEY, auditMap, exception,
         getOmRequest().getUserInfo()));
 
@@ -439,5 +437,18 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       }
     }
     return req;
+  }
+
+  protected void validateAtomicRewrite(OmKeyInfo dbKeyInfo, KeyArgs keyArgs)
+      throws OMException {
+    if (keyArgs.hasExpectedDataGeneration()) {
+      // If a key does not exist, or if it exists but the updateID do not match, then fail this request.
+      if (dbKeyInfo == null) {
+        throw new OMException("Key not found during expected rewrite", OMException.ResultCodes.KEY_NOT_FOUND);
+      }
+      if (dbKeyInfo.getUpdateID() != keyArgs.getExpectedDataGeneration()) {
+        throw new OMException("Generation mismatch during expected rewrite", OMException.ResultCodes.KEY_NOT_FOUND);
+      }
+    }
   }
 }

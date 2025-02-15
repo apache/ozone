@@ -92,17 +92,3 @@ At this point, the cluster is upgraded to a pre-finalized state and fully operat
     ```
 
 At this point, the cluster is finalized and the upgrade is complete.
-
-## Features Requiring Finalization
-
-Below is a list of backwards incompatible features and the version in which they were introduced. These features can only be used on a finalized ozone cluster with at least the specified version. Run `ozone version` to get the current version of your Ozone cluster.
-
-### Version 1.2.0
-
-- [Prefix based File System Optimization]({{< relref "PrefixFSO.md" >}}) 
-    - Although new 1.2.0 clusters can use this feature, it is currently not supported for clusters upgraded to 1.2.0, even after finalizing.
-
-- [SCM High Availability]({{< relref "SCM-HA.md" >}})
-    - Although new 1.2.0 clusters can use this feature, it is currently not supported for clusters upgraded to 1.2.0, even after finalizing.
-
-

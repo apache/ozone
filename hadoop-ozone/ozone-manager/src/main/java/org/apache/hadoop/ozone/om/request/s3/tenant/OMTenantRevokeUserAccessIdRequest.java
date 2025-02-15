@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.request.s3.tenant;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -152,8 +152,8 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long transactionLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long transactionLogIndex = context.getIndex();
 
     final OMMultiTenantManager multiTenantManager =
         ozoneManager.getMultiTenantManager();
@@ -247,7 +247,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     auditMap.put(OzoneConsts.TENANT, tenantId);
     auditMap.put("accessId", accessId);
     auditMap.put("userPrincipal", userPrincipal);
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.TENANT_REVOKE_USER_ACCESSID, auditMap, exception,
         getOmRequest().getUserInfo()));
 

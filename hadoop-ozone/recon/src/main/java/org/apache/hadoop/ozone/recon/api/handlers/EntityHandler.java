@@ -322,7 +322,7 @@ public abstract class EntityHandler {
    * @param bucketLayout
    * @return A normalized path
    */
-  private static String normalizePath(String path, BucketLayout bucketLayout) {
+  public static String normalizePath(String path, BucketLayout bucketLayout) {
     if (bucketLayout == BucketLayout.OBJECT_STORE) {
       return OM_KEY_PREFIX + OmUtils.normalizePathUptoBucket(path);
     }

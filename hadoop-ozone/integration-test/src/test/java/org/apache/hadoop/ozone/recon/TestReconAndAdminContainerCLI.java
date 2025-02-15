@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.hdds.scm.node.TestNodeUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -221,6 +222,7 @@ class TestReconAndAdminContainerCLI {
 
   @ParameterizedTest
   @MethodSource("outOfServiceNodeStateArgs")
+  @Flaky("HDDS-11128")
   void testNodesInDecommissionOrMaintenance(
       NodeOperationalState initialState, NodeOperationalState finalState,
       boolean isMaintenance) throws Exception {

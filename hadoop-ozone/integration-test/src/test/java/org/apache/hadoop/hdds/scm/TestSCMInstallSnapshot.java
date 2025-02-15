@@ -66,7 +66,6 @@ public class TestSCMInstallSnapshot {
   @BeforeAll
   static void setup(@TempDir Path tempDir) throws Exception {
     conf = new OzoneConfiguration();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, "10s");
     conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD, 1L);
     conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_DIR, tempDir.toString());
@@ -105,7 +104,7 @@ public class TestSCMInstallSnapshot {
     pipelineManager.openPipeline(ratisPipeline2.getId());
     SCMNodeDetails scmNodeDetails = new SCMNodeDetails.Builder()
         .setRpcAddress(new InetSocketAddress("0.0.0.0", 0))
-        .setGrpcPort(ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT)
+        .setGrpcPort(conf.getInt(ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY, ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT))
         .setSCMNodeId("scm1")
         .build();
     Map<String, SCMNodeDetails> peerMap = new HashMap<>();
@@ -128,15 +127,14 @@ public class TestSCMInstallSnapshot {
   public void testInstallCheckPoint() throws Exception {
     DBCheckpoint checkpoint = downloadSnapshot();
     StorageContainerManager scm = cluster.getStorageContainerManager();
-    DBStore db = HAUtils
-        .loadDB(conf, checkpoint.getCheckpointLocation().getParent().toFile(),
-            checkpoint.getCheckpointLocation().getFileName().toString(),
-            new SCMDBDefinition());
+    final Path location = checkpoint.getCheckpointLocation();
+    final DBStore db = HAUtils.loadDB(conf, location.getParent().toFile(),
+        location.getFileName().toString(), SCMDBDefinition.get());
     // Hack the transaction index in the checkpoint so as to ensure the
     // checkpointed transaction index is higher than when it was downloaded
     // from.
     assertNotNull(db);
-    HAUtils.getTransactionInfoTable(db, new SCMDBDefinition())
+    HAUtils.getTransactionInfoTable(db, SCMDBDefinition.get())
         .put(OzoneConsts.TRANSACTION_INFO_KEY, TransactionInfo.valueOf(10, 100));
     db.close();
     ContainerID cid =

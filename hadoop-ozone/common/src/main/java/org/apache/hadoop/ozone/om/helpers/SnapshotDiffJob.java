@@ -262,6 +262,11 @@ public class SnapshotDiffJob {
         .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     @Override
+    public Class<SnapshotDiffJob> getTypeClass() {
+      return SnapshotDiffJob.class;
+    }
+
+    @Override
     public byte[] toPersistedFormat(SnapshotDiffJob object)
         throws IOException {
       return MAPPER.writeValueAsBytes(object);

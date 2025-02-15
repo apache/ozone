@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.google.common.collect.Lists;
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -139,7 +139,7 @@ public class OMKeyRemoveAclRequest extends OMKeyAclRequest {
     if (ozoneAcls != null) {
       auditMap.put(OzoneConsts.ACL, ozoneAcls.toString());
     }
-    auditLog(auditLogger, buildAuditMessage(OMAction.REMOVE_ACL, auditMap,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.REMOVE_ACL, auditMap,
         exception, getOmRequest().getUserInfo()));
   }
 
@@ -150,9 +150,9 @@ public class OMKeyRemoveAclRequest extends OMKeyAclRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     ozoneManager.getMetrics().incNumRemoveAcl();
-    return super.validateAndUpdateCache(ozoneManager, termIndex);
+    return super.validateAndUpdateCache(ozoneManager, context);
   }
 
   /**

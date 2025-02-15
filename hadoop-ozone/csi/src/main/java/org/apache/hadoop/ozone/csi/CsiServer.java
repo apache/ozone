@@ -19,13 +19,13 @@ package org.apache.hadoop.ozone.csi;
 
 import java.util.concurrent.Callable;
 
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
@@ -54,8 +54,8 @@ public class CsiServer extends GenericCli implements Callable<Void> {
   public Void call() throws Exception {
     String[] originalArgs = getCmd().getParseResult().originalArgs()
             .toArray(new String[0]);
-    OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
-    StringUtils.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
+    OzoneConfiguration ozoneConfiguration = getOzoneConf();
+    HddsServerUtil.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
             CsiServer.class, originalArgs, LOG, ozoneConfiguration);
     CsiConfig csiConfig = ozoneConfiguration.getObject(CsiConfig.class);
 

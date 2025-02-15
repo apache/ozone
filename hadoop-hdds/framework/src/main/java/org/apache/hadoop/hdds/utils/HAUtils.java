@@ -1,23 +1,46 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.utils;
+
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CA_LIST_RETRY_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
+import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
+import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Streams;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -35,15 +58,13 @@ import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
+import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
@@ -53,29 +74,6 @@ import org.apache.ratis.util.FileUtils;
 import org.apache.ratis.util.function.CheckedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.security.cert.X509Certificate;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CA_LIST_RETRY_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
-import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
-import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
-import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 /**
  * utility class used by SCM and OM for HA.
@@ -374,80 +372,6 @@ public final class HAUtils {
   }
 
   /**
-   * Build CA list which need to be passed to client.
-   *
-   * If certificate client is null, obtain the list of CA using SCM security
-   * client, else it uses certificate client.
-   * @return list of CA
-   */
-  public static List<String> buildCAList(CertificateClient certClient,
-      ConfigurationSource configuration) throws IOException {
-    long waitDuration =
-        configuration.getTimeDuration(OZONE_SCM_CA_LIST_RETRY_INTERVAL,
-            OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT, TimeUnit.SECONDS);
-    if (certClient != null) {
-      if (!SCMHAUtils.isSCMHAEnabled(configuration)) {
-        return generateCAList(certClient);
-      } else {
-        Collection<String> scmNodes = SCMHAUtils.getSCMNodeIds(configuration);
-        int expectedCount = scmNodes.size() + 1;
-        if (scmNodes.size() > 1) {
-          // First check if cert client has ca list initialized.
-          // This is being done, when this method is called multiple times we
-          // don't make call to SCM, we return from in-memory.
-          List<String> caCertPemList = certClient.getCAList();
-          if (caCertPemList != null && caCertPemList.size() == expectedCount) {
-            return caCertPemList;
-          }
-          return getCAListWithRetry(() ->
-                  waitForCACerts(certClient::updateCAList, expectedCount),
-              waitDuration);
-        } else {
-          return generateCAList(certClient);
-        }
-      }
-    } else {
-      SCMSecurityProtocolClientSideTranslatorPB scmSecurityProtocolClient =
-          HddsServerUtil.getScmSecurityClient(configuration);
-      if (!SCMHAUtils.isSCMHAEnabled(configuration)) {
-        List<String> caCertPemList = new ArrayList<>();
-        SCMGetCertResponseProto scmGetCertResponseProto =
-            scmSecurityProtocolClient.getCACert();
-        if (scmGetCertResponseProto.hasX509Certificate()) {
-          caCertPemList.add(scmGetCertResponseProto.getX509Certificate());
-        }
-        if (scmGetCertResponseProto.hasX509RootCACertificate()) {
-          caCertPemList.add(scmGetCertResponseProto.getX509RootCACertificate());
-        }
-        return caCertPemList;
-      } else {
-        Collection<String> scmNodes = SCMHAUtils.getSCMNodeIds(configuration);
-        int expectedCount = scmNodes.size() + 1;
-        if (scmNodes.size() > 1) {
-          return getCAListWithRetry(() -> waitForCACerts(
-              scmSecurityProtocolClient::listCACertificate,
-              expectedCount), waitDuration);
-        } else {
-          return scmSecurityProtocolClient.listCACertificate();
-        }
-      }
-    }
-  }
-
-  private static List<String> generateCAList(CertificateClient certClient)
-      throws IOException {
-    List<String> caCertPemList = new ArrayList<>();
-    for (X509Certificate cert : certClient.getAllRootCaCerts()) {
-      caCertPemList.add(CertificateCodec.getPEMEncodedString(cert));
-    }
-    for (X509Certificate cert : certClient.getAllCaCerts()) {
-      caCertPemList.add(CertificateCodec.getPEMEncodedString(cert));
-    }
-    return caCertPemList;
-  }
-
-
-  /**
    * Retry forever until CA list matches expected count.
    * @param task - task to get CA list.
    * @return CA list.
@@ -488,23 +412,37 @@ public final class HAUtils {
    * Build CA List in the format of X509Certificate.
    * If certificate client is null, obtain the list of CA using SCM
    * security client, else it uses certificate client.
+   *
    * @return list of CA X509Certificates.
    */
-  public static List<X509Certificate> buildCAX509List(
-      CertificateClient certClient,
-      ConfigurationSource conf) throws IOException {
-    if (certClient != null) {
-      // Do this here to avoid extra conversion of X509 to pem and again to
-      // X509 by buildCAList.
-      if (!SCMHAUtils.isSCMHAEnabled(conf)) {
-        List<X509Certificate> x509Certificates = new ArrayList<>();
-        x509Certificates.addAll(certClient.getAllCaCerts());
-        x509Certificates.addAll(certClient.getAllRootCaCerts());
-        return x509Certificates;
+  public static List<X509Certificate> buildCAX509List(ConfigurationSource conf) throws IOException {
+    long waitDuration =
+        conf.getTimeDuration(OZONE_SCM_CA_LIST_RETRY_INTERVAL,
+            OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT, TimeUnit.SECONDS);
+    Collection<String> scmNodes = SCMHAUtils.getSCMNodeIds(conf);
+    SCMSecurityProtocolClientSideTranslatorPB scmSecurityProtocolClient =
+        HddsServerUtil.getScmSecurityClient(conf);
+    if (!SCMHAUtils.isSCMHAEnabled(conf)) {
+      List<String> caCertPemList = new ArrayList<>();
+      SCMGetCertResponseProto scmGetCertResponseProto =
+          scmSecurityProtocolClient.getCACert();
+      if (scmGetCertResponseProto.hasX509Certificate()) {
+        caCertPemList.add(scmGetCertResponseProto.getX509Certificate());
+      }
+      if (scmGetCertResponseProto.hasX509RootCACertificate()) {
+        caCertPemList.add(scmGetCertResponseProto.getX509RootCACertificate());
+      }
+      return OzoneSecurityUtil.convertToX509(caCertPemList);
+    } else {
+      int expectedCount = scmNodes.size() + 1;
+      if (scmNodes.size() > 1) {
+        return OzoneSecurityUtil.convertToX509(getCAListWithRetry(() -> waitForCACerts(
+            scmSecurityProtocolClient::listCACertificate,
+            expectedCount), waitDuration));
+      } else {
+        return OzoneSecurityUtil.convertToX509(scmSecurityProtocolClient.listCACertificate());
       }
     }
-    List<String> pemEncodedCerts = HAUtils.buildCAList(certClient, conf);
-    return OzoneSecurityUtil.convertToX509(pemEncodedCerts);
   }
 
 }

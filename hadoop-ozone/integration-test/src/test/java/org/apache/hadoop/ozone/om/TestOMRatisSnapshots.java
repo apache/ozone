@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
+import org.apache.hadoop.utils.FaultInjectorImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.assertj.core.api.Fail;
@@ -78,7 +79,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -404,14 +404,14 @@ public class TestOMRatisSnapshots {
     OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
 
     // Set fault injector to pause before install
-    FaultInjector faultInjector = new SnapshotPauseInjector();
+    FaultInjector faultInjector = new FaultInjectorImpl();
     followerOM.getOmSnapshotProvider().setInjector(faultInjector);
 
     // Do some transactions so that the log index increases
     List<String> firstKeys = writeKeysToIncreaseLogIndex(leaderRatisServer,
-        80);
+        100);
 
-    SnapshotInfo snapshotInfo2 = createOzoneSnapshot(leaderOM, "snap80");
+    SnapshotInfo snapshotInfo2 = createOzoneSnapshot(leaderOM, "snap100");
     followerOM.getConfiguration().setInt(
         OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
         KeyManagerImpl.DISABLE_VALUE);
@@ -424,9 +424,9 @@ public class TestOMRatisSnapshots {
     }, 1000, 30_000);
 
     // Get two incremental tarballs, adding new keys/snapshot for each.
-    IncrementData firstIncrement = getNextIncrementalTarball(160, 2, leaderOM,
+    IncrementData firstIncrement = getNextIncrementalTarball(200, 2, leaderOM,
         leaderRatisServer, faultInjector, followerOM, tempDir);
-    IncrementData secondIncrement = getNextIncrementalTarball(240, 3, leaderOM,
+    IncrementData secondIncrement = getNextIncrementalTarball(300, 3, leaderOM,
         leaderRatisServer, faultInjector, followerOM, tempDir);
 
     // Resume the follower thread, it would download the incremental snapshot.
@@ -501,10 +501,10 @@ public class TestOMRatisSnapshots {
     assertNotNull(filesInCandidate);
     assertEquals(0, filesInCandidate.length);
 
-    checkSnapshot(leaderOM, followerOM, "snap80", firstKeys, snapshotInfo2);
-    checkSnapshot(leaderOM, followerOM, "snap160", firstIncrement.getKeys(),
+    checkSnapshot(leaderOM, followerOM, "snap100", firstKeys, snapshotInfo2);
+    checkSnapshot(leaderOM, followerOM, "snap200", firstIncrement.getKeys(),
         firstIncrement.getSnapshotInfo());
-    checkSnapshot(leaderOM, followerOM, "snap240", secondIncrement.getKeys(),
+    checkSnapshot(leaderOM, followerOM, "snap300", secondIncrement.getKeys(),
         secondIncrement.getSnapshotInfo());
     assertEquals(
         followerOM.getOmSnapshotProvider().getInitCount(), 2,
@@ -613,12 +613,12 @@ public class TestOMRatisSnapshots {
     OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
 
     // Set fault injector to pause before install
-    FaultInjector faultInjector = new SnapshotPauseInjector();
+    FaultInjector faultInjector = new FaultInjectorImpl();
     followerOM.getOmSnapshotProvider().setInjector(faultInjector);
 
     // Do some transactions so that the log index increases
     List<String> firstKeys = writeKeysToIncreaseLogIndex(leaderRatisServer,
-        80);
+        100);
 
     // Start the inactive OM. Checkpoint installation will happen spontaneously.
     cluster.startInactiveOM(followerNodeId);
@@ -1126,48 +1126,6 @@ public class TestOMRatisSnapshots {
     public void exitSystem(int status, String message, Throwable throwable,
         Logger log) {
       log.error("System Exit: " + message, throwable);
-    }
-  }
-
-  private static class SnapshotPauseInjector extends FaultInjector {
-    private CountDownLatch ready;
-    private CountDownLatch wait;
-
-    SnapshotPauseInjector() {
-      init();
-    }
-
-    @Override
-    public void init() {
-      this.ready = new CountDownLatch(1);
-      this.wait = new CountDownLatch(1);
-    }
-
-    @Override
-    public void pause() throws IOException {
-      ready.countDown();
-      try {
-        wait.await();
-      } catch (InterruptedException e) {
-        throw new IOException(e);
-      }
-    }
-
-    @Override
-    public void resume() throws IOException {
-      // Make sure injector pauses before resuming.
-      try {
-        ready.await();
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-        assertTrue(Fail.fail("resume interrupted"));
-      }
-      wait.countDown();
-    }
-
-    @Override
-    public void reset() throws IOException {
-      init();
     }
   }
 

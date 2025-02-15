@@ -53,6 +53,16 @@ Snapshot Diff
                     Should contain      ${result}       +    ${KEY_TWO}
                     Should contain      ${result}       +    ${KEY_THREE}
 
+Snapshot Diff as JSON
+    ${result} =     Execute             ozone sh snapshot diff --json /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE} ${SNAPSHOT_TWO}
+                    Should contain      echo '${result}' | jq '.jobStatus'   DONE
+                    Should contain      echo '${result}' | jq '.snapshotDiffReport.volumeName'    ${VOLUME}
+                    Should contain      echo '${result}' | jq '.snapshotDiffReport.bucketName'    ${BUCKET}
+                    Should contain      echo '${result}' | jq '.snapshotDiffReport.fromSnapshot'  ${SNAPSHOT_ONE}
+                    Should contain      echo '${result}' | jq '.snapshotDiffReport.toSnapshot'    ${SNAPSHOT_TWO}
+                    Should contain      echo '${result}' | jq '.snapshotDiffReport.diffList | .[].sourcePath'    ${KEY_TWO}
+                    Should contain      echo '${result}' | jq '.snapshotDiffReport.diffList | .[].sourcePath'    ${KEY_THREE}
+
 List Snapshot Diff Jobs
     ${result} =     Execute             ozone sh snapshot listDiff /${VOLUME}/${BUCKET} --all
                     Should contain      ${result}        ${VOLUME}

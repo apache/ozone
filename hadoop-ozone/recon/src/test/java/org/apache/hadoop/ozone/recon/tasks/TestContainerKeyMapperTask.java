@@ -315,7 +315,7 @@ public class TestContainerKeyMapperTask {
         ArrayList<OMDBUpdateEvent>() {{
           add(keyEvent1);
           add(keyEvent2);
-        }});
+        }}, 0L);
 
     ContainerKeyMapperTask containerKeyMapperTask =
         new ContainerKeyMapperTask(reconContainerMetadataManager,
@@ -427,7 +427,7 @@ public class TestContainerKeyMapperTask {
             add(keyEvent1);
             add(keyEvent2);
           }
-        });
+        }, 0L);
 
     // Process PUT event for both the keys
     containerKeyMapperTask.process(omUpdateEventBatch);
@@ -460,7 +460,7 @@ public class TestContainerKeyMapperTask {
           {
             add(keyEvent3);
           }
-        });
+        }, 0L);
 
     // Process DELETE event for key2
     containerKeyMapperTask.process(omUpdateEventBatch2);

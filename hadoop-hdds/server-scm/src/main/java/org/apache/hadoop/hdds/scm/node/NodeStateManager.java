@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +17,18 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.HEALTHY_READONLY_NODE;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -29,14 +40,13 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
-
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -55,20 +65,6 @@ import org.apache.hadoop.ozone.common.statemachine.StateMachine;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.apache.hadoop.hdds.scm.events.SCMEvents.HEALTHY_READONLY_NODE;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -478,6 +474,38 @@ public class NodeStateManager implements Runnable, Closeable {
   }
 
   /**
+   * Returns all nodes that are in the decommissioning state.
+   * @return list of decommissioning nodes
+   */
+  public List<DatanodeInfo> getDecommissioningNodes() {
+    return getNodes(NodeOperationalState.DECOMMISSIONING, null);
+  }
+
+  /**
+   * Returns the count of decommissioning nodes.
+   * @return decommissioning node count
+   */
+  public int getDecommissioningNodeCount() {
+    return getDecommissioningNodes().size();
+  }
+
+  /**
+   * Returns all nodes that are in the entering maintenance state.
+   * @return list of entering maintenance nodes
+   */
+  public List<DatanodeInfo> getEnteringMaintenanceNodes() {
+    return getNodes(NodeOperationalState.ENTERING_MAINTENANCE, null);
+  }
+
+  /**
+   * Returns the count of entering maintenance nodes.
+   * @return entering maintenance node count
+   */
+  public int getEnteringMaintenanceNodeCount() {
+    return getEnteringMaintenanceNodes().size();
+  }
+
+  /**
    * Returns all the nodes with the specified status.
    *
    * @param status NodeStatus
@@ -499,6 +527,25 @@ public class NodeStateManager implements Runnable, Closeable {
   public List<DatanodeInfo> getNodes(
       NodeOperationalState opState, NodeState health) {
     return nodeStateMap.getDatanodeInfos(opState, health);
+  }
+
+  /**
+   * Returns all nodes that contain failed volumes.
+   * @return list of nodes containing failed volumes
+   */
+  public List<DatanodeInfo> getVolumeFailuresNodes() {
+    List<DatanodeInfo> allNodes = nodeStateMap.getAllDatanodeInfos();
+    List<DatanodeInfo> failedVolumeNodes = allNodes.stream().
+        filter(dn -> dn.getFailedVolumeCount() > 0).collect(Collectors.toList());
+    return failedVolumeNodes;
+  }
+
+  /**
+   * Returns the count of nodes containing the failed volume.
+   * @return failed volume node count
+   */
+  public int getVolumeFailuresNodeCount() {
+    return getVolumeFailuresNodes().size();
   }
 
   /**
@@ -682,6 +729,11 @@ public class NodeStateManager implements Runnable, Closeable {
     return nodeStateMap.getContainers(uuid);
   }
 
+  public int getContainerCount(UUID uuid)
+      throws NodeNotFoundException {
+    return nodeStateMap.getContainerCount(uuid);
+  }
+
   /**
    * Move Stale or Dead node to healthy if we got a heartbeat from them.
    * Move healthy nodes to stale nodes if it is needed.
@@ -734,7 +786,7 @@ public class NodeStateManager implements Runnable, Closeable {
    *
    * This method is synchronized to coordinate node state updates between
    * the upgrade finalization thread which calls this method, and the
-   * node health processing thread that calls {@link this#checkNodesHealth}.
+   * node health processing thread that calls {@link #checkNodesHealth}.
    */
   public synchronized void forceNodesToHealthyReadOnly() {
     try {
@@ -760,7 +812,7 @@ public class NodeStateManager implements Runnable, Closeable {
   /**
    * This method is synchronized to coordinate node state updates between
    * the upgrade finalization thread which calls
-   * {@link this#forceNodesToHealthyReadOnly}, and the node health processing
+   * {@link #forceNodesToHealthyReadOnly}, and the node health processing
    * thread that calls this method.
    */
   @VisibleForTesting

@@ -40,13 +40,28 @@ Compare files
     ${checksumafter} =          Execute                    md5sum ${file2} | awk '{print $1}'
                                 Should Be Equal            ${checksumbefore}            ${checksumafter}
 
+Create Random File MB
+    [arguments]    ${size_in_megabytes}    ${path}=${EMPTY}
+    ${path} =      Create Random File      ${size_in_megabytes}    1048576    ${path}
+    [return]       ${path}
+
+Create Random File KB
+    [arguments]    ${size_in_kilobytes}    ${path}=${EMPTY}
+    ${path} =      Create Random File      ${size_in_kilobytes}    1024    ${path}
+    [return]       ${path}
+
 Create Random File
-    ${postfix} =             Generate Random String  5  [NUMBERS]
+    [arguments]    ${block_count}    ${block_size}    ${path}=${EMPTY}
+    ${path} =      Run Keyword If   '${path}' == '${EMPTY}'    Get Random Filename
+    ...            ELSE             Set Variable    ${path}
+    Execute        dd if=/dev/urandom of=${path} bs=${block_size} count=${block_count} status=none
+    [return]       ${path}
+
+Get Random Filename
+    ${postfix} =             Generate Random String  10  [LOWER]
     ${tmpfile} =             Set Variable   /tmp/tempfile-${postfix}
     File Should Not Exist    ${tmpfile}
-    ${content} =             Set Variable   "Random string"
-    Create File              ${tmpfile}    ${content}
-    [Return]                 ${tmpfile}
+    [return]                 ${tmpfile}
 
 List All Processes
     ${output} =    Execute    ps aux

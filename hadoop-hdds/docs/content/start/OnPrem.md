@@ -30,7 +30,7 @@ capable of running independently. The components of ozone are the same in both a
 1. Ozone Manager - Is the server that is in charge of the namespace of Ozone. Ozone Manager is responsible for all volume, bucket and key operations.
 2. Storage Container Manager - Acts as the block manager. Ozone Manager
 requests blocks from SCM, to which clients can write data.
-3. Datanodes - Ozone data node code runs inside the HDFS datanode or in the independent deployment case runs an ozone datanode daemon.
+3. Datanodes - Ozone Datanodes is the server that stores all the containers created by SCM. Datanode is the service that handles all data reads and writes from the Ozone Client.
 
 ## Setting up an Ozone only cluster
 

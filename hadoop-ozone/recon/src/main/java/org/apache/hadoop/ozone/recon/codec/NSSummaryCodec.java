@@ -59,6 +59,11 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
   }
 
   @Override
+  public Class<NSSummary> getTypeClass() {
+    return NSSummary.class;
+  }
+
+  @Override
   public byte[] toPersistedFormat(NSSummary object) throws IOException {
     Set<Long> childDirs = object.getChildDir();
     String dirName = object.getDirName();

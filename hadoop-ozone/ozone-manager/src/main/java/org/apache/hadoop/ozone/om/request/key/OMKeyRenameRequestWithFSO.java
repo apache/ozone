@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -76,8 +76,8 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long trxnLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long trxnLogIndex = context.getIndex();
 
     RenameKeyRequest renameKeyRequest = getOmRequest().getRenameKeyRequest();
     KeyArgs keyArgs = renameKeyRequest.getKeyArgs();
@@ -218,7 +218,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       }
     }
 
-    auditLog(auditLogger, buildAuditMessage(OMAction.RENAME_KEY, auditMap,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.RENAME_KEY, auditMap,
             exception, getOmRequest().getUserInfo()));
 
     switch (result) {
@@ -293,7 +293,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     String bucketKey = metadataMgr.getBucketKey(
         fromKeyValue.getVolumeName(), fromKeyValue.getBucketName());
 
-    fromKeyValue.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+    fromKeyValue.setUpdateID(trxnLogIndex);
     // Set toFileName
     fromKeyValue.setKeyName(toKeyFileName);
     fromKeyValue.setFileName(toKeyFileName);
@@ -395,7 +395,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
    * level, e.g. source is /vol1/buck1/dir1/key1 and dest is /vol1/buck1).
    *
    * @param request
-   * @return
+   * @return {@code String}
    * @throws OMException
    */
   @Override
@@ -410,7 +410,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
    * Returns the validated and normalized source key name.
    *
    * @param keyArgs
-   * @return
+   * @return {@code String}
    * @throws OMException
    */
   @Override

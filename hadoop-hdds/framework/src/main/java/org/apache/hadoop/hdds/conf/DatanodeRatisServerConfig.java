@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,16 +17,15 @@
 
 package org.apache.hadoop.hdds.conf;
 
-import org.apache.ratis.server.RaftServerConfigKeys;
-
-import java.time.Duration;
-
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATASTREAM;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.RATIS;
 import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY;
+
+import java.time.Duration;
+import org.apache.ratis.server.RaftServerConfigKeys;
 
 /**
  * Datanode Ratis server Configuration.
@@ -54,14 +52,16 @@ public class DatanodeRatisServerConfig {
   }
 
   @Config(key = "watch.timeout",
-      defaultValue = "180s",
+      defaultValue = "30s",
       type = ConfigType.TIME,
       tags = {OZONE, DATANODE, RATIS},
       description = "The timeout duration for watch request on Ratis Server. " +
           "Timeout for the watch request in Ratis server to acknowledge a " +
-          "particular request is replayed to all servers."
+          "particular request is replayed to all servers. It is highly recommended " +
+          "for the timeout duration to be strictly shorter than Ratis client watch timeout " +
+          "(hdds.ratis.raft.client.rpc.watch.request.timeout)."
   )
-  private long watchTimeOut = Duration.ofSeconds(180).toMillis();
+  private long watchTimeOut = Duration.ofSeconds(30).toMillis();
 
   public long getWatchTimeOut() {
     return watchTimeOut;

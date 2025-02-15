@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.freon;
 
 import com.codahale.metrics.Timer;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
@@ -28,9 +29,9 @@ import java.util.concurrent.Callable;
  * Generate buckets via the s3 interface.
  *
  * For a secure cluster,
- * $> init user keytab
- * $> kinit -kt /etc/security/keytabs/testuser.keytab testuser/scm@EXAMPLE.COM
- * $> eval $(ozone s3 getsecret -e)
+ * $&gt; init user keytab
+ * $&gt; kinit -kt /etc/security/keytabs/testuser.keytab testuser/scm@EXAMPLE.COM
+ * $&gt; eval $(ozone s3 getsecret -e)
  * for getting and exporting access_key_id and secret_access_key
  * to freon shell test environment
  * secret access key.
@@ -44,6 +45,7 @@ import java.util.concurrent.Callable;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 public class S3BucketGenerator extends S3EntityGenerator
     implements Callable<Void> {
 

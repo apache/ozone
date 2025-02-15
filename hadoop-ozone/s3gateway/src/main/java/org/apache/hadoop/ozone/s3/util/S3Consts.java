@@ -74,6 +74,7 @@ public final class S3Consts {
   public static final String TAG_HEADER = "x-amz-tagging";
   public static final String TAG_DIRECTIVE_HEADER = "x-amz-tagging-directive";
   public static final String TAG_COUNT_HEADER = "x-amz-tagging-count";
+  public static final String AWS_TAG_PREFIX = "aws:";
 
   public static final int TAG_NUM_LIMIT = 10;
   public static final int TAG_KEY_LENGTH_LIMIT = 128;
@@ -81,6 +82,8 @@ public final class S3Consts {
   // See https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_S3Tag.html
   // Also see https://docs.aws.amazon.com/directoryservice/latest/devguide/API_Tag.html for Java regex equivalent
   public static final Pattern TAG_REGEX_PATTERN = Pattern.compile("^([\\p{L}\\p{Z}\\p{N}_.:/=+\\-]*)$");
+  public static final String MP_PARTS_COUNT = "x-amz-mp-parts-count";
+
 
   /**
    * Copy directive for metadata and tags.

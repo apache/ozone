@@ -152,31 +152,28 @@ public class NodeEndpoint {
         }
       });
       try {
-        Set<ContainerID> allContainers = nodeManager.getContainers(datanode);
-
-        builder.withContainers(allContainers.size());
-        builder.withOpenContainers(openContainers.get());
+        builder.setContainers(nodeManager.getContainerCount(datanode));
+        builder.setOpenContainers(openContainers.get());
       } catch (NodeNotFoundException ex) {
         LOG.warn("Cannot get containers, datanode {} not found.",
             datanode.getUuid(), ex);
       }
 
       DatanodeInfo dnInfo = (DatanodeInfo) datanode;
-      datanodes.add(builder.withHostname(nodeManager.getHostName(datanode))
-          .withDatanodeStorageReport(storageReport)
-          .withLastHeartbeat(nodeManager.getLastHeartbeat(datanode))
-          .withState(nodeState)
-          .withOperationalState(nodeOpState)
-          .withPipelines(pipelines)
-          .withLeaderCount(leaderCount.get())
-          .withUUid(datanode.getUuidString())
-          .withVersion(nodeManager.getVersion(datanode))
-          .withSetupTime(nodeManager.getSetupTime(datanode))
-          .withRevision(nodeManager.getRevision(datanode))
-          .withBuildDate(nodeManager.getBuildDate(datanode))
-          .withLayoutVersion(
+      datanodes.add(builder.setHostname(nodeManager.getHostName(datanode))
+          .setDatanodeStorageReport(storageReport)
+          .setLastHeartbeat(nodeManager.getLastHeartbeat(datanode))
+          .setState(nodeState)
+          .setOperationalState(nodeOpState)
+          .setPipelines(pipelines)
+          .setLeaderCount(leaderCount.get())
+          .setUuid(datanode.getUuidString())
+          .setVersion(nodeManager.getVersion(datanode))
+          .setSetupTime(nodeManager.getSetupTime(datanode))
+          .setRevision(nodeManager.getRevision(datanode))
+          .setLayoutVersion(
               dnInfo.getLastKnownLayoutVersion().getMetadataLayoutVersion())
-          .withNetworkLocation(datanode.getNetworkLocation())
+          .setNetworkLocation(datanode.getNetworkLocation())
           .build());
     });
 
@@ -223,26 +220,26 @@ public class NodeEndpoint {
         try {
           if (preChecksSuccess(nodeByUuid, failedNodeErrorResponseMap)) {
             removedDatanodes.add(DatanodeMetadata.newBuilder()
-                .withHostname(nodeManager.getHostName(nodeByUuid))
-                .withUUid(uuid)
-                .withState(nodeManager.getNodeStatus(nodeByUuid).getHealth())
+                .setHostname(nodeManager.getHostName(nodeByUuid))
+                .setUuid(uuid)
+                .setState(nodeManager.getNodeStatus(nodeByUuid).getHealth())
                 .build());
             nodeManager.removeNode(nodeByUuid);
             LOG.info("Node {} removed successfully !!!", uuid);
           } else {
             failedDatanodes.add(DatanodeMetadata.newBuilder()
-                .withHostname(nodeManager.getHostName(nodeByUuid))
-                .withUUid(uuid)
-                .withOperationalState(nodeByUuid.getPersistedOpState())
-                .withState(nodeManager.getNodeStatus(nodeByUuid).getHealth())
+                .setHostname(nodeManager.getHostName(nodeByUuid))
+                .setUuid(uuid)
+                .setOperationalState(nodeByUuid.getPersistedOpState())
+                .setState(nodeManager.getNodeStatus(nodeByUuid).getHealth())
                 .build());
           }
         } catch (NodeNotFoundException nnfe) {
           LOG.error("Selected node {} not found : {} ", uuid, nnfe);
           notFoundDatanodes.add(DatanodeMetadata.newBuilder()
-                  .withHostname("")
-                  .withState(NodeState.DEAD)
-              .withUUid(uuid).build());
+                  .setHostname("")
+                  .setState(NodeState.DEAD)
+              .setUuid(uuid).build());
         }
       }
     } catch (Exception exp) {
@@ -282,8 +279,7 @@ public class NodeEndpoint {
     AtomicBoolean isContainerOrPipeLineOpen = new AtomicBoolean(false);
     try {
       nodeStatus = nodeManager.getNodeStatus(nodeByUuid);
-      boolean isNodeDecommissioned = nodeByUuid.getPersistedOpState() == NodeOperationalState.DECOMMISSIONED;
-      if (isNodeDecommissioned || nodeStatus.isDead()) {
+      if (nodeStatus.isDead()) {
         checkContainers(nodeByUuid, isContainerOrPipeLineOpen);
         if (isContainerOrPipeLineOpen.get()) {
           failedNodeErrorResponseMap.put(nodeByUuid.getUuidString(), "Open Containers/Pipelines");
@@ -300,8 +296,7 @@ public class NodeEndpoint {
       LOG.error("Node : {} not found", nodeByUuid);
       return false;
     }
-    failedNodeErrorResponseMap.put(nodeByUuid.getUuidString(), "DataNode should be in either DECOMMISSIONED " +
-        "operational state or DEAD node state.");
+    failedNodeErrorResponseMap.put(nodeByUuid.getUuidString(), "DataNode should be in DEAD node status.");
     return false;
   }
 

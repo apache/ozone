@@ -17,12 +17,15 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 /**
  * This class represents a open key "session". A session here means a key is
  * opened by a specific client, the client sends the handler to server, such
  * that servers can recognize this client, and thus know how to close the key.
  */
 public class OpenKeySession {
+  @JsonProperty("clientId")
   private final long id;
   private final OmKeyInfo keyInfo;
   // the version of the key when it is being opened in this session.

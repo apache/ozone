@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.function.BiPredicate;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -63,8 +63,8 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long transactionLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long transactionLogIndex = context.getIndex();
 
     // protobuf guarantees acls are non-null.
     List<OzoneAcl> ozoneAcls = getAcls();
@@ -108,8 +108,7 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
       }
 
       operationResult = omBucketAclOp.test(ozoneAcls, omBucketInfo);
-      omBucketInfo.setUpdateID(transactionLogIndex,
-          ozoneManager.isRatisEnabled());
+      omBucketInfo.setUpdateID(transactionLogIndex);
 
       if (operationResult) {
         // Update the modification time when updating ACLs of Bucket.

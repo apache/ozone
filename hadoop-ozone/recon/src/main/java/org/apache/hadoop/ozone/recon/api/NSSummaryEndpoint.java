@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
@@ -78,7 +78,7 @@ public class NSSummaryEndpoint {
     }
 
     NamespaceSummaryResponse namespaceSummaryResponse;
-    if (!isInitializationComplete()) {
+    if (!ReconUtils.isInitializationComplete(omMetadataManager)) {
       namespaceSummaryResponse =
           NamespaceSummaryResponse.newBuilder()
               .setEntityType(EntityType.UNKNOWN)
@@ -119,7 +119,7 @@ public class NSSummaryEndpoint {
     }
 
     DUResponse duResponse = new DUResponse();
-    if (!isInitializationComplete()) {
+    if (!ReconUtils.isInitializationComplete(omMetadataManager)) {
       duResponse.setStatus(ResponseStatus.INITIALIZING);
       return Response.ok(duResponse).build();
     }
@@ -150,7 +150,7 @@ public class NSSummaryEndpoint {
     }
 
     QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
-    if (!isInitializationComplete()) {
+    if (!ReconUtils.isInitializationComplete(omMetadataManager)) {
       quotaUsageResponse.setResponseCode(ResponseStatus.INITIALIZING);
       return Response.ok(quotaUsageResponse).build();
     }
@@ -181,7 +181,7 @@ public class NSSummaryEndpoint {
 
     FileSizeDistributionResponse distResponse =
         new FileSizeDistributionResponse();
-    if (!isInitializationComplete()) {
+    if (!ReconUtils.isInitializationComplete(omMetadataManager)) {
       distResponse.setStatus(ResponseStatus.INITIALIZING);
       return Response.ok(distResponse).build();
     }
@@ -193,21 +193,6 @@ public class NSSummaryEndpoint {
     distResponse = handler.getDistResponse();
 
     return Response.ok(distResponse).build();
-  }
-
-  /**
-   * Return if all OMDB tables that will be used are initialized.
-   * @return if tables are initialized
-   */
-  private boolean isInitializationComplete() {
-    if (omMetadataManager == null) {
-      return false;
-    }
-    return omMetadataManager.getVolumeTable() != null
-        && omMetadataManager.getBucketTable() != null
-        && omMetadataManager.getDirectoryTable() != null
-        && omMetadataManager.getFileTable() != null
-        && omMetadataManager.getKeyTable(BucketLayout.LEGACY) != null;
   }
 
 }

@@ -23,9 +23,7 @@ import java.nio.charset.StandardCharsets;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.fs.Syncable;
-import org.apache.hadoop.fs.impl.StoreImplementationUtils;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 
 /**
@@ -109,20 +107,17 @@ public class ContentGenerator {
       // noop
       break;
     case HFLUSH:
-      if (StoreImplementationUtils.hasCapability(
-          outputStream, StreamCapabilities.HSYNC)) {
-        ((Syncable)outputStream).hflush();
+      if (outputStream instanceof Syncable) {
+        ((Syncable) outputStream).hflush();
       }
       break;
     case HSYNC:
-      if (StoreImplementationUtils.hasCapability(
-          outputStream, StreamCapabilities.HSYNC)) {
-        ((Syncable)outputStream).hsync();
+      if (outputStream instanceof Syncable) {
+        ((Syncable) outputStream).hsync();
       }
       break;
     default:
-      throw new IllegalArgumentException("Unsupported sync option"
-          + flushOrSync);
+      throw new IllegalArgumentException("Unsupported sync option" + flushOrSync);
     }
   }
 

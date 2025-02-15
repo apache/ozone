@@ -27,7 +27,6 @@ import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -66,8 +65,8 @@ abstract class AbstractOzoneFileSystemTestWithFSO extends AbstractOzoneFileSyste
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractOzoneFileSystemTestWithFSO.class);
 
-  AbstractOzoneFileSystemTestWithFSO(boolean enableOMRatis) {
-    super(true, enableOMRatis, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+  AbstractOzoneFileSystemTestWithFSO() {
+    super(true, BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   @Test
@@ -504,7 +503,7 @@ abstract class AbstractOzoneFileSystemTestWithFSO extends AbstractOzoneFileSyste
     FSDataOutputStream stream = getFs().create(source);
     try {
       // file not visible yet
-      assertThrows(OMException.class, () -> fs.isFileClosed(source));
+      assertThrows(FileNotFoundException.class, () -> fs.isFileClosed(source));
       stream.write(1);
       stream.hsync();
       // file is visible and open

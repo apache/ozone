@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
 import com.codahale.metrics.Timer;
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -38,6 +39,7 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 public class OmBucketGenerator extends BaseFreonGenerator
     implements Callable<Void> {
 
@@ -56,6 +58,11 @@ public class OmBucketGenerator extends BaseFreonGenerator
   private OzoneManagerProtocol ozoneManagerClient;
 
   private Timer bucketCreationTimer;
+
+  @Override
+  public boolean allowDuration() {
+    return false;
+  }
 
   @Override
   public Void call() throws Exception {

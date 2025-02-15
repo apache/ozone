@@ -24,7 +24,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.XceiverClientCreator;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
@@ -34,6 +35,7 @@ import org.apache.hadoop.ozone.common.ChecksumData;
 
 import com.codahale.metrics.Timer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
+import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
@@ -48,6 +50,7 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 public class DatanodeChunkValidator extends BaseFreonGenerator
     implements Callable<Void> {
 
@@ -91,8 +94,8 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
                  createStorageContainerLocationClient(ozoneConf)) {
       Pipeline pipeline = findPipelineForTest(pipelineId, scmClient, LOG);
 
-      try (XceiverClientManager xceiverClientManager =
-                   new XceiverClientManager(ozoneConf)) {
+      try (XceiverClientFactory xceiverClientManager =
+                   new XceiverClientCreator(ozoneConf)) {
         xceiverClient = xceiverClientManager.acquireClientForReadData(pipeline);
 
         checksumProtobuf = ContainerProtos.ChecksumData.newBuilder()

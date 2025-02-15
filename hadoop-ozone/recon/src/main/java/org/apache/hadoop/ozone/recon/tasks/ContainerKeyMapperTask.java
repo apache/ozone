@@ -57,7 +57,7 @@ import com.google.inject.Inject;
 
 /**
  * Class to iterate over the OM DB and populate the Recon container DB with
- * the container -> Key reverse mapping.
+ * the container -&gt; Key reverse mapping.
  */
 public class ContainerKeyMapperTask implements ReconOmTask {
 
@@ -81,8 +81,8 @@ public class ContainerKeyMapperTask implements ReconOmTask {
   }
 
   /**
-   * Read Key -> ContainerId data from OM snapshot DB and write reverse map
-   * (container, key) -> count to Recon Container DB.
+   * Read Key -&gt; ContainerId data from OM snapshot DB and write reverse map
+   * (container, key) -&gt; count to Recon Container DB.
    */
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
@@ -94,7 +94,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
     // containerId -> key count
     Map<Long, Long> containerKeyCountMap = new HashMap<>();
     try {
-      LOG.info("Starting a 'reprocess' run of ContainerKeyMapperTask.");
+      LOG.debug("Starting a 'reprocess' run of ContainerKeyMapperTask.");
       Instant start = Instant.now();
 
       // initialize new container DB
@@ -137,10 +137,10 @@ public class ContainerKeyMapperTask implements ReconOmTask {
         return new ImmutablePair<>(getTaskName(), false);
       }
 
-      LOG.info("Completed 'reprocess' of ContainerKeyMapperTask.");
+      LOG.debug("Completed 'reprocess' of ContainerKeyMapperTask.");
       Instant end = Instant.now();
       long duration = Duration.between(start, end).toMillis();
-      LOG.info("It took me {} seconds to process {} keys.",
+      LOG.debug("It took me {} seconds to process {} keys.",
           (double) duration / 1000.0, omKeyCount);
     } catch (IOException ioEx) {
       LOG.error("Unable to populate Container Key data in Recon DB. ",
@@ -208,7 +208,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
     Map<Long, Long> containerKeyCountMap = new HashMap<>();
     // List of the deleted (container, key) pair's
     List<ContainerKeyPrefix> deletedKeyCountList = new ArrayList<>();
-
+    long startTime = System.currentTimeMillis();
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, OmKeyInfo> omdbUpdateEvent = eventIterator.next();
       // Filter event inside process method to avoid duping
@@ -258,8 +258,8 @@ public class ContainerKeyMapperTask implements ReconOmTask {
       LOG.error("Unable to write Container Key Prefix data in Recon DB.", e);
       return new ImmutablePair<>(getTaskName(), false);
     }
-    LOG.info("{} successfully processed {} OM DB update event(s).",
-        getTaskName(), eventCount);
+    LOG.debug("{} successfully processed {} OM DB update event(s) in {} milliseconds.",
+        getTaskName(), eventCount, (System.currentTimeMillis() - startTime));
     return new ImmutablePair<>(getTaskName(), true);
   }
 

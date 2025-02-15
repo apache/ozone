@@ -1,38 +1,43 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.keyvalue.statemachine.background;
 
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
+
 import java.io.File;
 import java.io.IOException;
-
 import java.time.Duration;
 import java.time.Instant;
-import java.util.LinkedList;
-import java.util.Objects;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
-
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
+import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -47,13 +52,6 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.metadata.DeleteTransactionStore;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.util.Time;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
-
-import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
-import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
-import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
-
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -325,6 +323,8 @@ public class BlockDeletingTask implements BackgroundTask {
     try {
       Table<String, BlockData> blockDataTable =
           meta.getStore().getBlockDataTable();
+      Table<String, BlockData> lastChunkInfoTable =
+          meta.getStore().getLastChunkInfoTable();
       DeleteTransactionStore<?> txnStore =
           (DeleteTransactionStore<?>) meta.getStore();
       Table<?, DeletedBlocksTransaction> deleteTxns =
@@ -374,7 +374,10 @@ public class BlockDeletingTask implements BackgroundTask {
         for (DeletedBlocksTransaction delTx : deletedBlocksTxs) {
           deleter.apply(deleteTxns, batch, delTx.getTxID());
           for (Long blk : delTx.getLocalIDList()) {
+            // delete from both blockDataTable and lastChunkInfoTable.
             blockDataTable.deleteWithBatch(batch,
+                containerData.getBlockKey(blk));
+            lastChunkInfoTable.deleteWithBatch(batch,
                 containerData.getBlockKey(blk));
           }
         }
@@ -424,14 +427,27 @@ public class BlockDeletingTask implements BackgroundTask {
       List<DeletedBlocksTransaction> delBlocks, Handler handler,
       Table<String, BlockData> blockDataTable, Container container)
       throws IOException {
+
     int blocksProcessed = 0;
     int blocksDeleted = 0;
     long bytesReleased = 0;
     List<DeletedBlocksTransaction> deletedBlocksTxs = new ArrayList<>();
     Instant startTime = Instant.now();
 
+    // Track deleted blocks to avoid duplicate deletion
+    Set<Long> deletedBlockSet = new HashSet<>();
+
     for (DeletedBlocksTransaction entry : delBlocks) {
       for (Long blkLong : entry.getLocalIDList()) {
+        // Increment blocksProcessed for every block processed
+        blocksProcessed++;
+
+        // Check if the block has already been deleted
+        if (deletedBlockSet.contains(blkLong)) {
+          LOG.debug("Skipping duplicate deletion for block {}", blkLong);
+          continue;
+        }
+
         String blk = containerData.getBlockKey(blkLong);
         BlockData blkInfo = blockDataTable.get(blk);
         LOG.debug("Deleting block {}", blkLong);
@@ -442,8 +458,6 @@ public class BlockDeletingTask implements BackgroundTask {
             LOG.error("Failed to delete files for unreferenced block {} of" +
                     " container {}", blkLong,
                 container.getContainerData().getContainerID(), e);
-          } finally {
-            blocksProcessed++;
           }
           continue;
         }
@@ -453,14 +467,14 @@ public class BlockDeletingTask implements BackgroundTask {
           handler.deleteBlock(container, blkInfo);
           blocksDeleted++;
           deleted = true;
+          // Track this block as deleted
+          deletedBlockSet.add(blkLong);
         } catch (IOException e) {
           // TODO: if deletion of certain block retries exceed the certain
           //  number of times, service should skip deleting it,
           //  otherwise invalid numPendingDeletionBlocks could accumulate
           //  beyond the limit and the following deletion will stop.
           LOG.error("Failed to delete files for block {}", blkLong, e);
-        } finally {
-          blocksProcessed++;
         }
 
         if (deleted) {

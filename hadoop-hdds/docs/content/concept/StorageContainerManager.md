@@ -84,7 +84,7 @@ The following data is persisted in Storage Container Manager side in a specific 
    * Containers are the replication units. Data is required to act in case of data under/over replicated.
  * Deleted blocks
    * Block data is deleted in the background. Need a list to follow the progress.
- * Valid cert, Revoked certs
+ * Valid cert
   * Used by the internal Certificate Authority to authorize other Ozone services
 
 ## Notable configurations
