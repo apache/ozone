@@ -123,6 +123,15 @@ public class OMPerformanceMetrics {
   @Metric(about = "ACLs check latency in listKeys")
   private MutableRate listKeysAclCheckLatencyNs;
 
+  @Metric(about = "Overall latency of the allocate block call in nano seconds")
+  private MutableRate overallAllocateBlockLatencyNs;
+
+  @Metric(about = "latency for getBlocks from block prefetch queue in nano seconds")
+  private MutableRate getBlocksFromPrefetchQueueLatencyNs;
+
+  @Metric(about = "latency for prefetching blocks from SCM to OM in nano seconds")
+  private MutableRate prefetchBlocksLatencyNs;
+
   @Metric(about = "resolveBucketLink latency in listKeys")
   private MutableRate listKeysResolveBucketLatencyNs;
 
@@ -257,6 +266,18 @@ public class OMPerformanceMetrics {
 
   MutableRate getListKeysAclCheckLatencyNs() {
     return listKeysAclCheckLatencyNs;
+  }
+
+  public void setOverallAllocateBlockLatencyNs(long latencyInNs) {
+    overallAllocateBlockLatencyNs.add(latencyInNs);
+  }
+
+  public MutableRate getGetBlocksFromPrefetchQueueLatencyNs() {
+    return getBlocksFromPrefetchQueueLatencyNs;
+  }
+
+  public MutableRate getPrefetchBlocksLatencyNs() {
+    return prefetchBlocksLatencyNs;
   }
 
   MutableRate getListKeysResolveBucketLatencyNs() {
