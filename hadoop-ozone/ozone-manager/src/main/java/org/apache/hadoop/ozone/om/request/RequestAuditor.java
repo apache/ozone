@@ -60,15 +60,27 @@ public interface RequestAuditor {
    * Build auditMap for KeyArgs.
    * @param keyArgs
    */
-  default Map<String, String> buildKeyArgsAuditMap(KeyArgs keyArgs) {
-
+  default Map<String, String> buildLightKeyArgsAuditMap(KeyArgs keyArgs) {
     if (keyArgs == null) {
       return new HashMap<>(0);
     } else {
-      Map< String, String > auditMap = new LinkedHashMap<>();
+      Map<String, String> auditMap = new LinkedHashMap<>();
       auditMap.put(OzoneConsts.VOLUME, keyArgs.getVolumeName());
       auditMap.put(OzoneConsts.BUCKET, keyArgs.getBucketName());
       auditMap.put(OzoneConsts.KEY, keyArgs.getKeyName());
+      return auditMap;
+    }
+  }
+
+  /**
+   * Build auditMap for KeyArgs.
+   * @param keyArgs
+   */
+  default Map<String, String> buildKeyArgsAuditMap(KeyArgs keyArgs) {
+    if (keyArgs == null) {
+      return new HashMap<>(0);
+    } else {
+      Map< String, String > auditMap = buildLightKeyArgsAuditMap(keyArgs);
       auditMap.put(OzoneConsts.DATA_SIZE,
           String.valueOf(keyArgs.getDataSize()));
       if (keyArgs.hasType()) {

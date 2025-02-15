@@ -73,7 +73,7 @@ public class TransactionInfoRepair extends RepairTool {
     List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
     List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(
         dbPath);
-    String columnFamilyName = getColumnFamily().getName();
+    String columnFamilyName = getColumnFamily(serviceToBeOffline()).getName();
 
     try (ManagedRocksDB db = ManagedRocksDB.open(dbPath, cfDescList, cfHandleList)) {
       ColumnFamilyHandle transactionInfoCfh = RocksDBUtils.getColumnFamilyHandle(columnFamilyName, cfHandleList);
@@ -122,8 +122,7 @@ public class TransactionInfoRepair extends RepairTool {
     }
   }
 
-  private DBColumnFamilyDefinition<String, TransactionInfo> getColumnFamily() {
-    Component component = serviceToBeOffline();
+  public static DBColumnFamilyDefinition<String, TransactionInfo> getColumnFamily(Component component) {
     switch (component) {
     case OM:
       return OMDBDefinition.TRANSACTION_INFO_TABLE;

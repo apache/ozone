@@ -37,7 +37,7 @@ public class OzoneFsServerDefaults extends FsServerDefaults {
   }
 
   public OzoneFsServerDefaults(String keyProviderUri) {
-    super(0L, 0, 0, (short)0, 0, false, 0L, null, keyProviderUri);
+    super(0L, 16 * 1024, 0, (short)0, 0, false, 0L, null, keyProviderUri);
   }
 
   public FsServerDefaultsProto getProtobuf() {

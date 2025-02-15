@@ -142,7 +142,7 @@ public abstract class RepairTool extends AbstractSubcommand implements Callable<
   }
 
   /** Ozone component for offline tools. */
-  protected enum Component {
+  public enum Component {
     DATANODE,
     OM,
     SCM,

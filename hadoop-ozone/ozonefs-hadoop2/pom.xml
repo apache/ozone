@@ -102,11 +102,6 @@
     <!-- Test dependencies -->
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-hadoop-dependency-test</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-common</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
@@ -151,6 +146,13 @@
         <artifactId>spotbugs-maven-plugin</artifactId>
         <configuration>
           <onlyAnalyze>org.apache.hadoop.fs.ozone.*</onlyAnalyze>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <configuration>
+          <suppressionsLocation>${basedir}/../../hadoop-hdds/dev-support/checkstyle/suppressions-skip-imports.xml</suppressionsLocation>
         </configuration>
       </plugin>
     </plugins>

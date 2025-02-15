@@ -148,7 +148,6 @@ public class TestSnapshotRequestAndResponse {
             i.getArgument(0), "dummyBucketOwner", BucketLayout.FILE_SYSTEM_OPTIMIZED));
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
-    when(ozoneManager.isRatisEnabled()).thenReturn(true);
     when(ozoneManager.isFilesystemSnapshotEnabled()).thenReturn(true);
     when(ozoneManager.isAdmin(any())).thenReturn(isAdmin);
     when(ozoneManager.isOwner(any(), any())).thenReturn(false);

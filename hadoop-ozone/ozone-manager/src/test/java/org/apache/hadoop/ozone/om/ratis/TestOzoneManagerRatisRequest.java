@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -110,6 +111,8 @@ public class TestOzoneManagerRatisRequest {
         ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
+    final OmConfig omConfig = ozoneConfiguration.getObject(OmConfig.class);
+    when(ozoneManager.getConfig()).thenReturn(omConfig);
 
     OzoneManagerRatisServer ratisServer = mock(OzoneManagerRatisServer.class);
     ProtocolMessageMetrics<ProtocolMessageEnum> protocolMessageMetrics =
@@ -127,8 +130,7 @@ public class TestOzoneManagerRatisRequest {
 
     OzoneManagerProtocolServerSideTranslatorPB serverSideTranslatorPB =
         new OzoneManagerProtocolServerSideTranslatorPB(ozoneManager,
-            ratisServer, protocolMessageMetrics, true,
-            100L);
+            ratisServer, protocolMessageMetrics);
 
     OzoneManagerProtocolProtos.OMResponse actualResponse =
         serverSideTranslatorPB.processRequest(omRequest);

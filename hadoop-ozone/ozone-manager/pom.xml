@@ -180,13 +180,10 @@
     <dependency>
       <groupId>org.apache.ranger</groupId>
       <artifactId>ranger-intg</artifactId>
-      <version>${ranger.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.ranger</groupId>
       <artifactId>ranger-plugins-common</artifactId>
-      <version>${ranger.version}</version>
-      <scope>compile</scope>
       <!-- Workaround to prevent slf4j binding conflicts until ranger-intg is
        fixed to not introduce this to the classpath -->
       <exclusions>
@@ -279,12 +276,10 @@
     <dependency>
       <groupId>org.aspectj</groupId>
       <artifactId>aspectjrt</artifactId>
-      <version>${aspectj.version}</version>
     </dependency>
     <dependency>
       <groupId>org.aspectj</groupId>
       <artifactId>aspectjweaver</artifactId>
-      <version>${aspectj.version}</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
@@ -294,12 +289,10 @@
     <dependency>
       <groupId>org.codehaus.jackson</groupId>
       <artifactId>jackson-core-asl</artifactId>
-      <version>${jackson1.version}</version>
     </dependency>
     <dependency>
       <groupId>org.codehaus.jackson</groupId>
       <artifactId>jackson-jaxrs</artifactId>
-      <version>${jackson-jaxr.version}</version>
       <exclusions>
         <exclusion>
           <groupId>org.codehaus.jackson</groupId>
@@ -314,7 +307,6 @@
     <dependency>
       <groupId>org.codehaus.jackson</groupId>
       <artifactId>jackson-mapper-asl</artifactId>
-      <version>${jackson1.version}</version>
     </dependency>
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
@@ -354,6 +346,12 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-annotation-processing</artifactId>
       <scope>test</scope>
@@ -362,11 +360,6 @@
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-common</artifactId>
       <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-hadoop-dependency-test</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -467,7 +460,6 @@
       <plugin>
         <groupId>dev.aspectj</groupId>
         <artifactId>aspectj-maven-plugin</artifactId>
-        <version>${aspectj-plugin.version}</version>
         <configuration>
           <source>1.8</source>
           <target>1.8</target>
@@ -489,6 +481,13 @@
         <artifactId>spotbugs-maven-plugin</artifactId>
         <configuration>
           <excludeFilterFile>${basedir}/dev-support/findbugsExcludeFile.xml</excludeFilterFile>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <configuration>
+          <suppressionsLocation>${basedir}/../../hadoop-hdds/dev-support/checkstyle/suppressions-skip-imports.xml</suppressionsLocation>
         </configuration>
       </plugin>
     </plugins>

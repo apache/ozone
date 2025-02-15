@@ -48,8 +48,6 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.ErrorInjector;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
-import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -62,7 +60,6 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -84,12 +81,8 @@ import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.common.ChecksumCache;
 import org.apache.hadoop.ozone.container.TestHelper;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.impl.AbstractTestChunkManager;
-import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
-import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -103,6 +96,7 @@ import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
@@ -121,7 +115,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.event.Level;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
@@ -221,15 +214,6 @@ public class TestHSync {
 
     // create a volume and a bucket to be used by OzoneFileSystem
     bucket = TestDataUtil.createVolumeAndBucket(client, layout);
-
-    // Enable DEBUG level logging for relevant classes
-    GenericTestUtils.setLogLevel(BlockManagerImpl.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(AbstractDatanodeStore.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(BlockOutputStream.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(BlockInputStream.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(KeyValueHandler.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(BufferPool.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(ChecksumCache.LOG, Level.DEBUG);
 
     openKeyCleanupService =
         (OpenKeyCleanupService) cluster.getOzoneManager().getKeyManager().getOpenKeyCleanupService();
@@ -851,6 +835,7 @@ public class TestHSync {
 
   @ParameterizedTest
   @MethodSource("concurrentExceptionHandling")
+  @Unhealthy("HDDS-12313")
   public void testConcurrentExceptionHandling(int syncerThreads, int errors) throws Exception {
     final String rootPath = String.format("%s://%s/", OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
     CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);

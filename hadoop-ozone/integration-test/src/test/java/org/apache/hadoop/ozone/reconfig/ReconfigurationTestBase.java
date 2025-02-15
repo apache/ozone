@@ -18,11 +18,9 @@
 
 package org.apache.hadoop.ozone.reconfig;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.jupiter.api.AfterAll;
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
@@ -40,31 +38,16 @@ import static org.junit.jupiter.api.Assertions.fail;
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(300)
-abstract class ReconfigurationTestBase {
+abstract class ReconfigurationTestBase implements NonHATests.TestCase {
 
-  private MiniOzoneCluster cluster;
   private String currentUser;
 
   @BeforeAll
   void setup() throws Exception {
-    cluster = MiniOzoneCluster.newBuilder(new OzoneConfiguration())
-        .build();
-    cluster.waitForClusterToBeReady();
     currentUser = UserGroupInformation.getCurrentUser().getShortUserName();
   }
 
-  @AfterAll
-  void shutdown() {
-    if (cluster != null) {
-      cluster.shutdown();
-    }
-  }
-
   abstract ReconfigurationHandler getSubject();
-
-  MiniOzoneCluster getCluster() {
-    return cluster;
-  }
 
   String getCurrentUser() {
     return currentUser;

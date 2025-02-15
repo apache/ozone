@@ -18,28 +18,24 @@
 
 package org.apache.hadoop.hdds.scm;
 
+import org.apache.ozone.test.NonHATests;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 import javax.management.openmbean.CompositeData;
 import javax.management.openmbean.TabularData;
-import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.concurrent.TimeoutException;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -48,34 +44,18 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 /**
  * Class which tests the SCMNodeManagerInfo Bean.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(300)
-public class TestSCMNodeManagerMXBean {
+public abstract class TestSCMNodeManagerMXBean implements NonHATests.TestCase {
 
   public static final Logger LOG = LoggerFactory.getLogger(TestSCMMXBean.class);
-  private static int numOfDatanodes = 3;
-  private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
-  private static StorageContainerManager scm;
-  private static MBeanServer mbs;
+  private StorageContainerManager scm;
+  private MBeanServer mbs;
 
   @BeforeAll
-  public static void init() throws IOException, TimeoutException,
-      InterruptedException {
-    conf = new OzoneConfiguration();
-    conf.set(OZONE_SCM_STALENODE_INTERVAL, "60000ms");
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(numOfDatanodes)
-        .build();
-    cluster.waitForClusterToBeReady();
-    scm = cluster.getStorageContainerManager();
+  void init() {
+    scm = cluster().getStorageContainerManager();
     mbs = ManagementFactory.getPlatformMBeanServer();
-  }
-
-  @AfterAll
-  public static void cleanup() {
-    if (cluster != null) {
-      cluster.shutdown();
-    }
   }
 
   @Test

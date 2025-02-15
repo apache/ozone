@@ -14,9 +14,40 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
+package org.apache.hadoop.ozone.om;
+
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+
+import java.util.List;
+
 /**
- * Make CheckStyle happy.
+ * Used in {@link org.apache.hadoop.ozone.om.service.DirectoryDeletingService}
+ * to capture the result of each delete task.
  */
-package org.apache.hadoop.hdds.scm.container.closer;
+public class DeleteKeysResult {
+
+  private List<OmKeyInfo> keysToDelete;
+  private long consumedSize;
+
+  private boolean processedKeys;
+
+  public DeleteKeysResult(List<OmKeyInfo> keysToDelete,
+      long consumedSize, boolean processedKeys) {
+    this.keysToDelete = keysToDelete;
+    this.consumedSize = consumedSize;
+    this.processedKeys = processedKeys;
+  }
+
+  public List<OmKeyInfo> getKeysToDelete() {
+    return keysToDelete;
+  }
+
+  public long getConsumedSize() {
+    return consumedSize;
+  }
+
+  public boolean isProcessedKeys() {
+    return processedKeys;
+  }
+}

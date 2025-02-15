@@ -117,7 +117,7 @@ public class S3PutObjectTaggingRequestWithFSO extends S3PutObjectTaggingRequest 
       omKeyInfo.getTags().clear();
       omKeyInfo.getTags().putAll(KeyValueUtil.getFromProtobuf(keyArgs.getTagsList()));
       // Set the UpdateId to the current transactionLogIndex
-      omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+      omKeyInfo.setUpdateID(trxnLogIndex);
 
       // Note: Key modification time is not changed because S3 last modified
       // time only changes when there are changes in the object content

@@ -175,7 +175,7 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
                     "event is on {} table which is not useful for Recon to " +
                     "capture.", tableName);
           }
-          LOG.warn("Old Value of Key: {} in table: {} should not be null " +
+          LOG.debug("Old Value of Key: {} in table: {} should not be null " +
               "for DELETE event ", keyStr, tableName);
           return;
         }
