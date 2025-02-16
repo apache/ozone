@@ -192,7 +192,6 @@ public class KeyManagerImpl implements KeyManager {
   private SnapshotDeletingService snapshotDeletingService;
 
   private final KeyProviderCryptoExtension kmsProvider;
-  private final boolean enableFileSystemPaths;
   private DirectoryDeletingService dirDeletingService;
   private final OMPerformanceMetrics metrics;
 
@@ -218,9 +217,6 @@ public class KeyManagerImpl implements KeyManager {
     this.grpcBlockTokenEnabled = conf.getBoolean(
         HDDS_BLOCK_TOKEN_ENABLED,
         HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
-    this.enableFileSystemPaths =
-        conf.getBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-            OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
 
     this.ozoneManager = om;
     this.scmClient = scmClient;
@@ -473,7 +469,7 @@ public class KeyManagerImpl implements KeyManager {
         bucketName);
     try {
       keyName = OMClientRequest
-          .validateAndNormalizeKey(enableFileSystemPaths, keyName,
+          .validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(), keyName,
               bucketLayout);
 
       if (bucketLayout.isFileSystemOptimized()) {
@@ -665,7 +661,7 @@ public class KeyManagerImpl implements KeyManager {
     // underlying table using an iterator. That automatically creates a
     // snapshot of the data, so we don't need these locks at a higher level
     // when we iterate.
-    if (bucketLayout.shouldNormalizePaths(enableFileSystemPaths)) {
+    if (bucketLayout.shouldNormalizePaths(ozoneManager.getEnableFileSystemPaths())) {
       startKey = OmUtils.normalizeKey(startKey, true);
       keyPrefix = OmUtils.normalizeKey(keyPrefix, true);
     }
