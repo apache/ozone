@@ -84,10 +84,12 @@ public class SummarySubCommand implements Callable<Void> {
       printKVSeparator();
       System.out.println(summaryResponse.get("type"));
 
-      int numVol = summaryResponse.path("numVolume").asInt(-1);
-      int numBucket = summaryResponse.path("numBucket").asInt(-1);
-      int numDir = summaryResponse.path("numDir").asInt(-1);
-      int numKey = summaryResponse.path("numKey").asInt(-1);
+      JsonNode countStatsNode = summaryResponse.path("countStats");
+
+      int numVol = countStatsNode.path("numVolume").asInt(-1);
+      int numBucket = countStatsNode.path("numBucket").asInt(-1);
+      int numDir = countStatsNode.path("numDir").asInt(-1);
+      int numKey = countStatsNode.path("numKey").asInt(-1);
 
       if (numVol != -1) {
         printWithUnderline("Volumes", false);
