@@ -28,7 +28,8 @@ MAVEN_OPTIONS='-B -fae --no-transfer-progress'
 
 declare -i rc
 
-mvn "$MAVEN_OPTIONS" test-compile pmd:check -Dpmd.failOnViolation=false -Dpmd.printFailingErrors "$@" > "${REPORT_DIR}/pmd-output.log"
+#shellcheck disable=SC2086
+mvn $MAVEN_OPTIONS test-compile pmd:check -Dpmd.failOnViolation=false -Dpmd.printFailingErrors "$@" > "${REPORT_DIR}/pmd-output.log"
 
 rc=$?
 
