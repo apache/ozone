@@ -91,8 +91,7 @@ public class TestDefaultProfile {
    */
   @Test
   public void testVerifyCertificate() throws Exception {
-    //TODO: generateCSR!
-    PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
+    CertificateSignRequest csr = new CertificateSignRequest.Builder()
         .addDnsName("hadoop.apache.org")
         .addIpAddress("8.8.8.8")
         .addServiceName("OzoneMarketingCluster001")
@@ -102,9 +101,8 @@ public class TestDefaultProfile {
         .setSubject("Ozone Cluster")
         .setConfiguration(securityConfig)
         .setKey(keyPair)
-        .build()
-        .generateCSR();
-    assertTrue(approver.verifyPkcs10Request(csr));
+        .build();
+    assertFalse(approver.inspectCSR(csr.toEncodedFormat()).isCompletedExceptionally());
   }
 
 
@@ -118,8 +116,7 @@ public class TestDefaultProfile {
     KeyPair newKeyPair = new HDDSKeyGenerator(securityConfig).generateKey();
     KeyPair wrongKey = new KeyPair(keyPair.getPublic(),
         newKeyPair.getPrivate());
-    //TODO: generateCSR!
-    PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
+    CertificateSignRequest csr = new CertificateSignRequest.Builder()
         .addDnsName("hadoop.apache.org")
         .addIpAddress("8.8.8.8")
         .setCA(false)
@@ -128,11 +125,10 @@ public class TestDefaultProfile {
         .setSubject("Ozone Cluster")
         .setConfiguration(securityConfig)
         .setKey(wrongKey)
-        .build()
-        .generateCSR();
+        .build();
     // Signature verification should fail here, since the public/private key
     // does not match.
-    assertFalse(approver.verifyPkcs10Request(csr));
+    assertTrue(approver.inspectCSR(csr.toEncodedFormat()).isCompletedExceptionally());
   }
 
   /**
@@ -140,8 +136,7 @@ public class TestDefaultProfile {
    */
   @Test
   public void testExtensions() throws Exception {
-    //TODO: generateCSR!
-    PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
+    CertificateSignRequest csr = new CertificateSignRequest.Builder()
         .addDnsName("hadoop.apache.org")
         .addIpAddress("192.10.234.6")
         .setCA(false)
@@ -150,9 +145,8 @@ public class TestDefaultProfile {
         .setSubject("Ozone Cluster")
         .setConfiguration(securityConfig)
         .setKey(keyPair)
-        .build()
-        .generateCSR();
-    assertTrue(approver.verfiyExtensions(csr));
+        .build();
+    assertFalse(approver.inspectCSR(csr.toEncodedFormat()).isCompletedExceptionally());
   }
 
   /**
@@ -164,8 +158,7 @@ public class TestDefaultProfile {
 
   @Test
   public void testInvalidExtensionsWithCA() throws Exception {
-    //TODO: generateCSR!
-    PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
+    CertificateSignRequest csr = new CertificateSignRequest.Builder()
         .addDnsName("hadoop.apache.org")
         .addIpAddress("192.10.234.6")
         .setCA(true)
@@ -174,9 +167,8 @@ public class TestDefaultProfile {
         .setSubject("Ozone Cluster")
         .setConfiguration(securityConfig)
         .setKey(keyPair)
-        .build()
-        .generateCSR();
-    assertFalse(approver.verfiyExtensions(csr));
+        .build();
+    assertTrue(approver.inspectCSR(csr.toEncodedFormat()).isCompletedExceptionally());
   }
 
   /**

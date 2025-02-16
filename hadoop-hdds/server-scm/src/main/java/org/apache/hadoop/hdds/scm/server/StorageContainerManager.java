@@ -152,10 +152,9 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
 import org.apache.hadoop.hdds.security.token.ContainerTokenGenerator;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultCAServer;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.SubCAServer;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultCAProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -892,13 +891,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getCertificateServer() != null) {
       scmCertificateServer = configurator.getCertificateServer();
     } else {
-      scmCertificateServer = new DefaultCAServer(subject,
+      scmCertificateServer = new SubCAServer(subject,
           scmStorageConfig.getClusterID(), scmStorageConfig.getScmId(),
-          certificateStore, null, new DefaultCAProfile(),
-          scmCertificateClient.getComponentName());
+          certificateStore, new DefaultCAProfile(), null,
+          getScmAddress(scmHANodeDetails, configuration).getHostName());
       // INTERMEDIARY_CA which issues certs to DN and OM.
-      scmCertificateServer.init(new SecurityConfig(configuration),
-          CAType.SUBORDINATE);
+      scmCertificateServer.init(new SecurityConfig(configuration));
     }
 
     // If primary SCM node Id is set it means this is a cluster which has

@@ -81,8 +81,8 @@ public class TestCertificateSignRequest {
             .setClusterID(clusterID)
             .setKey(keyPair)
             .setConfiguration(securityConfig);
-    //TODO: generateCSR!
-    PKCS10CertificationRequest csr = builder.build().generateCSR();
+    String encodedRequest = builder.build().toEncodedFormat();
+    PKCS10CertificationRequest csr = CertificateSignRequest.getCertificationRequest(encodedRequest);
 
     // Check the Subject Name is in the expected format.
     String dnName = String.format(getDistinguishedNameFormat(),
@@ -139,8 +139,8 @@ public class TestCertificateSignRequest {
 
     builder.addDnsName("dn1.abc.com");
 
-    //TODO: generateCSR!
-    PKCS10CertificationRequest csr = builder.build().generateCSR();
+    String encodedRequest = builder.build().toEncodedFormat();
+    PKCS10CertificationRequest csr = CertificateSignRequest.getCertificationRequest(encodedRequest);
 
     // Check the Subject Name is in the expected format.
     String dnName = String.format(getDistinguishedNameFormat(),
@@ -215,8 +215,8 @@ public class TestCertificateSignRequest {
       builder.build();
     });
 
-    //TODO: generateCSR!
-    PKCS10CertificationRequest csr = builder.build().generateCSR();
+    String encodedRequest = builder.build().toEncodedFormat();
+    PKCS10CertificationRequest csr = CertificateSignRequest.getCertificationRequest(encodedRequest);
 
     // Check the Subject Name is in the expected format.
     String dnName = String.format(getDistinguishedNameFormat(),
@@ -251,8 +251,8 @@ public class TestCertificateSignRequest {
             .setKey(keyPair)
             .setConfiguration(securityConfig);
 
-    //TODO: generateCSR!
-    PKCS10CertificationRequest csr = builder.build().generateCSR();
+    String encodedRequest = builder.build().toEncodedFormat();
+    PKCS10CertificationRequest csr = CertificateSignRequest.getCertificationRequest(encodedRequest);
     byte[] csrBytes = csr.getEncoded();
 
     // Verify de-serialized CSR matches with the original CSR
