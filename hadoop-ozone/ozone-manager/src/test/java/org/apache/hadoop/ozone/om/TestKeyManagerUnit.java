@@ -69,7 +69,6 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 
@@ -114,7 +113,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
   private OzoneManagerProtocol writeClient;
   private OzoneManager om;
-  private OzoneManagerStateMachine omStateMachine;
+
   @BeforeAll
   void setup(@TempDir Path testDir) throws Exception {
     ExitUtils.disableSystemExit();
@@ -132,7 +131,6 @@ class TestKeyManagerUnit extends OzoneTestBase {
     metadataManager = omTestManagers.getMetadataManager();
     keyManager = (KeyManagerImpl)omTestManagers.getKeyManager();
     writeClient = omTestManagers.getWriteClient();
-    omStateMachine = omTestManagers.getOzoneManagerStateMachine();
   }
 
   @BeforeEach
@@ -254,18 +252,23 @@ class TestKeyManagerUnit extends OzoneTestBase {
   }
 
   @Test
-  public void listMultipartUploadsWithAbortedUpload() throws IOException, InterruptedException {
+  public void listMultipartUploadsWithFewEntriesInCache() throws IOException {
     String volume = volumeName();
     String bucket = "bucket";
 
     //GIVEN
     createBucket(metadataManager, volume, bucket);
+    createBucket(metadataManager, volume, bucket);
 
-    // Add few to DB.
-    initMultipartUpload(writeClient, volume, bucket, "dir/key1");
+
+    // Add few to cache and few to DB.
+    addinitMultipartUploadToCache(volume, bucket, "dir/key1");
+
     initMultipartUpload(writeClient, volume, bucket, "dir/key2");
-    // Wait for double buffer to flush. (cleanup cache and write records to DB)
-    omStateMachine.awaitDoubleBufferFlush();
+
+    addinitMultipartUploadToCache(volume, bucket, "dir/key3");
+
+    initMultipartUpload(writeClient, volume, bucket, "dir/key4");
 
     //WHEN
     OmMultipartUploadList omMultipartUploadList =
@@ -273,18 +276,56 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
     //THEN
     List<OmMultipartUpload> uploads = omMultipartUploadList.getUploads();
-    assertEquals(2, uploads.size());
+    assertEquals(4, uploads.size());
     assertEquals("dir/key1", uploads.get(0).getKeyName());
     assertEquals("dir/key2", uploads.get(1).getKeyName());
+    assertEquals("dir/key3", uploads.get(2).getKeyName());
+    assertEquals("dir/key4", uploads.get(3).getKeyName());
 
     // Add few more to test prefix.
-    OmMultipartInfo omMultipartInfo1 = initMultipartUpload(writeClient,
-        volume, bucket, "dir/ozonekey1");
-    OmMultipartInfo omMultipartInfo2 = initMultipartUpload(writeClient,
-        volume, bucket, "dir/ozonekey2");
-    // Wait for double buffer to flush. (cleanup cache and write records to DB)
-    omStateMachine.awaitDoubleBufferFlush();
 
+    // Same way add few to cache and few to DB.
+    addinitMultipartUploadToCache(volume, bucket, "dir/ozonekey1");
+
+    initMultipartUpload(writeClient, volume, bucket, "dir/ozonekey2");
+
+    OmMultipartInfo omMultipartInfo3 = addinitMultipartUploadToCache(volume,
+        bucket, "dir/ozonekey3");
+
+    OmMultipartInfo omMultipartInfo4 = initMultipartUpload(writeClient,
+        volume, bucket, "dir/ozonekey4");
+
+    omMultipartUploadList =
+        keyManager.listMultipartUploads(volume, bucket, "dir/ozone", "", "", 10);
+
+    //THEN
+    uploads = omMultipartUploadList.getUploads();
+    assertEquals(4, uploads.size());
+    assertEquals("dir/ozonekey1", uploads.get(0).getKeyName());
+    assertEquals("dir/ozonekey2", uploads.get(1).getKeyName());
+    assertEquals("dir/ozonekey3", uploads.get(2).getKeyName());
+    assertEquals("dir/ozonekey4", uploads.get(3).getKeyName());
+
+    // Abort multipart upload for key in DB.
+    abortMultipart(volume, bucket, "dir/ozonekey4",
+        omMultipartInfo4.getUploadID());
+
+    // Now list.
+    omMultipartUploadList =
+        keyManager.listMultipartUploads(volume, bucket, "dir/ozone", "", "", 10);
+
+    //THEN
+    uploads = omMultipartUploadList.getUploads();
+    assertEquals(3, uploads.size());
+    assertEquals("dir/ozonekey1", uploads.get(0).getKeyName());
+    assertEquals("dir/ozonekey2", uploads.get(1).getKeyName());
+    assertEquals("dir/ozonekey3", uploads.get(2).getKeyName());
+
+    // abort multipart upload for key in cache.
+    abortMultipart(volume, bucket, "dir/ozonekey3",
+        omMultipartInfo3.getUploadID());
+
+    // Now list.
     omMultipartUploadList =
         keyManager.listMultipartUploads(volume, bucket, "dir/ozone", "", "", 10);
 
@@ -294,30 +335,6 @@ class TestKeyManagerUnit extends OzoneTestBase {
     assertEquals("dir/ozonekey1", uploads.get(0).getKeyName());
     assertEquals("dir/ozonekey2", uploads.get(1).getKeyName());
 
-    // Abort multipart upload for key in DB.
-    abortMultipart(volume, bucket, "dir/ozonekey1",
-        omMultipartInfo1.getUploadID());
-
-    // Now list.
-    omMultipartUploadList =
-        keyManager.listMultipartUploads(volume, bucket, "dir/ozone", "", "", 10);
-
-    //THEN
-    uploads = omMultipartUploadList.getUploads();
-    assertEquals(1, uploads.size());
-    assertEquals("dir/ozonekey2", uploads.get(0).getKeyName());
-
-    // abort multipart upload for key in cache.
-    abortMultipart(volume, bucket, "dir/ozonekey2",
-        omMultipartInfo2.getUploadID());
-
-    // Now list.
-    omMultipartUploadList =
-        keyManager.listMultipartUploads(volume, bucket, "dir/ozone", "", "", 10);
-
-    //THEN
-    uploads = omMultipartUploadList.getUploads();
-    assertEquals(0, uploads.size());
   }
 
   @Test

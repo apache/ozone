@@ -100,9 +100,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * This test verifies all the S3 multipart client apis - prefix layout.
  */
@@ -119,8 +116,6 @@ public class TestOzoneClientMultipartUploadWithFSO {
   private String keyName;
   private OzoneVolume volume;
   private OzoneBucket bucket;
-
-  private static final Logger LOG = LoggerFactory.getLogger(TestOzoneClientMultipartUploadWithFSO.class);
 
   /**
    * Create a MiniOzoneCluster for testing.

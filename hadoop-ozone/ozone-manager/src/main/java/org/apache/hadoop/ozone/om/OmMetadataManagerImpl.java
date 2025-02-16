@@ -25,6 +25,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,7 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
@@ -1941,48 +1943,68 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       String uploadIdMarker, int maxUploads) throws IOException {
 
     MultipartUploadKeys.Builder resultBuilder = MultipartUploadKeys.newBuilder();
-    Set<String> responseKeys = new TreeSet<>();
-    String lastKey = null;
+    SortedSet<String> responseKeys = new TreeSet<>();
+    Set<String> aborted = new HashSet<>();
 
     String prefixKey =
         OmMultipartUpload.getDbKey(volumeName, bucketName, prefix);
 
-    if (!keyMarker.isEmpty()) {
+    if (StringUtil.isNotBlank(keyMarker)) {
       prefix = keyMarker;
-      if (!uploadIdMarker.isEmpty()) {
+      if (StringUtil.isNotBlank(uploadIdMarker)) {
         prefix = prefix + OM_KEY_PREFIX + uploadIdMarker;
       }
     }
-    String startKey = OmMultipartUpload.getDbKey(volumeName, bucketName, prefix);
+    String seekKey = OmMultipartUpload.getDbKey(volumeName, bucketName, prefix);
 
-    // prefixed iterator will only iterate until keys match the prefix
-    try (TableIterator<String, ? extends KeyValue<String, OmMultipartKeyInfo>>
-        iterator = getMultipartInfoTable().iterator(prefixKey)) {
-      iterator.seek(startKey);
-
-      while (iterator.hasNext() && responseKeys.size() < maxUploads + 1) {
-        KeyValue<String, OmMultipartKeyInfo> entry = iterator.next();
-        if (entry.getKey().startsWith(prefixKey)) {
-          // If it is marked for abort, skip it.
-          CacheValue<OmMultipartKeyInfo> cacheValue = getMultipartInfoTable()
-              .getCacheValue(new CacheKey<String>(entry.getKey()));
-          if (cacheValue == null || cacheValue.getCacheValue() != null) {
-            responseKeys.add(entry.getKey());
-            lastKey = entry.getKey();
-          }
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmMultipartKeyInfo>>>
+        cacheIterator = getMultipartInfoTable().cacheIterator();
+    // First iterate all the entries in cache.
+    while (cacheIterator.hasNext()) {
+      Map.Entry<CacheKey<String>, CacheValue<OmMultipartKeyInfo>> cacheEntry =
+          cacheIterator.next();
+      String cacheKey = cacheEntry.getKey().getCacheKey();
+      if (cacheKey.startsWith(prefixKey)) {
+        // Check if it is marked for delete, due to abort mpu
+        if (cacheEntry.getValue().getCacheValue() != null &&
+            cacheKey.compareTo(seekKey) >= 0) {
+          responseKeys.add(cacheKey);
         } else {
-          break;
+          aborted.add(cacheKey);
         }
       }
     }
 
-    if (lastKey != null && responseKeys.size() == maxUploads + 1) {
-      responseKeys.remove(lastKey);
+    int dbKeysCount = 0;
+    // the prefix iterator will only iterate keys that match the given prefix
+    // so we don't need to check if the key is started with prefixKey again
+    try (TableIterator<String, ? extends KeyValue<String, OmMultipartKeyInfo>>
+        iterator = getMultipartInfoTable().iterator(prefixKey)) {
+      iterator.seek(seekKey);
 
+      while (iterator.hasNext() && dbKeysCount < maxUploads + 1) {
+        KeyValue<String, OmMultipartKeyInfo> entry = iterator.next();
+        // If it is marked for abort, skip it.
+        if (!aborted.contains(entry.getKey())) {
+          responseKeys.add(entry.getKey());
+          dbKeysCount++;
+        }
+      }
+    }
+
+    String lastKey = responseKeys.stream()
+        .skip(maxUploads)
+        .findFirst()
+        .orElse(null);
+    if (lastKey != null) {
+      // implies the keyset size is greater than maxUploads
       OmMultipartUpload lastKeyMultipartUpload = OmMultipartUpload.from(lastKey);
       resultBuilder.setNextKeyMarker(lastKeyMultipartUpload.getKeyName())
           .setNextUploadIdMarker(lastKeyMultipartUpload.getUploadId())
           .setIsTruncated(true);
+      
+      // keep the [0, maxUploads] keys
+      responseKeys = responseKeys.subSet(responseKeys.first(), lastKey);
     }
 
     return resultBuilder
