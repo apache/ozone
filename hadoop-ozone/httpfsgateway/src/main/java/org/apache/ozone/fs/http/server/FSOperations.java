@@ -103,7 +103,7 @@ public final class FSOperations {
    */
   @SuppressWarnings({"unchecked"})
   private static Map<String, Object> toJson(FileStatus[] fileStatuses,
-                                            boolean isFile) {
+      boolean isFile) {
     Map<String, Object> json = new LinkedHashMap<>();
     Map<String, Object> inner = new LinkedHashMap<>();
     JSONArray statuses = new JSONArray();
