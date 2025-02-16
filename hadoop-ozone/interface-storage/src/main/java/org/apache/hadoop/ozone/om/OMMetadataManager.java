@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
+import org.apache.hadoop.ozone.om.helpers.MultipartUploadKeys;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
@@ -489,79 +490,6 @@ public interface OMMetadataManager extends DBStoreHAManager {
    */
   <KEY, VALUE> long countEstimatedRowsInTable(Table<KEY, VALUE> table)
       throws IOException;
-
-
-  /**
-   * This class is used to store the result of listMultipartUploads.
-   */
-  class MultipartUploadKeys {
-    private final Set<String> keys;
-    private final String nextKeyMarker;
-    private final String nextUploadIdMarker;
-    private final boolean isTruncated;
-
-    public MultipartUploadKeys(Set<String> keys, String nextKeyMarker, String nextUploadIdMarker, boolean isTruncated) {
-      this.keys = keys;
-      this.nextKeyMarker = nextKeyMarker;
-      this.nextUploadIdMarker = nextUploadIdMarker;
-      this.isTruncated = isTruncated;
-    }
-
-    public Set<String> getKeys() {
-      return keys;
-    }
-
-    public String getNextKeyMarker() {
-      return nextKeyMarker;
-    }
-
-    public String getNextUploadIdMarker() {
-      return nextUploadIdMarker;
-    }
-
-    public boolean isTruncated() {
-      return isTruncated;
-    }
-
-    public static Builder newBuilder() {
-      return new Builder();
-    }
-
-    /**
-     * Builder class for MultipartUploadKeys.
-     */
-    public static class Builder {
-      private Set<String> keys;
-      private String nextKeyMarker = "";
-      private String nextUploadIdMarker = "";
-      private boolean isTruncated = false;
-
-      public Builder setKeys(Set<String> keys) {
-        this.keys = keys;
-        return this;
-      }
-
-      public Builder setNextKeyMarker(String nextKeyMarker) {
-        this.nextKeyMarker = nextKeyMarker;
-        return this;
-      }
-
-      public Builder setNextUploadIdMarker(String nextUploadIdMarker) {
-        this.nextUploadIdMarker = nextUploadIdMarker;
-        return this;
-      }
-
-      public Builder setIsTruncated(boolean isTruncated) {
-        this.isTruncated = isTruncated;
-        return this;
-      }
-
-      public MultipartUploadKeys build() {
-        return new MultipartUploadKeys(keys, nextKeyMarker, nextUploadIdMarker, isTruncated);
-      }
-
-    }
-  }
 
   /**
    * Return the existing upload keys which includes volumeName, bucketName,

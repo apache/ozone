@@ -79,6 +79,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
+import org.apache.hadoop.ozone.om.helpers.MultipartUploadKeys;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -828,7 +829,7 @@ public class KeyManagerImpl implements KeyManager {
         bucketName);
     try {
 
-      OMMetadataManager.MultipartUploadKeys multipartUploadKeys =
+      MultipartUploadKeys multipartUploadKeys =
           metadataManager
               .getMultipartUploadKeys(volumeName, bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
 
