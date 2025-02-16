@@ -16,6 +16,8 @@
 
 #checks:basic
 
+set -u -o pipefail
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
@@ -24,23 +26,18 @@ mkdir -p "$REPORT_DIR"
 
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
-MAVEN_OPTIONS='-B -fae --no-transfer-progress'
+declare -i rc
+
+MAVEN_OPTIONS='-B -fae --no-transfer-progress -Dpmd.failOnViolation=false -Dpmd.printFailingErrors -DskipRecon'
 
 declare -i rc
 
 #shellcheck disable=SC2086
-mvn $MAVEN_OPTIONS test-compile pmd:check -Dpmd.failOnViolation=false -Dpmd.printFailingErrors "$@" > "${REPORT_DIR}/pmd-output.log"
-
+mvn $MAVEN_OPTIONS test-compile pmd:check "$@" | tee "${REPORT_DIR}/output.log"
 rc=$?
 
-cat "${REPORT_DIR}/pmd-output.log"
+grep -o "PMD Failure.*" "${REPORT_DIR}/output.log" > "$REPORT_FILE"
 
-find "." -name pmd-output.log -print0 \
-  | xargs -0 sed -n -e '/^\[WARNING\] PMD Failure/p' \
-  | tee "$REPORT_FILE"
+ERROR_PATTERN="\[ERROR\]"
 
-## generate counter
-grep -c ':' "$REPORT_FILE" > "$REPORT_DIR/failures"
-
-ERROR_PATTERN="\[WARNING\] PMD Failure"
 source "${DIR}/_post_process.sh"

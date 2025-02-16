@@ -424,6 +424,7 @@ function check_needs_pmd() {
         "^hadoop-ozone/dev-support/checks/pmd.sh"
         "pom.xml"
         "src/..../java"
+        "pmd-ruleset.xml"
     )
     local ignore_array=(
         "^hadoop-ozone/dist"
