@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,25 +17,7 @@
 
 package org.apache.ozone.lib.service.hadoop;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.ozone.lib.server.BaseService;
-import org.apache.ozone.lib.server.ServiceException;
-import org.apache.ozone.lib.service.FileSystemAccess;
-import org.apache.ozone.lib.service.FileSystemAccessException;
-import org.apache.ozone.lib.service.Instrumentation;
-import org.apache.ozone.lib.service.Scheduler;
-import org.apache.ozone.lib.util.Check;
-import org.apache.ozone.lib.util.ConfigurationUtils;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.util.VersionInfo;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 
 import java.io.File;
 import java.io.IOException;
@@ -49,8 +30,25 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.VersionInfo;
+import org.apache.ozone.lib.server.BaseService;
+import org.apache.ozone.lib.server.ServiceException;
+import org.apache.ozone.lib.service.FileSystemAccess;
+import org.apache.ozone.lib.service.FileSystemAccessException;
+import org.apache.ozone.lib.service.Instrumentation;
+import org.apache.ozone.lib.service.Scheduler;
+import org.apache.ozone.lib.util.Check;
+import org.apache.ozone.lib.util.ConfigurationUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Provides authenticated filesystem access.
