@@ -65,11 +65,14 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
   private OzoneBucket emptyLegacyOzoneBucket;
   private OzoneBucket emptyFsoOzoneBucket;
   private OzoneClient client;
+  private boolean originalFileSystemPathEnabled;
   private long originalMaxListSize;
 
   @BeforeAll
   void init() throws Exception {
     OmConfig omConfig = cluster().getOzoneManager().getConfig();
+    originalFileSystemPathEnabled = omConfig.isFileSystemPathEnabled();
+    omConfig.setFileSystemPathEnabled(true);
     originalMaxListSize = omConfig.getMaxListSize();
     omConfig.setMaxListSize(2);
 
@@ -124,7 +127,9 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
   @AfterAll
   void cleanup() {
     IOUtils.closeQuietly(client);
-    cluster().getOzoneManager().getConfig().setMaxListSize(originalMaxListSize);
+    OmConfig omConfig = cluster().getOzoneManager().getConfig();
+    omConfig.setFileSystemPathEnabled(originalFileSystemPathEnabled);
+    omConfig.setMaxListSize(originalMaxListSize);
   }
 
   private void initFSNameSpace() throws Exception {
