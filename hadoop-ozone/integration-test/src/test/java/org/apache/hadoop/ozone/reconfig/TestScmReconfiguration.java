@@ -38,11 +38,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * Tests for SCM reconfiguration.
  */
-class TestScmReconfiguration extends ReconfigurationTestBase {
+public abstract class TestScmReconfiguration extends ReconfigurationTestBase {
 
   @Override
   ReconfigurationHandler getSubject() {
-    return getCluster().getStorageContainerManager()
+    return cluster().getStorageContainerManager()
         .getReconfigurationHandler();
   }
 
@@ -69,7 +69,7 @@ class TestScmReconfiguration extends ReconfigurationTestBase {
 
     assertEquals(
         ImmutableSet.of(newValue, getCurrentUser()),
-        getCluster().getStorageContainerManager().getScmAdminUsernames());
+        cluster().getStorageContainerManager().getScmAdminUsernames());
   }
 
   @Test
@@ -81,7 +81,7 @@ class TestScmReconfiguration extends ReconfigurationTestBase {
 
     assertEquals(
         ImmutableSet.of(newValue),
-        getCluster().getStorageContainerManager()
+        cluster().getStorageContainerManager()
             .getScmReadOnlyAdminUsernames());
   }
 
@@ -97,14 +97,14 @@ class TestScmReconfiguration extends ReconfigurationTestBase {
   }
 
   private ReplicationManagerConfiguration replicationManagerConfig() {
-    return getCluster().getStorageContainerManager().getReplicationManager()
+    return cluster().getStorageContainerManager().getReplicationManager()
         .getConfig();
   }
 
   @Test
   void blockDeletionPerInterval() throws ReconfigurationException {
     SCMBlockDeletingService blockDeletingService =
-        getCluster().getStorageContainerManager().getScmBlockManager()
+        cluster().getStorageContainerManager().getScmBlockManager()
         .getSCMBlockDeletingService();
     int blockDeleteTXNum = blockDeletingService.getBlockDeleteTXNum();
     int newValue = blockDeleteTXNum + 1;

@@ -64,9 +64,8 @@ public class PrefixManagerImpl implements PrefixManager {
   // In-memory prefix tree to optimize ACL evaluation
   private RadixTree<OmPrefixInfo> prefixTree;
 
-  // TODO: This isRatisEnabled check will be removed as part of HDDS-1909,
-  //  where we integrate both HA and Non-HA code.
-  private boolean isRatisEnabled;
+  // Ratis is disabled for snapshots
+  private final boolean isRatisEnabled;
 
   public PrefixManagerImpl(OzoneManager ozoneManager, OMMetadataManager metadataManager,
       boolean isRatisEnabled) {

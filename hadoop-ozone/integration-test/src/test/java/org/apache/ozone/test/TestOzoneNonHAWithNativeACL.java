@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,28 +15,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.ozone.test;
 
-package org.apache.ozone.lib.wsrs;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.junit.jupiter.api.TestInstance;
 
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-
-/**
- * Byte parameter.
- */
-@InterfaceAudience.Private
-public abstract class ByteParam extends Param<Byte> {
-
-  public ByteParam(String name, Byte defaultValue) {
-    super(name, defaultValue);
-  }
-
+/** Test Ozone with native ACLs in non-HA cluster. */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class TestOzoneNonHAWithNativeACL extends AclTests {
   @Override
-  protected Byte parse(String str) throws Exception {
-    return Byte.parseByte(str);
-  }
-
-  @Override
-  protected String getDomain() {
-    return "a byte";
+  protected MiniOzoneCluster createCluster() throws Exception {
+    return newClusterBuilder()
+        .build();
   }
 }

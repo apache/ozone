@@ -99,7 +99,7 @@ public class TestS3MultipartUploadAbortResponseWithFSO
       OmMultipartKeyInfo omMultipartKeyInfo, OmBucketInfo omBucketInfo,
       OzoneManagerProtocolProtos.OMResponse omResponse) {
     return new S3MultipartUploadAbortResponseWithFSO(omResponse, multipartKey,
-        multipartOpenKey, omMultipartKeyInfo, true, omBucketInfo,
+        multipartOpenKey, omMultipartKeyInfo, omBucketInfo,
         getBucketLayout());
   }
 
