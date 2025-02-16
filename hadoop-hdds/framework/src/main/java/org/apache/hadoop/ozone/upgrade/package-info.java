@@ -16,6 +16,7 @@
  */
 
 /**
- * Ozone related test helper classes and tests of common utils.
+ * This package contains classes for the Ozone upgrade and layout version
+ * management.
  */
-package org.apache.hadoop.ozone;
+package org.apache.hadoop.ozone.upgrade;
