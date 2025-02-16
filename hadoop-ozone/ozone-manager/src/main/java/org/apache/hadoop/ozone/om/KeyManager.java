@@ -226,34 +226,6 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   void refresh(OmKeyInfo key) throws IOException;
 
   /**
-   * Assume OM has FS namespace like below, deleteDirTable stores absolute
-   * path name as existing KeyDeletionService expects full key name.
-   * For example, if user deletes directory 'd1' then the entry in OM DB looks
-   * like, DBKey = 1030/d3 and DBValue = KeyInfo with keyName "a/b2/d3"
-   *
-   *                   vol1
-   *                    |
-   *                  buck-1
-   *                    |
-   *                    a
-   *                    |
-   *      -----------------------------------
-   *     |             |                     |
-   *     b1            b2                    b3
-   *   -----       ---------               ----------
-   *   |    |      |    |   |             |    |     |
-   *  c1   c2     d1   d2  d3             e1   e2   e3
-   *                   |                  |
-   *               --------               |
-   *              |        |              |
-   *           d21.txt   d22.txt        e11.txt
-   *
-   * @return OmKeyInfo
-   * @throws IOException
-   */
-  Table.KeyValue<String, OmKeyInfo> getPendingDeletionDir() throws IOException;
-
-  /**
    * Returns an iterator for pending deleted directories.
    * @throws IOException
    */
