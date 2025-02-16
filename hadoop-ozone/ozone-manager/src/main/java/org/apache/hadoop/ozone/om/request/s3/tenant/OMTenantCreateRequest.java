@@ -287,8 +287,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         omVolumeArgs.setQuotaInNamespace(OzoneConsts.QUOTA_RESET);
         omVolumeArgs.setObjectID(
             ozoneManager.getObjectIdFromTxId(transactionLogIndex));
-        omVolumeArgs.setUpdateID(transactionLogIndex,
-            ozoneManager.isRatisEnabled());
+        omVolumeArgs.setUpdateID(transactionLogIndex);
 
         omVolumeArgs.incRefCount();
         // Remove this check when vol ref count is also used by other features

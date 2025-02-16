@@ -1015,13 +1015,13 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nonnull PrefixManager prefixManager,
           @Nullable OmBucketInfo omBucketInfo,
           OMFileRequest.OMPathInfo omPathInfo,
-          long transactionLogIndex, long objectID, boolean isRatisEnabled,
+          long transactionLogIndex, long objectID,
           ReplicationConfig replicationConfig, OzoneConfiguration config)
           throws IOException {
 
     return prepareFileInfo(omMetadataManager, keyArgs, dbKeyInfo, size,
             locations, encInfo, prefixManager, omBucketInfo, omPathInfo,
-            transactionLogIndex, objectID, isRatisEnabled, replicationConfig, config);
+            transactionLogIndex, objectID, replicationConfig, config);
   }
 
   /**
@@ -1039,7 +1039,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nullable OmBucketInfo omBucketInfo,
           OMFileRequest.OMPathInfo omPathInfo,
           long transactionLogIndex, long objectID,
-          boolean isRatisEnabled, ReplicationConfig replicationConfig,
+          ReplicationConfig replicationConfig,
           OzoneConfiguration config) throws IOException {
     if (keyArgs.getIsMultipartKey()) {
       return prepareMultipartFileInfo(omMetadataManager, keyArgs,
@@ -1061,7 +1061,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       // The modification time is set in preExecute. Use the same
       // modification time.
       dbKeyInfo.setModificationTime(keyArgs.getModificationTime());
-      dbKeyInfo.setUpdateID(transactionLogIndex, isRatisEnabled);
+      dbKeyInfo.setUpdateID(transactionLogIndex);
       dbKeyInfo.setReplicationConfig(replicationConfig);
 
       // Construct a new metadata map from KeyArgs.
@@ -1219,15 +1219,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
    *
    * @param keyToDelete OmKeyInfo of a key to be in deleteTable
    * @param trxnLogIndex
-   * @param isRatisEnabled
    * @return Old keys eligible for deletion.
    * @throws IOException
    */
   protected RepeatedOmKeyInfo getOldVersionsToCleanUp(
-      @Nonnull OmKeyInfo keyToDelete, long trxnLogIndex,
-      boolean isRatisEnabled) throws IOException {
-    return OmUtils.prepareKeyForDelete(keyToDelete,
-          trxnLogIndex, isRatisEnabled);
+      @Nonnull OmKeyInfo keyToDelete, long trxnLogIndex) throws IOException {
+    return OmUtils.prepareKeyForDelete(keyToDelete, trxnLogIndex);
   }
 
   protected OzoneLockStrategy getOzoneLockStrategy(OzoneManager ozoneManager) {

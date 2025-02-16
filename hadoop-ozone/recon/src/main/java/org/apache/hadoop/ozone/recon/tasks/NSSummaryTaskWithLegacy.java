@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.recon.tasks;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -64,8 +64,8 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
         reconOMMetadataManager, ozoneConfiguration);
     // true if FileSystemPaths enabled
     enableFileSystemPaths = ozoneConfiguration
-        .getBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-            OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
+        .getBoolean(OmConfig.Keys.ENABLE_FILESYSTEM_PATHS,
+            OmConfig.Defaults.ENABLE_FILESYSTEM_PATHS);
   }
 
   public boolean processWithLegacy(OMUpdateEventBatch events) {

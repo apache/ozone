@@ -147,7 +147,6 @@ public class TestS3GetSecretRequest {
         ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
-    when(ozoneManager.isRatisEnabled()).thenReturn(true);
     S3SecretLockedManager secretManager = new S3SecretLockedManager(
             new S3SecretManagerImpl(
                     omMetadataManager,

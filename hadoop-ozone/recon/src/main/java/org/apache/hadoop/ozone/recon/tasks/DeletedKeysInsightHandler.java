@@ -27,7 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Manages records in the Deleted Table, updating counts and sizes of
@@ -45,23 +45,19 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
   @Override
   public void handlePutEvent(OMDBUpdateEvent<String, Object> event,
                              String tableName,
-                             HashMap<String, Long> objectCountMap,
-                             HashMap<String, Long> unReplicatedSizeMap,
-                             HashMap<String, Long> replicatedSizeMap) {
-
-    String countKey = getTableCountKeyFromTable(tableName);
-    String unReplicatedSizeKey = getUnReplicatedSizeKeyFromTable(tableName);
-    String replicatedSizeKey = getReplicatedSizeKeyFromTable(tableName);
+                             Map<String, Long> objectCountMap,
+                             Map<String, Long> unReplicatedSizeMap,
+                             Map<String, Long> replicatedSizeMap) {
 
     if (event.getValue() != null) {
       RepeatedOmKeyInfo repeatedOmKeyInfo =
           (RepeatedOmKeyInfo) event.getValue();
-      objectCountMap.computeIfPresent(countKey,
+      objectCountMap.computeIfPresent(getTableCountKeyFromTable(tableName),
           (k, count) -> count + repeatedOmKeyInfo.getOmKeyInfoList().size());
       Pair<Long, Long> result = repeatedOmKeyInfo.getTotalSize();
-      unReplicatedSizeMap.computeIfPresent(unReplicatedSizeKey,
+      unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
           (k, size) -> size + result.getLeft());
-      replicatedSizeMap.computeIfPresent(replicatedSizeKey,
+      replicatedSizeMap.computeIfPresent(getReplicatedSizeKeyFromTable(tableName),
           (k, size) -> size + result.getRight());
     } else {
       LOG.warn("Put event does not have the Key Info for {}.",
@@ -77,23 +73,19 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
   @Override
   public void handleDeleteEvent(OMDBUpdateEvent<String, Object> event,
                                 String tableName,
-                                HashMap<String, Long> objectCountMap,
-                                HashMap<String, Long> unReplicatedSizeMap,
-                                HashMap<String, Long> replicatedSizeMap) {
-
-    String countKey = getTableCountKeyFromTable(tableName);
-    String unReplicatedSizeKey = getUnReplicatedSizeKeyFromTable(tableName);
-    String replicatedSizeKey = getReplicatedSizeKeyFromTable(tableName);
+                                Map<String, Long> objectCountMap,
+                                Map<String, Long> unReplicatedSizeMap,
+                                Map<String, Long> replicatedSizeMap) {
 
     if (event.getValue() != null) {
       RepeatedOmKeyInfo repeatedOmKeyInfo =
           (RepeatedOmKeyInfo) event.getValue();
-      objectCountMap.computeIfPresent(countKey, (k, count) ->
+      objectCountMap.computeIfPresent(getTableCountKeyFromTable(tableName), (k, count) ->
           count > 0 ? count - repeatedOmKeyInfo.getOmKeyInfoList().size() : 0L);
       Pair<Long, Long> result = repeatedOmKeyInfo.getTotalSize();
-      unReplicatedSizeMap.computeIfPresent(unReplicatedSizeKey,
+      unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
           (k, size) -> size > result.getLeft() ? size - result.getLeft() : 0L);
-      replicatedSizeMap.computeIfPresent(replicatedSizeKey,
+      replicatedSizeMap.computeIfPresent(getReplicatedSizeKeyFromTable(tableName),
           (k, size) -> size > result.getRight() ? size - result.getRight() :
               0L);
     } else {
@@ -109,9 +101,9 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
   @Override
   public void handleUpdateEvent(OMDBUpdateEvent<String, Object> event,
                                 String tableName,
-                                HashMap<String, Long> objectCountMap,
-                                HashMap<String, Long> unReplicatedSizeMap,
-                                HashMap<String, Long> replicatedSizeMap) {
+                                Map<String, Long> objectCountMap,
+                                Map<String, Long> unReplicatedSizeMap,
+                                Map<String, Long> replicatedSizeMap) {
     // The size of deleted keys cannot change hence no-op.
     return;
   }

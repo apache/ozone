@@ -137,7 +137,6 @@ class TestOzoneManagerDoubleBuffer {
         .setOmMetadataManager(omMetadataManager)
         .setS3SecretManager(secretManager)
         .setMaxUnFlushedTransactionCount(1000)
-        .enableRatis(true)
         .setFlushNotifier(spyFlushNotifier)
         .build()
         .start();
