@@ -74,6 +74,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.utils.InputSubstream;
 import org.apache.ozone.test.OzoneTestBase;
+import org.eclipse.jetty.util.StringUtil;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
@@ -95,10 +96,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
@@ -663,33 +666,93 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
   @Test
   public void testListMultipartUploads() {
     final String bucketName = getBucketName();
-    final String multipartKey1 = getKeyName("multipart1");
-    final String multipartKey2 = getKeyName("multipart2");
+    final String multipartKeyPrefix = getKeyName("multipart");
 
     s3Client.createBucket(bucketName);
 
-    List<String> uploadIds = new ArrayList<>();
+    // Create 25 multipart uploads to test pagination
+    List<String> allKeys = new ArrayList<>();
+    Map<String, String> keyToUploadId = new HashMap<>();
 
-    String uploadId1 = initiateMultipartUpload(bucketName, multipartKey1, null, null, null);
-    uploadIds.add(uploadId1);
-    String uploadId2 = initiateMultipartUpload(bucketName, multipartKey1, null, null, null);
-    uploadIds.add(uploadId2);
-    // TODO: Currently, Ozone sorts based on uploadId instead of MPU init time within the same key.
-    //  Remove this sorting step once HDDS-11532 has been implemented
-    Collections.sort(uploadIds);
-    String uploadId3 = initiateMultipartUpload(bucketName, multipartKey2, null, null, null);
-    uploadIds.add(uploadId3);
+    for (int i = 0; i < 25; i++) {
+      String key = String.format("%s-%03d", multipartKeyPrefix, i);
+      allKeys.add(key);
+      String uploadId = initiateMultipartUpload(bucketName, key, null, null, null);
+      keyToUploadId.put(key, uploadId);
+    }
+    Collections.sort(allKeys);
 
-    // TODO: Add test for max uploads threshold and marker once HDDS-11530 has been implemented
-    ListMultipartUploadsRequest listMultipartUploadsRequest = new ListMultipartUploadsRequest(bucketName);
+    // Test pagination with maxUploads=10
+    Set<String> retrievedKeys = new HashSet<>();
+    String keyMarker = null;
+    String uploadIdMarker = null;
+    boolean truncated = true;
+    int pageCount = 0;
 
-    MultipartUploadListing result = s3Client.listMultipartUploads(listMultipartUploadsRequest);
+    do {
+      ListMultipartUploadsRequest request = new ListMultipartUploadsRequest(bucketName)
+          .withMaxUploads(10)
+          .withKeyMarker(keyMarker)
+          .withUploadIdMarker(uploadIdMarker);
 
-    List<String> listUploadIds = result.getMultipartUploads().stream()
-        .map(MultipartUpload::getUploadId)
-        .collect(Collectors.toList());
+      MultipartUploadListing result = s3Client.listMultipartUploads(request);
 
-    assertEquals(uploadIds, listUploadIds);
+      // Verify page size
+      if (pageCount < 2) {
+        assertEquals(10, result.getMultipartUploads().size());
+        assertTrue(result.isTruncated());
+      } else {
+        assertEquals(5, result.getMultipartUploads().size());
+        assertFalse(result.isTruncated());
+      }
+
+      // Collect keys and verify uploadIds
+      for (MultipartUpload upload : result.getMultipartUploads()) {
+        String key = upload.getKey();
+        retrievedKeys.add(key);
+        assertEquals(keyToUploadId.get(key), upload.getUploadId());
+      }
+
+      // Verify response
+      assertNull(result.getPrefix());
+      assertEquals(result.getUploadIdMarker(), uploadIdMarker);
+      assertEquals(result.getKeyMarker(), keyMarker);
+      assertEquals(result.getMaxUploads(), 10);
+
+      // Update markers for next page
+      keyMarker = result.getNextKeyMarker();
+      uploadIdMarker = result.getNextUploadIdMarker();
+
+      truncated = result.isTruncated();
+      pageCount++;
+
+    } while (truncated);
+
+    // Verify pagination results
+    assertEquals(3, pageCount, "Should have exactly 3 pages");
+    assertEquals(25, retrievedKeys.size(), "Should retrieve all uploads");
+    assertEquals(
+        allKeys,
+        retrievedKeys.stream().sorted().collect(Collectors.toList()),
+        "Retrieved keys should match expected keys in order");
+
+    // Test with prefix
+    String prefix = multipartKeyPrefix + "-01";
+    ListMultipartUploadsRequest prefixRequest = new ListMultipartUploadsRequest(bucketName)
+        .withPrefix(prefix);
+
+    MultipartUploadListing prefixResult = s3Client.listMultipartUploads(prefixRequest);
+
+    assertEquals(prefix, prefixResult.getPrefix());
+    assertEquals(
+        Arrays.asList(multipartKeyPrefix + "-010", multipartKeyPrefix + "-011",
+            multipartKeyPrefix + "-012", multipartKeyPrefix + "-013",
+            multipartKeyPrefix + "-014", multipartKeyPrefix + "-015",
+            multipartKeyPrefix + "-016", multipartKeyPrefix + "-017",
+            multipartKeyPrefix + "-018", multipartKeyPrefix + "-019"),
+        prefixResult.getMultipartUploads().stream()
+            .map(MultipartUpload::getKey)
+            .collect(Collectors.toList()));
   }
 
   @Test

@@ -920,22 +920,24 @@ public class TestOzoneClientMultipartUploadWithFSO {
 
     // Test full pagination process
     final int maxUploads = 10;
-    final int expectedTruncated = 2;
-    int truncatedCount = 0;
+    final int expectedPages = 3;
+    int pageCount = 0;
     String keyMarker = "";
     String uploadIdMarker = "";
     Set<String> retrievedKeys = new HashSet<>();
-    boolean hasMore = true;
+    boolean isTruncated = true;
 
-    while (hasMore) {
+    do {
       OzoneMultipartUploadList result = bucket.listMultipartUploads(
           "dir", keyMarker, uploadIdMarker, maxUploads);
 
-      assertThat(result.getUploads())
-          .as("Number of uploads should not exceed maxUploads")
-          .hasSizeLessThanOrEqualTo(maxUploads);
-
-      assertEquals(result.getUploads().size(), result.getMaxUploads());
+      if (pageCount < 2) {
+        assertEquals(maxUploads, result.getUploads().size());
+        assertTrue(result.isTruncated());
+      } else {
+        assertEquals(numOfKeys - pageCount * maxUploads, result.getUploads().size());
+        assertFalse(result.isTruncated());
+      }
 
       for (OzoneMultipartUpload upload : result.getUploads()) {
         String key = upload.getKeyName();
@@ -947,13 +949,13 @@ public class TestOzoneClientMultipartUploadWithFSO {
       // Update markers for next iteration
       keyMarker = result.getNextKeyMarker();
       uploadIdMarker = result.getNextUploadIdMarker();
-      hasMore = result.isTruncated();
+      isTruncated = result.isTruncated();
 
-      truncatedCount += result.isTruncated() ? 1 : 0;
-    }
+      pageCount++;
+    } while (isTruncated);
 
     assertEquals(keys.size(), retrievedKeys.size());
-    assertEquals(expectedTruncated, truncatedCount);
+    assertEquals(expectedPages, pageCount);
     assertThat(retrievedKeys.stream().sorted().collect(Collectors.toList()))
         .as("Retrieved keys should match expected keys in order")
         .isEqualTo(keys.stream().sorted().collect(Collectors.toList()));
