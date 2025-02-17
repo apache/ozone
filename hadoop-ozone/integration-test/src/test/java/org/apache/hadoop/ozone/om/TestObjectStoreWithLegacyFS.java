@@ -23,12 +23,10 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -44,10 +42,12 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,11 +68,11 @@ import static org.junit.jupiter.api.Assertions.fail;
 /**
  * Test verifies object store with OZONE_OM_ENABLE_FILESYSTEM_PATHS enabled.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(200)
-public class TestObjectStoreWithLegacyFS {
+public abstract class TestObjectStoreWithLegacyFS implements NonHATests.TestCase {
 
-  private static MiniOzoneCluster cluster = null;
-  private static OzoneClient client;
+  private OzoneClient client;
 
   private String volumeName;
 
@@ -82,30 +82,22 @@ public class TestObjectStoreWithLegacyFS {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestObjectStoreWithLegacyFS.class);
+  private boolean originalFileSystemPathEnabled;
 
   @BeforeAll
-  public static void initClass() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
+  void initClass() throws Exception {
+    OmConfig omConfig = cluster().getOzoneManager().getConfig();
+    originalFileSystemPathEnabled = omConfig.isFileSystemPathEnabled();
+    omConfig.setFileSystemPathEnabled(true);
 
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
-    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        BucketLayout.LEGACY.name());
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
-        .build();
-    cluster.waitForClusterToBeReady();
-    client = cluster.newClient();
+    client = cluster().newClient();
   }
 
-  /**
-   * Shutdown MiniOzoneCluster.
-   */
   @AfterAll
-  public static void shutdown() {
+  void cleanup() {
     IOUtils.closeQuietly(client);
-    if (cluster != null) {
-      cluster.shutdown();
-    }
+    OmConfig omConfig = cluster().getOzoneManager().getConfig();
+    omConfig.setFileSystemPathEnabled(originalFileSystemPathEnabled);
   }
 
   @BeforeEach
@@ -132,11 +124,11 @@ public class TestObjectStoreWithLegacyFS {
         .createKey("dir1/dir2/dir3/key-1", 0);
     stream.close();
     Table<String, OmKeyInfo> keyTable =
-        cluster.getOzoneManager().getMetadataManager()
+        cluster().getOzoneManager().getMetadataManager()
             .getKeyTable(BucketLayout.OBJECT_STORE);
 
     String seekKey = "dir";
-    String dbKey = cluster.getOzoneManager().getMetadataManager()
+    String dbKey = cluster().getOzoneManager().getMetadataManager()
         .getOzoneKey(volumeName, bucketName, seekKey);
 
     GenericTestUtils

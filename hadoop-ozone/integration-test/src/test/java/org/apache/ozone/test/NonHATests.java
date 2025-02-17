@@ -147,14 +147,6 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class ObjectStore extends org.apache.hadoop.ozone.om.TestObjectStore {
-    @Override
-    public MiniOzoneCluster cluster() {
-      return getCluster();
-    }
-  }
-
-  @Nested
   class BucketLayoutWithOlderClient extends org.apache.hadoop.ozone.om.TestBucketLayoutWithOlderClient {
     @Override
     public MiniOzoneCluster cluster() {
@@ -163,7 +155,47 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
+  class ListKeys extends org.apache.hadoop.ozone.om.TestListKeys {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class ListKeysWithFSO extends org.apache.hadoop.ozone.om.TestListKeysWithFSO {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class ListStatus extends org.apache.hadoop.ozone.om.TestListStatus {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class ObjectStore extends org.apache.hadoop.ozone.om.TestObjectStore {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
   class ObjectStoreWithFSO extends org.apache.hadoop.ozone.om.TestObjectStoreWithFSO {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class ObjectStoreWithLegacyFS extends org.apache.hadoop.ozone.om.TestObjectStoreWithLegacyFS {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
