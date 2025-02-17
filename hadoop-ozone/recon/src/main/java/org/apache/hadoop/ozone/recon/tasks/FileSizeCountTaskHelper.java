@@ -41,6 +41,8 @@ import java.util.Map;
 import java.util.List;
 import java.util.HashMap;
 
+import static org.hadoop.ozone.recon.schema.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
+
 /**
  * Helper class that encapsulates the common code for file size count tasks.
  * This class does not implement {@code ReconOmTask}; instead, it exposes static
