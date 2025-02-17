@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React from 'react';
+import React, { ReactElement } from 'react';
 import { Card, Col, Row } from 'antd';
 import { Link } from 'react-router-dom';
 import {
@@ -44,6 +44,7 @@ type OverviewCardProps = {
   hoverable?: boolean;
   loading?: boolean;
   linkToUrl?: string;
+  taskIcon?: ReactElement;
 }
 
 // ------------- Styles -------------- //
@@ -108,27 +109,33 @@ const OverviewSimpleCard: React.FC<OverviewCardProps> = ({
   title = '',
   hoverable = false,
   loading = false,
-  linkToUrl = ''
+  linkToUrl = undefined,
+  taskIcon = undefined
 }) => {
 
-  const titleElement = (linkToUrl)
-    ? (
-      <div className='card-title-div'>
+  const titleElement = (
+    <div className='card-title-div'>
+      <span>
+        {taskIcon}
         {title}
+      </span>
+      {
+        linkToUrl &&
         <Link
           to={linkToUrl}
           style={titleLinkStyle}>
           View More
         </Link>
-      </div>)
-    : title
+      }
+    </div>
+  );
 
   return (
     <Card
       size='small'
       loading={loading}
       hoverable={hoverable}
-      title={(linkToUrl) ? titleElement : title}
+      title={titleElement}
       headStyle={cardHeadStyle}
       bodyStyle={cardBodyStyle}
       data-testid={`overview-${title}`}>

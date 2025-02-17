@@ -18,69 +18,25 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import moment from 'moment';
-import filesize from 'filesize';
 import axios from 'axios';
 import { Row, Col, Button } from 'antd';
-import {
-  CheckCircleFilled,
-  WarningFilled
-} from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 
 import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
 import OverviewSummaryCard from '@/v2/components/overviewCard/overviewSummaryCard';
 import OverviewStorageCard from '@/v2/components/overviewCard/overviewStorageCard';
 import OverviewSimpleCard from '@/v2/components/overviewCard/overviewSimpleCard';
+import OverviewOMCardGroup from '@/v2/pages/overview/components/OmDataCardGroup';
 
 import { AutoReloadHelper } from '@/utils/autoReloadHelper';
 import { checkResponseError, showDataFetchError } from '@/utils/common';
 import { AxiosGetHelper, cancelRequests, PromiseAllSettledGetHelper } from '@/utils/axiosRequestHelper';
+import { getHealthIcon } from '@/v2/pages/overview/overview.utils';
 
 import { ClusterStateResponse, OverviewState, StorageReport } from '@/v2/types/overview.types';
 
 import './overview.less';
-
-
-const size = filesize.partial({ round: 1 });
-
-const getHealthIcon = (value: string): React.ReactElement => {
-  const values = value.split('/');
-  if (values.length == 2 && values[0] < values[1]) {
-    return (
-      <>
-        <div className='icon-warning' style={{
-          fontSize: '20px',
-          alignItems: 'center'
-        }}>
-          <WarningFilled style={{
-            marginRight: '5px'
-          }} />
-          Unhealthy
-        </div>
-      </>
-    )
-  }
-  return (
-    <div className='icon-success' style={{
-      fontSize: '20px',
-      alignItems: 'center'
-    }}>
-      <CheckCircleFilled style={{
-        marginRight: '5px'
-      }} />
-      Healthy
-    </div>
-  )
-}
-
-const getSummaryTableValue = (
-  value: number | string | undefined,
-  colType: 'value' | undefined = undefined
-): string => {
-  if (!value) return 'N/A';
-  if (colType === 'value') return String(value as string)
-  return size(value as number)
-}
+import OverviewSummaryCardGroup from '@/v2/pages/overview/components/SummaryCardGroup';
 
 const Overview: React.FC<{}> = () => {
 
@@ -109,7 +65,11 @@ const Overview: React.FC<{}> = () => {
     deletePendingSummarytotalRepSize: 0,
     deletePendingSummarytotalDeletedKeys: 0,
     scmServiceId: '',
-    omServiceId: ''
+    omServiceId: '',
+    omTask: {
+      taskRunning: true,
+      taskStatus: false
+    }
   })
   const [storageReport, setStorageReport] = useState<StorageReport>({
     capacity: 0,
@@ -190,11 +150,14 @@ const Overview: React.FC<{}> = () => {
       const taskStatus = taskstatusResponse.value?.data ?? [{
         taskName: 'N/A',
         lastUpdatedTimestamp: 0,
-        lastUpdatedSeqNumber: 0
+        lastUpdatedSeqNumber: 0,
+        isCurrentTaskRunning: 1,
+        lastTaskRunStatus: 0
       }];
       const missingContainersCount = clusterState.missingContainers;
       const omDBDeltaObject = taskStatus && taskStatus.find((item: any) => item.taskName === 'OmDeltaRequest');
       const omDBFullObject = taskStatus && taskStatus.find((item: any) => item.taskName === 'OmSnapshotRequest');
+      const omTask = taskStatus && taskStatus.find((item: any) => item.taskName === 'OmTableInsightTask');
 
       setState({
         ...state,
@@ -217,6 +180,10 @@ const Overview: React.FC<{}> = () => {
         deletePendingSummarytotalUnrepSize: deletePendingResponse?.value?.data?.totalUnreplicatedDataSize,
         deletePendingSummarytotalRepSize: deletePendingResponse?.value?.data?.totalReplicatedDataSize,
         deletePendingSummarytotalDeletedKeys: deletePendingResponse?.value?.data?.totalDeletedKeys,
+        omTask: {
+          taskRunning: (omTask?.isCurrentTaskRunning ?? 1) === 1,
+          taskStatus: (omTask?.lastTaskRunStatus ?? 0) === 0
+        },
         scmServiceId: clusterState?.scmServiceId ?? 'N/A',
         omServiceId: clusterState?.omServiceId ?? 'N/A'
       });
@@ -276,7 +243,7 @@ const Overview: React.FC<{}> = () => {
     keys, missingContainersCount,
     lastRefreshed, lastUpdatedOMDBDelta,
     lastUpdatedOMDBFull,
-    omStatus, openContainers,
+    omStatus, openContainers, omTask,
     deletedContainers, scmServiceId, omServiceId
   } = state;
 
@@ -380,29 +347,11 @@ const Overview: React.FC<{}> = () => {
             lg: 16,
             xl: 16
           }, 20]}>
-          <Col flex="1 0 20%">
-            <OverviewSimpleCard
-              title='Volumes'
-              icon='inbox'
-              loading={loading}
-              data={volumes}
-              linkToUrl='/Volumes' />
-          </Col>
-          <Col flex="1 0 20%">
-            <OverviewSimpleCard
-              title='Buckets'
-              icon='folder-open'
-              loading={loading}
-              data={buckets}
-              linkToUrl='/Buckets' />
-          </Col>
-          <Col flex="1 0 20%">
-            <OverviewSimpleCard
-              title='Keys'
-              icon='file-text'
-              loading={loading}
-              data={keys} />
-          </Col>
+          <OverviewOMCardGroup
+            loading={loading}
+            data={{ volumes, buckets, keys }}
+            {...omTask}
+          />
           <Col flex="1 0 20%">
             <OverviewSimpleCard
               title='Pipelines'
@@ -427,86 +376,15 @@ const Overview: React.FC<{}> = () => {
             lg: 16,
             xl: 16
           }, 20]}>
-          <Col xs={24} sm={24} md={24} lg={12} xl={12}>
-            <OverviewSummaryCard
-              title='Open Keys Summary'
-              loading={loading}
-              columns={[
-                {
-                  title: 'Name',
-                  dataIndex: 'name',
-                  key: 'name'
-                },
-                {
-                  title: 'Size',
-                  dataIndex: 'value',
-                  key: 'size',
-                  align: 'right'
-                }
-              ]}
-              tableData={[
-                {
-                  key: 'total-replicated-data',
-                  name: 'Total Replicated Data',
-                  value: getSummaryTableValue(openSummarytotalRepSize)
-                },
-                {
-                  key: 'total-unreplicated-data',
-                  name: 'Total Unreplicated Data',
-                  value: getSummaryTableValue(openSummarytotalUnrepSize)
-                },
-                {
-                  key: 'open-keys',
-                  name: 'Open Keys',
-                  value: getSummaryTableValue(
-                    openSummarytotalOpenKeys,
-                    'value'
-                  )
-                }
-              ]}
-              linkToUrl='/Om'
-              state={{activeTab: '2'}} />
-          </Col>
-          <Col xs={24} sm={24} md={24} lg={12} xl={12}>
-            <OverviewSummaryCard
-              title='Delete Pending Keys Summary'
-              loading={loading}
-              columns={[
-                {
-                  title: 'Name',
-                  dataIndex: 'name',
-                  key: 'name'
-                },
-                {
-                  title: 'Size',
-                  dataIndex: 'value',
-                  key: 'size',
-                  align: 'right'
-                }
-              ]}
-              tableData={[
-                {
-                  key: 'total-replicated-data',
-                  name: 'Total Replicated Data',
-                  value: getSummaryTableValue(deletePendingSummarytotalRepSize)
-                },
-                {
-                  key: 'total-unreplicated-data',
-                  name: 'Total Unreplicated Data',
-                  value: getSummaryTableValue(deletePendingSummarytotalUnrepSize)
-                },
-                {
-                  key: 'delete-pending-keys',
-                  name: 'Delete Pending Keys',
-                  value: getSummaryTableValue(
-                    deletePendingSummarytotalDeletedKeys,
-                    'value'
-                  )
-                }
-              ]}
-              linkToUrl='/Om'
-              state={{activeTab: '3'}} />
-          </Col>
+          <OverviewSummaryCardGroup
+            loading={loading}
+            openSummarytotalOpenKeys={openSummarytotalOpenKeys}
+            openSummarytotalRepSize={openSummarytotalRepSize}
+            openSummarytotalUnrepSize={openSummarytotalUnrepSize}
+            deletePendingSummarytotalDeletedKeys={deletePendingSummarytotalDeletedKeys}
+            deletePendingSummarytotalRepSize={deletePendingSummarytotalRepSize}
+            deletePendingSummarytotalUnrepSize={deletePendingSummarytotalUnrepSize}
+            {...omTask} />
         </Row>
         <span style={{ paddingLeft: '8px' }}>
           <span style={{ color: '#6E6E6E' }}>Ozone Service ID:&nbsp;</span>
