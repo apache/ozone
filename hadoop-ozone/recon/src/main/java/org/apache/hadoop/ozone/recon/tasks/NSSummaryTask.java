@@ -101,21 +101,37 @@ public class NSSummaryTask implements ReconOmTask {
   @Override
   public Pair<String, Boolean> process(OMUpdateEventBatch events) {
     long startTime = System.currentTimeMillis();
-    boolean success = nsSummaryTaskWithFSO.processWithFSO(events);
-    if (!success) {
-      LOG.error("processWithFSO failed.");
-    }
-    success = nsSummaryTaskWithLegacy.processWithLegacy(events);
-    if (!success) {
-      LOG.error("processWithLegacy failed.");
-    }
-    success = nsSummaryTaskWithOBS.processWithOBS(events);
-    if (!success) {
-      LOG.error("processWithOBS failed.");
+
+    // Thread pool to execute tasks concurrently
+    ExecutorService executorService = Executors.newFixedThreadPool(3);
+
+    // Create a list of tasks
+    List<Callable<Boolean>> tasks = new ArrayList<>();
+    tasks.add(() -> nsSummaryTaskWithFSO.processWithFSO(events));
+    tasks.add(() -> nsSummaryTaskWithLegacy.processWithLegacy(events));
+    tasks.add(() -> nsSummaryTaskWithOBS.processWithOBS(events));
+
+    try {
+      // Execute all tasks in parallel
+      List<Future<Boolean>> results = executorService.invokeAll(tasks);
+
+      // Check results and return failure if any task failed
+      for (Future<Boolean> result : results) {
+        if (!result.get()) {
+          LOG.error("One or more process tasks failed.");
+          return new ImmutablePair<>(getTaskName(), false);
+        }
+      }
+    } catch (InterruptedException | ExecutionException e) {
+      LOG.error("Error executing process tasks in parallel", e);
+      return new ImmutablePair<>(getTaskName(), false);
+    } finally {
+      executorService.shutdown();
     }
     LOG.debug("{} successfully processed in {} milliseconds",
         getTaskName(), (System.currentTimeMillis() - startTime));
-    return new ImmutablePair<>(getTaskName(), success);
+
+    return new ImmutablePair<>(getTaskName(), true);
   }
 
   @Override
