@@ -32,6 +32,7 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.FileOutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.List;
@@ -139,8 +140,8 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
     OMNodeDetails leader = peerNodesMap.get(leaderNodeID);
     URL omCheckpointUrl = leader.getOMDBCheckpointEndpointUrl(
         httpPolicy.isHttpEnabled(), true);
-    LOG.info("Downloading latest checkpoint from Leader OM {}. Checkpoint " +
-        "URL: {}", leaderNodeID, omCheckpointUrl);
+    LOG.info("Downloading latest checkpoint from Leader OM {}. Checkpoint: {} URL: {}",
+        leaderNodeID, targetFile.getName(), omCheckpointUrl);
     SecurityUtil.doAsCurrentUser(() -> {
       HttpURLConnection connection = (HttpURLConnection)
           connectionFactory.openConnection(omCheckpointUrl, spnegoEnabled);
@@ -162,7 +163,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
       }
 
       try (InputStream inputStream = connection.getInputStream()) {
-        FileUtils.copyInputStreamToFile(inputStream, targetFile);
+        downloadFileWithProgress(inputStream, targetFile);
       } catch (IOException ex) {
         boolean deleted = FileUtils.deleteQuietly(targetFile);
         if (!deleted) {
@@ -175,6 +176,34 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
       }
       return null;
     });
+  }
+
+  /**
+   * Writes data from the given InputStream to the target file while logging download progress every 30 seconds.
+   */
+  public static void downloadFileWithProgress(InputStream inputStream, File targetFile)
+          throws IOException {
+    try (FileOutputStream outputStream = new FileOutputStream(targetFile)) {
+      byte[] buffer = new byte[8 * 1024];
+      long totalBytesRead = 0;
+      int bytesRead;
+      long lastLoggedTime = System.currentTimeMillis();
+
+      while ((bytesRead = inputStream.read(buffer)) != -1) {
+        outputStream.write(buffer, 0, bytesRead);
+        totalBytesRead += bytesRead;
+
+        // Log progress every 30 seconds
+        if (System.currentTimeMillis() - lastLoggedTime >= 30000) {
+          LOG.info("Downloading '{}': {} KB downloaded so far...",
+              targetFile.getName(), totalBytesRead / (1024));
+          lastLoggedTime = System.currentTimeMillis();
+        }
+      }
+
+      LOG.info("Download completed for '{}'. Total size: {} KB",
+          targetFile.getName(), totalBytesRead / (1024));
+    }
   }
 
   /**
