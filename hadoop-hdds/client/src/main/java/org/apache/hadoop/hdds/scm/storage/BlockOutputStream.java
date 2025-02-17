@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -228,7 +229,7 @@ public class BlockOutputStream extends OutputStream {
     totalWriteChunkLength = 0;
     totalPutBlockLength = 0;
     writtenDataLength = 0;
-    failedServers = new ArrayList<>(0);
+    failedServers = new CopyOnWriteArrayList<>();
     ioException = new AtomicReference<>(null);
     this.checksum = new Checksum(config.getChecksumType(), config.getBytesPerChecksum(), true);
     this.clientMetrics = clientMetrics;
