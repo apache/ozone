@@ -34,6 +34,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.*;
 
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
@@ -81,102 +82,105 @@ public class ContainerKeyMapperTask implements ReconOmTask {
   }
 
   /**
-   * Read Key -&gt; ContainerId data from OM snapshot DB and write reverse map
-   * (container, key) -&gt; count to Recon Container DB.
+   * Read Key -> ContainerId data from OM snapshot DB and write reverse map
+   * (container, key) -> count to Recon Container DB.
    */
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
-    long omKeyCount = 0;
+    LOG.info("Starting parallel reprocess of ContainerKeyMapperTask.");
 
-    // In-memory maps for fast look up and batch write
-    // (container, key) -> count
-    Map<ContainerKeyPrefix, Integer> containerKeyMap = new HashMap<>();
-    // containerId -> key count
-    Map<Long, Long> containerKeyCountMap = new HashMap<>();
+    Instant start = Instant.now();
+
     try {
-      LOG.debug("Starting a 'reprocess' run of ContainerKeyMapperTask.");
-      Instant start = Instant.now();
+      // Step 1: Reset Recon DB before processing
+      reconContainerMetadataManager.reinitWithNewContainerDataFromOm(new HashMap<>());
 
-      // initialize new container DB
-      reconContainerMetadataManager
-              .reinitWithNewContainerDataFromOm(new HashMap<>());
+      // Step 2: Thread pool for parallel execution
+      int numThreads = 2; // Adjust based on performance requirements
+      ExecutorService executor = Executors.newFixedThreadPool(numThreads);
 
-      // loop over both key table and file table
-      for (BucketLayout layout : Arrays.asList(BucketLayout.LEGACY,
-          BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
-        // (HDDS-8580) Since "reprocess" iterate over the whole key table,
-        // containerKeyMap needs to be incrementally flushed to DB based on
-        // configured batch threshold.
-        // containerKeyCountMap can be flushed at the end since the number
-        // of containers in a cluster will not have significant memory overhead.
-        Table<String, OmKeyInfo> omKeyInfoTable =
-            omMetadataManager.getKeyTable(layout);
-        try (
-            TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-                keyIter = omKeyInfoTable.iterator()) {
-          while (keyIter.hasNext()) {
-            Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
-            OmKeyInfo omKeyInfo = kv.getValue();
-            handleKeyReprocess(kv.getKey(), omKeyInfo, containerKeyMap,
-                containerKeyCountMap);
-            if (!checkAndCallFlushToDB(containerKeyMap)) {
-              LOG.error("Unable to flush containerKey information to the DB");
-              return new ImmutablePair<>(getTaskName(), false);
+      // Step 3: List of tasks for parallel execution
+      List<Future<Boolean>> futures = new ArrayList<>();
+      List<BucketLayout> layouts = Arrays.asList(
+          BucketLayout.LEGACY, BucketLayout.FILE_SYSTEM_OPTIMIZED
+      );
+
+      for (BucketLayout layout : layouts) {
+        futures.add(executor.submit(() -> {
+          LOG.info("Processing layout: {}", layout);
+
+          Map<ContainerKeyPrefix, Integer> containerKeyMap = new HashMap<>();
+          Map<Long, Long> containerKeyCountMap = new HashMap<>();
+
+          try {
+            Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable(layout);
+            try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iter =
+                     omKeyInfoTable.iterator()) {
+
+              while (iter.hasNext()) {
+                Table.KeyValue<String, OmKeyInfo> kv = iter.next();
+                handleKeyReprocess(kv.getKey(), kv.getValue(), containerKeyMap, containerKeyCountMap);
+
+                // Partial flush if threshold is reached
+                if (containerKeyMap.size() >= containerKeyFlushToDBMaxThreshold) {
+                  synchronized (this) {
+                    writeToTheDB(containerKeyMap, containerKeyCountMap, Collections.emptyList());
+                    containerKeyMap.clear();
+                    containerKeyCountMap.clear();
+                  }
+                }
+              }
             }
-            omKeyCount++;
+
+            // Final flush for any remaining data
+            if (!containerKeyMap.isEmpty()) {
+              synchronized (this) {
+                writeToTheDB(containerKeyMap, containerKeyCountMap, Collections.emptyList());
+              }
+            }
+
+            LOG.info("Completed layout: {}", layout);
+            return true;
+          } catch (Exception e) {
+            LOG.error("Error processing layout {}", layout, e);
+            return false;
           }
+        }));
+      }
+
+      // Step 4: Wait for all tasks to finish
+      boolean allSuccessful = true;
+      for (Future<Boolean> f : futures) {
+        if (!f.get()) {
+          allSuccessful = false;
         }
       }
 
-      // flush and commit left out keys at end,
-      // also batch write containerKeyCountMap to the containerKeyCountTable
-      if (!flushAndCommitContainerKeyInfoToDB(containerKeyMap,
-          containerKeyCountMap)) {
-        LOG.error("Unable to flush Container Key Count and " +
-            "remaining Container Key information to the DB");
+      // Step 5: Shutdown executor
+      executor.shutdown();
+      executor.awaitTermination(10, TimeUnit.MINUTES);
+
+      if (!allSuccessful) {
+        LOG.error("One or more threads failed during reprocess().");
         return new ImmutablePair<>(getTaskName(), false);
       }
 
-      LOG.debug("Completed 'reprocess' of ContainerKeyMapperTask.");
-      Instant end = Instant.now();
-      long duration = Duration.between(start, end).toMillis();
-      LOG.debug("It took me {} seconds to process {} keys.",
-          (double) duration / 1000.0, omKeyCount);
+      // Done, log total
+      long durationMillis = Duration.between(start, Instant.now()).toMillis();
+      LOG.info("Completed parallel reprocess in {} ms", durationMillis);
+      return new ImmutablePair<>(getTaskName(), true);
+
     } catch (IOException ioEx) {
-      LOG.error("Unable to populate Container Key data in Recon DB. ",
-          ioEx);
+      LOG.error("Unable to re-init Recon DB.", ioEx);
+      return new ImmutablePair<>(getTaskName(), false);
+    } catch (InterruptedException ie) {
+      Thread.currentThread().interrupt();
+      LOG.error("reprocess() was interrupted.", ie);
+      return new ImmutablePair<>(getTaskName(), false);
+    } catch (ExecutionException ee) {
+      LOG.error("Exception from parallel tasks in reprocess()", ee);
       return new ImmutablePair<>(getTaskName(), false);
     }
-    return new ImmutablePair<>(getTaskName(), true);
-  }
-
-  private boolean flushAndCommitContainerKeyInfoToDB(
-      Map<ContainerKeyPrefix, Integer> containerKeyMap,
-      Map<Long, Long> containerKeyCountMap) {
-    try {
-      // deleted container list is not needed since "reprocess" only has
-      // put operations
-      writeToTheDB(containerKeyMap, containerKeyCountMap,
-          Collections.emptyList());
-      containerKeyMap.clear();
-      containerKeyCountMap.clear();
-    } catch (IOException e) {
-      LOG.error("Unable to write Container Key and " +
-          "Container Key Count data in Recon DB.", e);
-      return false;
-    }
-    return true;
-  }
-
-  private boolean checkAndCallFlushToDB(
-      Map<ContainerKeyPrefix, Integer> containerKeyMap) {
-    // if containerKeyMap more than entries, flush to DB and clear the map
-    if (null != containerKeyMap && containerKeyMap.size() >=
-          containerKeyFlushToDBMaxThreshold) {
-      return flushAndCommitContainerKeyInfoToDB(containerKeyMap,
-          Collections.emptyMap());
-    }
-    return true;
   }
 
   @Override
@@ -208,7 +212,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
     Map<Long, Long> containerKeyCountMap = new HashMap<>();
     // List of the deleted (container, key) pair's
     List<ContainerKeyPrefix> deletedKeyCountList = new ArrayList<>();
-    long startTime = System.currentTimeMillis();
+
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, OmKeyInfo> omdbUpdateEvent = eventIterator.next();
       // Filter event inside process method to avoid duping
@@ -258,8 +262,8 @@ public class ContainerKeyMapperTask implements ReconOmTask {
       LOG.error("Unable to write Container Key Prefix data in Recon DB.", e);
       return new ImmutablePair<>(getTaskName(), false);
     }
-    LOG.debug("{} successfully processed {} OM DB update event(s) in {} milliseconds.",
-        getTaskName(), eventCount, (System.currentTimeMillis() - startTime));
+    LOG.debug("{} successfully processed {} OM DB update event(s).",
+        getTaskName(), eventCount);
     return new ImmutablePair<>(getTaskName(), true);
   }
 
@@ -451,7 +455,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
    * @param omKeyInfo omKeyInfo value
    * @param containerKeyMap we keep the added containerKeys in this map
    *                        to allow incremental batching to containerKeyTable
-   * @param containerKeyCountMap we keep the containerKey counts in this map 
+   * @param containerKeyCountMap we keep the containerKey counts in this map
    *                             to allow batching to containerKeyCountTable
    *                             after reprocessing is done
    * @throws IOException if unable to write to recon DB.
