@@ -30,7 +30,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
  */
 public interface OzoneLockStrategy {
   OMLockDetails acquireWriteLock(OMMetadataManager omMetadataManager,
-                                 String volumeName, String bucketName, String keyName)
+                           String volumeName, String bucketName, String keyName)
       throws IOException;
 
   OMLockDetails releaseWriteLock(OMMetadataManager omMetadataManager,
