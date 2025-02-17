@@ -49,7 +49,8 @@ import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
-import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
+import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTaskFSO;
+import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTaskOBS;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
@@ -74,6 +75,8 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static org.apache.hadoop.hdds.scm.cli.ContainerOperationClient.newContainerRpcClient;
 import static org.apache.hadoop.ozone.OmUtils.getOzoneManagerServiceId;
@@ -130,10 +133,17 @@ public class ReconControllerModule extends AbstractModule {
       Multibinder<ReconOmTask> taskBinder =
           Multibinder.newSetBinder(binder(), ReconOmTask.class);
       taskBinder.addBinding().to(ContainerKeyMapperTask.class);
-      taskBinder.addBinding().to(FileSizeCountTask.class);
+      taskBinder.addBinding().to(FileSizeCountTaskFSO.class);
+      taskBinder.addBinding().to(FileSizeCountTaskOBS.class);
       taskBinder.addBinding().to(OmTableInsightTask.class);
       taskBinder.addBinding().to(NSSummaryTask.class);
     }
+  }
+
+  @Provides
+  @Singleton
+  public ExecutorService provideReconExecutorService() {
+    return Executors.newFixedThreadPool(5);
   }
 
   /**
