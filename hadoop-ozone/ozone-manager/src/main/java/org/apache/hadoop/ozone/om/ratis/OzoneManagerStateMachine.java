@@ -463,7 +463,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .setMaxUnFlushedTransactionCount(maxUnFlushedTransactionCount)
         .setThreadPrefix(threadPrefix)
         .setS3SecretManager(ozoneManager.getS3SecretManager())
-        .enableRatis(true)
         .enableTracing(isTracingEnabled)
         .build()
         .start();

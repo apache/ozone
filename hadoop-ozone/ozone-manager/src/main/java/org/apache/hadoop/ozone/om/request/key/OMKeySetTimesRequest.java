@@ -218,7 +218,7 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
 
       operationResult = true;
       apply(omKeyInfo);
-      omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+      omKeyInfo.setUpdateID(trxnLogIndex);
 
       // update cache.
       omMetadataManager.getKeyTable(getBucketLayout())

@@ -427,27 +427,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.block.deleting.container.limit.per.interval</name>
-    <value>10</value>
-    <tag>OZONE, PERFORMANCE, SCM</tag>
-    <description>A maximum number of containers to be scanned by block deleting
-      service per
-      time interval. The block deleting service spawns a thread to handle block
-      deletions in a container. This property is used to throttle the number of
-      threads spawned for block deletions.
-    </description>
-  </property>
-  <property>
-    <name>ozone.block.deleting.limit.per.task</name>
-    <value>1000</value>
-    <tag>OZONE, PERFORMANCE, SCM</tag>
-    <description>A maximum number of blocks to be deleted by block deleting
-      service per
-      time interval. This property is used to throttle the actual number of
-      block deletions on a data node per container.
-    </description>
-  </property>
-  <property>
     <name>ozone.block.deleting.service.interval</name>
     <value>1m</value>
     <tag>OZONE, PERFORMANCE, SCM</tag>
@@ -464,8 +443,7 @@
     <description>A timeout value of block deletion service. If this is set
       greater than 0,
       the service will stop waiting for the block deleting completion after this
-      time. If timeout happens to a large proportion of block deletion, this
-      needs to be increased with ozone.block.deleting.limit.per.task. This
+      time. This
       setting supports multiple time unit suffixes as described in
       dfs.heartbeat.interval. If no suffix is specified, then milliseconds is
       assumed.
@@ -3358,7 +3336,7 @@
     <value>5s</value>
     <tag>OZONE, RECON, OM</tag>
     <description>
-      Interval in MINUTES by Recon to request OM DB Snapshot.
+      Interval in SECONDS by Recon to request OM DB Snapshot.
     </description>
   </property>
   <property>
@@ -3391,12 +3369,13 @@
     </description>
   </property>
   <property>
-    <name>recon.om.delta.update.loop.limit</name>
-    <value>50</value>
+    <name>recon.om.delta.update.lag.threshold</name>
+    <value>0</value>
     <tag>OZONE, RECON</tag>
     <description>
-      The sync between Recon and OM consists of several small
-      fetch loops.
+      At every Recon OM sync, recon starts fetching OM DB updates, and it continues to
+      fetch from OM till the lag, between OM DB WAL sequence number and Recon OM DB
+      snapshot WAL sequence number, is less than this lag threshold value.
     </description>
   </property>
   <property>
@@ -3576,21 +3555,6 @@
       contains illegal characters when creating/renaming key.
       For the definition of illegal characters, follow the
       rules in Amazon S3's object key naming guide.
-    </description>
-  </property>
-
-  <property>
-    <name>ozone.om.enable.filesystem.paths</name>
-    <tag>OZONE, OM</tag>
-    <value>false</value>
-    <description>If true, key names will be interpreted as file system paths.
-      "/" will be treated as a special character and paths will be normalized
-      and must follow Unix filesystem path naming conventions. This flag will
-      be helpful when objects created by S3G need to be accessed using OFS/O3Fs.
-      If false, it will fallback to default behavior of Key/MPU create
-      requests where key paths are not normalized and any intermediate
-      directories will not be created or any file checks happens to check
-      filesystem semantics.
     </description>
   </property>
 
@@ -4577,15 +4541,6 @@
       This setting specifies the interval (in seconds) for monitoring percentile performance metrics.
       It helps in tracking the read and write performance of DataNodes in real-time,
       allowing for better identification and analysis of performance issues.
-    </description>
-  </property>
-
-  <property>
-    <name>ozone.om.server.list.max.size</name>
-    <value>1000</value>
-    <tag>OZONE, OM</tag>
-    <description>
-      Configuration property to configure the max server side response size for list calls on om.
     </description>
   </property>
 </configuration>

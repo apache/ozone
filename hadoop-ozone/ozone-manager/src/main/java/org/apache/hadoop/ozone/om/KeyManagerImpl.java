@@ -22,7 +22,6 @@ import java.security.PrivilegedExceptionAction;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -192,7 +191,6 @@ public class KeyManagerImpl implements KeyManager {
   private SnapshotDeletingService snapshotDeletingService;
 
   private final KeyProviderCryptoExtension kmsProvider;
-  private final boolean enableFileSystemPaths;
   private DirectoryDeletingService dirDeletingService;
   private final OMPerformanceMetrics metrics;
 
@@ -218,9 +216,6 @@ public class KeyManagerImpl implements KeyManager {
     this.grpcBlockTokenEnabled = conf.getBoolean(
         HDDS_BLOCK_TOKEN_ENABLED,
         HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
-    this.enableFileSystemPaths =
-        conf.getBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-            OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
 
     this.ozoneManager = om;
     this.scmClient = scmClient;
@@ -473,7 +468,7 @@ public class KeyManagerImpl implements KeyManager {
         bucketName);
     try {
       keyName = OMClientRequest
-          .validateAndNormalizeKey(enableFileSystemPaths, keyName,
+          .validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(), keyName,
               bucketLayout);
 
       if (bucketLayout.isFileSystemOptimized()) {
@@ -665,7 +660,7 @@ public class KeyManagerImpl implements KeyManager {
     // underlying table using an iterator. That automatically creates a
     // snapshot of the data, so we don't need these locks at a higher level
     // when we iterate.
-    if (bucketLayout.shouldNormalizePaths(enableFileSystemPaths)) {
+    if (bucketLayout.shouldNormalizePaths(ozoneManager.getEnableFileSystemPaths())) {
       startKey = OmUtils.normalizeKey(startKey, true);
       keyPrefix = OmUtils.normalizeKey(keyPrefix, true);
     }
@@ -696,7 +691,7 @@ public class KeyManagerImpl implements KeyManager {
           TableIterator<String, ? extends Table.KeyValue<String, V>> tableIterator,
           Function<V, R> valueFunction, int size) throws IOException {
     List<Table.KeyValue<String, R>> entries = new ArrayList<>();
-    /* Seek to the start key if it not null. The next key in queue is ensured to start with the bucket
+    /* Seek to the start key if it's not null. The next key in queue is ensured to start with the bucket
          prefix, {@link org.apache.hadoop.hdds.utils.db.Table#iterator(bucketPrefix)} would ensure this.
     */
     if (startKey != null) {
@@ -1548,14 +1543,7 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public void refresh(OmKeyInfo key) throws IOException {
     Preconditions.checkNotNull(key, "Key info can not be null");
-    refreshPipeline(Arrays.asList(key));
-  }
-
-  public static boolean isKeyDeleted(String key, Table keyTable) {
-    CacheValue<OmKeyInfo> omKeyInfoCacheValue
-        = keyTable.getCacheValue(new CacheKey(key));
-    return omKeyInfoCacheValue != null
-        && omKeyInfoCacheValue.getCacheValue() == null;
+    refreshPipeline(Collections.singletonList(key));
   }
 
   /**
@@ -2045,23 +2033,6 @@ public class KeyManagerImpl implements KeyManager {
             .subList(keyLocationVersionLength - 1, keyLocationVersionLength));
       }
     }
-  }
-
-  @Override
-  public Table.KeyValue<String, OmKeyInfo> getPendingDeletionDir()
-          throws IOException {
-    // TODO: Make the return type as OmDirectoryInfo after adding
-    //  volumeId and bucketId to OmDirectoryInfo
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-             deletedDirItr = metadataManager.getDeletedDirTable().iterator()) {
-      if (deletedDirItr.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> keyValue = deletedDirItr.next();
-        if (keyValue != null) {
-          return keyValue;
-        }
-      }
-    }
-    return null;
   }
 
   @Override

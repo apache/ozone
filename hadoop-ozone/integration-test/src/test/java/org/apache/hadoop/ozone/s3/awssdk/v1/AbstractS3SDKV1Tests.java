@@ -60,6 +60,7 @@ import com.amazonaws.services.s3.transfer.TransferManagerBuilder;
 import com.amazonaws.services.s3.transfer.Upload;
 import com.amazonaws.services.s3.transfer.model.UploadResult;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -812,6 +813,28 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     assertEquals(ErrorType.Client, ase.getErrorType());
     assertEquals(404, ase.getStatusCode());
     assertEquals("NoSuchUpload", ase.getErrorCode());
+  }
+
+  @Test
+  public void testQuotaExceeded() throws IOException {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+
+    s3Client.createBucket(bucketName);
+
+    cluster.newClient().getObjectStore()
+        .getVolume("s3v")
+        .getBucket(bucketName)
+        .setQuota(OzoneQuota.parseQuota("1", "10"));
+
+    // Upload some objects to the bucket
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.putObject(bucketName, keyName,
+            RandomStringUtils.randomAlphanumeric(1024)));
+
+    assertEquals(ErrorType.Client, ase.getErrorType());
+    assertEquals(403, ase.getStatusCode());
+    assertEquals("QuotaExceeded", ase.getErrorCode());
   }
 
   private boolean isBucketEmpty(Bucket bucket) {

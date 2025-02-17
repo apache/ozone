@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
@@ -199,7 +198,7 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
    * Tests removing keys from the open key table cache that have higher
    * updateID than the transactionID. Those keys should be ignored.
    * It is OK if updateID equals to or less than transactionID.
-   * See {@link WithObjectID#setUpdateID(long, boolean)}.
+   * See {@link #setUpdateID(long)}.
    *
    * @throws Exception
    */

@@ -203,7 +203,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
     }
 
     return new OMDirectoriesPurgeResponseWithFSO(
-        omResponse.build(), purgeRequests, ozoneManager.isRatisEnabled(),
-            getBucketLayout(), volBucketInfoMap, fromSnapshotInfo, openKeyInfoMap);
+        omResponse.build(), purgeRequests,
+        getBucketLayout(), volBucketInfoMap, fromSnapshotInfo, openKeyInfoMap);
   }
 }

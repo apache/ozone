@@ -58,7 +58,7 @@ env:
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
 jobs:
   ratis:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     outputs:
       ratis-version: ${{ steps.versions.outputs.ratis }}
@@ -102,7 +102,7 @@ jobs:
             ~/.m2/repository/org/apache/ratis
           retention-days: 1
   ratis-thirdparty:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     needs:
       - ratis
     timeout-minutes: 30
@@ -123,7 +123,7 @@ jobs:
           echo "netty=$(mvn help:evaluate -N -q -DforceStdout -Dscan=false -Dexpression=shaded.netty.version)" >> $GITHUB_OUTPUT
           echo "protobuf=$(mvn help:evaluate -N -q -DforceStdout -Dscan=false -Dexpression=shaded.protobuf.version)" >> $GITHUB_OUTPUT
   debug:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     needs:
       - ratis
       - ratis-thirdparty

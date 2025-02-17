@@ -57,6 +57,14 @@ public abstract class HATests extends ClusterForTests<MiniOzoneHAClusterImpl> {
   }
 
   @Nested
+  class ScmApplyTransactionFailure extends org.apache.hadoop.hdds.scm.container.TestScmApplyTransactionFailure {
+    @Override
+    public MiniOzoneHAClusterImpl cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
   class GetClusterTreeInformation extends org.apache.hadoop.ozone.TestGetClusterTreeInformation {
     @Override
     public MiniOzoneHAClusterImpl cluster() {

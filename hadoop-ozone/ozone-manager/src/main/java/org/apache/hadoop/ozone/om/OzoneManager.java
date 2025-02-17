@@ -249,7 +249,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
 import static org.apache.hadoop.hdds.HddsUtils.preserveThreadName;
-import static org.apache.hadoop.hdds.ratis.RatisHelper.newJvmPauseMonitor;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 import static org.apache.hadoop.hdds.utils.HAUtils.getScmInfo;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
@@ -279,8 +278,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KEY_PATH_LOCK_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KEY_PATH_LOCK_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_DEFAULT;
@@ -338,7 +335,6 @@ import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.FileUtils;
-import org.apache.ratis.util.JvmPauseMonitor;
 import org.apache.ratis.util.LifeCycle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -359,6 +355,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       AuditLoggerType.OMSYSTEMLOGGER);
 
   private static final String OM_DAEMON = "om";
+  private static final String NO_LEADER_ERROR_MESSAGE =
+          "There is no leader among the Ozone Manager servers. If this message " +
+                  "persists, the service may be down. Possible cause: only one OM is up, or " +
+                  "other OMs are unable to respond to Ratis leader vote messages";
+
 
   // This is set for read requests when OMRequest has S3Authentication set,
   // and it is reset when read request is processed.
@@ -375,6 +376,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private ScmTopologyClient scmTopologyClient;
   private final Text omRpcAddressTxt;
   private OzoneConfiguration configuration;
+  private OmConfig config;
   private RPC.Server omRpcServer;
   private GrpcOzoneManagerServer omS3gGrpcServer;
   private final InetSocketAddress omRpcAddress;
@@ -416,7 +418,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final File omMetaDir;
   private boolean isAclEnabled;
   private final boolean isSpnegoEnabled;
-  private final JvmPauseMonitor jvmPauseMonitor;
   private final SecurityConfig secConfig;
   private S3SecretManager s3SecretManager;
   private final boolean isOmGrpcServerEnabled;
@@ -425,7 +426,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private String omComponent;
   private OzoneManagerProtocolServerSideTranslatorPB omServerProtocol;
 
-  private final boolean isRatisEnabled;
   private OzoneManagerRatisServer omRatisServer;
   private OmRatisSnapshotProvider omRatisSnapshotProvider;
   private OMNodeDetails omNodeDetails;
@@ -531,6 +531,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins)
             .register(OZONE_READONLY_ADMINISTRATORS,
                 this::reconfOzoneReadOnlyAdmins)
+            .register(OZONE_OM_VOLUME_LISTALL_ALLOWED, this::reconfigureAllowListAllVolumes)
             .register(OZONE_KEY_DELETING_LIMIT_PER_TASK,
                 this::reconfOzoneKeyDeletingLimitPerTask);
 
@@ -582,11 +583,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.isStrictS3 = conf.getBoolean(
         OZONE_OM_NAMESPACE_STRICT_S3,
         OZONE_OM_NAMESPACE_STRICT_S3_DEFAULT);
-
-    isRatisEnabled = true;
-
-    // Ratis server comes with JvmPauseMonitor, no need to start another
-    jvmPauseMonitor = !isRatisEnabled ? newJvmPauseMonitor(omId) : null;
 
     String defaultBucketLayoutString =
         configuration.getTrimmed(OZONE_DEFAULT_BUCKET_LAYOUT,
@@ -768,7 +764,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private void setInstanceVariablesFromConf() {
     this.isAclEnabled = configuration.getBoolean(OZONE_ACL_ENABLED,
         OZONE_ACL_ENABLED_DEFAULT);
-    this.allowListAllVolumes = configuration.getBoolean(
+    setAllowListAllVolumesFromConfig();
+  }
+
+  public void setAllowListAllVolumesFromConfig() {
+    allowListAllVolumes = configuration.getBoolean(
         OZONE_OM_VOLUME_LISTALL_ALLOWED,
         OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT);
   }
@@ -859,7 +859,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       delegationTokenMgr = createDelegationTokenSecretManager(configuration);
     }
 
-    prefixManager = new PrefixManagerImpl(this, metadataManager, isRatisEnabled);
+    prefixManager = new PrefixManagerImpl(this, metadataManager, true);
     keyManager = new KeyManagerImpl(this, scmClient, configuration,
         perfMetrics);
     // If authorizer is not initialized or the authorizer is Native
@@ -1262,14 +1262,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         ProtobufRpcEngine.class);
 
     this.omServerProtocol = new OzoneManagerProtocolServerSideTranslatorPB(
-        this, omRatisServer, omClientProtocolMetrics, isRatisEnabled,
-        getLastTrxnIndexForNonRatis());
+        this, omRatisServer, omClientProtocolMetrics);
     BlockingService omService =
         OzoneManagerService.newReflectiveBlockingService(omServerProtocol);
 
     OMInterServiceProtocolServerSideImpl omInterServerProtocol =
-        new OMInterServiceProtocolServerSideImpl(this, omRatisServer,
-            isRatisEnabled);
+        new OMInterServiceProtocolServerSideImpl(this, omRatisServer);
     BlockingService omInterService =
         OzoneManagerInterService.newReflectiveBlockingService(
             omInterServerProtocol);
@@ -1467,75 +1465,73 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   private void initializeRatisDirs(OzoneConfiguration conf) throws IOException {
-    if (isRatisEnabled) {
-      // Create Ratis storage dir
-      String omRatisDirectory =
-          OzoneManagerRatisUtils.getOMRatisDirectory(conf);
-      if (omRatisDirectory == null || omRatisDirectory.isEmpty()) {
-        throw new IllegalArgumentException(HddsConfigKeys.OZONE_METADATA_DIRS +
-            " must be defined.");
-      }
-      OmUtils.createOMDir(omRatisDirectory);
+    // Create Ratis storage dir
+    String omRatisDirectory =
+        OzoneManagerRatisUtils.getOMRatisDirectory(conf);
+    if (omRatisDirectory == null || omRatisDirectory.isEmpty()) {
+      throw new IllegalArgumentException(HddsConfigKeys.OZONE_METADATA_DIRS +
+          " must be defined.");
+    }
+    OmUtils.createOMDir(omRatisDirectory);
 
-      String scmStorageDir = SCMHAUtils.getRatisStorageDir(conf);
-      if (!Strings.isNullOrEmpty(omRatisDirectory) && !Strings
-          .isNullOrEmpty(scmStorageDir) && omRatisDirectory
-          .equals(scmStorageDir)) {
-        throw new IOException(
-            "Path of " + OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR + " and "
-                + ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR
-                + " should not be co located. Please change atleast one path.");
-      }
+    String scmStorageDir = SCMHAUtils.getRatisStorageDir(conf);
+    if (!Strings.isNullOrEmpty(omRatisDirectory) && !Strings
+        .isNullOrEmpty(scmStorageDir) && omRatisDirectory
+        .equals(scmStorageDir)) {
+      throw new IOException(
+          "Path of " + OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR + " and "
+              + ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR
+              + " should not be co located. Please change atleast one path.");
+    }
 
-      // Create Ratis snapshot dir
-      omRatisSnapshotDir = OmUtils.createOMDir(
-          OzoneManagerRatisUtils.getOMRatisSnapshotDirectory(conf));
+    // Create Ratis snapshot dir
+    omRatisSnapshotDir = OmUtils.createOMDir(
+        OzoneManagerRatisUtils.getOMRatisSnapshotDirectory(conf));
 
-      // Before starting ratis server, check if previous installation has
-      // snapshot directory in Ratis storage directory. if yes, move it to
-      // new snapshot directory.
+    // Before starting ratis server, check if previous installation has
+    // snapshot directory in Ratis storage directory. if yes, move it to
+    // new snapshot directory.
 
-      File snapshotDir = new File(omRatisDirectory, OZONE_RATIS_SNAPSHOT_DIR);
+    File snapshotDir = new File(omRatisDirectory, OZONE_RATIS_SNAPSHOT_DIR);
 
-      if (snapshotDir.isDirectory()) {
-        FileUtils.moveDirectory(snapshotDir.toPath(),
-            omRatisSnapshotDir.toPath());
-      }
+    if (snapshotDir.isDirectory()) {
+      FileUtils.moveDirectory(snapshotDir.toPath(),
+          omRatisSnapshotDir.toPath());
+    }
 
-      File omRatisDir = new File(omRatisDirectory);
-      String groupIDfromServiceID = RaftGroupId.valueOf(
-          getRaftGroupIdFromOmServiceId(getOMServiceId())).getUuid().toString();
+    File omRatisDir = new File(omRatisDirectory);
+    String groupIDfromServiceID = RaftGroupId.valueOf(
+        getRaftGroupIdFromOmServiceId(getOMServiceId())).getUuid().toString();
 
-      // If a directory exists in ratis storage dir
-      // Check the Ratis group Dir is same as the one generated from
-      // om service id.
+    // If a directory exists in ratis storage dir
+    // Check the Ratis group Dir is same as the one generated from
+    // om service id.
 
-      // This will help to catch if some one has changed service id later on.
-      File[] ratisDirFiles = omRatisDir.listFiles();
-      if (ratisDirFiles != null) {
-        for (File ratisGroupDir : ratisDirFiles) {
-          if (ratisGroupDir.isDirectory()) {
-            if (!ratisGroupDir.getName().equals(groupIDfromServiceID)) {
-              throw new IOException("Ratis group Dir on disk "
-                  + ratisGroupDir.getName() + " does not match with RaftGroupID"
-                  + groupIDfromServiceID + " generated from service id "
-                  + getOMServiceId() + ". Looks like there is a change to " +
-                  OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY + " value after the " +
-                  "cluster is setup. Currently change to this value is not " +
-                  "supported.");
-            }
-          } else {
-            LOG.warn("Unknown file {} exists in ratis storage dir {}."
-                + " It is recommended not to share the ratis storage dir.",
-                ratisGroupDir, omRatisDir);
+    // This will help to catch if some one has changed service id later on.
+    File[] ratisDirFiles = omRatisDir.listFiles();
+    if (ratisDirFiles != null) {
+      for (File ratisGroupDir : ratisDirFiles) {
+        if (ratisGroupDir.isDirectory()) {
+          if (!ratisGroupDir.getName().equals(groupIDfromServiceID)) {
+            throw new IOException("Ratis group Dir on disk "
+                + ratisGroupDir.getName() + " does not match with RaftGroupID"
+                + groupIDfromServiceID + " generated from service id "
+                + getOMServiceId() + ". Looks like there is a change to " +
+                OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY + " value after the " +
+                "cluster is setup. Currently change to this value is not " +
+                "supported.");
           }
+        } else {
+          LOG.warn("Unknown file {} exists in ratis storage dir {}."
+              + " It is recommended not to share the ratis storage dir.",
+              ratisGroupDir, omRatisDir);
         }
       }
+    }
 
-      if (peerNodesMap != null && !peerNodesMap.isEmpty()) {
-        this.omRatisSnapshotProvider = new OmRatisSnapshotProvider(
-            configuration, omRatisSnapshotDir, peerNodesMap);
-      }
+    if (peerNodesMap != null && !peerNodesMap.isEmpty()) {
+      this.omRatisSnapshotProvider = new OmRatisSnapshotProvider(
+          configuration, omRatisSnapshotDir, peerNodesMap);
     }
   }
 
@@ -1750,7 +1746,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     registerMXBean();
 
-    startJVMPauseMonitor();
     setStartTime();
 
     if (omState == State.BOOTSTRAPPING) {
@@ -1832,7 +1827,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omS3gGrpcServer.start();
       isOmGrpcServerRunning = true;
     }
-    startJVMPauseMonitor();
     setStartTime();
     omState = State.RUNNING;
     auditMap.put("NewOmState", omState.name());
@@ -1941,23 +1935,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public void bootstrap(OMNodeDetails newOMNode) throws IOException {
     // Create InterOmServiceProtocol client to send request to other OMs
-    if (isRatisEnabled) {
-      try (OMInterServiceProtocolClientSideImpl omInterServiceProtocol =
-               new OMInterServiceProtocolClientSideImpl(configuration,
-                   getRemoteUser(), getOMServiceId())) {
+    try (OMInterServiceProtocolClientSideImpl omInterServiceProtocol =
+             new OMInterServiceProtocolClientSideImpl(configuration,
+                 getRemoteUser(), getOMServiceId())) {
 
-        omInterServiceProtocol.bootstrap(omNodeDetails);
+      omInterServiceProtocol.bootstrap(omNodeDetails);
 
-        LOG.info("Successfully bootstrapped OM {} and joined the Ratis group " +
-            "{}", getOMNodeId(), omRatisServer.getRaftGroup());
-      } catch (Exception e) {
-        LOG.error("Failed to Bootstrap OM.");
-        throw e;
-      }
-    } else {
-      throw new IOException("OzoneManager can be bootstrapped only when ratis" +
-          " is enabled and there is atleast one OzoneManager to bootstrap" +
-          " from.");
+      LOG.info("Successfully bootstrapped OM {} and joined the Ratis group " +
+          "{}", getOMNodeId(), omRatisServer.getRaftGroup());
+    } catch (Exception e) {
+      LOG.error("Failed to Bootstrap OM.");
+      throw e;
     }
   }
 
@@ -2195,42 +2183,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   private void initializeRatisServer(boolean shouldBootstrap)
       throws IOException {
-    if (isRatisEnabled) {
-      if (omRatisServer == null) {
-        // This needs to be done before initializing Ratis.
-        ratisReporterList = RatisDropwizardExports.
-            registerRatisMetricReporters(ratisMetricsMap, this::isStopped);
-        omRatisServer = OzoneManagerRatisServer.newOMRatisServer(
-            configuration, this, omNodeDetails, peerNodesMap,
-            secConfig, certClient, shouldBootstrap);
-      }
-      LOG.info("OzoneManager Ratis server initialized at port {}",
-          omRatisServer.getServerPort());
-    } else {
-      omRatisServer = null;
+    if (omRatisServer == null) {
+      // This needs to be done before initializing Ratis.
+      ratisReporterList = RatisDropwizardExports.
+          registerRatisMetricReporters(ratisMetricsMap, this::isStopped);
+      omRatisServer = OzoneManagerRatisServer.newOMRatisServer(
+          configuration, this, omNodeDetails, peerNodesMap,
+          secConfig, certClient, shouldBootstrap);
     }
+    LOG.info("OzoneManager Ratis server initialized at port {}",
+        omRatisServer.getServerPort());
   }
 
   public long getObjectIdFromTxId(long trxnId) {
     return OmUtils.getObjectIdFromTxId(metadataManager.getOmEpoch(),
         trxnId);
-  }
-
-  @VisibleForTesting
-  long getLastTrxnIndexForNonRatis() throws IOException {
-    TransactionInfo transactionInfo =
-        TransactionInfo.readTransactionInfo(metadataManager);
-    // If the OMTransactionInfo does not exist in DB, return 0 so that new incoming
-    // requests can have transaction index starting from 1.
-    if (transactionInfo == null) {
-      return 0;
-    }
-    // If there exists a last transaction index in DB, including two cases:
-    // 1. transactionInfo.getTerm() == -1 corresponds to a non-Ratis cluster
-    // 2. transactionInfo.getTerm() != -1 indicates that the DB may be migrated from Ratis cluster
-    // For both cases above, the new incoming requests in non-Ratis cluster must have
-    // transaction index incrementally increasing from the stored transaction index onwards.
-    return transactionInfo.getTransactionIndex();
   }
 
   /**
@@ -2286,9 +2253,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       // When ratis is not enabled, we need to call stop() to stop
       // OzoneManageDoubleBuffer in OM server protocol.
-      if (!isRatisEnabled) {
-        omServerProtocol.stop();
-      }
       if (omRatisServer != null) {
         omRatisServer.stop();
         OMHAMetrics.unRegister();
@@ -2316,9 +2280,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       metrics.unRegister();
       omClientProtocolMetrics.unregister();
       unregisterMXBean();
-      if (jvmPauseMonitor != null) {
-        jvmPauseMonitor.stop();
-      }
       if (omRatisSnapshotProvider != null) {
         omRatisSnapshotProvider.close();
       }
@@ -3093,17 +3054,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public List<List<String>> getRatisRoles() {
     int port = omNodeDetails.getRatisPort();
-    if (!isRatisEnabled) {
-      return getRatisRolesException("Ratis is disabled");
-    }
     if (null == omRatisServer) {
       return getRatisRolesException("Server is shutting down");
     }
     String leaderReadiness = omRatisServer.checkLeaderStatus().name();
     final RaftPeerId leaderId = omRatisServer.getLeaderId();
     if (leaderId == null) {
-      LOG.error("No leader found");
-      return getRatisRolesException("No leader found");
+      LOG.error(NO_LEADER_ERROR_MESSAGE);
+      return getRatisRolesException(NO_LEADER_ERROR_MESSAGE);
     }
 
     final List<ServiceInfo> serviceList;
@@ -3196,35 +3154,33 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .build();
     omServiceInfoBuilder.setOmRoleInfo(omRole);
 
-    if (isRatisEnabled) {
-      if (omRatisServer != null) {
-        omServiceInfoBuilder.addServicePort(ServicePort.newBuilder()
-            .setType(ServicePort.Type.RATIS)
-            .setValue(omNodeDetails.getRatisPort())
-            .build());
-      }
+    if (omRatisServer != null) {
+      omServiceInfoBuilder.addServicePort(ServicePort.newBuilder()
+          .setType(ServicePort.Type.RATIS)
+          .setValue(omNodeDetails.getRatisPort())
+          .build());
+    }
 
-      for (OMNodeDetails peerNode : peerNodesMap.values()) {
-        ServiceInfo.Builder peerOmServiceInfoBuilder = ServiceInfo.newBuilder()
-            .setNodeType(HddsProtos.NodeType.OM)
-            .setHostname(peerNode.getHostName())
-            // For now assume peer is at the same version.
-            // This field needs to be fetched from peer when rolling upgrades
-            // are implemented.
-            .setOmVersion(OzoneManagerVersion.CURRENT)
-            .addServicePort(ServicePort.newBuilder()
-                .setType(ServicePort.Type.RPC)
-                .setValue(peerNode.getRpcPort())
-                .build());
+    for (OMNodeDetails peerNode : peerNodesMap.values()) {
+      ServiceInfo.Builder peerOmServiceInfoBuilder = ServiceInfo.newBuilder()
+          .setNodeType(HddsProtos.NodeType.OM)
+          .setHostname(peerNode.getHostName())
+          // For now assume peer is at the same version.
+          // This field needs to be fetched from peer when rolling upgrades
+          // are implemented.
+          .setOmVersion(OzoneManagerVersion.CURRENT)
+          .addServicePort(ServicePort.newBuilder()
+              .setType(ServicePort.Type.RPC)
+              .setValue(peerNode.getRpcPort())
+              .build());
 
-        OMRoleInfo peerOmRole = OMRoleInfo.newBuilder()
-            .setNodeId(peerNode.getNodeId())
-            .setServerRole(RaftPeerRole.FOLLOWER.name())
-            .build();
-        peerOmServiceInfoBuilder.setOmRoleInfo(peerOmRole);
+      OMRoleInfo peerOmRole = OMRoleInfo.newBuilder()
+          .setNodeId(peerNode.getNodeId())
+          .setServerRole(RaftPeerRole.FOLLOWER.name())
+          .build();
+      peerOmServiceInfoBuilder.setOmRoleInfo(peerOmRole);
 
-        services.add(peerOmServiceInfoBuilder.build());
-      }
+      services.add(peerOmServiceInfoBuilder.build());
     }
 
     services.add(omServiceInfoBuilder.build());
@@ -3356,9 +3312,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void transferLeadership(String newLeaderId)
       throws IOException {
     checkAdminUserPrivilege("transfer raft leadership.");
-    if (!isRatisEnabled) {
-      throw new IOException("OM HA not enabled.");
-    }
     boolean auditSuccess = true;
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put("newLeaderId", newLeaderId);
@@ -4187,9 +4140,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return configuration;
   }
 
+  public OmConfig getConfig() {
+    return config;
+  }
+
   @VisibleForTesting
   public void setConfiguration(OzoneConfiguration conf) {
     this.configuration = conf;
+    config = conf.getObject(OmConfig.class);
   }
 
   public OzoneConfiguration reloadConfiguration() {
@@ -4259,9 +4217,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public boolean isLeaderReady() {
     final OzoneManagerRatisServer ratisServer = omRatisServer;
-    return !isRatisEnabled
-        || (ratisServer != null &&
-            ratisServer.checkLeaderStatus() == LEADER_AND_READY);
+    return ratisServer != null && ratisServer.checkLeaderStatus() == LEADER_AND_READY;
   }
 
   /**
@@ -4284,13 +4240,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     default: throw new IllegalStateException(
         "Unknown Ratis Server state: " + raftServerStatus);
     }
-  }
-
-  /**
-   * Return if Ratis is enabled or not.
-   */
-  public boolean isRatisEnabled() {
-    return isRatisEnabled;
   }
 
   /**
@@ -4377,12 +4326,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public boolean isRunning() {
     return omState == State.RUNNING;
-  }
-
-  private void startJVMPauseMonitor() {
-    if (jvmPauseMonitor != null) {
-      jvmPauseMonitor.start();
-    }
   }
 
   public ResolvedBucket resolveBucketLink(KeyArgs args,
@@ -4522,8 +4465,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public boolean getEnableFileSystemPaths() {
-    return configuration.getBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-        OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
+    return config.isFileSystemPathEnabled();
   }
 
   public boolean getKeyPathLockEnabled() {
@@ -5041,6 +4983,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return newVal;
   }
 
+  private String reconfigureAllowListAllVolumes(String newVal) {
+    getConfiguration().set(OZONE_OM_VOLUME_LISTALL_ALLOWED, newVal);
+    setAllowListAllVolumesFromConfig();
+    return String.valueOf(allowListAllVolumes);
+  }
+
   public void validateReplicationConfig(ReplicationConfig replicationConfig)
       throws OMException {
     try {
@@ -5067,11 +5015,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * fs needs to synchronized with the rocksdb's for the snapshots.
    */
   public void awaitDoubleBufferFlush() throws InterruptedException {
-    if (isRatisEnabled()) {
-      getOmRatisServer().getOmStateMachine().awaitDoubleBufferFlush();
-    } else {
-      getOmServerProtocol().awaitDoubleBufferFlush();
-    }
+    getOmRatisServer().getOmStateMachine().awaitDoubleBufferFlush();
   }
 
   public void checkFeatureEnabled(OzoneManagerVersion feature) throws OMException {

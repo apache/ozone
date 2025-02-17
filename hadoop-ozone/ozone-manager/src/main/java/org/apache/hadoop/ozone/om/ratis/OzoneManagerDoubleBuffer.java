@@ -99,7 +99,6 @@ public final class OzoneManagerDoubleBuffer {
   public static final class Builder {
     private OMMetadataManager omMetadataManager;
     private Consumer<TermIndex> updateLastAppliedIndex = termIndex -> { };
-    private boolean isRatisEnabled = false;
     private boolean isTracingEnabled = false;
     private int maxUnFlushedTransactionCount = 0;
     private FlushNotifier flushNotifier;
@@ -115,11 +114,6 @@ public final class OzoneManagerDoubleBuffer {
 
     Builder setUpdateLastAppliedIndex(Consumer<TermIndex> updateLastAppliedIndex) {
       this.updateLastAppliedIndex = updateLastAppliedIndex;
-      return this;
-    }
-
-    public Builder enableRatis(boolean enableRatis) {
-      this.isRatisEnabled = enableRatis;
       return this;
     }
 
@@ -149,9 +143,8 @@ public final class OzoneManagerDoubleBuffer {
     }
 
     public OzoneManagerDoubleBuffer build() {
-      Preconditions.assertTrue(isRatisEnabled == maxUnFlushedTransactionCount > 0L,
-          () -> "Ratis is " + (isRatisEnabled ? "enabled" : "disabled")
-              + " but maxUnFlushedTransactionCount = " + maxUnFlushedTransactionCount);
+      Preconditions.assertTrue(maxUnFlushedTransactionCount > 0L,
+          () -> "maxUnFlushedTransactionCount = " + maxUnFlushedTransactionCount);
       if (flushNotifier == null) {
         flushNotifier = new FlushNotifier();
       }
@@ -172,7 +165,6 @@ public final class OzoneManagerDoubleBuffer {
   private Queue<Entry> readyBuffer;
   /**
    * Limit the number of un-flushed transactions for {@link OzoneManagerStateMachine}.
-   * It is set to null if ratis is disabled; see {@link #isRatisEnabled()}.
    */
   private final Semaphore unFlushedTransactions;
 
@@ -221,16 +213,11 @@ public final class OzoneManagerDoubleBuffer {
     return this;
   }
 
-  private boolean isRatisEnabled() {
-    return unFlushedTransactions != null;
-  }
-
   /**
    * Acquires the given number of permits from unFlushedTransactions,
    * blocking until all are available, or the thread is interrupted.
    */
   public void acquireUnFlushedTransactions(int n) throws InterruptedException {
-    Preconditions.assertTrue(isRatisEnabled(), "Ratis is not enabled");
     unFlushedTransactions.acquire(n);
   }
 
@@ -369,15 +356,6 @@ public final class OzoneManagerDoubleBuffer {
       metrics.updateFlushTime(Time.monotonicNow() - startTime);
     }
 
-    // Complete futures first and then do other things.
-    // So that handler threads will be released.
-    if (!isRatisEnabled()) {
-      buffer.stream()
-          .map(Entry::getResponse)
-          .map(OMClientResponse::getFlushFuture)
-          .forEach(f -> f.complete(null));
-    }
-
     final long accumulativeCount = flushedTransactionCount.addAndGet(flushedTransactionsSize);
     final long flushedIterations = flushIterations.incrementAndGet();
     LOG.debug("Sync iteration: {}, size in this iteration: {}, accumulative count: {}",
@@ -386,9 +364,7 @@ public final class OzoneManagerDoubleBuffer {
     // Clean up committed transactions.
     cleanupCache(cleanupEpochs);
 
-    if (isRatisEnabled()) {
-      releaseUnFlushedTransactions(flushedTransactionsSize);
-    }
+    releaseUnFlushedTransactions(flushedTransactionsSize);
     // update the last updated index in OzoneManagerStateMachine.
     updateLastAppliedIndex.accept(lastTransaction);
 
@@ -555,10 +531,6 @@ public final class OzoneManagerDoubleBuffer {
   public synchronized void add(OMClientResponse response, TermIndex termIndex) {
     currentBuffer.add(new Entry(termIndex, response));
     notify();
-
-    if (!isRatisEnabled()) {
-      response.setFlushFuture(new CompletableFuture<>());
-    }
   }
 
   /**

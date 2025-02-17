@@ -176,7 +176,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       // Set Modification time
       omKeyInfo.setModificationTime(keyArgs.getModificationTime());
       // Set the UpdateID to current transactionLogIndex
-      omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+      omKeyInfo.setUpdateID(trxnLogIndex);
 
       int partNumber = keyArgs.getMultipartNumber();
       partName = getPartName(ozoneKey, uploadID, partNumber);
@@ -207,8 +207,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       multipartKeyInfo.addPartKeyInfo(partKeyInfo.build());
 
       // Set the UpdateID to current transactionLogIndex
-      multipartKeyInfo.setUpdateID(trxnLogIndex,
-          ozoneManager.isRatisEnabled());
+      multipartKeyInfo.setUpdateID(trxnLogIndex);
 
       // OldPartKeyInfo will be deleted. Its updateID will be set in
       // S3MultipartUploadCommitPartResponse before being added to
@@ -292,7 +291,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
     return new S3MultipartUploadCommitPartResponse(build, multipartKey, openKey,
         multipartKeyInfo, oldPartKeyInfo, omKeyInfo,
-        ozoneManager.isRatisEnabled(), omBucketInfo, getBucketLayout());
+        omBucketInfo, getBucketLayout());
   }
 
   protected OmKeyInfo getOmKeyInfo(OMMetadataManager omMetadataManager,

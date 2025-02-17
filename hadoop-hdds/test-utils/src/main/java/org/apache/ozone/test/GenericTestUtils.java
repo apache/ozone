@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,6 +17,9 @@
 
 package org.apache.ozone.test;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
+import com.google.common.base.Preconditions;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.InputStream;
@@ -25,15 +27,20 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeoutException;
-
-import com.google.common.base.Preconditions;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.CharSequenceInputStream;
 import org.apache.commons.lang3.tuple.Pair;
@@ -43,17 +50,6 @@ import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BooleanSupplier;
-import java.util.function.Consumer;
-import java.util.function.Supplier;
-import java.util.stream.Collectors;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
-import static org.apache.logging.log4j.util.StackLocatorUtil.getCallerClass;
 
 /**
  * Provides some very generic helpers which might be used across the tests.
@@ -94,51 +90,6 @@ public abstract class GenericTestUtils {
   }
 
   /**
-   * Get the (created) base directory for tests.
-   *
-   * @return the absolute directory
-   *
-   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
-   */
-  @Deprecated
-  public static File getTestDir() {
-    String prop =
-        System.getProperty(SYSPROP_TEST_DATA_DIR, DEFAULT_TEST_DATA_DIR);
-    if (prop.isEmpty()) {
-      // corner case: property is there but empty
-      prop = DEFAULT_TEST_DATA_DIR;
-    }
-    File dir = new File(prop).getAbsoluteFile();
-    assertDirCreation(dir);
-    return dir;
-  }
-
-  /**
-   * Get an uncreated directory for tests.
-   *
-   * @return the absolute directory for tests. Caller is expected to create it.
-   *
-   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
-   */
-  @Deprecated
-  public static File getTestDir(String subdir) {
-    return new File(getTestDir(), subdir).getAbsoluteFile();
-  }
-
-  /**
-   * Get an uncreated directory for tests with a randomized alphanumeric
-   * name. This is likely to provide a unique path for tests run in parallel
-   *
-   * @return the absolute directory for tests. Caller is expected to create it.
-   *
-   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
-   */
-  @Deprecated
-  public static File getRandomizedTestDir() {
-    return new File(getRandomizedTempPath());
-  }
-
-  /**
    * Get a temp path. This may or may not be relative; it depends on what the
    * {@link #SYSPROP_TEST_DATA_DIR} is set to. If unset, it returns a path
    * under the relative path {@link #DEFAULT_TEST_DATA_PATH}
@@ -161,30 +112,6 @@ public abstract class GenericTestUtils {
       prop = prop + "/";
     }
     return prop + subpath;
-  }
-
-  /**
-   * Get a temp path. This may or may not be relative; it depends on what the
-   * {@link #SYSPROP_TEST_DATA_DIR} is set to. If unset, it returns a path
-   * under the relative path {@link #DEFAULT_TEST_DATA_PATH}
-   *
-   * @return a string to use in paths
-   *
-   * @deprecated use {@link org.junit.jupiter.api.io.TempDir} instead.
-   */
-  @SuppressWarnings("java:S2245") // no need for secure random
-  @Deprecated
-  public static String getRandomizedTempPath() {
-    return getTempPath(getCallerClass(GenericTestUtils.class).getSimpleName()
-        + "-" + randomAlphanumeric(10));
-  }
-
-  /**
-   * Assert that a given dir can be created or it already exists.
-   */
-  public static void assertDirCreation(File f) {
-    Assertions.assertTrue(f.mkdirs() || f.exists(),
-        "Could not create dir " + f + ", nor does it exist");
   }
 
   /**
@@ -305,21 +232,6 @@ public abstract class GenericTestUtils {
     return map.entrySet().stream().flatMap(entry -> entry.getValue().stream()
             .map(v -> Pair.of(v, entry.getKey())))
             .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
-  }
-
-  /***
-   * Removed all files and dirs in the given dir recursively.
-   */
-  public static boolean deleteDirectory(File dir) {
-    File[] allContents = dir.listFiles();
-    if (allContents != null) {
-      for (File content : allContents) {
-        if (!deleteDirectory(content)) {
-          return false;
-        }
-      }
-    }
-    return dir.delete();
   }
 
   /**
