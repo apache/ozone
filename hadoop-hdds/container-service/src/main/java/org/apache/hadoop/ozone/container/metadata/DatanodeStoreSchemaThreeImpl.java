@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.metadata;
 
 import static org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -29,6 +30,7 @@ import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
@@ -61,6 +63,7 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
   public static final String DUMP_DIR = "db";
 
   private final Table<String, DeletedBlocksTransaction> deleteTransactionTable;
+  private static FaultInjector injector;
 
   public DatanodeStoreSchemaThreeImpl(ConfigurationSource config,
       String dbPath, boolean openReadOnly) throws IOException {
@@ -103,6 +106,10 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
   }
 
   public void removeKVContainerData(long containerID) throws IOException {
+    if (getInjector() != null && getInjector().getException() != null
+        && getInjector().getTag().equalsIgnoreCase("removeKVContainerData")) {
+      throw (IOException) getInjector().getException();
+    }
     String prefix = getContainerKeyPrefix(containerID);
     try (BatchOperation batch = getBatchHandler().initBatchOperation()) {
       getMetadataTable().deleteBatchWithPrefix(batch, prefix);
@@ -133,6 +140,10 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
 
   public void loadKVContainerData(File dumpDir)
       throws IOException {
+    if (getInjector() != null && getInjector().getException() != null
+        && getInjector().getTag().equalsIgnoreCase("loadKVContainerData")) {
+      throw (IOException) getInjector().getException();
+    }
     getMetadataTable().loadFromFile(
         getTableDumpFile(getMetadataTable(), dumpDir));
     getBlockDataTable().loadFromFile(
@@ -229,5 +240,15 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
         }
       }
     }
+  }
+
+  @VisibleForTesting
+  public static FaultInjector getInjector() {
+    return injector;
+  }
+
+  @VisibleForTesting
+  public static void setInjector(FaultInjector instance) {
+    injector = instance;
   }
 }

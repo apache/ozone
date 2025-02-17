@@ -15,57 +15,91 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.utils;
+package org.apache.hadoop.ozone;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.util.concurrent.CountDownLatch;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.utils.FaultInjector;
+import org.assertj.core.api.Fail;
+import org.junit.jupiter.api.Assertions;
 
 /**
- * Used to inject certain faults for testing.
+ * A general FaultInjector implementation.
  */
-public abstract class FaultInjector {
+public class FaultInjectorImpl extends FaultInjector {
+  private CountDownLatch ready;
+  private CountDownLatch wait;
+  private Throwable ex;
+  private ContainerProtos.Type type = null;
+  private String tag;
 
-  @VisibleForTesting
+  public FaultInjectorImpl() {
+    init();
+  }
+
+  @Override
   public void init() {
+    this.ready = new CountDownLatch(1);
+    this.wait = new CountDownLatch(1);
   }
 
-  @VisibleForTesting
+  @Override
   public void pause() throws IOException {
+    ready.countDown();
+    try {
+      wait.await();
+    } catch (InterruptedException e) {
+      throw new IOException(e);
+    }
   }
 
-  @VisibleForTesting
+  @Override
   public void resume() throws IOException {
+    // Make sure injector pauses before resuming.
+    try {
+      ready.await();
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+      Assertions.assertTrue(Fail.fail("resume interrupted"));
+    }
+    wait.countDown();
   }
 
-  @VisibleForTesting
+  @Override
   public void reset() throws IOException {
+    init();
   }
 
   @VisibleForTesting
   public void setException(Throwable e) {
+    ex = e;
   }
 
   @VisibleForTesting
   public Throwable getException() {
-    return null;
+    return ex;
   }
 
   @VisibleForTesting
   public void setType(ContainerProtos.Type type) {
+    this.type = type;
   }
 
   @VisibleForTesting
   public ContainerProtos.Type getType() {
-    return null;
+    return type;
   }
 
   @VisibleForTesting
   public void setTag(String tag) {
+    this.tag = tag;
   }
 
   @VisibleForTesting
   public String getTag() {
-    return null;
+    return this.tag;
   }
 }
+
