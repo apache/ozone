@@ -69,7 +69,7 @@ public class TestOmStartupSlvLessThanMlv {
 
     MiniOzoneCluster.Builder clusterBuilder = MiniOzoneCluster.newBuilder(conf);
 
-    GenericTestUtils.withLogDisabled(MiniOzoneClusterImpl.LOG, () -> {
+    GenericTestUtils.withLogDisabled(MiniOzoneClusterImpl.class, () -> {
       OMException omException = assertThrows(OMException.class,
           clusterBuilder::build);
       String expectedMessage = String.format("Cannot initialize " +

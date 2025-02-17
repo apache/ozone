@@ -346,7 +346,7 @@ public class TestOzoneManagerConfiguration {
     conf.set(omNode2RpcAddrKey, "125.0.0.2:9862");
     conf.set(omNode3RpcAddrKey, "124.0.0.124:9862");
 
-    GenericTestUtils.withLogDisabled(MiniOzoneClusterImpl.LOG, () -> {
+    GenericTestUtils.withLogDisabled(MiniOzoneClusterImpl.class, () -> {
       Exception exception = assertThrows(OzoneIllegalArgumentException.class, this::startCluster);
       assertThat(exception).hasMessage(
           "Configuration has no " + OZONE_OM_ADDRESS_KEY + " address that matches local node's address.");
@@ -362,7 +362,7 @@ public class TestOzoneManagerConfiguration {
     String omServiceId = "service1";
     conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, omServiceId);
     // Deliberately skip OZONE_OM_NODES_KEY and OZONE_OM_ADDRESS_KEY config
-    GenericTestUtils.withLogDisabled(MiniOzoneClusterImpl.LOG, () -> {
+    GenericTestUtils.withLogDisabled(MiniOzoneClusterImpl.class, () -> {
       Exception e = assertThrows(OzoneIllegalArgumentException.class, this::startCluster);
       // Expect error message
       assertThat(e).hasMessageContaining("List of OM Node ID's should be specified");
@@ -387,7 +387,7 @@ public class TestOzoneManagerConfiguration {
     conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, omServiceId);
     conf.set(omNodesKey, omNodesKeyValue);
     // Deliberately skip OZONE_OM_ADDRESS_KEY config
-    GenericTestUtils.withLogDisabled(MiniOzoneClusterImpl.LOG, () -> {
+    GenericTestUtils.withLogDisabled(MiniOzoneClusterImpl.class, () -> {
       Exception e = assertThrows(OzoneIllegalArgumentException.class, this::startCluster);
       // Expect error message
       assertThat(e).hasMessageContaining("OM RPC Address should be set for all node");

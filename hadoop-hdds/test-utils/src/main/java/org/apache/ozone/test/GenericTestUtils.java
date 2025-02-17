@@ -50,6 +50,7 @@ import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
+import org.slf4j.LoggerFactory;
 
 /**
  * Provides some very generic helpers which might be used across the tests.
@@ -179,7 +180,8 @@ public abstract class GenericTestUtils {
     setLogLevel(toLog4j(logger), Level.toLevel(level.toString()));
   }
 
-  public static void withLogDisabled(org.slf4j.Logger logger, Runnable task) {
+  public static void withLogDisabled(Class<?> clazz, Runnable task) {
+    org.slf4j.Logger logger = LoggerFactory.getLogger(clazz);
     final Logger log4j = toLog4j(logger);
     final Level level = log4j.getLevel();
     setLogLevel(log4j, Level.OFF);
