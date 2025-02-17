@@ -24,11 +24,10 @@ import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.MetricsTag;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
@@ -103,7 +102,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
 
   public static synchronized ScmBlockDeletingServiceMetrics create() {
     if (instance == null) {
-      MetricsSystem ms = DefaultMetricsSystem.instance();
+      org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
       instance = ms.register(SOURCE_NAME, "SCMBlockDeletingService",
           new ScmBlockDeletingServiceMetrics());
     }
@@ -116,7 +115,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
    */
   public static void unRegister() {
     instance = null;
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }
 

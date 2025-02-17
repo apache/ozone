@@ -21,14 +21,17 @@ import java.util.EnumMap;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
+import org.apache.hadoop.ozone.metrics.MutableRate;
 import org.apache.ratis.protocol.RaftGroupId;
+
+import java.util.EnumMap;
+
+import static org.apache.hadoop.ozone.metrics.MetricsSystem.registerNewMutableRate;
 
 /**
  * This class is for maintaining Container State Machine statistics.
@@ -40,6 +43,7 @@ public class CSMMetrics {
       CSMMetrics.class.getSimpleName();
   private RaftGroupId gid;
 
+  private final MetricsRegistry registry;
   // ratis op metrics metrics
   private @Metric MutableCounterLong numWriteStateMachineOps;
   private @Metric MutableCounterLong numQueryStateMachineOps;
@@ -51,7 +55,6 @@ public class CSMMetrics {
   private @Metric MutableRate transactionLatencyMs;
   private final EnumMap<Type, MutableRate> opsLatencyMs;
   private final EnumMap<Type, MutableRate> opsQueueingDelay;
-  private MetricsRegistry registry = null;
 
   // Failure Metrics
   private @Metric MutableCounterLong numWriteStateMachineFails;
@@ -79,13 +82,16 @@ public class CSMMetrics {
     this.opsQueueingDelay = new EnumMap<>(ContainerProtos.Type.class);
     this.registry = new MetricsRegistry(CSMMetrics.class.getSimpleName());
     for (ContainerProtos.Type type : ContainerProtos.Type.values()) {
-      opsLatencyMs.put(type, registry.newRate(type.toString() + "Ms", type + " op"));
-      opsQueueingDelay.put(type, registry.newRate("queueingDelay" + type.toString() + "Ns", type + " op"));
+      opsLatencyMs.put(type, registerNewMutableRate(registry, type.toString() + "Ms", type + " op"));
+      opsQueueingDelay.put(
+          type,
+          registerNewMutableRate(registry, "queueingDelay" + type.toString() + "Ns", type + " op")
+      );
     }
   }
 
   public static CSMMetrics create(RaftGroupId gid) {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     return ms.register(SOURCE_NAME + gid.toString(),
         "Container State Machine",
         new CSMMetrics(gid));
@@ -256,7 +262,7 @@ public class CSMMetrics {
   }
 
   public void unRegister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME + gid.toString());
   }
 }

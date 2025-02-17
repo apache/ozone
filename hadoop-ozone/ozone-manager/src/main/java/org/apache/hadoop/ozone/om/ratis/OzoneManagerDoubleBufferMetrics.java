@@ -17,13 +17,12 @@
 
 package org.apache.hadoop.ozone.om.ratis;
 
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeFloat;
-import org.apache.hadoop.metrics2.lib.MutableRate;
-import org.apache.hadoop.metrics2.lib.MutableStat;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
+import org.apache.hadoop.ozone.metrics.MutableStat;
+import org.apache.hadoop.ozone.metrics.MutableRate;
 
 /**
  * Class which maintains metrics related to OzoneManager DoubleBuffer.
@@ -63,7 +62,7 @@ public class OzoneManagerDoubleBufferMetrics {
     if (instance != null) {
       return instance;
     } else {
-      MetricsSystem ms = DefaultMetricsSystem.instance();
+      org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
       OzoneManagerDoubleBufferMetrics omDoubleBufferMetrics =
           ms.register(SOURCE_NAME,
               "OzoneManager DoubleBuffer Metrics",
@@ -143,7 +142,7 @@ public class OzoneManagerDoubleBufferMetrics {
   }
 
   public void unRegister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }
 }

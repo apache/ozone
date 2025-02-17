@@ -22,13 +22,13 @@ import static org.apache.hadoop.metrics2.impl.MsInfo.SessionId;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.source.JvmMetrics;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 
 /**
  *
@@ -79,7 +79,7 @@ public class HttpFSServerMetrics {
   public static HttpFSServerMetrics create(Configuration conf,
       String serverName) {
     String sessionId = conf.get(DFS_METRICS_SESSION_ID_KEY);
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     JvmMetrics jm = JvmMetrics.create("HttpFSServer", sessionId, ms);
     String name = "ServerActivity-" + (serverName.isEmpty()
         ? "UndefinedServer" + ThreadLocalRandom.current().nextInt()
@@ -146,7 +146,7 @@ public class HttpFSServerMetrics {
   }
 
   public void shutdown() {
-    DefaultMetricsSystem.shutdown();
+    MetricsSystem.shutdown();
   }
 
   public long getBytesWritten() {
