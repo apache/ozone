@@ -65,7 +65,7 @@ public class TestReconOmMetadataManagerImpl {
     File snapshotFile = new File(
         checkpoint.getCheckpointLocation().getParent() + "/" +
             "om.snapshot.db_" + System.currentTimeMillis());
-    checkpoint.getCheckpointLocation().toFile().renameTo(snapshotFile);
+    assertTrue(checkpoint.getCheckpointLocation().toFile().renameTo(snapshotFile));
 
     //Create new Recon OM Metadata manager instance.
     File reconOmDbDir = Files.createDirectory(

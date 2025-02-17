@@ -28,13 +28,9 @@ import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
@@ -57,7 +53,7 @@ import org.junit.jupiter.api.io.TempDir;
  * Test Recon Utility methods.
  */
 public class TestReconUtils {
-  private static PipelineID randomPipelineID = PipelineID.randomId();
+  private static final PipelineID RANDOM_PIPELINE_ID = PipelineID.randomId();
 
   @TempDir
   private Path temporaryFolder;
@@ -77,31 +73,18 @@ public class TestReconUtils {
   public void testCreateTarFile(@TempDir File tempSnapshotDir)
       throws Exception {
 
-    FileInputStream fis = null;
-    FileOutputStream fos = null;
     File tarFile = null;
 
     try {
       String testDirName = tempSnapshotDir.getPath();
 
-      File file = new File(testDirName + "/temp1.txt");
-      OutputStreamWriter writer = new OutputStreamWriter(
-          new FileOutputStream(file), UTF_8);
-      writer.write("Test data 1");
-      writer.close();
-
-      file = new File(testDirName + "/temp2.txt");
-      writer = new OutputStreamWriter(
-          new FileOutputStream(file), UTF_8);
-      writer.write("Test data 2");
-      writer.close();
+      FileUtils.write(new File(testDirName + "/temp1.txt"), "Test data 1", UTF_8);
+      FileUtils.write(new File(testDirName + "/temp2.txt"), "Test data 2", UTF_8);
 
       tarFile = createTarFile(Paths.get(testDirName));
       assertNotNull(tarFile);
 
     } finally {
-      org.apache.hadoop.io.IOUtils.closeStream(fis);
-      org.apache.hadoop.io.IOUtils.closeStream(fos);
       FileUtils.deleteDirectory(tempSnapshotDir);
       FileUtils.deleteQuietly(tarFile);
     }
@@ -114,19 +97,11 @@ public class TestReconUtils {
         temporaryFolder.resolve("NewDir")).toFile();
     File file1 = Paths.get(newDir.getAbsolutePath(), "file1")
         .toFile();
-    String str = "File1 Contents";
-    BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
-        new FileOutputStream(file1.getAbsoluteFile()), UTF_8));
-    writer.write(str);
-    writer.close();
+    FileUtils.write(file1, "File1 Contents", UTF_8);
 
     File file2 = Paths.get(newDir.getAbsolutePath(), "file2")
         .toFile();
-    str = "File2 Contents";
-    writer = new BufferedWriter(new OutputStreamWriter(
-        new FileOutputStream(file2.getAbsoluteFile()), UTF_8));
-    writer.write(str);
-    writer.close();
+    FileUtils.write(file2, "File2 Contents", UTF_8);
 
     //Create test tar file.
     File tarFile = createTarFile(newDir.toPath());
@@ -143,25 +118,23 @@ public class TestReconUtils {
     String url = "http://localhost:9874/dbCheckpoint";
     File file1 = Paths.get(temporaryFolder.toString(), "file1")
         .toFile();
-    BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
-        new FileOutputStream(file1.getAbsoluteFile()), UTF_8));
-    writer.write("File 1 Contents");
-    writer.close();
-    InputStream fileInputStream = new FileInputStream(file1);
+    FileUtils.write(file1, "File 1 Contents", UTF_8);
+    try (InputStream fileInputStream = Files.newInputStream(file1.toPath())) {
 
-    String contents;
-    URLConnectionFactory connectionFactoryMock =
-        mock(URLConnectionFactory.class);
-    HttpURLConnection urlConnectionMock = mock(HttpURLConnection.class);
-    when(urlConnectionMock.getInputStream()).thenReturn(fileInputStream);
-    when(connectionFactoryMock.openConnection(any(URL.class), anyBoolean()))
-        .thenReturn(urlConnectionMock);
-    try (InputStream inputStream = new ReconUtils()
-        .makeHttpCall(connectionFactoryMock, url, false).getInputStream()) {
-      contents = IOUtils.toString(inputStream, Charset.defaultCharset());
+      String contents;
+      URLConnectionFactory connectionFactoryMock =
+          mock(URLConnectionFactory.class);
+      HttpURLConnection urlConnectionMock = mock(HttpURLConnection.class);
+      when(urlConnectionMock.getInputStream()).thenReturn(fileInputStream);
+      when(connectionFactoryMock.openConnection(any(URL.class), anyBoolean()))
+          .thenReturn(urlConnectionMock);
+      try (InputStream inputStream = new ReconUtils()
+          .makeHttpCall(connectionFactoryMock, url, false).getInputStream()) {
+        contents = IOUtils.toString(inputStream, Charset.defaultCharset());
+      }
+
+      assertEquals("File 1 Contents", contents);
     }
-
-    assertEquals("File 1 Contents", contents);
   }
 
   @Test
@@ -169,28 +142,15 @@ public class TestReconUtils {
 
     File file1 = Paths.get(newDir.getAbsolutePath(), "valid_1")
         .toFile();
-    String str = "File1 Contents";
-    BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
-        new FileOutputStream(file1.getAbsoluteFile()), UTF_8));
-    writer.write(str);
-    writer.close();
+    FileUtils.write(file1, "File1 Contents", UTF_8);
 
     File file2 = Paths.get(newDir.getAbsolutePath(), "valid_2")
         .toFile();
-    str = "File2 Contents";
-    writer = new BufferedWriter(new OutputStreamWriter(
-        new FileOutputStream(file2.getAbsoluteFile()), UTF_8));
-    writer.write(str);
-    writer.close();
-
+    FileUtils.write(file2, "File2 Contents", UTF_8);
 
     File file3 = Paths.get(newDir.getAbsolutePath(), "invalid_3")
         .toFile();
-    str = "File3 Contents";
-    writer = new BufferedWriter(new OutputStreamWriter(
-        new FileOutputStream(file3.getAbsoluteFile()), UTF_8));
-    writer.write(str);
-    writer.close();
+    FileUtils.write(file3, "File3 Contents", UTF_8);
 
     ReconUtils reconUtils = new ReconUtils();
     File latestValidFile = reconUtils.getLastKnownDB(newDir, "valid");
@@ -256,7 +216,7 @@ public class TestReconUtils {
   public static ContainerInfo getContainer(
       final HddsProtos.LifeCycleState state) {
     return getDefaultContainerInfoBuilder(state)
-        .setPipelineID(randomPipelineID)
+        .setPipelineID(RANDOM_PIPELINE_ID)
         .build();
   }
 }
