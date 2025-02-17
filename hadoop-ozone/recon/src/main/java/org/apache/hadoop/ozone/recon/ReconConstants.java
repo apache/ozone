@@ -94,13 +94,13 @@ public final class ReconConstants {
       Math.log(2)) + 1;
 
   // For file-size count reprocessing: ensure only one task truncates the table.
-  public static final AtomicBoolean TABLE_TRUNCATED = new AtomicBoolean(false);
+  public static final AtomicBoolean FILE_SIZE_COUNT_TABLE_TRUNCATED = new AtomicBoolean(false);
 
   /**
-   * Resets the table-truncated flag. This should be called once per reprocess cycle,
+   * Resets the table-truncated flag for the given tables. This should be called once per reprocess cycle,
    * for example by the OM task controller, before the tasks run.
    */
-  public static void resetTableTruncatedFlag() {
-    TABLE_TRUNCATED.set(false);
+  public static void resetTableTruncatedFlags() {
+    FILE_SIZE_COUNT_TABLE_TRUNCATED.set(false);
   }
 }
