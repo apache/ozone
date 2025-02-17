@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,32 +17,22 @@
 
 package org.apache.hadoop.ozone.om;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.recon.ReconConfig;
-import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
-import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
-import org.apache.hadoop.hdds.utils.db.RDBStore;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
-import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeFile;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeRatisSnapshotCompleteFlag;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
+import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
+import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.createHardLinkList;
+import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileName;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -62,19 +51,27 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeFile;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeRatisSnapshotCompleteFlag;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
-import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
-import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.createHardLinkList;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
-import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileName;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.recon.ReconConfig;
+import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Provides the current checkpoint Snapshot of the OM DB. (tar.gz)
