@@ -131,8 +131,6 @@ Test ozone shell errors
     ${result} =     Execute and checkrc    ozone sh bucket create ${protocol}${server}/${volume}/bucket1                    255
                     Should contain      ${result}       QUOTA_ERROR
                     Execute and checkrc    ozone sh volume delete ${protocol}${server}/${volume}                            0
-    ${result} =     Execute and checkrc    ozone sh key put ${protocol}${server}/${volume}/bucket1/key1 sample.txt          255
-                    Should Match Regexp                    ${result}       Error: File not found: .*
 
 Test Volume Acls
     [arguments]     ${protocol}         ${server}       ${volume}
@@ -188,6 +186,8 @@ Test key handling
                     Should Contain      ${result}       NOTICE.txt.1 exists
     ${result} =     Execute             ozone sh key get --force ${protocol}${server}/${volume}/bb1/key1 /tmp/NOTICE.txt.1
                     Should Not Contain  ${result}       NOTICE.txt.1 exists
+    ${result} =     Execute and checkrc    ozone sh key put ${protocol}${server}/${volume}/bb1/key1 sample.txt          255
+                    Should Contain         ${result}       File not found: sample.txt
     ${result} =     Execute             ozone sh key info ${protocol}${server}/${volume}/bb1/key1 | jq -r '. | select(.name=="key1")'
                     Should contain      ${result}       creationTime
                     Should not contain  ${result}       ETag

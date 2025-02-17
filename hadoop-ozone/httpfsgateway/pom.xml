@@ -34,8 +34,6 @@
     <httpfs.source.repository>REPO NOT AVAIL</httpfs.source.repository>
     <httpfs.source.revision>REVISION NOT AVAIL</httpfs.source.revision>
     <maven.build.timestamp.format>yyyy-MM-dd'T'HH:mm:ssZ</maven.build.timestamp.format>
-    <!-- no tests in this module so far -->
-    <maven.test.skip>true</maven.test.skip>
   </properties>
 
   <dependencies>
