@@ -62,7 +62,7 @@ public class SCMSecurityProtocolServerSideTranslatorPB
   private final StorageContainerManager scm;
 
   private OzoneProtocolMessageDispatcher<SCMSecurityRequest,
-      SCMSecurityResponse, ProtocolMessageEnum>
+      SCMSecurityResponse, ProtocolMessageEnum, String>
       dispatcher;
 
   public SCMSecurityProtocolServerSideTranslatorPB(SCMSecurityProtocol impl,
@@ -84,7 +84,7 @@ public class SCMSecurityProtocolServerSideTranslatorPB
           scm.getSecurityProtocolRpcPort(), scm.getScmId());
     }
     return dispatcher.processRequest(request, this::processRequest,
-        request.getCmdType(), request.getTraceID());
+        request.getCmdType(), request.getTraceID(), "");
   }
 
   public SCMSecurityResponse processRequest(SCMSecurityRequest request)
