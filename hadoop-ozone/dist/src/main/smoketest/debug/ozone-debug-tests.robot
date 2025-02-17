@@ -37,7 +37,7 @@ Write keys
 
 *** Test Cases ***
 Test ozone debug read-replicas
-    ${directory} =                      Execute read-replicas CLI tool
+    ${directory} =                      Execute replicas verify checksums CLI tool
     Set Test Variable    ${DIR}         ${directory}
 
     ${count_files} =                    Count Files In Directory    ${directory}
