@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.atMostOnce;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -35,9 +36,12 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 import org.apache.ozone.test.GenericTestUtils;
@@ -93,10 +97,19 @@ public class TestBackgroundContainerMetadataScanner extends
   @Override
   public void testScannerMetrics() {
     scanner.runIteration();
-
     ContainerMetadataScannerMetrics metrics = scanner.getMetrics();
     assertEquals(1, metrics.getNumScanIterations());
     assertEquals(4, metrics.getNumContainersScanned());
+    assertEquals(1, metrics.getNumUnHealthyContainers());
+
+    Container<ContainerData> container = mock(Container.class);
+    ContainerTestUtils.setupMockContainer(container,
+        false, getUnhealthyScanResult(), ScanResult.healthy(),
+        new AtomicLong(1), vol);
+    setContainers(container);
+    scanner.runIteration();
+    assertEquals(2, metrics.getNumScanIterations());
+    assertEquals(1, metrics.getNumContainersScanned());
     assertEquals(1, metrics.getNumUnHealthyContainers());
   }
 
@@ -122,6 +135,30 @@ public class TestBackgroundContainerMetadataScanner extends
     verifyContainerMarkedUnhealthy(corruptData, never());
     verifyContainerMarkedUnhealthy(openCorruptMetadata, atLeastOnce());
     verifyContainerMarkedUnhealthy(openContainer, never());
+
+    Container<ContainerData> container1 = mock(Container.class);
+    ContainerMetadataScannerMetrics metrics = scanner.getMetrics();
+    ContainerTestUtils.setupMockContainer(container1,
+        false, getUnhealthyScanResult(), ScanResult.healthy(),
+        new AtomicLong(1), vol, 200);
+    setContainers(container1);
+
+    scanner.runIteration();
+    assertEquals(2, metrics.getNumScanIterations());
+    assertEquals(1, metrics.getNumContainersScanned());
+    assertEquals(1, metrics.getNumUnHealthyContainers());
+    assertTrue(metrics.getTotalRunTime() > 200);
+
+    Container<ContainerData> container2 = mock(Container.class);
+    ContainerTestUtils.setupMockContainer(container2,
+        false, getUnhealthyScanResult(), ScanResult.healthy(),
+        new AtomicLong(2), vol, 300);
+    setContainers(container2);
+    scanner.runIteration();
+    assertEquals(3, metrics.getNumScanIterations());
+    assertEquals(1, metrics.getNumContainersScanned());
+    assertEquals(1, metrics.getNumUnHealthyContainers());
+    assertTrue(metrics.getTotalRunTime() > 500);
   }
 
   @Test
