@@ -56,10 +56,8 @@ OZONE-SITE.XML_hdds.grpc.tls.enabled=true
 OZONE-SITE.XML_ozone.s3g.kerberos.keytab.file=/etc/security/keytabs/s3g.keytab
 OZONE-SITE.XML_ozone.s3g.kerberos.principal=s3g/s3g@EXAMPLE.COM
 
-HDFS-SITE.XML_hdds.datanode.kerberos.principal=dn/dn@EXAMPLE.COM
-HDFS-SITE.XML_hdds.datanode.kerberos.keytab.file=/etc/security/keytabs/dn.keytab
-HDFS-SITE.XML_dfs.web.authentication.kerberos.principal=HTTP/dn@EXAMPLE.COM
-HDFS-SITE.XML_hdds.web.authentication.kerberos.keytab=/etc/security/keytabs/dn.keytab
+OZONE-SITE.XML_hdds.datanode.kerberos.principal=dn/dn@EXAMPLE.COM
+OZONE-SITE.XML_hdds.datanode.kerberos.keytab.file=/etc/security/keytabs/dn.keytab
 
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 OZONE-SITE.XML_hdds.datanode.volume.min.free.space=100MB

@@ -67,9 +67,6 @@ public final class DFSConfigKeysLegacy {
   public static final String DFS_METRICS_PERCENTILES_INTERVALS_KEY =
       "hdds.metrics.percentiles.intervals";
 
-  public static final String DFS_WEB_AUTHENTICATION_KERBEROS_KEYTAB_KEY =
-      "hdds.web.authentication.kerberos.keytab";
-
 }
 
 

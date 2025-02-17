@@ -88,11 +88,8 @@ OZONE-SITE.XML_ozone.scm.close.container.wait.duration=5s
 # Ratis streaming is disabled to ensure coverage for both cases
 OZONE-SITE.XML_hdds.container.ratis.datastream.enabled=false
 
-HDFS-SITE.XML_hdds.datanode.kerberos.principal=dn/dn@EXAMPLE.COM
-HDFS-SITE.XML_hdds.datanode.kerberos.keytab.file=/etc/security/keytabs/dn.keytab
-HDFS-SITE.XML_dfs.web.authentication.kerberos.principal=HTTP/ozone@EXAMPLE.COM
-HDFS-SITE.XML_hdds.web.authentication.kerberos.keytab=/etc/security/keytabs/HTTP.keytab
-
+OZONE-SITE.XML_hdds.datanode.kerberos.principal=dn/dn@EXAMPLE.COM
+OZONE-SITE.XML_hdds.datanode.kerberos.keytab.file=/etc/security/keytabs/dn.keytab
 
 OZONE-SITE.XML_ozone.security.http.kerberos.enabled=true
 OZONE-SITE.XML_ozone.s3g.secret.http.enabled=true
