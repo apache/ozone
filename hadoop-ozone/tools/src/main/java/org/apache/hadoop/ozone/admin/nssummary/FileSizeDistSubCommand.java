@@ -27,7 +27,6 @@ import java.util.concurrent.Callable;
 
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.makeHttpCall;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printEmptyPathRequest;
-import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printBucketReminder;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printNewLines;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printPathNotFound;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printSpaces;
@@ -79,10 +78,6 @@ public class FileSizeDistSubCommand implements Callable {
     } else if ("TYPE_NOT_APPLICABLE".equals(distResponse.path("status").asText())) {
       printTypeNA("File Size Distribution");
     } else {
-      if (parent.isNotValidBucketOrOBSBucket(path)) {
-        printBucketReminder();
-      }
-
       printWithUnderline("File Size Distribution", true);
       JsonNode fileSizeDist = distResponse.path("dist");
       double sum = 0;

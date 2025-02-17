@@ -26,7 +26,8 @@ import java.sql.SQLException;
 
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Class to test basic SQL schema setup.
@@ -41,8 +42,9 @@ public class TestSqlSchemaSetup extends AbstractReconSqlDBTest {
    * Make sure schema was created correctly.
    * @throws SQLException
    */
-  @Test
-  public void testSchemaSetup() throws SQLException {
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, -1})
+  public void testSchemaSetup(int lastTaskRunStatus) throws SQLException {
     assertNotNull(getInjector());
     assertNotNull(getConfiguration());
     assertNotNull(getDslContext());
@@ -51,7 +53,7 @@ public class TestSqlSchemaSetup extends AbstractReconSqlDBTest {
       assertNotNull(getDao(dao));
     });
     ReconTaskStatusDao dao = getDao(ReconTaskStatusDao.class);
-    dao.insert(new ReconTaskStatus("TestTask", 1L, 2L));
+    dao.insert(new ReconTaskStatus("TestTask", 1L, 2L, lastTaskRunStatus, 0));
     assertEquals(1, dao.findAll().size());
   }
 }

@@ -34,10 +34,10 @@
     <apache-rat-plugin.version>0.16.1</apache-rat-plugin.version>
     <aspectj-plugin.version>1.14</aspectj-plugin.version>
     <aspectj.version>1.9.7</aspectj.version>
-    <assertj.version>3.27.2</assertj.version>
+    <assertj.version>3.27.3</assertj.version>
     <aws-java-sdk.version>1.12.661</aws-java-sdk.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
-    <bouncycastle.version>1.79</bouncycastle.version>
+    <bouncycastle.version>1.80</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.0</build-helper-maven-plugin.version>
     <cdi-api.version>2.0</cdi-api.version>
     <checkstyle.version>9.3</checkstyle.version>
@@ -129,12 +129,13 @@
     <jetty.version>9.4.57.v20241219</jetty.version>
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
-    <jline.version>3.28.0</jline.version>
+    <jline.version>3.29.0</jline.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
     <jnr-posix.version>3.1.20</jnr-posix.version>
     <joda.time.version>2.12.7</joda.time.version>
     <jooq.version>3.11.10</jooq.version>
     <jsch.version>0.1.55</jsch.version>
+    <json-simple.version>1.1.1</json-simple.version>
     <jsp-api.version>2.1</jsp-api.version>
     <jsr311-api.version>1.1.1</jsr311-api.version>
     <junit5.version>5.11.4</junit5.version>
@@ -155,6 +156,7 @@
     <maven-install-plugin.version>3.1.3</maven-install-plugin.version>
     <maven-jar-plugin.version>3.4.2</maven-jar-plugin.version>
     <maven-javadoc-plugin.version>3.11.1</maven-javadoc-plugin.version>
+    <maven-patch-plugin.version>1.1.1</maven-patch-plugin.version>
     <maven-pdf-plugin.version>1.6.1</maven-pdf-plugin.version>
     <maven-remote-resources-plugin.version>3.3.0</maven-remote-resources-plugin.version>
     <maven-resources-plugin.version>3.3.0</maven-resources-plugin.version>
@@ -163,6 +165,7 @@
     <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
     <maven-surefire-plugin.argLine>-Xmx8192m -XX:+HeapDumpOnOutOfMemoryError</maven-surefire-plugin.argLine>
     <maven-surefire-plugin.argLineAccessArgs />
+    <!-- if surefire is upgraded, dependency on junit-jupiter-engine can be removed -->
     <maven-surefire-plugin.version>3.0.0-M4</maven-surefire-plugin.version>
     <maven-surefire-report-plugin.version>${maven-surefire-plugin.version}</maven-surefire-report-plugin.version>
     <maven-war-plugin.version>3.4.0</maven-war-plugin.version>
@@ -184,6 +187,7 @@
     <ozone.version>2.0.0-SNAPSHOT</ozone.version>
     <picocli.version>4.7.5</picocli.version>
     <plexus-archiver.version>4.2.2</plexus-archiver.version>
+    <pmd.version>3.26.0</pmd.version>
     <!-- Enable Reproducible Builds mode -->
     <project.build.outputTimestamp>2023-01-01T00:00:00Z</project.build.outputTimestamp>
     <!-- platform encoding override -->
@@ -215,7 +219,7 @@
     <sortpom-maven-plugin.version>3.0.1</sortpom-maven-plugin.version>
     <spotbugs.version>3.1.12.2</spotbugs.version>
     <spring.version>5.3.39</spring.version>
-    <sqlite.version>3.47.2.0</sqlite.version>
+    <sqlite.version>3.49.0.0</sqlite.version>
     <stax2.version>4.2.2</stax2.version>
     <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
     <surefire.fork.timeout>1200</surefire.fork.timeout>
@@ -230,7 +234,7 @@
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
     <woodstox.version>5.4.0</woodstox.version>
     <zookeeper.version>3.8.4</zookeeper.version>
-    <zstd-jni.version>1.5.6-9</zstd-jni.version>
+    <zstd-jni.version>1.5.6-10</zstd-jni.version>
   </properties>
 
   <dependencyManagement>
@@ -406,6 +410,11 @@
         <version>${compile-testing.version}</version>
       </dependency>
       <dependency>
+        <groupId>com.googlecode.json-simple</groupId>
+        <artifactId>json-simple</artifactId>
+        <version>${json-simple.version}</version>
+      </dependency>
+      <dependency>
         <groupId>com.jcraft</groupId>
         <artifactId>jsch</artifactId>
         <version>${jsch.version}</version>
@@ -464,6 +473,11 @@
         <groupId>commons-daemon</groupId>
         <artifactId>commons-daemon</artifactId>
         <version>${commons-daemon.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>commons-fileupload</groupId>
+        <artifactId>commons-fileupload</artifactId>
+        <version>${commons-fileupload.version}</version>
       </dependency>
       <dependency>
         <groupId>commons-io</groupId>
@@ -764,6 +778,12 @@
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdfs</artifactId>
+        <version>${hadoop.version}</version>
+        <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-hdfs-client</artifactId>
         <version>${hadoop.version}</version>
       </dependency>
@@ -777,6 +797,16 @@
         <artifactId>hadoop-kms</artifactId>
         <version>${hadoop.version}</version>
         <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-mapreduce-client-core</artifactId>
+        <version>${hadoop.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-mapreduce-client-jobclient</artifactId>
+        <version>${hadoop.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
@@ -832,6 +862,16 @@
         <groupId>org.apache.logging.log4j</groupId>
         <artifactId>log4j-core</artifactId>
         <version>${log4j2.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ranger</groupId>
+        <artifactId>ranger-intg</artifactId>
+        <version>${ranger.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ranger</groupId>
+        <artifactId>ranger-plugins-common</artifactId>
+        <version>${ranger.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ratis</groupId>
@@ -920,6 +960,16 @@
         </exclusions>
       </dependency>
       <dependency>
+        <groupId>org.aspectj</groupId>
+        <artifactId>aspectjrt</artifactId>
+        <version>${aspectj.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.aspectj</groupId>
+        <artifactId>aspectjweaver</artifactId>
+        <version>${aspectj.version}</version>
+      </dependency>
+      <dependency>
         <groupId>org.assertj</groupId>
         <artifactId>assertj-core</artifactId>
         <version>${assertj.version}</version>
@@ -938,6 +988,21 @@
         <groupId>org.bouncycastle</groupId>
         <artifactId>bcutil-jdk18on</artifactId>
         <version>${bouncycastle.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.codehaus.jackson</groupId>
+        <artifactId>jackson-core-asl</artifactId>
+        <version>${jackson1.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.codehaus.jackson</groupId>
+        <artifactId>jackson-jaxrs</artifactId>
+        <version>${jackson-jaxr.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.codehaus.jackson</groupId>
+        <artifactId>jackson-mapper-asl</artifactId>
+        <version>${jackson1.version}</version>
       </dependency>
       <dependency>
         <groupId>org.codehaus.woodstox</groupId>
@@ -1020,7 +1085,6 @@
         <groupId>org.glassfish.jersey.containers</groupId>
         <artifactId>jersey-container-servlet</artifactId>
         <version>${jersey2.version}</version>
-        <scope>compile</scope>
         <exclusions>
           <exclusion>
             <groupId>org.glassfish.hk2</groupId>
@@ -1081,6 +1145,11 @@
         <groupId>org.hamcrest</groupId>
         <artifactId>hamcrest</artifactId>
         <version>${hamcrest.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jacoco</groupId>
+        <artifactId>org.jacoco.core</artifactId>
+        <version>${jacoco.version}</version>
       </dependency>
       <dependency>
         <groupId>org.javassist</groupId>
@@ -1216,20 +1285,48 @@
         <artifactId>snakeyaml</artifactId>
         <version>${snakeyaml.version}</version>
       </dependency>
-      <dependency>
-        <groupId>org.jacoco</groupId>
-        <artifactId>org.jacoco.core</artifactId>
-        <version>${jacoco.version}</version>
-        <scope>provided</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-mapreduce-client-jobclient</artifactId>
-        <version>${hadoop.version}</version>
-        <scope>test</scope>
-      </dependency>
     </dependencies>
   </dependencyManagement>
+
+  <dependencies>
+    <!-- Test Dependencies used by most modules -->
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <!-- required for Surefire versions before 3.0.0-M5 -->
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-engine</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-params</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-inline</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
 
   <build>
     <pluginManagement>
@@ -1258,6 +1355,11 @@
           <groupId>com.github.eirslett</groupId>
           <artifactId>frontend-maven-plugin</artifactId>
           <version>${frontend-maven-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>dev.aspectj</groupId>
+          <artifactId>aspectj-maven-plugin</artifactId>
+          <version>${aspectj-plugin.version}</version>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
@@ -1296,6 +1398,7 @@
           </executions>
         </plugin>
         <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-clean-plugin</artifactId>
           <version>${maven-clean-plugin.version}</version>
         </plugin>
@@ -1306,6 +1409,11 @@
           <configuration>
             <useIncrementalCompilation>false</useIncrementalCompilation>
           </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-patch-plugin</artifactId>
+          <version>${maven-patch-plugin.version}</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -1370,6 +1478,14 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-resources-plugin</artifactId>
           <version>${maven-resources-plugin.version}</version>
+          <configuration>
+            <nonFilteredFileExtensions>
+              <nonFilteredFileExtension>swp</nonFilteredFileExtension>
+              <nonFilteredFileExtension>woff</nonFilteredFileExtension>
+              <nonFilteredFileExtension>woff2</nonFilteredFileExtension>
+              <nonFilteredFileExtension>robot</nonFilteredFileExtension>
+            </nonFilteredFileExtensions>
+          </configuration>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
@@ -1456,6 +1572,10 @@
                       <!-- Allow RocksDB constants and static methods to be used. -->
                       <allowedImport>org.rocksdb.RocksDB.*</allowedImport>
                     </allowedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
                     <exclusions>
                       <exclusion>org.apache.hadoop.hdds.utils.db.managed.*</exclusion>
                       <exclusion>org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer</exclusion>
@@ -1480,6 +1600,10 @@
                       <bannedImport>org.apache.hadoop.thirdparty.com.google.common.**</bannedImport>
                       <bannedImport>org.apache.hadoop.util.Preconditions</bannedImport>
                     </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
                   </restrictImports>
                   <restrictImports>
                     <includeTestCode>true</includeTestCode>
@@ -1487,6 +1611,10 @@
                     <bannedImports>
                       <bannedImport>org.junit.jupiter.api.Disabled</bannedImport>
                     </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
                   </restrictImports>
                   <restrictImports>
                     <includeTestCode>true</includeTestCode>
@@ -1498,6 +1626,10 @@
                       <bannedImport>org.apache.hadoop.classification.InterfaceAudience</bannedImport>
                       <bannedImport>org.apache.hadoop.classification.InterfaceStability</bannedImport>
                     </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
                     <exclusions>
                       <exclusion>org.apache.hadoop.fs.contract.*</exclusion>
                       <exclusion>org.apache.hadoop.tools.contract.*</exclusion>
@@ -1510,6 +1642,10 @@
                       <bannedImport>org.apache.hadoop.hdfs.MiniDFSCluster</bannedImport>
                       <bannedImport>org.apache.hadoop.hdfs.DFSConfigKeys</bannedImport>
                     </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
                   </restrictImports>
                   <restrictImports>
                     <includeTestCode>true</includeTestCode>
@@ -1522,6 +1658,10 @@
                       <allowedImport>org.junit.jupiter.**</allowedImport>
                       <allowedImport>org.junit.platform.**</allowedImport>
                     </allowedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
                   </restrictImports>
                   <restrictImports>
                     <includeTestCode>true</includeTestCode>
@@ -1534,6 +1674,10 @@
                       <bannedImport>org.jetbrains.annotations.NotNull</bannedImport>
                       <bannedImport>org.jetbrains.annotations.Nullable</bannedImport>
                     </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
                   </restrictImports>
                   <restrictImports>
                     <includeTestCode>true</includeTestCode>
@@ -1541,6 +1685,10 @@
                     <bannedImports>
                       <bannedImport>org.apache.commons.lang.**</bannedImport>
                     </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
                   </restrictImports>
                 </rules>
               </configuration>
@@ -1562,6 +1710,10 @@
                       <bannedImport>org.apache.hadoop.hdds.scm.metadata.Replicate</bannedImport>
                       <bannedImport>org.kohsuke.MetaInfServices</bannedImport>
                     </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
                   </restrictImports>
                 </rules>
               </configuration>
@@ -1603,6 +1755,17 @@
           <artifactId>cyclonedx-maven-plugin</artifactId>
           <version>${cyclonedx.version}</version>
         </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-pmd-plugin</artifactId>
+          <version>${pmd.version}</version>
+          <configuration>
+            <rulesets>
+              <ruleset>dev-support/pmd/pmd-ruleset.xml</ruleset>
+            </rulesets>
+            <printFailingErrors>true</printFailingErrors>
+          </configuration>
+        </plugin>
       </plugins>
     </pluginManagement>
 
@@ -1611,6 +1774,15 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
         <executions>
+          <execution>
+            <id>analyze</id>
+            <goals>
+              <goal>analyze-only</goal>
+            </goals>
+            <configuration>
+              <ignoreNonCompile>true</ignoreNonCompile>
+            </configuration>
+          </execution>
           <execution>
             <id>add-classpath-descriptor</id>
             <goals>
@@ -1640,6 +1812,7 @@
         </executions>
       </plugin>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-clean-plugin</artifactId>
         <configuration>
           <filesets>
@@ -2121,7 +2294,7 @@
     </profile>
     <!-- The following profiles define test splits for CI -->
     <profile>
-      <id>client</id>
+      <id>test-client</id>
       <build>
         <plugins>
           <plugin>
@@ -2138,7 +2311,7 @@
       </build>
     </profile>
     <profile>
-      <id>container</id>
+      <id>test-container</id>
       <build>
         <plugins>
           <plugin>
@@ -2156,7 +2329,7 @@
       </build>
     </profile>
     <profile>
-      <id>om</id>
+      <id>test-om</id>
       <build>
         <plugins>
           <plugin>
@@ -2176,7 +2349,7 @@
       </build>
     </profile>
     <profile>
-      <id>snapshot</id>
+      <id>test-snapshot</id>
       <build>
         <plugins>
           <plugin>
@@ -2193,7 +2366,7 @@
       </build>
     </profile>
     <profile>
-      <id>filesystem</id>
+      <id>test-filesystem</id>
       <build>
         <plugins>
           <plugin>
@@ -2210,7 +2383,7 @@
       </build>
     </profile>
     <profile>
-      <id>hdds</id>
+      <id>test-hdds</id>
       <build>
         <plugins>
           <plugin>
@@ -2230,7 +2403,7 @@
       </build>
     </profile>
     <profile>
-      <id>ozone</id>
+      <id>test-ozone</id>
       <build>
         <plugins>
           <plugin>
@@ -2257,7 +2430,7 @@
       </build>
     </profile>
     <profile>
-      <id>recon</id>
+      <id>test-recon</id>
       <build>
         <plugins>
           <plugin>
@@ -2274,7 +2447,7 @@
       </build>
     </profile>
     <profile>
-      <id>shell</id>
+      <id>test-shell</id>
       <build>
         <plugins>
           <plugin>
@@ -2293,7 +2466,7 @@
       </build>
     </profile>
     <profile>
-      <id>stable</id>
+      <id>stable-tests</id>
       <build>
         <plugins>
           <plugin>
@@ -2308,7 +2481,7 @@
     </profile>
     <profile>
       <!-- Test split dedicated for running @Flaky tests -->
-      <id>flaky</id>
+      <id>test-flaky</id>
       <build>
         <plugins>
           <plugin>
@@ -2324,7 +2497,7 @@
     </profile>
     <profile>
       <!-- Test split dedicated for running @Native tests -->
-      <id>native</id>
+      <id>native-tests</id>
       <build>
         <plugins>
           <plugin>

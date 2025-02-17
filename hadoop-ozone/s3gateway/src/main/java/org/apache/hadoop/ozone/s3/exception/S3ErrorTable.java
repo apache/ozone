@@ -149,6 +149,12 @@ public final class S3ErrorTable {
       "MalformedXML", "The XML you provided was not well-formed or did not " +
       "validate against our published schema", HTTP_BAD_REQUEST);
 
+  public static final OS3Exception QUOTA_EXCEEDED = new OS3Exception(
+      "QuotaExceeded", "The quota has been exceeded. " +
+      "Please review your disk space or namespace usage and adjust accordingly.",
+      HTTP_FORBIDDEN
+  );
+
   public static OS3Exception newError(OS3Exception e, String resource) {
     return newError(e, resource, null);
   }

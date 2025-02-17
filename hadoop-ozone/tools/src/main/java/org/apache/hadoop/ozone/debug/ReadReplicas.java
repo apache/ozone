@@ -109,8 +109,11 @@ public class ReadReplicas extends KeyHandler implements DebugSubcommand {
       String volumeName = address.getVolumeName();
       String bucketName = address.getBucketName();
       String keyName = address.getKeyName();
+      // Multilevel keys will have a '/' in their names. This interferes with
+      // directory and file creation process. Flatten the keys to fix this.
+      String sanitizedKeyName = address.getKeyName().replace("/", "_");
 
-      File dir = createDirectory(volumeName, bucketName, keyName);
+      File dir = createDirectory(volumeName, bucketName, sanitizedKeyName);
 
       OzoneKeyDetails keyInfoDetails
           = checksumClient.getKeyDetails(volumeName, bucketName, keyName);
@@ -128,13 +131,13 @@ public class ReadReplicas extends KeyHandler implements DebugSubcommand {
       result.put(JSON_PROPERTY_FILE_SIZE, keyInfoDetails.getDataSize());
 
       ArrayNode blocks = JsonUtils.createArrayNode();
-      downloadReplicasAndCreateManifest(keyName, replicas,
+      downloadReplicasAndCreateManifest(sanitizedKeyName, replicas,
           replicasWithoutChecksum, dir, blocks);
       result.set(JSON_PROPERTY_FILE_BLOCKS, blocks);
 
       String prettyJson = JsonUtils.toJsonStringWithDefaultPrettyPrinter(result);
 
-      String manifestFileName = keyName + "_manifest";
+      String manifestFileName = sanitizedKeyName + "_manifest";
       System.out.println("Writing manifest file : " + manifestFileName);
       File manifestFile
           = new File(dir, manifestFileName);

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.repair.om;
 
+import jakarta.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -85,11 +86,6 @@ public class FSORepairTool extends RepairTool {
       description = "Path to OM RocksDB")
   private String omDBPath;
 
-  @CommandLine.Option(names = {"-r", "--repair"},
-      defaultValue = "false",
-      description = "Run in repair mode to move unreferenced files and directories to deleted tables.")
-  private boolean repair;
-
   @CommandLine.Option(names = {"-v", "--volume"},
       description = "Filter by volume name. Add '/' before the volume name.")
   private String volumeFilter;
@@ -99,19 +95,17 @@ public class FSORepairTool extends RepairTool {
   private String bucketFilter;
 
   @CommandLine.Option(names = {"--verbose"},
-      description = "Verbose output. Show all intermediate steps and deleted keys info.")
+      description = "Verbose output. Show all intermediate steps.")
   private boolean verbose;
+
+  @Nonnull
+  @Override
+  protected Component serviceToBeOffline() {
+    return Component.OM;
+  }
 
   @Override
   public void execute() throws Exception {
-    if (checkIfServiceIsRunning("OM")) {
-      return;
-    }
-    if (repair) {
-      info("FSO Repair Tool is running in repair mode");
-    } else {
-      info("FSO Repair Tool is running in debug mode");
-    }
     try {
       Impl repairTool = new Impl();
       repairTool.run();
@@ -274,18 +268,12 @@ public class FSORepairTool extends RepairTool {
     }
 
     private void processBucket(OmVolumeArgs volume, OmBucketInfo bucketInfo) throws IOException {
-      info("Processing bucket: " + volume.getVolume() + "/" + bucketInfo.getBucketName());
       if (checkIfSnapshotExistsForBucket(volume.getVolume(), bucketInfo.getBucketName())) {
-        if (!repair) {
-          info(
-              "Snapshot detected in bucket '" + volume.getVolume() + "/" + bucketInfo.getBucketName() + "'. ");
-        } else {
-          info(
-              "Skipping repair for bucket '" + volume.getVolume() + "/" + bucketInfo.getBucketName() + "' " +
-                  "due to snapshot presence.");
-          return;
-        }
+        info("Skipping repair for bucket '" + volume.getVolume() + "/" + bucketInfo.getBucketName() + "' " +
+                "due to snapshot presence.");
+        return;
       }
+      info("Processing bucket: " + volume.getVolume() + "/" + bucketInfo.getBucketName());
       markReachableObjectsInBucket(volume, bucketInfo);
       handleUnreachableAndUnreferencedObjects(volume, bucketInfo);
     }
@@ -359,15 +347,10 @@ public class FSORepairTool extends RepairTool {
 
           if (!isReachable(dirKey)) {
             if (!isDirectoryInDeletedDirTable(dirKey)) {
-              info("Found unreferenced directory: " + dirKey);
               unreferencedStats.addDir();
 
-              if (!repair) {
-                if (verbose) {
-                  info("Marking unreferenced directory " + dirKey + " for deletion.");
-                }
-              } else {
-                info("Deleting unreferenced directory " + dirKey);
+              info("Deleting unreferenced directory " + dirKey);
+              if (!isDryRun()) {
                 OmDirectoryInfo dirInfo = dirEntry.getValue();
                 markDirectoryForDeletion(volume.getVolume(), bucket.getBucketName(), dirKey, dirInfo);
               }
@@ -393,15 +376,10 @@ public class FSORepairTool extends RepairTool {
           OmKeyInfo fileInfo = fileEntry.getValue();
           if (!isReachable(fileKey)) {
             if (!isFileKeyInDeletedTable(fileKey)) {
-              info("Found unreferenced file: " + fileKey);
               unreferencedStats.addFile(fileInfo.getDataSize());
 
-              if (!repair) {
-                if (verbose) {
-                  info("Marking unreferenced file " + fileKey + " for deletion." + fileKey);
-                }
-              } else {
-                info("Deleting unreferenced file " + fileKey);
+              info("Deleting unreferenced file " + fileKey);
+              if (!isDryRun()) {
                 markFileForDeletion(fileKey, fileInfo);
               }
             } else {
@@ -423,7 +401,7 @@ public class FSORepairTool extends RepairTool {
 
         RepeatedOmKeyInfo originalRepeatedKeyInfo = deletedTable.get(fileKey);
         RepeatedOmKeyInfo updatedRepeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-            fileInfo, fileInfo.getUpdateID(), true);
+            fileInfo, fileInfo.getUpdateID());
         // NOTE: The FSO code seems to write the open key entry with the whole
         // path, using the object's names instead of their ID. This would only
         // be possible when the file is deleted explicitly, and not part of a
