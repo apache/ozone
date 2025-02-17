@@ -1,23 +1,39 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug;
+package org.apache.hadoop.ozone.debug.replicas;
 
-import org.apache.hadoop.hdds.cli.DebugSubcommand;
+import static java.util.Collections.emptyMap;
+
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import jakarta.annotation.Nonnull;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.Map;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -38,26 +54,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.Shell;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import jakarta.annotation.Nonnull;
-import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
-
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Iterator;
-import java.util.Map;
-
-import static java.util.Collections.emptyMap;
 
 /**
  * Class that downloads every replica for all the blocks associated with a
@@ -67,9 +64,8 @@ import static java.util.Collections.emptyMap;
 @CommandLine.Command(name = "checksums",
     description = "Reads every replica for all the blocks associated with a " +
         "given key.",
-    aliases = {"read-replicas"})
-@MetaInfServices(DebugSubcommand.class)
-public class ReadReplicas extends Handler implements DebugSubcommand {
+    aliases = {"--checksums"})
+public class Checksums extends Handler {
 
   @CommandLine.Option(names = {"--outputDir", "-o", "--output-dir"},
       description = "Destination where the directory will be created" +
@@ -93,6 +89,8 @@ public class ReadReplicas extends Handler implements DebugSubcommand {
   @CommandLine.Parameters(arity = "1",
       description = Shell.OZONE_URI_DESCRIPTION)
   private String uri;
+
+  private RpcClient rpcClient = null;
 
   @Override
   protected OzoneAddress getAddress() throws OzoneClientException {
@@ -250,10 +248,7 @@ public class ReadReplicas extends Handler implements DebugSubcommand {
     System.out.println("Processing key : " + volumeName + "/" + bucketName + "/" + keyName);
     boolean isChecksumVerifyEnabled
         = getConf().getBoolean("ozone.client.verify.checksum", true);
-    OzoneConfiguration configuration = new OzoneConfiguration(getConf());
-    configuration.setBoolean("ozone.client.verify.checksum",
-        !isChecksumVerifyEnabled);
-    RpcClient newClient = new RpcClient(configuration, null);
+    RpcClient newClient = getClient(isChecksumVerifyEnabled);
 
     try {
       ClientProtocol noChecksumClient;
@@ -290,5 +285,16 @@ public class ReadReplicas extends Handler implements DebugSubcommand {
     } finally {
       newClient.close();
     }
+  }
+
+  private RpcClient getClient(boolean isChecksumVerifyEnabled) throws IOException {
+    if (rpcClient != null) {
+      return rpcClient;
+    }
+
+    OzoneConfiguration configuration = new OzoneConfiguration(getConf());
+    configuration.setBoolean("ozone.client.verify.checksum", !isChecksumVerifyEnabled);
+    rpcClient = new RpcClient(configuration, null);
+    return rpcClient;
   }
 }

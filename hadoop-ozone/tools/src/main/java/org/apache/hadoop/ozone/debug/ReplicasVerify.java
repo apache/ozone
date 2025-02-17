@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.debug;
 
+import org.apache.hadoop.ozone.debug.replicas.Checksums;
 import picocli.CommandLine;
 
 /**
@@ -28,7 +29,7 @@ import picocli.CommandLine;
     name = "verify",
     description = "Run various debug tools to verify data across replicas",
     subcommands = {
-        ReadReplicas.class,
+        Checksums.class,
         FindMissingPadding.class
     })
 public class ReplicasVerify {
