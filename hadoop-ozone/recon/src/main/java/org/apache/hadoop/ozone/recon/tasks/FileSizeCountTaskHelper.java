@@ -45,9 +45,6 @@ import static org.hadoop.ozone.recon.schema.tables.FileCountBySizeTable.FILE_COU
 
 /**
  * Helper class that encapsulates the common code for file size count tasks.
- * This class does not implement {@code ReconOmTask}; instead, it exposes static
- * helper methods that require all needed objects (e.g. DSLContext, DAO, OMMetadataManager)
- * to be passed as arguments.
  */
 public abstract class FileSizeCountTaskHelper {
   protected static final Logger LOG = LoggerFactory.getLogger(FileSizeCountTaskHelper.class);
@@ -73,7 +70,7 @@ public abstract class FileSizeCountTaskHelper {
    * @param dslContext         DSLContext for DB operations.
    * @param fileCountBySizeDao DAO for file count table.
    * @param bucketLayout       The bucket layout to process.
-   * @param taskName           The name of the task (for logging).
+   * @param taskName           The name of the task for logging.
    * @return A Pair of task name and boolean indicating success.
    */
   public static Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager,
@@ -104,7 +101,7 @@ public abstract class FileSizeCountTaskHelper {
    * @param fileSizeCountMap   Map accumulating file size counts.
    * @param dslContext         DSLContext for DB operations.
    * @param fileCountBySizeDao DAO for file count table.
-   * @param taskName           The name of the task (for logging).
+   * @param taskName           The name of the task for logging.
    * @return true if processing succeeds, false otherwise.
    */
   public static boolean reprocessBucketLayout(BucketLayout bucketLayout,
@@ -140,10 +137,10 @@ public abstract class FileSizeCountTaskHelper {
    * Processes a batch of OM update events.
    *
    * @param events             OM update event batch.
-   * @param taskTables         The tables this task listens to.
+   * @param bucketLayout       The bucket layout for which either keyTable or fileTable is fetched
    * @param dslContext         DSLContext for DB operations.
    * @param fileCountBySizeDao DAO for file count table.
-   * @param taskName           The name of the task (for logging).
+   * @param taskName           The name of the task for logging.
    * @return A Pair of task name and boolean indicating success.
    */
   public static Pair<String, Boolean> processEvents(OMUpdateEventBatch events,
@@ -250,7 +247,7 @@ public abstract class FileSizeCountTaskHelper {
   }
 
   /**
-   * Increments the count for a given key (on a PUT event).
+   * Increments the count for a given key on a PUT event.
    */
   public static void handlePutKeyEvent(OmKeyInfo omKeyInfo,
                                        Map<FileSizeCountKey, Long> fileSizeCountMap) {
@@ -260,7 +257,7 @@ public abstract class FileSizeCountTaskHelper {
   }
 
   /**
-   * Decrements the count for a given key (on a DELETE event).
+   * Decrements the count for a given key on a DELETE event.
    */
   public static void handleDeleteKeyEvent(String key, OmKeyInfo omKeyInfo,
                                           Map<FileSizeCountKey, Long> fileSizeCountMap) {
