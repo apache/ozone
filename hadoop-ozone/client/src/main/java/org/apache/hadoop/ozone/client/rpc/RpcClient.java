@@ -2140,8 +2140,7 @@ public class RpcClient implements ClientProtocol {
     OzoneMultipartUploadList result = new OzoneMultipartUploadList(uploads,
         omMultipartUploadList.getNextKeyMarker(),
         omMultipartUploadList.getNextUploadIdMarker(),
-        omMultipartUploadList.isTruncated(),
-        omMultipartUploadList.getUploads().size());
+        omMultipartUploadList.isTruncated());
     return result;
   }
 
