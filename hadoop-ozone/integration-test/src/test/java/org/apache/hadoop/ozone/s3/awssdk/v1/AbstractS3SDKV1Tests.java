@@ -829,7 +829,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
 
     // Upload some objects to the bucket
     AmazonServiceException ase = assertThrows(AmazonServiceException.class,
-        () -> s3Client.putObject(bucketName, "key",
+        () -> s3Client.putObject(bucketName, keyName,
             RandomStringUtils.randomAlphanumeric(1024)));
 
     assertEquals(ErrorType.Client, ase.getErrorType());
