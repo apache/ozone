@@ -366,10 +366,6 @@ public final class OzoneManagerDoubleBuffer {
               batchOperation, TRANSACTION_INFO_KEY, TransactionInfo.valueOf(lastTransaction)));
 
       updateOmCommitIndex.accept(batchOperation, index);
-      //addToBatchTransactionInfoWithTrace(lastTraceId,
-      //    lastTransaction.getIndex(),
-      //    () -> omMetadataManager.getTransactionInfoTable().putWithBatch(
-      //        batchOperation, IndexGenerator.OM_INDEX_KEY, TransactionInfo.valueOf(-1, index)));
 
       long startTime = Time.monotonicNow();
       flushBatchWithTrace(lastTraceId, buffer.size(),
@@ -482,7 +478,7 @@ public final class OzoneManagerDoubleBuffer {
       }
       for (String table : cleanupTables) {
         cleanupEpochs.computeIfAbsent(table, list -> new ArrayList<>())
-            .add(entry.getTermIndex().getIndex());
+            .add(entry.getIndex());
       }
     } else {
       // This is to catch early errors, when a new response class missed to
