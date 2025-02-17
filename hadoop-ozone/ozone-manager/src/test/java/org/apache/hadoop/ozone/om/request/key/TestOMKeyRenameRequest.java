@@ -22,10 +22,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
 import java.util.UUID;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -149,47 +151,19 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
   @Test
   public void testValidateAndUpdateCacheWithToKeyInvalid() throws Exception {
     String invalidToKeyName = "";
-    OMRequest modifiedOmRequest = doPreExecute(createRenameKeyRequest(
-        volumeName, bucketName, fromKeyName, invalidToKeyName));
-
-    // Add only volume and bucket entry to DB.
-
-    // In actual implementation we don't check for bucket/volume exists
-    // during delete key.
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
-
-    OMKeyRenameRequest omKeyRenameRequest =
-        new OMKeyRenameRequest(modifiedOmRequest, getBucketLayout());
-
-    OMClientResponse omKeyRenameResponse =
-        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L);
-
-    assertEquals(OzoneManagerProtocolProtos.Status.INVALID_KEY_NAME,
-        omKeyRenameResponse.getOMResponse().getStatus());
+    OMException exception = assertThrows(OMException.class, () -> doPreExecute(
+        createRenameKeyRequest(volumeName, bucketName, fromKeyName,
+            invalidToKeyName)));
+    assertEquals(OMException.ResultCodes.INVALID_KEY_NAME, exception.getResult());
   }
 
   @Test
   public void testValidateAndUpdateCacheWithFromKeyInvalid() throws Exception {
-    String invalidToKeyName = "";
-    OMRequest modifiedOmRequest = doPreExecute(createRenameKeyRequest(
-        volumeName, bucketName, invalidToKeyName, toKeyName));
-
-    // Add only volume and bucket entry to DB.
-
-    // In actual implementation we don't check for bucket/volume exists
-    // during delete key.
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
-
-    OMKeyRenameRequest omKeyRenameRequest =
-        new OMKeyRenameRequest(modifiedOmRequest, getBucketLayout());
-
-    OMClientResponse omKeyRenameResponse =
-        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L);
-
-    assertEquals(OzoneManagerProtocolProtos.Status.INVALID_KEY_NAME,
-        omKeyRenameResponse.getOMResponse().getStatus());
+    String invalidFromKeyName = "";
+    OMException exception = assertThrows(OMException.class, () -> doPreExecute(
+        createRenameKeyRequest(volumeName, bucketName, invalidFromKeyName,
+            toKeyName)));
+    assertEquals(OMException.ResultCodes.INVALID_KEY_NAME, exception.getResult());
   }
 
   /**
