@@ -187,6 +187,7 @@
     <ozone.version>2.0.0-SNAPSHOT</ozone.version>
     <picocli.version>4.7.5</picocli.version>
     <plexus-archiver.version>4.2.2</plexus-archiver.version>
+    <pmd.version>3.26.0</pmd.version>
     <!-- Enable Reproducible Builds mode -->
     <project.build.outputTimestamp>2023-01-01T00:00:00Z</project.build.outputTimestamp>
     <!-- platform encoding override -->
@@ -1753,6 +1754,17 @@
           <groupId>org.cyclonedx</groupId>
           <artifactId>cyclonedx-maven-plugin</artifactId>
           <version>${cyclonedx.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-pmd-plugin</artifactId>
+          <version>${pmd.version}</version>
+          <configuration>
+            <rulesets>
+              <ruleset>dev-support/pmd/pmd-ruleset.xml</ruleset>
+            </rulesets>
+            <printFailingErrors>true</printFailingErrors>
+          </configuration>
         </plugin>
       </plugins>
     </pluginManagement>

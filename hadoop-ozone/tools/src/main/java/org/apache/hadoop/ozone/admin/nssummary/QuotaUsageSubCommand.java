@@ -27,7 +27,6 @@ import java.util.concurrent.Callable;
 
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.makeHttpCall;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printEmptyPathRequest;
-import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printBucketReminder;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printKVSeparator;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printNewLines;
 import static org.apache.hadoop.ozone.admin.nssummary.NSSummaryCLIUtils.printPathNotFound;
@@ -80,10 +79,6 @@ public class QuotaUsageSubCommand implements Callable {
     } else if ("TYPE_NOT_APPLICABLE".equals(quotaResponse.path("status").asText())) {
       printTypeNA("Quota");
     } else {
-      if (parent.isNotValidBucketOrOBSBucket(path)) {
-        printBucketReminder();
-      }
-
       printWithUnderline("Quota", true);
 
       long quotaAllowed = quotaResponse.get("allowed").asLong();
