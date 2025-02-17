@@ -21,7 +21,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_CACHE_SI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -34,57 +33,55 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 
 /**
  * Test covers listKeys(keyPrefix, startKey) combinations
  * in a FSO bucket layout type.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(1200)
-public class TestListKeysWithFSO {
+public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
 
-  private static MiniOzoneCluster cluster = null;
-  private static OzoneConfiguration conf;
+  private OzoneBucket legacyOzoneBucket;
+  private OzoneBucket fsoOzoneBucket;
+  private OzoneBucket legacyOzoneBucket2;
+  private OzoneBucket fsoOzoneBucket2;
+  private OzoneBucket emptyLegacyOzoneBucket;
+  private OzoneBucket emptyFsoOzoneBucket;
+  private OzoneClient client;
+  private boolean originalFileSystemPathEnabled;
+  private long originalMaxListSize;
 
-  private static OzoneBucket legacyOzoneBucket;
-  private static OzoneBucket fsoOzoneBucket;
-  private static OzoneBucket legacyOzoneBucket2;
-  private static OzoneBucket fsoOzoneBucket2;
-  private static OzoneBucket emptyLegacyOzoneBucket;
-  private static OzoneBucket emptyFsoOzoneBucket;
-  private static OzoneClient client;
-
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   *
-   * @throws IOException
-   */
   @BeforeAll
-  public static void init() throws Exception {
-    conf = new OzoneConfiguration();
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-        true);
+  void init() throws Exception {
+    OmConfig omConfig = cluster().getOzoneManager().getConfig();
+    originalFileSystemPathEnabled = omConfig.isFileSystemPathEnabled();
+    omConfig.setFileSystemPathEnabled(true);
+    originalMaxListSize = omConfig.getMaxListSize();
+    omConfig.setMaxListSize(2);
+
+    OzoneConfiguration conf = new OzoneConfiguration(cluster().getConf());
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 3);
     conf.setInt(OZONE_CLIENT_LIST_CACHE_SIZE, 3);
-    conf.setInt(OmConfig.Keys.SERVER_LIST_MAX_SIZE, 2);
-    cluster = MiniOzoneCluster.newBuilder(conf).build();
-    cluster.waitForClusterToBeReady();
-    client = cluster.newClient();
+
+    client = OzoneClientFactory.getRpcClient(conf);
 
     // create a volume and a LEGACY bucket
     legacyOzoneBucket = TestDataUtil
@@ -128,14 +125,14 @@ public class TestListKeysWithFSO {
   }
 
   @AfterAll
-  public static void teardownClass() {
+  void cleanup() {
     IOUtils.closeQuietly(client);
-    if (cluster != null) {
-      cluster.shutdown();
-    }
+    OmConfig omConfig = cluster().getOzoneManager().getConfig();
+    omConfig.setFileSystemPathEnabled(originalFileSystemPathEnabled);
+    omConfig.setMaxListSize(originalMaxListSize);
   }
 
-  private static void initFSNameSpace() throws Exception {
+  private void initFSNameSpace() throws Exception {
     /*
     Keys Namespace:
 
@@ -615,7 +612,7 @@ public class TestListKeysWithFSO {
         fsoBucket.listKeys(keyPrefix, startKey, shallow);
     ReplicationConfig expectedReplication =
         Optional.ofNullable(fsoBucket.getReplicationConfig())
-            .orElse(cluster.getOzoneManager().getDefaultReplicationConfig());
+            .orElse(cluster().getOzoneManager().getDefaultReplicationConfig());
 
     List <String> keyLists = new ArrayList<>();
     while (ozoneKeyIterator.hasNext()) {
