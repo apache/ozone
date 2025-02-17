@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
+import java.lang.reflect.Proxy;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -429,4 +430,14 @@ public class SCMRatisServerImpl implements SCMRatisServer {
           division.getRaftConf().getPeer(RaftPeerId.valueOf(leaderId));
     }
   }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public <T> T getProxyHandler(final RequestType type, final Class<T> intf, final T obj) {
+    final SCMHAInvocationHandler invocationHandler =
+        new SCMHAInvocationHandler(type, obj, this);
+    return (T) Proxy.newProxyInstance(getClass().getClassLoader(),
+        new Class<?>[] {intf}, invocationHandler);
+  }
+
 }

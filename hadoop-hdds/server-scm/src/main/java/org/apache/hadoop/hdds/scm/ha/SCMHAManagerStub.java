@@ -291,5 +291,11 @@ public final class SCMHAManagerStub implements SCMHAManager {
     public RaftPeerId getLeaderId() {
       return leaderId;
     }
+
+    @Override
+    public <T> T getProxyHandler(RequestType type, Class<T> intf, T supplier) {
+      return supplier;
+    }
+
   }
 }

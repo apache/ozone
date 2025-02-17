@@ -118,6 +118,12 @@ public class TestReplicationAnnotation {
       public RaftPeerId getLeaderId() {
         return RaftPeerId.valueOf(UUID.randomUUID().toString());
       }
+
+      @Override
+      public <T> T getProxyHandler(RequestType type, Class<T> intf, T supplier) {
+        return supplier;
+      }
+
     };
   }
 

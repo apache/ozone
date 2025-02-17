@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.ha;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
-import java.lang.reflect.Proxy;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -135,13 +134,8 @@ public final class StatefulServiceStateManagerImpl
           new StatefulServiceStateManagerImpl(statefulServiceConfig,
               transactionBuffer);
 
-      final SCMHAInvocationHandler invocationHandler =
-          new SCMHAInvocationHandler(RequestType.STATEFUL_SERVICE_CONFIG,
-              stateManager, scmRatisServer);
-
-      return (StatefulServiceStateManager) Proxy.newProxyInstance(
-          SCMHAInvocationHandler.class.getClassLoader(),
-          new Class<?>[]{StatefulServiceStateManager.class}, invocationHandler);
+      return scmRatisServer.getProxyHandler(RequestType.STATEFUL_SERVICE_CONFIG,
+          StatefulServiceStateManager.class, stateManager);
     }
   }
 }

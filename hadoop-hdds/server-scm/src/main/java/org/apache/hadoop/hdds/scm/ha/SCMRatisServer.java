@@ -70,4 +70,5 @@ public interface SCMRatisServer {
 
   RaftPeerId getLeaderId();
 
+  <T> T getProxyHandler(RequestType type, Class<T> intf, T supplier);
 }
