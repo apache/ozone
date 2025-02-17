@@ -41,8 +41,6 @@ import java.util.Map;
 import java.util.List;
 import java.util.HashMap;
 
-import static org.hadoop.ozone.recon.schema.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
-
 /**
  * Helper class that encapsulates the common code for file size count tasks.
  * This class does not implement {@code ReconOmTask}; instead, it exposes static
@@ -209,34 +207,42 @@ public abstract class FileSizeCountTaskHelper {
   public static void writeCountsToDB(Map<FileSizeCountKey, Long> fileSizeCountMap,
                                      DSLContext dslContext,
                                      FileCountBySizeDao fileCountBySizeDao) {
+
     List<FileCountBySize> insertToDb = new ArrayList<>();
     List<FileCountBySize> updateInDb = new ArrayList<>();
-    boolean isDbTruncated = isFileCountBySizeTableEmpty(dslContext);
-    for (FileSizeCountKey key : fileSizeCountMap.keySet()) {
+    boolean isDbTruncated = isFileCountBySizeTableEmpty(dslContext); // Check if table is empty
+
+    fileSizeCountMap.keySet().forEach((FileSizeCountKey key) -> {
       FileCountBySize newRecord = new FileCountBySize();
       newRecord.setVolume(key.volume);
       newRecord.setBucket(key.bucket);
       newRecord.setFileSize(key.fileSizeUpperBound);
       newRecord.setCount(fileSizeCountMap.get(key));
       if (!isDbTruncated) {
+        // Get the current count from database and update
         Record3<String, String, Long> recordToFind =
-            dslContext.newRecord(FILE_COUNT_BY_SIZE.VOLUME,
+            dslContext.newRecord(
+                    FILE_COUNT_BY_SIZE.VOLUME,
                     FILE_COUNT_BY_SIZE.BUCKET,
                     FILE_COUNT_BY_SIZE.FILE_SIZE)
                 .value1(key.volume)
                 .value2(key.bucket)
                 .value3(key.fileSizeUpperBound);
-        FileCountBySize fileCountRecord = fileCountBySizeDao.findById(recordToFind);
+        FileCountBySize fileCountRecord =
+            fileCountBySizeDao.findById(recordToFind);
         if (fileCountRecord == null && newRecord.getCount() > 0L) {
+          // insert new row only for non-zero counts.
           insertToDb.add(newRecord);
         } else if (fileCountRecord != null) {
-          newRecord.setCount(fileCountRecord.getCount() + fileSizeCountMap.get(key));
+          newRecord.setCount(fileCountRecord.getCount() +
+              fileSizeCountMap.get(key));
           updateInDb.add(newRecord);
         }
       } else if (newRecord.getCount() > 0) {
+        // insert new row only for non-zero counts.
         insertToDb.add(newRecord);
       }
-    }
+    });
     fileCountBySizeDao.insert(insertToDb);
     fileCountBySizeDao.update(updateInDb);
   }
@@ -285,9 +291,9 @@ public abstract class FileSizeCountTaskHelper {
    * Helper key class used for grouping file size counts.
    */
   public static class FileSizeCountKey {
-    public final String volume;
-    public final String bucket;
-    public final Long fileSizeUpperBound;
+    private final String volume;
+    private final String bucket;
+    private final Long fileSizeUpperBound;
 
     public FileSizeCountKey(String volume, String bucket, Long fileSizeUpperBound) {
       this.volume = volume;
