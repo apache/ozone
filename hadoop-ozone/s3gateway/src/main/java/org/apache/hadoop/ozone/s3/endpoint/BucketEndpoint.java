@@ -38,8 +38,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import javax.inject.Inject;
-import javax.validation.constraints.Max;
-import javax.validation.constraints.Min;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -116,6 +114,9 @@ public class BucketEndpoint extends EndpointBase {
       @QueryParam("start-after") String startAfter,
       @QueryParam("uploads") String uploads,
       @QueryParam("acl") String aclMarker,
+      @QueryParam("key-marker") String keyMarker,
+      @QueryParam("upload-id-marker") String uploadIdMarker,
+      @DefaultValue("1000") @QueryParam("max-uploads") int maxUploads,
       @Context HttpHeaders hh) throws OS3Exception, IOException {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.GET_BUCKET;
@@ -138,7 +139,7 @@ public class BucketEndpoint extends EndpointBase {
 
       if (uploads != null) {
         s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
-        return listMultipartUploads(bucketName, prefix, null, null, maxKeys);
+        return listMultipartUploads(bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
       }
 
       if (prefix == null) {
@@ -328,12 +329,18 @@ public class BucketEndpoint extends EndpointBase {
   }
 
   public Response listMultipartUploads(
-      @PathParam("bucket") String bucketName,
-      @QueryParam("prefix") String prefix,
-      @QueryParam("key-marker") String keyMarker,
-      @QueryParam("upload-id-marker") String uploadIdMarker,
-      @QueryParam("max-uploads") @DefaultValue("1000") @Min(1) @Max(1000) int maxUploads)
+      String bucketName,
+      String prefix,
+      String keyMarker,
+      String uploadIdMarker,
+      int maxUploads)
       throws OS3Exception, IOException {
+
+    if (maxUploads < 1 || maxUploads > 1000) {
+      throw newError(S3ErrorTable.INVALID_ARGUMENT, "max-uploads",
+          new Exception("max-uploads must be between 1 and 1000"));
+    }
+
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
 
