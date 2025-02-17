@@ -287,9 +287,6 @@ public class AbstractContainerReportHandler {
       }
 
       if (replica.getState() == State.CLOSED) {
-        Preconditions.checkArgument(replica.getBlockCommitSequenceId()
-            == container.getSequenceId());
-
         /*
         For an EC container, only the first index and the parity indexes are
         guaranteed to have block data. So, update the container's state in SCM
@@ -308,6 +305,9 @@ public class AbstractContainerReportHandler {
         logger.info("Moving container {} to CLOSED state, datanode {} " +
             "reported CLOSED replica with index {}.", containerId, datanode,
             replica.getReplicaIndex());
+        if (!verifyBcsId(replica.getBlockCommitSequenceId(), container.getSequenceId(), datanode, containerId)) {
+          return true;  // ignored = true
+        }
         containerManager.updateContainerState(containerId,
             LifeCycleEvent.CLOSE);
       }
@@ -332,8 +332,9 @@ public class AbstractContainerReportHandler {
       if (replica.getState() == State.CLOSED) {
         logger.info("Moving container {} to CLOSED state, datanode {} " +
             "reported CLOSED replica.", containerId, datanode);
-        Preconditions.checkArgument(replica.getBlockCommitSequenceId()
-            == container.getSequenceId());
+        if (!verifyBcsId(replica.getBlockCommitSequenceId(), container.getSequenceId(), datanode, containerId)) {
+          return true;  // ignored = true
+        }
         containerManager.updateContainerState(containerId,
             LifeCycleEvent.FORCE_CLOSE);
       }
@@ -370,6 +371,33 @@ public class AbstractContainerReportHandler {
     }
 
     return ignored;
+  }
+
+  /**
+   * Helper method to verify that the replica's bcsId matches the container's in SCM.
+   * Throws IOException if the bcsIds do not match.
+   * <p>
+   * @param replicaBcsId Replica bcsId
+   * @param containerBcsId Container bcsId in SCM
+   * @param datanode DatanodeDetails for logging
+   * @param containerId ContainerID for logging
+   * @return true if verification has passed, false otherwise
+   * @throws IOException Thrown when bcsIds do not match
+   */
+  private boolean verifyBcsId(long replicaBcsId, long containerBcsId,
+      DatanodeDetails datanode, ContainerID containerId) throws IOException {
+
+    if (replicaBcsId != containerBcsId) {
+      final String errMsg = "Unexpected bcsId for container " + containerId +
+          " from datanode " + datanode + ". replica's: " + replicaBcsId +
+          ", SCM's: " + containerBcsId +
+          ". Ignoring container report for " + containerId;
+
+      logger.error(errMsg);
+      return false;
+    } else {
+      return true;
+    }
   }
 
   private void updateContainerReplica(final DatanodeDetails datanodeDetails,
