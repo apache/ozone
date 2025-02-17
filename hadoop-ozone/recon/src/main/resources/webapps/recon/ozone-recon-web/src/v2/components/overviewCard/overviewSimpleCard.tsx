@@ -30,7 +30,7 @@ import {
   InboxOutlined,
   QuestionCircleOutlined
 } from '@ant-design/icons';
-import { numberToWord, numberWithCommas } from '@/utils/common';
+import { numberWithCommas } from '@/utils/common';
 
 
 // ------------- Types -------------- //
