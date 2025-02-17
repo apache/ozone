@@ -53,7 +53,6 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
-import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
@@ -458,11 +457,9 @@ final class TestSecureOzoneCluster {
     scmStore.setPrimaryScmNodeId(scmId);
     // writes the version file properties
     scmStore.initialize();
-    if (SCMHAUtils.isSCMHAEnabled(conf)) {
-      SCMRatisServerImpl.initialize(clusterId, scmId,
-          SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
-                  .getLocalNodeDetails(), conf);
-    }
+    SCMRatisServerImpl.initialize(clusterId, scmId,
+        SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
+                .getLocalNodeDetails(), conf);
 
     /*
      * As all these processes run inside the same JVM, there are issues around
