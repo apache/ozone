@@ -146,11 +146,11 @@ function ozonecmd_case
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneShell
       ozone_deprecate_envvar HDFS_OM_SH_OPTS OZONE_SH_OPTS
       OZONE_SH_OPTS="${OZONE_SH_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-cli-shell"
     ;;
     s3)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.s3.S3Shell
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-cli-shell"
     ;;
     scm)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
@@ -271,13 +271,15 @@ function check_running_ozone_services
 ## @audience     private
 function ozone_suppress_shell_log
 {
-  if [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-tools" ]] \
-      && [[ "${OZONE_CLASSNAME}" != "org.apache.hadoop.ozone.freon.Freon" ]] \
-      && [[ -z "${OZONE_ORIGINAL_LOGLEVEL}" ]] \
-      && [[ -z "${OZONE_ORIGINAL_ROOT_LOGGER}" ]]; then
-    OZONE_LOGLEVEL=OFF
-    OZONE_ROOT_LOGGER="${OZONE_LOGLEVEL},console"
-    OZONE_OPTS="${OZONE_OPTS} -Dslf4j.internal.verbosity=ERROR"
+  if [[ "${OZONE_RUN_ARTIFACT_NAME}" =~ ozone-cli-.* ]] \
+      || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-tools" ]]; then
+    if [[ "${OZONE_CLASSNAME}" != "org.apache.hadoop.ozone.freon.Freon" ]] \
+        && [[ -z "${OZONE_ORIGINAL_LOGLEVEL}" ]] \
+        && [[ -z "${OZONE_ORIGINAL_ROOT_LOGGER}" ]]; then
+      OZONE_LOGLEVEL=OFF
+      OZONE_ROOT_LOGGER="${OZONE_LOGLEVEL},console"
+      OZONE_OPTS="${OZONE_OPTS} -Dslf4j.internal.verbosity=ERROR"
+    fi
   fi
 }
 

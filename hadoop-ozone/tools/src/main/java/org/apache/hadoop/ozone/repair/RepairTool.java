@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.repair;
 
+import jakarta.annotation.Nullable;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import picocli.CommandLine;
 
@@ -45,33 +46,55 @@ public abstract class RepairTool extends AbstractSubcommand implements Callable<
   /** Hook method for subclasses for performing actual repair task. */
   protected abstract void execute() throws Exception;
 
+  /** Which Ozone component should be verified to be offline. */
+  @Nullable
+  protected Component serviceToBeOffline() {
+    return null;
+  }
+
   @Override
   public final Void call() throws Exception {
     if (!dryRun) {
       confirmUser();
     }
-    execute();
+    if (isServiceStateOK()) {
+      execute();
+    }
     return null;
   }
 
-  protected boolean checkIfServiceIsRunning(String serviceName) {
-    String runningEnvVar = String.format("OZONE_%s_RUNNING", serviceName);
-    String pidEnvVar = String.format("OZONE_%s_PID", serviceName);
-    String isServiceRunning = System.getenv(runningEnvVar);
-    String servicePid = System.getenv(pidEnvVar);
-    if ("true".equals(isServiceRunning)) {
-      if (!force) {
-        error("Error: %s is currently running on this host with PID %s. " +
-            "Stop the service before running the repair tool.", serviceName, servicePid);
-        return true;
-      } else {
-        info("Warning: --force flag used. Proceeding despite %s being detected as running with PID %s.",
-            serviceName, servicePid);
-      }
-    } else {
-      info("No running %s service detected. Proceeding with repair.", serviceName);
+  private boolean isServiceStateOK() {
+    final Component service = serviceToBeOffline();
+
+    if (service == null) {
+      return true; // online tool
     }
+
+    if (!isServiceRunning(service)) {
+      info("No running %s service detected. Proceeding with repair.", service);
+      return true;
+    }
+
+    String servicePid = getServicePid(service);
+
+    if (force) {
+      info("Warning: --force flag used. Proceeding despite %s being detected as running with PID %s.",
+          service, servicePid);
+      return true;
+    }
+
+    error("Error: %s is currently running on this host with PID %s. " +
+        "Stop the service before running the repair tool.", service, servicePid);
+
     return false;
+  }
+
+  private static String getServicePid(Component service) {
+    return System.getenv(String.format("OZONE_%s_PID", service));
+  }
+
+  private static boolean isServiceRunning(Component service) {
+    return "true".equals(System.getenv(String.format("OZONE_%s_RUNNING", service)));
   }
 
   protected boolean isDryRun() {
@@ -116,5 +139,12 @@ public abstract class RepairTool extends AbstractSubcommand implements Callable<
     return new Scanner(System.in, StandardCharsets.UTF_8.name())
         .nextLine()
         .trim();
+  }
+
+  /** Ozone component for offline tools. */
+  public enum Component {
+    DATANODE,
+    OM,
+    SCM,
   }
 }
