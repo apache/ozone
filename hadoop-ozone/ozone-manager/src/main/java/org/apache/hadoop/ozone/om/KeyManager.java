@@ -203,7 +203,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
 
 
   OmMultipartUploadList listMultipartUploads(String volumeName,
-      String bucketName, String prefix) throws OMException;
+      String bucketName, String prefix, String keyMarker, String uploadIdMarker, int maxUploads) throws OMException;
 
   /**
    * Returns list of parts of a multipart upload key.

@@ -1017,7 +1017,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
     OmMultipartUploadList omMultipartUploadList =
         impl.listMultipartUploads(request.getVolume(), request.getBucket(),
-            request.getPrefix());
+            request.getPrefix(), request.getKeyMarker(), request.getUploadIdMarker(), request.getMaxUploads());
 
     List<MultipartUploadInfo> info = omMultipartUploadList
         .getUploads()
@@ -1048,6 +1048,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     ListMultipartUploadsResponse response =
         ListMultipartUploadsResponse.newBuilder()
             .addAllUploadsList(info)
+            .setIsTruncated(omMultipartUploadList.isTruncated())
+            .setNextKeyMarker(omMultipartUploadList.getNextKeyMarker())
+            .setNextUploadIdMarker(omMultipartUploadList.getNextUploadIdMarker())
             .build();
 
     return response;

@@ -231,7 +231,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
     //WHEN
     OmMultipartUploadList omMultipartUploadList =
-        keyManager.listMultipartUploads(volume, "bucket1", "");
+        keyManager.listMultipartUploads(volume, "bucket1", "", "", "", 10);
 
     //THEN
     List<OmMultipartUpload> uploads = omMultipartUploadList.getUploads();
@@ -268,7 +268,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
     //WHEN
     OmMultipartUploadList omMultipartUploadList =
-        keyManager.listMultipartUploads(volume, bucket, "");
+        keyManager.listMultipartUploads(volume, bucket, "", "", "", 10);
 
     //THEN
     List<OmMultipartUpload> uploads = omMultipartUploadList.getUploads();
@@ -292,7 +292,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
         volume, bucket, "dir/ozonekey4");
 
     omMultipartUploadList =
-        keyManager.listMultipartUploads(volume, bucket, "dir/ozone");
+        keyManager.listMultipartUploads(volume, bucket, "dir/ozone", "", "", 10);
 
     //THEN
     uploads = omMultipartUploadList.getUploads();
@@ -308,7 +308,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
     // Now list.
     omMultipartUploadList =
-        keyManager.listMultipartUploads(volume, bucket, "dir/ozone");
+        keyManager.listMultipartUploads(volume, bucket, "dir/ozone", "", "", 10);
 
     //THEN
     uploads = omMultipartUploadList.getUploads();
@@ -323,7 +323,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
     // Now list.
     omMultipartUploadList =
-        keyManager.listMultipartUploads(volume, bucket, "dir/ozone");
+        keyManager.listMultipartUploads(volume, bucket, "dir/ozone", "", "", 10);
 
     //THEN
     uploads = omMultipartUploadList.getUploads();
@@ -351,7 +351,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
     //WHEN
     OmMultipartUploadList omMultipartUploadList =
-        keyManager.listMultipartUploads(volumeName, "bucket1", "dir");
+        keyManager.listMultipartUploads(volumeName, "bucket1", "dir", "", "", 10);
 
     //THEN
     List<OmMultipartUpload> uploads = omMultipartUploadList.getUploads();

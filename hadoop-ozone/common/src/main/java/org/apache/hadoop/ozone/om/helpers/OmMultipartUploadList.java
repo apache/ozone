@@ -25,10 +25,19 @@ import java.util.List;
 public class OmMultipartUploadList {
 
   private List<OmMultipartUpload> uploads;
+  private String nextKeyMarker;
+  private String nextUploadIdMarker;
+  private boolean isTruncated;
 
   public OmMultipartUploadList(
-      List<OmMultipartUpload> uploads) {
+      List<OmMultipartUpload> uploads,
+      String nextKeyMarker,
+      String nextUploadIdMarker,
+      boolean isTruncated) {
     this.uploads = uploads;
+    this.nextKeyMarker = nextKeyMarker;
+    this.nextUploadIdMarker = nextUploadIdMarker;
+    this.isTruncated = isTruncated;
   }
 
   public List<OmMultipartUpload> getUploads() {
@@ -38,6 +47,18 @@ public class OmMultipartUploadList {
   public void setUploads(
       List<OmMultipartUpload> uploads) {
     this.uploads = uploads;
+  }
+
+  public String getNextKeyMarker() {
+    return nextKeyMarker;
+  }
+
+  public String getNextUploadIdMarker() {
+    return nextUploadIdMarker;
+  }
+
+  public boolean isTruncated() {
+    return isTruncated;
   }
 
 }
