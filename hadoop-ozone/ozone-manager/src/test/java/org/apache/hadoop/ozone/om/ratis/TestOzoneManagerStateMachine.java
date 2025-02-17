@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -97,6 +98,8 @@ public class TestOzoneManagerStateMachine {
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     prepareState = new OzoneManagerPrepareState(conf);
     when(ozoneManager.getPrepareState()).thenReturn(prepareState);
+    OMLayoutVersionManager versionManager = mock(OMLayoutVersionManager.class);
+    when(ozoneManager.getVersionManager()).thenReturn(versionManager);
 
     when(ozoneManagerRatisServer.getOzoneManager()).thenReturn(ozoneManager);
     when(ozoneManager.getTransactionInfo()).thenReturn(mock(TransactionInfo.class));
