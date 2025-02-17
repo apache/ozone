@@ -81,7 +81,7 @@ public class SCMSecurityProtocolServerSideTranslatorPB
     if (!scm.checkLeader()) {
       RatisUtil.checkRatisException(
           scm.getScmHAManager().getRatisServer().triggerNotLeaderException(),
-          scm.getSecurityProtocolRpcPort(), scm.getScmId());
+          scm.getSecurityProtocolRpcPort(), scm.getScmId(), scm.getHostname(), "SCM");
     }
     return dispatcher.processRequest(request, this::processRequest,
         request.getCmdType(), request.getTraceID());
@@ -149,7 +149,7 @@ public class SCMSecurityProtocolServerSideTranslatorPB
       }
     } catch (IOException e) {
       RatisUtil.checkRatisException(e, scm.getSecurityProtocolRpcPort(),
-          scm.getScmId());
+          scm.getScmId(), scm.getHostname(), "SCM");
       scmSecurityResponse.setSuccess(false);
       scmSecurityResponse.setStatus(exceptionToResponseStatus(e));
       // If actual cause is set in SCMSecurityException, set message with
