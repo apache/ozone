@@ -31,8 +31,8 @@ import org.apache.hadoop.ozone.metric.util.MetricsRecordBuilderImpl;
 import org.apache.hadoop.ozone.metrics.MutableQuantiles;
 import org.apache.hadoop.ozone.metrics.MutableRate;
 import org.apache.hadoop.ozone.metrics.MutableStat;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.Test;
-
 
 /**
  * Test for checking the correctness of metrics while concurrent collecting.
@@ -61,17 +61,22 @@ public class TestMetricsConsistency {
     MutableRate rate = new MutableRate("Test name", "Test description", true);
     final MetricsRecordBuilderImpl builder = getMetricsRecordBuilder();
     ExecutorService executor = Executors.newFixedThreadPool(10);
-    for (int i = 0; i < 1000; i++) {
-      int finalI = i;
+    try {
+      for (int i = 0; i < 1000; i++) {
+        int finalI = i;
 
-      executor.submit(() -> {
-        rate.add(finalI);
-        if (finalI % 100 == 0) {
-          rate.snapshot(getMetricsRecordBuilder());
-        }
-      });
+        executor.submit(() -> {
+          rate.add(finalI);
+          if (finalI % 100 == 0) {
+            rate.snapshot(getMetricsRecordBuilder());
+          }
+        });
+      }
+    } finally {
+      executor.shutdown();
+      executor.awaitTermination(10, TimeUnit.SECONDS);
     }
-    executor.awaitTermination(1, TimeUnit.SECONDS);
+
     rate.snapshot(builder);
     AbstractMetric numOpsMetric = builder.metrics().get(0);
     assertEquals(1000, numOpsMetric.value().intValue());
@@ -82,17 +87,21 @@ public class TestMetricsConsistency {
     MutableRate metric = new MutableRate("Test name", "Test description", false);
     final MetricsRecordBuilderImpl builder = getMetricsRecordBuilder();
     ExecutorService executor = Executors.newFixedThreadPool(10);
-    for (int i = 0; i < 10000; i++) {
-      int finalI = i;
+    try {
+      for (int i = 0; i < 10000; i++) {
+        int finalI = i;
 
-      executor.submit(() -> {
-        metric.add(finalI);
-        if (finalI % 100 == 0) {
-          metric.snapshot(getMetricsRecordBuilder());
-        }
-      });
+        executor.submit(() -> {
+          metric.add(finalI);
+          if (finalI % 100 == 0) {
+            metric.snapshot(getMetricsRecordBuilder());
+          }
+        });
+      }
+    } finally {
+      executor.shutdown();
+      executor.awaitTermination(10, TimeUnit.SECONDS);
     }
-    executor.awaitTermination(1, TimeUnit.SECONDS);
     metric.snapshot(builder);
     AbstractMetric numOpsMetric = builder.metrics().get(0);
     assertEquals(10000, numOpsMetric.value().intValue());
@@ -107,17 +116,21 @@ public class TestMetricsConsistency {
         "Test_value_name");
     final MetricsRecordBuilderImpl builder = getMetricsRecordBuilder();
     ExecutorService executor = Executors.newFixedThreadPool(10);
-    for (int i = 0; i < 10000; i++) {
-      int finalI = i;
+    try {
+      for (int i = 0; i < 10000; i++) {
+        int finalI = i;
 
-      executor.submit(() -> {
-        metric.add(finalI);
-        if (finalI % 100 == 0) {
-          metric.snapshot(getMetricsRecordBuilder());
-        }
-      });
+        executor.submit(() -> {
+          metric.add(finalI);
+          if (finalI % 100 == 0) {
+            metric.snapshot(getMetricsRecordBuilder());
+          }
+        });
+      }
+    } finally {
+      executor.shutdown();
+      executor.awaitTermination(10, TimeUnit.SECONDS);
     }
-    executor.awaitTermination(1, TimeUnit.SECONDS);
     metric.snapshot(builder);
     AbstractMetric numOpsMetric = builder.metrics().get(0);
     assertEquals(10000, numOpsMetric.value().intValue());
@@ -125,7 +138,7 @@ public class TestMetricsConsistency {
 
 
   @Test
-  void testMutableQuantilesConsistencyTest() throws InterruptedException {
+  void testMutableQuantilesConsistencyTest() throws Exception {
     MutableQuantiles metric = new MutableQuantiles(
         "Test_name",
         "Test_description",
@@ -135,19 +148,27 @@ public class TestMetricsConsistency {
 
     final MetricsRecordBuilderImpl builder = getMetricsRecordBuilder();
     ExecutorService executor = Executors.newFixedThreadPool(10);
-    for (int i = 0; i < 10000; i++) {
-      int finalI = i;
+    try {
+      for (int i = 0; i < 10000; i++) {
+        int finalI = i;
 
-      executor.submit(() -> {
-        metric.add(finalI);
-        if (finalI % 101 == 0) {
-          metric.snapshot(getMetricsRecordBuilder());
-        }
-      });
+        executor.submit(() -> {
+          metric.add(finalI);
+          if (finalI % 101 == 0) {
+            metric.snapshot(getMetricsRecordBuilder());
+          }
+        });
+      }
+
+    } finally {
+      executor.shutdown();
+      executor.awaitTermination(10, TimeUnit.SECONDS);
     }
-
-    executor.awaitTermination(1, TimeUnit.SECONDS);
-    metric.snapshot(builder);
+    LambdaTestUtils.await(5000, 500,
+        () -> {
+          metric.snapshot(builder);
+          return !builder.metrics().isEmpty();
+        });
     AbstractMetric numOpsMetric = builder.metrics().get(0);
     assertEquals(10000, numOpsMetric.value().intValue());
   }
