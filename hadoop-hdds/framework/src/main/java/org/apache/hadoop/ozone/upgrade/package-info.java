@@ -16,6 +16,7 @@
  */
 
 /**
- * Freon related helper classes used for load testing.
+ * This package contains classes for the Ozone upgrade and layout version
+ * management.
  */
-package org.apache.hadoop.hdds.freon;
+package org.apache.hadoop.ozone.upgrade;
