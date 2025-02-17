@@ -28,7 +28,9 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCK
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -39,6 +41,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -59,10 +62,12 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
+import org.apache.hadoop.ozone.om.helpers.MultipartUploadKeys;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -1105,5 +1110,87 @@ public class TestOmMetadataManager {
     for (SnapshotInfo snapshotInfo : snapshotInfos2) {
       assertTrue(snapshotInfo.getName().startsWith(snapshotName2));
     }
+  }
+
+  @Test
+  public void testGetMultipartUploadKeys() throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    String prefix = "dir/";
+    int maxUploads = 10;
+
+    // Create volume and bucket
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    addBucketsToCache(volumeName, bucketName);
+
+    List<String> expectedKeys = new ArrayList<>();
+    for (int i = 0; i < 25; i++) {
+      String key = prefix + "key" + i;
+      String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
+
+      // Create multipart key info
+      OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(
+          volumeName, bucketName, key,
+          RatisReplicationConfig.getInstance(ONE))
+          .build();
+
+      OmMultipartKeyInfo multipartKeyInfo = OMRequestTestUtils
+          .createOmMultipartKeyInfo(uploadId, Time.now(),
+              HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.ONE, 0L);
+
+      if (i % 2 == 0) {
+        OMRequestTestUtils.addMultipartInfoToTable(false, keyInfo,
+            multipartKeyInfo, 0L, omMetadataManager);
+      } else {
+        OMRequestTestUtils.addMultipartInfoToTableCache(keyInfo,
+            multipartKeyInfo, 0L, omMetadataManager);
+      }
+
+      expectedKeys.add(key);
+    }
+    Collections.sort(expectedKeys);
+
+    // List first page without markers
+    MultipartUploadKeys result = omMetadataManager.getMultipartUploadKeys(
+        volumeName, bucketName, prefix, null, null, maxUploads);
+
+    assertEquals(maxUploads, result.getKeys().size());
+    assertTrue(result.isTruncated());
+    assertNotNull(result.getNextKeyMarker());
+    assertNotNull(result.getNextUploadIdMarker());
+
+    // List next page using markers from first page
+    MultipartUploadKeys nextPage = omMetadataManager.getMultipartUploadKeys(
+        volumeName, bucketName, prefix,
+        result.getNextKeyMarker(),
+        result.getNextUploadIdMarker(),
+        maxUploads);
+
+    assertEquals(maxUploads, nextPage.getKeys().size());
+    assertTrue(nextPage.isTruncated());
+
+    // List with different prefix
+    MultipartUploadKeys differentPrefix = omMetadataManager.getMultipartUploadKeys(
+        volumeName, bucketName, "different/", null, null, maxUploads);
+
+    assertEquals(0, differentPrefix.getKeys().size());
+    assertFalse(differentPrefix.isTruncated());
+
+    // List all entries with large maxUploads
+    MultipartUploadKeys allEntries = omMetadataManager.getMultipartUploadKeys(
+        volumeName, bucketName, prefix, null, null, 100);
+
+    assertEquals(25, allEntries.getKeys().size());
+    assertFalse(allEntries.isTruncated());
+
+    // Verify all keys are present
+    List<String> actualKeys = new ArrayList<>();
+    for (String dbKey : allEntries.getKeys()) {
+      OmMultipartUpload mpu = OmMultipartUpload.from(dbKey);
+      actualKeys.add(mpu.getKeyName());
+    }
+    Collections.sort(actualKeys);
+    assertEquals(expectedKeys, actualKeys);
   }
 }

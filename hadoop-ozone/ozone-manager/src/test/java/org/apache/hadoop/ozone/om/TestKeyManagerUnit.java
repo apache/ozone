@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.anySet;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
@@ -358,6 +359,74 @@ class TestKeyManagerUnit extends OzoneTestBase {
     assertEquals(2, uploads.size());
     assertEquals("dir/key1", uploads.get(0).getKeyName());
     assertEquals("dir/key2", uploads.get(1).getKeyName());
+  }
+
+  @Test
+  public void testListMultipartUploadsWithPagination() throws IOException {
+    // GIVEN
+    final String volumeName = volumeName();
+    final String bucketName = "bucket1";
+    createBucket(metadataManager, volumeName, bucketName);
+
+    // Create 25 multipart uploads to test pagination
+    List<OmMultipartInfo> uploadInfos = new ArrayList<>();
+    for (int i = 0; i < 25; i++) {
+      String key = String.format("key-%03d", i); // pad with zeros for proper sorting
+      OmMultipartInfo info = initMultipartUpload(writeClient, volumeName, bucketName, key);
+      uploadInfos.add(info);
+    }
+
+    // WHEN - First page (10 entries)
+    OmMultipartUploadList firstPage = keyManager.listMultipartUploads(
+        volumeName, bucketName, "", "", "", 10);
+
+    // THEN
+    assertEquals(10, firstPage.getUploads().size());
+    assertTrue(firstPage.isTruncated());
+    assertNotNull(firstPage.getNextKeyMarker());
+    assertNotNull(firstPage.getNextUploadIdMarker());
+
+    // Verify first page content
+    for (int i = 0; i < 10; i++) {
+      assertEquals(String.format("key-%03d", i),
+          firstPage.getUploads().get(i).getKeyName());
+    }
+
+    // WHEN - Second page using markers from first page
+    OmMultipartUploadList secondPage = keyManager.listMultipartUploads(
+        volumeName, bucketName, "",
+        firstPage.getNextKeyMarker(),
+        firstPage.getNextUploadIdMarker(),
+        10);
+
+    // THEN
+    assertEquals(10, secondPage.getUploads().size());
+    assertTrue(secondPage.isTruncated());
+
+    // Verify second page content
+    for (int i = 0; i < 10; i++) {
+      assertEquals(String.format("key-%03d", i + 10),
+          secondPage.getUploads().get(i).getKeyName());
+    }
+
+    // WHEN - Last page
+    OmMultipartUploadList lastPage = keyManager.listMultipartUploads(
+        volumeName, bucketName, "",
+        secondPage.getNextKeyMarker(),
+        secondPage.getNextUploadIdMarker(),
+        10);
+
+    // THEN
+    assertEquals(5, lastPage.getUploads().size());
+    assertFalse(lastPage.isTruncated());
+    assertEquals("", lastPage.getNextKeyMarker());
+    assertEquals("", lastPage.getNextUploadIdMarker());
+
+    // Verify last page content
+    for (int i = 0; i < 5; i++) {
+      assertEquals(String.format("key-%03d", i + 20),
+          lastPage.getUploads().get(i).getKeyName());
+    }
   }
 
   private void createBucket(OMMetadataManager omMetadataManager,
