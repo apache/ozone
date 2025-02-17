@@ -112,7 +112,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -1741,8 +1740,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     if (layout.equals(BucketLayout.LEGACY)) {
-      OzoneConfiguration conf = cluster.getConf();
-      conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
+      cluster.getOzoneManager().getConfig().setFileSystemPathEnabled(true);
     }
 
     // the directory "/dir1", ""/dir1/dir2/", "/dir1/dir2/dir3/"

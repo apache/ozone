@@ -17,13 +17,13 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 class TestOmConfig {
 
