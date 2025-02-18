@@ -47,6 +47,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.OffsetDateTime;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
@@ -84,6 +85,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       OzoneManager impl,
       OzoneManagerRatisServer ratisServer,
       ProtocolMessageMetrics<ProtocolMessageEnum> metrics) {
+//    LOG.error("Created at {} thread: {}", OffsetDateTime.now(), Thread.currentThread().getName());
     this.ozoneManager = impl;
     this.ozoneBucket = new OzoneBucket(this.ozoneManager, this.ozoneManager.getConfiguration());
     this.perfMetrics = impl.getPerfMetrics();
@@ -167,6 +169,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       // To validate credentials we have already verified leader status.
       // This will skip of checking leader status again if request has S3Auth.
       if (!s3Auth) {
+//        LOG.warn("Checking leadership while request processing: {}", request.getCmdType());
         OzoneManagerRatisUtils.checkLeaderStatus(ozoneManager);
       }
 
@@ -199,6 +202,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
 
       final OMResponse response;
 
+//      LOG.error("Current thread: {}", Thread.currentThread().getName());
       if (OmUtils.isBucketWriteRequest(request)) {
         response = ozoneBucket.getWriteChannel().submitRequest(requestToSubmit);
       } else {

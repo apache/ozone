@@ -69,6 +69,7 @@ public class Hadoop27RpcTransport implements OmTransport {
 
   @Override
   public OMResponse submitRequest(OMRequest payload) throws IOException {
+//    LOG.error("Current thread: {}", Thread.currentThread().getName());
     try {
       OMResponse omResponse =
           rpcProxy.submitRequest(NULL_RPC_CONTROLLER, payload);
