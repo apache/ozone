@@ -48,7 +48,8 @@ class App extends React.Component<Record<string, object>, IAppState> {
     super(props);
     this.state = {
       collapsed: false,
-      enableOldUI: false
+      // Set the state from data persisted in current session storage, else default to new UI
+      enableOldUI: JSON.parse(sessionStorage.getItem('enableOldUI') ?? 'false')
     };
   }
 
@@ -78,9 +79,15 @@ class App extends React.Component<Record<string, object>, IAppState> {
                   <AntDSwitch
                     unCheckedChildren={<div style={{ paddingRight: '2px' }}>Old UI</div>}
                     checkedChildren={<div style={{ paddingLeft: '2px' }}>New UI</div>}
+                    checked={this.state.enableOldUI}
                     onChange={(checked: boolean) => {
                       this.setState({
                         enableOldUI: checked
+                      }, () => {
+                        // This is to persist the state of the UI between refreshes.
+                        // While using session storage to store state is an anti-pattern, provided the size of the data stored in this case
+                        // and the plan to deprecate UI v1 (old UI) in the future - this is the simplest approach/fix for persisting state.
+                        sessionStorage.setItem('enableOldUI', JSON.stringify(checked));
                       });
                     }} />
                 </span>

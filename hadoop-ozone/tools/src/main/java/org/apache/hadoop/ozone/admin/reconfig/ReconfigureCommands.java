@@ -18,21 +18,17 @@
 package org.apache.hadoop.ozone.admin.reconfig;
 
 import org.apache.hadoop.hdds.cli.AdminSubcommand;
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.OzoneAdmin;
+import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Model.CommandSpec;
-import picocli.CommandLine.Spec;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.Callable;
 
 /**
  * Subcommand to group reconfigure OM related operations.
@@ -48,13 +44,10 @@ import java.util.concurrent.Callable;
         ReconfigurePropertiesSubcommand.class
     })
 @MetaInfServices(AdminSubcommand.class)
-public class ReconfigureCommands implements Callable<Void>, AdminSubcommand {
+public class ReconfigureCommands implements AdminSubcommand {
 
   @CommandLine.ParentCommand
   private OzoneAdmin parent;
-
-  @Spec
-  private CommandSpec spec;
 
   @CommandLine.Option(names = {"--service"},
       description = "service: OM, SCM, DATANODE.",
@@ -71,12 +64,6 @@ public class ReconfigureCommands implements Callable<Void>, AdminSubcommand {
           "to all available DataNodes in the IN_SERVICE operational state.",
       required = false)
   private boolean batchReconfigDatanodes;
-
-  @Override
-  public Void call() throws Exception {
-    GenericCli.missingSubcommand(spec);
-    return null;
-  }
 
   public String getAddress() {
     return address;

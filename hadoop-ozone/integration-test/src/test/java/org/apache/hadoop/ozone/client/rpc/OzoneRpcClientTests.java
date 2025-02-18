@@ -22,6 +22,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
@@ -87,6 +88,8 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneTestUtils;
+import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.audit.AuditLogTestUtils;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -109,7 +112,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -179,7 +181,6 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.REA
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assumptions.assumeThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -228,10 +229,13 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       remoteGroupName, ACCESS, READ);
   private static MessageDigest eTagProvider;
   private static Set<OzoneClient> ozoneClients = new HashSet<>();
+  private static GenericTestUtils.PrintStreamCapturer output;
 
   @BeforeAll
-  public static void initialize() throws NoSuchAlgorithmException {
+  public static void initialize() throws NoSuchAlgorithmException, UnsupportedEncodingException {
     eTagProvider = MessageDigest.getInstance(MD5_HASH);
+    AuditLogTestUtils.enableAuditLog();
+    output = GenericTestUtils.captureOut();
   }
 
   /**
@@ -270,6 +274,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   static void shutdownCluster() {
     org.apache.hadoop.hdds.utils.IOUtils.closeQuietly(ozoneClients);
     ozoneClients.clear();
+    org.apache.hadoop.hdds.utils.IOUtils.closeQuietly(output);
 
     if (storageContainerLocationClient != null) {
       storageContainerLocationClient.close();
@@ -1076,6 +1081,64 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     store.deleteVolume(volumeName);
   }
 
+  @Test
+  public void testDeleteAuditLog() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    String value = "sample value";
+    int valueLength = value.getBytes(UTF_8).length;
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    // create a three replica file
+    String keyName1 = "key1";
+    TestDataUtil.createKey(bucket, keyName1, THREE, RATIS, value);
+
+    // create a EC replica file
+    String keyName2 = "key2";
+    ReplicationConfig replicationConfig = new ECReplicationConfig("rs-3-2-1024k");
+    TestDataUtil.createKey(bucket, keyName2, replicationConfig, value);
+
+    // create a directory and a file
+    String dirName = "dir1";
+    bucket.createDirectory(dirName);
+    String keyName3 = "key3";
+    TestDataUtil.createKey(bucket, keyName3, THREE, RATIS, value);
+
+    // delete files and directory
+    output.reset();
+    bucket.deleteKey(keyName1);
+    bucket.deleteKey(keyName2);
+    bucket.deleteDirectory(dirName, true);
+
+    // create keys for deleteKeys case
+    String keyName4 = "key4";
+    TestDataUtil.createKey(bucket, dirName + "/" + keyName4, THREE, RATIS, value);
+
+    String keyName5 = "key5";
+    TestDataUtil.createKey(bucket, dirName + "/" + keyName5, replicationConfig, value);
+
+    List<String> keysToDelete = new ArrayList<>();
+    keysToDelete.add(dirName + "/" + keyName4);
+    keysToDelete.add(dirName + "/" + keyName5);
+    bucket.deleteKeys(keysToDelete);
+
+    String consoleOutput = output.get();
+    assertThat(consoleOutput).contains("op=DELETE_KEY {volume=" + volumeName + ", bucket=" + bucketName +
+        ", key=key1, dataSize=" + valueLength + ", replicationConfig=RATIS/THREE");
+    assertThat(consoleOutput).contains("op=DELETE_KEY {volume=" + volumeName + ", bucket=" + bucketName +
+        ", key=key2, dataSize=" + valueLength + ", replicationConfig=EC{rs-3-2-1024k}");
+    assertThat(consoleOutput).contains("op=DELETE_KEY {volume=" + volumeName + ", bucket=" + bucketName +
+        ", key=dir1, Transaction");
+    assertThat(consoleOutput).contains("op=DELETE_KEYS {volume=" + volumeName + ", bucket=" + bucketName +
+        ", deletedKeysList={key=dir1/key4, dataSize=" + valueLength +
+        ", replicationConfig=RATIS/THREE}, {key=dir1/key5, dataSize=" + valueLength +
+        ", replicationConfig=EC{rs-3-2-1024k}}, unDeletedKeysList=");
+  }
+
   protected void verifyReplication(String volumeName, String bucketName,
       String keyName, ReplicationConfig replication)
       throws IOException {
@@ -1677,8 +1740,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     if (layout.equals(BucketLayout.LEGACY)) {
-      OzoneConfiguration conf = cluster.getConf();
-      conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
+      cluster.getOzoneManager().getConfig().setFileSystemPathEnabled(true);
     }
 
     // the directory "/dir1", ""/dir1/dir2/", "/dir1/dir2/dir3/"
@@ -4934,8 +4996,6 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @Test
   public void testParallelDeleteBucketAndCreateKey() throws IOException,
       InterruptedException, TimeoutException {
-    assumeThat(getCluster().getOzoneManager().isRatisEnabled()).isTrue();
-
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 

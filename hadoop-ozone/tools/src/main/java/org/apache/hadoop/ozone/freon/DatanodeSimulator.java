@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClient
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
+import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -119,7 +120,8 @@ import static org.apache.hadoop.hdds.utils.HddsVersionInfo.HDDS_VERSION_INFO;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
-public class DatanodeSimulator implements Callable<Void> {
+@MetaInfServices(FreonSubcommand.class)
+public class DatanodeSimulator implements Callable<Void>, FreonSubcommand {
   private static final Logger LOGGER = LoggerFactory.getLogger(
       DatanodeSimulator.class);
 

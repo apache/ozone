@@ -43,7 +43,7 @@ if [[ ! -s "${REPORT_DIR}/failures" ]]; then
 fi
 
 # exit with failure if report is not empty
-if [[ -s "${REPORT_FILE}" ]]; then
+if [[ -s "${REPORT_FILE}" ]] && [[ ${ITERATIONS:-1} -eq 1 ]]; then
   rc=1
 fi
 

@@ -145,6 +145,7 @@ The [`hadoop-ozone/dev-support/checks` directory](https://github.com/apache/ozon
     * `docs.sh`: sanity checks for [Ozone documentation](https://github.com/apache/ozone/tree/master/hadoop-hdds/docs)
     * `dependency.sh`: compares list of jars in build output with known list
     * `checkstyle.sh`: Checkstyle
+    * `pmd.sh`: PMD
  3. moderate (around 10 minutes)
     * `findbugs.sh`: SpotBugs
     * `kubernetes.sh`: very limited set of tests run in Kubernetes environment

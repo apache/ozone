@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React from 'react';
+import React, { HTMLAttributes } from 'react';
 import moment from 'moment';
 import { Popover, Tooltip } from 'antd'
 import {
@@ -306,7 +306,11 @@ const DatanodesTable: React.FC<DatanodeTableProps> = ({
         rowKey='uuid'
         pagination={paginationConfig}
         scroll={{ x: 'max-content', scrollToFirstRowOnChange: true }}
-        locale={{ filterTitle: '' }} />
+        locale={{ filterTitle: '' }}
+        onRow={(record: Datanode) => ({
+          'data-testid': `dntable-${record.uuid}`
+        } as HTMLAttributes<HTMLElement>)}
+        data-testid='dn-table' />
     </div>
   );
 }

@@ -19,47 +19,26 @@ package org.apache.hadoop.ozone.shell;
 
 import java.net.InetSocketAddress;
 
-import org.apache.hadoop.hdds.cli.OzoneAdmin;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.junit.jupiter.api.AfterAll;
+import org.apache.hadoop.ozone.admin.OzoneAdmin;
+import org.apache.ozone.test.HATests;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 /**
  * This class tests ozone admin scm commands.
  */
-public class TestScmAdminHA {
-  private static OzoneAdmin ozoneAdmin;
-  private static OzoneConfiguration conf;
-  private static String omServiceId;
-  private static int numOfOMs;
-  private static MiniOzoneCluster cluster;
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public abstract class TestScmAdminHA implements HATests.TestCase {
+
+  private OzoneAdmin ozoneAdmin;
+  private MiniOzoneCluster cluster;
 
   @BeforeAll
-  public static void init() throws Exception {
+  void init() {
     ozoneAdmin = new OzoneAdmin();
-    conf = new OzoneConfiguration();
-
-    // Init HA cluster
-    omServiceId = "om-service-test1";
-    numOfOMs = 3;
-    cluster = MiniOzoneCluster.newHABuilder(conf)
-        .setOMServiceId(omServiceId)
-        .setNumOfOzoneManagers(numOfOMs)
-        .build();
-    conf.setQuietMode(false);
-    // enable ratis for Scm.
-    conf.setBoolean(ScmConfigKeys.HDDS_CONTAINER_RATIS_ENABLED_KEY, true);
-    cluster.waitForClusterToBeReady();
-  }
-
-  @AfterAll
-  public static void shutdown() {
-    if (cluster != null) {
-      cluster.shutdown();
-    }
+    cluster = cluster();
   }
 
   @Test

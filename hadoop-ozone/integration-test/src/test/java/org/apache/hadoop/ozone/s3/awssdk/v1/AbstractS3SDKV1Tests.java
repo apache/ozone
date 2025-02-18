@@ -27,6 +27,7 @@ import com.amazonaws.services.s3.model.CanonicalGrantee;
 import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
 import com.amazonaws.services.s3.model.CompleteMultipartUploadResult;
 import com.amazonaws.services.s3.model.CreateBucketRequest;
+import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.Grantee;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadResult;
@@ -59,6 +60,7 @@ import com.amazonaws.services.s3.transfer.TransferManagerBuilder;
 import com.amazonaws.services.s3.transfer.Upload;
 import com.amazonaws.services.s3.transfer.model.UploadResult;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -737,6 +739,65 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
   }
 
   @Test
+  public void testGetParticularPart(@TempDir Path tempDir) throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+
+    s3Client.createBucket(bucketName);
+
+    File multipartUploadFile = Files.createFile(tempDir.resolve("multipartupload.txt")).toFile();
+
+    createFile(multipartUploadFile, (int) (15 * MB));
+
+    multipartUpload(bucketName, keyName, multipartUploadFile, 5 * MB, null, null, null);
+
+    GetObjectRequest getObjectRequestAll = new GetObjectRequest(bucketName, keyName);
+    getObjectRequestAll.setPartNumber(0);
+    S3Object s3ObjectAll = s3Client.getObject(getObjectRequestAll);
+    long allPartContentLength = s3ObjectAll.getObjectMetadata().getContentLength();
+
+    GetObjectRequest getObjectRequestOne = new GetObjectRequest(bucketName, keyName);
+    getObjectRequestOne.setPartNumber(1);
+    S3Object s3ObjectOne = s3Client.getObject(getObjectRequestOne);
+    long partOneContentLength = s3ObjectOne.getObjectMetadata().getContentLength();
+    assertEquals(allPartContentLength / 3, partOneContentLength);
+
+    GetObjectRequest getObjectRequestTwo = new GetObjectRequest(bucketName, keyName);
+    getObjectRequestTwo.setPartNumber(2);
+    S3Object s3ObjectTwo = s3Client.getObject(getObjectRequestTwo);
+    long partTwoContentLength = s3ObjectTwo.getObjectMetadata().getContentLength();
+    assertEquals(allPartContentLength / 3, partTwoContentLength);
+
+    GetObjectRequest getObjectRequestThree = new GetObjectRequest(bucketName, keyName);
+    getObjectRequestThree.setPartNumber(1);
+    S3Object s3ObjectThree = s3Client.getObject(getObjectRequestTwo);
+    long partThreeContentLength = s3ObjectThree.getObjectMetadata().getContentLength();
+    assertEquals(allPartContentLength / 3, partThreeContentLength);
+
+    assertEquals(allPartContentLength, (partOneContentLength + partTwoContentLength + partThreeContentLength));
+  }
+
+  @Test
+  public void testGetNotExistedPart(@TempDir Path tempDir) throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+
+    s3Client.createBucket(bucketName);
+
+    File multipartUploadFile = Files.createFile(tempDir.resolve("multipartupload.txt")).toFile();
+
+    createFile(multipartUploadFile, (int) (15 * MB));
+
+    multipartUpload(bucketName, keyName, multipartUploadFile, 5 * MB, null, null, null);
+
+    GetObjectRequest getObjectRequestOne = new GetObjectRequest(bucketName, keyName);
+    getObjectRequestOne.setPartNumber(4);
+    S3Object s3ObjectOne = s3Client.getObject(getObjectRequestOne);
+    long partOneContentLength = s3ObjectOne.getObjectMetadata().getContentLength();
+    assertEquals(0, partOneContentLength);
+  }
+
+  @Test
   public void testListPartsNotFound() {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
@@ -752,6 +813,28 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     assertEquals(ErrorType.Client, ase.getErrorType());
     assertEquals(404, ase.getStatusCode());
     assertEquals("NoSuchUpload", ase.getErrorCode());
+  }
+
+  @Test
+  public void testQuotaExceeded() throws IOException {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+
+    s3Client.createBucket(bucketName);
+
+    cluster.newClient().getObjectStore()
+        .getVolume("s3v")
+        .getBucket(bucketName)
+        .setQuota(OzoneQuota.parseQuota("1", "10"));
+
+    // Upload some objects to the bucket
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.putObject(bucketName, keyName,
+            RandomStringUtils.randomAlphanumeric(1024)));
+
+    assertEquals(ErrorType.Client, ase.getErrorType());
+    assertEquals(403, ase.getStatusCode());
+    assertEquals("QuotaExceeded", ase.getErrorCode());
   }
 
   private boolean isBucketEmpty(Bucket bucket) {

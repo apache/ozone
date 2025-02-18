@@ -20,15 +20,17 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -48,45 +50,32 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 /**
  * A simple test that asserts that list status output is sorted.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(1200)
-public class TestListStatus {
+public abstract class TestListStatus implements NonHATests.TestCase {
   private static final Logger LOG = LoggerFactory.getLogger(TestListStatus.class);
 
-  private static MiniOzoneCluster cluster = null;
-  private static OzoneBucket fsoOzoneBucket;
-  private static OzoneClient client;
+  private OzoneBucket fsoOzoneBucket;
+  private OzoneClient client;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   *
-   * @throws IOException in case of I/O error
-   */
   @BeforeAll
-  public static void init() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-        true);
-    cluster = MiniOzoneCluster.newBuilder(conf).build();
-    cluster.waitForClusterToBeReady();
-    client = cluster.newClient();
+  void init() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration(cluster().getConf());
+    // Set the number of keys to be processed during batch operated.
+    conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
+
+    client = OzoneClientFactory.getRpcClient(conf);
 
     // create a volume and a LEGACY bucket
     fsoOzoneBucket = TestDataUtil
         .createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
-    // Set the number of keys to be processed during batch operated.
-    conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
-
     buildNameSpaceTree(fsoOzoneBucket);
   }
 
   @AfterAll
-  public static void teardownClass() {
+  void cleanup() {
     IOUtils.closeQuietly(client);
-    if (cluster != null) {
-      cluster.shutdown();
-    }
   }
 
   @MethodSource("sortedListStatusParametersSource")

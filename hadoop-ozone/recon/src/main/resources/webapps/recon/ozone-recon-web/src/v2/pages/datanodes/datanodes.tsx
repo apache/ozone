@@ -246,7 +246,8 @@ const Datanodes: React.FC<{}> = () => {
                 onChange={handleColumnChange}
                 onTagClose={() => { }}
                 fixedColumn='hostname'
-                columnLength={columnOptions.length} />
+                columnLength={columnOptions.length}
+                data-testid='dn-multi-select' />
               {selectedRows.length > 0 &&
                 <Button
                   type="primary"
@@ -256,7 +257,8 @@ const Datanodes: React.FC<{}> = () => {
                     borderColor: '#FF4D4E'
                   }}
                   loading={loading}
-                  onClick={() => { setModalOpen(true) }}> Remove
+                  onClick={() => { setModalOpen(true) }}
+                  data-testid='dn-remove-btn'> Remove
                 </Button>
               }
             </div>
@@ -271,7 +273,7 @@ const Datanodes: React.FC<{}> = () => {
               onChange={(value) => {
                 setSearchTerm('');
                 setSearchColumn(value as 'hostname' | 'uuid' | 'version' | 'revision')
-              }} />
+              }}/>
           </div>
           <DatanodesTable
             loading={loading}
@@ -281,7 +283,7 @@ const Datanodes: React.FC<{}> = () => {
             searchColumn={searchColumn}
             searchTerm={debouncedSearch}
             handleSelectionChange={handleSelectionChange}
-            decommissionUuids={decommissionUuids} />
+            decommissionUuids={decommissionUuids}/>
         </div>
       </div>
       <Modal
@@ -296,7 +298,8 @@ const Datanodes: React.FC<{}> = () => {
               margin: '0px 0px 5px 0px',
               fontSize: '16px',
               fontWeight: 'bold'
-            }}>
+            }}
+          data-testid='dn-remove-modal'>
               <WarningFilled className='icon-warning' style={{paddingRight: '8px'}}/>
               Stop Tracking Datanode
             </div>

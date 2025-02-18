@@ -446,8 +446,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     }
 
     protected void initOMRatisConf() {
-      conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
-
       // If test change the following config values we will respect,
       // otherwise we will set lower timeout values.
       long defaultDuration = OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_DEFAULT
@@ -540,7 +538,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     }
 
     /**
-     * Start OM service with multiple OMs.
+     * Start SCM service with multiple SCMs.
      */
     protected SCMHAService createSCMService()
         throws IOException, AuthenticationException {
@@ -564,7 +562,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             OzoneConfiguration scmConfig = new OzoneConfiguration(conf);
             scmConfig.set(OZONE_METADATA_DIRS, metaDirPath);
             scmConfig.set(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY, nodeId);
-            scmConfig.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
 
             configureSCM();
             if (i == 1) {
@@ -619,10 +616,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
      * Initialize HA related configurations.
      */
     private void initSCMHAConfig() {
-      // Set configurations required for starting OM HA service, because that
+      // Set configurations required for starting SCM HA service, because that
       // is the serviceID being passed to start Ozone HA cluster.
-      // Here setting internal service and OZONE_OM_SERVICE_IDS_KEY, in this
-      // way in OM start it uses internal service id to find it's service id.
+      // Here setting internal service and OZONE_SCM_SERVICE_IDS_KEY, in this
+      // way in SCM start it uses internal service id to find it's service id.
       conf.set(ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY, scmServiceId);
       conf.set(ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID, scmServiceId);
       String scmNodesKey = ConfUtils.addKeySuffixes(
@@ -632,6 +629,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
       for (int i = 1; i <= numOfSCMs; i++) {
         String scmNodeId = SCM_NODE_ID_PREFIX + i;
+
+        if (i == 1) {
+          conf.set(ScmConfigKeys.OZONE_SCM_PRIMORDIAL_NODE_ID_KEY, scmNodeId);
+        }
         scmNodesKeyValue.append(",").append(scmNodeId);
 
         String scmAddrKey = ConfUtils.addKeySuffixes(

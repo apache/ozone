@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -58,6 +59,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -117,7 +119,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVER_LIST_MAX_SIZE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -150,9 +151,8 @@ abstract class AbstractOzoneFileSystemTest {
       p -> !p.toUri().getPath().startsWith(TRASH_ROOT.toString());
   private String fsRoot;
 
-  AbstractOzoneFileSystemTest(boolean setDefaultFs, boolean enableOMRatis, BucketLayout layout) {
+  AbstractOzoneFileSystemTest(boolean setDefaultFs, BucketLayout layout) {
     enabledFileSystemPaths = setDefaultFs;
-    omRatisEnabled = enableOMRatis;
     bucketLayout = layout;
   }
 
@@ -161,7 +161,6 @@ abstract class AbstractOzoneFileSystemTest {
 
   private final BucketLayout bucketLayout;
   private final boolean enabledFileSystemPaths;
-  private final boolean omRatisEnabled;
 
   private MiniOzoneCluster cluster;
   private OzoneClient client;
@@ -185,8 +184,7 @@ abstract class AbstractOzoneFileSystemTest {
     conf.setFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
     conf.setFloat(FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
     conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, TRASH_INTERVAL / 2);
-    conf.setInt(OZONE_OM_SERVER_LIST_MAX_SIZE, 2);
-    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
+    conf.setInt(OmConfig.Keys.SERVER_LIST_MAX_SIZE, 2);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
     conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
@@ -1584,40 +1582,42 @@ abstract class AbstractOzoneFileSystemTest {
     Configuration conf = new OzoneConfiguration(cluster.getConf());
     conf.set(FS_DEFAULT_NAME_KEY, rootPath);
     // Set the number of keys to be processed during batch operate.
-    OzoneFileSystem o3FS = (OzoneFileSystem) FileSystem.get(conf);
+    try (FileSystem fileSystem = FileSystem.get(conf)) {
+      OzoneFileSystem o3FS = (OzoneFileSystem) fileSystem;
 
-    //Let's reset the clock to control the time.
-    ((BasicOzoneClientAdapterImpl) (o3FS.getAdapter())).setClock(testClock);
+      //Let's reset the clock to control the time.
+      ((BasicOzoneClientAdapterImpl) (o3FS.getAdapter())).setClock(testClock);
 
-    createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key"),
-        ReplicationType.RATIS);
+      createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key"),
+          ReplicationType.RATIS);
 
-    bucket.setReplicationConfig(new ECReplicationConfig("rs-3-2-1024k"));
+      bucket.setReplicationConfig(new ECReplicationConfig("rs-3-2-1024k"));
 
-    //After changing the bucket policy, it should create ec key, but o3fs will
-    // refresh after some time. So, it will be sill old type.
-    createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key1"),
-        ReplicationType.RATIS);
+      //After changing the bucket policy, it should create ec key, but o3fs will
+      // refresh after some time. So, it will be sill old type.
+      createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key1"),
+          ReplicationType.RATIS);
 
-    testClock.fastForward(300 * 1000 + 1);
+      testClock.fastForward(300 * 1000 + 1);
 
-    //After client bucket refresh time, it should create new type what is
-    // available on bucket at that moment.
-    createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key2"),
-        ReplicationType.EC);
+      //After client bucket refresh time, it should create new type what is
+      // available on bucket at that moment.
+      createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key2"),
+          ReplicationType.EC);
 
-    // Rechecking the same steps with changing to Ratis again to check the
-    // behavior is consistent.
-    bucket.setReplicationConfig(
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+      // Rechecking the same steps with changing to Ratis again to check the
+      // behavior is consistent.
+      bucket.setReplicationConfig(RatisReplicationConfig.getInstance(
+          HddsProtos.ReplicationFactor.THREE));
 
-    createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key3"),
-        ReplicationType.EC);
+      createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key3"),
+          ReplicationType.EC);
 
-    testClock.fastForward(300 * 1000 + 1);
+      testClock.fastForward(300 * 1000 + 1);
 
-    createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key4"),
-        ReplicationType.RATIS);
+      createKeyAndAssertKeyType(bucket, o3FS, new Path(rootPath, "key4"),
+          ReplicationType.RATIS);
+    }
   }
 
   private void createKeyAndAssertKeyType(OzoneBucket bucket,
@@ -1671,9 +1671,11 @@ abstract class AbstractOzoneFileSystemTest {
     OzoneConfiguration conf2 = new OzoneConfiguration(cluster.getConf());
     conf2.setClass("fs.trash.classname", TrashPolicyDefault.class,
         TrashPolicy.class);
-    Trash trashPolicyDefault = new Trash(conf2);
-    assertThrows(IOException.class,
-        () -> trashPolicyDefault.moveToTrash(root));
+    try (FileSystem fs = FileSystem.get(conf2)) {
+      Trash trashPolicyDefault = new Trash(fs, conf2);
+      assertThrows(IOException.class,
+          () -> trashPolicyDefault.moveToTrash(root));
+    }
   }
 
   /**
@@ -2275,6 +2277,24 @@ abstract class AbstractOzoneFileSystemTest {
       IllegalArgumentException e = GenericTestUtils.assertThrows(IllegalArgumentException.class,
               () -> FileSystem.get(config));
       assertThat(e.getMessage()).contains("OBJECT_STORE, which does not support file system semantics");
+    }
+  }
+
+  @Test
+  public void testGetFileChecksumWithInvalidCombineMode() throws IOException {
+    final String root = "/root";
+    Path rootPath = new Path(fs.getUri().toString() + root);
+    fs.mkdirs(rootPath);
+    Path file = new Path(fs.getUri().toString() + root
+        + "/dummy");
+    ContractTestUtils.touch(fs, file);
+    OzoneClientConfig clientConfig = cluster.getConf().getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumCombineMode("NONE");
+    OzoneConfiguration conf = cluster.getConf();
+    conf.setFromObject(clientConfig);
+    conf.setBoolean("fs.o3fs.impl.disable.cache", true);
+    try (FileSystem fileSystem = FileSystem.get(conf)) {
+      assertNull(fileSystem.getFileChecksum(file));
     }
   }
 
