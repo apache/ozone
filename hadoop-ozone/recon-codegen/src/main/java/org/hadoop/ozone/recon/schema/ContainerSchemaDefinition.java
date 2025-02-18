@@ -53,7 +53,7 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
     MIS_REPLICATED,
     ALL_REPLICAS_BAD,
     NEGATIVE_SIZE, // Added new state to track containers with negative sizes
-    DATA_CHECKSUM_MISMATCH
+    CHECKSUM_MISMATCH
   }
 
   private static final String CONTAINER_ID = "container_id";

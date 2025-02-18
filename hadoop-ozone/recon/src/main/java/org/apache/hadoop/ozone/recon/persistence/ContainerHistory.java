@@ -34,6 +34,7 @@ public class ContainerHistory implements Serializable {
   private String state;
   private long dataChecksum;
 
+  @SuppressWarnings("parameternumber")
   public ContainerHistory(long containerId, String datanodeUuid,
                           String datanodeHost, long firstSeenTime,
                           long lastSeenTime, long lastBcsId, String state, long dataChecksum) {

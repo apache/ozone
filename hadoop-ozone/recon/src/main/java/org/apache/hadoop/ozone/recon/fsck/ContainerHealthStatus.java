@@ -191,19 +191,19 @@ public class ContainerHealthStatus {
   }
 
   private ContainerReplicaCount getContainerReplicaCountInstance(
-      OzoneConfiguration conf, Set<ContainerReplica> replicas) {
+      OzoneConfiguration conf, Set<ContainerReplica> containerReplicas) {
     ReplicationManager.ReplicationManagerConfiguration rmConf = conf.getObject(
         ReplicationManager.ReplicationManagerConfiguration.class);
     boolean isEC = container.getReplicationConfig()
                        .getReplicationType() == HddsProtos.ReplicationType.EC;
     return isEC ?
                new ECContainerReplicaCount(container,
-                   replicas, new ArrayList<>(),
+                   containerReplicas, new ArrayList<>(),
                    rmConf.getMaintenanceRemainingRedundancy()) :
                // This class ignores unhealthy replicas,
                // therefore set 'considerUnhealthy' to false.
                new RatisContainerReplicaCount(container,
-                   replicas, new ArrayList<>(),
+                   containerReplicas, new ArrayList<>(),
                    rmConf.getMaintenanceReplicaMinimum(), false);
   }
 }

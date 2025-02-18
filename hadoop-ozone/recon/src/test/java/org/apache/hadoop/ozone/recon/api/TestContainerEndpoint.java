@@ -733,7 +733,7 @@ public class TestContainerEndpoint {
     uuid2 = newDatanode("host2", "127.0.0.2");
     uuid3 = newDatanode("host3", "127.0.0.3");
     uuid4 = newDatanode("host4", "127.0.0.4");
-    createUnhealthyRecords(5, 0, 0, 0);
+    createUnhealthyRecords(5, 0, 0, 0, 0);
 
     Response responseWithLimit = containerEndpoint.getMissingContainers(3);
     MissingContainersResponse responseWithLimitObject
@@ -818,7 +818,7 @@ public class TestContainerEndpoint {
     uuid2 = newDatanode("host2", "127.0.0.2");
     uuid3 = newDatanode("host3", "127.0.0.3");
     uuid4 = newDatanode("host4", "127.0.0.4");
-    createUnhealthyRecords(5, 4, 3, 2);
+    createUnhealthyRecords(5, 4, 3, 2, 1);
 
     response = containerEndpoint.getUnhealthyContainers(1000, 1);
 
@@ -827,6 +827,7 @@ public class TestContainerEndpoint {
     assertEquals(4, responseObject.getOverReplicatedCount());
     assertEquals(3, responseObject.getUnderReplicatedCount());
     assertEquals(2, responseObject.getMisReplicatedCount());
+    assertEquals(1, responseObject.getDataChecksumMismatchCount());
 
     Collection<UnhealthyContainerMetadata> records
         = responseObject.getContainers();
@@ -927,7 +928,7 @@ public class TestContainerEndpoint {
     uuid2 = newDatanode("host2", "127.0.0.2");
     uuid3 = newDatanode("host3", "127.0.0.3");
     uuid4 = newDatanode("host4", "127.0.0.4");
-    createUnhealthyRecords(5, 4, 3, 2);
+    createUnhealthyRecords(5, 4, 3, 2, 1);
     createEmptyMissingUnhealthyRecords(2); // For EMPTY_MISSING state
     createNegativeSizeUnhealthyRecords(2); // For NEGATIVE_SIZE state
 
@@ -941,6 +942,7 @@ public class TestContainerEndpoint {
     assertEquals(4, responseObject.getOverReplicatedCount());
     assertEquals(3, responseObject.getUnderReplicatedCount());
     assertEquals(2, responseObject.getMisReplicatedCount());
+    assertEquals(1, responseObject.getDataChecksumMismatchCount());
 
     Collection<UnhealthyContainerMetadata> records = responseObject.getContainers();
     assertTrue(records.stream()
@@ -1097,7 +1099,7 @@ public class TestContainerEndpoint {
 
 
   private void createUnhealthyRecords(int missing, int overRep, int underRep,
-                                      int misRep, int dataCheksum) {
+                                      int misRep, int dataChecksum) {
     int cid = 0;
     for (int i = 0; i < missing; i++) {
       createUnhealthyRecord(++cid, UnHealthyContainerStates.MISSING.toString(),
@@ -1118,9 +1120,9 @@ public class TestContainerEndpoint {
           UnHealthyContainerStates.MIS_REPLICATED.toString(),
           2, 1, 1, "some reason", false);
     }
-    for (int i = 0; i < dataCheksum; i++) {
+    for (int i = 0; i < dataChecksum; i++) {
       createUnhealthyRecord(++cid,
-              UnHealthyContainerStates.DATA_CHECKSUM_MISMATCH.toString(),
+              UnHealthyContainerStates.CHECKSUM_MISMATCH.toString(),
               3, 3, 0, null, true);
     }
   }

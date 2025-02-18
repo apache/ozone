@@ -51,6 +51,12 @@ public class UnhealthyContainersResponse {
   private long misReplicatedCount = 0;
 
   /**
+   * Total count of data checksum mismatched containers.
+   */
+  @JsonProperty("dataChecksumMismatchCount")
+  private long dataChecksumMismatchCount = 0;
+
+  /**
    * A collection of unhealthy containers.
    */
   @JsonProperty("containers")
@@ -77,6 +83,9 @@ public class UnhealthyContainersResponse {
     } else if (state.equals(
         UnHealthyContainerStates.MIS_REPLICATED.toString())) {
       this.misReplicatedCount = count;
+    } else if(state.equals(
+        UnHealthyContainerStates.CHECKSUM_MISMATCH.toString())) {
+      this.dataChecksumMismatchCount = count;
     }
   }
 
@@ -94,6 +103,10 @@ public class UnhealthyContainersResponse {
 
   public long getMisReplicatedCount() {
     return misReplicatedCount;
+  }
+
+  public long getDataChecksumMismatchCount() {
+    return dataChecksumMismatchCount;
   }
 
   public Collection<UnhealthyContainerMetadata> getContainers() {

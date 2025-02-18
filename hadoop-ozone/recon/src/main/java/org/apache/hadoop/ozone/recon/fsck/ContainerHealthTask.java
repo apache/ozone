@@ -235,7 +235,7 @@ public class ContainerHealthTask extends ReconScmTask {
     unhealthyContainerStateStatsMap.put(
         UnHealthyContainerStates.NEGATIVE_SIZE, new HashMap<>());
     unhealthyContainerStateStatsMap.put(
-            UnHealthyContainerStates.DATA_CHECKSUM_MISMATCH, new HashMap<>());
+            UnHealthyContainerStates.CHECKSUM_MISMATCH, new HashMap<>());
   }
 
   private ContainerHealthStatus setCurrentContainer(long recordId)
@@ -502,7 +502,7 @@ public class ContainerHealthTask extends ReconScmTask {
       case OVER_REPLICATED:
         returnValue = keepOverReplicatedRecord(container, rec);
         break;
-      case DATA_CHECKSUM_MISMATCH:
+      case CHECKSUM_MISMATCH:
         returnValue = keepDataChecksumMismatchedRecord(container, rec);
         break;
       default:
@@ -533,7 +533,7 @@ public class ContainerHealthTask extends ReconScmTask {
         Map<UnHealthyContainerStates, Map<String, Long>>
             unhealthyContainerStateStatsMap) {
       List<UnhealthyContainers> records = new ArrayList<>();
-      if ((container.isHealthilyReplicated() && !container.isDataChecksumMismatched() ) || container.isDeleted()) {
+      if ((container.isHealthilyReplicated() && !container.isDataChecksumMismatched()) || container.isDeleted()) {
         return records;
       }
 
@@ -600,11 +600,11 @@ public class ContainerHealthTask extends ReconScmTask {
 
       if (container.isDataChecksumMismatched()
               && !recordForStateExists.contains(
-              UnHealthyContainerStates.DATA_CHECKSUM_MISMATCH.toString())) {
+              UnHealthyContainerStates.CHECKSUM_MISMATCH.toString())) {
         records.add(recordForState(
-                container, UnHealthyContainerStates.DATA_CHECKSUM_MISMATCH, time));
+                container, UnHealthyContainerStates.CHECKSUM_MISMATCH, time));
         populateContainerStats(container,
-                UnHealthyContainerStates.DATA_CHECKSUM_MISMATCH,
+                UnHealthyContainerStates.CHECKSUM_MISMATCH,
                 unhealthyContainerStateStatsMap);
       }
 
