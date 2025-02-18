@@ -611,6 +611,7 @@ public final class OzoneManagerRatisServer {
    */
   private OzoneManagerStateMachine getStateMachine(ConfigurationSource conf)
       throws IOException {
+//    LOG.error("Get ozone manager state machine");
     return new OzoneManagerStateMachine(this,
         TracingUtil.isTracingEnabled(conf));
   }

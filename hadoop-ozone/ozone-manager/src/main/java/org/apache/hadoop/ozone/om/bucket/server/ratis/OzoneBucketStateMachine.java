@@ -133,7 +133,7 @@ public class OzoneBucketStateMachine extends BaseStateMachine {
       throws IOException {
     super.initialize(server, id, raftStorage);
     storage.init(raftStorage);
-//    ratisServer.notifyGroupAdd(id);
+    ratisServer.notifyGroupAdd(id);
 
     LOG.info("{}: initialize {}", server.getId(), id);
     loadSnapshot(storage.getLatestSnapshot());
@@ -459,6 +459,7 @@ public class OzoneBucketStateMachine extends BaseStateMachine {
   @Override
   public void notifyLeaderChanged(RaftGroupMemberId groupMemberId,
                                   RaftPeerId raftPeerId) {
+//    LOG.error("notifyLeaderChanged {} - {}", groupMemberId, raftPeerId);
     ratisServer.handleLeaderChangedNotification(groupMemberId, raftPeerId);
   }
 

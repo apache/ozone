@@ -52,6 +52,7 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
   public void submitRequest(OMRequest request,
                             io.grpc.stub.StreamObserver<OMResponse>
                                 responseObserver) {
+//    LOG.error("Current thread: {}", Thread.currentThread().getName());
     LOG.debug("OzoneManagerServiceGrpc: OzoneManagerServiceImplBase " +
         "processing s3g client submit request - for command {}",
         request.getCmdType().name());
