@@ -111,6 +111,7 @@ public class HddsVolume extends StorageVolume {
       return this;
     }
 
+    @Override
     public HddsVolume build() throws IOException {
       return new HddsVolume(this);
     }

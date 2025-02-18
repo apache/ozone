@@ -164,6 +164,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
     trxBufferMonitorService.start();
   }
 
+  @Override
   public SCMRatisServer getRatisServer() {
     return ratisServer;
   }

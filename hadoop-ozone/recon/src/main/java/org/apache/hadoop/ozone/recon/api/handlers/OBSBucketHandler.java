@@ -259,6 +259,7 @@ public class OBSBucketHandler extends BucketHandler {
     return getOmMetadataManager().getKeyTable(getBucketLayout());
   }
 
+  @Override
   public BucketLayout getBucketLayout() {
     return BucketLayout.OBJECT_STORE;
   }

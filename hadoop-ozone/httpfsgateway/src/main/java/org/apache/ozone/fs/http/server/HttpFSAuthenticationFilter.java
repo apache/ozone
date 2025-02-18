@@ -121,6 +121,7 @@ public class HttpFSAuthenticationFilter
     return props;
   }
 
+  @Override
   protected Configuration getProxyuserConfiguration(FilterConfig filterConfig) {
     Map<String, String> proxyuserConf = HttpFSServerWebApp.get().getConfig().
         getValByRegex("httpfs\\.proxyuser\\.");

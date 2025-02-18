@@ -134,6 +134,7 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
     return isFullChunk(data.getChunks().get(data.getChunks().size() - 1));
   }
 
+  @Override
   public void putBlockByID(BatchOperation batch, boolean incremental,
       long localID, BlockData data, KeyValueContainerData containerData,
       boolean endOfBlock) throws IOException {

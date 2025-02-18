@@ -70,6 +70,7 @@ public class DeletedBlockLogStateManagerImpl
         isRatisEnabled ? ConcurrentHashMap.newKeySet() : null;
   }
 
+  @Override
   public TableIterator<Long, TypedTable.KeyValue<Long,
       DeletedBlocksTransaction>> getReadOnlyIterator() throws IOException {
     return new TableIterator<Long, TypedTable.KeyValue<Long,
@@ -238,6 +239,7 @@ public class DeletedBlockLogStateManagerImpl
     return resetCount;
   }
 
+  @Override
   public void onFlush() {
     // onFlush() can be invoked only when ratis is enabled.
     Preconditions.checkNotNull(deletingTxIDs);

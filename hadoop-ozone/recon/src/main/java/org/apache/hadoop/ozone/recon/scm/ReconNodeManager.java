@@ -153,6 +153,7 @@ public class ReconNodeManager extends SCMNodeManager {
    * @param datanodeDetails DatanodeDetails
    * @return last heartbeat time
    */
+  @Override
   public long getLastHeartbeat(DatanodeDetails datanodeDetails) {
     return datanodeHeartbeatMap.getOrDefault(datanodeDetails.getUuid(), 0L);
   }
