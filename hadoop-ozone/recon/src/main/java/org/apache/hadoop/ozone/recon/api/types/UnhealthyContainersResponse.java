@@ -83,7 +83,7 @@ public class UnhealthyContainersResponse {
     } else if (state.equals(
         UnHealthyContainerStates.MIS_REPLICATED.toString())) {
       this.misReplicatedCount = count;
-    } else if(state.equals(
+    } else if (state.equals(
         UnHealthyContainerStates.CHECKSUM_ERROR.toString())) {
       this.dataChecksumMismatchCount = count;
     }
