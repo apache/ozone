@@ -1,39 +1,21 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.s3.endpoint;
-
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.s3.RequestIdentifier;
-import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.Response;
-import java.io.ByteArrayInputStream;
 
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -46,18 +28,30 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
 /**
  * This class tests Upload part request.
  */
 public class TestPartUploadWithStream {
 
-  private static final ObjectEndpoint REST = new ObjectEndpoint();
+  private ObjectEndpoint rest;
 
   private static final String S3BUCKET = "streampartb1";
   private static final String S3KEY = "testkey";
 
-  @BeforeAll
-  public static void setUp() throws Exception {
+  @BeforeEach
+  public void setUp() throws Exception {
     OzoneClient client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket(S3BUCKET);
 
@@ -65,26 +59,29 @@ public class TestPartUploadWithStream {
     HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("STANDARD");
 
-    REST.setHeaders(headers);
-    REST.setClient(client);
-    REST.setRequestIdentifier(new RequestIdentifier());
 
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED,
         true);
-    REST.setOzoneConfiguration(conf);
-    REST.init();
+
+    rest = EndpointBuilder.newObjectEndpointBuilder()
+        .setHeaders(headers)
+        .setClient(client)
+        .setConfig(conf)
+        .build();
+
+    rest.init();
   }
 
   @Test
   public void testEnableStream() {
-    assertTrue(REST.isDatastreamEnabled());
+    assertTrue(rest.isDatastreamEnabled());
   }
 
   @Test
   public void testPartUpload() throws Exception {
 
-    Response response = REST.initializeMultipartUpload(S3BUCKET, S3KEY);
+    Response response = rest.initializeMultipartUpload(S3BUCKET, S3KEY);
     MultipartUploadInitiateResponse multipartUploadInitiateResponse =
         (MultipartUploadInitiateResponse) response.getEntity();
     assertNotNull(multipartUploadInitiateResponse.getUploadID());
@@ -95,7 +92,7 @@ public class TestPartUploadWithStream {
     String content = "Multipart Upload";
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
-    response = REST.put(S3BUCKET, S3KEY,
+    response = rest.put(S3BUCKET, S3KEY,
         content.length(), 1, uploadID, null, null, body);
 
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
@@ -105,7 +102,7 @@ public class TestPartUploadWithStream {
   @Test
   public void testPartUploadWithOverride() throws Exception {
 
-    Response response = REST.initializeMultipartUpload(S3BUCKET, S3KEY);
+    Response response = rest.initializeMultipartUpload(S3BUCKET, S3KEY);
     MultipartUploadInitiateResponse multipartUploadInitiateResponse =
         (MultipartUploadInitiateResponse) response.getEntity();
     assertNotNull(multipartUploadInitiateResponse.getUploadID());
@@ -116,7 +113,7 @@ public class TestPartUploadWithStream {
     String content = "Multipart Upload";
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
-    response = REST.put(S3BUCKET, S3KEY,
+    response = rest.put(S3BUCKET, S3KEY,
         content.length(), 1, uploadID, null, null, body);
 
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
@@ -125,7 +122,7 @@ public class TestPartUploadWithStream {
 
     // Upload part again with same part Number, the ETag should be changed.
     content = "Multipart Upload Changed";
-    response = REST.put(S3BUCKET, S3KEY,
+    response = rest.put(S3BUCKET, S3KEY,
         content.length(), 1, uploadID, null, null, body);
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
     assertNotEquals(eTag, response.getHeaderString(OzoneConsts.ETAG));
@@ -138,7 +135,7 @@ public class TestPartUploadWithStream {
       String content = "Multipart Upload With Incorrect uploadID";
       ByteArrayInputStream body =
           new ByteArrayInputStream(content.getBytes(UTF_8));
-      REST.put(S3BUCKET, S3KEY, content.length(), 1,
+      rest.put(S3BUCKET, S3KEY, content.length(), 1,
           "random", null, null, body);
     });
     assertEquals("NoSuchUpload", ex.getCode());
