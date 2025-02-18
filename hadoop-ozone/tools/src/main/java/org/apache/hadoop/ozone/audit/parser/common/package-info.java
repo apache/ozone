@@ -16,6 +16,6 @@
  */
 
 /**
- * Classes to define constants & helpers for Ozone audit parser tool.
+ * Classes to define constants &amp; helpers for Ozone audit parser tool.
  */
 package org.apache.hadoop.ozone.audit.parser.common;
