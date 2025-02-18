@@ -1,45 +1,44 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.shell;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 
-import org.apache.hadoop.hdds.cli.OzoneAdmin;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.ratis.protocol.RaftPeer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
 
 /**
  * Test transferLeadership with SCM HA setup.
@@ -52,6 +51,7 @@ public class TestTransferLeadershipShell {
   private String scmServiceId;
   private int numOfOMs = 3;
   private int numOfSCMs = 3;
+  private OzoneAdmin ozoneAdmin;
 
   private static final long SNAPSHOT_THRESHOLD = 5;
 
@@ -62,7 +62,8 @@ public class TestTransferLeadershipShell {
    */
   @BeforeAll
   public void init() throws Exception {
-    conf = new OzoneConfiguration();
+    ozoneAdmin = new OzoneAdmin();
+    conf = ozoneAdmin.getOzoneConf();
     omServiceId = "om-service-test1";
     scmServiceId = "scm-service-test1";
     conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
@@ -95,7 +96,6 @@ public class TestTransferLeadershipShell {
     omList.remove(oldLeader);
     OzoneManager newLeader = omList.get(0);
     cluster.waitForClusterToBeReady();
-    OzoneAdmin ozoneAdmin = new OzoneAdmin(conf);
     String[] args1 = {"om", "transfer", "-n", newLeader.getOMNodeId()};
     ozoneAdmin.execute(args1);
     Thread.sleep(3000);
@@ -119,7 +119,6 @@ public class TestTransferLeadershipShell {
     scmList.remove(oldLeader);
     StorageContainerManager newLeader = scmList.get(0);
 
-    OzoneAdmin ozoneAdmin = new OzoneAdmin(conf);
     String[] args1 = {"scm", "transfer", "-n", newLeader.getScmId()};
     ozoneAdmin.execute(args1);
     cluster.waitForClusterToBeReady();

@@ -18,11 +18,11 @@
 
 import React, { useRef, useState } from 'react';
 import moment from 'moment';
-import { AxiosError } from 'axios';
+import axios, { AxiosError } from 'axios';
 import { Table } from 'antd';
 
-import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
-import { byteToSize, showDataFetchError } from '@/utils/common';
+import { AxiosGetHelper, cancelRequests, PromiseAllSettledGetHelper } from '@/utils/axiosRequestHelper';
+import { byteToSize, checkResponseError, removeDuplicatesAndMerge, showDataFetchError } from '@/utils/common';
 
 import { Acl } from '@/v2/types/acl.types';
 
@@ -115,9 +115,9 @@ type MetadataProps = {
 };
 
 type MetadataState = {
-  keys: string[];
-  values: (string | number | boolean | null)[];
-};
+  key: string,
+  value: string | number | boolean | null
+}[];
 
 
 // ------------- Component -------------- //
@@ -125,26 +125,19 @@ const DUMetadata: React.FC<MetadataProps> = ({
   path = '/'
 }) => {
   const [loading, setLoading] = useState<boolean>(false);
-  const [state, setState] = useState<MetadataState>({
-    keys: [],
-    values: []
-  });
-  const cancelSummarySignal = useRef<AbortController>();
+  const [state, setState] = useState<MetadataState>([]);
   const keyMetadataSummarySignal = useRef<AbortController>();
-  const cancelQuotaSignal = useRef<AbortController>();
+  const cancelMetadataSignal = useRef<AbortController>();
 
   const getObjectInfoMapping = React.useCallback((summaryResponse) => {
-
-    const keys: string[] = [];
-    const values: (string | number | boolean | null)[] = [];
+    const data: MetadataState = [];
     /**
      * We are creating a specific set of keys under Object Info response
      * which do not require us to modify anything
      */
     const selectedInfoKeys = [
       'bucketName', 'bucketLayout', 'encInfo', 'fileName', 'keyName',
-      'name', 'owner', 'sourceBucket', 'sourceVolume', 'storageType',
-      'usedNamespace', 'volumeName', 'volume'
+      'name', 'owner', 'storageType', 'usedNamespace', 'volumeName', 'volume'
     ] as const;
     const objectInfo: ObjectInfo = summaryResponse.objectInfo ?? {};
 
@@ -154,231 +147,232 @@ const DUMetadata: React.FC<MetadataProps> = ({
         // The following regex will match abcDef and produce Abc Def
         let keyName = key.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
         keyName = keyName.charAt(0).toUpperCase() + keyName.slice(1);
-        keys.push(keyName);
-        values.push(objectInfo[key as keyof ObjectInfo]);
+        data.push({
+          key: keyName as string,
+          value: objectInfo[key as keyof ObjectInfo]
+        });
       }
     });
 
+    // Source Volume and Source Bucket are present for linked buckets and volumes.
+    // If it is not linked it will be null and should not be shown
+    if (objectInfo?.sourceBucket !== undefined && objectInfo?.sourceBucket !== null) {
+      data.push({
+        key: 'Source Bucket',
+        value: objectInfo.sourceBucket
+      });
+    }
+
+    if(objectInfo?.sourceVolume !== undefined && objectInfo?.sourceVolume !== null) {
+      data.push({
+        key: 'Source Volume',
+        value: objectInfo.sourceVolume
+      });
+    }
+
     if (objectInfo?.creationTime !== undefined && objectInfo?.creationTime !== -1) {
-      keys.push('Creation Time');
-      values.push(moment(objectInfo.creationTime).format('ll LTS'));
+      data.push({
+        key: 'Creation Time',
+        value: moment(objectInfo.creationTime).format('ll LTS')
+      });
     }
 
     if (objectInfo?.usedBytes !== undefined && objectInfo?.usedBytes !== -1 && objectInfo!.usedBytes !== null) {
-      keys.push('Used Bytes');
-      values.push(byteToSize(objectInfo.usedBytes, 3));
+      data.push({
+        key: 'Used Bytes',
+        value: byteToSize(objectInfo.usedBytes, 3)
+      });
     }
 
     if (objectInfo?.dataSize !== undefined && objectInfo?.dataSize !== -1) {
-      keys.push('Data Size');
-      values.push(byteToSize(objectInfo.dataSize, 3));
+      data.push({
+        key: 'Data Size',
+        value: byteToSize(objectInfo.dataSize, 3)
+      });
     }
 
     if (objectInfo?.modificationTime !== undefined && objectInfo?.modificationTime !== -1) {
-      keys.push('Modification Time');
-      values.push(moment(objectInfo.modificationTime).format('ll LTS'));
-    }
-
-    if (objectInfo?.quotaInBytes !== undefined && objectInfo?.quotaInBytes !== -1) {
-      keys.push('Quota In Bytes');
-      values.push(byteToSize(objectInfo.quotaInBytes, 3));
+      data.push({
+        key: 'Modification Time',
+        value: moment(objectInfo.modificationTime).format('ll LTS')
+      });
     }
 
     if (objectInfo?.quotaInNamespace !== undefined && objectInfo?.quotaInNamespace !== -1) {
-      keys.push('Quota In Namespace');
-      values.push(byteToSize(objectInfo.quotaInNamespace, 3));
+      data.push({
+        key: 'Quota In Namespace',
+        value: byteToSize(objectInfo.quotaInNamespace, 3)
+      });
     }
 
     if (summaryResponse.objectInfo?.replicationConfig?.replicationFactor !== undefined) {
-      keys.push('Replication Factor');
-      values.push(summaryResponse.objectInfo.replicationConfig.replicationFactor);
+      data.push({
+        key: 'Replication Factor',
+        value: summaryResponse.objectInfo.replicationConfig.replicationFactor
+      });
     }
 
     if (summaryResponse.objectInfo?.replicationConfig?.replicationType !== undefined) {
-      keys.push('Replication Type');
-      values.push(summaryResponse.objectInfo.replicationConfig.replicationType);
+      data.push({
+        key: 'Replication Type',
+        value: summaryResponse.objectInfo.replicationConfig.replicationType
+      });
     }
 
     if (summaryResponse.objectInfo?.replicationConfig?.requiredNodes !== undefined
       && summaryResponse.objectInfo?.replicationConfig?.requiredNodes !== -1) {
-      keys.push('Replication Required Nodes');
-      values.push(summaryResponse.objectInfo.replicationConfig.requiredNodes);
+      data.push({
+        key: 'Replication Required Nodes',
+        value: summaryResponse.objectInfo.replicationConfig.requiredNodes
+      });
     }
 
-    return { keys, values }
+    return data;
   }, [path]);
 
-  function loadMetadataSummary(path: string) {
-    cancelRequests([
-      cancelSummarySignal.current!,
-      keyMetadataSummarySignal.current!
-    ]);
-    const keys: string[] = [];
-    const values: (string | number | boolean | null)[] = [];
-
-    const { request, controller } = AxiosGetHelper(
+  function loadData(path: string) {
+    const { requests, controller } = PromiseAllSettledGetHelper([
       `/api/v1/namespace/summary?path=${path}`,
-      cancelSummarySignal.current
-    );
-    cancelSummarySignal.current = controller;
+      `/api/v1/namespace/quota?path=${path}`
+    ], cancelMetadataSignal.current);
+    cancelMetadataSignal.current = controller;
 
-    request.then(response => {
-      const summaryResponse: SummaryResponse = response.data;
-      keys.push('Entity Type');
-      values.push(summaryResponse.type);
+    requests.then(axios.spread((
+      nsSummaryResponse: Awaited<Promise<any>>,
+      quotaApiResponse: Awaited<Promise<any>>,
+    ) => {
+      checkResponseError([nsSummaryResponse, quotaApiResponse]);
+      const summaryResponse: SummaryResponse = nsSummaryResponse.value?.data ?? {};
+      const quotaResponse = quotaApiResponse.value?.data ?? {};
+      let data: MetadataState = [];
+      let summaryResponsePresent = true;
+      let quotaResponsePresent = true;
 
+      // Error checks
       if (summaryResponse.status === 'INITIALIZING') {
+        summaryResponsePresent = false;
         showDataFetchError(`The metadata is currently initializing. Please wait a moment and try again later`);
-        return;
       }
 
-      if (summaryResponse.status === 'PATH_NOT_FOUND') {
+      if (summaryResponse.status === 'PATH_NOT_FOUND' || quotaResponse.status === 'PATH_NOT_FOUND') {
+        summaryResponsePresent = false;
+        quotaResponsePresent = false;
         showDataFetchError(`Invalid Path: ${path}`);
-        return;
       }
 
-      // If the entity is a Key then fetch the Key metadata only
-      if (summaryResponse.type === 'KEY') {
-        const { request: metadataRequest, controller: metadataNewController } = AxiosGetHelper(
-          `/api/v1/namespace/du?path=${path}&replica=true`,
-          keyMetadataSummarySignal.current
-        );
-        keyMetadataSummarySignal.current = metadataNewController;
-        metadataRequest.then(response => {
-          keys.push('File Size');
-          values.push(byteToSize(response.data.size, 3));
-          keys.push('File Size With Replication');
-          values.push(byteToSize(response.data.sizeWithReplica, 3));
-          keys.push("Creation Time");
-          values.push(moment(summaryResponse.objectInfo.creationTime).format('ll LTS'));
-          keys.push("Modification Time");
-          values.push(moment(summaryResponse.objectInfo.modificationTime).format('ll LTS'));
-
-          setState({
-            keys: keys,
-            values: values
-          });
-        }).catch(error => {
-          showDataFetchError(error.toString());
+      if (summaryResponsePresent) {
+        // Summary Response data section
+        data.push({
+          key: 'Entity Type',
+          value: summaryResponse.type
         });
-        return;
-      }
 
-      /** 
-       * Will iterate over the keys of the countStats to avoid multiple if blocks
-       * and check from the map for the respective key name / title to insert
-      */
-      const countStats: CountStats = summaryResponse.countStats ?? {};
-      const keyToNameMap: Record<string, string> = {
-        numVolume: 'Volumes',
-        numBucket: 'Buckets',
-        numDir: 'Total Directories',
-        numKey: 'Total Keys'
-      }
-      Object.keys(countStats).forEach((key: string) => {
-        if (countStats[key as keyof CountStats] !== undefined
-          && countStats[key as keyof CountStats] !== -1) {
-          keys.push(keyToNameMap[key]);
-          values.push(countStats[key as keyof CountStats]);
+        // If the entity is a Key then fetch the Key metadata only
+        if (summaryResponse.type === 'KEY') {
+          const { request: metadataRequest, controller: metadataNewController } = AxiosGetHelper(
+            `/api/v1/namespace/du?path=${path}&replica=true`,
+            keyMetadataSummarySignal.current
+          );
+          keyMetadataSummarySignal.current = metadataNewController;
+          metadataRequest.then(response => {
+            data.push(...[{
+              key: 'File Size',
+              value: byteToSize(response.data.size, 3)
+            }, {
+              key: 'File Size With Replication',
+              value: byteToSize(response.data.sizeWithReplica, 3)
+            }, {
+              key: 'Creation Time',
+              value: moment(summaryResponse.objectInfo.creationTime).format('ll LTS')
+            }, {
+              key: 'Modification Time',
+              value: moment(summaryResponse.objectInfo.modificationTime).format('ll LTS')
+            }])
+            setState(data);
+          }).catch(error => {
+            showDataFetchError(error.toString());
+          });
+          return;
         }
-      })
 
-      const {
-        keys: objectInfoKeys,
-        values: objectInfoValues
-      } = getObjectInfoMapping(summaryResponse);
+        data = removeDuplicatesAndMerge(data, getObjectInfoMapping(summaryResponse), 'key');
 
-      keys.push(...objectInfoKeys);
-      values.push(...objectInfoValues);
-
-      setState({
-        keys: keys,
-        values: values
-      });
-    }).catch(error => {
-      showDataFetchError((error as AxiosError).toString());
-    });
-  }
-
-  function loadQuotaSummary(path: string) {
-    cancelRequests([
-      cancelQuotaSignal.current!
-    ]);
-
-    const { request, controller } = AxiosGetHelper(
-      `/api/v1/namespace/quota?path=${path}`,
-      cancelQuotaSignal.current
-    );
-    cancelQuotaSignal.current = controller;
-
-    request.then(response => {
-      const quotaResponse = response.data;
-
-      if (quotaResponse.status === 'INITIALIZING') {
-        return;
+        /** 
+         * Will iterate over the keys of the countStats to avoid multiple if blocks
+         * and check from the map for the respective key name / title to insert
+        */
+        const countStats: CountStats = summaryResponse.countStats ?? {};
+        const keyToNameMap: Record<string, string> = {
+          numVolume: 'Volumes',
+          numBucket: 'Buckets',
+          numDir: 'Total Directories',
+          numKey: 'Total Keys'
+        }
+        Object.keys(countStats).forEach((key: string) => {
+          if (countStats[key as keyof CountStats] !== undefined
+            && countStats[key as keyof CountStats] !== -1) {
+            data.push({
+              key: keyToNameMap[key],
+              value: countStats[key as keyof CountStats]
+            });
+          }
+        })
       }
+
+      if (quotaResponse.state === 'INITIALIZING') {
+        quotaResponsePresent = false;
+        showDataFetchError(`The quota is currently initializing. Please wait a moment and try again later`);
+      }
+
       if (quotaResponse.status === 'TYPE_NOT_APPLICABLE') {
-        return;
-      }
-      if (quotaResponse.status === 'PATH_NOT_FOUND') {
-        showDataFetchError(`Invalid Path: ${path}`);
-        return;
+        quotaResponsePresent = false;
       }
 
-      const keys: string[] = [];
-      const values: (string | number | boolean | null)[] = [];
-      // Append quota information
-      // In case the object's quota isn't set
-      if (quotaResponse.allowed !== undefined && quotaResponse.allowed !== -1) {
-        keys.push('Quota Allowed');
-        values.push(byteToSize(quotaResponse.allowed, 3));
-      }
+      if (quotaResponsePresent) {
+        // Quota Response section
+        // In case the object's quota isn't set, we should not populate the values
+        if (quotaResponse.allowed !== undefined && quotaResponse.allowed !== -1) {
+          data.push({
+            key: 'Quota Allowed',
+            value: byteToSize(quotaResponse.allowed, 3)
+          });
+        }
 
-      if (quotaResponse.used !== undefined && quotaResponse.used !== -1) {
-        keys.push('Quota Used');
-        values.push(byteToSize(quotaResponse.used, 3));
+        if (quotaResponse.used !== undefined && quotaResponse.used !== -1) {
+          data.push({
+            key: 'Quota Used',
+            value: byteToSize(quotaResponse.used, 3)
+          })
+        }
       }
-      setState((prevState) => ({
-        keys: [...prevState.keys, ...keys],
-        values: [...prevState.values, ...values]
-      }));
-    }).catch(error => {
-      showDataFetchError(error.toString());
+      setState(data);
+    })).catch(error => {
+      showDataFetchError((error as AxiosError).toString());
     });
   }
 
   React.useEffect(() => {
     setLoading(true);
-    loadMetadataSummary(path);
-    loadQuotaSummary(path);
+    loadData(path);
     setLoading(false);
 
     return (() => {
       cancelRequests([
-        cancelSummarySignal.current!,
-        keyMetadataSummarySignal.current!,
-        cancelQuotaSignal.current!
+        cancelMetadataSignal.current!,
       ]);
     })
   }, [path]);
-
-  const content = [];
-  for (const [i, v] of state.keys.entries()) {
-    content.push({
-      key: v,
-      value: state.values[i]
-    });
-  }
 
   return (
     <Table
       size='small'
       loading={loading}
-      dataSource={content}
+      dataSource={state}
       bordered={true}
       style={{
         flex: '0 1 45%',
-        margin: '10px auto' }}
+        margin: '10px auto'
+      }}
       locale={{ filterTitle: '' }}>
       <Table.Column title='Property' dataIndex='key' />
       <Table.Column title='Value' dataIndex='value' />

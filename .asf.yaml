@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 github:
-  description: "Scalable, redundant, and distributed object store for Apache Hadoop"
+  description: "Scalable, reliable, distributed storage system optimized for data analytics and object store workloads."
   homepage: https://ozone.apache.org
   labels:
     - hadoop

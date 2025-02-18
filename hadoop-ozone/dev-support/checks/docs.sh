@@ -22,7 +22,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "${DIR}/../../.." || exit 1
 
 source "${DIR}/_lib.sh"
-install_hugo
+source "${DIR}/install/hugo.sh"
 
 REPORT_DIR=${OUTPUT_DIR:-"${DIR}/../../../target/docs"}
 mkdir -p "${REPORT_DIR}"

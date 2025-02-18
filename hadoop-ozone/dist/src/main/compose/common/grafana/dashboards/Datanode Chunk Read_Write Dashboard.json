@@ -1,34 +1,4 @@
 {
-  "__inputs": [
-    {
-      "label": "prometheus",
-      "description": "",
-      "type": "datasource",
-      "pluginId": "prometheus",
-      "pluginName": "Prometheus"
-    }
-  ],
-  "__elements": {},
-  "__requires": [
-    {
-      "type": "grafana",
-      "id": "grafana",
-      "name": "Grafana",
-      "version": "11.1.4"
-    },
-    {
-      "type": "datasource",
-      "id": "prometheus",
-      "name": "Prometheus",
-      "version": "1.0.0"
-    },
-    {
-      "type": "panel",
-      "id": "timeseries",
-      "name": "Time series",
-      "version": ""
-    }
-  ],
   "annotations": {
     "list": [
       {
@@ -48,10 +18,11 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": null,
+  "id": 1,
   "links": [],
   "panels": [
     {
+      "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -59,6 +30,7 @@
         "y": 0
       },
       "id": 12,
+      "panels": [],
       "title": "Volume Metrics",
       "type": "row"
     },
@@ -78,6 +50,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -140,6 +113,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -147,7 +121,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "rate(volume_io_stats_read_bytes[$__interval])",
+          "expr": "rate(volume_io_stats_read_bytes[$__rate_interval])",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -176,6 +150,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -237,6 +212,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -244,7 +220,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "rate(volume_io_stats_read_op_count[$__interval])",
+          "expr": "rate(volume_io_stats_read_op_count[$__rate_interval])",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -273,6 +249,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -335,6 +312,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -342,7 +320,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "rate(volume_io_stats_write_bytes[$__interval])",
+          "expr": "rate(volume_io_stats_write_bytes[$__rate_interval])",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -371,6 +349,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -432,6 +411,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -439,7 +419,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "rate(volume_io_stats_write_op_count[$__interval])",
+          "expr": "rate(volume_io_stats_write_op_count[$__rate_interval])",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -481,6 +461,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -543,6 +524,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -550,7 +532,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "rate(storage_container_metrics_bytes_write_chunk[$__interval])",
+          "expr": "rate(storage_container_metrics_bytes_write_chunk[$__rate_interval])",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -579,6 +561,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -641,6 +624,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -648,7 +632,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "sum(rate(storage_container_metrics_bytes_write_chunk[$__interval]))",
+          "expr": "sum(rate(storage_container_metrics_bytes_write_chunk[$__rate_interval]))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -677,6 +661,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -738,6 +723,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -745,7 +731,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "rate(storage_container_metrics_num_write_chunk[$__interval])",
+          "expr": "rate(storage_container_metrics_num_write_chunk[$__rate_interval])",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -774,6 +760,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -835,6 +822,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -842,7 +830,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "rate(storage_container_metrics_bytes_put_block[$__interval])",
+          "expr": "rate(storage_container_metrics_bytes_put_block[$__rate_interval])",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -884,6 +872,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -946,6 +935,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -953,7 +943,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "rate(storage_container_metrics_bytes_read_chunk[$__interval])",
+          "expr": "rate(storage_container_metrics_bytes_read_chunk[$__rate_interval])",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -982,6 +972,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -1044,6 +1035,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -1051,7 +1043,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "sum(rate(storage_container_metrics_bytes_read_chunk[$__interval]))",
+          "expr": "sum(rate(storage_container_metrics_bytes_read_chunk[$__rate_interval]))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -1080,6 +1072,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -1141,6 +1134,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -1148,7 +1142,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "rate(storage_container_metrics_num_read_chunk[$__interval])",
+          "expr": "rate(storage_container_metrics_num_read_chunk[$__rate_interval])",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -1162,20 +1156,21 @@
       "type": "timeseries"
     }
   ],
+  "preload": false,
   "refresh": "",
-  "schemaVersion": 39,
+  "schemaVersion": 40,
   "tags": [],
   "templating": {
     "list": []
   },
   "time": {
-    "from": "now-7d",
+    "from": "now-5m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "Datanode Chunk Read/Write Dashboard",
   "uid": "edj2lc6lfn5s0a",
-  "version": 4,
+  "version": 7,
   "weekStart": ""
 }

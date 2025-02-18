@@ -19,7 +19,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import moment from 'moment';
 import filesize from 'filesize';
-import axios, { CanceledError } from 'axios';
+import axios from 'axios';
 import { Row, Col, Button } from 'antd';
 import {
   CheckCircleFilled,
@@ -33,7 +33,7 @@ import OverviewStorageCard from '@/v2/components/overviewCard/overviewStorageCar
 import OverviewSimpleCard from '@/v2/components/overviewCard/overviewSimpleCard';
 
 import { AutoReloadHelper } from '@/utils/autoReloadHelper';
-import { showDataFetchError } from '@/utils/common';
+import { checkResponseError, showDataFetchError } from '@/utils/common';
 import { AxiosGetHelper, cancelRequests, PromiseAllSettledGetHelper } from '@/utils/axiosRequestHelper';
 
 import { ClusterStateResponse, OverviewState, StorageReport } from '@/v2/types/overview.types';
@@ -71,27 +71,6 @@ const getHealthIcon = (value: string): React.ReactElement => {
       Healthy
     </div>
   )
-}
-
-const checkResponseError = (responses: Awaited<Promise<any>>[]) => {
-  const responseError = responses.filter(
-    (resp) => resp.status === 'rejected'
-  );
-
-  if (responseError.length !== 0) {
-    responseError.forEach((err) => {
-      if (err.reason.toString().includes("CanceledError")) {
-        throw new CanceledError('canceled', "ERR_CANCELED");
-      }
-      else {
-        const reqMethod = err.reason.config.method;
-        const reqURL = err.reason.config.url
-        showDataFetchError(
-          `Failed to ${reqMethod} URL ${reqURL}\n${err.reason.toString()}`
-        );
-      }
-    })
-  }
 }
 
 const getSummaryTableValue = (
@@ -530,7 +509,7 @@ const Overview: React.FC<{}> = () => {
           </Col>
         </Row>
         <span style={{ paddingLeft: '8px' }}>
-          <span style={{ color: '#6E6E6E' }}>OM ID:&nbsp;</span>
+          <span style={{ color: '#6E6E6E' }}>Ozone Service ID:&nbsp;</span>
           {omServiceId}
         </span>
         <span style={{ marginLeft: '12px', marginRight: '12px' }}> | </span>

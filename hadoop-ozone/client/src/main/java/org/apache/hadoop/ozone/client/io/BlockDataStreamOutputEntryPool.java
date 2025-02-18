@@ -1,24 +1,31 @@
-
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.time.Clock;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
+import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -33,14 +40,6 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.time.Clock;
-import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.ListIterator;
-import java.util.Map;
 
 /**
  * This class manages the stream entries list and handles block allocation
@@ -62,6 +61,7 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
   private final long openID;
   private final ExcludeList excludeList;
   private List<StreamBuffer> bufferList;
+  private ContainerBlockID lastUpdatedBlockId = new ContainerBlockID(-1, -1);
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public BlockDataStreamOutputEntryPool(
@@ -150,6 +150,33 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
       }
     }
     return locationInfoList;
+  }
+
+  void hsyncKey(long offset) throws IOException {
+    if (keyArgs != null) {
+      // in test, this could be null
+      keyArgs.setDataSize(offset);
+      keyArgs.setLocationInfoList(getLocationInfoList());
+      // When the key is multipart upload part file upload, we should not
+      // commit the key, as this is not an actual key, this is a just a
+      // partial key of a large file.
+      if (keyArgs.getIsMultipartKey()) {
+        throw new IOException("Hsync is unsupported for multipart keys.");
+      } else {
+        if (keyArgs.getLocationInfoList().size() == 0) {
+          omClient.hsyncKey(keyArgs, openID);
+        } else {
+          ContainerBlockID lastBLockId = keyArgs.getLocationInfoList().get(keyArgs.getLocationInfoList().size() - 1)
+              .getBlockID().getContainerBlockID();
+          if (!lastUpdatedBlockId.equals(lastBLockId)) {
+            omClient.hsyncKey(keyArgs, openID);
+            lastUpdatedBlockId = lastBLockId;
+          }
+        }
+      }
+    } else {
+      LOG.warn("Closing KeyOutputStream, but key args is null");
+    }
   }
 
   /**

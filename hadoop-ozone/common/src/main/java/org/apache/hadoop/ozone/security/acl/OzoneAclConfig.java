@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +14,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.security.acl;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -40,7 +43,7 @@ public class OzoneAclConfig {
   private String userDefaultRights;
 
   @Config(key = "group.rights",
-      defaultValue = "ALL",
+      defaultValue = "READ, LIST",
       type = ConfigType.STRING,
       tags = {ConfigTag.OM, ConfigTag.SECURITY},
       description = "Default group permissions set for an object in " +
@@ -48,18 +51,26 @@ public class OzoneAclConfig {
   )
   private String groupDefaultRights;
 
-  public ACLType getUserDefaultRights() {
+  public ACLType[] getUserDefaultRights() {
+    List<ACLType> types = new ArrayList();
     if (userDefaultRights == null) {
-      return ACLType.ALL;
+      types.add(ACLType.ALL);
+    } else {
+      String[] array = userDefaultRights.trim().split(",");
+      Arrays.stream(array).forEach(t -> types.add(ACLType.valueOf(t.trim())));
     }
-    return ACLType.valueOf(userDefaultRights);
+    return types.toArray(new ACLType[0]);
   }
 
-  public ACLType getGroupDefaultRights() {
+  public ACLType[] getGroupDefaultRights() {
+    List<ACLType> types = new ArrayList();
     if (groupDefaultRights == null) {
-      return ACLType.ALL;
+      types.add(ACLType.READ);
+      types.add(ACLType.LIST);
+    } else {
+      String[] array = groupDefaultRights.trim().split(",");
+      Arrays.stream(array).forEach(t -> types.add(ACLType.valueOf(t.trim())));
     }
-    return ACLType.valueOf(groupDefaultRights);
+    return types.toArray(new ACLType[0]);
   }
-
 }

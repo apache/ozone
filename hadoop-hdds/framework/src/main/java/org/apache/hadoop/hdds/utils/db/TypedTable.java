@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,10 +13,15 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
+
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.apache.hadoop.hdds.utils.db.cache.CacheResult.CacheStatus.EXISTS;
+import static org.apache.hadoop.hdds.utils.db.cache.CacheResult.CacheStatus.NOT_EXIST;
+import static org.apache.ratis.util.JavaUtils.getClassSimpleName;
+
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -26,8 +30,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
@@ -36,14 +38,11 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheResult;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.cache.FullTableCache;
 import org.apache.hadoop.hdds.utils.db.cache.PartialTableCache;
-import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
+import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.function.CheckedBiFunction;
 
-import static org.apache.hadoop.hdds.utils.db.cache.CacheResult.CacheStatus.EXISTS;
-import static org.apache.hadoop.hdds.utils.db.cache.CacheResult.CacheStatus.NOT_EXIST;
-import static org.apache.ratis.util.JavaUtils.getClassSimpleName;
 /**
  * Strongly typed table implementation.
  * <p>
@@ -573,6 +572,14 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     public VALUE getValue() throws IOException {
       return decodeValue(rawKeyValue.getValue());
     }
+
+    public byte[] getRawKey() throws IOException {
+      return rawKeyValue.getKey();
+    }
+
+    public byte[] getRawValue() throws IOException {
+      return rawKeyValue.getValue();
+    }
   }
 
   RawIterator<CodecBuffer> newCodecBufferTableIterator(
@@ -597,9 +604,10 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       @Override
       KeyValue<KEY, VALUE> convert(KeyValue<CodecBuffer, CodecBuffer> raw)
           throws IOException {
+        final int rawSize = raw.getValue().readableBytes();
         final KEY key = keyCodec.fromCodecBuffer(raw.getKey());
         final VALUE value = valueCodec.fromCodecBuffer(raw.getValue());
-        return Table.newKeyValue(key, value);
+        return Table.newKeyValue(key, value, rawSize);
       }
     };
   }

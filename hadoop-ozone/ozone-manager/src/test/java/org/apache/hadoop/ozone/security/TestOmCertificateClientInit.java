@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,36 +13,9 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
+
 package org.apache.hadoop.ozone.security;
-
-import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
-import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
-import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
-import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.apache.hadoop.ozone.om.OMStorage;
-import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.security.KeyPair;
-import java.security.cert.X509Certificate;
-import java.util.UUID;
-import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse;
@@ -56,6 +28,32 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.KeyPair;
+import java.security.cert.X509Certificate;
+import java.util.UUID;
+import java.util.stream.Stream;
+import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
+import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
+import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.ozone.om.OMStorage;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+
 /**
  * Test class for {@link OMCertificateClient}.
  */
@@ -66,7 +64,7 @@ public class TestOmCertificateClientInit {
   private OMCertificateClient omCertificateClient;
   private HDDSKeyGenerator keyGenerator;
   private SecurityConfig securityConfig;
-  private KeyCodec omKeyCodec;
+  private KeyStorage omKeyStorage;
   private X509Certificate x509Certificate;
   private static final String OM_COMPONENT = OMCertificateClient.COMPONENT_NAME;
 
@@ -101,7 +99,7 @@ public class TestOmCertificateClientInit {
     omCertificateClient =
         new OMCertificateClient(
             securityConfig, null, storage, omInfo, "", null, null, null);
-    omKeyCodec = new KeyCodec(securityConfig, OM_COMPONENT);
+    omKeyStorage = new KeyStorage(securityConfig, OM_COMPONENT);
 
     Files.createDirectories(securityConfig.getKeyLocation(OM_COMPONENT));
   }
@@ -117,7 +115,7 @@ public class TestOmCertificateClientInit {
   public void testInitOzoneManager(boolean pvtKeyPresent, boolean pubKeyPresent,
       boolean certPresent, InitResponse expectedResult) throws Exception {
     if (pvtKeyPresent) {
-      omKeyCodec.writePrivateKey(keyPair.getPrivate());
+      omKeyStorage.storePrivateKey(keyPair.getPrivate());
     } else {
       FileUtils.deleteQuietly(Paths.get(
           securityConfig.getKeyLocation(OM_COMPONENT).toString(),
@@ -126,7 +124,7 @@ public class TestOmCertificateClientInit {
 
     if (pubKeyPresent) {
       if (omCertificateClient.getPublicKey() == null) {
-        omKeyCodec.writePublicKey(keyPair.getPublic());
+        omKeyStorage.storePublicKey(keyPair.getPublic());
       }
     } else {
       FileUtils.deleteQuietly(Paths.get(

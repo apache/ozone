@@ -22,8 +22,8 @@
 SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
 ALL_RESULT_DIR="$SCRIPT_DIR/result"
 PROJECT_DIR="$SCRIPT_DIR/.."
-mkdir -p "$ALL_RESULT_DIR"
-rm "$ALL_RESULT_DIR"/* || true
+rm -rf "${ALL_RESULT_DIR}"
+mkdir -p "${ALL_RESULT_DIR}"
 
 source "$SCRIPT_DIR"/testlib.sh
 

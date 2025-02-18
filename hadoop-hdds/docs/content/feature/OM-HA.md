@@ -41,14 +41,6 @@ Client connects to the Leader Ozone Manager which process the request and schedu
 
 ## Configuration
 
-HA mode of Ozone Manager can be enabled with the following settings in `ozone-site.xml`:
-
-```XML
-<property>
-   <name>ozone.om.ratis.enable</name>
-   <value>true</value>
-</property>
-```
 One Ozone configuration (`ozone-site.xml`) can support multiple Ozone HA cluster. To select between the available HA clusters a logical name is required for each of the clusters which can be resolved to the IP addresses (and domain names) of the Ozone Managers.
 
 This logical name is called `serviceId` and can be configured in the `ozone-site.xml`
@@ -115,7 +107,7 @@ The details of this approach are discussed in a separate [design doc]({{< ref "d
 To convert a non-HA OM to be HA or to add new OM nodes to existing HA OM ring, new OM node(s) need to be bootstrapped.
 
 Before bootstrapping a new OM node, all the existing OM's on-disk configuration file (ozone-site.xml) must be updated with the configuration details
-of the new OM such as nodeId, address, port etc. Note that the existing OM's need not be restarted. They will reload the configuration from disk when
+of the new OM such as nodeId, address, port etc. Note that the existing OMs need not be restarted. They will reload the configuration from disk when
 they receive a bootstrap request from the bootstrapping node.
 
 To bootstrap an OM, the following command needs to be run:

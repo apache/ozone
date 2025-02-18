@@ -26,11 +26,6 @@ Execute read-replicas CLI tool
     File Should Exist               ${directory}/${TESTFILE}_manifest
     [Return]                        ${directory}
 
-Execute Lease recovery cli
-    [Arguments]                     ${KEY_PATH}
-    ${result} =                     Execute And Ignore Error      ozone debug recover --path=${KEY_PATH}
-    [Return]                        ${result}
-
 Read Replicas Manifest
     ${manifest} =        Get File        ${DIR}/${TESTFILE}_manifest
     ${json} =            Evaluate        json.loads('''${manifest}''')        json
@@ -74,6 +69,12 @@ Verify Healthy Replica
     ${block_filenames} =     Get Replica Filenames    ${json}    ${replica}
     ${md5sum} =              Execute     cat ${block_filenames} | md5sum | awk '{print $1}'
     Should Be Equal          ${md5sum}   ${expected_md5sum}
+
+Verify Healthy EC Replica
+    [arguments]              ${directory}    ${block}    ${expected_block_size}
+
+    ${block_size} =          Execute     ls -l ${directory} | grep "testfile_block${block}_ozone-datanode-.*\.ozone_default" | awk '{sum += $5} END {print sum}'
+    Should Be Equal As Integers      ${block_size}     ${expected_block_size}
 
 Verify Corrupt Replica
     [arguments]              ${json}    ${replica}    ${valid_md5sum}

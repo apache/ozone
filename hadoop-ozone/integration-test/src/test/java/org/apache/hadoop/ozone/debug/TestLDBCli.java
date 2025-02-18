@@ -1,24 +1,48 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.debug;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import jakarta.annotation.Nonnull;
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.NavigableMap;
+import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -35,9 +59,10 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
+import org.apache.hadoop.ozone.debug.ldb.DBScanner;
+import org.apache.hadoop.ozone.debug.ldb.RDBParser;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Named;
@@ -47,27 +72,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import picocli.CommandLine;
-
-import java.io.File;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.NavigableMap;
-import java.util.TreeMap;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Stream;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class tests `ozone debug ldb` CLI that reads from a RocksDB directory.
@@ -98,8 +102,6 @@ public class TestLDBCli {
     pstderr = new PrintWriter(stderr);
 
     cmd = new CommandLine(new RDBParser())
-        .addSubcommand(new DBScanner())
-        .addSubcommand(new ValueSchema())
         .setOut(pstdout)
         .setErr(pstderr);
 
@@ -291,8 +293,8 @@ public class TestLDBCli {
     // Prepare scan args
     List<String> completeScanArgs = new ArrayList<>();
     completeScanArgs.addAll(Arrays.asList(
-        "--db", dbStore.getDbLocation().getAbsolutePath(),
         "scan",
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
         "--column-family", tableName));
     completeScanArgs.addAll(scanArgs);
 
@@ -339,6 +341,50 @@ public class TestLDBCli {
 
     // Check stderr
     assertEquals("", stderr.toString());
+  }
+
+  @Test
+  void testScanWithRecordsPerFile() throws IOException {
+    // Prepare dummy table
+    int recordsCount = 5;
+    prepareKeyTable(recordsCount);
+
+    String scanDir1 = tempDir.getAbsolutePath() + "/scandir1";
+    // Prepare scan args
+    int maxRecordsPerFile = 2;
+    List<String> completeScanArgs1 = new ArrayList<>(Arrays.asList(
+        "scan",
+        "--column-family", KEY_TABLE, "--out", scanDir1 + File.separator + "keytable",
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
+        "--max-records-per-file", String.valueOf(maxRecordsPerFile)));
+    File tmpDir1 = new File(scanDir1);
+    tmpDir1.deleteOnExit();
+
+    int exitCode1 = cmd.execute(completeScanArgs1.toArray(new String[0]));
+    assertEquals(0, exitCode1);
+    assertTrue(tmpDir1.isDirectory());
+    File[] subFiles = tmpDir1.listFiles();
+    assertNotNull(subFiles);
+    assertEquals(Math.ceil(recordsCount / (maxRecordsPerFile * 1.0)), subFiles.length);
+    for (File subFile : subFiles) {
+      JsonNode jsonNode = MAPPER.readTree(subFile);
+      assertNotNull(jsonNode);
+    }
+
+    String scanDir2 = tempDir.getAbsolutePath() + "/scandir2";
+    // Used with parameter '-l'
+    List<String> completeScanArgs2 = new ArrayList<>(Arrays.asList(
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
+        "scan",
+        "--column-family", KEY_TABLE, "--out", scanDir2 + File.separator + "keytable",
+        "--max-records-per-file", String.valueOf(maxRecordsPerFile), "-l", "2"));
+    File tmpDir2 = new File(scanDir2);
+    tmpDir2.deleteOnExit();
+
+    int exitCode2 = cmd.execute(completeScanArgs2.toArray(new String[0]));
+    assertEquals(0, exitCode2);
+    assertTrue(tmpDir2.isDirectory());
+    assertEquals(1, tmpDir2.listFiles().length);
   }
 
   @Test
@@ -389,22 +435,7 @@ public class TestLDBCli {
 
     switch (tableName) {
     case KEY_TABLE:
-      // Dummy om.db with only keyTable
-      dbStore = DBStoreBuilder.newBuilder(conf).setName("om.db")
-          .setPath(tempDir.toPath()).addTable(KEY_TABLE).build();
-
-      Table<byte[], byte[]> keyTable = dbStore.getTable(KEY_TABLE);
-      // Insert 5 keys
-      for (int i = 1; i <= 5; i++) {
-        String key = "key" + i;
-        OmKeyInfo value = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1",
-            key, ReplicationConfig.fromProtoTypeAndFactor(STAND_ALONE, HddsProtos.ReplicationFactor.ONE)).build();
-        keyTable.put(key.getBytes(UTF_8),
-            value.getProtobuf(ClientVersion.CURRENT_VERSION).toByteArray());
-
-        // Populate map
-        dbMap.put(key, toMap(value));
-      }
+      prepareKeyTable(5);
       break;
 
     case BLOCK_DATA:
@@ -449,6 +480,29 @@ public class TestLDBCli {
       break;
     default:
       throw new IllegalArgumentException("Unsupported table: " + tableName);
+    }
+  }
+
+  /**
+   * Prepare the keytable for testing.
+   * @param recordsCount prepare the number of keys
+   */
+  private void prepareKeyTable(int recordsCount) throws IOException {
+    if (recordsCount < 1) {
+      throw new IllegalArgumentException("recordsCount must be greater than 1.");
+    }
+    // Dummy om.db with only keyTable
+    dbStore = DBStoreBuilder.newBuilder(conf).setName("om.db")
+        .setPath(tempDir.toPath()).addTable(KEY_TABLE).build();
+    Table<byte[], byte[]> keyTable = dbStore.getTable(KEY_TABLE);
+    for (int i = 1; i <= recordsCount; i++) {
+      String key = "key" + i;
+      OmKeyInfo value = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1",
+          key, ReplicationConfig.fromProtoTypeAndFactor(STAND_ALONE,
+              HddsProtos.ReplicationFactor.ONE)).build();
+      keyTable.put(key.getBytes(UTF_8), value.getProtobuf(ClientVersion.CURRENT_VERSION).toByteArray());
+      // Populate map
+      dbMap.put(key, toMap(value));
     }
   }
 

@@ -1,39 +1,38 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.shell.checknative;
 
+import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
+
+import java.util.Collections;
+import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.hadoop.io.erasurecode.ErasureCodeNative;
 import picocli.CommandLine;
 
-import java.util.Collections;
-
-import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
-
 /**
  * CLI command to check if native libraries are loaded.
  */
 @CommandLine.Command(name = "ozone checknative",
     description = "Checks if native libraries are loaded")
-public class CheckNative extends GenericCli {
+public class CheckNative extends GenericCli implements Callable<Void> {
 
   public static void main(String[] argv) {
     new CheckNative().run(argv);
@@ -56,10 +55,10 @@ public class CheckNative extends GenericCli {
         isalLoaded = true;
       }
     }
-    System.out.println("Native library checking:");
-    System.out.printf("hadoop:  %b %s%n", nativeHadoopLoaded,
+    out().println("Native library checking:");
+    out().printf("hadoop:  %b %s%n", nativeHadoopLoaded,
         hadoopLibraryName);
-    System.out.printf("ISA-L:   %b %s%n", isalLoaded, isalDetail);
+    out().printf("ISA-L:   %b %s%n", isalLoaded, isalDetail);
 
     // Attempt to load the rocks-tools lib
     boolean nativeRocksToolsLoaded = NativeLibraryLoader.getInstance().loadLibrary(
@@ -69,7 +68,7 @@ public class CheckNative extends GenericCli {
     if (nativeRocksToolsLoaded) {
       rocksToolsDetail = NativeLibraryLoader.getJniLibraryFileName();
     }
-    System.out.printf("rocks-tools: %b %s%n", nativeRocksToolsLoaded, rocksToolsDetail);
+    out().printf("rocks-tools: %b %s%n", nativeRocksToolsLoaded, rocksToolsDetail);
     return null;
   }
 }

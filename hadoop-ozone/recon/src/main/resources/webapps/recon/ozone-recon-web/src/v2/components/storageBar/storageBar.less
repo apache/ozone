@@ -16,30 +16,15 @@
 * limitations under the License.
 */
 
-@progress-gray: #d0d0d0;
-@progress-light-blue: rgb(230, 235, 248);
-@progress-blue: #1890ff;
-@progress-green: #52c41a;
-@progress-red: #FFA39E;
-
 .storage-cell-container-v2 {
   .capacity-bar-v2 {
     font-size: 1em;
   }
-}
-
-.ozone-used-bg-v2 {
-  color: @progress-green !important;
-}
-
-.non-ozone-used-bg-v2 {
-  color: @progress-blue !important;
-}
-
-.remaining-bg-v2 {
-  color: @progress-light-blue !important;
-}
-
-.committed-bg-v2 {
-  color: @progress-red !important;
+  
+  .capacity-bar-v2-error {
+    font-size: 1em;
+    .ant-progress-text {
+      color: #F5222D;
+    }
+  }
 }

@@ -17,9 +17,9 @@
  */
 import React, { ChangeEvent, useRef, useState } from 'react';
 import moment, { Moment } from 'moment';
-import { Row, Button, Menu, Input, Dropdown, DatePicker, Form, Result, message, Spin } from 'antd';
+import { Button, Menu, Input, Dropdown, DatePicker, Form, Result, Spin } from 'antd';
 import { MenuProps } from 'antd/es/menu';
-import { DownOutlined, LoadingOutlined, UndoOutlined } from '@ant-design/icons';
+import { DownOutlined } from '@ant-design/icons';
 
 
 import { showDataFetchError } from '@/utils/common';
@@ -30,7 +30,6 @@ import HeatmapPlot from '@/v2/components/plots/heatmapPlot';
 
 import './heatmap.less';
 import { useLocation } from 'react-router-dom';
-import { AxiosResponse } from 'axios';
 
 let minSize = Infinity;
 let maxSize = 0;
@@ -266,13 +265,13 @@ const Heatmap: React.FC<{}> = () => {
         90 Days
       </Menu.Item>
       <Menu.SubMenu title='Custom Select Last 90 Days'>
-        <Menu.Item key='heatmapDatePicker'>
+        <div>
           <DatePicker
             format="YYYY-MM-DD"
             onChange={handleDatePickerChange}
             onClick={(e) => { e.stopPropagation() }}
             disabledDate={isDateDisabled} />
-        </Menu.Item>
+        </div>
       </Menu.SubMenu>
     </Menu>
   );

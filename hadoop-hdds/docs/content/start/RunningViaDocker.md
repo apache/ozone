@@ -59,3 +59,6 @@ To shutdown the cluster, please run
 docker-compose down
 {{< /highlight >}}
 
+**You can refer to the link [README](https://github.com/apache/ozone/blob/master/hadoop-ozone/dist/src/main/compose/ozone/README.md) for configuring `monitoring` and `profiling` add-ons**
+
+

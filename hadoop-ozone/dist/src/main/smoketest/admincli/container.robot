@@ -105,7 +105,7 @@ Close container
 
 Incomplete command
     ${output} =         Execute And Ignore Error     ozone admin container
-                        Should contain   ${output}   Incomplete command
+                        Should contain   ${output}   Missing required subcommand
                         Should contain   ${output}   list
                         Should contain   ${output}   info
                         Should contain   ${output}   create

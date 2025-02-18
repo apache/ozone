@@ -1,22 +1,28 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.security.acl;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
+
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Objects;
+import java.util.function.BooleanSupplier;
+import java.util.function.Predicate;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
@@ -30,11 +36,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Objects;
-import java.util.function.Predicate;
-
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 
 /**
  * Native (internal) implementation of {@link IAccessAuthorizer}.
@@ -54,7 +55,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
   private PrefixManager prefixManager;
   private Predicate<UserGroupInformation> adminCheck = NO_ADMIN;
   private Predicate<UserGroupInformation> readOnlyAdminCheck = NO_ADMIN;
-  private boolean allowListAllVolumes;
+  private BooleanSupplier allowListAllVolumes = () -> false;
 
   public OzoneNativeAuthorizer() {
     // required for instantiation in OmMetadataReader#getACLAuthorizerInstance
@@ -222,12 +223,12 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     readOnlyAdminCheck = Objects.requireNonNull(check, "read-only admin check");
   }
 
-  public void setAllowListAllVolumes(boolean allowListAllVolumes) {
-    this.allowListAllVolumes = allowListAllVolumes;
+  public void setAllowListAllVolumes(BooleanSupplier allowListAllVolumes) {
+    this.allowListAllVolumes = Objects.requireNonNull(allowListAllVolumes, "allowListAllVolumes");
   }
 
   public boolean getAllowListAllVolumes() {
-    return allowListAllVolumes;
+    return allowListAllVolumes.getAsBoolean();
   }
 
   private static boolean isOwner(UserGroupInformation ugi, String ownerName) {

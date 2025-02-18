@@ -60,7 +60,7 @@ Close pipeline
 
 Incomplete command
     ${output} =         Execute And Ignore Error     ozone admin pipeline
-                        Should contain   ${output}   Incomplete command
+                        Should contain   ${output}   Missing required subcommand
                         Should contain   ${output}   close
                         Should contain   ${output}   create
                         Should contain   ${output}   deactivate

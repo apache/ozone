@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -24,9 +23,11 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.BiPredicate;
-
 import org.jooq.exception.DataAccessException;
 import org.jooq.impl.DSL;
 import org.slf4j.Logger;
@@ -95,4 +96,23 @@ public final class SqlDbUtils {
         LOG.info("{} table already exists, skipping creation.", tableName);
         return true;
       };
+
+  /**
+   * Utility method to list all user-defined tables in the database.
+   *
+   * @param connection The database connection to use.
+   * @return A list of table names (user-defined tables only).
+   * @throws SQLException If there is an issue accessing the database metadata.
+   */
+  public static List<String> listAllTables(Connection connection) throws SQLException {
+    List<String> tableNames = new ArrayList<>();
+    try (ResultSet resultSet = connection.getMetaData().getTables(null, null, null, new String[]{"TABLE"})) {
+      while (resultSet.next()) {
+        String tableName = resultSet.getString("TABLE_NAME");
+        tableNames.add(tableName);
+      }
+    }
+    LOG.debug("Found {} user-defined tables in the database: {}", tableNames.size(), tableNames);
+    return tableNames;
+  }
 }

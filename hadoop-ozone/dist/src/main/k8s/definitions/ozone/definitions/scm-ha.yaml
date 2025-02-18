@@ -49,7 +49,6 @@ description: Enable HA for SCM component
     OZONE-SITE.XML_ozone.scm.address.scmservice.scm0: scm-0.scm.default.svc.cluster.local
     OZONE-SITE.XML_ozone.scm.address.scmservice.scm1: scm-1.scm.default.svc.cluster.local
     OZONE-SITE.XML_ozone.scm.address.scmservice.scm2: scm-2.scm.default.svc.cluster.local
-    OZONE-SITE.XML_ozone.scm.ratis.enable: "true"
     OZONE-SITE.XML_ozone.scm.primordial.node.id: scm0
 - type: add
   trigger:

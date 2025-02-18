@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -15,9 +14,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.apache.hadoop.hdds.HddsUtils.formatStackTrace;
+import static org.apache.hadoop.hdds.HddsUtils.getStackTrace;
+
 import com.google.protobuf.ByteString;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiFunction;
+import java.util.function.IntFunction;
+import java.util.function.ToIntFunction;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufAllocator;
@@ -33,20 +46,6 @@ import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.ByteBuffer;
-import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BiFunction;
-import java.util.function.IntFunction;
-import java.util.function.ToIntFunction;
-
-import static org.apache.hadoop.hdds.HddsUtils.formatStackTrace;
-import static org.apache.hadoop.hdds.HddsUtils.getStackTrace;
-
 /**
  * A buffer used by {@link Codec}
  * for supporting RocksDB direct {@link ByteBuffer} APIs.
@@ -58,9 +57,9 @@ public class CodecBuffer implements UncheckedAutoCloseable {
   private static class Factory {
     private static volatile BiFunction<ByteBuf, Object, CodecBuffer> constructor
         = CodecBuffer::new;
-    static void set(BiFunction<ByteBuf, Object, CodecBuffer> f) {
+    static void set(BiFunction<ByteBuf, Object, CodecBuffer> f, String name) {
       constructor = f;
-      LOG.info("Successfully set constructor to " + f);
+      LOG.info("Successfully set constructor to {}: {}", name, f);
     }
 
     static CodecBuffer newCodecBuffer(ByteBuf buf) {
@@ -89,7 +88,7 @@ public class CodecBuffer implements UncheckedAutoCloseable {
    * Note that there is a severe performance penalty for leak detection.
    */
   public static void enableLeakDetection() {
-    Factory.set(LeakDetector::newCodecBuffer);
+    Factory.set(LeakDetector::newCodecBuffer, "LeakDetector::newCodecBuffer");
   }
 
   /** The size of a buffer. */
