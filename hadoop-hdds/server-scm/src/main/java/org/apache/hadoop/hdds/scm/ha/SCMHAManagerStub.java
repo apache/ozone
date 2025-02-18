@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumMap;
@@ -293,8 +294,12 @@ public final class SCMHAManagerStub implements SCMHAManager {
     }
 
     @Override
-    public <T> T getProxyHandler(RequestType type, Class<T> intf, T supplier) {
-      return supplier;
+    @SuppressWarnings("unchecked")
+    public <T> T getProxyHandler(RequestType type, Class<T> intf, T impl) {
+      final SCMHAInvocationHandler invocationHandler =
+          new SCMHAInvocationHandler(type, impl, this);
+      return (T) Proxy.newProxyInstance(getClass().getClassLoader(),
+          new Class<?>[] {intf}, invocationHandler);
     }
 
   }

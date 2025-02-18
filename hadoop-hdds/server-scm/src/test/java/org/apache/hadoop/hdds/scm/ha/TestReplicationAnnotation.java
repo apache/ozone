@@ -120,8 +120,8 @@ public class TestReplicationAnnotation {
       }
 
       @Override
-      public <T> T getProxyHandler(RequestType type, Class<T> intf, T supplier) {
-        return supplier;
+      public <T> T getProxyHandler(RequestType type, Class<T> intf, T impl) {
+        return impl;
       }
 
     };

@@ -433,9 +433,9 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
   @Override
   @SuppressWarnings("unchecked")
-  public <T> T getProxyHandler(final RequestType type, final Class<T> intf, final T obj) {
+  public <T> T getProxyHandler(final RequestType type, final Class<T> intf, final T impl) {
     final SCMHAInvocationHandler invocationHandler =
-        new SCMHAInvocationHandler(type, obj, this);
+        new SCMHAInvocationHandler(type, impl, this);
     return (T) Proxy.newProxyInstance(getClass().getClassLoader(),
         new Class<?>[] {intf}, invocationHandler);
   }
