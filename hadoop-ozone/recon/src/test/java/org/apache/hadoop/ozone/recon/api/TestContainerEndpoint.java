@@ -1122,7 +1122,7 @@ public class TestContainerEndpoint {
     }
     for (int i = 0; i < dataChecksum; i++) {
       createUnhealthyRecord(++cid,
-              UnHealthyContainerStates.CHECKSUM_MISMATCH.toString(),
+              UnHealthyContainerStates.CHECKSUM_ERROR.toString(),
               3, 3, 0, null, true);
     }
   }
