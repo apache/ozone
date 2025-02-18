@@ -47,17 +47,30 @@ import org.slf4j.LoggerFactory;
 public abstract class FileSizeCountTaskHelper {
   protected static final Logger LOG = LoggerFactory.getLogger(FileSizeCountTaskHelper.class);
 
+  // Static lock to guard table truncation.
+  private static final Object TRUNCATE_LOCK = new Object();
+
   /**
    * Truncates the FILE_COUNT_BY_SIZE table if it has not been truncated yet.
+   * This method synchronizes on a static lock to ensure only one task truncates at a time.
+   * If an error occurs, the flag is reset to allow retrying the truncation.
    *
    * @param dslContext DSLContext for executing DB commands.
    */
   public static void truncateTableIfNeeded(DSLContext dslContext) {
-    if (ReconConstants.FILE_SIZE_COUNT_TABLE_TRUNCATED.compareAndSet(false, true)) {
-      int execute = dslContext.delete(FILE_COUNT_BY_SIZE).execute();
-      LOG.info("Deleted {} records from {}", execute, FILE_COUNT_BY_SIZE);
-    } else {
-      LOG.info("Table already truncated by another task; skipping deletion.");
+    synchronized (TRUNCATE_LOCK) {
+      if (ReconConstants.FILE_SIZE_COUNT_TABLE_TRUNCATED.compareAndSet(false, true)) {
+        try {
+          int execute = dslContext.delete(FILE_COUNT_BY_SIZE).execute();
+          LOG.info("Deleted {} records from {}", execute, FILE_COUNT_BY_SIZE);
+        } catch (Exception e) {
+          // Reset the flag so that truncation can be retried
+          ReconConstants.FILE_SIZE_COUNT_TABLE_TRUNCATED.set(false);
+          LOG.error("Error while truncating FILE_COUNT_BY_SIZE table, resetting flag.", e);
+        }
+      } else {
+        LOG.info("Table already truncated by another task; waiting for truncation to complete.");
+      }
     }
   }
 

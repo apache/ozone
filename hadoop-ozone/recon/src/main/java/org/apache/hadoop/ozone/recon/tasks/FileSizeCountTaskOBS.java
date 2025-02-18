@@ -30,8 +30,6 @@ import org.jooq.DSLContext;
  * Task for ObjectStore (OBS) which processes the KEY_TABLE.
  */
 public class FileSizeCountTaskOBS implements ReconOmTask {
-  private static final org.slf4j.Logger LOG =
-      org.slf4j.LoggerFactory.getLogger(FileSizeCountTaskOBS.class);
 
   private final FileCountBySizeDao fileCountBySizeDao;
   private final DSLContext dslContext;

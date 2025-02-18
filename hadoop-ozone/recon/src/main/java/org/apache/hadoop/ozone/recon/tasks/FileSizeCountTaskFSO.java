@@ -30,8 +30,6 @@ import org.jooq.DSLContext;
  * Task for FileSystemOptimized (FSO) which processes the FILE_TABLE.
  */
 public class FileSizeCountTaskFSO implements ReconOmTask {
-  private static final org.slf4j.Logger LOG =
-      org.slf4j.LoggerFactory.getLogger(FileSizeCountTaskFSO.class);
 
   private final FileCountBySizeDao fileCountBySizeDao;
   private final DSLContext dslContext;
