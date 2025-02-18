@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.ozone.container.common.volume.VolumeChoosingUtil.logIfSomeReadOnlyVolumes;
 import static org.apache.hadoop.ozone.container.common.volume.VolumeChoosingUtil.logIfSomeVolumesOutOfSpace;
 import static org.apache.hadoop.ozone.container.common.volume.VolumeChoosingUtil.throwDiskOutOfSpace;
 
@@ -58,14 +59,11 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
       throw new DiskOutOfSpaceException("No more available volumes");
     }
 
-    List<HddsVolume> volumesWithWriteAllowed =
-        volumes.stream().filter(k -> k.getStorageState() != StorageVolume.VolumeState.READ_ONLY)
-            .collect(Collectors.toList());
-
     AvailableSpaceFilter filter = new AvailableSpaceFilter(maxContainerSize);
 
-    List<HddsVolume> volumesWithEnoughSpace = volumesWithWriteAllowed.stream()
+    List<HddsVolume> volumesWithEnoughSpace = volumes.stream()
         .filter(filter)
+        .filter(k -> k.getStorageState() != StorageVolume.VolumeState.READ_ONLY)
         .collect(Collectors.toList());
 
     if (volumesWithEnoughSpace.isEmpty()) {
@@ -73,6 +71,7 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
     } else {
       logIfSomeVolumesOutOfSpace(filter, LOG);
     }
+    logIfSomeReadOnlyVolumes(filter, LOG);
 
     int count = volumesWithEnoughSpace.size();
     if (count == 1) {

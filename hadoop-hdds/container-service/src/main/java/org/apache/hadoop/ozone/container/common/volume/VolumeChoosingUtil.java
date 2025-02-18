@@ -46,4 +46,12 @@ final class VolumeChoosingUtil {
     }
   }
 
+  static void logIfSomeReadOnlyVolumes(AvailableSpaceFilter filter,
+                                         Logger log) {
+    if (log.isDebugEnabled() && filter.foundReadOnlyVolumes()) {
+      log.debug("Some volumes are read-only; {}",
+          filter);
+    }
+  }
+
 }
