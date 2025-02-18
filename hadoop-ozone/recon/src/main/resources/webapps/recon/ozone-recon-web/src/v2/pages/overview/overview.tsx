@@ -27,6 +27,7 @@ import OverviewSummaryCard from '@/v2/components/overviewCard/overviewSummaryCar
 import OverviewStorageCard from '@/v2/components/overviewCard/overviewStorageCard';
 import OverviewSimpleCard from '@/v2/components/overviewCard/overviewSimpleCard';
 import OverviewOMCardGroup from '@/v2/pages/overview/components/OmDataCardGroup';
+import OverviewSummaryCardGroup from '@/v2/pages/overview/components/SummaryCardGroup';
 
 import { AutoReloadHelper } from '@/utils/autoReloadHelper';
 import { checkResponseError, showDataFetchError } from '@/utils/common';
@@ -36,7 +37,6 @@ import { getHealthIcon } from '@/v2/pages/overview/overview.utils';
 import { ClusterStateResponse, OverviewState, StorageReport } from '@/v2/types/overview.types';
 
 import './overview.less';
-import OverviewSummaryCardGroup from '@/v2/pages/overview/components/SummaryCardGroup';
 
 const Overview: React.FC<{}> = () => {
 
