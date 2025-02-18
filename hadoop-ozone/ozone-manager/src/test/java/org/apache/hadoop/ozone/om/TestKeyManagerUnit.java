@@ -369,11 +369,9 @@ class TestKeyManagerUnit extends OzoneTestBase {
     createBucket(metadataManager, volumeName, bucketName);
 
     // Create 25 multipart uploads to test pagination
-    List<OmMultipartInfo> uploadInfos = new ArrayList<>();
     for (int i = 0; i < 25; i++) {
       String key = String.format("key-%03d", i); // pad with zeros for proper sorting
       OmMultipartInfo info = initMultipartUpload(writeClient, volumeName, bucketName, key);
-      uploadInfos.add(info);
     }
 
     // WHEN - First page (10 entries)
