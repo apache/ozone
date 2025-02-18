@@ -17,11 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
-import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 
 /**
  * This class is used for maintaining SafeMode metric information, which can
@@ -52,7 +51,7 @@ public class SafeModeMetrics {
       currentPipelinesWithAtleastOneReplicaReportedCount;
 
   public static SafeModeMetrics create() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     return ms.register(SOURCE_NAME,
         "SCM Safemode Metrics",
         new SafeModeMetrics());
@@ -121,7 +120,7 @@ public class SafeModeMetrics {
 
 
   public void unRegister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
+    org.apache.hadoop.metrics2.MetricsSystem ms = MetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }
 }

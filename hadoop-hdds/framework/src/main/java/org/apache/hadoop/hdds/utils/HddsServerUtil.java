@@ -94,12 +94,11 @@ import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.metrics2.MetricsException;
-import org.apache.hadoop.metrics2.MetricsSystem;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.source.JvmMetrics;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ShutdownHookManager;
 import org.rocksdb.RocksDBException;
@@ -575,13 +574,13 @@ public final class HddsServerUtil {
    * @param configuration OzoneConfiguration to use.
    * @param serverName    The logical name of the server components.
    */
-  public static MetricsSystem initializeMetrics(
+  public static org.apache.hadoop.metrics2.MetricsSystem initializeMetrics(
       OzoneConfiguration configuration, String serverName) {
-    MetricsSystem metricsSystem = DefaultMetricsSystem.initialize(serverName);
+    org.apache.hadoop.metrics2.MetricsSystem metricsSystem = MetricsSystem.initialize(serverName);
     try {
       JvmMetrics.create(serverName,
           configuration.get(DFSConfigKeysLegacy.DFS_METRICS_SESSION_ID_KEY),
-          DefaultMetricsSystem.instance());
+          MetricsSystem.instance());
       CpuMetrics.create();
     } catch (MetricsException e) {
       LOG.info("Metrics source JvmMetrics already added to DataNode.");

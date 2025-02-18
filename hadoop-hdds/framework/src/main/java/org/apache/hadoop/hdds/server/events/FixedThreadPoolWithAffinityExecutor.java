@@ -33,8 +33,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.utils.MetricsUtil;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.ozone.metrics.MetricsSystem;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -221,7 +221,7 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
       executor.shutdown();
     }
     executorMap.clear();
-    DefaultMetricsSystem.instance().unregisterSource(EVENT_QUEUE + name);
+    MetricsSystem.instance().unregisterSource(EVENT_QUEUE + name);
   }
 
   @Override
