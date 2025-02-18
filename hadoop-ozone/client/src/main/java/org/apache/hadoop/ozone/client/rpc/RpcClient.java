@@ -2126,8 +2126,14 @@ public class RpcClient implements ClientProtocol {
   public OzoneMultipartUploadList listMultipartUploads(String volumeName,
       String bucketName, String prefix, String keyMarker, String uploadIdMarker, int maxUploads) throws IOException {
 
-    OmMultipartUploadList omMultipartUploadList =
-        ozoneManagerClient.listMultipartUploads(volumeName, bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
+    OmMultipartUploadList omMultipartUploadList;
+    if (omVersion.compareTo(OzoneManagerVersion.S3_LIST_MULTIPART_UPLOADS_PAGINATION) >= 0) {
+      omMultipartUploadList = ozoneManagerClient.listMultipartUploads(volumeName, bucketName, prefix, keyMarker,
+          uploadIdMarker, maxUploads, false);
+    } else {
+      omMultipartUploadList = ozoneManagerClient.listMultipartUploads(volumeName, bucketName, prefix, keyMarker,
+          uploadIdMarker, maxUploads, true);
+    }
     List<OzoneMultipartUpload> uploads = omMultipartUploadList.getUploads()
         .stream()
         .map(upload -> new OzoneMultipartUpload(upload.getVolumeName(),

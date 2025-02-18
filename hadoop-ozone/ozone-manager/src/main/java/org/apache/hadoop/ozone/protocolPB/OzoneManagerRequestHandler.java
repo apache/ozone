@@ -1015,9 +1015,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       ListMultipartUploadsRequest request)
       throws IOException {
 
-    OmMultipartUploadList omMultipartUploadList =
-        impl.listMultipartUploads(request.getVolume(), request.getBucket(),
-            request.getPrefix(), request.getKeyMarker(), request.getUploadIdMarker(), request.getMaxUploads());
+    OmMultipartUploadList omMultipartUploadList = impl.listMultipartUploads(request.getVolume(), request.getBucket(),
+        request.getPrefix(),
+        request.getKeyMarker(), request.getUploadIdMarker(), request.getMaxUploads(), request.getNoPagination());
 
     List<MultipartUploadInfo> info = omMultipartUploadList
         .getUploads()

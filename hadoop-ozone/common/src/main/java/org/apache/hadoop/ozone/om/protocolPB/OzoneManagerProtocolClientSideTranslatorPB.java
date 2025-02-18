@@ -1808,7 +1808,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @Override
   public OmMultipartUploadList listMultipartUploads(String volumeName,
       String bucketName,
-      String prefix, String keyMarker, String uploadIdMarker, int maxUploads) throws IOException {
+      String prefix, String keyMarker, String uploadIdMarker, int maxUploads, boolean noPagination) throws IOException {
     ListMultipartUploadsRequest request = ListMultipartUploadsRequest
         .newBuilder()
         .setVolume(volumeName)
@@ -1817,6 +1817,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setKeyMarker(keyMarker == null ? "" : keyMarker)
         .setUploadIdMarker(uploadIdMarker == null ? "" : uploadIdMarker)
         .setMaxUploads(maxUploads)
+        .setNoPagination(noPagination)
         .build();
 
     OMRequest omRequest = createOMRequest(Type.ListMultipartUploads)

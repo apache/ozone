@@ -3710,7 +3710,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public OmMultipartUploadList listMultipartUploads(String volumeName,
-      String bucketName, String prefix, String keyMarker, String uploadIdMarker, int maxUploads) throws IOException {
+      String bucketName,
+      String prefix, String keyMarker, String uploadIdMarker, int maxUploads, boolean noPagination) throws IOException {
 
     ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
 
@@ -3721,7 +3722,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       OmMultipartUploadList omMultipartUploadList =
           keyManager.listMultipartUploads(bucket.realVolume(),
-              bucket.realBucket(), prefix, keyMarker, uploadIdMarker, maxUploads);
+              bucket.realBucket(), prefix, keyMarker, uploadIdMarker, maxUploads, noPagination);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction
           .LIST_MULTIPART_UPLOADS, auditMap));
       return omMultipartUploadList;

@@ -495,7 +495,8 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * keyName.
    */
   MultipartUploadKeys getMultipartUploadKeys(String volumeName,
-      String bucketName, String prefix, String keyMarker, String uploadIdMarker, int maxUploads) throws IOException;
+          String bucketName, String prefix, String keyMarker, String uploadIdMarker, int maxUploads,
+          boolean noPagination) throws IOException;
 
   /**
    * Gets the DirectoryTable.

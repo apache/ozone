@@ -1153,7 +1153,7 @@ public class TestOmMetadataManager {
 
     // List first page without markers
     MultipartUploadKeys result = omMetadataManager.getMultipartUploadKeys(
-        volumeName, bucketName, prefix, null, null, maxUploads);
+        volumeName, bucketName, prefix, null, null, maxUploads, false);
 
     assertEquals(maxUploads, result.getKeys().size());
     assertTrue(result.isTruncated());
@@ -1165,21 +1165,21 @@ public class TestOmMetadataManager {
         volumeName, bucketName, prefix,
         result.getNextKeyMarker(),
         result.getNextUploadIdMarker(),
-        maxUploads);
+        maxUploads, false);
 
     assertEquals(maxUploads, nextPage.getKeys().size());
     assertTrue(nextPage.isTruncated());
 
     // List with different prefix
     MultipartUploadKeys differentPrefix = omMetadataManager.getMultipartUploadKeys(
-        volumeName, bucketName, "different/", null, null, maxUploads);
+        volumeName, bucketName, "different/", null, null, maxUploads, false);
 
     assertEquals(0, differentPrefix.getKeys().size());
     assertFalse(differentPrefix.isTruncated());
 
     // List all entries with large maxUploads
     MultipartUploadKeys allEntries = omMetadataManager.getMultipartUploadKeys(
-        volumeName, bucketName, prefix, null, null, 100);
+        volumeName, bucketName, prefix, null, null, 100, false);
 
     assertEquals(25, allEntries.getKeys().size());
     assertFalse(allEntries.isTruncated());
@@ -1192,5 +1192,13 @@ public class TestOmMetadataManager {
     }
     Collections.sort(actualKeys);
     assertEquals(expectedKeys, actualKeys);
+
+    // Test with no pagination
+    MultipartUploadKeys noPagination = omMetadataManager.getMultipartUploadKeys(
+        volumeName, bucketName, prefix, null, null, 10, true);
+
+    assertEquals(25, noPagination.getKeys().size());
+    assertFalse(noPagination.isTruncated());
+    
   }
 }

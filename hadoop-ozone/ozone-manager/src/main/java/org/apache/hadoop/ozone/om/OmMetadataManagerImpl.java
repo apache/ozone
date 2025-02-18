@@ -1938,7 +1938,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public MultipartUploadKeys getMultipartUploadKeys(
       String volumeName, String bucketName, String prefix, String keyMarker,
-      String uploadIdMarker, int maxUploads) throws IOException {
+      String uploadIdMarker, int maxUploads, boolean noPagination) throws IOException {
 
     MultipartUploadKeys.Builder resultBuilder = MultipartUploadKeys.newBuilder();
     SortedSet<String> responseKeys = new TreeSet<>();
@@ -1980,7 +1980,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         iterator = getMultipartInfoTable().iterator(prefixKey)) {
       iterator.seek(seekKey);
 
-      while (iterator.hasNext() && dbKeysCount < maxUploads + 1) {
+      while (iterator.hasNext() && (noPagination || dbKeysCount < maxUploads + 1)) {
         KeyValue<String, OmMultipartKeyInfo> entry = iterator.next();
         // If it is marked for abort, skip it.
         if (!aborted.contains(entry.getKey())) {
@@ -1988,6 +1988,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           dbKeysCount++;
         }
       }
+    }
+
+    if (noPagination) {
+      resultBuilder.setKeys(responseKeys);
+      return resultBuilder.build();
     }
 
     String lastKey = responseKeys.stream()
