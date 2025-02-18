@@ -1,23 +1,24 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Comparator;
@@ -31,7 +32,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
-
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -47,19 +47,16 @@ import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.client.api.DataStreamApi;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.proto.RaftProtos.CommitInfoProto;
 import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
+import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.apache.ratis.protocol.exceptions.NotReplicatedException;
 import org.apache.ratis.protocol.exceptions.RaftException;
-import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
@@ -79,12 +76,12 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   public static XceiverClientRatis newXceiverClientRatis(
       org.apache.hadoop.hdds.scm.pipeline.Pipeline pipeline,
       ConfigurationSource ozoneConf) {
-    return newXceiverClientRatis(pipeline, ozoneConf, null);
+    return newXceiverClientRatis(pipeline, ozoneConf, null, null);
   }
 
   public static XceiverClientRatis newXceiverClientRatis(
       org.apache.hadoop.hdds.scm.pipeline.Pipeline pipeline,
-      ConfigurationSource ozoneConf, ClientTrustManager trustManager) {
+      ConfigurationSource ozoneConf, ClientTrustManager trustManager, ErrorInjector errorInjector) {
     final String rpcType = ozoneConf
         .get(ScmConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_KEY,
             ScmConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_DEFAULT);
@@ -93,7 +90,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
         SecurityConfig(ozoneConf), trustManager);
     return new XceiverClientRatis(pipeline,
         SupportedRpcType.valueOfIgnoreCase(rpcType),
-        retryPolicy, tlsConfig, ozoneConf);
+        retryPolicy, tlsConfig, ozoneConf, errorInjector);
   }
 
   private final Pipeline pipeline;
@@ -110,13 +107,14 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       = XceiverClientManager.getXceiverClientMetrics();
   private final RaftProtos.ReplicationLevel watchType;
   private final int majority;
+  private final ErrorInjector errorInjector;
 
   /**
    * Constructs a client.
    */
   private XceiverClientRatis(Pipeline pipeline, RpcType rpcType,
       RetryPolicy retryPolicy, GrpcTlsConfig tlsConfig,
-      ConfigurationSource configuration) {
+      ConfigurationSource configuration, ErrorInjector errorInjector) {
     super();
     this.pipeline = pipeline;
     this.majority = (pipeline.getReplicationConfig().getRequiredNodes() / 2) + 1;
@@ -142,6 +140,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       LOG.trace("new XceiverClientRatis for pipeline " + pipeline.getId(),
           new Throwable("TRACE"));
     }
+    this.errorInjector = errorInjector;
   }
 
   private long updateCommitInfosMap(RaftClientReply reply, RaftProtos.ReplicationLevel level) {
@@ -248,6 +247,12 @@ public final class XceiverClientRatis extends XceiverClientSpi {
 
   private CompletableFuture<RaftClientReply> sendRequestAsync(
       ContainerCommandRequestProto request) {
+    if (errorInjector != null) {
+      RaftClientReply response = errorInjector.getResponse(request, getClient().getId(), pipeline);
+      if (response != null) {
+        return CompletableFuture.completedFuture(response);
+      }
+    }
     return TracingUtil.executeInNewSpan(
         "XceiverClientRatis." + request.getCmdType().name(),
         () -> {
@@ -274,7 +279,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   // gets the minimum log index replicated to all servers
   @Override
   public long getReplicatedMinCommitIndex() {
-    return commitInfoMap.values().parallelStream()
+    return commitInfoMap.values().stream()
         .mapToLong(Long::longValue).min().orElse(0);
   }
 

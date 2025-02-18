@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -33,10 +36,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
@@ -53,8 +52,6 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Preconditions;
-
 /**
  * Represents a group of datanodes which store a container.
  */
@@ -68,6 +65,7 @@ public final class Pipeline {
       Proto2Codec.get(HddsProtos.Pipeline.getDefaultInstance()),
       Pipeline::getFromProtobufSetCreationTimestamp,
       p -> p.getProtobufMessage(ClientVersion.CURRENT_VERSION),
+      Pipeline.class,
       DelegatedCodec.CopyType.UNSUPPORTED);
 
   public static Codec<Pipeline> getCodec() {
@@ -243,7 +241,6 @@ public final class Pipeline {
 
   /**
    * Get the replicaIndex Map.
-   * @return
    */
   public Map<DatanodeDetails, Integer> getReplicaIndexes() {
     return this.getNodes().stream().collect(Collectors.toMap(Function.identity(), this::getReplicaIndex));
@@ -330,7 +327,11 @@ public final class Pipeline {
   }
 
   void reportDatanode(DatanodeDetails dn) throws IOException {
-    if (nodeStatus.get(dn) == null) {
+    //This is a workaround for the case a datanode restarted with reinitializing it's dnId but it still reports the
+    // same set of pipelines it was part of. The pipeline report should be accepted for this anomalous condition.
+    //  We rely on StaleNodeHandler in closing this pipeline eventually.
+    if (dn == null || (nodeStatus.get(dn) == null
+        && nodeStatus.keySet().stream().noneMatch(node -> node.compareNodeValues(dn)))) {
       throw new IOException(
           String.format("Datanode=%s not part of pipeline=%s", dn, id));
     }
@@ -362,12 +363,17 @@ public final class Pipeline {
 
   public HddsProtos.Pipeline getProtobufMessage(int clientVersion)
       throws UnknownPipelineStateException {
+    return getProtobufMessage(clientVersion, Collections.emptySet());
+  }
+
+  public HddsProtos.Pipeline getProtobufMessage(int clientVersion, Set<DatanodeDetails.Port.Name> filterPorts)
+      throws UnknownPipelineStateException {
 
     List<HddsProtos.DatanodeDetailsProto> members = new ArrayList<>();
     List<Integer> memberReplicaIndexes = new ArrayList<>();
 
     for (DatanodeDetails dn : nodeStatus.keySet()) {
-      members.add(dn.toProto(clientVersion));
+      members.add(dn.toProto(clientVersion, filterPorts));
       memberReplicaIndexes.add(replicaIndexes.getOrDefault(dn, 0));
     }
 

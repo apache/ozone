@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,6 +17,14 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotMoveDeletedKeysResponse.createRepeatedOmKeyInfo;
+
+import jakarta.annotation.Nonnull;
+import java.io.IOException;
+import java.util.List;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -25,26 +32,17 @@ import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
 
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
-
-import java.io.IOException;
-import java.util.List;
-import jakarta.annotation.Nonnull;
-
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
-import static org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotMoveDeletedKeysResponse.createRepeatedOmKeyInfo;
-
 /**
  * Response for {@link OMKeyPurgeRequest} request.
  */
-@CleanupTableInfo(cleanupTables = {DELETED_TABLE})
+@CleanupTableInfo(cleanupTables = {DELETED_TABLE, SNAPSHOT_INFO_TABLE})
 public class OMKeyPurgeResponse extends OmKeyResponse {
   private List<String> purgeKeyList;
   private SnapshotInfo fromSnapshot;
@@ -75,18 +73,13 @@ public class OMKeyPurgeResponse extends OmKeyResponse {
 
     if (fromSnapshot != null) {
       OmSnapshotManager omSnapshotManager =
-          ((OmMetadataManagerImpl) omMetadataManager)
-              .getOzoneManager().getOmSnapshotManager();
+          ((OmMetadataManagerImpl) omMetadataManager).getOzoneManager().getOmSnapshotManager();
 
       try (ReferenceCounted<OmSnapshot> rcOmFromSnapshot =
-          omSnapshotManager.getSnapshot(
-              fromSnapshot.getVolumeName(),
-              fromSnapshot.getBucketName(),
-              fromSnapshot.getName())) {
+          omSnapshotManager.getSnapshot(fromSnapshot.getSnapshotId())) {
 
         OmSnapshot fromOmSnapshot = rcOmFromSnapshot.get();
-        DBStore fromSnapshotStore =
-            fromOmSnapshot.getMetadataManager().getStore();
+        DBStore fromSnapshotStore = fromOmSnapshot.getMetadataManager().getStore();
         // Init Batch Operation for snapshot db.
         try (BatchOperation writeBatch =
             fromSnapshotStore.initBatchOperation()) {
@@ -95,6 +88,7 @@ public class OMKeyPurgeResponse extends OmKeyResponse {
           fromSnapshotStore.commitBatchOperation(writeBatch);
         }
       }
+      omMetadataManager.getSnapshotInfoTable().putWithBatch(batchOperation, fromSnapshot.getTableKey(), fromSnapshot);
     } else {
       processKeys(batchOperation, omMetadataManager);
       processKeysToUpdate(batchOperation, omMetadataManager);

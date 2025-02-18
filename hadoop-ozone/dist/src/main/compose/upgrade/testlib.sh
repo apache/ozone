@@ -51,12 +51,12 @@ create_data_dirs() {
 #    be used.
 ##   Else, a binary image will be used.
 prepare_for_image() {
-  local image_version="$1"
+  local image_version="${1}"
 
   if [[ "$image_version" = "$OZONE_CURRENT_VERSION" ]]; then
       prepare_for_runner_image
   else
-      prepare_for_binary_image "$image_version"
+      prepare_for_binary_image "${image_version}"
   fi
 }
 

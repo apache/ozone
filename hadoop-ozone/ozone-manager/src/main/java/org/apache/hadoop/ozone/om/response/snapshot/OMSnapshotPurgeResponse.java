@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,10 +13,19 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
+
 package org.apache.hadoop.ozone.om.response.snapshot;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
+
+import com.google.common.annotations.VisibleForTesting;
+import jakarta.annotation.Nonnull;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -31,15 +39,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import jakarta.annotation.Nonnull;
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.List;
-import java.util.Map;
-
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
-
 /**
  * Response for OMSnapshotPurgeRequest.
  */
@@ -49,18 +48,15 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
       LoggerFactory.getLogger(OMSnapshotPurgeResponse.class);
   private final List<String> snapshotDbKeys;
   private final Map<String, SnapshotInfo> updatedSnapInfos;
-  private final Map<String, SnapshotInfo> updatedPreviousAndGlobalSnapInfos;
 
   public OMSnapshotPurgeResponse(
       @Nonnull OMResponse omResponse,
       @Nonnull List<String> snapshotDbKeys,
-      Map<String, SnapshotInfo> updatedSnapInfos,
-      Map<String, SnapshotInfo> updatedPreviousAndGlobalSnapInfos
+      Map<String, SnapshotInfo> updatedSnapInfos
   ) {
     super(omResponse);
     this.snapshotDbKeys = snapshotDbKeys;
     this.updatedSnapInfos = updatedSnapInfos;
-    this.updatedPreviousAndGlobalSnapInfos = updatedPreviousAndGlobalSnapInfos;
   }
 
   /**
@@ -72,7 +68,6 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
     checkStatusNotOK();
     this.snapshotDbKeys = null;
     this.updatedSnapInfos = null;
-    this.updatedPreviousAndGlobalSnapInfos = null;
   }
 
   @Override
@@ -82,8 +77,6 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
     OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
         omMetadataManager;
     updateSnapInfo(metadataManager, batchOperation, updatedSnapInfos);
-    updateSnapInfo(metadataManager, batchOperation,
-        updatedPreviousAndGlobalSnapInfos);
     for (String dbKey: snapshotDbKeys) {
       // Skip the cache here because snapshot is purged from cache in OMSnapshotPurgeRequest.
       SnapshotInfo snapshotInfo = omMetadataManager
@@ -96,8 +89,15 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
         continue;
       }
 
+      // Remove and close snapshot's RocksDB instance from SnapshotCache.
+      ((OmMetadataManagerImpl) omMetadataManager).getOzoneManager().getOmSnapshotManager()
+          .invalidateCacheEntry(snapshotInfo.getSnapshotId());
+      // Remove the snapshot from snapshotId to snapshotTableKey map.
+      ((OmMetadataManagerImpl) omMetadataManager).getSnapshotChainManager()
+          .removeFromSnapshotIdToTable(snapshotInfo.getSnapshotId());
       // Delete Snapshot checkpoint directory.
       deleteCheckpointDirectory(omMetadataManager, snapshotInfo);
+      // Delete snapshotInfo from the table.
       omMetadataManager.getSnapshotInfoTable().deleteWithBatch(batchOperation, dbKey);
     }
   }
@@ -136,5 +136,10 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
             snapshotInfo.getBucketName(), snapshotInfo.getName());
       }
     }
+  }
+
+  @VisibleForTesting
+  public Map<String, SnapshotInfo> getUpdatedSnapInfos() {
+    return updatedSnapInfos;
   }
 }

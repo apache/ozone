@@ -28,6 +28,10 @@ export interface EChartProps {
   loading?: boolean;
   theme?: 'light';
   onClick?: () => any | void;
+  eventHandler?: {
+    name: string,
+    handler: (arg0: any) => void
+  };
 }
 
 const EChart = ({
@@ -36,7 +40,8 @@ const EChart = ({
   settings,
   loading,
   theme,
-  onClick
+  onClick,
+  eventHandler
 }: EChartProps): JSX.Element => {
   const chartRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -46,6 +51,10 @@ const EChart = ({
       chart = init(chartRef.current, theme);
       if (onClick) {
         chart.on('click', onClick);
+      }
+
+      if (eventHandler) {
+        chart.on(eventHandler.name, eventHandler.handler);
       }
     }
 
@@ -71,6 +80,10 @@ const EChart = ({
       if (onClick) {
         chart!.on('click', onClick);
       }
+
+      if (eventHandler) {
+        chart!.on(eventHandler.name, eventHandler.handler);
+      }
     }
   }, [option, settings, theme]); // Whenever theme changes we need to add option and setting due to it being deleted in cleanup function
 
@@ -83,7 +96,7 @@ const EChart = ({
     }
   }, [loading, theme]); // If we switch theme we should put chart in loading mode, and also if loading changes i.e completes then hide loader
 
-  return <div ref={chartRef} style={{ width: "100em", height: "50em", margin: 'auto', ...style }} />;
+  return <div ref={chartRef} style={{ width: "50vw", height: "25vh", margin: 'auto', ...style }} />;
 }
 
 export default EChart;

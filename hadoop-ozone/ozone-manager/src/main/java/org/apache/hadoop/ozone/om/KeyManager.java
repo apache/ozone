@@ -1,42 +1,45 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om;
 
+import java.io.IOException;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.fs.OzoneManagerFS;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
-import org.apache.hadoop.ozone.om.fs.OzoneManagerFS;
-import org.apache.hadoop.hdds.utils.BackgroundService;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.service.SnapshotDirectoryCleaningService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
-
-import java.io.IOException;
-import java.time.Duration;
-import java.util.List;
 
 /**
  * Handles key level commands.
@@ -47,7 +50,6 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * Start key manager.
    *
    * @param configuration
-   * @throws IOException
    */
   void start(OzoneConfiguration configuration);
 
@@ -108,24 +110,6 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
       throws IOException;
 
   /**
-   * List trash allows the user to list the keys that were marked as deleted,
-   * but not actually deleted by Ozone Manager. This allows a user to recover
-   * keys within a configurable window.
-   * @param volumeName - The volume name, which can also be a wild card
-   *                   using '*'.
-   * @param bucketName - The bucket name, which can also be a wild card
-   *                   using '*'.
-   * @param startKeyName - List keys from a specific key name.
-   * @param keyPrefix - List keys using a specific prefix.
-   * @param maxKeys - The number of keys to be returned. This must be below
-   *                the cluster level set by admins.
-   * @return The list of keys that are deleted from the deleted table.
-   * @throws IOException
-   */
-  List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
-      String startKeyName, String keyPrefix, int maxKeys) throws IOException;
-
-  /**
    * Returns a PendingKeysDeletion. It has a list of pending deletion key info
    * that ups to the given count.Each entry is a {@link BlockGroup}, which
    * contains the info about the key name and all its associated block IDs.
@@ -137,6 +121,29 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @throws IOException
    */
   PendingKeysDeletion getPendingDeletionKeys(int count) throws IOException;
+
+  /**
+   * Returns a list rename entries from the snapshotRenamedTable.
+   *
+   * @param size max number of keys to return.
+   * @return a Pair of list of {@link org.apache.hadoop.hdds.utils.db.Table.KeyValue} representing the keys in the
+   * underlying metadataManager.
+   * @throws IOException
+   */
+  List<Table.KeyValue<String, String>> getRenamesKeyEntries(
+      String volume, String bucket, String startKey, int size) throws IOException;
+
+
+  /**
+   * Returns a list deleted entries from the deletedTable.
+   *
+   * @param size max number of keys to return.
+   * @return a Pair of list of {@link org.apache.hadoop.hdds.utils.db.Table.KeyValue} representing the keys in the
+   * underlying metadataManager.
+   * @throws IOException
+   */
+  List<Table.KeyValue<String, List<OmKeyInfo>>> getDeletedKeyEntries(
+      String volume, String bucket, String startKey, int size) throws IOException;
 
   /**
    * Returns the names of up to {@code count} open keys whose age is
@@ -170,6 +177,17 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    */
   List<ExpiredMultipartUploadsBucket> getExpiredMultipartUploads(
       Duration expireThreshold, int maxParts) throws IOException;
+
+  /**
+   * Look up an existing key from the OM table and retrieve the tags from
+   * the key info.
+   *
+   * @param args the args of the key provided by client.
+   * @param bucket the resolved parent bucket of the key.
+   * @return Map of the tag set associated with the key.
+   * @throws IOException
+   */
+  Map<String, String> getObjectTagging(OmKeyArgs args, ResolvedBucket bucket) throws IOException;
 
   /**
    * Returns the metadataManager.
@@ -208,61 +226,51 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   void refresh(OmKeyInfo key) throws IOException;
 
   /**
-   * Assume OM has FS namespace like below, deleteDirTable stores absolute
-   * path name as existing KeyDeletionService expects full key name.
-   * For example, if user deletes directory 'd1' then the entry in OM DB looks
-   * like, DBKey = 1030/d3 and DBValue = KeyInfo with keyName "a/b2/d3"
-   *
-   *                   vol1
-   *                    |
-   *                  buck-1
-   *                    |
-   *                    a
-   *                    |
-   *      -----------------------------------
-   *     |             |                     |
-   *     b1            b2                    b3
-   *   -----       ---------               ----------
-   *   |    |      |    |   |             |    |     |
-   *  c1   c2     d1   d2  d3             e1   e2   e3
-   *                   |                  |
-   *               --------               |
-   *              |        |              |
-   *           d21.txt   d22.txt        e11.txt
-   *
-   * @return OmKeyInfo
+   * Returns an iterator for pending deleted directories.
    * @throws IOException
    */
-  Table.KeyValue<String, OmKeyInfo> getPendingDeletionDir() throws IOException;
+  TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(
+      String volume, String bucket) throws IOException;
+
+  default List<Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(String volume, String bucket, int size)
+      throws IOException {
+    List<Table.KeyValue<String, OmKeyInfo>> deletedDirEntries = new ArrayList<>(size);
+    try (TableIterator<String, ? extends  Table.KeyValue<String, OmKeyInfo>> iterator =
+             getDeletedDirEntries(volume, bucket)) {
+      while (deletedDirEntries.size() < size && iterator.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
+        deletedDirEntries.add(Table.newKeyValue(kv.getKey(), kv.getValue()));
+      }
+      return deletedDirEntries;
+    }
+  }
 
   /**
    * Returns all sub directories under the given parent directory.
    *
    * @param parentInfo
-   * @param numEntries
    * @return list of dirs
    * @throws IOException
    */
-  List<OmKeyInfo> getPendingDeletionSubDirs(long volumeId, long bucketId,
-      OmKeyInfo parentInfo, long numEntries) throws IOException;
+  DeleteKeysResult getPendingDeletionSubDirs(long volumeId, long bucketId,
+      OmKeyInfo parentInfo, long remainingBufLimit) throws IOException;
 
   /**
    * Returns all sub files under the given parent directory.
    *
    * @param parentInfo
-   * @param numEntries
    * @return list of files
    * @throws IOException
    */
-  List<OmKeyInfo> getPendingDeletionSubFiles(long volumeId,
-      long bucketId, OmKeyInfo parentInfo, long numEntries)
+  DeleteKeysResult getPendingDeletionSubFiles(long volumeId,
+      long bucketId, OmKeyInfo parentInfo, long remainingBufLimit)
           throws IOException;
 
   /**
    * Returns the instance of Directory Deleting Service.
    * @return Background service.
    */
-  BackgroundService getDirDeletingService();
+  DirectoryDeletingService getDirDeletingService();
 
   /**
    * Returns the instance of Open Key Cleanup Service.

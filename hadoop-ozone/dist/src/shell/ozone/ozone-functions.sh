@@ -2817,14 +2817,6 @@ function ozone_assemble_classpath() {
   done
   ozone_add_classpath "${OZONE_HOME}/share/ozone/web"
 
-  #We need to add the artifact manually as it's not part the generated classpath desciptor
-  local MAIN_ARTIFACT
-  MAIN_ARTIFACT=$(find "$HDDS_LIB_JARS_DIR" -name "${OZONE_RUN_ARTIFACT_NAME}-*.jar")
-  if [[ -z "$MAIN_ARTIFACT" ]] || [[ ! -e "$MAIN_ARTIFACT" ]]; then
-    echo "ERROR: Component jar file $MAIN_ARTIFACT is missing from ${HDDS_LIB_JARS_DIR}"
-  fi
-  ozone_add_classpath "${MAIN_ARTIFACT}"
-
   #Add optional jars to the classpath
   local OPTIONAL_CLASSPATH_DIR
   OPTIONAL_CLASSPATH_DIR="${HDDS_LIB_JARS_DIR}/${OZONE_RUN_ARTIFACT_NAME}"

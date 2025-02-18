@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,6 +18,9 @@
 package org.apache.hadoop.hdds.scm;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.metrics2.annotation.Metric;
@@ -28,11 +30,9 @@ import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
+import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
-
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Container client metrics that describe how data writes are distributed to
@@ -52,6 +52,21 @@ public final class ContainerClientMetrics {
   private MutableCounterLong totalWriteChunkCalls;
   @Metric
   private MutableCounterLong totalWriteChunkBytes;
+
+  @Metric
+  private MutableRate hsyncSynchronizedWorkNs;
+  @Metric
+  private MutableRate hsyncSendWriteChunkNs;
+  @Metric
+  private MutableRate hsyncWaitForFlushNs;
+  @Metric
+  private MutableRate hsyncWatchForCommitNs;
+  @Metric
+  private MutableCounterLong writeChunksDuringWrite;
+  @Metric
+  private MutableCounterLong flushesDuringWrite;
+
+
   private MutableQuantiles[] listBlockLatency;
   private MutableQuantiles[] getBlockLatency;
   private MutableQuantiles[] getCommittedBlockLengthLatency;
@@ -82,6 +97,7 @@ public final class ContainerClientMetrics {
     }
     referenceCount--;
     if (referenceCount == 0) {
+      instance.stop();
       DefaultMetricsSystem.instance().unregisterSource(
           SOURCE_NAME + instanceCount);
       instance = null;
@@ -138,6 +154,17 @@ public final class ContainerClientMetrics {
                   + "s", "client hsync latency to DN in nanoseconds", "ops",
               "latency", interval);
     }
+  }
+
+  public void stop() {
+    MetricUtil.stop(listBlockLatency);
+    MetricUtil.stop(getBlockLatency);
+    MetricUtil.stop(getCommittedBlockLengthLatency);
+    MetricUtil.stop(readChunkLatency);
+    MetricUtil.stop(getSmallFileLatency);
+    MetricUtil.stop(hsyncLatencyNs);
+    MetricUtil.stop(omHsyncLatencyNs);
+    MetricUtil.stop(datanodeHsyncLatencyNs);
   }
 
   public void recordWriteChunk(Pipeline pipeline, long chunkSizeBytes) {
@@ -248,5 +275,29 @@ public final class ContainerClientMetrics {
 
   Map<UUID, MutableCounterLong> getWriteChunksCallsByLeaders() {
     return writeChunksCallsByLeaders;
+  }
+
+  public MutableRate getHsyncSynchronizedWorkNs() {
+    return hsyncSynchronizedWorkNs;
+  }
+
+  public MutableRate getHsyncSendWriteChunkNs() {
+    return hsyncSendWriteChunkNs;
+  }
+
+  public MutableRate getHsyncWaitForFlushNs() {
+    return hsyncWaitForFlushNs;
+  }
+
+  public MutableRate getHsyncWatchForCommitNs() {
+    return hsyncWatchForCommitNs;
+  }
+
+  public MutableCounterLong getWriteChunksDuringWrite() {
+    return writeChunksDuringWrite;
+  }
+
+  public MutableCounterLong getFlushesDuringWrite() {
+    return flushesDuringWrite;
   }
 }

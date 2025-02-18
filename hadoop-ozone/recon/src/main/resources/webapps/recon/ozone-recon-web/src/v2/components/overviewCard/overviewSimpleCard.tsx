@@ -30,6 +30,7 @@ import {
   InboxOutlined,
   QuestionCircleOutlined
 } from '@ant-design/icons';
+import { numberWithCommas } from '@/utils/common';
 
 
 // ------------- Types -------------- //
@@ -130,14 +131,15 @@ const OverviewSimpleCard: React.FC<OverviewCardProps> = ({
       hoverable={hoverable}
       title={(linkToUrl) ? titleElement : title}
       headStyle={cardHeadStyle}
-      bodyStyle={cardBodyStyle}>
+      bodyStyle={cardBodyStyle}
+      data-testid={`overview-${title}`}>
       <Row
         align='middle'>
         <Col>
           <IconSelector iconType={icon} style={iconStyle} />
         </Col>
         <Col style={dataColStyle}>
-          {data}
+          {numberWithCommas(data)}
         </Col>
       </Row>
     </Card>

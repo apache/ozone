@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,12 +18,13 @@
 package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT_KEY;
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY;
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY_COUNT;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.KEY_CONTAINER;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.REPLICA_HISTORY_V2;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider.truncateTable;
-import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY;
-import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY_COUNT;
 
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -34,14 +34,16 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-
 import javax.inject.Inject;
 import javax.inject.Singleton;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconUtils;
@@ -52,13 +54,8 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistoryList;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
-import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
-import jakarta.annotation.Nonnull;
 import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -191,7 +188,7 @@ public class ReconContainerMetadataManagerImpl
   }
 
   /**
-   * Store the containerID -> no. of keys count into the container DB store.
+   * Store the containerID -&gt; no. of keys count into the container DB store.
    *
    * @param containerID the containerID.
    * @param count count of the keys within the given containerID.
@@ -204,7 +201,7 @@ public class ReconContainerMetadataManagerImpl
   }
 
   /**
-   * Store the containerID -> no. of keys count into a batch.
+   * Store the containerID -&gt; no. of keys count into a batch.
    *
    * @param batch the batch we store into
    * @param containerID the containerID.
@@ -219,7 +216,7 @@ public class ReconContainerMetadataManagerImpl
   }
 
   /**
-   * Store the ContainerID -> ContainerReplicaHistory (container first and last
+   * Store the ContainerID -&gt; ContainerReplicaHistory (container first and last
    * seen time) mapping to the container DB store.
    *
    * @param containerID the containerID.
@@ -417,16 +414,16 @@ public class ReconContainerMetadataManagerImpl
   }
 
   /**
-   * Iterate the DB to construct a Map of containerID -> containerMetadata
+   * Iterate the DB to construct a Map of containerID -&gt; containerMetadata
    * only for the given limit from the given start key. The start containerID
    * is skipped from the result.
    *
-   * Return all the containers if limit < 0.
+   * Return all the containers if limit &lt; 0.
    *
    * @param limit No of containers to get.
    * @param prevContainer containerID after which the
    *                      list of containers are scanned.
-   * @return Map of containerID -> containerMetadata.
+   * @return Map of containerID -&gt; containerMetadata.
    * @throws IOException on failure.
    */
   @Override

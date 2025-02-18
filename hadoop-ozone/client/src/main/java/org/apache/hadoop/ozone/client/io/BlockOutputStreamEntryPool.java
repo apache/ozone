@@ -1,23 +1,24 @@
-
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.client.io;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.ZoneOffset;
@@ -27,7 +28,6 @@ import java.util.ListIterator;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
-
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
@@ -44,9 +44,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.util.MetricUtil;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -141,7 +138,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
     // only the blocks allocated in this open session (block createVersion
     // equals to open session version)
     for (OmKeyLocationInfo subKeyInfo : version.getLocationList(openVersion)) {
-      addKeyLocationInfo(subKeyInfo);
+      addKeyLocationInfo(subKeyInfo, false);
     }
   }
 
@@ -154,7 +151,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
    *                   key to be written.
    * @return a BlockOutputStreamEntry instance that handles how data is written.
    */
-  BlockOutputStreamEntry createStreamEntry(OmKeyLocationInfo subKeyInfo) {
+  BlockOutputStreamEntry createStreamEntry(OmKeyLocationInfo subKeyInfo, boolean forRetry) {
     return
         new BlockOutputStreamEntry.Builder()
             .setBlockID(subKeyInfo.getBlockID())
@@ -168,12 +165,13 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
             .setClientMetrics(clientMetrics)
             .setStreamBufferArgs(streamBufferArgs)
             .setExecutorServiceSupplier(executorServiceSupplier)
+            .setForRetry(forRetry)
             .build();
   }
 
-  private synchronized void addKeyLocationInfo(OmKeyLocationInfo subKeyInfo) {
+  private synchronized void addKeyLocationInfo(OmKeyLocationInfo subKeyInfo, boolean forRetry) {
     Preconditions.checkNotNull(subKeyInfo.getPipeline());
-    streamEntries.add(createStreamEntry(subKeyInfo));
+    streamEntries.add(createStreamEntry(subKeyInfo, forRetry));
   }
 
   /**
@@ -295,13 +293,13 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
    *
    * @throws IOException
    */
-  private void allocateNewBlock() throws IOException {
+  private void allocateNewBlock(boolean forRetry) throws IOException {
     if (!excludeList.isEmpty()) {
       LOG.debug("Allocating block with {}", excludeList);
     }
     OmKeyLocationInfo subKeyInfo =
         omClient.allocateBlock(keyArgs, openID, excludeList);
-    addKeyLocationInfo(subKeyInfo);
+    addKeyLocationInfo(subKeyInfo, forRetry);
   }
 
   /**
@@ -379,7 +377,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
    * @return the new current open stream to write to
    * @throws IOException if the block allocation failed.
    */
-  synchronized BlockOutputStreamEntry allocateBlockIfNeeded() throws IOException {
+  synchronized BlockOutputStreamEntry allocateBlockIfNeeded(boolean forRetry) throws IOException {
     BlockOutputStreamEntry streamEntry = getCurrentStreamEntry();
     if (streamEntry != null && streamEntry.isClosed()) {
       // a stream entry gets closed either by :
@@ -391,7 +389,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
       Preconditions.checkNotNull(omClient);
       // allocate a new block, if a exception happens, log an error and
       // throw exception to the caller directly, and the write fails.
-      allocateNewBlock();
+      allocateNewBlock(forRetry);
     }
     // in theory, this condition should never violate due the check above
     // still do a sanity check.

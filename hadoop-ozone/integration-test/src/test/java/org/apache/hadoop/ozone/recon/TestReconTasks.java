@@ -1,25 +1,33 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.recon;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer.runTestOzoneContainerViaDataNode;
+import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+
 import java.time.Duration;
 import java.util.List;
-
+import java.util.Map;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -47,13 +55,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.event.Level;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer.runTestOzoneContainerViaDataNode;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-
 /**
  * Integration Tests for Recon's tasks.
  */
@@ -77,6 +78,7 @@ public class TestReconTasks {
     cluster =  MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1)
         .includeRecon(true).build();
     cluster.waitForClusterToBeReady();
+    cluster.waitForPipelineTobeReady(ONE, 30000);
     GenericTestUtils.setLogLevel(SCMDatanodeHeartbeatDispatcher.LOG,
         Level.DEBUG);
   }
@@ -236,6 +238,8 @@ public class TestReconTasks {
     // Bring down the Datanode that had the container replica.
     cluster.shutdownHddsDatanode(pipeline.getFirstNode());
 
+    // Since we no longer add EMPTY_MISSING containers to the table, we should
+    // have zero EMPTY_MISSING containers in the DB but their information will be logged.
     LambdaTestUtils.await(25000, 1000, () -> {
       List<UnhealthyContainers> allEmptyMissingContainers =
           reconContainerManager.getContainerSchemaManager()
@@ -243,9 +247,18 @@ public class TestReconTasks {
                   ContainerSchemaDefinition.UnHealthyContainerStates.
                       EMPTY_MISSING,
                   0, 1000);
-      return (allEmptyMissingContainers.size() == 1);
-    });
 
+      // Check if EMPTY_MISSING containers are not added to the DB and their count is logged
+      Map<ContainerSchemaDefinition.UnHealthyContainerStates, Map<String, Long>>
+          unhealthyContainerStateStatsMap = reconScm.getContainerHealthTask()
+          .getUnhealthyContainerStateStatsMap();
+
+      // Return true if the size of the fetched containers is 0 and the log shows 1 for EMPTY_MISSING state
+      return allEmptyMissingContainers.size() == 0 &&
+          unhealthyContainerStateStatsMap.get(
+                  ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING)
+              .getOrDefault(CONTAINER_COUNT, 0L) == 1;
+    });
 
     // Now add a container to key mapping count as 3. This data is used to
     // identify if container is empty in terms of keys mapped to container.
@@ -272,7 +285,17 @@ public class TestReconTasks {
                   ContainerSchemaDefinition.UnHealthyContainerStates.
                       EMPTY_MISSING,
                   0, 1000);
-      return (allEmptyMissingContainers.isEmpty());
+
+
+      Map<ContainerSchemaDefinition.UnHealthyContainerStates, Map<String, Long>>
+          unhealthyContainerStateStatsMap = reconScm.getContainerHealthTask()
+          .getUnhealthyContainerStateStatsMap();
+
+      // Return true if the size of the fetched containers is 0 and the log shows 0 for EMPTY_MISSING state
+      return allEmptyMissingContainers.size() == 0 &&
+          unhealthyContainerStateStatsMap.get(
+                  ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING)
+              .getOrDefault(CONTAINER_COUNT, 0L) == 0;
     });
 
     // Now remove keys from container. This data is used to
@@ -283,8 +306,8 @@ public class TestReconTasks {
       reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
     }
 
-    // Check existing container state in UNHEALTHY_CONTAINER table
-    // will be updated as EMPTY_MISSING
+    // Since we no longer add EMPTY_MISSING containers to the table, we should
+    // have zero EMPTY_MISSING containers in the DB but their information will be logged.
     LambdaTestUtils.await(25000, 1000, () -> {
       List<UnhealthyContainers> allEmptyMissingContainers =
           reconContainerManager.getContainerSchemaManager()
@@ -292,7 +315,16 @@ public class TestReconTasks {
                   ContainerSchemaDefinition.UnHealthyContainerStates.
                       EMPTY_MISSING,
                   0, 1000);
-      return (allEmptyMissingContainers.size() == 1);
+
+      Map<ContainerSchemaDefinition.UnHealthyContainerStates, Map<String, Long>>
+          unhealthyContainerStateStatsMap = reconScm.getContainerHealthTask()
+          .getUnhealthyContainerStateStatsMap();
+
+      // Return true if the size of the fetched containers is 0 and the log shows 1 for EMPTY_MISSING state
+      return allEmptyMissingContainers.size() == 0 &&
+          unhealthyContainerStateStatsMap.get(
+                  ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING)
+              .getOrDefault(CONTAINER_COUNT, 0L) == 1;
     });
 
     // Now restart the cluster and verify the container is no longer missing.

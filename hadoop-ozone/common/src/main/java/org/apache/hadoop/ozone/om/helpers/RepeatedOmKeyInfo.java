@@ -1,40 +1,38 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.helpers;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .RepeatedKeyInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .KeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RepeatedKeyInfo;
 
 /**
  * Args for deleted keys. This is written to om metadata deletedTable.
  * Once a key is deleted, it is moved to om metadata deletedTable. Having a
- * {label: List<OMKeyInfo>} ensures that if users create & delete keys with
+ * label: {@code List<OMKeyInfo>} ensures that if users create and delete keys with
  * exact same uri multiple times, all the delete instances are bundled under
  * the same key name. This is useful as part of GDPR compliance where an
  * admin wants to confirm if a given key is deleted from deletedTable metadata.
@@ -47,7 +45,8 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
     return new DelegatedCodec<>(
         Proto2Codec.get(RepeatedKeyInfo.getDefaultInstance()),
         RepeatedOmKeyInfo::getFromProto,
-        k -> k.getProto(ignorePipeline, ClientVersion.CURRENT_VERSION));
+        k -> k.getProto(ignorePipeline, ClientVersion.CURRENT_VERSION),
+        RepeatedOmKeyInfo.class);
   }
 
   public static Codec<RepeatedOmKeyInfo> getCodec(boolean ignorePipeline) {
@@ -110,9 +109,7 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
   }
 
   /**
-   *
-   * @param compact, true for persistence, false for network transmit
-   * @return
+   * @param compact true for persistence, false for network transmit
    */
   public RepeatedKeyInfo getProto(boolean compact, int clientVersion) {
     List<KeyInfo> list = new ArrayList<>();

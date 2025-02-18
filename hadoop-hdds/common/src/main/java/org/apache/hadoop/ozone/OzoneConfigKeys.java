@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,17 +17,15 @@
 
 package org.apache.hadoop.ozone;
 
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.http.HttpConfig;
-
 import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
 import org.apache.ratis.util.TimeDuration;
-
-import java.util.concurrent.TimeUnit;
 
 /**
  * This class contains constants for configuration keys used in Ozone.
@@ -121,6 +118,14 @@ public final class OzoneConfigKeys {
       = "4MB";
 
   /**
+   * Flag to allow server-side HBase-related features and enhancements to be enabled.
+   */
+  public static final String OZONE_HBASE_ENHANCEMENTS_ALLOWED
+      = "ozone.hbase.enhancements.allowed";
+  public static final boolean OZONE_HBASE_ENHANCEMENTS_ALLOWED_DEFAULT
+      = false;
+
+  /**
    * Flag to enable hsync/hflush.
    */
   public static final String OZONE_FS_HSYNC_ENABLED
@@ -193,9 +198,6 @@ public final class OzoneConfigKeys {
       "ozone.client.ec.grpc.write.timeout";
   public static final String OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT_DEFAULT = "30s";
 
-  public static final String OZONE_EC_GRPC_ZERO_COPY_ENABLED =
-      "ozone.ec.grpc.zerocopy.enabled";
-  public static final boolean OZONE_EC_GRPC_ZERO_COPY_ENABLED_DEFAULT = true;
 
   /**
    * Ozone administrator users delimited by comma.
@@ -322,17 +324,6 @@ public final class OzoneConfigKeys {
       "ozone.key.preallocation.max.blocks";
   public static final int OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT
       = 64;
-
-  public static final String OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER =
-      "ozone.block.deleting.limit.per.task";
-  public static final int OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER_DEFAULT
-      = 1000;
-
-  public static final String OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL
-      = "ozone.block.deleting.container.limit.per.interval";
-  public static final int
-      OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL_DEFAULT = 10;
-
   public static final String HDDS_CONTAINER_RATIS_ENABLED_KEY
       = ScmConfigKeys.HDDS_CONTAINER_RATIS_ENABLED_KEY;
   public static final boolean HDDS_CONTAINER_RATIS_ENABLED_DEFAULT
@@ -535,10 +526,6 @@ public final class OzoneConfigKeys {
 
   public static final int OZONE_MANAGER_STRIPED_LOCK_SIZE_DEFAULT = 512;
 
-  public static final String OZONE_CLIENT_LIST_TRASH_KEYS_MAX =
-      "ozone.client.list.trash.keys.max";
-  public static final int OZONE_CLIENT_LIST_TRASH_KEYS_MAX_DEFAULT = 1000;
-
   public static final String OZONE_HTTP_BASEDIR = "ozone.http.basedir";
 
   public static final String OZONE_HTTP_POLICY_KEY =
@@ -567,11 +554,6 @@ public final class OzoneConfigKeys {
       "ozone.https.client.need-auth";
   public static final boolean OZONE_CLIENT_HTTPS_NEED_AUTH_DEFAULT = false;
 
-  public static final String OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY =
-      "ozone.om.keyname.character.check.enabled";
-  public static final boolean OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT =
-      false;
-
   public static final int OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT = -1;
   public static final String OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY =
       "ozone.client.key.provider.cache.expiry";
@@ -582,6 +564,13 @@ public final class OzoneConfigKeys {
       "ozone.client.key.latest.version.location";
   public static final boolean OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION_DEFAULT =
       true;
+
+  public static final String OZONE_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS =
+      "ozone.client.server-defaults.validity.period.ms";
+
+  public static final long
+      OZONE_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS_DEFAULT =
+      TimeUnit.HOURS.toMillis(1); // 1 hour
 
   public static final String OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED =
           "ozone.network.flexible.fqdn.resolution.enabled";

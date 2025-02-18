@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,16 +17,15 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.ozone.common.Storage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
 
 /**
  * Interface to define the upgrade finalizer implementations.
@@ -50,14 +48,14 @@ public interface UpgradeFinalizer<T> {
    * Represents the current state in which the service is with regards to
    * finalization after an upgrade.
    * The state transitions are the following:
-   * ALREADY_FINALIZED - no entry no exit from this status without restart.
+   * {@code ALREADY_FINALIZED} - no entry no exit from this status without restart.
    * After an upgrade:
-   * FINALIZATION_REQUIRED -(finalize)-> STARTING_FINALIZATION
-   * -> FINALIZATION_IN_PROGRESS -> FINALIZATION_DONE from finalization done
+   * {@code FINALIZATION_REQUIRED -(finalize)-> STARTING_FINALIZATION
+   * -> FINALIZATION_IN_PROGRESS -> FINALIZATION_DONE} from finalization done
    * there is no more move possible, after a restart the service can end up in:
-   * - FINALIZATION_REQUIRED, if the finalization failed and have not reached
-   * FINALIZATION_DONE,
-   * - or it can be ALREADY_FINALIZED if the finalization was successfully done.
+   * {@code FINALIZATION_REQUIRED}, if the finalization failed and have not reached
+   * {@code FINALIZATION_DONE},
+   * - or it can be {@code ALREADY_FINALIZED} if the finalization was successfully done.
    */
   enum Status {
     ALREADY_FINALIZED,

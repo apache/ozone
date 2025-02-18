@@ -19,13 +19,12 @@
 import React from 'react';
 import { Progress } from 'antd';
 import filesize from 'filesize';
-import Icon from '@ant-design/icons';
-import { withRouter } from 'react-router-dom';
 import Tooltip from 'antd/lib/tooltip';
 
-import { FilledIcon } from '@/utils/themeIcons';
 import { getCapacityPercent } from '@/utils/common';
 import type { StorageReport } from '@/v2/types/overview.types';
+
+import './storageBar.less';
 
 const size = filesize.partial({
   standard: 'iec',
@@ -33,59 +32,65 @@ const size = filesize.partial({
 });
 
 type StorageReportProps = {
-  showMeta: boolean;
+  showMeta?: boolean;
+  strokeWidth?: number;
 } & StorageReport
 
 
-const StorageBar = (props: StorageReportProps = {
-  capacity: 0,
-  used: 0,
-  remaining: 0,
-  committed: 0,
-  showMeta: true,
+const StorageBar: React.FC<StorageReportProps> = ({
+  capacity = 0,
+  used = 0,
+  remaining = 0,
+  committed = 0,
+  showMeta = false,
+  strokeWidth = 3
 }) => {
-  const { capacity, used, remaining, committed, showMeta } = props;
 
   const nonOzoneUsed = capacity - remaining - used;
   const totalUsed = capacity - remaining;
   const tooltip = (
     <>
-      <div>
-        <Icon component={FilledIcon} className='ozone-used-bg' />
-        Ozone Used ({size(used)})
-      </div>
-      <div>
-        <Icon component={FilledIcon} className='non-ozone-used-bg' />
-        Non Ozone Used ({size(nonOzoneUsed)})
-      </div>
-      <div>
-        <Icon component={FilledIcon} className='remaining-bg' />
-        Remaining ({size(remaining)})
-      </div>
-      <div>
-        <Icon component={FilledIcon} className='committed-bg' />
-        Container Pre-allocated ({size(committed)})
-      </div>
+      <table cellPadding={5}>
+        <tbody>
+          <tr>
+            <td>Ozone Used</td>
+            <td><strong>{size(used)}</strong></td>
+          </tr>
+          <tr>
+            <td>Non Ozone Used</td>
+            <td><strong>{size(nonOzoneUsed)}</strong></td>
+          </tr>
+          <tr>
+            <td>Remaining</td>
+            <td><strong>{size(remaining)}</strong></td>
+          </tr>
+          <tr>
+            <td>Container Pre-allocated</td>
+            <td><strong>{size(committed)}</strong></td>
+          </tr>
+        </tbody>
+      </table>
     </>
   );
-  const metaElement = (showMeta) ? (
-    <div>
-      {size(used + nonOzoneUsed)} / {size(capacity)}
-    </div>
-  ) : <></>;
 
+  const percentage = getCapacityPercent(totalUsed, capacity)
 
   return (
-    <div className='storage-cell-container'>
-      <Tooltip title={tooltip} placement='bottomLeft'>
-        {metaElement}
+      <Tooltip
+        title={tooltip}
+        placement='bottomLeft'
+        className='storage-cell-container-v2' >
+        {(showMeta) &&
+          <div>
+            {size(used + nonOzoneUsed)} / {size(capacity)}
+          </div>
+        }
         <Progress
           strokeLinecap='round'
-          percent={getCapacityPercent(totalUsed, capacity)}
-          success={{ percent: getCapacityPercent(used, capacity) }}
-          className='capacity-bar' strokeWidth={3} />
+          percent={percentage}
+          strokeColor={(percentage > 80) ? '#FF4D4E' : '#52C41A'}
+          className={(percentage > 80) ? 'capacity-bar-v2-error' : 'capacity-bar-v2'} strokeWidth={strokeWidth} />
       </Tooltip>
-    </div>
   );
 }
 

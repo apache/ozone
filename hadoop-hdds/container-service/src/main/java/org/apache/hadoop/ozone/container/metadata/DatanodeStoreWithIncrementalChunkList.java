@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,9 +14,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.metadata;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
+import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
+import static org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl.FULL_CHUNK;
+
 import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -25,15 +33,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
-import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
-import static org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl.FULL_CHUNK;
 
 /**
  * Constructs a datanode store in accordance with schema version 2, which uses
@@ -56,11 +55,9 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
 
 
   @Override
-  public BlockData getBlockByID(BlockID blockID,
-      String blockKey) throws IOException {
+  public BlockData getCompleteBlockData(BlockData blockData,
+      BlockID blockID, String blockKey) throws IOException {
     BlockData lastChunk = null;
-    // check block data table
-    BlockData blockData = getBlockDataTable().get(blockKey);
     if (blockData == null || isPartialChunkList(blockData)) {
       // check last chunk table
       lastChunk = getLastChunkInfoTable().get(blockKey);
@@ -190,18 +187,29 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
 
   private void putBlockWithPartialChunks(BatchOperation batch, long localID,
       BlockData data, KeyValueContainerData containerData) throws IOException {
+    String blockKey = containerData.getBlockKey(localID);
+    BlockData blockData = getBlockDataTable().get(blockKey);
     if (data.getChunks().size() == 1) {
       // Case (3.1) replace/update the last chunk info table
       getLastChunkInfoTable().putWithBatch(
-          batch, containerData.getBlockKey(localID), data);
+          batch, blockKey, data);
+      // If the block does not exist in the block data table because it is the first chunk
+      // and the chunk is not full, then add an empty block data to populate the block table.
+      // This is required because some of the test code and utilities expect the block to be
+      // present in the block data table, they don't check the last chunk info table.
+      if (blockData == null) {
+        // populate blockDataTable with empty chunk list
+        blockData = new BlockData(data.getBlockID());
+        blockData.addMetadata(INCREMENTAL_CHUNK_LIST, "");
+        blockData.setBlockCommitSequenceId(data.getBlockCommitSequenceId());
+        getBlockDataTable().putWithBatch(batch, blockKey, blockData);
+      }
     } else {
       int lastChunkIndex = data.getChunks().size() - 1;
       // received more than one chunk this time
       List<ContainerProtos.ChunkInfo> lastChunkInfo =
           Collections.singletonList(
               data.getChunks().get(lastChunkIndex));
-      BlockData blockData = getBlockDataTable().get(
-          containerData.getBlockKey(localID));
       if (blockData == null) {
         // Case 3.2: if the block does not exist in the block data table
         List<ContainerProtos.ChunkInfo> chunkInfos =

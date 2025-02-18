@@ -24,7 +24,7 @@ if [ ! "$SONAR_TOKEN" ]; then
 fi
 
 
-mvn -V -B -DskipShade -DskipTests -Dskip.npx -Dskip.installnpx --no-transfer-progress \
+mvn -V -B -DskipShade -DskipTests -DskipRecon --no-transfer-progress \
   -Dsonar.coverage.jacoco.xmlReportPaths="$(pwd)/target/coverage/all.xml" \
   -Dsonar.host.url=https://sonarcloud.io -Dsonar.organization=apache -Dsonar.projectKey=hadoop-ozone \
   verify org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar

@@ -1,32 +1,54 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.replication;
 
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.LOW;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.NORMAL;
+import static org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status.DONE;
+import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.fromSources;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyList;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import com.google.protobuf.Proto2Utils;
+import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Clock;
-import java.util.ArrayList;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.SortedMap;
 import java.util.UUID;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.CountDownLatch;
@@ -37,8 +59,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
-
-import com.google.protobuf.Proto2Utils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -46,20 +66,23 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCommandInfo;
+import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinatorTask;
+import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionMetrics;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -68,27 +91,6 @@ import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
-
-import jakarta.annotation.Nonnull;
-
-import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
-import static org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status.DONE;
-import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.fromSources;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.LOW;
-import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.NORMAL;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyList;
-import static org.mockito.Mockito.anyLong;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Test the replication supervisor.
@@ -108,6 +110,8 @@ public class TestReplicationSupervisor {
     }
   };
   private final AtomicReference<ContainerReplicator> replicatorRef =
+      new AtomicReference<>();
+  private final AtomicReference<ECReconstructionCoordinator> ecReplicatorRef =
       new AtomicReference<>();
 
   private ContainerSet set;
@@ -135,6 +139,7 @@ public class TestReplicationSupervisor {
   @AfterEach
   public void cleanup() {
     replicatorRef.set(null);
+    ecReplicatorRef.set(null);
   }
 
   @ContainerLayoutTestInfo.ContainerTest
@@ -395,6 +400,116 @@ public class TestReplicationSupervisor {
   }
 
   @ContainerLayoutTestInfo.ContainerTest
+  public void testMultipleReplication(ContainerLayoutVersion layout,
+      @TempDir File tempFile) throws IOException {
+    this.layoutVersion = layout;
+    OzoneConfiguration conf = new OzoneConfiguration();
+    // GIVEN
+    ReplicationSupervisor replicationSupervisor =
+        supervisorWithReplicator(FakeReplicator::new);
+    ReplicationSupervisor ecReconstructionSupervisor = supervisorWithECReconstruction();
+    ReplicationSupervisorMetrics replicationMetrics =
+        ReplicationSupervisorMetrics.create(replicationSupervisor);
+    ReplicationSupervisorMetrics ecReconstructionMetrics =
+        ReplicationSupervisorMetrics.create(ecReconstructionSupervisor);
+    try {
+      //WHEN
+      replicationSupervisor.addTask(createTask(1L));
+      ecReconstructionSupervisor.addTask(createECTaskWithCoordinator(2L));
+      replicationSupervisor.addTask(createTask(1L));
+      replicationSupervisor.addTask(createTask(3L));
+      ecReconstructionSupervisor.addTask(createECTaskWithCoordinator(4L));
+
+      SimpleContainerDownloader moc = mock(SimpleContainerDownloader.class);
+      Path res = Paths.get("file:/tmp/no-such-file");
+      when(moc.getContainerDataFromReplicas(anyLong(), anyList(),
+          any(Path.class), any())).thenReturn(res);
+
+      final String testDir = tempFile.getPath();
+      MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+      when(volumeSet.getVolumesList()).thenReturn(singletonList(
+          new HddsVolume.Builder(testDir).conf(conf).build()));
+      ContainerController mockedCC = mock(ContainerController.class);
+      ContainerImporter importer = new ContainerImporter(conf, set, mockedCC, volumeSet);
+      ContainerReplicator replicator = new DownloadAndImportReplicator(
+          conf, set, importer, moc);
+      replicatorRef.set(replicator);
+      replicationSupervisor.addTask(createTask(5L));
+
+      ReplicateContainerCommand cmd1 = createCommand(6L);
+      cmd1.setDeadline(clock.millis() + 10000);
+      ReplicationTask task1 = new ReplicationTask(cmd1, replicatorRef.get());
+      clock.fastForward(15000);
+      replicationSupervisor.addTask(task1);
+
+      ReconstructECContainersCommand cmd2 = createReconstructionCmd(7L);
+      cmd2.setDeadline(clock.millis() + 10000);
+      ECReconstructionCoordinatorTask task2 = new ECReconstructionCoordinatorTask(
+          ecReplicatorRef.get(), new ECReconstructionCommandInfo(cmd2));
+      clock.fastForward(15000);
+      ecReconstructionSupervisor.addTask(task2);
+      ecReconstructionSupervisor.addTask(createECTask(8L));
+      ecReconstructionSupervisor.addTask(createECTask(9L));
+
+      //THEN
+      assertEquals(2, replicationSupervisor.getReplicationSuccessCount());
+      assertEquals(2, replicationSupervisor.getReplicationSuccessCount(
+          task1.getMetricName()));
+      assertEquals(1, replicationSupervisor.getReplicationFailureCount());
+      assertEquals(1, replicationSupervisor.getReplicationFailureCount(
+          task1.getMetricName()));
+      assertEquals(1, replicationSupervisor.getReplicationSkippedCount());
+      assertEquals(1, replicationSupervisor.getReplicationSkippedCount(
+          task1.getMetricName()));
+      assertEquals(1, replicationSupervisor.getReplicationTimeoutCount());
+      assertEquals(1, replicationSupervisor.getReplicationTimeoutCount(
+          task1.getMetricName()));
+      assertEquals(5, replicationSupervisor.getReplicationRequestCount());
+      assertEquals(5, replicationSupervisor.getReplicationRequestCount(
+          task1.getMetricName()));
+      assertEquals(0, replicationSupervisor.getReplicationRequestCount(
+          task2.getMetricName()));
+
+      assertEquals(2, ecReconstructionSupervisor.getReplicationSuccessCount());
+      assertEquals(2, ecReconstructionSupervisor.getReplicationSuccessCount(
+          task2.getMetricName()));
+      assertEquals(1, ecReconstructionSupervisor.getReplicationTimeoutCount());
+      assertEquals(1, ecReconstructionSupervisor.getReplicationTimeoutCount(
+          task2.getMetricName()));
+      assertEquals(2, ecReconstructionSupervisor.getReplicationFailureCount());
+      assertEquals(2, ecReconstructionSupervisor.getReplicationFailureCount(
+          task2.getMetricName()));
+      assertEquals(5, ecReconstructionSupervisor.getReplicationRequestCount());
+      assertEquals(5, ecReconstructionSupervisor.getReplicationRequestCount(
+          task2.getMetricName()));
+      assertEquals(0, ecReconstructionSupervisor.getReplicationRequestCount(
+          task1.getMetricName()));
+
+      assertTrue(replicationSupervisor.getReplicationRequestTotalTime(
+          task1.getMetricName()) > 0);
+      assertTrue(ecReconstructionSupervisor.getReplicationRequestTotalTime(
+          task2.getMetricName()) > 0);
+      assertTrue(replicationSupervisor.getReplicationRequestAvgTime(
+          task1.getMetricName()) > 0);
+      assertTrue(ecReconstructionSupervisor.getReplicationRequestAvgTime(
+          task2.getMetricName()) > 0);
+
+      MetricsCollectorImpl replicationMetricsCollector = new MetricsCollectorImpl();
+      replicationMetrics.getMetrics(replicationMetricsCollector, true);
+      assertEquals(1, replicationMetricsCollector.getRecords().size());
+
+      MetricsCollectorImpl ecReconstructionMetricsCollector = new MetricsCollectorImpl();
+      ecReconstructionMetrics.getMetrics(ecReconstructionMetricsCollector, true);
+      assertEquals(1, ecReconstructionMetricsCollector.getRecords().size());
+    } finally {
+      replicationMetrics.unRegister();
+      ecReconstructionMetrics.unRegister();
+      replicationSupervisor.stop();
+      ecReconstructionSupervisor.stop();
+    }
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
   public void testPriorityOrdering(ContainerLayoutVersion layout)
       throws InterruptedException {
     this.layoutVersion = layout;
@@ -477,6 +592,16 @@ public class TestReplicationSupervisor {
     }
 
     @Override
+    protected String getMetricName() {
+      return "Blockings";
+    }
+
+    @Override
+    protected String getMetricDescriptionSegment() {
+      return "blockings";
+    }
+
+    @Override
     public void runTask() {
       runningLatch.countDown();
       assertDoesNotThrow(() -> waitForCompleteLatch.await(),
@@ -500,6 +625,16 @@ public class TestReplicationSupervisor {
       this.name = name;
       this.completeLatch = completeLatch;
       setPriority(priority);
+    }
+
+    @Override
+    protected String getMetricName() {
+      return "Ordereds";
+    }
+
+    @Override
+    protected String getMetricDescriptionSegment() {
+      return "ordereds";
     }
 
     @Override
@@ -531,6 +666,22 @@ public class TestReplicationSupervisor {
     return supervisor;
   }
 
+  private ReplicationSupervisor supervisorWithECReconstruction() throws IOException {
+    ConfigurationSource conf = new OzoneConfiguration();
+    ExecutorService executor = newDirectExecutorService();
+    ReplicationServer.ReplicationConfig repConf =
+        conf.getObject(ReplicationServer.ReplicationConfig.class);
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context).replicationConfig(repConf).executor(executor)
+        .clock(clock).build();
+
+    FakeECReconstructionCoordinator coordinator = new FakeECReconstructionCoordinator(
+        new OzoneConfiguration(), null, null, context,
+        ECReconstructionMetrics.create(), "", supervisor);
+    ecReplicatorRef.set(coordinator);
+    return supervisor;
+  }
+
   private ReplicationTask createTask(long containerId) {
     ReplicateContainerCommand cmd = createCommand(containerId);
     return new ReplicationTask(cmd, replicatorRef.get());
@@ -538,7 +689,13 @@ public class TestReplicationSupervisor {
 
   private ECReconstructionCoordinatorTask createECTask(long containerId) {
     return new ECReconstructionCoordinatorTask(null,
-        createReconstructionCmd(containerId));
+        createReconstructionCmdInfo(containerId));
+  }
+
+  private ECReconstructionCoordinatorTask createECTaskWithCoordinator(long containerId) {
+    ECReconstructionCommandInfo ecReconstructionCommandInfo = createReconstructionCmdInfo(containerId);
+    return new ECReconstructionCoordinatorTask(ecReplicatorRef.get(),
+        ecReconstructionCommandInfo);
   }
 
   private static ReplicateContainerCommand createCommand(long containerId) {
@@ -548,18 +705,20 @@ public class TestReplicationSupervisor {
     return cmd;
   }
 
-  private static ECReconstructionCommandInfo createReconstructionCmd(
+  private static ECReconstructionCommandInfo createReconstructionCmdInfo(
       long containerId) {
-    List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex> sources
-        = new ArrayList<>();
-    sources.add(new ReconstructECContainersCommand
-        .DatanodeDetailsAndReplicaIndex(
-            MockDatanodeDetails.randomDatanodeDetails(), 1));
-    sources.add(new ReconstructECContainersCommand
-        .DatanodeDetailsAndReplicaIndex(
+    return new ECReconstructionCommandInfo(createReconstructionCmd(containerId));
+  }
+
+  private static ReconstructECContainersCommand createReconstructionCmd(
+      long containerId) {
+    List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex> sources =
+        new ArrayList<>();
+    sources.add(new ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex(
+        MockDatanodeDetails.randomDatanodeDetails(), 1));
+    sources.add(new ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex(
         MockDatanodeDetails.randomDatanodeDetails(), 2));
-    sources.add(new ReconstructECContainersCommand
-        .DatanodeDetailsAndReplicaIndex(
+    sources.add(new ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex(
         MockDatanodeDetails.randomDatanodeDetails(), 3));
 
     byte[] missingIndexes = new byte[1];
@@ -567,14 +726,44 @@ public class TestReplicationSupervisor {
 
     List<DatanodeDetails> target = singletonList(
         MockDatanodeDetails.randomDatanodeDetails());
-    ReconstructECContainersCommand cmd =
-        new ReconstructECContainersCommand(containerId,
-            sources,
-            target,
-            Proto2Utils.unsafeByteString(missingIndexes),
-            new ECReplicationConfig(3, 2));
+    ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(containerId, sources, target,
+        Proto2Utils.unsafeByteString(missingIndexes),
+        new ECReplicationConfig(3, 2));
+    cmd.setTerm(CURRENT_TERM);
+    return cmd;
+  }
 
-    return new ECReconstructionCommandInfo(cmd);
+  /**
+   * A fake coordinator that simulates successful reconstruction of ec containers.
+   */
+  private class FakeECReconstructionCoordinator extends ECReconstructionCoordinator {
+
+    private final OzoneConfiguration conf = new OzoneConfiguration();
+    private final ReplicationSupervisor supervisor;
+
+    FakeECReconstructionCoordinator(ConfigurationSource conf,
+        CertificateClient certificateClient, SecretKeySignerClient secretKeyClient,
+        StateContext context, ECReconstructionMetrics metrics, String threadNamePrefix,
+        ReplicationSupervisor supervisor)
+            throws IOException {
+      super(conf, certificateClient, secretKeyClient, context, metrics, threadNamePrefix);
+      this.supervisor = supervisor;
+    }
+
+    @Override
+    public void reconstructECContainerGroup(long containerID,
+        ECReplicationConfig repConfig, SortedMap<Integer, DatanodeDetails> sourceNodeMap,
+        SortedMap<Integer, DatanodeDetails> targetNodeMap) {
+      assertEquals(1, supervisor.getTotalInFlightReplications());
+
+      KeyValueContainerData kvcd = new KeyValueContainerData(
+          containerID, layoutVersion, 100L,
+          UUID.randomUUID().toString(), UUID.randomUUID().toString());
+      KeyValueContainer kvc = new KeyValueContainer(kvcd, conf);
+      assertDoesNotThrow(() -> {
+        set.addContainer(kvc);
+      });
+    }
   }
 
   /**

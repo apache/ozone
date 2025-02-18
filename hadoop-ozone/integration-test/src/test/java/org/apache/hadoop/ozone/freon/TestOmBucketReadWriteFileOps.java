@@ -1,21 +1,29 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.freon;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.net.URI;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -36,24 +44,17 @@ import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
-
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.net.URI;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test for OmBucketReadWriteFileOps.
  */
 public class TestOmBucketReadWriteFileOps {
-
-  private String path;
+  @TempDir
+  private java.nio.file.Path path;
   private OzoneConfiguration conf = null;
   private MiniOzoneCluster cluster = null;
   private ObjectStore store = null;
@@ -63,12 +64,8 @@ public class TestOmBucketReadWriteFileOps {
 
   @BeforeEach
   public void setup() {
-    path = GenericTestUtils
-        .getTempPath(TestOmBucketReadWriteFileOps.class.getSimpleName());
     GenericTestUtils.setLogLevel(RaftLog.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(RaftServer.LOG, Level.DEBUG);
-    File baseDir = new File(path);
-    baseDir.mkdirs();
   }
 
   /**
@@ -78,7 +75,6 @@ public class TestOmBucketReadWriteFileOps {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
-      FileUtils.deleteDirectory(new File(path));
     }
   }
 
@@ -107,8 +103,7 @@ public class TestOmBucketReadWriteFileOps {
   public void testOmBucketReadWriteFileOps() throws Exception {
     try {
       startCluster();
-      FileOutputStream out = FileUtils.openOutputStream(new File(path,
-          "conf"));
+      FileOutputStream out = FileUtils.openOutputStream(new File(path.toString(), "conf"));
       cluster.getConf().writeXml(out);
       out.getFD().sync();
       out.close();
@@ -154,7 +149,7 @@ public class TestOmBucketReadWriteFileOps {
     volume.createBucket(parameterBuilder.bucketName);
     String rootPath = "o3fs://" + parameterBuilder.bucketName + "." +
             parameterBuilder.volumeName + parameterBuilder.prefixFilePath;
-    String confPath = new File(path, "conf").getAbsolutePath();
+    String confPath = new File(path.toString(), "conf").getAbsolutePath();
     new Freon().execute(
         new String[]{"-conf", confPath, "obrwf", "-P", rootPath,
             "-r", String.valueOf(parameterBuilder.fileCountForRead),

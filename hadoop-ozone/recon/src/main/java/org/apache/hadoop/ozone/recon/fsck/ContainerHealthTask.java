@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,6 +17,13 @@
 
 package org.apache.hadoop.ozone.recon.fsck;
 
+import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT;
+import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
+import static org.apache.hadoop.ozone.recon.ReconConstants.TOTAL_KEYS;
+import static org.apache.hadoop.ozone.recon.ReconConstants.TOTAL_USED_BYTES;
+import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING;
+
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -28,7 +34,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -44,21 +49,15 @@ import org.apache.hadoop.ozone.recon.scm.ReconScmTask;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.hadoop.util.Time;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
-import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.hadoop.ozone.recon.schema.tables.records.UnhealthyContainersRecord;
 import org.jooq.Cursor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT;
-import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
-import static org.apache.hadoop.ozone.recon.ReconConstants.TOTAL_KEYS;
-import static org.apache.hadoop.ozone.recon.ReconConstants.TOTAL_USED_BYTES;
-import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING;
-
 
 /**
  * Class that scans the list of containers and keeps track of containers with
@@ -78,22 +77,25 @@ public class ContainerHealthTask extends ReconScmTask {
   private final ReconContainerMetadataManager reconContainerMetadataManager;
   private final PlacementPolicy placementPolicy;
   private final long interval;
+  private Map<UnHealthyContainerStates, Map<String, Long>>
+      unhealthyContainerStateStatsMapForTesting;
 
   private final Set<ContainerInfo> processedContainers = new HashSet<>();
 
   private final OzoneConfiguration conf;
 
+  private final ReconTaskStatusUpdater taskStatusUpdater;
+
   @SuppressWarnings("checkstyle:ParameterNumber")
   public ContainerHealthTask(
       ContainerManager containerManager,
       StorageContainerServiceProvider scmClient,
-      ReconTaskStatusDao reconTaskStatusDao,
       ContainerHealthSchemaManager containerHealthSchemaManager,
       PlacementPolicy placementPolicy,
       ReconTaskConfig reconTaskConfig,
       ReconContainerMetadataManager reconContainerMetadataManager,
-      OzoneConfiguration conf) {
-    super(reconTaskStatusDao);
+      OzoneConfiguration conf, ReconTaskStatusUpdaterManager taskStatusUpdaterManager) {
+    super(taskStatusUpdaterManager);
     this.scmClient = scmClient;
     this.containerHealthSchemaManager = containerHealthSchemaManager;
     this.reconContainerMetadataManager = reconContainerMetadataManager;
@@ -101,13 +103,14 @@ public class ContainerHealthTask extends ReconScmTask {
     this.containerManager = containerManager;
     this.conf = conf;
     interval = reconTaskConfig.getMissingContainerTaskInterval().toMillis();
+    this.taskStatusUpdater = getTaskStatusUpdater();
   }
 
   @Override
   public void run() {
     try {
       while (canRun()) {
-        triggerContainerHealthCheck();
+        initializeAndRunTask();
         Thread.sleep(interval);
       }
     } catch (Throwable t) {
@@ -115,10 +118,13 @@ public class ContainerHealthTask extends ReconScmTask {
       if (t instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
+      taskStatusUpdater.setLastTaskRunStatus(-1);
+      taskStatusUpdater.recordRunCompletion();
     }
   }
 
-  public void triggerContainerHealthCheck() {
+  @Override
+  protected void runTask() throws Exception {
     lock.writeLock().lock();
     // Map contains all UNHEALTHY STATES as keys and value is another map
     // with 3 keys (CONTAINER_COUNT, TOTAL_KEYS, TOTAL_USED_BYTES) and value
@@ -141,7 +147,11 @@ public class ContainerHealthTask extends ReconScmTask {
               " process {} existing database records.",
           Time.monotonicNow() - start, existingCount);
 
+      start = Time.monotonicNow();
       checkAndProcessContainers(unhealthyContainerStateStatsMap, currentTime);
+      LOG.debug("Container Health Task thread took {} milliseconds to process containers",
+          Time.monotonicNow() - start);
+      taskStatusUpdater.setLastTaskRunStatus(0);
       processedContainers.clear();
     } finally {
       lock.writeLock().unlock();
@@ -162,7 +172,6 @@ public class ContainerHealthTask extends ReconScmTask {
           .filter(c -> !processedContainers.contains(c))
           .forEach(c -> processContainer(c, currentTime,
               unhealthyContainerStateStatsMap));
-      recordSingleRunCompletion();
       LOG.debug("Container Health task thread took {} milliseconds for" +
               " processing {} containers.", Time.monotonicNow() - start,
           containers.size());
@@ -185,10 +194,12 @@ public class ContainerHealthTask extends ReconScmTask {
   private void logUnhealthyContainerStats(
       Map<UnHealthyContainerStates, Map<String, Long>>
           unhealthyContainerStateStatsMap) {
+    unhealthyContainerStateStatsMapForTesting =
+        new HashMap<>(unhealthyContainerStateStatsMap);
     // If any EMPTY_MISSING containers, then it is possible that such
     // containers got stuck in the closing state which never got
     // any replicas created on the datanodes. In this case, we log it as
-    // EMPTY, and insert as EMPTY_MISSING in UNHEALTHY_CONTAINERS table.
+    // EMPTY_MISSING in unhealthy container statistics but do not add it to the table.
     unhealthyContainerStateStatsMap.entrySet().forEach(stateEntry -> {
       UnHealthyContainerStates unhealthyContainerState = stateEntry.getKey();
       Map<String, Long> containerStateStatsMap = stateEntry.getValue();
@@ -256,6 +267,11 @@ public class ContainerHealthTask extends ReconScmTask {
    * completeProcessingContainer is called. This will check to see if any
    * additional records need to be added to the database.
    *
+   * If a container is identified as missing, empty-missing, under-replicated,
+   * over-replicated or mis-replicated, the method checks with SCM to determine
+   * if it has been deleted, using {@code containerDeletedInSCM}. If the container is
+   * deleted in SCM, the corresponding record is removed from Recon.
+   *
    * @param currentTime Timestamp to place on all records generated by this run
    * @param unhealthyContainerStateCountMap
    * @return Count of records processed
@@ -273,9 +289,11 @@ public class ContainerHealthTask extends ReconScmTask {
         recordCount++;
         UnhealthyContainersRecord rec = cursor.fetchNext();
         try {
+          // Set the current container if it's not already set
           if (currentContainer == null) {
             currentContainer = setCurrentContainer(rec.getContainerId());
           }
+          // If the container ID has changed, finish processing the previous one
           if (currentContainer.getContainerID() != rec.getContainerId()) {
             completeProcessingContainer(
                 currentContainer, existingRecords, currentTime,
@@ -283,24 +301,29 @@ public class ContainerHealthTask extends ReconScmTask {
             existingRecords.clear();
             currentContainer = setCurrentContainer(rec.getContainerId());
           }
-          if (ContainerHealthRecords
-              .retainOrUpdateRecord(currentContainer, rec
-              )) {
-            // Check if the missing container is deleted in SCM
-            if (currentContainer.isMissing() &&
-                containerDeletedInSCM(currentContainer.getContainer())) {
-              rec.delete();
-            }
-            existingRecords.add(rec.getContainerState());
-            if (rec.changed()) {
-              rec.update();
-            }
-          } else {
+
+          //  Unhealthy Containers such as MISSING, UNDER_REPLICATED,
+          // OVER_REPLICATED, MIS_REPLICATED can have their unhealthy states changed or retained.
+          if (!ContainerHealthRecords.retainOrUpdateRecord(currentContainer, rec)) {
+            rec.delete();
             LOG.info("DELETED existing unhealthy container record...for Container: {}",
                 currentContainer.getContainerID());
+          }
+
+          // If the container is marked as MISSING and it's deleted in SCM, remove the record
+          if (currentContainer.isMissing() && containerDeletedInSCM(currentContainer.getContainer())) {
             rec.delete();
+            LOG.info("DELETED existing unhealthy container record...for Container: {}",
+                currentContainer.getContainerID());
+          }
+
+          existingRecords.add(rec.getContainerState());
+          // If the record was changed, update it
+          if (rec.changed()) {
+            rec.update();
           }
         } catch (ContainerNotFoundException cnf) {
+          // If the container is not found, delete the record and reset currentContainer
           rec.delete();
           currentContainer = null;
         }
@@ -326,13 +349,6 @@ public class ContainerHealthTask extends ReconScmTask {
           containerReplicas, placementPolicy,
           reconContainerMetadataManager, conf);
 
-      // Handle negative sized containers separately
-      if (h.getContainer().getUsedBytes() < 0) {
-        handleNegativeSizedContainers(h, currentTime,
-            unhealthyContainerStateStatsMap);
-        return;
-      }
-
       if (h.isHealthilyReplicated() || h.isDeleted()) {
         return;
       }
@@ -349,6 +365,18 @@ public class ContainerHealthTask extends ReconScmTask {
     }
   }
 
+  /**
+   * Ensures the container's state in Recon is updated to match its state in SCM.
+   *
+   * If SCM reports the container as DELETED, this method attempts to transition
+   * the container's state in Recon from CLOSED to DELETING, or from DELETING to
+   * DELETED, based on the current state in Recon. It logs each transition attempt
+   * and handles any exceptions that may occur.
+   *
+   * @param containerInfo the container whose state is being checked and potentially updated.
+   * @return {@code true} if the container was found to be DELETED in SCM and the
+   *         state transition was attempted in Recon; {@code false} otherwise.
+   */
   private boolean containerDeletedInSCM(ContainerInfo containerInfo) {
     try {
       ContainerWithPipeline containerWithPipeline =
@@ -358,6 +386,8 @@ public class ContainerHealthTask extends ReconScmTask {
         if (containerInfo.getState() == HddsProtos.LifeCycleState.CLOSED) {
           containerManager.updateContainerState(containerInfo.containerID(),
               HddsProtos.LifeCycleEvent.DELETE);
+          LOG.debug("Successfully changed container {} state from CLOSED to DELETING.",
+              containerInfo.containerID());
         }
         if (containerInfo.getState() == HddsProtos.LifeCycleState.DELETING &&
             containerManager.getContainerReplicas(containerInfo.containerID())
@@ -365,6 +395,7 @@ public class ContainerHealthTask extends ReconScmTask {
         ) {
           containerManager.updateContainerState(containerInfo.containerID(),
               HddsProtos.LifeCycleEvent.CLEANUP);
+          LOG.info("Successfully Deleted container {} from Recon.", containerInfo.containerID());
         }
         return true;
       }
@@ -380,28 +411,50 @@ public class ContainerHealthTask extends ReconScmTask {
 
   /**
    * This method is used to handle containers with negative sizes. It logs an
-   * error message and inserts a record into the UNHEALTHY_CONTAINERS table.
+   * error message.
    * @param containerHealthStatus
    * @param currentTime
    * @param unhealthyContainerStateStatsMap
    */
-  private void handleNegativeSizedContainers(
+  private static void handleNegativeSizedContainers(
       ContainerHealthStatus containerHealthStatus, long currentTime,
       Map<UnHealthyContainerStates, Map<String, Long>>
           unhealthyContainerStateStatsMap) {
+    // NEGATIVE_SIZE containers are also not inserted into the database.
+    // This condition usually arises due to corrupted or invalid metadata, where
+    // the container's size is inaccurately recorded as negative. Since this does not
+    // represent a typical unhealthy scenario and may not have any meaningful
+    // impact on system health, such containers are logged for investigation but
+    // excluded from the UNHEALTHY_CONTAINERS table to maintain data integrity.
     ContainerInfo container = containerHealthStatus.getContainer();
-    LOG.error(
-        "Container {} has negative size. Please visit Recon's unhealthy " +
-            "container endpoint for more details.",
-        container.getContainerID());
-    UnhealthyContainers record =
-        ContainerHealthRecords.recordForState(containerHealthStatus,
-            UnHealthyContainerStates.NEGATIVE_SIZE, currentTime);
-    List<UnhealthyContainers> records = Collections.singletonList(record);
-    populateContainerStats(containerHealthStatus,
-        UnHealthyContainerStates.NEGATIVE_SIZE,
+    LOG.error("Container {} has negative size.", container.getContainerID());
+    populateContainerStats(containerHealthStatus, UnHealthyContainerStates.NEGATIVE_SIZE,
         unhealthyContainerStateStatsMap);
-    containerHealthSchemaManager.insertUnhealthyContainerRecords(records);
+  }
+
+  /**
+   * This method is used to handle containers that are empty and missing. It logs
+   * a debug message.
+   * @param containerHealthStatus
+   * @param currentTime
+   * @param unhealthyContainerStateStatsMap
+   */
+  private static void handleEmptyMissingContainers(
+      ContainerHealthStatus containerHealthStatus, long currentTime,
+      Map<UnHealthyContainerStates, Map<String, Long>>
+          unhealthyContainerStateStatsMap) {
+    // EMPTY_MISSING containers are not inserted into the database.
+    // These containers typically represent those that were never written to
+    // or remain in an incomplete state. Tracking such containers as unhealthy
+    // would not provide valuable insights since they don't pose a risk or issue
+    // to the system. Instead, they are logged for awareness, but not stored in
+    // the UNHEALTHY_CONTAINERS table to avoid unnecessary entries.
+    ContainerInfo container = containerHealthStatus.getContainer();
+    LOG.debug("Empty container {} is missing. It will be logged in the " +
+        "unhealthy container statistics, but no record will be created in the " +
+        "UNHEALTHY_CONTAINERS table.", container.getContainerID());
+    populateContainerStats(containerHealthStatus, EMPTY_MISSING,
+        unhealthyContainerStateStatsMap);
   }
 
   /**
@@ -492,20 +545,19 @@ public class ContainerHealthTask extends ReconScmTask {
           populateContainerStats(container, UnHealthyContainerStates.MISSING,
               unhealthyContainerStateStatsMap);
         } else {
-
-          LOG.debug("Empty container {} is missing. Kindly check the " +
-              "consolidated container stats per UNHEALTHY state logged as " +
-              "starting with **Container State Stats:**");
-
-          records.add(
-              recordForState(container, EMPTY_MISSING,
-                  time));
-          populateContainerStats(container,
-              EMPTY_MISSING,
+          handleEmptyMissingContainers(container, time,
               unhealthyContainerStateStatsMap);
         }
         // A container cannot have any other records if it is missing so return
         return records;
+      }
+
+      // For Negative sized containers we only log but not insert into DB
+      if (container.getContainer().getUsedBytes() < 0
+          && !recordForStateExists.contains(
+          UnHealthyContainerStates.NEGATIVE_SIZE.toString())) {
+        handleNegativeSizedContainers(container, time,
+            unhealthyContainerStateStatsMap);
       }
 
       if (container.isUnderReplicated()
@@ -650,4 +702,23 @@ public class ContainerHealthTask extends ReconScmTask {
               (value + container.getContainer().getUsedBytes()));
     }
   }
+
+  /**
+   * Expose the logger for testing purposes.
+   *
+   * @return the logger instance
+   */
+  @VisibleForTesting
+  public Logger getLogger() {
+    return LOG;
+  }
+
+  /**
+   * Expose the unhealthyContainerStateStatsMap for testing purposes.
+   */
+  @VisibleForTesting
+  public Map<UnHealthyContainerStates, Map<String, Long>> getUnhealthyContainerStateStatsMap() {
+    return unhealthyContainerStateStatsMapForTesting;
+  }
+
 }

@@ -1,36 +1,66 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.node;
+
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import java.io.IOException;
+import java.math.RoundingMode;
+import java.net.InetAddress;
+import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import javax.management.ObjectName;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -66,37 +96,6 @@ import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.management.ObjectName;
-import java.io.IOException;
-import java.math.RoundingMode;
-import java.net.InetAddress;
-import java.text.DecimalFormat;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
-import java.util.Arrays;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.function.BiConsumer;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
-import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
 
 /**
  * Maintains information about the Datanodes on SCM side.
@@ -146,6 +145,8 @@ public class SCMNodeManager implements NodeManager {
   private static final String LASTHEARTBEAT = "LASTHEARTBEAT";
   private static final String USEDSPACEPERCENT = "USEDSPACEPERCENT";
   private static final String TOTALCAPACITY = "CAPACITY";
+  private static final String DNUUID = "UUID";
+  private static final String VERSION = "VERSION";
   /**
    * Constructs SCM machine Manager.
    */
@@ -447,6 +448,11 @@ public class SCMNodeManager implements NodeManager {
           processNodeReport(datanodeDetails, nodeReport);
           LOG.info("Updated datanode to: {}", dn);
           scmNodeEventPublisher.fireEvent(SCMEvents.NODE_ADDRESS_UPDATE, dn);
+        } else if (isVersionChange(oldNode.getVersion(), datanodeDetails.getVersion())) {
+          LOG.info("Update the version for registered datanode = {}, " +
+              "oldVersion = {}, newVersion = {}.",
+              datanodeDetails.getUuid(), oldNode.getVersion(), datanodeDetails.getVersion());
+          nodeStateManager.updateNode(datanodeDetails, layoutInfo);
         }
       } catch (NodeNotFoundException e) {
         LOG.error("Cannot find datanode {} from nodeStateManager",
@@ -506,6 +512,18 @@ public class SCMNodeManager implements NodeManager {
       }
     }
     return ipChanged || hostNameChanged;
+  }
+
+  /**
+   * Check if the version has been updated.
+   *
+   * @param oldVersion datanode oldVersion
+   * @param newVersion datanode newVersion
+   * @return true means replacement is needed, while false means replacement is not needed.
+   */
+  private boolean isVersionChange(String oldVersion, String newVersion) {
+    final boolean versionChanged = !Objects.equals(oldVersion, newVersion);
+    return versionChanged;
   }
 
   /**
@@ -982,6 +1000,7 @@ public class SCMNodeManager implements NodeManager {
     DatanodeUsageInfo usageInfo = new DatanodeUsageInfo(dn, stat);
     try {
       usageInfo.setContainerCount(getContainerCount(dn));
+      usageInfo.setPipelineCount(getPipeLineCount(dn));
     } catch (NodeNotFoundException ex) {
       LOG.error("Unknown datanode {}.", dn, ex);
     }
@@ -1135,6 +1154,8 @@ public class SCMNodeManager implements NodeManager {
       String nonScmUsedPerc = storagePercentage[1];
       map.put(USEDSPACEPERCENT,
           "Ozone: " + scmUsedPerc + "%, other: " + nonScmUsedPerc + "%");
+      map.put(DNUUID, dni.getUuidString());
+      map.put(VERSION, dni.getVersion());
       nodes.put(hostName, map);
     }
     return nodes;
@@ -1144,7 +1165,6 @@ public class SCMNodeManager implements NodeManager {
    * Calculate the storage capacity of the DataNode node.
    * @param storageReports Calculate the storage capacity corresponding
    *                       to the storage collection.
-   * @return
    */
   public static String calculateStorageCapacity(
       List<StorageReportProto> storageReports) {
@@ -1192,7 +1212,6 @@ public class SCMNodeManager implements NodeManager {
    * Calculate the storage usage percentage of a DataNode node.
    * @param storageReports Calculate the storage percentage corresponding
    *                       to the storage collection.
-   * @return
    */
   public static String[] calculateStoragePercentage(
       List<StorageReportProto> storageReports) {
@@ -1610,6 +1629,11 @@ public class SCMNodeManager implements NodeManager {
     return nodeStateManager.getContainerCount(datanodeDetails.getUuid());
   }
 
+  public int getPipeLineCount(DatanodeDetails datanodeDetails)
+      throws NodeNotFoundException {
+    return nodeStateManager.getPipelinesCount(datanodeDetails);
+  }
+
   @Override
   public void addDatanodeCommand(UUID dnId, SCMCommand command) {
     writeLock().lock();
@@ -1708,7 +1732,7 @@ public class SCMNodeManager implements NodeManager {
     }
     Set<UUID> uuids = dnsToUuidMap.get(address);
     if (uuids == null) {
-      LOG.warn("Cannot find node for address {}", address);
+      LOG.debug("Cannot find node for address {}", address);
       return results;
     }
 

@@ -16,10 +16,10 @@
  * limitations under the License.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import moment from 'moment';
 import filesize from 'filesize';
-import axios, { CanceledError } from 'axios';
+import axios from 'axios';
 import { Row, Col, Button } from 'antd';
 import {
   CheckCircleFilled,
@@ -33,7 +33,7 @@ import OverviewStorageCard from '@/v2/components/overviewCard/overviewStorageCar
 import OverviewSimpleCard from '@/v2/components/overviewCard/overviewSimpleCard';
 
 import { AutoReloadHelper } from '@/utils/autoReloadHelper';
-import { showDataFetchError } from '@/utils/common';
+import { checkResponseError, showDataFetchError } from '@/utils/common';
 import { AxiosGetHelper, cancelRequests, PromiseAllSettledGetHelper } from '@/utils/axiosRequestHelper';
 
 import { ClusterStateResponse, OverviewState, StorageReport } from '@/v2/types/overview.types';
@@ -73,40 +73,19 @@ const getHealthIcon = (value: string): React.ReactElement => {
   )
 }
 
-const checkResponseError = (responses: Awaited<Promise<any>>[]) => {
-  const responseError = responses.filter(
-    (resp) => resp.status === 'rejected'
-  );
-
-  if (responseError.length !== 0) {
-    responseError.forEach((err) => {
-      if (err.reason.toString().includes("CanceledError")) {
-        throw new CanceledError('canceled', "ERR_CANCELED");
-      }
-      else {
-        const reqMethod = err.reason.config.method;
-        const reqURL = err.reason.config.url
-        showDataFetchError(
-          `Failed to ${reqMethod} URL ${reqURL}\n${err.reason.toString()}`
-        );
-      }
-    })
-  }
-}
-
 const getSummaryTableValue = (
   value: number | string | undefined,
   colType: 'value' | undefined = undefined
 ): string => {
   if (!value) return 'N/A';
-  if (colType === 'value') String(value as string)
+  if (colType === 'value') return String(value as string)
   return size(value as number)
 }
 
 const Overview: React.FC<{}> = () => {
 
-  let cancelOverviewSignal: AbortController;
-  let cancelOMDBSyncSignal: AbortController;
+  const cancelOverviewSignal = useRef<AbortController>();
+  const cancelOMDBSyncSignal = useRef<AbortController>();
 
   const [state, setState] = useState<OverviewState>({
     loading: false,
@@ -147,8 +126,8 @@ const Overview: React.FC<{}> = () => {
       // Component will Un-mount
       autoReloadHelper.stopPolling();
       cancelRequests([
-        cancelOMDBSyncSignal,
-        cancelOverviewSignal
+        cancelOMDBSyncSignal.current!,
+        cancelOverviewSignal.current!
       ]);
     })
   }, [])
@@ -161,8 +140,8 @@ const Overview: React.FC<{}> = () => {
 
     // Cancel any previous pending requests
     cancelRequests([
-      cancelOMDBSyncSignal,
-      cancelOverviewSignal
+      cancelOMDBSyncSignal.current!,
+      cancelOverviewSignal.current!
     ]);
 
     const { requests, controller } = PromiseAllSettledGetHelper([
@@ -170,8 +149,8 @@ const Overview: React.FC<{}> = () => {
       '/api/v1/task/status',
       '/api/v1/keys/open/summary',
       '/api/v1/keys/deletePending/summary'
-    ], cancelOverviewSignal);
-    cancelOverviewSignal = controller;
+    ], cancelOverviewSignal.current);
+    cancelOverviewSignal.current = controller;
 
     requests.then(axios.spread((
       clusterStateResponse: Awaited<Promise<any>>,
@@ -238,8 +217,8 @@ const Overview: React.FC<{}> = () => {
         deletePendingSummarytotalUnrepSize: deletePendingResponse?.value?.data?.totalUnreplicatedDataSize,
         deletePendingSummarytotalRepSize: deletePendingResponse?.value?.data?.totalReplicatedDataSize,
         deletePendingSummarytotalDeletedKeys: deletePendingResponse?.value?.data?.totalDeletedKeys,
-        scmServiceId: clusterState?.scmServiceId,
-        omServiceId: clusterState?.omServiceId
+        scmServiceId: clusterState?.scmServiceId ?? 'N/A',
+        omServiceId: clusterState?.omServiceId ?? 'N/A'
       });
       setStorageReport({
         ...storageReport,
@@ -264,10 +243,10 @@ const Overview: React.FC<{}> = () => {
 
     const { request, controller } = AxiosGetHelper(
       '/api/v1/triggerdbsync/om',
-      cancelOMDBSyncSignal,
+      cancelOMDBSyncSignal.current,
       'OM-DB Sync request cancelled because data was updated'
     );
-    cancelOMDBSyncSignal = controller;
+    cancelOMDBSyncSignal.current = controller;
 
     request.then(omStatusResponse => {
       const omStatus = omStatusResponse.data;
@@ -322,20 +301,13 @@ const Overview: React.FC<{}> = () => {
     </Button>
   )
 
-  const containersLink = (missingContainersCount > 0)
-    ? (
-      <Button
-        type='link'
-        size='small'>
-        <Link to='/MissingContainers'> View More</Link>
-      </Button>
-    ) : (
-      <Button
-        type='link'
-        size='small'>
-        <Link to='/Containers'> View More</Link>
-      </Button>
-    )
+  const containersLink = (
+    <Button
+      type='link'
+      size='small'>
+      <Link to='/Containers'> View More</Link>
+    </Button>
+  )
 
   return (
     <>
@@ -345,7 +317,7 @@ const Overview: React.FC<{}> = () => {
           lastUpdatedOMDBDelta={lastUpdatedOMDBDelta} lastUpdatedOMDBFull={lastUpdatedOMDBFull}
           togglePolling={autoReloadHelper.handleAutoReloadToggle} onReload={loadOverviewPageData} omSyncLoad={syncOmData} omStatus={omStatus} />
       </div>
-      <div style={{ padding: '24px' }}>
+      <div className='data-container'>
         <Row
           align='stretch'
           gutter={[
@@ -492,7 +464,8 @@ const Overview: React.FC<{}> = () => {
                   )
                 }
               ]}
-              linkToUrl='/Om' />
+              linkToUrl='/Om'
+              state={{activeTab: '2'}} />
           </Col>
           <Col xs={24} sm={24} md={24} lg={12} xl={12}>
             <OverviewSummaryCard
@@ -531,9 +504,19 @@ const Overview: React.FC<{}> = () => {
                   )
                 }
               ]}
-              linkToUrl='/Om' />
+              linkToUrl='/Om'
+              state={{activeTab: '3'}} />
           </Col>
         </Row>
+        <span style={{ paddingLeft: '8px' }}>
+          <span style={{ color: '#6E6E6E' }}>Ozone Service ID:&nbsp;</span>
+          {omServiceId}
+        </span>
+        <span style={{ marginLeft: '12px', marginRight: '12px' }}> | </span>
+        <span>
+          <span style={{ color: '#6E6E6E' }}>SCM ID:&nbsp;</span>
+          {scmServiceId}
+        </span>
       </div>
     </>
   );

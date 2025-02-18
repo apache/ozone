@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -22,28 +21,28 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 
+import com.google.common.base.Strings;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-
 import javax.inject.Inject;
 import javax.inject.Singleton;
-
-import com.google.common.base.Strings;
 import org.apache.commons.compress.utils.Lists;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfoProtoWrapper;
 import org.eclipse.jetty.util.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -97,6 +96,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
           .setName(dbFile.getName())
           .setPath(dbFile.toPath().getParent());
       addOMTablesAndCodecs(dbStoreBuilder);
+      dbStoreBuilder.addCodec(KeyEntityInfoProtoWrapper.class, KeyEntityInfoProtoWrapper.getCodec());
       setStore(dbStoreBuilder.build());
       LOG.info("Created OM DB handle from snapshot at {}.",
           dbFile.getAbsolutePath());
@@ -107,6 +107,12 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
       initializeOmTables(TableCache.CacheType.FULL_CACHE, true);
       omTablesInitialized = true;
     }
+  }
+
+  @Override
+  public Table<String, KeyEntityInfoProtoWrapper> getKeyTableLite(BucketLayout bucketLayout) throws IOException {
+    String tableName = bucketLayout.isFileSystemOptimized() ? FILE_TABLE : KEY_TABLE;
+    return getStore().getTable(tableName, String.class, KeyEntityInfoProtoWrapper.class);
   }
 
   @Override
@@ -169,8 +175,16 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     // Unlike in {@link OmMetadataManagerImpl}, the volumes are queried directly
     // from the volume table (not through cache) since Recon does not use
     // Table cache.
+    Table<String, OmVolumeArgs>  volumeTable = getVolumeTable();
+
+    // If the table is not yet initialized, i.e. it is null
+    // Return empty list as response
+    if (volumeTable == null) {
+      return result;
+    }
+
     try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
-             iterator = getVolumeTable().iterator()) {
+                 iterator = volumeTable.iterator()) {
 
       while (iterator.hasNext() && result.size() < maxKeys) {
         Table.KeyValue<String, OmVolumeArgs> kv = iterator.next();
@@ -296,6 +310,11 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
 
     int currentCount = 0;
     Table<String, OmBucketInfo> bucketTable = getBucketTable();
+    // If the table is not yet initialized, i.e. it is null
+    // Return empty list as response
+    if (bucketTable == null) {
+      return result;
+    }
 
     try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
              iterator = bucketTable.iterator()) {

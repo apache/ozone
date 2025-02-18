@@ -1,40 +1,21 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.cli.datanode;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.commons.codec.CharEncoding;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import picocli.CommandLine;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.PrintStream;
-import java.io.UnsupportedEncodingException;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
 
 import static com.fasterxml.jackson.databind.node.JsonNodeType.ARRAY;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -44,6 +25,24 @@ import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.commons.codec.CharEncoding;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import picocli.CommandLine;
 
 /**
  * Test for the UsageInfoSubCommand class.
@@ -94,6 +93,7 @@ public class TestUsageInfoSubcommand {
     assertEquals(80.00, json.get(0).get("remainingPercent").doubleValue(), 0.001);
 
     assertEquals(5, json.get(0).get("containerCount").longValue());
+    assertEquals(10, json.get(0).get("pipelineCount").longValue());
   }
 
   @Test
@@ -122,6 +122,7 @@ public class TestUsageInfoSubcommand {
     assertThat(output).contains("Remaining    :");
     assertThat(output).contains("Remaining %  :");
     assertThat(output).contains("Container(s) :");
+    assertThat(output).contains("Pipeline(s)  :");
     assertThat(output).contains("Container Pre-allocated :");
     assertThat(output).contains("Remaining Allocatable   :");
     assertThat(output).contains("Free Space To Spare     :");
@@ -135,6 +136,7 @@ public class TestUsageInfoSubcommand {
         .setRemaining(80)
         .setUsed(10)
         .setContainerCount(5)
+        .setPipelineCount(10)
         .build());
     return result;
   }

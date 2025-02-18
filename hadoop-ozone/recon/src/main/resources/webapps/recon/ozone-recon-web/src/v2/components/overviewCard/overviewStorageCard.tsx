@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React, { useMemo } from 'react';
+import React, { HTMLAttributes, useMemo } from 'react';
 import filesize from 'filesize';
 import { Card, Row, Col, Table, Tag } from 'antd';
 
@@ -44,7 +44,7 @@ function getUsagePercentages(
     ozoneUsedPercentage: Math.floor(used / capacity * 100),
     nonOzoneUsedPercentage: Math.floor((capacity - remaining - used) / capacity * 100),
     committedPercentage: Math.floor(committed / capacity * 100),
-    usagePercentage: Math.floor((capacity - remaining) / capacity * 100)
+    usagePercentage: Math.round((capacity - remaining) / capacity * 100)
   }
 }
 
@@ -54,6 +54,10 @@ const cardBodyStyle: React.CSSProperties = { padding: '16px' };
 const cardStyle: React.CSSProperties = {
   boxSizing: 'border-box',
   height: '100%'
+}
+const cardErrorStyle: React.CSSProperties = {
+  borderColor: '#FF4D4E',
+  borderWidth: '1.4px'
 }
 const eChartStyle: React.CSSProperties = {
   width: '280px',
@@ -175,7 +179,7 @@ const OverviewStorageCard: React.FC<OverviewStorageCardProps> = ({
       title='Cluster Capacity'
       headStyle={cardHeadStyle}
       bodyStyle={cardBodyStyle}
-      style={cardStyle}>
+      style={(usagePercentage > 79) ? {...cardStyle, ...cardErrorStyle} : cardStyle} >
       <Row justify='space-between'>
         <Col
           className='echart-col'
@@ -224,7 +228,10 @@ const OverviewStorageCard: React.FC<OverviewStorageCardProps> = ({
                 usage: <Tag key='pre-allocated' color='red'>Container Pre-allocated</Tag>,
                 size: size(storageReport.committed)
               }
-            ]} />
+            ]}
+            onRow={(record) => ({
+              'data-testid': `capacity-${record.key}`
+            }) as HTMLAttributes<HTMLElement>} />
         </Col>
       </Row>
     </Card>

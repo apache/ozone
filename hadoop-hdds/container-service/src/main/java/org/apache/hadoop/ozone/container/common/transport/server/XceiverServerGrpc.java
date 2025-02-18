@@ -1,24 +1,29 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.common.transport.server;
 
+import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.opentracing.Scope;
+import io.opentracing.Span;
+import io.opentracing.util.GlobalTracer;
 import java.io.IOException;
+import java.net.BindException;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -26,10 +31,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -44,12 +47,6 @@ import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
-
-import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import io.opentracing.Scope;
-import io.opentracing.Span;
-import io.opentracing.util.GlobalTracer;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.ratis.thirdparty.io.grpc.Server;
 import org.apache.ratis.thirdparty.io.grpc.ServerInterceptors;
@@ -65,9 +62,6 @@ import org.apache.ratis.thirdparty.io.netty.channel.socket.nio.NioServerSocketCh
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_EC_GRPC_ZERO_COPY_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_EC_GRPC_ZERO_COPY_ENABLED_DEFAULT;
 
 /**
  * Creates a Grpc server endpoint that acts as the communication layer for
@@ -134,13 +128,9 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
       eventLoopGroup = new NioEventLoopGroup(poolSize / 10, factory);
       channelType = NioServerSocketChannel.class;
     }
-    final boolean zeroCopyEnabled = conf.getBoolean(
-        OZONE_EC_GRPC_ZERO_COPY_ENABLED,
-        OZONE_EC_GRPC_ZERO_COPY_ENABLED_DEFAULT);
 
     LOG.info("GrpcServer channel type {}", channelType.getSimpleName());
-    GrpcXceiverService xceiverService = new GrpcXceiverService(dispatcher,
-        zeroCopyEnabled);
+    GrpcXceiverService xceiverService = new GrpcXceiverService(dispatcher);
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
         .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
         .bossEventLoopGroup(eventLoopGroup)
@@ -185,7 +175,16 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   @Override
   public void start() throws IOException {
     if (!isStarted) {
-      server.start();
+      try {
+        server.start();
+      } catch (IOException e) {
+        LOG.error("Error while starting the server", e);
+        if (e.getMessage().contains("Failed to bind to address")) {
+          throw new BindException(e.getMessage());
+        } else {
+          throw e;
+        }
+      }
       int realPort = server.getPort();
 
       if (port == 0) {
@@ -195,9 +194,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
       }
 
       //register the real port to the datanode details.
-      datanodeDetails.setPort(DatanodeDetails
-          .newPort(Name.STANDALONE,
-              realPort));
+      datanodeDetails.setPort(DatanodeDetails.newStandalonePort(realPort));
 
       isStarted = true;
     }
