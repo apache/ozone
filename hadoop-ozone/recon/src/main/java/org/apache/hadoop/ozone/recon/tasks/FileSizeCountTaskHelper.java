@@ -148,14 +148,14 @@ public abstract class FileSizeCountTaskHelper {
    * Processes a batch of OM update events.
    *
    * @param events             OM update event batch.
-   * @param bucketLayout       The bucket layout for which either keyTable or fileTable is fetched
+   * @param tableName       The bucket layout for which either keyTable or fileTable is fetched
    * @param dslContext         DSLContext for DB operations.
    * @param fileCountBySizeDao DAO for file count table.
    * @param taskName           The name of the task for logging.
    * @return A Pair of task name and boolean indicating success.
    */
   public static Pair<String, Boolean> processEvents(OMUpdateEventBatch events,
-                                                    String bucketLayout,
+                                                    String tableName,
                                                     DSLContext dslContext,
                                                     FileCountBySizeDao fileCountBySizeDao,
                                                     String taskName) {
@@ -164,7 +164,7 @@ public abstract class FileSizeCountTaskHelper {
     long startTime = System.currentTimeMillis();
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, Object> omdbUpdateEvent = eventIterator.next();
-      if (!bucketLayout.equals(omdbUpdateEvent.getTable())) {
+      if (!tableName.equals(omdbUpdateEvent.getTable())) {
         continue;
       }
       String updatedKey = omdbUpdateEvent.getKey();
