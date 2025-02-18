@@ -28,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Set;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -52,17 +51,19 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Unit test for NSSummaryTaskWithOBS.
  */
-public final class TestNSSummaryTaskWithOBS implements Serializable {
-  private static ReconNamespaceSummaryManager reconNamespaceSummaryManager;
-  private static OMMetadataManager omMetadataManager;
-  private static ReconOMMetadataManager reconOMMetadataManager;
-  private static NSSummaryTaskWithOBS nSSummaryTaskWithOBS;
-  private static OzoneConfiguration omConfiguration;
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class TestNSSummaryTaskWithOBS {
+  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
+  private OMMetadataManager omMetadataManager;
+  private ReconOMMetadataManager reconOMMetadataManager;
+  private NSSummaryTaskWithOBS nSSummaryTaskWithOBS;
+  private OzoneConfiguration omConfiguration;
 
   // Object names
   private static final String VOL = "vol";
@@ -101,11 +102,8 @@ public final class TestNSSummaryTaskWithOBS implements Serializable {
   private static final long KEY_SIX_SIZE = 6000L;
   private static final long KEY_SEVEN_SIZE = 7000L;
 
-  private TestNSSummaryTaskWithOBS() {
-  }
-
   @BeforeAll
-  public static void setUp(@TempDir File tmpDir) throws Exception {
+  void setUp(@TempDir File tmpDir) throws Exception {
     initializeNewOmMetadataManager(new File(tmpDir, "om"));
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         getMockOzoneManagerServiceProviderWithFSO();
@@ -137,7 +135,7 @@ public final class TestNSSummaryTaskWithOBS implements Serializable {
    * Nested class for testing NSSummaryTaskWithOBS reprocess.
    */
   @Nested
-  public class TestReprocess {
+  class TestReprocess {
 
     private NSSummary nsSummaryForBucket1;
     private NSSummary nsSummaryForBucket2;
@@ -389,7 +387,7 @@ public final class TestNSSummaryTaskWithOBS implements Serializable {
    *
    * @throws IOException
    */
-  private static void populateOMDB() throws IOException {
+  private void populateOMDB() throws IOException {
     writeKeyToOm(reconOMMetadataManager,
         KEY_ONE,
         BUCKET_ONE,
@@ -454,7 +452,7 @@ public final class TestNSSummaryTaskWithOBS implements Serializable {
    *
    * @throws IOException ioEx
    */
-  private static void initializeNewOmMetadataManager(
+  private void initializeNewOmMetadataManager(
       File omDbDir)
       throws IOException {
     omConfiguration = new OzoneConfiguration();
