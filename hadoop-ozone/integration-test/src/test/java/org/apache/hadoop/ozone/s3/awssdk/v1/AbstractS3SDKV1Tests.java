@@ -74,7 +74,6 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.utils.InputSubstream;
 import org.apache.ozone.test.OzoneTestBase;
-import org.eclipse.jetty.util.StringUtil;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;

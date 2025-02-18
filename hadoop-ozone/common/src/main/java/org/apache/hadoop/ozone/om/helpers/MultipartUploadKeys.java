@@ -60,8 +60,8 @@ public class MultipartUploadKeys {
    */
   public static class Builder {
     private Set<String> keys;
-    private String nextKeyMarker;
-    private String nextUploadIdMarker;
+    private String nextKeyMarker = "";
+    private String nextUploadIdMarker = "";
     private boolean isTruncated;
 
     public Builder setKeys(Set<String> keys) {
