@@ -21,6 +21,13 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.freon.TestDNRPCLoadGenerator;
+import org.apache.hadoop.ozone.freon.TestHadoopDirTreeGenerator;
+import org.apache.hadoop.ozone.freon.TestHadoopNestedDirGenerator;
+import org.apache.hadoop.ozone.freon.TestHsyncGenerator;
+import org.apache.hadoop.ozone.freon.TestOmBucketReadWriteFileOps;
+import org.apache.hadoop.ozone.freon.TestOmBucketReadWriteKeyOps;
+import org.apache.hadoop.ozone.freon.TestRandomKeyGenerator;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.TestInstance;
 
@@ -47,7 +54,7 @@ public abstract class FreonTests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class DNRPCLoadGenerator extends org.apache.hadoop.ozone.freon.TestDNRPCLoadGenerator {
+  class DNRPCLoadGenerator extends TestDNRPCLoadGenerator {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -55,7 +62,7 @@ public abstract class FreonTests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class HadoopDirTreeGenerator extends org.apache.hadoop.ozone.freon.TestHadoopDirTreeGenerator {
+  class HadoopDirTreeGenerator extends TestHadoopDirTreeGenerator {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -63,7 +70,7 @@ public abstract class FreonTests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class HadoopNestedDirGenerator extends org.apache.hadoop.ozone.freon.TestHadoopNestedDirGenerator {
+  class HadoopNestedDirGenerator extends TestHadoopNestedDirGenerator {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -71,7 +78,7 @@ public abstract class FreonTests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class HsyncGenerator extends org.apache.hadoop.ozone.freon.TestHsyncGenerator {
+  class HsyncGenerator extends TestHsyncGenerator {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -79,7 +86,7 @@ public abstract class FreonTests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class OmBucketReadWriteFileOps extends org.apache.hadoop.ozone.freon.TestOmBucketReadWriteFileOps {
+  class OmBucketReadWriteFileOps extends TestOmBucketReadWriteFileOps {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -87,7 +94,7 @@ public abstract class FreonTests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class OmBucketReadWriteKeyOps extends org.apache.hadoop.ozone.freon.TestOmBucketReadWriteKeyOps {
+  class OmBucketReadWriteKeyOps extends TestOmBucketReadWriteKeyOps {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -95,7 +102,7 @@ public abstract class FreonTests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class RandomKeyGenerator extends org.apache.hadoop.ozone.freon.TestRandomKeyGenerator {
+  class RandomKeyGenerator extends TestRandomKeyGenerator {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
