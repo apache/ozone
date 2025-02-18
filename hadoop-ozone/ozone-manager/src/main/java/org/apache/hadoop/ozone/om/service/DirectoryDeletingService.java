@@ -1,22 +1,32 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.service;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -41,19 +51,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePa
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT;
 
 /**
  * This is a background service to delete orphan directories and its
@@ -80,11 +77,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   // from parent directory info from deleted directory table concurrently
   // and send deletion requests.
   private final int dirDeletingCorePoolSize;
-  private static final int MIN_ERR_LIMIT_PER_TASK = 1000;
-
-  // Number of items(dirs/files) to be batched in an iteration.
-  private final long pathLimitPerTask;
-  private final int ratisByteLimit;
+  private int ratisByteLimit;
   private final AtomicBoolean suspended;
   private AtomicBoolean isRunningOnAOS;
 
@@ -97,9 +90,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       OzoneConfiguration configuration, int dirDeletingServiceCorePoolSize) {
     super(DirectoryDeletingService.class.getSimpleName(), interval, unit,
         dirDeletingServiceCorePoolSize, serviceTimeout, ozoneManager, null);
-    this.pathLimitPerTask = configuration
-        .getInt(OZONE_PATH_DELETING_LIMIT_PER_TASK,
-            OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT);
     int limit = (int) configuration.getStorageSize(
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
@@ -143,6 +133,10 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   @VisibleForTesting
   public void resume() {
     suspended.set(false);
+  }
+
+  public void setRatisByteLimit(int ratisByteLimit) {
+    this.ratisByteLimit = ratisByteLimit;
   }
 
   @Override
@@ -221,11 +215,11 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           long dirNum = 0L;
           long subDirNum = 0L;
           long subFileNum = 0L;
-          long remainNum = pathLimitPerTask;
+          long remainingBufLimit = ratisByteLimit;
           int consumedSize = 0;
           List<PurgePathRequest> purgePathRequestList = new ArrayList<>();
           List<Pair<String, OmKeyInfo>> allSubDirList =
-              new ArrayList<>((int) remainNum);
+              new ArrayList<>();
 
           Table.KeyValue<String, OmKeyInfo> pendingDeletedDirInfo;
           // This is to avoid race condition b/w purge request and snapshot chain updation. For AOS taking the global
@@ -236,7 +230,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
                     .getLatestGlobalSnapshotId();
 
             long startTime = Time.monotonicNow();
-            while (remainNum > 0) {
+            while (remainingBufLimit > 0) {
               pendingDeletedDirInfo = getPendingDeletedDirInfo();
               if (pendingDeletedDirInfo == null) {
                 break;
@@ -247,31 +241,14 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
                 continue;
               }
 
-              PurgePathRequest request = prepareDeleteDirRequest(remainNum,
+              PurgePathRequest request = prepareDeleteDirRequest(
                   pendingDeletedDirInfo.getValue(),
                   pendingDeletedDirInfo.getKey(), allSubDirList,
-                  getOzoneManager().getKeyManager());
-              if (isBufferLimitCrossed(ratisByteLimit, consumedSize,
-                  request.getSerializedSize())) {
-                if (purgePathRequestList.size() != 0) {
-                  // if message buffer reaches max limit, avoid sending further
-                  remainNum = 0;
-                  break;
-                }
-                // if directory itself is having a lot of keys / files,
-                // reduce capacity to minimum level
-                remainNum = MIN_ERR_LIMIT_PER_TASK;
-                request = prepareDeleteDirRequest(remainNum,
-                    pendingDeletedDirInfo.getValue(),
-                    pendingDeletedDirInfo.getKey(), allSubDirList,
-                    getOzoneManager().getKeyManager());
-              }
+                  getOzoneManager().getKeyManager(), remainingBufLimit);
+
               consumedSize += request.getSerializedSize();
+              remainingBufLimit -= consumedSize;
               purgePathRequestList.add(request);
-              // reduce remain count for self, sub-files, and sub-directories
-              remainNum = remainNum - 1;
-              remainNum = remainNum - request.getDeletedSubFilesCount();
-              remainNum = remainNum - request.getMarkDeletedSubDirsCount();
               // Count up the purgeDeletedDir, subDirs and subFiles
               if (request.getDeletedDir() != null && !request.getDeletedDir()
                   .isEmpty()) {
@@ -280,9 +257,10 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
               subDirNum += request.getMarkDeletedSubDirsCount();
               subFileNum += request.getDeletedSubFilesCount();
             }
-            optimizeDirDeletesAndSubmitRequest(remainNum, dirNum, subDirNum,
+
+            optimizeDirDeletesAndSubmitRequest(dirNum, subDirNum,
                 subFileNum, allSubDirList, purgePathRequestList, null,
-                startTime, ratisByteLimit - consumedSize,
+                startTime, remainingBufLimit,
                 getOzoneManager().getKeyManager(), expectedPreviousSnapshotId,
                 rnCnt);
 

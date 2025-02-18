@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -21,19 +20,21 @@ package org.apache.hadoop.ozone.recon.tasks;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.mockito.Mockito.any;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.HashSet;
-
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,8 +56,14 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
   public void setUp() {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
-    reconTaskController = new ReconTaskControllerImpl(ozoneConfiguration,
-        reconTaskStatusDao, new HashSet<>());
+    ReconTaskStatusUpdaterManager reconTaskStatusUpdaterManagerMock = mock(ReconTaskStatusUpdaterManager.class);
+    when(reconTaskStatusUpdaterManagerMock.getTaskStatusUpdater(anyString()))
+        .thenAnswer(i -> {
+          String taskName = i.getArgument(0);
+          return new ReconTaskStatusUpdater(reconTaskStatusDao, taskName);
+        });
+    reconTaskController = new ReconTaskControllerImpl(ozoneConfiguration, new HashSet<>(),
+        reconTaskStatusUpdaterManagerMock);
     reconTaskController.start();
   }
 
@@ -90,13 +97,44 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
         .process(any());
     long endTime = System.currentTimeMillis();
 
-    reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
     ReconTaskStatus reconTaskStatus = reconTaskStatusDao.findById("MockTask");
     long taskTimeStamp = reconTaskStatus.getLastUpdatedTimestamp();
     long seqNumber = reconTaskStatus.getLastUpdatedSeqNumber();
 
     assertThat(taskTimeStamp).isGreaterThanOrEqualTo(startTime).isLessThanOrEqualTo(endTime);
     assertEquals(seqNumber, omUpdateEventBatchMock.getLastSequenceNumber());
+  }
+
+  @Test
+  public void testTaskRecordsFailureOnException() throws Exception {
+    ReconOmTask reconOmTaskMock = getMockTask("MockTask");
+    OMUpdateEventBatch omUpdateEventBatchMock = mock(OMUpdateEventBatch.class);
+
+    // Throw exception when trying to run task
+    when(reconOmTaskMock.process(any(OMUpdateEventBatch.class)))
+        .thenThrow(new RuntimeException("Mock Failure"));
+    reconTaskController.registerTask(reconOmTaskMock);
+    when(omUpdateEventBatchMock.getLastSequenceNumber()).thenReturn(100L);
+    when(omUpdateEventBatchMock.isEmpty()).thenReturn(false);
+
+    long startTime = System.currentTimeMillis();
+    reconTaskController.consumeOMEvents(
+        omUpdateEventBatchMock,
+        mock(OMMetadataManager.class));
+
+    verify(reconOmTaskMock, times(1))
+        .process(any());
+    long endTime = System.currentTimeMillis();
+
+    ReconTaskStatus reconTaskStatus = reconTaskStatusDao.findById("MockTask");
+    long taskTimeStamp = reconTaskStatus.getLastUpdatedTimestamp();
+    long seqNumber = reconTaskStatus.getLastUpdatedSeqNumber();
+    int taskStatus = reconTaskStatus.getLastTaskRunStatus();
+
+    assertThat(taskTimeStamp).isGreaterThanOrEqualTo(startTime).isLessThanOrEqualTo(endTime);
+    // Task failed so seqNumber should not be updated, and last task status should be -1
+    assertEquals(seqNumber, 0);
+    assertEquals(taskStatus, -1);
   }
 
   @Test
@@ -149,6 +187,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     }
 
     //Should be ignored now.
+    Long startTime = System.currentTimeMillis();
     reconTaskController.consumeOMEvents(omUpdateEventBatchMock,
         omMetadataManagerMock);
     assertThat(reconTaskController.getRegisteredTasks()).isEmpty();
@@ -157,7 +196,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     ReconTaskStatus dbRecord = reconTaskStatusDao.findById(taskName);
 
     assertEquals(taskName, dbRecord.getTaskName());
-    assertEquals(Long.valueOf(0L), dbRecord.getLastUpdatedTimestamp());
+    assertThat(dbRecord.getLastUpdatedTimestamp()).isGreaterThanOrEqualTo(startTime);
     assertEquals(Long.valueOf(0L), dbRecord.getLastUpdatedSeqNumber());
   }
 

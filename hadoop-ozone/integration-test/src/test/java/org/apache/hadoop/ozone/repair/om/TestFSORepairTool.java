@@ -1,22 +1,37 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.repair.om;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.ozone.test.IntLambda.withTextFromSystemIn;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -36,35 +51,18 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.repair.OzoneRepair;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * FSORepairTool test cases.
@@ -89,8 +87,8 @@ public class TestFSORepairTool {
   private static FSORepairTool.Report fullReport;
   private static FSORepairTool.Report emptyReport;
 
-  private GenericTestUtils.PrintStreamCapturer out;
-  private GenericTestUtils.PrintStreamCapturer err;
+  private static GenericTestUtils.PrintStreamCapturer out;
+  private static GenericTestUtils.PrintStreamCapturer err;
 
   @BeforeAll
   public static void setup() throws Exception {
@@ -103,6 +101,8 @@ public class TestFSORepairTool {
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     fs = FileSystem.get(conf);
 
+    out = GenericTestUtils.captureOut();
+    err = GenericTestUtils.captureErr();
     cmd = new OzoneRepair().getCmd();
     dbPath = new File(OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME).getPath();
 
@@ -147,19 +147,13 @@ public class TestFSORepairTool {
 
   @BeforeEach
   public void init() throws Exception {
-    out = GenericTestUtils.captureOut();
-    err = GenericTestUtils.captureErr();
-  }
-
-  @AfterEach
-  public void clean() throws Exception {
-    // reset stream after each unit test
-    IOUtils.closeQuietly(out, err);
+    out.reset();
+    err.reset();
   }
 
   @AfterAll
   public static void reset() throws IOException {
-    IOUtils.closeQuietly(fs, client, cluster);
+    IOUtils.closeQuietly(fs, client, cluster, out, err);
   }
 
   /**
@@ -239,7 +233,7 @@ public class TestFSORepairTool {
     // When a non-existent bucket filter is passed
     int exitCode = dryRun("--volume", "/vol1", "--bucket", "bucket3");
     assertEquals(0, exitCode);
-    String cliOutput = out.getOutput();
+    String cliOutput = err.getOutput();
     assertThat(cliOutput).contains("Bucket 'bucket3' does not exist in volume '/vol1'.");
   }
 
@@ -249,7 +243,7 @@ public class TestFSORepairTool {
     // When a non-existent volume filter is passed
     int exitCode = dryRun("--volume", "/vol5");
     assertEquals(0, exitCode);
-    String cliOutput = out.getOutput();
+    String cliOutput = err.getOutput();
     assertThat(cliOutput).contains("Volume '/vol5' does not exist.");
   }
 
@@ -259,7 +253,7 @@ public class TestFSORepairTool {
     // When bucket filter is passed without the volume filter.
     int exitCode = dryRun("--bucket", "bucket1");
     assertEquals(0, exitCode);
-    String cliOutput = out.getOutput();
+    String cliOutput = err.getOutput();
     assertThat(cliOutput).contains("--bucket flag cannot be used without specifying --volume.");
   }
 
@@ -350,12 +344,13 @@ public class TestFSORepairTool {
 
   private int execute(boolean dryRun, String... args) {
     List<String> argList = new ArrayList<>(Arrays.asList("om", "fso-tree", "--db", dbPath));
-    if (!dryRun) {
-      argList.add("--repair");
+    if (dryRun) {
+      argList.add("--dry-run");
     }
     argList.addAll(Arrays.asList(args));
 
-    return cmd.execute(argList.toArray(new String[0]));
+    return withTextFromSystemIn("y")
+        .execute(() -> cmd.execute(argList.toArray(new String[0])));
   }
 
   private <K, V> int countTableEntries(Table<K, V> table) throws Exception {

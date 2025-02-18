@@ -1,22 +1,23 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.debug.ldb;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -27,6 +28,31 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.lang.reflect.Field;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -53,33 +79,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.lang.reflect.Field;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-
 /**
  * Parser for scm.db, om.db or container db file.
  */
@@ -87,13 +86,10 @@ import static java.nio.charset.StandardCharsets.UTF_8;
     name = "scan",
     description = "Parse specified metadataTable"
 )
-public class DBScanner implements Callable<Void> {
+public class DBScanner extends AbstractSubcommand implements Callable<Void> {
 
   public static final Logger LOG = LoggerFactory.getLogger(DBScanner.class);
   private static final String SCHEMA_V3 = "V3";
-
-  @CommandLine.Spec
-  private static CommandLine.Model.CommandSpec spec;
 
   @CommandLine.ParentCommand
   private RDBParser parent;
@@ -212,14 +208,6 @@ public class DBScanner implements Callable<Void> {
     }
 
     return null;
-  }
-
-  private static PrintWriter err() {
-    return spec.commandLine().getErr();
-  }
-
-  private static PrintWriter out() {
-    return spec.commandLine().getOut();
   }
 
   public byte[] getValueObject(DBColumnFamilyDefinition dbColumnFamilyDefinition, String key) {
@@ -525,7 +513,7 @@ public class DBScanner implements Callable<Void> {
     return false;
   }
 
-  static Field getRequiredFieldFromAllFields(Class clazz, String fieldName) throws NoSuchFieldException {
+  Field getRequiredFieldFromAllFields(Class clazz, String fieldName) throws NoSuchFieldException {
     List<Field> classFieldList = ValueSchema.getAllFields(clazz);
     Field classField = null;
     for (Field f : classFieldList) {
@@ -680,12 +668,12 @@ public class DBScanner implements Callable<Void> {
   }
 
 
-  private static class Task implements Callable<Void> {
+  private class Task implements Callable<Void> {
 
     private final DBColumnFamilyDefinition dbColumnFamilyDefinition;
     private final ArrayList<ByteArrayKeyValue> batch;
     private final LogWriter logWriter;
-    private static final ObjectWriter WRITER =
+    private final ObjectWriter writer =
         JsonSerializationHelper.getWriter();
     private final long sequenceId;
     private final boolean withKey;
@@ -758,12 +746,12 @@ public class DBScanner implements Callable<Void> {
               }
               String cid = key.toString().substring(0, index);
               String blockId = key.toString().substring(index);
-              sb.append(WRITER.writeValueAsString(LongCodec.get()
+              sb.append(writer.writeValueAsString(LongCodec.get()
                   .fromPersistedFormat(
                       FixedLengthStringCodec.string2Bytes(cid)) +
                   KEY_SEPARATOR_SCHEMA_V3 + blockId));
             } else {
-              sb.append(WRITER.writeValueAsString(key));
+              sb.append(writer.writeValueAsString(key));
             }
             sb.append(": ");
           }
@@ -774,9 +762,9 @@ public class DBScanner implements Callable<Void> {
           if (valueFields != null) {
             Map<String, Object> filteredValue = new HashMap<>();
             filteredValue.putAll(getFieldsFilteredObject(o, dbColumnFamilyDefinition.getValueType(), fieldsSplitMap));
-            sb.append(WRITER.writeValueAsString(filteredValue));
+            sb.append(writer.writeValueAsString(filteredValue));
           } else {
-            sb.append(WRITER.writeValueAsString(o));
+            sb.append(writer.writeValueAsString(o));
           }
 
           results.add(sb.toString());
