@@ -233,39 +233,47 @@ public class OMBucketCreateRequest extends OMClientRequest {
       //Check if bucket already exists
       if (metadataManager.getBucketTable().isExist(bucketKey)) {
         LOG.debug("bucket: {} already exists ", bucketName);
-        throw new OMException("Bucket already exist", BUCKET_ALREADY_EXISTS);
+//        throw new OMException("Bucket already exist", BUCKET_ALREADY_EXISTS);
+        omResponse.setCreateBucketResponse(
+                CreateBucketResponse.newBuilder().build());
+        omClientResponse = new OMBucketCreateResponse(omResponse.build(),
+                omBucketInfo, omVolumeArgs.copyObject());
+      } else {
+        //Check quotaInBytes to update
+        if (!bucketInfo.hasSourceBucket()) {
+          checkQuotaBytesValid(metadataManager, omVolumeArgs, omBucketInfo,
+                  volumeKey);
+        }
+
+        // Add objectID and updateID
+        omBucketInfo.setObjectID(
+                ozoneManager.getObjectIdFromTxId(transactionLogIndex));
+        omBucketInfo.setUpdateID(transactionLogIndex,
+                ozoneManager.isRatisEnabled());
+
+        addDefaultAcls(omBucketInfo, omVolumeArgs, ozoneManager);
+
+        // check namespace quota
+        checkQuotaInNamespace(omVolumeArgs, 1L);
+
+        // update used namespace for volume
+        omVolumeArgs.incrUsedNamespace(1L);
+
+        // Update table cache.
+        metadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey),
+                CacheValue.get(transactionLogIndex, omVolumeArgs));
+        metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
+                CacheValue.get(transactionLogIndex, omBucketInfo));
+
+        omResponse.setCreateBucketResponse(
+                CreateBucketResponse.newBuilder().build());
+        omClientResponse = new OMBucketCreateResponse(omResponse.build(),
+                omBucketInfo, omVolumeArgs.copyObject());
       }
 
-      //Check quotaInBytes to update
-      if (!bucketInfo.hasSourceBucket()) {
-        checkQuotaBytesValid(metadataManager, omVolumeArgs, omBucketInfo,
-            volumeKey);
-      }
 
-      // Add objectID and updateID
-      omBucketInfo.setObjectID(
-          ozoneManager.getObjectIdFromTxId(transactionLogIndex));
-      omBucketInfo.setUpdateID(transactionLogIndex,
-          ozoneManager.isRatisEnabled());
 
-      addDefaultAcls(omBucketInfo, omVolumeArgs, ozoneManager);
 
-      // check namespace quota
-      checkQuotaInNamespace(omVolumeArgs, 1L);
-
-      // update used namespace for volume
-      omVolumeArgs.incrUsedNamespace(1L);
-
-      // Update table cache.
-      metadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey),
-          CacheValue.get(transactionLogIndex, omVolumeArgs));
-      metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
-          CacheValue.get(transactionLogIndex, omBucketInfo));
-
-      omResponse.setCreateBucketResponse(
-          CreateBucketResponse.newBuilder().build());
-      omClientResponse = new OMBucketCreateResponse(omResponse.build(),
-          omBucketInfo, omVolumeArgs.copyObject());
     } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new OMBucketCreateResponse(

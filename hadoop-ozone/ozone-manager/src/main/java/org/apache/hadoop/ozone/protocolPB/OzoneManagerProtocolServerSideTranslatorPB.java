@@ -167,6 +167,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       // To validate credentials we have already verified leader status.
       // This will skip of checking leader status again if request has S3Auth.
       if (!s3Auth) {
+        LOG.warn("Checking leadership while request processing: {}", request.getCmdType());
         OzoneManagerRatisUtils.checkLeaderStatus(ozoneManager);
       }
 

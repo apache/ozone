@@ -40,7 +40,7 @@ public interface XbeiverServerSpi {
    * @param request ContainerCommandRequest
    */
   OzoneManagerProtocolProtos.OMResponse submitRequest(OzoneManagerProtocolProtos.OMRequest omRequest)
-      throws ServiceException;
+          throws ServiceException;
 
   /**
    * Returns true if the given pipeline exist.
@@ -48,13 +48,6 @@ public interface XbeiverServerSpi {
    * @return true if pipeline present, else false
    */
   boolean isExist(RaftGroupId pipelineId);
-
-  /**
-   * Join a new pipeline.
-   */
-  default void addGroup(RaftGroupId groupId,
-                        List<RaftPeer> peers) throws IOException {
-  }
 
   /**
    * Join a new pipeline with priority.

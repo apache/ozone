@@ -416,7 +416,7 @@ public final class OmUtils {
     case CreateVolume:
     case SetVolumeProperty:
     case DeleteVolume:
-    case CreateBucket:
+//    case CreateBucket:
     case SetBucketProperty:
     case DeleteBucket:
     case RenameKey:
@@ -433,7 +433,7 @@ public final class OmUtils {
     case RenewDelegationToken:
     case CancelDelegationToken:
     case CreateDirectory:
-    case CreateFile:
+//    case CreateFile:
       // RecoverTrash is deprecated by HDDS-11251. Keeping this in here
       // As protobuf currently doesn't support deprecating enum fields
       // TODO: Remove once migrated to proto3 and mark fields in proto
@@ -468,7 +468,9 @@ public final class OmUtils {
     case DeleteObjectTagging:
     case UnknownCommand:
       return false;
+    case CreateBucket:
     case CreateKey:
+    case CreateFile:
     case CommitKey:
       return true;
     default:

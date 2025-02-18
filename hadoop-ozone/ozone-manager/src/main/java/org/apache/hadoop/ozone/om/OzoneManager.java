@@ -3309,6 +3309,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public void transferLeadership(String newLeaderId)
       throws IOException {
+    LOG.error("OM leader changing {}", newLeaderId);
     checkAdminUserPrivilege("transfer raft leadership.");
     boolean auditSuccess = true;
     Map<String, String> auditMap = new LinkedHashMap<>();
