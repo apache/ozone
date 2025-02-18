@@ -61,7 +61,6 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
 
     List<HddsVolume> volumesWithEnoughSpace = volumes.stream()
         .filter(filter)
-        .filter(k -> k.getStorageState() != StorageVolume.VolumeState.READ_ONLY)
         .collect(Collectors.toList());
 
     if (volumesWithEnoughSpace.isEmpty()) {
