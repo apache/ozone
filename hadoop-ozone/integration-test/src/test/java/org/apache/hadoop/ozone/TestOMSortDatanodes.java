@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone;
 
 import com.google.common.collect.ImmutableMap;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -185,8 +184,8 @@ public class TestOMSortDatanodes {
 
   private String nodeAddress(DatanodeDetails dn) {
     boolean useHostname = config.getBoolean(
-        DFSConfigKeysLegacy.HDDS_DATANODE_USE_DN_HOSTNAME,
-        DFSConfigKeysLegacy.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+        OzoneConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
+        OzoneConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
     return useHostname ? dn.getHostName() : dn.getIpAddress();
   }
 }

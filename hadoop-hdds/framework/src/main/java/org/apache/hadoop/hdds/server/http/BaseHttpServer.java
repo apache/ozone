@@ -44,7 +44,6 @@ import java.util.OptionalInt;
 import javax.servlet.http.HttpServlet;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.HddsConfServlet;
@@ -128,12 +127,12 @@ public abstract class BaseHttpServer {
       }
 
       final boolean xFrameEnabled = conf.getBoolean(
-          DFSConfigKeysLegacy.HDDS_XFRAME_OPTION_ENABLED,
-          DFSConfigKeysLegacy.HDDS_XFRAME_OPTION_ENABLED_DEFAULT);
+          OzoneConfigKeys.HDDS_XFRAME_OPTION_ENABLED,
+          OzoneConfigKeys.HDDS_XFRAME_OPTION_ENABLED_DEFAULT);
 
       final String xFrameOptionValue = conf.getTrimmed(
-          DFSConfigKeysLegacy.HDDS_XFRAME_OPTION_VALUE,
-          DFSConfigKeysLegacy.HDDS_XFRAME_OPTION_VALUE_DEFAULT);
+          OzoneConfigKeys.HDDS_XFRAME_OPTION_VALUE,
+          OzoneConfigKeys.HDDS_XFRAME_OPTION_VALUE_DEFAULT);
 
       builder.configureXFrame(xFrameEnabled).setXFrameOption(xFrameOptionValue);
 

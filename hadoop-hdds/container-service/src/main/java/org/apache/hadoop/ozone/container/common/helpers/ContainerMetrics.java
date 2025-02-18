@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.container.common.helpers;
 
 import java.io.Closeable;
 import java.util.EnumMap;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -31,6 +30,7 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
@@ -94,7 +94,7 @@ public class ContainerMetrics implements Closeable {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     // Percentile measurement is off by default, by watching no intervals
     int[] intervals =
-        conf.getInts(DFSConfigKeysLegacy.HDDS_METRICS_PERCENTILES_INTERVALS_KEY);
+        conf.getInts(OzoneConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY);
     return ms.register(STORAGE_CONTAINER_METRICS,
                        "Storage Container Node Metrics",
                        new ContainerMetrics(intervals));

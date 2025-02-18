@@ -69,7 +69,6 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -102,6 +101,7 @@ import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
@@ -1828,7 +1828,7 @@ public class TestSCMNodeManager {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
         MILLISECONDS);
-    conf.setBoolean(DFSConfigKeysLegacy.HDDS_DATANODE_USE_DN_HOSTNAME,
+    conf.setBoolean(OzoneConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
         useHostname);
 
     // create table mapping file
@@ -1942,7 +1942,7 @@ public class TestSCMNodeManager {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
         MILLISECONDS);
-    conf.setBoolean(DFSConfigKeysLegacy.HDDS_DATANODE_USE_DN_HOSTNAME,
+    conf.setBoolean(OzoneConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
         useHostname);
 
     // create a set of hosts - note two hosts on "host1"

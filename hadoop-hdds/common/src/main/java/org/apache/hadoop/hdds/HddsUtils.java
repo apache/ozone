@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.hdds;
 
-import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.HDDS_DATANODE_DNS_INTERFACE_KEY;
-import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.HDDS_DATANODE_DNS_NAMESERVER_KEY;
-import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.HDDS_DATANODE_HOST_NAME_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_BIND_HOST_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_BIND_HOST_KEY;
@@ -34,6 +31,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_DNS_INTERFACE_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_DNS_NAMESERVER_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_HOST_NAME_KEY;
 
 import com.google.common.base.Preconditions;
 import com.google.common.net.HostAndPort;

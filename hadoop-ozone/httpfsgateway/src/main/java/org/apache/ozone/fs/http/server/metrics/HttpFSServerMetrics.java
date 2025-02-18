@@ -17,8 +17,8 @@
 
 package org.apache.ozone.fs.http.server.metrics;
 
-import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.HDDS_METRICS_SESSION_ID_KEY;
 import static org.apache.hadoop.metrics2.impl.MsInfo.SessionId;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_METRICS_SESSION_ID_KEY;
 
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.conf.Configuration;

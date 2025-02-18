@@ -595,6 +595,34 @@ public final class OzoneConfigKeys {
       OZONE_CLIENT_BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_DEFAULT_MS =
       300 * 1000;
 
+  public static final String HDDS_DATANODE_DNS_INTERFACE_KEY =
+          "hdds.datanode.dns.interface";
+  public static final String HDDS_DATANODE_DNS_NAMESERVER_KEY =
+          "hdds.datanode.dns.nameserver";
+  public static final String HDDS_DATANODE_HOST_NAME_KEY =
+          "hdds.datanode.hostname";
+  public static final String HDDS_DATANODE_DATA_DIR_KEY =
+          "hdds.datanode.data.dir";
+  public static final String HDDS_DATANODE_USE_DN_HOSTNAME =
+          "hdds.datanode.use.datanode.hostname";
+  public static final boolean HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT = false;
+
+  public static final String HDDS_XFRAME_OPTION_ENABLED = "hdds.xframe.enabled";
+  public static final boolean HDDS_XFRAME_OPTION_ENABLED_DEFAULT = true;
+  public static final String HDDS_XFRAME_OPTION_VALUE = "hdds.xframe.value";
+  public static final String HDDS_XFRAME_OPTION_VALUE_DEFAULT = "SAMEORIGIN";
+
+  public static final String HDDS_METRICS_SESSION_ID_KEY =
+          "hdds.metrics.session-id";
+  public static final String NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY =
+          "net.topology.node.switch.mapping.impl";
+
+  public static final String HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY =
+          "hdds.datanode.kerberos.principal";
+  public static final String HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY =
+          "hdds.datanode.kerberos.keytab.file";
+  public static final String HDDS_METRICS_PERCENTILES_INTERVALS_KEY =
+          "hdds.metrics.percentiles.intervals";
 
   // Values for bucket layout configurations.
   public static final String OZONE_BUCKET_LAYOUT_LEGACY =
