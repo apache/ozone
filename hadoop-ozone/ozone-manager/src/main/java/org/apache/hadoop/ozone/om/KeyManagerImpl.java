@@ -696,7 +696,6 @@ public class KeyManagerImpl implements KeyManager {
     */
     if (startKey != null) {
       tableIterator.seek(startKey);
-      tableIterator.seekToFirst();
     }
     int currentCount = 0;
     while (tableIterator.hasNext() && currentCount < size) {
