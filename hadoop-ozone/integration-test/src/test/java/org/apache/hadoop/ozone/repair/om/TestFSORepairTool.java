@@ -346,8 +346,8 @@ public class TestFSORepairTool {
 
   private int execute(boolean dryRun, String... args) {
     List<String> argList = new ArrayList<>(Arrays.asList("om", "fso-tree", "--db", dbPath));
-    if (!dryRun) {
-      argList.add("--repair");
+    if (dryRun) {
+      argList.add("--dry-run");
     }
     argList.addAll(Arrays.asList(args));
 

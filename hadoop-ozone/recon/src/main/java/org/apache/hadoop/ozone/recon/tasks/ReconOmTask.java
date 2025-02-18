@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,10 +17,9 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import org.apache.hadoop.ozone.om.OMMetadataManager;
-
 import java.util.Collections;
 import java.util.Map;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 
 /**
  * Interface used to denote a Recon task that needs to act on OM DB events.
@@ -35,11 +33,16 @@ public interface ReconOmTask {
   String getTaskName();
 
   /**
-   * Processes a set of OM events on tables that the task is listening to.
+   * Initialize the recon om task with first time initialization of resources.
+   */
+  default void init() { }
+
+  /**
+   * Process a set of OM events on tables that the task is listening on.
    *
    * @param events            The batch of OM update events to be processed.
-   * @param subTaskSeekPosMap A map containing the position from where to start
-   *                          iterating events for each sub-task.
+   * @param subTaskSeekPosMap A map containing the seek positions for
+   *                          each sub-task, indicating where processing should start.
    * @return A {@link TaskResult} containing:
    *         - The task name.
    *         - A map of sub-task names to their respective seek positions.

@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,12 +17,23 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
+import static org.hadoop.ozone.recon.schema.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
+
 import com.google.inject.Inject;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
@@ -32,18 +42,6 @@ import org.jooq.DSLContext;
 import org.jooq.Record3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
-import static org.hadoop.ozone.recon.schema.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
 
 /**
  * Class to iterate over the OM DB and store the counts of existing/new
@@ -70,7 +68,10 @@ public class FileSizeCountTask implements ReconOmTask {
    * File Size it belongs to.
    *
    * @param omMetadataManager OM Metadata instance.
-   * @return Pair
+   * @return A {@link TaskResult} containing:
+   *         - The task name.
+   *         - A map of sub-task names to their respective seek positions.
+   *         - A boolean indicating whether the task was successful.
    */
   @Override
   public TaskResult reprocess(OMMetadataManager omMetadataManager) {
@@ -96,7 +97,7 @@ public class FileSizeCountTask implements ReconOmTask {
           .setTaskSuccess(false)
           .build();
     }
-    writeCountsToDB(true, fileSizeCountMap);
+    writeCountsToDB(fileSizeCountMap);
     LOG.debug("Completed a 'reprocess' run of FileSizeCountTask.");
     return new TaskResult.Builder()
         .setTaskName(getTaskName())
@@ -116,7 +117,7 @@ public class FileSizeCountTask implements ReconOmTask {
         handlePutKeyEvent(kv.getValue(), fileSizeCountMap);
         //  The time complexity of .size() method is constant time, O(1)
         if (fileSizeCountMap.size() >= 100000) {
-          writeCountsToDB(true, fileSizeCountMap);
+          writeCountsToDB(fileSizeCountMap);
           fileSizeCountMap.clear();
         }
       }
@@ -144,9 +145,13 @@ public class FileSizeCountTask implements ReconOmTask {
    * Read the Keys from update events and update the count of files
    * pertaining to a certain upper bound.
    *
-   * @param events            Update events - PUT/DELETE.
-   * @param subTaskSeekPosMap
-   * @return Pair
+   * @param events            The batch of OM update events to be processed.
+   * @param subTaskSeekPosMap A map containing the seek positions for
+   *                          each sub-task, indicating where to start processing.
+   * @return A {@link TaskResult} containing:
+   *         - The task name.
+   *         - A map of sub-task names to their respective seek positions.
+   *         - A boolean indicating whether the task was successful.
    */
   @Override
   public TaskResult process(OMUpdateEventBatch events,
@@ -207,7 +212,7 @@ public class FileSizeCountTask implements ReconOmTask {
             value.getClass().getName(), updatedKey);
       }
     }
-    writeCountsToDB(false, fileSizeCountMap);
+    writeCountsToDB(fileSizeCountMap);
     LOG.debug("{} successfully processed in {} milliseconds",
         getTaskName(), (System.currentTimeMillis() - startTime));
     return new TaskResult.Builder()
@@ -219,12 +224,12 @@ public class FileSizeCountTask implements ReconOmTask {
   /**
    * Populate DB with the counts of file sizes calculated
    * using the dao.
-   *
    */
-  private void writeCountsToDB(boolean isDbTruncated,
-                               Map<FileSizeCountKey, Long> fileSizeCountMap) {
+  private void writeCountsToDB(Map<FileSizeCountKey, Long> fileSizeCountMap) {
+
     List<FileCountBySize> insertToDb = new ArrayList<>();
     List<FileCountBySize> updateInDb = new ArrayList<>();
+    boolean isDbTruncated = isFileCountBySizeTableEmpty(); // Check if table is empty
 
     fileSizeCountMap.keySet().forEach((FileSizeCountKey key) -> {
       FileCountBySize newRecord = new FileCountBySize();
@@ -282,10 +287,6 @@ public class FileSizeCountTask implements ReconOmTask {
     fileSizeCountMap.put(key, count);
   }
 
-  private BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
-  }
-
   /**
    * Calculate and update the count of files being tracked by
    * fileSizeCountMap.
@@ -305,6 +306,15 @@ public class FileSizeCountTask implements ReconOmTask {
           fileSizeCountMap.get(countKey) - 1L : -1L;
       fileSizeCountMap.put(countKey, count);
     }
+  }
+
+  /**
+   * Checks if the FILE_COUNT_BY_SIZE table is empty.
+   *
+   * @return true if the table is empty, false otherwise.
+   */
+  private boolean isFileCountBySizeTableEmpty() {
+    return dslContext.fetchCount(FILE_COUNT_BY_SIZE) == 0;
   }
 
   private static class FileSizeCountKey {
