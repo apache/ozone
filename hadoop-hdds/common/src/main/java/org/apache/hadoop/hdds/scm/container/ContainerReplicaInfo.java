@@ -27,7 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import java.io.IOException;
 import java.util.UUID;
 
-import static org.apache.hadoop.hdds.HddsUtils.getHexString;
+import static org.apache.hadoop.hdds.HddsUtils.checksumToString;
 
 /**
  * Class which stores ContainerReplica details on the client.
@@ -104,7 +104,7 @@ public final class ContainerReplicaInfo {
   private static class LongToHexJsonSerializer extends JsonSerializer<Long> {
     @Override
     public void serialize(Long value, JsonGenerator gen, SerializerProvider provider) throws IOException {
-      gen.writeString(getHexString(value));
+      gen.writeString(checksumToString(value));
     }
   }
 

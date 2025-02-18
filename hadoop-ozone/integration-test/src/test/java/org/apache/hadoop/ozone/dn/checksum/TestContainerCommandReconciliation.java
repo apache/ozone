@@ -18,19 +18,28 @@
 
 package org.apache.hadoop.ozone.dn.checksum;
 
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
+import org.apache.hadoop.ozone.security.SecretKeyTestClient;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.commons.io.IOUtils;
@@ -40,11 +49,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.client.ObjectStore;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
@@ -73,6 +77,8 @@ import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphabetic;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
@@ -97,6 +103,7 @@ public class TestContainerCommandReconciliation {
   private static ObjectStore store;
   private static OzoneConfiguration conf;
   private static DNContainerOperationClient dnClient;
+  private static final String KEY_NAME = "testkey";
 
   @TempDir
   private static File testDir;
@@ -106,6 +113,13 @@ public class TestContainerCommandReconciliation {
     testDir = GenericTestUtils.getTestDir(
         TestContainerCommandReconciliation.class.getSimpleName());
     conf = new OzoneConfiguration();
+    // Add security configuration.
+    // conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
+    conf.setBoolean(HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED, true);
+    conf.setBoolean(HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED, true);
+    conf.setBoolean(HDDS_GRPC_TLS_ENABLED, true);
+    conf.setInt(HDDS_BLOCK_TOKEN_EXPIRY_TIME, 1000);
+    // conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.name());
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
     conf.set(OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     conf.setStorageSize(OZONE_SCM_CHUNK_SIZE_KEY, 1024 * 1024, StorageUnit.BYTES);
@@ -113,8 +127,10 @@ public class TestContainerCommandReconciliation {
     // Disable the container scanner so it does not create merkle tree files that interfere with this test.
     conf.getObject(ContainerScannerConfiguration.class).setEnabled(false);
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(5)
-        .build();
+            .setCertificateClient(new CertificateClientTestImpl(conf))
+            .setSecretKeyClient(new SecretKeyTestClient())
+            .setNumDatanodes(3)
+            .build();
     cluster.waitForClusterToBeReady();
     rpcClient = OzoneClientFactory.getRpcClient(conf);
     store = rpcClient.getObjectStore();
@@ -142,7 +158,9 @@ public class TestContainerCommandReconciliation {
    */
   @Test
   public void testGetChecksumInfoOpenReplica() throws Exception {
-    long containerID = writeDataAndGetContainer(false);
+    String volume = UUID.randomUUID().toString();
+    String bucket = UUID.randomUUID().toString();
+    long containerID = writeDataAndGetContainer(false, volume, bucket);
     HddsDatanodeService targetDN = cluster.getHddsDatanodes().get(0);
     StorageContainerException ex = assertThrows(StorageContainerException.class,
         () -> dnClient.getContainerChecksumInfo(containerID, targetDN.getDatanodeDetails()));
@@ -177,7 +195,9 @@ public class TestContainerCommandReconciliation {
    */
   @Test
   public void testGetChecksumInfoNonexistentFile() throws Exception {
-    long containerID = writeDataAndGetContainer(true);
+    String volume = UUID.randomUUID().toString();
+    String bucket = UUID.randomUUID().toString();
+    long containerID = writeDataAndGetContainer(true, volume, bucket);
     // Pick a datanode and remove its checksum file.
     HddsDatanodeService targetDN = cluster.getHddsDatanodes().get(0);
     Container<?> container = targetDN.getDatanodeStateMachine().getContainer()
@@ -200,7 +220,9 @@ public class TestContainerCommandReconciliation {
    */
   @Test
   public void testGetChecksumInfoServerIOError() throws Exception {
-    long containerID = writeDataAndGetContainer(true);
+    String volume = UUID.randomUUID().toString();
+    String bucket = UUID.randomUUID().toString();
+    long containerID = writeDataAndGetContainer(true, volume, bucket);
     // Pick a datanode and remove its checksum file.
     HddsDatanodeService targetDN = cluster.getHddsDatanodes().get(0);
     Container<?> container = targetDN.getDatanodeStateMachine().getContainer()
@@ -222,7 +244,9 @@ public class TestContainerCommandReconciliation {
    */
   @Test
   public void testGetCorruptChecksumInfo() throws Exception {
-    long containerID = writeDataAndGetContainer(true);
+    String volume = UUID.randomUUID().toString();
+    String bucket = UUID.randomUUID().toString();
+    long containerID = writeDataAndGetContainer(true, volume, bucket);
 
     // Pick a datanode and corrupt its checksum file.
     HddsDatanodeService targetDN = cluster.getHddsDatanodes().get(0);
@@ -239,7 +263,9 @@ public class TestContainerCommandReconciliation {
 
   @Test
   public void testGetEmptyChecksumInfo() throws Exception {
-    long containerID = writeDataAndGetContainer(true);
+    String volume = UUID.randomUUID().toString();
+    String bucket = UUID.randomUUID().toString();
+    long containerID = writeDataAndGetContainer(true, volume, bucket);
 
     // Pick a datanode and truncate its checksum file to zero length.
     HddsDatanodeService targetDN = cluster.getHddsDatanodes().get(0);
@@ -261,7 +287,9 @@ public class TestContainerCommandReconciliation {
 
   @Test
   public void testGetChecksumInfoSuccess() throws Exception {
-    long containerID = writeDataAndGetContainer(true);
+    String volume = UUID.randomUUID().toString();
+    String bucket = UUID.randomUUID().toString();
+    long containerID = writeDataAndGetContainer(true, volume, bucket);
     // Overwrite the existing tree with a custom one for testing. We will check that it is returned properly from the
     // API.
     ContainerMerkleTreeWriter tree = buildTestTree(conf);
@@ -282,7 +310,12 @@ public class TestContainerCommandReconciliation {
   @Test
   public void testContainerChecksumWithBlockMissing() throws Exception {
     // 1. Write data to a container.
-    long containerID = writeDataAndGetContainer(true, 20 * 1024 * 1024);
+    // Read the key back check it's hash.
+    String volume = UUID.randomUUID().toString();
+    String bucket = UUID.randomUUID().toString();
+    Pair<Long, byte[]> containerAndData = getDataAndContainer(true, 20 * 1024 * 1024, volume, bucket);
+    long containerID = containerAndData.getLeft();
+    byte[] data = containerAndData.getRight();
     TestHelper.waitForReplicasContainerState(cluster, containerID, ContainerReplicaProto.State.CLOSED);
     HddsDatanodeService hddsDatanodeService = cluster.getHddsDatanodes().get(0);
     DatanodeStateMachine datanodeStateMachine = hddsDatanodeService.getDatanodeStateMachine();
@@ -323,7 +356,7 @@ public class TestContainerCommandReconciliation {
     Assertions.assertNotEquals(oldDataChecksum, dataChecksumAfterBlockDelete);
 
     // 3. Reconcile the container.
-    cluster.getStorageContainerManager().getClientProtocolServer().reconcileContainer(containerID);
+    cluster.getStorageContainerLocationClient().reconcileContainer(containerID);
     GenericTestUtils.waitFor(() -> {
       try {
         ContainerProtos.ContainerChecksumInfo newContainerChecksumInfo = readChecksumFile(container.getContainerData());
@@ -342,12 +375,21 @@ public class TestContainerCommandReconciliation {
         .map(HddsProtos.SCMContainerReplicaProto::getDataChecksum)
         .collect(Collectors.toSet());
     assertEquals(1, dataChecksums.size());
+    cluster.getHddsDatanodes().get(1).stop();
+    cluster.getHddsDatanodes().get(2).stop();
+    TestHelper.validateData(KEY_NAME, data, store, volume, bucket);
+    cluster.getHddsDatanodes().get(1).start();
+    cluster.getHddsDatanodes().get(2).start();
   }
 
   @Test
   public void testContainerChecksumChunkCorruption() throws Exception {
     // 1. Write data to a container.
-    long containerID = writeDataAndGetContainer(true, 20 * 1024 * 1024);
+    String volume = UUID.randomUUID().toString();
+    String bucket = UUID.randomUUID().toString();
+    Pair<Long, byte[]> containerAndData = getDataAndContainer(true, 20 * 1024 * 1024, volume, bucket);
+    long containerID = containerAndData.getLeft();
+    byte[] data = containerAndData.getRight();
     TestHelper.waitForReplicasContainerState(cluster, containerID, ContainerReplicaProto.State.CLOSED);
     HddsDatanodeService hddsDatanodeService = cluster.getHddsDatanodes().get(0);
     DatanodeStateMachine datanodeStateMachine = hddsDatanodeService.getDatanodeStateMachine();
@@ -421,7 +463,7 @@ public class TestContainerCommandReconciliation {
     writeContainerDataTreeProto(container.getContainerData(), builder.getContainerMerkleTree());
 
     // 4. Reconcile the container.
-    cluster.getStorageContainerManager().getClientProtocolServer().reconcileContainer(containerID);
+    cluster.getStorageContainerLocationClient().reconcileContainer(containerID);
     GenericTestUtils.waitFor(() -> {
       try {
         ContainerProtos.ContainerChecksumInfo newContainerChecksumInfo = readChecksumFile(container.getContainerData());
@@ -441,11 +483,15 @@ public class TestContainerCommandReconciliation {
         .map(HddsProtos.SCMContainerReplicaProto::getDataChecksum)
         .collect(Collectors.toSet());
     assertEquals(1, dataChecksums.size());
+    cluster.getHddsDatanodes().get(1).stop();
+    cluster.getHddsDatanodes().get(2).stop();
+    TestHelper.validateData(KEY_NAME, data, store, volume, bucket);
+    cluster.getHddsDatanodes().get(1).start();
+    cluster.getHddsDatanodes().get(2).start();
   }
 
-  private long writeDataAndGetContainer(boolean close, int dataLen) throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
+  private Pair<Long, byte[]> getDataAndContainer(boolean close, int dataLen, String volumeName, String bucketName)
+          throws Exception {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -453,21 +499,21 @@ public class TestContainerCommandReconciliation {
 
     byte[] data = randomAlphabetic(dataLen).getBytes(UTF_8);
     // Write Key
-    try (OzoneOutputStream os = TestHelper.createKey("testkey", RATIS, THREE, dataLen, store, volumeName, bucketName)) {
+    try (OzoneOutputStream os = TestHelper.createKey(KEY_NAME, RATIS, THREE, dataLen, store, volumeName, bucketName)) {
       IOUtils.write(data, os);
     }
 
-    long containerID = bucket.getKey("testkey").getOzoneKeyLocations().stream()
+    long containerID = bucket.getKey(KEY_NAME).getOzoneKeyLocations().stream()
         .findFirst().get().getContainerID();
     if (close) {
       TestHelper.waitForContainerClose(cluster, containerID);
       TestHelper.waitForScmContainerState(cluster, containerID, HddsProtos.LifeCycleState.CLOSED);
     }
-    return containerID;
+    return Pair.of(containerID, data);
   }
 
-  private long writeDataAndGetContainer(boolean close) throws Exception {
-    return writeDataAndGetContainer(close, 5);
+  private long writeDataAndGetContainer(boolean close, String volume, String bucket) throws Exception {
+    return getDataAndContainer(close, 5, volume, bucket).getLeft();
   }
 
   public static void writeChecksumFileToDatanodes(long containerID, ContainerMerkleTreeWriter tree) throws Exception {

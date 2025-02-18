@@ -102,6 +102,86 @@ public class BlockManagerImpl implements BlockManager {
         data, endOfBlock);
   }
 
+  @Override
+  public long putBlockForClosedContainer(Container container, BlockData data, boolean overwriteBcsId)
+          throws IOException {
+    return persistPutBlockForClosedContainer((KeyValueContainer) container, data, overwriteBcsId);
+  }
+
+  private long persistPutBlockForClosedContainer(KeyValueContainer container, BlockData data, boolean overwriteBcsId)
+          throws IOException {
+    Preconditions.checkNotNull(data, "BlockData cannot be null for put " +
+            "operation.");
+    Preconditions.checkState(data.getContainerID() >= 0, "Container Id " +
+            "cannot be negative");
+
+    KeyValueContainerData containerData = container.getContainerData();
+
+    // We are not locking the key manager since RocksDB serializes all actions
+    // against a single DB. We rely on DB level locking to avoid conflicts.
+    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
+      // This is a post condition that acts as a hint to the user.
+      // Should never fail.
+      Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
+
+      long bcsId = data.getBlockCommitSequenceId();
+      long containerBCSId = containerData.getBlockCommitSequenceId();
+
+      // Check if the block is already present in the DB of the container to determine whether
+      // the blockCount is already incremented for this block in the DB or not.
+      long localID = data.getLocalID();
+      boolean incrBlockCount = false;
+
+      // update the blockData as well as BlockCommitSequenceId here
+      try (BatchOperation batch = db.getStore().getBatchHandler()
+              .initBatchOperation()) {
+        // If block exists in cache, blockCount should not be incremented.
+        if (db.getStore().getBlockDataTable().get(containerData.getBlockKey(localID)) == null) {
+          // Block does not exist in DB => blockCount needs to be
+          // incremented when the block is added into DB.
+          incrBlockCount = true;
+        }
+
+        db.getStore().getBlockDataTable().putWithBatch(batch, containerData.getBlockKey(localID), data);
+        if (overwriteBcsId && bcsId > containerBCSId) {
+          db.getStore().getMetadataTable().putWithBatch(batch, containerData.getBcsIdKey(), bcsId);
+        }
+
+        // Set Bytes used, this bytes used will be updated for every write and
+        // only get committed for every put block. In this way, when datanode
+        // is up, for computation of disk space by container only committed
+        // block length is used, And also on restart the blocks committed to DB
+        // is only used to compute the bytes used. This is done to keep the
+        // current behavior and avoid DB write during write chunk operation.
+        db.getStore().getMetadataTable().putWithBatch(batch, containerData.getBytesUsedKey(),
+                containerData.getBytesUsed());
+
+        // Set Block Count for a container.
+        if (incrBlockCount) {
+          db.getStore().getMetadataTable().putWithBatch(batch, containerData.getBlockCountKey(),
+                  containerData.getBlockCount() + 1);
+        }
+
+        db.getStore().getBatchHandler().commitBatchOperation(batch);
+      }
+
+      if (overwriteBcsId && bcsId > containerBCSId) {
+        container.updateBlockCommitSequenceId(bcsId);
+      }
+
+      // Increment block count in-memory after the DB update.
+      if (incrBlockCount) {
+        containerData.incrBlockCount();
+      }
+
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Block " + data.getBlockID() + " successfully committed with bcsId "
+                        + bcsId + " chunk size " + data.getChunks().size());
+      }
+      return data.getSize();
+    }
+  }
+
   public long persistPutBlock(KeyValueContainer container,
       BlockData data, boolean endOfBlock)
       throws IOException {
@@ -125,7 +205,7 @@ public class BlockManagerImpl implements BlockManager {
       // default blockCommitSequenceId for any block is 0. It the putBlock
       // request is not coming via Ratis(for test scenarios), it will be 0.
       // In such cases, we should overwrite the block as well
-      if ((bcsId != 0) && (bcsId < containerBCSId)) {
+      if ((bcsId != 0) && (bcsId <= containerBCSId)) {
         // Since the blockCommitSequenceId stored in the db is greater than
         // equal to blockCommitSequenceId to be updated, it means the putBlock
         // transaction is reapplied in the ContainerStateMachine on restart.

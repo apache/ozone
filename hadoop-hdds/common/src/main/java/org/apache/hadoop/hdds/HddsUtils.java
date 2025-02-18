@@ -887,7 +887,7 @@ public final class HddsUtils {
   }
 
   /** @return Hex string representation of {@code value} */
-  public static String getHexString(long value) {
+  public static String checksumToString(long value) {
     return Long.toHexString(value);
   }
 

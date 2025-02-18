@@ -165,8 +165,8 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     ChunkBuffer.wrap(getData());
     Assertions.assertThrows(IOException.class, () -> keyValueHandler.writeChunkForClosedContainer(
         getChunkInfo(), getBlockID(), ChunkBuffer.wrap(getData()), keyValueContainer));
-    Assertions.assertThrows(IOException.class, () -> keyValueHandler.putBlockForClosedContainer(
-        null, keyValueContainer, new BlockData(getBlockID()), 0L));
+    Assertions.assertThrows(IOException.class, () -> keyValueHandler.putBlockForClosedContainer(keyValueContainer,
+            new BlockData(getBlockID()), 0L, true));
   }
 
   @Test
@@ -228,7 +228,8 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     List<ContainerProtos.ChunkInfo> chunkInfoList = new ArrayList<>();
     chunkInfoList.add(getChunkInfo().getProtoBufMessage());
     BlockData putBlockData = new BlockData(getBlockID());
-    keyValueHandler.putBlockForClosedContainer(chunkInfoList, kvContainer, putBlockData, 1L);
+    putBlockData.setChunks(chunkInfoList);
+    keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 1L, true);
     Assertions.assertEquals(containerData.getBlockCommitSequenceId(), 1L);
     Assertions.assertEquals(containerData.getBlockCount(), 1L);
 
@@ -243,7 +244,8 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     ChunkInfo newChunkInfo = new ChunkInfo(String.format("%d.data.%d", getBlockID()
         .getLocalID(), 1L), 0, 20L);
     chunkInfoList.add(newChunkInfo.getProtoBufMessage());
-    keyValueHandler.putBlockForClosedContainer(chunkInfoList, kvContainer, putBlockData, 2L);
+    putBlockData.setChunks(chunkInfoList);
+    keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 2L, true);
     Assertions.assertEquals(containerData.getBlockCommitSequenceId(), 2L);
     Assertions.assertEquals(containerData.getBlockCount(), 1L);
 
@@ -254,8 +256,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
       Assertions.assertTrue(blockDataEquals(putBlockData, getBlockData));
     }
 
-    // Put block on bcsId <= containerBcsId should be a no-op
-    keyValueHandler.putBlockForClosedContainer(chunkInfoList, kvContainer, putBlockData, 2L);
+    keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 2L, true);
     Assertions.assertEquals(containerData.getBlockCommitSequenceId(), 2L);
   }
 

@@ -51,6 +51,17 @@ public interface BlockManager {
       throws IOException;
 
   /**
+   * Puts or overwrites a block to a closed container.
+   *
+   * @param container - Container for which block need to be added.
+   * @param data - Block Data.
+   * @param overwriteBcsId - To overwrite bcsId in the block data.
+   * @return length of the Block.
+   */
+  long putBlockForClosedContainer(Container container, BlockData data, boolean overwriteBcsId)
+          throws IOException;
+
+  /**
    * Gets an existing block.
    *
    * @param container - Container from which block needs to be fetched.

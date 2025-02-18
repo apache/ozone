@@ -24,7 +24,7 @@ import org.apache.logging.log4j.Logger;
 
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 
-import static org.apache.hadoop.hdds.HddsUtils.getHexString;
+import static org.apache.hadoop.hdds.HddsUtils.checksumToString;
 
 /**
  * Utility class defining methods to write to the datanode container log.
@@ -153,11 +153,9 @@ public final class ContainerLogger {
    *
    * @param containerData The container that was reconciled on this datanode.
    * @param oldDataChecksum The old data checksum.
-   * @param newDataChecksum The new data checksum.
    */
-  public static void logReconciled(ContainerData containerData, long oldDataChecksum, long newDataChecksum) {
-    LOG.info(getMessage(containerData, "Container reconciled. Old checksum is " + getHexString(oldDataChecksum) +
-        " , New checksum is " + getHexString(newDataChecksum)));
+  public static void logReconciled(ContainerData containerData, long oldDataChecksum) {
+    LOG.info(getMessage(containerData, "Container reconciled. Old checksum is " + checksumToString(oldDataChecksum)));
   }
 
   private static String getMessage(ContainerData containerData,
@@ -170,6 +168,7 @@ public final class ContainerLogger {
         "ID=" + containerData.getContainerID(),
         "Index=" + containerData.getReplicaIndex(),
         "BCSID=" + containerData.getBlockCommitSequenceId(),
-        "State=" + containerData.getState());
+        "State=" + containerData.getState(),
+        "DataChecksum=" + checksumToString(containerData.getDataChecksum()));
   }
 }
