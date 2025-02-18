@@ -17,12 +17,11 @@
 
 package org.apache.hadoop.ozone.om.request.validation;
 
+import java.lang.annotation.Annotation;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.Versioned;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
-
-import java.lang.annotation.Annotation;
 
 /**
  * Class to extract version out of OM request.

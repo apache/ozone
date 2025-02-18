@@ -21,6 +21,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
+import java.lang.annotation.Annotation;
+import java.util.Map;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.Versioned;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
