@@ -22,6 +22,8 @@ set -u -o pipefail
 #
 SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
 
+source "${SCRIPT_DIR}/testlib.sh"
+
 ALL_RESULT_DIR="$SCRIPT_DIR/result"
 rm "$ALL_RESULT_DIR"/* || true
 mkdir -p "$ALL_RESULT_DIR"
@@ -51,6 +53,6 @@ for test in $(find "$SCRIPT_DIR" -name test.sh | grep "${OZONE_TEST_SELECTOR:-""
   fi
 done
 
-rebot -N "smoketests" -d "$ALL_RESULT_DIR/" "$ALL_RESULT_DIR/*.xml"
+run_rebot "$ALL_RESULT_DIR" "$ALL_RESULT_DIR" "-N smoketests *.xml"
 
 exit ${RESULT}

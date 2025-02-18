@@ -59,7 +59,7 @@ env:
 run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0}#{1}[{2}]-{3}x{4}', inputs.test-class, inputs.test-name, inputs.ref, inputs.splits, inputs.iterations) || '' }}
 jobs:
   prepare-job:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     outputs:
       matrix: ${{steps.generate.outputs.matrix}}
     steps:
@@ -87,7 +87,7 @@ jobs:
     needs:
       - prepare-job
       - ratis
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - name: Checkout project
@@ -139,7 +139,7 @@ jobs:
       - ratis
       - build
     name: Run-Split
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         split: ${{fromJson(needs.prepare-job.outputs.matrix)}}  # Define  splits
@@ -216,7 +216,7 @@ jobs:
   count-failures:
     if: ${{ failure() }}
     needs: run-test
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Download build results
         uses: actions/download-artifact@v4
