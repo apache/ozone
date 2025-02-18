@@ -58,7 +58,7 @@ env:
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
 jobs:
   ratis:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     outputs:
       ratis-version: ${{ steps.versions.outputs.ratis }}
@@ -84,15 +84,15 @@ jobs:
       - name: Get component versions
         id: versions
         run: |
-          thirdparty_version="$(mvn help:evaluate -N -q -DforceStdout -Dexpression=ratis.thirdparty.version)"
+          thirdparty_version="$(mvn help:evaluate -N -q -DforceStdout -Dscan=false -Dexpression=ratis.thirdparty.version)"
           echo "thirdparty=${thirdparty_version}" >> $GITHUB_OUTPUT
 
           ratis_sha=$(git rev-parse --short HEAD)
-          ratis_version="$(mvn help:evaluate -N -q -DforceStdout -Dexpression=project.version | sed -e "s/-SNAPSHOT/-${ratis_sha}-SNAPSHOT/")"
+          ratis_version="$(mvn help:evaluate -N -q -DforceStdout -Dscan=false -Dexpression=project.version | sed -e "s/-SNAPSHOT/-${ratis_sha}-SNAPSHOT/")"
           echo "ratis=${ratis_version}" >> $GITHUB_OUTPUT
       - name: Run a full build
         run: |
-          mvn versions:set -DnewVersion=${{ steps.versions.outputs.ratis }}
+          mvn -B --no-transfer-progress -Dscan=false versions:set -DnewVersion=${{ steps.versions.outputs.ratis }}
           dev-support/checks/build.sh
       - name: Store Maven repo for tests
         uses: actions/upload-artifact@v4
@@ -102,7 +102,7 @@ jobs:
             ~/.m2/repository/org/apache/ratis
           retention-days: 1
   ratis-thirdparty:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     needs:
       - ratis
     timeout-minutes: 30
@@ -119,11 +119,11 @@ jobs:
       - name: Get component versions
         id: versions
         run: |
-          echo "grpc=$(mvn help:evaluate -N -q -DforceStdout -Dexpression=shaded.grpc.version)" >> $GITHUB_OUTPUT
-          echo "netty=$(mvn help:evaluate -N -q -DforceStdout -Dexpression=shaded.netty.version)" >> $GITHUB_OUTPUT
-          echo "protobuf=$(mvn help:evaluate -N -q -DforceStdout -Dexpression=shaded.protobuf.version)" >> $GITHUB_OUTPUT
+          echo "grpc=$(mvn help:evaluate -N -q -DforceStdout -Dscan=false -Dexpression=shaded.grpc.version)" >> $GITHUB_OUTPUT
+          echo "netty=$(mvn help:evaluate -N -q -DforceStdout -Dscan=false -Dexpression=shaded.netty.version)" >> $GITHUB_OUTPUT
+          echo "protobuf=$(mvn help:evaluate -N -q -DforceStdout -Dscan=false -Dexpression=shaded.protobuf.version)" >> $GITHUB_OUTPUT
   debug:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     needs:
       - ratis
       - ratis-thirdparty

@@ -1,6 +1,6 @@
 ---
 title: "Securing S3"
-date: "2019-April-03"
+date: "2019-04-03"
 summary: Ozone supports S3 protocol, and uses AWS Signature Version 4 protocol which allows a seamless S3 experience.
 weight: 5
 menu:

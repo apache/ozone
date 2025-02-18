@@ -20,16 +20,11 @@ Resource            ../lib/os.robot
 
 *** Keywords ***
 Execute read-replicas CLI tool
-    Execute                         ozone debug -Dozone.network.topology.aware.read=true read-replicas o3://om/${VOLUME}/${BUCKET}/${TESTFILE}
-    ${directory} =                  Execute     ls -d /opt/hadoop/${VOLUME}_${BUCKET}_${TESTFILE}_*/ | tail -n 1
+    Execute                         ozone debug -Dozone.network.topology.aware.read=true read-replicas --output-dir ${TEMP_DIR} o3://om/${VOLUME}/${BUCKET}/${TESTFILE}
+    ${directory} =                  Execute     ls -d ${TEMP_DIR}/${VOLUME}_${BUCKET}_${TESTFILE}_*/ | tail -n 1
     Directory Should Exist          ${directory}
     File Should Exist               ${directory}/${TESTFILE}_manifest
     [Return]                        ${directory}
-
-Execute Lease recovery cli
-    [Arguments]                     ${KEY_PATH}
-    ${result} =                     Execute And Ignore Error      ozone debug recover --path=${KEY_PATH}
-    [Return]                        ${result}
 
 Read Replicas Manifest
     ${manifest} =        Get File        ${DIR}/${TESTFILE}_manifest
@@ -40,7 +35,7 @@ Read Replicas Manifest
 Validate JSON
     [arguments]                     ${json}
     Should Be Equal                 ${json}[filename]                   ${VOLUME}/${BUCKET}/${TESTFILE}
-    ${file_size} =                  Get File Size                       ${TESTFILE}
+    ${file_size} =                  Get File Size                       ${TEMP_DIR}/${TESTFILE}
     Should Be Equal                 ${json}[datasize]                   ${file_size}
     Should Be Equal As Integers     ${json}[blocks][0][blockIndex]      1
     Should Not Be Empty             Convert To String       ${json}[blocks][0][containerId]
@@ -74,6 +69,12 @@ Verify Healthy Replica
     ${block_filenames} =     Get Replica Filenames    ${json}    ${replica}
     ${md5sum} =              Execute     cat ${block_filenames} | md5sum | awk '{print $1}'
     Should Be Equal          ${md5sum}   ${expected_md5sum}
+
+Verify Healthy EC Replica
+    [arguments]              ${directory}    ${block}    ${expected_block_size}
+
+    ${block_size} =          Execute     ls -l ${directory} | grep "testfile_block${block}_ozone-datanode-.*\.ozone_default" | awk '{sum += $5} END {print sum}'
+    Should Be Equal As Integers      ${block_size}     ${expected_block_size}
 
 Verify Corrupt Replica
     [arguments]              ${json}    ${replica}    ${valid_md5sum}

@@ -1,34 +1,21 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.cli.container;
-
-import java.io.IOException;
-import java.util.List;
-
-import com.google.common.base.Strings;
-import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
-import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
@@ -36,6 +23,18 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.google.common.base.Strings;
+import java.io.IOException;
+import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
+import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Help.Visibility;
 import picocli.CommandLine.Option;
@@ -55,9 +54,14 @@ public class ListSubcommand extends ScmSubcommand {
   private long startId;
 
   @Option(names = {"-c", "--count"},
-      description = "Maximum number of containers to list",
+      description = "Maximum number of containers to list.",
       defaultValue = "20", showDefaultValue = Visibility.ALWAYS)
   private int count;
+
+  @Option(names = {"-a", "--all"},
+      description = "List all containers.",
+      defaultValue = "false")
+  private boolean all;
 
   @Option(names = {"--state"},
       description = "Container state(OPEN, CLOSING, QUASI_CLOSED, CLOSED, " +
@@ -105,12 +109,49 @@ public class ListSubcommand extends ScmSubcommand {
           ReplicationType.fromProto(type),
           replication, new OzoneConfiguration());
     }
-    List<ContainerInfo> containerList =
-        scmClient.listContainer(startId, count, state, type, repConfig);
 
-    // Output data list
-    for (ContainerInfo container : containerList) {
-      outputContainerInfo(container);
+    int maxCountAllowed = getOzoneConf()
+        .getInt(ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT,
+            ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT_DEFAULT);
+
+    ContainerListResult containerListAndTotalCount;
+
+    if (!all) {
+      if (count > maxCountAllowed) {
+        System.err.printf("Attempting to list the first %d records of containers." +
+            " However it exceeds the cluster's current limit of %d. The results will be capped at the" +
+            " maximum allowed count.%n", count, ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT_DEFAULT);
+        count = maxCountAllowed;
+      }
+      containerListAndTotalCount = scmClient.listContainer(startId, count, state, type, repConfig);
+      for (ContainerInfo container : containerListAndTotalCount.getContainerInfoList()) {
+        outputContainerInfo(container);
+      }
+
+      if (containerListAndTotalCount.getTotalCount() > count) {
+        System.err.printf("Displaying %d out of %d containers. " +
+                        "Container list has more containers.%n",
+                count, containerListAndTotalCount.getTotalCount());
+      }
+    } else {
+      // Batch size is either count passed through cli or maxCountAllowed
+      int batchSize = (count > 0) ? count : maxCountAllowed;
+      long currentStartId = startId;
+      int fetchedCount;
+
+      do {
+        // Fetch containers in batches of 'batchSize'
+        containerListAndTotalCount = scmClient.listContainer(currentStartId, batchSize, state, type, repConfig);
+        fetchedCount = containerListAndTotalCount.getContainerInfoList().size();
+
+        for (ContainerInfo container : containerListAndTotalCount.getContainerInfoList()) {
+          outputContainerInfo(container);
+        }
+
+        if (fetchedCount > 0) {
+          currentStartId = containerListAndTotalCount.getContainerInfoList().get(fetchedCount - 1).getContainerID() + 1;
+        }
+      } while (fetchedCount > 0);
     }
   }
 }

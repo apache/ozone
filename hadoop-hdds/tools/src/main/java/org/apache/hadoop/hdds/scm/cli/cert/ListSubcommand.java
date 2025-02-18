@@ -1,22 +1,28 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.cli.cert;
 
+import static java.lang.System.err;
+
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.CertificateException;
@@ -25,22 +31,14 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.SerializerProvider;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
-
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Help.Visibility;
 import picocli.CommandLine.Option;
-
-import static java.lang.System.err;
 
 /**
  * This is the handler that process certificate list command.
@@ -68,8 +66,9 @@ public class ListSubcommand extends ScmCertSubcommand {
   private String role;
 
   @Option(names = {"-t", "--type"},
-      description = "Filter certificate by the type: valid or revoked",
-      defaultValue = "valid", showDefaultValue = Visibility.ALWAYS)
+      description = "This option is unused currently, and has no effect on the output.",
+      defaultValue = "VALID", showDefaultValue = Visibility.NEVER)
+  @Deprecated
   private String type;
   
   @Option(names = { "--json" },
@@ -89,10 +88,8 @@ public class ListSubcommand extends ScmCertSubcommand {
 
   @Override
   protected void execute(SCMSecurityProtocol client) throws IOException {
-    boolean isRevoked = type.equalsIgnoreCase("revoked");
     HddsProtos.NodeType nodeType = parseCertRole(role);
-    List<String> certPemList = client.listCertificate(nodeType,
-        startSerialId, count, isRevoked);
+    List<String> certPemList = client.listCertificate(nodeType, startSerialId, count);
     if (count == certPemList.size()) {
       err.println("The certificate list could be longer than the batch size: "
           + count + ". Please use the \"-c\" option to see more" +
@@ -100,8 +97,7 @@ public class ListSubcommand extends ScmCertSubcommand {
     }
 
     if (json) {
-      err.println("Certificate list:(Type=" + type.toUpperCase() +
-          ", BatchSize=" + count + ", CertCount=" + certPemList.size() + ")");
+      err.println("Certificate list:(BatchSize=" + count + ", CertCount=" + certPemList.size() + ")");
       List<Certificate> certList = new ArrayList<>();
       for (String certPemStr : certPemList) {
         try {
@@ -117,8 +113,7 @@ public class ListSubcommand extends ScmCertSubcommand {
       return;
     }
 
-    System.out.printf("Certificate list:(Type=%s, BatchSize=%s, CertCount=%s)%n",
-        type.toUpperCase(), count, certPemList.size());
+    System.out.printf("Certificate list:(BatchSize=%s, CertCount=%s)%n", count, certPemList.size());
     printCertList(certPemList);
   }
 

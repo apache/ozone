@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +17,17 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_SERVICE_ID;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DECOMMISSIONED_NODES_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.om.TestOzoneManagerHA.createKey;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.FileFilter;
@@ -27,7 +37,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -47,6 +56,7 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.grpc.server.GrpcLogAppender;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
@@ -55,16 +65,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.event.Level;
-
-import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_SERVICE_ID;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.om.TestOzoneManagerHA.createKey;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test for OM bootstrap process.
@@ -81,8 +81,6 @@ public class TestAddRemoveOzoneManager {
   private static final String OM_SERVICE_ID = "om-add-remove";
   private static final String VOLUME_NAME;
   private static final String BUCKET_NAME;
-  private static final String DECOMM_NODES_CONFIG_KEY =
-      "ozone.om.decommissioned.nodes." + OM_SERVICE_ID;
 
   static {
     VOLUME_NAME = "volume" + RandomStringUtils.randomNumeric(5);
@@ -286,6 +284,7 @@ public class TestAddRemoveOzoneManager {
    * 1. Stop 1 OM and update configs on rest, bootstrap new node -> fail
    * 2. Force bootstrap (with 1 node down and updated configs on rest) -> pass
    */
+  @Flaky("HDDS-11358")
   @Test
   public void testForceBootstrap() throws Exception {
     GenericTestUtils.setLogLevel(GrpcLogAppender.LOG, Level.ERROR);
@@ -387,9 +386,9 @@ public class TestAddRemoveOzoneManager {
    */
   private void decommissionOM(String decommNodeId) throws Exception {
     Collection<String> decommNodes = conf.getTrimmedStringCollection(
-        DECOMM_NODES_CONFIG_KEY);
+        OZONE_OM_DECOMMISSIONED_NODES_KEY);
     decommNodes.add(decommNodeId);
-    conf.set(DECOMM_NODES_CONFIG_KEY, StringUtils.join(",", decommNodes));
+    conf.set(OZONE_OM_DECOMMISSIONED_NODES_KEY, StringUtils.join(",", decommNodes));
     List<OzoneManager> activeOMs = new ArrayList<>();
     for (OzoneManager om : cluster.getOzoneManagersList()) {
       String omNodeId = om.getOMNodeId();

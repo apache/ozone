@@ -1,22 +1,23 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.helpers;
 
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,8 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
-
-import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileChecksum;
@@ -34,8 +33,8 @@ import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -45,7 +44,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocationList;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.util.Time;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,7 +63,8 @@ public final class OmKeyInfo extends WithParentObjectId
     return new DelegatedCodec<>(
         Proto2Codec.get(KeyInfo.getDefaultInstance()),
         OmKeyInfo::getFromProtobuf,
-        k -> k.getProtobuf(ignorePipeline, ClientVersion.CURRENT_VERSION));
+        k -> k.getProtobuf(ignorePipeline, ClientVersion.CURRENT_VERSION),
+        OmKeyInfo.class);
   }
 
   public static Codec<OmKeyInfo> getCodec(boolean ignorePipeline) {
@@ -107,6 +106,14 @@ public final class OmKeyInfo extends WithParentObjectId
    */
   private Map<String, String> tags;
 
+  // expectedDataGeneration, when used in key creation indicates that a
+  // key with the same keyName should exist with the given generation.
+  // For a key commit to succeed, the original key should still be present with the
+  // generation unchanged.
+  // This allows a key to be created an committed atomically if the original has not
+  // been modified.
+  private Long expectedDataGeneration = null;
+
   private OmKeyInfo(Builder b) {
     super(b);
     this.volumeName = b.volumeName;
@@ -124,6 +131,7 @@ public final class OmKeyInfo extends WithParentObjectId
     this.isFile = b.isFile;
     this.ownerName = b.ownerName;
     this.tags = b.tags;
+    this.expectedDataGeneration = b.expectedDataGeneration;
   }
 
   public String getVolumeName() {
@@ -166,8 +174,24 @@ public final class OmKeyInfo extends WithParentObjectId
     return fileName;
   }
 
+  public void setExpectedDataGeneration(Long generation) {
+    this.expectedDataGeneration = generation;
+  }
+
+  public Long getExpectedDataGeneration() {
+    return expectedDataGeneration;
+  }
+
   public String getOwnerName() {
     return ownerName;
+  }
+
+  /**
+   * Returns the generation of the object. Note this is currently the same as updateID for a key.
+   * @return long
+   */
+  public long getGeneration() {
+    return getUpdateID();
   }
 
   public synchronized OmKeyLocationInfoGroup getLatestVersionLocations() {
@@ -335,7 +359,6 @@ public final class OmKeyInfo extends WithParentObjectId
    * @param updateTime if true, updates modification time.
    * @param keepOldVersions if false, old blocks won't be kept
    *                        and the new block versions will always be 0
-   * @throws IOException
    */
   public synchronized long addNewVersion(
       List<OmKeyLocationInfo> newLocationList, boolean updateTime,
@@ -452,6 +475,7 @@ public final class OmKeyInfo extends WithParentObjectId
 
     private boolean isFile;
     private final Map<String, String> tags = new HashMap<>();
+    private Long expectedDataGeneration = null;
 
     public Builder() {
     }
@@ -590,6 +614,11 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    public Builder setExpectedDataGeneration(Long existingGeneration) {
+      this.expectedDataGeneration = existingGeneration;
+      return this;
+    }
+
     public OmKeyInfo build() {
       return new OmKeyInfo(this);
     }
@@ -597,7 +626,7 @@ public final class OmKeyInfo extends WithParentObjectId
 
   /**
    * For network transmit.
-   * @return
+   * @return KeyInfo
    */
   public KeyInfo getProtobuf(int clientVersion) {
     return getProtobuf(false, clientVersion);
@@ -629,7 +658,7 @@ public final class OmKeyInfo extends WithParentObjectId
   /**
    *
    * @param ignorePipeline true for persist to DB, false for network transmit.
-   * @return
+   * @return KeyInfo
    */
   public KeyInfo getProtobuf(boolean ignorePipeline, int clientVersion) {
     return getProtobuf(ignorePipeline, null, clientVersion, false);
@@ -695,6 +724,9 @@ public final class OmKeyInfo extends WithParentObjectId
       kb.setFileEncryptionInfo(OMPBHelper.convert(encInfo));
     }
     kb.setIsFile(isFile);
+    if (expectedDataGeneration != null) {
+      kb.setExpectedDataGeneration(expectedDataGeneration);
+    }
     if (ownerName != null) {
       kb.setOwnerName(ownerName);
     }
@@ -744,6 +776,9 @@ public final class OmKeyInfo extends WithParentObjectId
 
     if (keyInfo.hasIsFile()) {
       builder.setFile(keyInfo.getIsFile());
+    }
+    if (keyInfo.hasExpectedDataGeneration()) {
+      builder.setExpectedDataGeneration(keyInfo.getExpectedDataGeneration());
     }
 
     if (keyInfo.hasOwnerName()) {
@@ -862,6 +897,9 @@ public final class OmKeyInfo extends WithParentObjectId
 
     if (fileChecksum != null) {
       builder.setFileChecksum(fileChecksum);
+    }
+    if (expectedDataGeneration != null) {
+      builder.setExpectedDataGeneration(expectedDataGeneration);
     }
 
     return builder.build();

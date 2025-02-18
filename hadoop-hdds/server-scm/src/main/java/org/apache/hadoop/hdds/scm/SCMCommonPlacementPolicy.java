@@ -1,27 +1,39 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm;
-
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.PriorityQueue;
+import java.util.Queue;
+import java.util.Random;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
@@ -37,20 +49,6 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.PriorityQueue;
-import java.util.Queue;
-import java.util.Random;
-import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * This policy implements a set of invariants which are common
@@ -525,7 +523,7 @@ public abstract class SCMCommonPlacementPolicy implements
    * Given a set of replicas of a container which are
    * neither over underreplicated nor overreplicated,
    * return a set of replicas to copy to another node to fix misreplication.
-   * @param replicas: Map of replicas with value signifying if
+   * @param replicas Map of replicas with value signifying if
    *                  replica can be copied
    */
   @Override
@@ -582,7 +580,7 @@ public abstract class SCMCommonPlacementPolicy implements
    * replication is computed.
    * The algorithm starts with creating a replicaIdMap which contains the
    * replicas grouped by replica Index. A placementGroup Map is created which
-   * groups replicas based on their rack & the replicas within the rack
+   * groups replicas based on their rack and the replicas within the rack
    * are further grouped based on the replica Index.
    * A placement Group Count Map is created which keeps
    * track of the count of replicas in each rack.
@@ -590,13 +588,13 @@ public abstract class SCMCommonPlacementPolicy implements
    * order based on their current replication factor in a descending factor.
    * For each replica Index the replica is removed from the rack which contains
    * the most replicas, in order to achieve this the racks are put
-   * into priority queue & are based on the number of replicas they have.
-   * The replica is removed from the rack with maximum replicas & the replica
-   * to be removed is also removed from the maps created above &
+   * into priority queue and are based on the number of replicas they have.
+   * The replica is removed from the rack with maximum replicas and the replica
+   * to be removed is also removed from the maps created above and
    * the count for rack is reduced.
    * The set of replicas computed are then returned by the function.
-   * @param replicas: Set of existing replicas of the container
-   * @param expectedCountPerUniqueReplica: Replication factor of each
+   * @param replicas Set of existing replicas of the container
+   * @param expectedCountPerUniqueReplica Replication factor of each
    *    *                                     unique replica
    * @return Set of replicas to be removed are computed.
    */

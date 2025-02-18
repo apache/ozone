@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,13 +18,12 @@
 package org.apache.hadoop.hdds.client;
 
 import com.google.common.base.Strings;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.ratis.util.Preconditions;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.ratis.util.Preconditions;
 
 /**
  * represents an OzoneQuota Object that can be applied to
@@ -77,9 +75,11 @@ public final class OzoneQuota {
     PARSE_ORDER = Collections.unmodifiableList(reversed);
   }
 
+  private static final RawQuotaInBytes ZERO_BYTES = new RawQuotaInBytes(Units.B, 0);
+
   // Quota to decide how many buckets can be created.
   private long quotaInNamespace;
-  // Quota to decide how many storage space will be used in bytes.
+  // Quota to decide how much storage space will be used in bytes.
   private final long quotaInBytes;
   private final RawQuotaInBytes rawQuotaInBytes;
 
@@ -89,6 +89,9 @@ public final class OzoneQuota {
   private static class RawQuotaInBytes {
     static RawQuotaInBytes valueOf(long quotaInBytes) {
       Preconditions.assertTrue(quotaInBytes >= 0, () -> "quotaInBytes = " + quotaInBytes + " must be >= 0");
+      if (quotaInBytes == 0) {
+        return ZERO_BYTES;
+      }
       final int i = Long.numberOfTrailingZeros(quotaInBytes) / 10;
       final Units unit = Units.values()[i];
       final RawQuotaInBytes b = unit.getRawQuotaInBytes(quotaInBytes >> (i * 10));

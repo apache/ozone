@@ -30,8 +30,8 @@ if [[ ${ITERATIONS} -le 0 ]]; then
   ITERATIONS=1
 fi
 
-export MAVEN_OPTS="-Xmx4096m $MAVEN_OPTS"
-MAVEN_OPTIONS="-B -V -Dskip.npx -Dskip.installnpx -Dnative.lib.tmp.dir=/tmp --no-transfer-progress"
+export MAVEN_OPTS="-Xmx4096m ${MAVEN_OPTS:-}"
+MAVEN_OPTIONS="-B -V -DskipRecon -Dnative.lib.tmp.dir=/tmp --no-transfer-progress"
 
 if [[ "${OZONE_WITH_COVERAGE}" != "true" ]]; then
   MAVEN_OPTIONS="${MAVEN_OPTIONS} -Djacoco.skip"
@@ -66,7 +66,7 @@ for i in $(seq 1 ${ITERATIONS}); do
     mkdir -p "${REPORT_DIR}"
   fi
 
-  mvn ${MAVEN_OPTIONS} -Dmaven-surefire-plugin.argLineAccessArgs="${OZONE_MODULE_ACCESS_ARGS}" "$@" test \
+  mvn ${MAVEN_OPTIONS} -Dmaven-surefire-plugin.argLineAccessArgs="${OZONE_MODULE_ACCESS_ARGS}" "$@" verify \
     | tee "${REPORT_DIR}/output.log"
   irc=$?
 
@@ -83,6 +83,10 @@ for i in $(seq 1 ${ITERATIONS}); do
       FAIL_FAST=true
     fi
 
+    if [[ ${irc} == 0 ]]; then
+      rm -fr "${REPORT_DIR}"
+    fi
+
     REPORT_DIR="${original_report_dir}"
     echo "Iteration ${i} exit code: ${irc}" | tee -a "${REPORT_FILE}"
   fi
@@ -96,14 +100,10 @@ for i in $(seq 1 ${ITERATIONS}); do
   fi
 done
 
-# check if Maven failed due to some error other than test failure
-if [[ ${rc} -ne 0 ]] && [[ ! -s "${REPORT_FILE}" ]]; then
-  grep -m1 -F '[ERROR]' "${REPORT_DIR}/output.log" > "${REPORT_FILE}"
-fi
-
 if [[ "${OZONE_WITH_COVERAGE}" == "true" ]]; then
   #Archive combined jacoco records
-  mvn -B -N jacoco:merge -Djacoco.destFile=$REPORT_DIR/jacoco-combined.exec
+  mvn -B -N jacoco:merge -Djacoco.destFile=$REPORT_DIR/jacoco-combined.exec -Dscan=false
 fi
 
-exit ${rc}
+ERROR_PATTERN="\[ERROR\]"
+source "${DIR}/_post_process.sh"

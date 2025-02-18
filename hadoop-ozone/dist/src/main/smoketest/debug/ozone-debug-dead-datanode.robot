@@ -34,7 +34,7 @@ Test ozone debug read-replicas with one datanode DEAD
     Should Be Equal As Integers    ${count_files}     5
 
     ${json} =                      Read Replicas Manifest
-    ${md5sum} =                    Execute     md5sum testfile | awk '{print $1}'
+    ${md5sum} =                    Execute     md5sum ${TEMP_DIR}/${TESTFILE} | awk '{print $1}'
 
     FOR    ${replica}    IN RANGE    2
         Verify Healthy Replica   ${json}    ${replica}    ${md5sum}

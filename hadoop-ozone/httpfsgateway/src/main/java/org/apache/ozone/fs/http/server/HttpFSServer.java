@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,10 +17,40 @@
 
 package org.apache.ozone.fs.http.server;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.security.AccessControlException;
+import java.security.PrivilegedExceptionAction;
+import java.text.MessageFormat;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
+import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriBuilder;
+import javax.ws.rs.core.UriInfo;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.XAttrCodec;
 import org.apache.hadoop.fs.XAttrSetFlag;
+import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.http.JettyUtils;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.delegation.web.HttpUserGroupInformation;
 import org.apache.ozone.fs.http.HttpFSConstants;
 import org.apache.ozone.fs.http.server.HttpFSParametersProvider.AccessTimeParam;
 import org.apache.ozone.fs.http.server.HttpFSParametersProvider.AclPermissionParam;
@@ -45,16 +74,13 @@ import org.apache.ozone.fs.http.server.HttpFSParametersProvider.PermissionParam;
 import org.apache.ozone.fs.http.server.HttpFSParametersProvider.PolicyNameParam;
 import org.apache.ozone.fs.http.server.HttpFSParametersProvider.RecursiveParam;
 import org.apache.ozone.fs.http.server.HttpFSParametersProvider.ReplicationParam;
+import org.apache.ozone.fs.http.server.HttpFSParametersProvider.SnapshotNameParam;
 import org.apache.ozone.fs.http.server.HttpFSParametersProvider.SourcesParam;
 import org.apache.ozone.fs.http.server.HttpFSParametersProvider.UnmaskedPermissionParam;
-import org.apache.ozone.fs.http.server.HttpFSParametersProvider.SnapshotNameParam;
 import org.apache.ozone.fs.http.server.HttpFSParametersProvider.XAttrEncodingParam;
 import org.apache.ozone.fs.http.server.HttpFSParametersProvider.XAttrNameParam;
 import org.apache.ozone.fs.http.server.HttpFSParametersProvider.XAttrSetFlagParam;
 import org.apache.ozone.fs.http.server.HttpFSParametersProvider.XAttrValueParam;
-import org.apache.hadoop.fs.permission.FsAction;
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.http.JettyUtils;
 import org.apache.ozone.lib.service.FileSystemAccess;
 import org.apache.ozone.lib.service.FileSystemAccessException;
 import org.apache.ozone.lib.service.Groups;
@@ -62,38 +88,10 @@ import org.apache.ozone.lib.service.Instrumentation;
 import org.apache.ozone.lib.servlet.FileSystemReleaseFilter;
 import org.apache.ozone.lib.wsrs.InputStreamEntity;
 import org.apache.ozone.lib.wsrs.Parameters;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.delegation.web.HttpUserGroupInformation;
 import org.json.simple.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.PUT;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.UriBuilder;
-import javax.ws.rs.core.UriInfo;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.security.AccessControlException;
-import java.security.PrivilegedExceptionAction;
-import java.text.MessageFormat;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Map;
 
 /**
  * Main class of HttpFSServer server.
@@ -111,6 +109,14 @@ public class HttpFSServer {
   private static final Logger AUDIT_LOG
       = LoggerFactory.getLogger("httpfsaudit");
   private static final Logger LOG = LoggerFactory.getLogger(HttpFSServer.class);
+
+  private static final HttpFSParametersProvider PARAMETERS_PROVIDER =
+      new HttpFSParametersProvider();
+
+  private Parameters getParams(HttpServletRequest request) {
+    return PARAMETERS_PROVIDER.get(request);
+  }
+
   private AccessMode accessMode = AccessMode.READWRITE;
 
   public HttpFSServer() {
@@ -209,7 +215,6 @@ public class HttpFSServer {
    *
    * @param uriInfo uri info of the request.
    * @param op the HttpFS operation of the request.
-   * @param params the HttpFS parameters of the request.
    *
    * @return the request response.
    *
@@ -223,10 +228,9 @@ public class HttpFSServer {
   @Produces(MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8)
   public Response getRoot(@Context UriInfo uriInfo,
                           @QueryParam(OperationParam.NAME) OperationParam op,
-                          @Context Parameters params,
                           @Context HttpServletRequest request)
       throws IOException, FileSystemAccessException {
-    return get("", uriInfo, op, params, request);
+    return get("", uriInfo, op, request);
   }
 
   private String makeAbsolute(String path) {
@@ -239,7 +243,6 @@ public class HttpFSServer {
    * @param path the path for operation.
    * @param uriInfo uri info of the request.
    * @param op the HttpFS operation of the request.
-   * @param params the HttpFS parameters of the request.
    *
    * @return the request response.
    *
@@ -256,7 +259,6 @@ public class HttpFSServer {
   public Response get(@PathParam("path") String path,
                       @Context UriInfo uriInfo,
                       @QueryParam(OperationParam.NAME) OperationParam op,
-                      @Context Parameters params,
                       @Context HttpServletRequest request)
       throws IOException, FileSystemAccessException,
       UnsupportedOperationException {
@@ -267,6 +269,7 @@ public class HttpFSServer {
       return Response.status(Response.Status.FORBIDDEN).build();
     }
     UserGroupInformation user = HttpUserGroupInformation.get();
+    final Parameters params = getParams(request);
     Response response;
     path = makeAbsolute(path);
     MDC.put(HttpFSConstants.OP_PARAM, op.value().name());
@@ -669,7 +672,6 @@ public class HttpFSServer {
    *
    * @param path the path for operation.
    * @param op the HttpFS operation of the request.
-   * @param params the HttpFS parameters of the request.
    *
    * @return the request response.
    *
@@ -684,7 +686,6 @@ public class HttpFSServer {
   @Produces(MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8)
   public Response delete(@PathParam("path") String path,
                          @QueryParam(OperationParam.NAME) OperationParam op,
-                         @Context Parameters params,
                          @Context HttpServletRequest request)
       throws IOException, FileSystemAccessException {
     // Do not allow DELETE commands in read-only mode
@@ -692,6 +693,7 @@ public class HttpFSServer {
       return Response.status(Response.Status.FORBIDDEN).build();
     }
     UserGroupInformation user = HttpUserGroupInformation.get();
+    final Parameters params = getParams(request);
     Response response;
     path = makeAbsolute(path);
     MDC.put(HttpFSConstants.OP_PARAM, op.value().name());
@@ -746,7 +748,6 @@ public class HttpFSServer {
    * @param is the inputstream for the request payload.
    * @param uriInfo the of the request.
    * @param op the HttpFS operation of the request.
-   * @param params the HttpFS parameters of the request.
    *
    * @return the request response.
    *
@@ -760,9 +761,9 @@ public class HttpFSServer {
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8 })
   public Response postRoot(InputStream is, @Context UriInfo uriInfo,
       @QueryParam(OperationParam.NAME) OperationParam op,
-      @Context Parameters params, @Context HttpServletRequest request)
+      @Context HttpServletRequest request)
       throws IOException, FileSystemAccessException {
-    return post(is, uriInfo, "/", op, params, request);
+    return post(is, uriInfo, "/", op, request);
   }
 
   /**
@@ -772,7 +773,6 @@ public class HttpFSServer {
    * @param uriInfo the of the request.
    * @param path the path for operation.
    * @param op the HttpFS operation of the request.
-   * @param params the HttpFS parameters of the request.
    *
    * @return the request response.
    *
@@ -790,7 +790,6 @@ public class HttpFSServer {
                        @Context UriInfo uriInfo,
                        @PathParam("path") String path,
                        @QueryParam(OperationParam.NAME) OperationParam op,
-                       @Context Parameters params,
                        @Context HttpServletRequest request)
       throws IOException, FileSystemAccessException {
     // Do not allow POST commands in read-only mode
@@ -798,6 +797,7 @@ public class HttpFSServer {
       return Response.status(Response.Status.FORBIDDEN).build();
     }
     UserGroupInformation user = HttpUserGroupInformation.get();
+    final Parameters params = getParams(request);
     Response response;
     path = makeAbsolute(path);
     MDC.put(HttpFSConstants.OP_PARAM, op.value().name());
@@ -928,7 +928,6 @@ public class HttpFSServer {
    * @param is the inputstream for the request payload.
    * @param uriInfo the of the request.
    * @param op the HttpFS operation of the request.
-   * @param params the HttpFS parameters of the request.
    *
    * @return the request response.
    *
@@ -942,9 +941,9 @@ public class HttpFSServer {
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8 })
   public Response putRoot(InputStream is, @Context UriInfo uriInfo,
       @QueryParam(OperationParam.NAME) OperationParam op,
-      @Context Parameters params, @Context HttpServletRequest request)
+      @Context HttpServletRequest request)
       throws IOException, FileSystemAccessException {
-    return put(is, uriInfo, "/", op, params, request);
+    return put(is, uriInfo, "/", op, request);
   }
 
   /**
@@ -954,7 +953,6 @@ public class HttpFSServer {
    * @param uriInfo the of the request.
    * @param path the path for operation.
    * @param op the HttpFS operation of the request.
-   * @param params the HttpFS parameters of the request.
    *
    * @return the request response.
    *
@@ -972,7 +970,6 @@ public class HttpFSServer {
                        @Context UriInfo uriInfo,
                        @PathParam("path") String path,
                        @QueryParam(OperationParam.NAME) OperationParam op,
-                       @Context Parameters params,
                        @Context HttpServletRequest request)
       throws IOException, FileSystemAccessException {
     // Do not allow PUT commands in read-only mode
@@ -980,6 +977,7 @@ public class HttpFSServer {
       return Response.status(Response.Status.FORBIDDEN).build();
     }
     UserGroupInformation user = HttpUserGroupInformation.get();
+    final Parameters params = getParams(request);
     Response response;
     path = makeAbsolute(path);
     MDC.put(HttpFSConstants.OP_PARAM, op.value().name());

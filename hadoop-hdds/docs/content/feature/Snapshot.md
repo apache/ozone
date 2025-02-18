@@ -34,7 +34,7 @@ Snapshot feature for Apache Ozone object store allows users to take point-in-tim
 ## Snapshot APIs
 
 Snapshot feature is available through 'ozone fs' and 'ozone sh' CLI. This feature can also be programmatically accessed from Ozone `ObjectStore` Java client. The feature provides following functionalities:
-* Create Snapshot: Create an instantenous snapshot for a given bucket
+* Create Snapshot: Create an instantaneous snapshot for a given bucket
 ```shell
 ozone sh snapshot create [-hV] <bucket> [<snapshotName>]
 ```
@@ -71,7 +71,7 @@ Ozone also provides SnapshotDiff API. Whenever a user issues a SnapshotDiff betw
 ----------
 ### Cluster and Hardware Configuration
 
-Snapshot feature places additional demands on the cluster in terms of CPU, memory and storage. Cluster nodes running Ozone Managers and Ozone Datanodes should be configured with extra storage capacity depending on the number of active snapshots that the user wants to keep. Ozone Snapshots consume incremental amount of space per snapshot. e.g. if the active object store has 100 GB data (before replication) and a snapshot is taken, then the 100 GB of space will be locked in that snapshot. If the active object store consumes another 10 GB of space (before replication) subsequently then overall space requirement would be 100 GB + 10 GB = 110 GB in total (before replication). This is because common keys between Ozone snapshots and the active object store will share the storage space.
+Snapshot feature places additional demands on the cluster in terms of CPU, memory and storage. Cluster nodes running Ozone Managers and Ozone Datanodes should be configured with extra storage capacity depending on the number of active snapshots that the user wants to keep. Ozone Snapshots consume an incremental amount of space per snapshot. e.g. if the active object store has 100 GB data (before replication) and a snapshot is taken, then the 100 GB of space will be locked in that snapshot. If the active object store consumes another 10 GB of space (before replication) subsequently then overall space requirement would be 100 GB + 10 GB = 110 GB in total (before replication). This is because common keys between Ozone snapshots and the active object store will share the storage space.
 
 Similarly, nodes running Ozone Manager should be configured with extra memory depending on how many snapshots are concurrently read from. This also depends on how many concurrent SnapshotDiff jobs are expected in the cluster. By default, an Ozone Manager allows 10 concurrent SnapshotDiff jobs at a time, which can be increased in config.
 

@@ -1,26 +1,33 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.fs.ozone.contract;
 
+import static org.apache.hadoop.fs.contract.ContractTestUtils.cleanup;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
+import static org.assertj.core.api.Assumptions.assumeThat;
+
+import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractContractCreateTest;
 import org.apache.hadoop.fs.contract.AbstractContractDeleteTest;
 import org.apache.hadoop.fs.contract.AbstractContractGetFileStatusTest;
+import org.apache.hadoop.fs.contract.AbstractContractLeaseRecoveryTest;
 import org.apache.hadoop.fs.contract.AbstractContractMkdirTest;
 import org.apache.hadoop.fs.contract.AbstractContractOpenTest;
 import org.apache.hadoop.fs.contract.AbstractContractRenameTest;
@@ -28,25 +35,14 @@ import org.apache.hadoop.fs.contract.AbstractContractRootDirectoryTest;
 import org.apache.hadoop.fs.contract.AbstractContractSeekTest;
 import org.apache.hadoop.fs.contract.AbstractContractUnbufferTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
-import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.tools.contract.AbstractContractDistCpTest;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-
-import java.io.IOException;
-import java.time.Duration;
-
-import static org.apache.hadoop.fs.contract.ContractTestUtils.cleanup;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
-import static org.assertj.core.api.Assumptions.assumeThat;
 
 /**
  * Base class for Ozone contract tests.  Manages lifecycle of {@link MiniOzoneCluster}.
@@ -58,11 +54,9 @@ import static org.assertj.core.api.Assumptions.assumeThat;
  * but can tweak configuration by also overriding {@link #createOzoneConfig()}.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-abstract class AbstractOzoneContractTest {
+abstract class AbstractOzoneContractTest extends ClusterForTests<MiniOzoneCluster> {
 
   private static final String CONTRACT_XML = "contract/ozone.xml";
-
-  private MiniOzoneCluster cluster;
 
   /**
    * This must be implemented by all subclasses.
@@ -70,53 +64,18 @@ abstract class AbstractOzoneContractTest {
    */
   abstract AbstractFSContract createOzoneContract(Configuration conf);
 
-  /**
-   * Creates the base configuration for contract tests.  This can be tweaked
-   * in subclasses by overriding {@link #createOzoneConfig()}.
-   */
-  protected static OzoneConfiguration createBaseConfiguration() {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    DatanodeRatisServerConfig ratisServerConfig =
-        conf.getObject(DatanodeRatisServerConfig.class);
-    ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));
-    ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(10));
-    conf.setFromObject(ratisServerConfig);
-
-    RatisClientConfig.RaftConfig raftClientConfig =
-        conf.getObject(RatisClientConfig.RaftConfig.class);
-    raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
-    raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(10));
-    conf.setFromObject(raftClientConfig);
-
+  @Override
+  protected OzoneConfiguration createOzoneConfig() {
+    OzoneConfiguration conf = createBaseConfiguration();
     conf.addResource(CONTRACT_XML);
-
-    conf.setBoolean(OZONE_FS_HSYNC_ENABLED, true);
-
     return conf;
   }
 
-  /**
-   * Hook method that allows tweaking the configuration.
-   */
-  OzoneConfiguration createOzoneConfig() {
-    return createBaseConfiguration();
-  }
-
-  MiniOzoneCluster getCluster() {
-    return cluster;
-  }
-
-  @BeforeAll
-  void setup() throws Exception {
-    cluster = MiniOzoneCluster.newBuilder(createOzoneConfig())
+  @Override
+  protected MiniOzoneCluster createCluster() throws Exception {
+    return MiniOzoneCluster.newBuilder(createOzoneConfig())
         .setNumDatanodes(5)
         .build();
-    cluster.waitForClusterToBeReady();
-  }
-
-  @AfterAll
-  void teardown() {
-    IOUtils.closeQuietly(cluster);
   }
 
   @Nested
@@ -309,6 +268,47 @@ abstract class AbstractOzoneContractTest {
     @Override
     protected AbstractFSContract createContract(Configuration conf) {
       return createOzoneContract(conf);
+    }
+  }
+
+  @Nested
+  class TestContractLeaseRecovery extends AbstractContractLeaseRecoveryTest {
+
+    @Override
+    protected AbstractFSContract createContract(Configuration conf) {
+      return createOzoneContract(conf);
+    }
+
+    @Override
+    protected Configuration createConfiguration() {
+      return createOzoneConfig();
+    }
+
+    @Override
+    @Test
+    public void testLeaseRecovery() throws Throwable {
+      assumeThat(getContract().getConf().get(OZONE_DEFAULT_BUCKET_LAYOUT,
+          BucketLayout.FILE_SYSTEM_OPTIMIZED.name()))
+          .isEqualTo(BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
+      super.testLeaseRecovery();
+    }
+
+    @Override
+    @Test
+    public void testLeaseRecoveryFileNotExist() throws Throwable {
+      assumeThat(getContract().getConf().get(OZONE_DEFAULT_BUCKET_LAYOUT,
+          BucketLayout.FILE_SYSTEM_OPTIMIZED.name()))
+          .isEqualTo(BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
+      super.testLeaseRecoveryFileNotExist();
+    }
+
+    @Override
+    @Test
+    public void testLeaseRecoveryFileOnDirectory() throws Throwable {
+      assumeThat(getContract().getConf().get(OZONE_DEFAULT_BUCKET_LAYOUT,
+          BucketLayout.FILE_SYSTEM_OPTIMIZED.name()))
+          .isEqualTo(BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
+      super.testLeaseRecoveryFileOnDirectory();
     }
   }
 

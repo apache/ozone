@@ -23,8 +23,9 @@ summary: Recon server supports HTTP endpoints to help troubleshoot and monitor O
   limitations under the License.
 -->
 
-The Recon API v1 is a set of HTTP endpoints that help you understand the current 
-state of an Ozone cluster and to troubleshoot if needed.
+The Recon API v1 offers a collection of HTTP endpoints designed to provide insights into the current state of an Ozone cluster, 
+facilitating monitoring, management, and troubleshooting. These endpoints allow administrators to access critical cluster 
+metadata, container status, key management, and more.
 
 Endpoints that are marked as *admin only* can only be accessed by Kerberos users
 specified in the **ozone.administrators** or **ozone.recon.administrators**
@@ -37,7 +38,7 @@ ozone.security.enabled| *true*
 ozone.security.http.kerberos.enabled| *true*
 ozone.acl.enabled| *true*
 
-Checkout an interactive version of the API powered by Swagger [here]({{< relref "./SwaggerReconApi.md" >}})
+Access an interactive version of the API, complete with detailed descriptions and example requests, powered by Swagger [here]({{< relref "./SwaggerReconApi.md" >}})
 
 ## Containers (admin only)
 
@@ -1061,6 +1062,28 @@ response object being the upper cap for file size range.
      	"fileSize": 1024,
      	"count": 2
      }]
+```
+
+### GET /api/v1/utilization/containerCount
+
+**Parameters**
+
+* containerSize (optional)
+
+  Filters the results based on the given container size. The smallest container size being tracked for count is 512 MB (512000000 bytes).
+
+**Returns**
+
+Returns the container counts within different container size ranges, with `containerSize` representing the size range and `count` representing the number of containers within that range.
+
+```json
+    [{
+      "containerSize": 2147483648,
+      "count": 9
+    }, {
+      "containerSize": 1073741824,
+      "count": 3
+    }]
 ```
   
 ## Metrics

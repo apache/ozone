@@ -84,7 +84,7 @@
   <property>
     <name>hdds.container.ratis.log.appender.queue.byte-limit
 </name>
-    <value>8MB</value>
+    <value>32MB</value>
   </property>
   <property>
     <name>ozone.om.ratis.log.appender.queue.byte-limit</name>

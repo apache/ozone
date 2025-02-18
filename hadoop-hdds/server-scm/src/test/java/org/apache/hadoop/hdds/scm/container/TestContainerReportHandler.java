@@ -1,55 +1,34 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.container;
 
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
-import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
-import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
-import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipelineManager;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.server
-    .SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
-import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainerReports;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
@@ -64,18 +43,37 @@ import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.times;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
-import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
-import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
+import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
+import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test the behaviour of the ContainerReportHandler.
@@ -97,10 +95,8 @@ public class TestContainerReportHandler {
     final OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
     nodeManager = new MockNodeManager(true, 10);
     containerManager = mock(ContainerManager.class);
-    dbStore = DBStoreBuilder.createDBStore(
-        conf, new SCMDBDefinition());
+    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     scmhaManager = SCMHAManagerStub.getInstance(true);
-    nodeManager = new MockNodeManager(true, 10);
     pipelineManager =
         new MockPipelineManager(dbStore, scmhaManager, nodeManager);
     containerStateManager = ContainerStateManagerImpl.newBuilder()
@@ -151,6 +147,10 @@ public class TestContainerReportHandler {
     }).when(containerManager).removeContainerReplica(
         any(ContainerID.class), any(ContainerReplica.class));
 
+    doAnswer(invocation -> {
+      containerStateManager.transitionDeletingToClosedState(((ContainerID) invocation.getArgument(0)).getProtobuf());
+      return null;
+    }).when(containerManager).transitionDeletingToClosedState(any(ContainerID.class));
   }
 
   @AfterEach
@@ -440,6 +440,107 @@ public class TestContainerReportHandler {
         ContainerReplicaProto.State.CLOSED, dns.get(8), 9);
     // index is 9, container should transition to CLOSED
     assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(container2.containerID()).getState());
+  }
+
+  /**
+   * Tests that a DELETING RATIS container transitions to CLOSED if a non-empty CLOSED replica is reported. It does not
+   * transition if a non-empty CLOSING replica is reported.
+   */
+  @Test
+  public void ratisContainerShouldTransitionFromDeletingToClosedWhenNonEmptyClosedReplica() throws IOException {
+    ContainerInfo container = getContainer(LifeCycleState.DELETING);
+    containerStateManager.addContainer(container.getProtobuf());
+
+    // set up a non-empty CLOSED replica
+    DatanodeDetails dnWithClosedReplica = nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0);
+    ContainerReplicaProto.Builder builder = ContainerReplicaProto.newBuilder();
+    ContainerReplicaProto closedReplica = builder.setContainerID(container.getContainerID())
+        .setIsEmpty(false)
+        .setState(ContainerReplicaProto.State.CLOSED)
+        .setKeyCount(0)
+        .setBlockCommitSequenceId(123)
+        .setOriginNodeId(dnWithClosedReplica.getUuidString()).build();
+
+    // set up a non-empty CLOSING replica
+    DatanodeDetails dnWithClosingReplica = nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(1);
+    ContainerReplicaProto closingReplica = builder.setState(ContainerReplicaProto.State.CLOSING)
+        .setOriginNodeId(dnWithClosingReplica.getUuidString()).build();
+
+    // should not transition on processing the CLOSING replica's report
+    ContainerReportHandler containerReportHandler = new ContainerReportHandler(nodeManager, containerManager);
+    ContainerReportsProto closingContainerReport = getContainerReports(closingReplica);
+    containerReportHandler
+        .onMessage(new ContainerReportFromDatanode(dnWithClosingReplica, closingContainerReport), publisher);
+
+    assertEquals(LifeCycleState.DELETING, containerStateManager.getContainer(container.containerID()).getState());
+
+    // should transition on processing the CLOSED replica's report
+    ContainerReportsProto closedContainerReport = getContainerReports(closedReplica);
+    containerReportHandler
+        .onMessage(new ContainerReportFromDatanode(dnWithClosedReplica, closedContainerReport), publisher);
+    assertEquals(LifeCycleState.CLOSED, containerStateManager.getContainer(container.containerID()).getState());
+  }
+
+  @Test
+  public void ratisContainerShouldNotTransitionFromDeletingToClosedWhenEmptyClosedReplica() throws IOException {
+    ContainerInfo container = getContainer(LifeCycleState.DELETING);
+    containerStateManager.addContainer(container.getProtobuf());
+
+    // set up an empty CLOSED replica
+    DatanodeDetails dnWithClosedReplica = nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0);
+    ContainerReplicaProto.Builder builder = ContainerReplicaProto.newBuilder();
+    ContainerReplicaProto closedReplica = builder.setContainerID(container.getContainerID())
+        .setIsEmpty(true)
+        .setState(ContainerReplicaProto.State.CLOSED)
+        .setKeyCount(0)
+        .setBlockCommitSequenceId(123)
+        .setOriginNodeId(dnWithClosedReplica.getUuidString()).build();
+
+    ContainerReportHandler containerReportHandler = new ContainerReportHandler(nodeManager, containerManager);
+    ContainerReportsProto closedContainerReport = getContainerReports(closedReplica);
+    containerReportHandler
+        .onMessage(new ContainerReportFromDatanode(dnWithClosedReplica, closedContainerReport), publisher);
+    assertEquals(LifeCycleState.DELETING, containerStateManager.getContainer(container.containerID()).getState());
+  }
+
+  /**
+   * Tests that a DELETING EC container transitions to CLOSED if a non-empty CLOSED replica is reported. It does not
+   * transition if a non-empty CLOSING (or any other state) replica is reported.
+   */
+  @Test
+  public void ecContainerShouldTransitionFromDeletingToClosedWhenNonEmptyClosedReplica() throws IOException {
+    ContainerInfo container = getECContainer(LifeCycleState.DELETING, PipelineID.randomId(),
+        new ECReplicationConfig(6, 3));
+    containerStateManager.addContainer(container.getProtobuf());
+
+    // set up a non-empty CLOSED replica
+    DatanodeDetails dnWithClosedReplica = nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0);
+    ContainerReplicaProto.Builder builder = ContainerReplicaProto.newBuilder();
+    ContainerReplicaProto closedReplica = builder.setContainerID(container.getContainerID())
+        .setIsEmpty(false)
+        .setState(ContainerReplicaProto.State.CLOSED)
+        .setKeyCount(0)
+        .setBlockCommitSequenceId(0)
+        .setReplicaIndex(1)
+        .setOriginNodeId(dnWithClosedReplica.getUuidString()).build();
+
+    // set up a non-empty CLOSING replica
+    DatanodeDetails dnWithClosingReplica = nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(1);
+    ContainerReplicaProto closingReplica = builder.setState(ContainerReplicaProto.State.CLOSING).setReplicaIndex(2)
+        .setOriginNodeId(dnWithClosingReplica.getUuidString()).build();
+
+    // should not transition on processing the CLOSING replica's report
+    ContainerReportHandler containerReportHandler = new ContainerReportHandler(nodeManager, containerManager);
+    ContainerReportsProto closingContainerReport = getContainerReports(closingReplica);
+    containerReportHandler
+        .onMessage(new ContainerReportFromDatanode(dnWithClosingReplica, closingContainerReport), publisher);
+    assertEquals(LifeCycleState.DELETING, containerStateManager.getContainer(container.containerID()).getState());
+
+    // should transition on processing the CLOSED replica's report
+    ContainerReportsProto closedContainerReport = getContainerReports(closedReplica);
+    containerReportHandler
+        .onMessage(new ContainerReportFromDatanode(dnWithClosedReplica, closedContainerReport), publisher);
+    assertEquals(LifeCycleState.CLOSED, containerStateManager.getContainer(container.containerID()).getState());
   }
 
   /**

@@ -1,36 +1,35 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
-package org.apache.hadoop.ozone.container.common.statemachine;
 
-import org.apache.hadoop.hdds.conf.Config;
-import org.apache.hadoop.hdds.conf.ConfigGroup;
-import org.apache.hadoop.hdds.conf.ConfigType;
-import org.apache.hadoop.hdds.conf.PostConstruct;
-import org.apache.hadoop.hdds.conf.ConfigTag;
+package org.apache.hadoop.ozone.container.common.statemachine;
 
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONFIG_PREFIX;
 
+import java.time.Duration;
+import org.apache.hadoop.hdds.conf.Config;
+import org.apache.hadoop.hdds.conf.ConfigGroup;
+import org.apache.hadoop.hdds.conf.ConfigTag;
+import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.time.Duration;
 
 /**
  * Configuration class used for high level datanode configuration parameters.
@@ -109,6 +108,11 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       "hdds.datanode.rocksdb.delete_obsolete_files_period";
   public static final Boolean
       OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT = false;
+
+  private static final long
+      AUTO_COMPACTION_SMALL_SST_FILE_INTERVAL_MINUTES_DEFAULT = 120;
+  private static final int
+      AUTO_COMPACTION_SMALL_SST_FILE_THREADS_DEFAULT = 1;
 
   /**
    * Number of threads per volume that Datanode will use for chunk read.
@@ -536,6 +540,24 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private int autoCompactionSmallSstFileNum = 512;
 
+  @Config(key = "rocksdb.auto-compaction-small-sst-file.interval.minutes",
+      defaultValue = "120",
+      type = ConfigType.LONG,
+      tags = { DATANODE },
+      description = "Auto compact small SST files interval in minutes."
+  )
+  private long autoCompactionSmallSstFileIntervalMinutes =
+      AUTO_COMPACTION_SMALL_SST_FILE_INTERVAL_MINUTES_DEFAULT;
+
+  @Config(key = "rocksdb.auto-compaction-small-sst-file.threads",
+      defaultValue = "1",
+      type = ConfigType.INT,
+      tags = { DATANODE },
+      description = "Auto compact small SST files threads."
+  )
+  private int autoCompactionSmallSstFileThreads =
+      AUTO_COMPACTION_SMALL_SST_FILE_THREADS_DEFAULT;
+
   /**
    * Whether to check container directory or not to determine
    * container is empty.
@@ -549,6 +571,20 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private boolean bCheckEmptyContainerDir =
       OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT;
+
+  @Config(key = "delete.container.timeout",
+      type = ConfigType.TIME,
+      defaultValue = "60s",
+      tags = { DATANODE },
+      description = "If a delete container request spends more than this time waiting on the container lock or " +
+          "performing pre checks, the command will be skipped and SCM will resend it automatically. This avoids " +
+          "commands running for a very long time without SCM being informed of the progress."
+  )
+  private long deleteContainerTimeoutMs = Duration.ofSeconds(60).toMillis();
+
+  public long getDeleteContainerTimeoutMs() {
+    return deleteContainerTimeoutMs;
+  }
 
   @PostConstruct
   public void validate() {
@@ -909,5 +945,25 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public void setAutoCompactionSmallSstFileNum(int num) {
     this.autoCompactionSmallSstFileNum = num;
+  }
+
+  public long getAutoCompactionSmallSstFileIntervalMinutes() {
+    return autoCompactionSmallSstFileIntervalMinutes;
+  }
+
+  public void setAutoCompactionSmallSstFileIntervalMinutes(
+      long autoCompactionSmallSstFileIntervalMinutes) {
+    this.autoCompactionSmallSstFileIntervalMinutes =
+        autoCompactionSmallSstFileIntervalMinutes;
+  }
+
+  public int getAutoCompactionSmallSstFileThreads() {
+    return autoCompactionSmallSstFileThreads;
+  }
+
+  public void setAutoCompactionSmallSstFileThreads(
+      int autoCompactionSmallSstFileThreads) {
+    this.autoCompactionSmallSstFileThreads =
+        autoCompactionSmallSstFileThreads;
   }
 }
