@@ -182,8 +182,8 @@ public class SCMNodeManager implements NodeManager {
     this.clusterMap = networkTopology;
     this.nodeResolver = nodeResolver;
     this.useHostname = conf.getBoolean(
-        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
-        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+        DFSConfigKeysLegacy.HDDS_DATANODE_USE_DN_HOSTNAME,
+        DFSConfigKeysLegacy.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
     this.numPipelinesPerMetadataVolume =
         conf.getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME,
             ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME_DEFAULT);

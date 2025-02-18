@@ -94,7 +94,7 @@ public class ContainerMetrics implements Closeable {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     // Percentile measurement is off by default, by watching no intervals
     int[] intervals =
-        conf.getInts(DFSConfigKeysLegacy.DFS_METRICS_PERCENTILES_INTERVALS_KEY);
+        conf.getInts(DFSConfigKeysLegacy.HDDS_METRICS_PERCENTILES_INTERVALS_KEY);
     return ms.register(STORAGE_CONTAINER_METRICS,
                        "Storage Container Node Metrics",
                        new ContainerMetrics(intervals));

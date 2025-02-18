@@ -98,7 +98,7 @@ public class TestHddsSecureDatanodeInit {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getPath());
     //conf.set(ScmConfigKeys.OZONE_SCM_NAMES, "localhost");
     String volumeDir = testDir + "/disk1";
-    conf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY, volumeDir);
+    conf.set(DFSConfigKeysLegacy.HDDS_DATANODE_DATA_DIR_KEY, volumeDir);
 
     conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
     conf.setClass(OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY,

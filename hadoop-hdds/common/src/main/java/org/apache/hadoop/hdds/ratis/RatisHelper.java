@@ -450,8 +450,8 @@ public final class RatisHelper {
 
   private static boolean datanodeUseHostName() {
     return CONF.getBoolean(
-            DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
-            DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+            DFSConfigKeysLegacy.HDDS_DATANODE_USE_DN_HOSTNAME,
+            DFSConfigKeysLegacy.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
   }
 
   private static <U> Class<? extends U> getClass(String name,

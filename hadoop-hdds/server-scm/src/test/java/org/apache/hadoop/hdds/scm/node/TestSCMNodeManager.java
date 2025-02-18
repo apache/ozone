@@ -1828,7 +1828,7 @@ public class TestSCMNodeManager {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
         MILLISECONDS);
-    conf.setBoolean(DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
+    conf.setBoolean(DFSConfigKeysLegacy.HDDS_DATANODE_USE_DN_HOSTNAME,
         useHostname);
 
     // create table mapping file
@@ -1942,7 +1942,7 @@ public class TestSCMNodeManager {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
         MILLISECONDS);
-    conf.setBoolean(DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
+    conf.setBoolean(DFSConfigKeysLegacy.HDDS_DATANODE_USE_DN_HOSTNAME,
         useHostname);
 
     // create a set of hosts - note two hosts on "host1"

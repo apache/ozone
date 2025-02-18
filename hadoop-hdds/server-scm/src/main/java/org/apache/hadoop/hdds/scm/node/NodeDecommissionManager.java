@@ -273,8 +273,8 @@ public class NodeDecommissionManager {
     );
 
     useHostnames = config.getBoolean(
-        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
-        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+        DFSConfigKeysLegacy.HDDS_DATANODE_USE_DN_HOSTNAME,
+        DFSConfigKeysLegacy.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
 
     long monitorInterval = config.getTimeDuration(
         ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,

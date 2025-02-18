@@ -77,7 +77,7 @@ public class TestVolumeSet {
     String dataDirKey = volume1 + "," + volume2;
     volumes.add(volume1);
     volumes.add(volume2);
-    conf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY, dataDirKey);
+    conf.set(DFSConfigKeysLegacy.HDDS_DATANODE_DATA_DIR_KEY, dataDirKey);
     conf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
         dataDirKey);
     initializeVolumeSet();

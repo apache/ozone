@@ -32,7 +32,7 @@ import org.apache.hadoop.security.KerberosInfo;
     protocolVersion = 1)
 @KerberosInfo(
     serverPrincipal = OZONE_RECON_KERBEROS_PRINCIPAL_KEY,
-    clientPrincipal = DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY)
+    clientPrincipal = DFSConfigKeysLegacy.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY)
 public interface ReconDatanodeProtocolPB extends
     StorageContainerDatanodeProtocolPB {
 }

@@ -185,8 +185,8 @@ public class TestOMSortDatanodes {
 
   private String nodeAddress(DatanodeDetails dn) {
     boolean useHostname = config.getBoolean(
-        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
-        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+        DFSConfigKeysLegacy.HDDS_DATANODE_USE_DN_HOSTNAME,
+        DFSConfigKeysLegacy.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
     return useHostname ? dn.getHostName() : dn.getIpAddress();
   }
 }

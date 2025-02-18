@@ -128,12 +128,12 @@ public abstract class BaseHttpServer {
       }
 
       final boolean xFrameEnabled = conf.getBoolean(
-          DFSConfigKeysLegacy.DFS_XFRAME_OPTION_ENABLED,
-          DFSConfigKeysLegacy.DFS_XFRAME_OPTION_ENABLED_DEFAULT);
+          DFSConfigKeysLegacy.HDDS_XFRAME_OPTION_ENABLED,
+          DFSConfigKeysLegacy.HDDS_XFRAME_OPTION_ENABLED_DEFAULT);
 
       final String xFrameOptionValue = conf.getTrimmed(
-          DFSConfigKeysLegacy.DFS_XFRAME_OPTION_VALUE,
-          DFSConfigKeysLegacy.DFS_XFRAME_OPTION_VALUE_DEFAULT);
+          DFSConfigKeysLegacy.HDDS_XFRAME_OPTION_VALUE,
+          DFSConfigKeysLegacy.HDDS_XFRAME_OPTION_VALUE_DEFAULT);
 
       builder.configureXFrame(xFrameEnabled).setXFrameOption(xFrameOptionValue);
 

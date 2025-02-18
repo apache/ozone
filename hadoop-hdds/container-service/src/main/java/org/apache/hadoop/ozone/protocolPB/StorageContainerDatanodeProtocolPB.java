@@ -33,7 +33,7 @@ import org.apache.hadoop.security.KerberosInfo;
     protocolVersion = 1)
 @KerberosInfo(
     serverPrincipal = ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY,
-    clientPrincipal = DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY)
+    clientPrincipal = DFSConfigKeysLegacy.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY)
 public interface StorageContainerDatanodeProtocolPB extends
     StorageContainerDatanodeProtocolService.BlockingInterface {
 }

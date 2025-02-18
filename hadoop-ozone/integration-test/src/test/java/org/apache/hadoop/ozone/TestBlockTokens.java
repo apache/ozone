@@ -67,8 +67,8 @@ import java.util.function.Function;
 
 import static java.util.Objects.requireNonNull;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
-import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY;
-import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_EXPIRY_DURATION;
@@ -355,7 +355,7 @@ public final class TestBlockTokens {
     conf.set(HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY, "HTTP_SCM/" + hostAndRealm);
     conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, "scm/" + hostAndRealm);
     conf.set(OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY, "HTTP_OM/" + hostAndRealm);
-    conf.set(DFS_DATANODE_KERBEROS_PRINCIPAL_KEY, "scm/" + hostAndRealm);
+    conf.set(HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY, "scm/" + hostAndRealm);
 
     ozoneKeytab = new File(workDir, "scm.keytab");
     spnegoKeytab = new File(workDir, "http.keytab");
@@ -370,7 +370,7 @@ public final class TestBlockTokens {
         ozoneKeytab.getAbsolutePath());
     conf.set(OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE,
         spnegoKeytab.getAbsolutePath());
-    conf.set(DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY,
+    conf.set(HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY,
         ozoneKeytab.getAbsolutePath());
   }
 

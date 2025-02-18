@@ -28,6 +28,6 @@ import org.apache.hadoop.security.KerberosInfo;
 @ProtocolInfo(
     protocolName = "org.apache.hadoop.hdds.protocol.ReconfigureProtocol",
     protocolVersion = 1)
-@KerberosInfo(serverPrincipal = DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY)
+@KerberosInfo(serverPrincipal = DFSConfigKeysLegacy.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY)
 public interface ReconfigureProtocolDatanodePB extends ReconfigureProtocolPB {
 }

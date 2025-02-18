@@ -1967,8 +1967,8 @@ public class KeyManagerImpl implements KeyManager {
                              List<DatanodeDetails> nodes) {
     List<DatanodeDetails> matchingNodes = new ArrayList<>();
     boolean useHostname = ozoneManager.getConfiguration().getBoolean(
-        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
-        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+        DFSConfigKeysLegacy.HDDS_DATANODE_USE_DN_HOSTNAME,
+        DFSConfigKeysLegacy.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
     for (DatanodeDetails node : nodes) {
       if ((useHostname ? node.getHostName() : node.getIpAddress()).equals(
           clientMachine)) {

@@ -91,7 +91,7 @@ public class TestContainerMetrics {
   @BeforeAll
   public static void setup() {
     DefaultMetricsSystem.setMiniClusterMode(true);
-    CONF.setInt(DFSConfigKeysLegacy.DFS_METRICS_PERCENTILES_INTERVALS_KEY,
+    CONF.setInt(DFSConfigKeysLegacy.HDDS_METRICS_PERCENTILES_INTERVALS_KEY,
         DFS_METRICS_PERCENTILES_INTERVALS);
     CONF.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, false);
     CONF.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDir.toString());
