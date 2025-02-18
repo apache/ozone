@@ -66,23 +66,19 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
     return hasEnoughSpace;
   }
 
-  boolean foundFullVolumes() {
-    return !fullVolumes.isEmpty();
+  boolean excludedSomeVolumes() {
+    return !fullVolumes.isEmpty() || !readOnlyVolumes.isEmpty();
   }
 
   long mostAvailableSpace() {
     return mostAvailableSpace;
   }
 
-  boolean foundReadOnlyVolumes() {
-    return !readOnlyVolumes.isEmpty();
-  }
-
   @Override
   public String toString() {
     return "required space: " + requiredSpace +
-        ", volumes: " + fullVolumes +
-        ", readOnlyVolumes" + readOnlyVolumes;
+        ", full volumes: " + fullVolumes +
+        ", read-only volumes:" + readOnlyVolumes;
   }
 
   private static class AvailableSpace {

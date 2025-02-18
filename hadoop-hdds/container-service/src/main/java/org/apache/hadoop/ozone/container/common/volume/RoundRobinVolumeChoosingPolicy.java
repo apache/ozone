@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import static org.apache.hadoop.ozone.container.common.volume.VolumeChoosingUtil.logIfSomeReadOnlyVolumes;
 import static org.apache.hadoop.ozone.container.common.volume.VolumeChoosingUtil.logIfSomeVolumesOutOfSpace;
 import static org.apache.hadoop.ozone.container.common.volume.VolumeChoosingUtil.throwDiskOutOfSpace;
 
@@ -68,13 +67,11 @@ public class RoundRobinVolumeChoosingPolicy implements VolumeChoosingPolicy {
 
       if (hasEnoughSpace) {
         logIfSomeVolumesOutOfSpace(filter, LOG);
-        logIfSomeReadOnlyVolumes(filter, LOG);
         nextVolumeIndex.compareAndSet(nextIndex, currentVolumeIndex);
         return volume;
       }
 
       if (currentVolumeIndex == startVolumeIndex) {
-        logIfSomeReadOnlyVolumes(filter, LOG);
         throwDiskOutOfSpace(filter, LOG);
       }
     }

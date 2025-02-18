@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import static org.apache.hadoop.ozone.container.common.volume.VolumeChoosingUtil.logIfSomeReadOnlyVolumes;
 import static org.apache.hadoop.ozone.container.common.volume.VolumeChoosingUtil.logIfSomeVolumesOutOfSpace;
 import static org.apache.hadoop.ozone.container.common.volume.VolumeChoosingUtil.throwDiskOutOfSpace;
 
@@ -68,7 +67,6 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
     } else {
       logIfSomeVolumesOutOfSpace(filter, LOG);
     }
-    logIfSomeReadOnlyVolumes(filter, LOG);
 
     int count = volumesWithEnoughSpace.size();
     if (count == 1) {
