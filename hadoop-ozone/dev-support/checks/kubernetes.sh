@@ -41,6 +41,8 @@ if [ ! -d "$DIST_DIR" ]; then
     "$DIR/build.sh" -Pcoverage
 fi
 
+create_aws_dir
+
 mkdir -p "$REPORT_DIR"
 
 cd "$DIST_DIR/kubernetes/examples" || exit 1

@@ -1,27 +1,35 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.recon;
+
+import static org.apache.hadoop.hdds.scm.cli.ContainerOperationClient.newContainerRpcClient;
+import static org.apache.hadoop.ozone.OmUtils.getOzoneManagerServiceId;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 
 import com.google.common.collect.ImmutableList;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.google.inject.multibindings.Multibinder;
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
@@ -51,10 +59,10 @@ import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImp
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask;
+import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
-import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.protocol.ClientId;
@@ -69,15 +77,6 @@ import org.jooq.Configuration;
 import org.jooq.DAO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.util.List;
-
-import static org.apache.hadoop.hdds.scm.cli.ContainerOperationClient.newContainerRpcClient;
-import static org.apache.hadoop.ozone.OmUtils.getOzoneManagerServiceId;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 
 /**
  * Guice controller that defines concrete bindings.
