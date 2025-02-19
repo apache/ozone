@@ -166,16 +166,12 @@ As Ozone uses Apache Maven it can be developed from any IDE.  IntelliJ IDEA is a
 
 ### Run Ozone from IntelliJ
 
-Ozone components depends on maven classpath. We generate classpath descriptor from the maven pom.xml files to use exactly the same classpath at runtime.
+Ozone components depend on maven classpath. We generate classpath descriptor from the maven pom.xml files to use exactly the same classpath at runtime.
 
-As a result, it's easy to start _all_ the components from IDE as the right classpath (without provided scope) has already been set.
+As a result, it's straightforward to start _all_ the components from IDE as the right classpath (without provided scope) has already been set.
 
-To start Ozone from IntelliJ:
-
-1. Stop your IDE
-2. Execute the `./hadoop-ozone/dev-support/intellij/install-runconfigs.sh` helper script.
-3. Start the IDE
-4. New runner definitions are available from the Run menu.
+Ozone project already has pre-defined run configurations shared via .run folder.
+They will be automatically imported into IDE on project import. 
 
 You can use the installed Run configurations in the following order:
 
@@ -190,12 +186,9 @@ You can use the installed Run configurations in the following order:
 
 Checkstyle plugin may help to detect violations directly from the IDE.
 
-1. Install `Checkstyle+IDEA` plugin from `File` -> `Settings` -> `Plugins`
-2. Open `File` -> `Settings` -> `Other settings` -> `Checkstyle` and Add (`+`) a new `Configuration File`
-  * Description: `Ozone`
-  * Use a local checkstyle `./hadoop-hdds/dev-support/checkstyle/checkstyle.xml`
-3. Check the `pom.xml` for the current version of the used checkstyle and use the same version with the plugin (`File` -> `Settings` -> `Other settings` -> `Checkstyle`)
-4. Open the _Checkstyle Tool Window_, select the `Ozone` rule and execute the check
+Ozone checkstyle is shared via standard .idea/codeStyle folder and will be automatically imported when the project is opened.
+
+To use checkstyle, you need to select "Stored in project" scheme in Editor - Code Style settings. 
 
 ### Common problems
 
