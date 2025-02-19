@@ -424,7 +424,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
     // Test with no pagination
     OmMultipartUploadList noPagination = keyManager.listMultipartUploads(
-        volumeName, bucketName, "", "", "", 10, true);
+        volumeName, bucketName, "", "", "", 10, false);
 
     assertEquals(25, noPagination.getUploads().size());
     assertFalse(noPagination.isTruncated());

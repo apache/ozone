@@ -817,7 +817,8 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public OmMultipartUploadList listMultipartUploads(String volumeName,
       String bucketName,
-      String prefix, String keyMarker, String uploadIdMarker, int maxUploads, boolean noPagination) throws OMException {
+      String prefix, String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination)
+      throws OMException {
     Preconditions.checkNotNull(volumeName);
     Preconditions.checkNotNull(bucketName);
 
@@ -826,7 +827,8 @@ public class KeyManagerImpl implements KeyManager {
     try {
 
       MultipartUploadKeys multipartUploadKeys = metadataManager
-          .getMultipartUploadKeys(volumeName, bucketName, prefix, keyMarker, uploadIdMarker, maxUploads, noPagination);
+          .getMultipartUploadKeys(volumeName, bucketName, prefix, keyMarker, uploadIdMarker, maxUploads,
+              !withPagination);
 
       List<OmMultipartUpload> collect = multipartUploadKeys.getKeys().stream()
           .map(OmMultipartUpload::from)

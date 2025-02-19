@@ -2129,10 +2129,10 @@ public class RpcClient implements ClientProtocol {
     OmMultipartUploadList omMultipartUploadList;
     if (omVersion.compareTo(OzoneManagerVersion.S3_LIST_MULTIPART_UPLOADS_PAGINATION) >= 0) {
       omMultipartUploadList = ozoneManagerClient.listMultipartUploads(volumeName, bucketName, prefix, keyMarker,
-          uploadIdMarker, maxUploads, false);
+          uploadIdMarker, maxUploads, true);
     } else {
       omMultipartUploadList = ozoneManagerClient.listMultipartUploads(volumeName, bucketName, prefix, keyMarker,
-          uploadIdMarker, maxUploads, true);
+          uploadIdMarker, maxUploads, false);
     }
     List<OzoneMultipartUpload> uploads = omMultipartUploadList.getUploads()
         .stream()

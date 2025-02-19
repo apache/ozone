@@ -1017,7 +1017,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
     OmMultipartUploadList omMultipartUploadList = impl.listMultipartUploads(request.getVolume(), request.getBucket(),
         request.getPrefix(),
-        request.getKeyMarker(), request.getUploadIdMarker(), request.getMaxUploads(), request.getNoPagination());
+        request.getKeyMarker(), request.getUploadIdMarker(), request.getMaxUploads(), request.getWithPagination());
 
     List<MultipartUploadInfo> info = omMultipartUploadList
         .getUploads()

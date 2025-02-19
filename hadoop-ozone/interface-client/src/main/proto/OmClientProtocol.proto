@@ -1762,7 +1762,7 @@ message ListMultipartUploadsRequest {
     optional string keyMarker = 4;
     optional string uploadIdMarker = 5;
     optional int32 maxUploads = 6;
-    optional bool noPagination = 7; // for backward compatibility
+    optional bool withPagination = 7; // for backward compatibility
 }
 
 message ListMultipartUploadsResponse {
