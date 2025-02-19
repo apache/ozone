@@ -520,6 +520,7 @@ public class RpcClient implements ClientProtocol {
     }
   }
 
+  @Override
   public OzoneVolume buildOzoneVolume(OmVolumeArgs volume) {
     return OzoneVolume.newBuilder(conf, this)
         .setName(volume.getVolume())
@@ -826,6 +827,7 @@ public class RpcClient implements ClientProtocol {
   /**
    * {@inheritDoc}
    */
+  @Override
   public S3SecretValue setS3Secret(String accessId, String secretKey)
           throws IOException {
     Preconditions.checkArgument(StringUtils.isNotBlank(accessId),
@@ -1003,6 +1005,7 @@ public class RpcClient implements ClientProtocol {
    * @return snapshot info for volume/bucket snapshot path.
    * @throws IOException
    */
+  @Override
   public OzoneSnapshot getSnapshotInfo(String volumeName,
                                        String bucketName,
                                        String snapshotName) throws IOException {

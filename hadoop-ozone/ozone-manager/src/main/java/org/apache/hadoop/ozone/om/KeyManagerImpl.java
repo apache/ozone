@@ -802,6 +802,7 @@ public class KeyManagerImpl implements KeyManager {
     return snapshotDeletingService;
   }
 
+  @Override
   public SnapshotDirectoryCleaningService getSnapshotDirectoryService() {
     return snapshotDirectoryCleaningService;
   }
@@ -1642,6 +1643,7 @@ public class KeyManagerImpl implements KeyManager {
     return listStatus(args, recursive, startKey, numEntries, null);
   }
 
+  @Override
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
                                           String startKey, long numEntries,
                                           String clientAddress)

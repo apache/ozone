@@ -198,6 +198,7 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
    * @return String         - pem encoded SCM signed
    *                          certificate.
    */
+  @Override
   public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
       String certSignReq, boolean renew) throws IOException {
     return getSCMCertChain(scmNodeDetails, certSignReq, renew)

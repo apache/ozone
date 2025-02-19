@@ -1111,6 +1111,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
+  @Override
   public UUID refetchSecretKey() {
     secretKeyClient.refetchSecretKey();
     return secretKeyClient.getCurrentSecretKey().getId();
@@ -3087,6 +3088,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return omhaMetrics;
   }
 
+  @Override
   public String getRatisLogDirectory() {
     return  OzoneManagerRatisUtils.getOMRatisDirectory(configuration);
   }
@@ -3414,6 +3416,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * List tenants.
    */
+  @Override
   public TenantStateList listTenant() throws IOException {
 
     metrics.incNumTenantLists();
@@ -3468,6 +3471,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * Tenant get user info.
    */
+  @Override
   public TenantUserInfoValue tenantGetUserInfo(String userPrincipal)
       throws IOException {
 
@@ -3766,6 +3770,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return listStatus(args, recursive, startKey, numEntries, false);
   }
 
+  @Override
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries, boolean allowPartialPrefixes)
       throws IOException {
@@ -4878,6 +4883,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         ozoneObj.getKeyName());
   }
 
+  @Override
   @SuppressWarnings("parameternumber")
   public SnapshotDiffResponse snapshotDiff(String volume,
                                            String bucket,
@@ -4895,6 +4901,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         fromSnapshot, toSnapshot, token, pageSize, forceFullDiff, disableNativeDiff);
   }
 
+  @Override
   public CancelSnapshotDiffResponse cancelSnapshotDiff(String volume,
                                                        String bucket,
                                                        String fromSnapshot,
@@ -4905,6 +4912,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         fromSnapshot, toSnapshot);
   }
 
+  @Override
   public List<SnapshotDiffJob> listSnapshotDiffJobs(String volume,
                                                     String bucket,
                                                     String jobStatus,
@@ -4919,6 +4927,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         jobStatus, listAll);
   }
 
+  @Override
   public String printCompactionLogDag(String fileNamePrefix,
                                       String graphType)
       throws IOException {

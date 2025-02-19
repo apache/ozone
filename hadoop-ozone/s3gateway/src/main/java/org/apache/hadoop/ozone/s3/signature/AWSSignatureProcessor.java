@@ -59,6 +59,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
   @Context
   private ContainerRequestContext context;
 
+  @Override
   public SignatureInfo parseSignature() throws OS3Exception {
 
     LowerCaseKeyStringMap headers =

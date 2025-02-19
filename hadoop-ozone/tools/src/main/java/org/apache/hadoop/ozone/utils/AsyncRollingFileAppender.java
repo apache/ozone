@@ -112,14 +112,17 @@ public class AsyncRollingFileAppender extends AsyncAppender {
     return blocking;
   }
 
+  @Override
   public synchronized void setBlocking(boolean blocking) {
     this.blocking = blocking;
   }
 
+  @Override
   public synchronized int getBufferSize() {
     return bufferSize;
   }
 
+  @Override
   public synchronized void setBufferSize(int bufferSize) {
     this.bufferSize = bufferSize;
   }

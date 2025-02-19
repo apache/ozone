@@ -265,11 +265,13 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
       return this;
     }
 
+    @Override
     public Builder setObjectID(long obId) {
       super.setObjectID(obId);
       return this;
     }
 
+    @Override
     public Builder setUpdateID(long id) {
       super.setUpdateID(id);
       return this;

@@ -181,6 +181,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     cancelledNodes.add(tn);
   }
 
+  @Override
   public synchronized void setMetrics(NodeDecommissionMetrics metrics) {
     this.metrics = metrics;
   }

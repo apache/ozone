@@ -450,6 +450,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
    */
   Table<String, OmMultipartKeyInfo> getMultipartInfoTable();
 
+  @Override
   Table<String, TransactionInfo> getTransactionInfoTable();
 
   Table<String, OmDBAccessIdInfo> getTenantAccessIdTable();
