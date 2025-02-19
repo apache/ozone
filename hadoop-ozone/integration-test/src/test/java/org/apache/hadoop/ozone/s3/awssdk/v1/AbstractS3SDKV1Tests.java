@@ -86,11 +86,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -1064,9 +1064,8 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
   private static void createFile(File newFile, int size) throws IOException {
     // write random data so that filesystems with compression enabled (e.g. ZFS)
     // can't compress the file
-    Random random = new Random();
     byte[] data = new byte[size];
-    random.nextBytes(data);
+    data = RandomUtils.secure().randomBytes(data.length);
 
     RandomAccessFile file = new RandomAccessFile(newFile, "rws");
 
