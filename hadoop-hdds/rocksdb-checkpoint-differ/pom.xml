@@ -95,11 +95,6 @@
     <!-- Test dependencies -->
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-hadoop-dependency-test</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-rocks-native</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
@@ -126,16 +121,6 @@
         <configuration>
           <proc>none</proc>
         </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>depcheck</id>
-            <phase />
-          </execution>
-        </executions>
       </plugin>
     </plugins>
   </build>
