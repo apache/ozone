@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -35,7 +36,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -53,7 +53,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -67,48 +66,33 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Base class for SCM HA tests.
+ * Tests for SCM HA.
  */
 @Timeout(300)
 public class TestStorageContainerManagerHA {
 
   private static final Logger LOG = LoggerFactory.getLogger(TestStorageContainerManagerHA.class);
 
-  private MiniOzoneHAClusterImpl cluster = null;
+  private MiniOzoneHAClusterImpl cluster;
   private OzoneConfiguration conf;
-  private String omServiceId;
-  private static int numOfOMs = 3;
-  private String scmServiceId;
-  private static int numOfSCMs = 3;
+  private static final int OM_COUNT = 3;
+  private static final int SCM_COUNT = 3;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   public void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, "10s");
     conf.set(ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL,
         "5s");
     conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_GAP, "1");
-    omServiceId = "om-service-test1";
-    scmServiceId = "scm-service-test1";
     cluster = MiniOzoneCluster.newHABuilder(conf)
-        .setOMServiceId(omServiceId)
-        .setSCMServiceId(scmServiceId)
-        .setNumOfStorageContainerManagers(numOfSCMs)
-        .setNumOfOzoneManagers(numOfOMs)
+        .setOMServiceId("om-service-test1")
+        .setSCMServiceId("scm-service-test1")
+        .setNumOfStorageContainerManagers(SCM_COUNT)
+        .setNumOfOzoneManagers(OM_COUNT)
         .build();
     cluster.waitForClusterToBeReady();
-    waitForLeaderToBeReady();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     if (cluster != null) {
@@ -121,7 +105,7 @@ public class TestStorageContainerManagerHA {
     init();
     int count = 0;
     List<StorageContainerManager> scms = cluster.getStorageContainerManagers();
-    assertEquals(numOfSCMs, scms.size());
+    assertEquals(SCM_COUNT, scms.size());
     int peerSize = cluster.getStorageContainerManager().getScmHAManager()
         .getRatisServer().getDivision().getGroup().getPeers().size();
     StorageContainerManager leaderScm = null;
@@ -131,7 +115,7 @@ public class TestStorageContainerManagerHA {
         leaderScm = scm;
       }
       assertNotNull(scm.getScmHAManager().getRatisServer().getLeaderId());
-      assertEquals(peerSize, numOfSCMs);
+      assertEquals(peerSize, SCM_COUNT);
     }
     assertEquals(1, count);
     assertNotNull(leaderScm);
@@ -143,7 +127,7 @@ public class TestStorageContainerManagerHA {
 
     count = 0;
     List<OzoneManager> oms = cluster.getOzoneManagersList();
-    assertEquals(numOfOMs, oms.size());
+    assertEquals(OM_COUNT, oms.size());
     for (OzoneManager om : oms) {
       if (om.isLeaderReady()) {
         count++;
@@ -153,18 +137,15 @@ public class TestStorageContainerManagerHA {
     
     // verify timer based transaction buffer flush is working
     SnapshotInfo latestSnapshot = leaderScm.getScmHAManager()
-        .asSCMHADBTransactionBuffer().getLatestSnapshot();
+        .asSCMHADBTransactionBuffer()
+        .getLatestSnapshot();
     doPutKey();
     final StorageContainerManager leaderScmTmp = leaderScm;
     GenericTestUtils.waitFor(() -> {
-      if (leaderScmTmp.getScmHAManager().asSCMHADBTransactionBuffer()
-          .getLatestSnapshot() != null) {
-        if (leaderScmTmp.getScmHAManager().asSCMHADBTransactionBuffer()
-            .getLatestSnapshot().getIndex() > latestSnapshot.getIndex()) {
-          return true;
-        }
-      }
-      return false;
+      SnapshotInfo newSnapshot = leaderScmTmp.getScmHAManager()
+          .asSCMHADBTransactionBuffer()
+          .getLatestSnapshot();
+      return newSnapshot != null && newSnapshot.getIndex() > latestSnapshot.getIndex();
     }, 2000, 30000);
   }
 
@@ -182,20 +163,22 @@ public class TestStorageContainerManagerHA {
 
       String keyName = UUID.randomUUID().toString();
 
-      OzoneOutputStream out = bucket
-          .createKey(keyName, value.getBytes(UTF_8).length, RATIS, ONE,
-              new HashMap<>());
-      out.write(value.getBytes(UTF_8));
-      out.close();
+      byte[] bytes = value.getBytes(UTF_8);
+      try (OutputStream out = bucket.createKey(keyName, bytes.length, RATIS, ONE, new HashMap<>())) {
+        out.write(bytes);
+      }
+
       OzoneKey key = bucket.getKey(keyName);
       assertEquals(keyName, key.getName());
-      OzoneInputStream is = bucket.readKey(keyName);
-      byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-      assertEquals(fileContent.length, is.read(fileContent));
-      assertEquals(value, new String(fileContent, UTF_8));
-      assertFalse(key.getCreationTime().isBefore(testStartTime));
-      assertFalse(key.getModificationTime().isBefore(testStartTime));
-      is.close();
+
+      try (OzoneInputStream is = bucket.readKey(keyName)) {
+        byte[] fileContent = new byte[bytes.length];
+        assertEquals(fileContent.length, is.read(fileContent));
+        assertEquals(value, new String(fileContent, UTF_8));
+        assertFalse(key.getCreationTime().isBefore(testStartTime));
+        assertFalse(key.getModificationTime().isBefore(testStartTime));
+      }
+
       final OmKeyArgs keyArgs = new OmKeyArgs.Builder()
           .setVolumeName(volumeName)
           .setBucketName(bucketName)
@@ -218,7 +201,7 @@ public class TestStorageContainerManagerHA {
       // Ensure all follower scms have caught up with the leader
       GenericTestUtils.waitFor(() -> areAllScmInSync(finalIndex), 100, 10000);
       final long containerID = keyLocationInfos.get(0).getContainerID();
-      for (int k = 0; k < numOfSCMs; k++) {
+      for (int k = 0; k < SCM_COUNT; k++) {
         StorageContainerManager scm =
             cluster.getStorageContainerManagers().get(k);
         // flush to DB on each SCM
@@ -309,23 +292,6 @@ public class TestStorageContainerManagerHA {
           scmHAMetrics.getSCMHAMetricsInfoLeaderState());
       assertEquals(nodeId, scmHAMetrics.getSCMHAMetricsInfoNodeId());
     }
-  }
-
-  /**
-   * Some tests are stopping or restarting SCMs.
-   * There are test cases where we might need to
-   * wait for a leader to be elected and ready.
-   */
-  private void waitForLeaderToBeReady()
-      throws InterruptedException, TimeoutException {
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return cluster.getActiveSCM().checkLeader();
-      } catch (Exception e) {
-        return false;
-      }
-    }, 1000, (int) ScmConfigKeys
-        .OZONE_SCM_HA_RATIS_LEADER_READY_WAIT_TIMEOUT_DEFAULT);
   }
 
   @Test
