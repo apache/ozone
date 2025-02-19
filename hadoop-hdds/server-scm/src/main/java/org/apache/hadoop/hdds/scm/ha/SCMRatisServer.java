@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import java.io.IOException;
+import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
@@ -70,5 +71,11 @@ public interface SCMRatisServer {
 
   RaftPeerId getLeaderId();
 
-  <T> T getProxyHandler(RequestType type, Class<T> intf, T supplier);
+  default <T> T getProxyHandler(final RequestType type, final Class<T> intf, final T impl) {
+    final SCMHAInvocationHandler invocationHandler =
+        new SCMHAInvocationHandler(type, impl, this);
+    return intf.cast(Proxy.newProxyInstance(getClass().getClassLoader(),
+        new Class<?>[] {intf}, invocationHandler));
+  }
+
 }
