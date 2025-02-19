@@ -198,7 +198,6 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.util.ExitUtils;
-import org.apache.ratis.util.JvmPauseMonitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -284,7 +283,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private RootCARotationManager rootCARotationManager;
   private ContainerTokenSecretManager containerTokenMgr;
 
-  private final JvmPauseMonitor jvmPauseMonitor;
   private final OzoneConfiguration configuration;
   private SCMContainerMetrics scmContainerMetrics;
   private SCMContainerPlacementMetrics placementMetrics;
@@ -383,8 +381,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     threadNamePrefix = getScmNodeDetails().threadNamePrefix();
     primaryScmNodeId = scmStorageConfig.getPrimaryScmNodeId();
-
-    jvmPauseMonitor = newJvmPauseMonitor(getScmId());
 
     /*
      * Important : This initialization sequence is assumed by some of our tests.
@@ -1542,10 +1538,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmBlockManager.start();
     leaseManager.start();
 
-    if (jvmPauseMonitor != null) {
-      jvmPauseMonitor.start();
-    }
-
     try {
       httpServer = new StorageContainerManagerHttpServer(configuration, this);
       httpServer.start();
@@ -1697,10 +1689,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       eventQueue.close();
     } catch (Exception ex) {
       LOG.error("SCM Event Queue stop failed", ex);
-    }
-
-    if (jvmPauseMonitor != null) {
-      jvmPauseMonitor.stop();
     }
 
     try {
