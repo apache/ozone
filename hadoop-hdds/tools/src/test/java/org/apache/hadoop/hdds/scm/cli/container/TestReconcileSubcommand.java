@@ -3,6 +3,7 @@ package org.apache.hadoop.hdds.scm.cli.container;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
@@ -23,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -30,6 +32,7 @@ import java.util.stream.Collectors;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -117,34 +120,74 @@ public class TestReconcileSubcommand {
     }
   }
 
-  private void validateStatusOutput(ReconcileSubcommand.ContainerWrapper containerOutput,
-                                    ContainerInfo expectedContainerInfo, List<ContainerReplicaInfo> expectedReplicas, boolean replicasMatch) {
+  private void validateStatusOutput(Map<String, Object> containerOutput, ContainerInfo expectedContainerInfo,
+      List<ContainerReplicaInfo> expectedReplicas, boolean replicasMatch) throws Exception {
+//    Map<String, Object> containerOutputList = JsonUtils.getDefaultMapper().readValue(output,
+//        new TypeReference<List<Object>>() {});
+
+    Map<String, Object> repConfig = (Map<String, Object>)containerOutput.get("replicationConfig");
+
     // Check container level fields.
-    assertEquals(expectedContainerInfo.getContainerID(), containerOutput.getContainerID());
-    assertEquals(expectedContainerInfo.getState(), containerOutput.getState());
-    assertEquals(expectedContainerInfo.getReplicationConfig(), containerOutput.getReplicationConfig());
-    assertEquals(replicasMatch, containerOutput.getReplicasMatch());
+    assertEquals(expectedContainerInfo.getContainerID(), containerOutput.get("containerID"));
+    assertEquals(expectedContainerInfo.getState(), containerOutput.get("state"));
+    assertEquals(expectedContainerInfo.getReplicationConfig().getReplicationType().toString(),
+        repConfig.get("replicationType"));
+    assertEquals(replicasMatch, containerOutput.get("replicasMatch"));
+
 
     // Check replica fields.
-    List<ReconcileSubcommand.ReplicaWrapper> replicaOutputList = containerOutput.getReplicas();
+    List<Object> replicaOutputList = (List<Object>)containerOutput.get("replicas");
     assertEquals(expectedReplicas.size(), replicaOutputList.size());
     for (int i = 0; i < expectedReplicas.size(); i++) {
-      ReconcileSubcommand.ReplicaWrapper replicaOutput = replicaOutputList.get(i);
+      Map<String, Object> replicaOutput = (Map<String, Object>)replicaOutputList.get(i);
       ContainerReplicaInfo expectedReplica = expectedReplicas.get(i);
 
-      // TODO Ratis replica output should not have replica index field
       // Check container replica info.
-      assertEquals(expectedReplica.getState(), replicaOutput.getState());
-      assertEquals(expectedReplica.getDataChecksum(), replicaOutput.getDataChecksum());
+      assertEquals(expectedReplica.getState(), replicaOutput.get("state"));
+      assertEquals(expectedReplica.getDataChecksum(), replicaOutput.get("dataChecksum"));
+      // Replica index should only be output for EC containers. It has no meaning for Ratis containers.
+      if (expectedContainerInfo.getReplicationType().equals(HddsProtos.ReplicationType.RATIS)) {
+        assertFalse(replicaOutput.containsKey("replicaIndex"));
+      } else {
+        assertEquals(expectedReplica.getReplicaIndex(), replicaOutput.get("replicaIndex"));
+      }
 
       // Check datanode info.
-      ReconcileSubcommand.DatanodeWrapper dnWrapper = replicaOutput.getDatanode();
+      Map<String, Object> dnOutput = (Map<String, Object>)replicaOutput.get("datanode");
       DatanodeDetails expectedDnDetails = expectedReplica.getDatanodeDetails();
-      assertEquals(expectedDnDetails.getHostName(), dnWrapper.getHostname());
-      assertEquals(expectedDnDetails.getUuidString(), dnWrapper.getUuid());
-    }
 
+      assertEquals(expectedDnDetails.getHostName(), dnOutput.get("hostname"));
+      assertEquals(expectedDnDetails.getUuidString(), dnOutput.get("id"));
+    }
   }
+
+//  private void validateStatusOutput(ReconcileSubcommand.ContainerWrapper containerOutput,
+//                                    ContainerInfo expectedContainerInfo, List<ContainerReplicaInfo> expectedReplicas, boolean replicasMatch) {
+//    // Check container level fields.
+//    assertEquals(expectedContainerInfo.getContainerID(), containerOutput.getContainerID());
+//    assertEquals(expectedContainerInfo.getState(), containerOutput.getState());
+//    assertEquals(expectedContainerInfo.getReplicationConfig(), containerOutput.getReplicationConfig());
+//    assertEquals(replicasMatch, containerOutput.getReplicasMatch());
+//
+//    // Check replica fields.
+//    List<ReconcileSubcommand.ReplicaWrapper> replicaOutputList = containerOutput.getReplicas();
+//    assertEquals(expectedReplicas.size(), replicaOutputList.size());
+//    for (int i = 0; i < expectedReplicas.size(); i++) {
+//      ReconcileSubcommand.ReplicaWrapper replicaOutput = replicaOutputList.get(i);
+//      ContainerReplicaInfo expectedReplica = expectedReplicas.get(i);
+//
+//      // TODO Ratis replica output should not have replica index field
+//      // Check container replica info.
+//      assertEquals(expectedReplica.getState(), replicaOutput.getState());
+//      assertEquals(expectedReplica.getDataChecksum(), replicaOutput.getDataChecksum());
+//
+//      // Check datanode info.
+//      ReconcileSubcommand.DatanodeWrapper dnWrapper = replicaOutput.getDatanode();
+//      DatanodeDetails expectedDnDetails = expectedReplica.getDatanodeDetails();
+//      assertEquals(expectedDnDetails.getHostName(), dnWrapper.getHostname());
+//      assertEquals(expectedDnDetails.getUuidString(), dnWrapper.getUuid());
+//    }
+//  }
 
   private void validateCommandsSent(long... containerIDs) throws Exception {
     // No extra commands should have been sent.
