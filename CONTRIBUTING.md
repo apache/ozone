@@ -125,13 +125,13 @@ Basic code conventions followed by Ozone:
 
 These are checked by tools like Checkstyle and RAT.
 
-For IntelliJ users, it is recommended to import and select the Code Style scheme located at:
+For IntelliJ users, Ozone checkstyle is shared via standard configuration folder and will be automatically imported when the project is open:
 
 ```
-./hadoop-ozone/dev-support/intellij/ozone-style.xml
+./.idea/codeStyle
 ```
 
-See https://www.jetbrains.com/help/idea/configuring-code-style.html#import-code-style for detailed instructions.
+See https://www.jetbrains.com/help/idea/configure-project-settings.html#share-project-through-vcs for detailed instructions.
 
 ### Check your contribution
 
@@ -170,7 +170,12 @@ Ozone components depend on maven classpath. We generate classpath descriptor fro
 
 As a result, it's straightforward to start _all_ the components from IDE as the right classpath (without provided scope) has already been set.
 
-Ozone project already has pre-defined run configurations shared via .run folder.
+Ozone project already has pre-defined run configurations shared via standard IDE folder for run configurations:
+
+```
+./.run
+```
+
 They will be automatically imported into IDE on project import. 
 
 You can use the installed Run configurations in the following order:
@@ -186,9 +191,12 @@ You can use the installed Run configurations in the following order:
 
 Checkstyle plugin may help to detect violations directly from the IDE.
 
-Ozone checkstyle is shared via standard .idea/codeStyle folder and will be automatically imported when the project is opened.
-
-To use checkstyle, you need to select "Stored in project" scheme in Editor - Code Style settings. 
+1. Install `Checkstyle+IDEA` plugin from `File` -> `Settings` -> `Plugins`
+2. Open `File` -> `Settings` -> `Other settings` -> `Checkstyle` and Add (`+`) a new `Configuration File`
+  * Description: `Ozone`
+  * Use a local checkstyle `./hadoop-hdds/dev-support/checkstyle/checkstyle.xml`
+3. Check the `pom.xml` for the current version of the used checkstyle and use the same version with the plugin (`File` -> `Settings` -> `Other settings` -> `Checkstyle`)
+4. Open the _Checkstyle Tool Window_, select the `Ozone` rule and execute the check
 
 ### Common problems
 
