@@ -86,7 +86,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.DeletedBlocksTransact
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
-import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
@@ -847,10 +846,6 @@ public class SCMClientProtocolServer implements
   public void transferLeadership(String newLeaderId)
       throws IOException {
     getScm().checkAdminAccess(getRemoteUser(), false);
-    if (!SCMHAUtils.isSCMHAEnabled(getScm().getConfiguration())) {
-      throw new SCMException("SCM HA not enabled.", ResultCodes.INTERNAL_ERROR);
-    }
-
     checkIfCertSignRequestAllowed(scm.getRootCARotationManager(),
         false, config, "transferLeadership");
 

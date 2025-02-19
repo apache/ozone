@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
-import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -64,10 +63,8 @@ public class DeletedBlockLogStateManagerImpl
     this.deletedTable = deletedTable;
     this.containerManager = containerManager;
     this.transactionBuffer = txBuffer;
-    final boolean isRatisEnabled = SCMHAUtils.isSCMHAEnabled(conf);
-    this.deletingTxIDs = isRatisEnabled ? ConcurrentHashMap.newKeySet() : null;
-    this.skippingRetryTxIDs =
-        isRatisEnabled ? ConcurrentHashMap.newKeySet() : null;
+    this.deletingTxIDs = ConcurrentHashMap.newKeySet();
+    this.skippingRetryTxIDs = ConcurrentHashMap.newKeySet();
   }
 
   public TableIterator<Long, TypedTable.KeyValue<Long,
