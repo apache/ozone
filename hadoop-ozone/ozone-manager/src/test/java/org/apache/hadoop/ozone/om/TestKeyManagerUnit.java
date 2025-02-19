@@ -372,7 +372,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
     // WHEN - First page (10 entries)
     OmMultipartUploadList firstPage = keyManager.listMultipartUploads(
-        volumeName, bucketName, "", "", "", 10, false);
+        volumeName, bucketName, "", "", "", 10, true);
 
     // THEN
     assertEquals(10, firstPage.getUploads().size());
@@ -391,7 +391,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
         volumeName, bucketName, "",
         firstPage.getNextKeyMarker(),
         firstPage.getNextUploadIdMarker(),
-        10, false);
+        10, true);
 
     // THEN
     assertEquals(10, secondPage.getUploads().size());
@@ -408,7 +408,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
         volumeName, bucketName, "",
         secondPage.getNextKeyMarker(),
         secondPage.getNextUploadIdMarker(),
-        10, false);
+        10, true);
 
     // THEN
     assertEquals(5, lastPage.getUploads().size());
