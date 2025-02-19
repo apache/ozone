@@ -67,6 +67,7 @@ public abstract class FileSizeCountTaskHelper {
           // Reset the flag so that truncation can be retried
           ReconConstants.FILE_SIZE_COUNT_TABLE_TRUNCATED.set(false);
           LOG.error("Error while truncating FILE_COUNT_BY_SIZE table, resetting flag.", e);
+          throw new RuntimeException("Table truncation failed", e);  // Propagate upwards
         }
       } else {
         LOG.info("Table already truncated by another task; waiting for truncation to complete.");
