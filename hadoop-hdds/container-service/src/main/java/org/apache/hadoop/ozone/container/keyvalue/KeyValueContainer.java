@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_ALREADY_EXISTS;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_FILES_CREATE_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
@@ -666,7 +667,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   public void importContainerData(KeyValueContainerData originalContainerData)
       throws IOException {
-    containerData.setState(originalContainerData.getState());
+    // place the container in the Recovering state while it is being imported
+    containerData.setState(RECOVERING);
     containerData
         .setContainerDBType(originalContainerData.getContainerDBType());
     containerData.setSchemaVersion(originalContainerData.getSchemaVersion());
@@ -681,6 +683,10 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
     //fill in memory stat counter (keycount, byte usage)
     KeyValueContainerUtil.parseKVContainerData(containerData, config);
+
+    // restore imported container's state to the original state and flush the yaml file
+    containerData.setState(originalContainerData.getState());
+    update(originalContainerData.getMetadata(), true);
   }
 
   @Override
