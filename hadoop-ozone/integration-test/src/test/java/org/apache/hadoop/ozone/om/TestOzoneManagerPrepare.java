@@ -151,7 +151,6 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
    * @throws Exception
    */
   @Test
-  @Unhealthy("RATIS-1481") // until upgrade to Ratis 2.3.0
   public void testPrepareDownedOM() throws Exception {
     // Index of the OM that will be shut down during this test.
     final int shutdownOMIndex = 2;
