@@ -771,24 +771,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     ScmInfo.Builder builder = new ScmInfo.Builder()
         .setClusterId(resp.getClusterId())
         .setScmId(resp.getScmId())
-        .setRatisPeerRoles(resp.getPeerRolesList());
-
-    // By default, we assume that SCM Ratis is not enabled.
-
-    // If the response contains the `ScmRatisEnabled` field,
-    // we will set it directly; otherwise,
-    // we will determine if Ratis is enabled based on
-    // whether the `peerRolesList` contains the keywords 'leader' or 'follower'.
-    if (resp.hasScmRatisEnabled()) {
-      builder.setScmRatisEnabled(resp.getScmRatisEnabled());
-    } else {
-      List<String> peerRolesList = resp.getPeerRolesList();
-      if (!peerRolesList.isEmpty()) {
-        boolean containsScmRoles = peerRolesList.stream().map(String::toLowerCase)
-            .anyMatch(scmRatisRolesToCheck::contains);
-        builder.setScmRatisEnabled(containsScmRoles);
-      }
-    }
+        .setPeerRoles(resp.getPeerRolesList());
     return builder.build();
   }
 
