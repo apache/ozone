@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.server;
 
 import static org.apache.hadoop.hdds.HddsUtils.preserveThreadName;
-import static org.apache.hadoop.hdds.ratis.RatisHelper.newJvmPauseMonitor;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmUtils.checkIfCertSignRequestAllowed;
@@ -199,7 +198,6 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.util.ExitUtils;
-import org.apache.ratis.util.JvmPauseMonitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -285,7 +283,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private RootCARotationManager rootCARotationManager;
   private ContainerTokenSecretManager containerTokenMgr;
 
-  private final JvmPauseMonitor jvmPauseMonitor;
   private final OzoneConfiguration configuration;
   private SCMContainerMetrics scmContainerMetrics;
   private SCMContainerPlacementMetrics placementMetrics;
@@ -363,15 +360,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     initMetrics();
     initPerfMetrics();
 
-    boolean ratisEnabled = SCMHAUtils.isSCMHAEnabled(conf);
     if (scmStorageConfig.getState() != StorageState.INITIALIZED) {
       String errMsg = "Please make sure you have run 'ozone scm --init' " +
           "command to generate all the required metadata to " +
-          scmStorageConfig.getStorageDir();
-      if (ratisEnabled && !scmStorageConfig.isSCMHAEnabled()) {
-        errMsg += " or make sure you have run 'ozone scm --bootstrap' cmd to "
-            + "add the SCM to existing SCM HA group";
-      }
+          scmStorageConfig.getStorageDir() +
+          " or make sure you have run 'ozone scm --bootstrap' cmd to " +
+          "add the SCM to existing SCM HA group";
       LOG.error(errMsg + ".");
       throw new SCMException("SCM not initialized due to storage config " +
           "failure.", ResultCodes.SCM_NOT_INITIALIZED);
@@ -387,8 +381,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     threadNamePrefix = getScmNodeDetails().threadNamePrefix();
     primaryScmNodeId = scmStorageConfig.getPrimaryScmNodeId();
-
-    jvmPauseMonitor = !ratisEnabled ? newJvmPauseMonitor(getScmId()) : null;
 
     /*
      * Important : This initialization sequence is assumed by some of our tests.
@@ -418,9 +410,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (isSecretKeyEnable(securityConfig)) {
       secretKeyManagerService = new SecretKeyManagerService(scmContext, conf,
               scmHAManager.getRatisServer());
-      if (!ratisEnabled) {
-        secretKeyManagerService.getSecretKeyManager().checkAndInitialize();
-      }
       serviceManager.register(secretKeyManagerService);
     } else {
       secretKeyManagerService = null;
@@ -711,13 +700,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getScmContext() != null) {
       scmContext = configurator.getScmContext();
     } else {
-      // When term equals SCMContext.INVALID_TERM, the isLeader() check
-      // and getTermOfLeader() will always pass.
-      long term = SCMHAUtils.isSCMHAEnabled(conf) ? 0 : SCMContext.INVALID_TERM;
       // non-leader of term 0, in safe mode, preCheck not completed.
       scmContext = new SCMContext.Builder()
           .setLeader(false)
-          .setTerm(term)
+          .setTerm(0)
           .setIsInSafeMode(true)
           .setIsPreCheckComplete(false)
           .setSCM(this)
@@ -1142,10 +1128,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   public static boolean scmBootstrap(OzoneConfiguration conf)
       throws AuthenticationException, IOException {
-    if (!SCMHAUtils.isSCMHAEnabled(conf)) {
-      LOG.error("Bootstrap is not supported without SCM HA.");
-      return false;
-    }
     String primordialSCM = SCMHAUtils.getPrimordialSCM(conf);
     SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
     SCMHANodeDetails scmhaNodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf,
@@ -1153,11 +1135,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     String selfNodeId = scmhaNodeDetails.getLocalNodeDetails().getNodeId();
     final String selfHostName =
         scmhaNodeDetails.getLocalNodeDetails().getHostName();
-    if (primordialSCM != null && SCMHAUtils.isSCMHAEnabled(conf)
-        && SCMHAUtils.isPrimordialSCM(conf, selfNodeId, selfHostName)) {
-      LOG.info(
-          "SCM bootstrap command can only be executed in non-Primordial SCM "
-              + "{}, self id {} " + "Ignoring it.", primordialSCM, selfNodeId);
+    if (primordialSCM != null && SCMHAUtils.isPrimordialSCM(conf, selfNodeId, selfHostName)) {
+      LOG.info("SCM bootstrap command can only be executed in non-Primordial SCM "
+          + "{}, self id {} " + "Ignoring it.", primordialSCM, selfNodeId);
       return true;
     }
 
@@ -1321,7 +1301,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
          * to the bootstrapping SCMs later.
          */
         try {
-          SCMHAUtils.setRatisEnabled(true);
           StorageContainerManager scm = createSCM(conf);
           scm.start();
           scm.getScmHAManager().getRatisServer().triggerSnapshot();
@@ -1563,10 +1542,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmBlockManager.start();
     leaseManager.start();
 
-    if (jvmPauseMonitor != null) {
-      jvmPauseMonitor.start();
-    }
-
     try {
       httpServer = new StorageContainerManagerHttpServer(configuration, this);
       httpServer.start();
@@ -1577,8 +1552,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     setStartTime();
 
-    RaftPeerId leaderId = SCMHAUtils.isSCMHAEnabled(configuration)
-        ? getScmHAManager().getRatisServer().getLeaderId() : null;
+    RaftPeerId leaderId = getScmHAManager().getRatisServer().getLeaderId();
     scmHAMetricsUpdate(Objects.toString(leaderId, null));
 
     if (scmCertificateClient != null) {
@@ -1719,10 +1693,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       eventQueue.close();
     } catch (Exception ex) {
       LOG.error("SCM Event Queue stop failed", ex);
-    }
-
-    if (jvmPauseMonitor != null) {
-      jvmPauseMonitor.stop();
     }
 
     try {
@@ -1925,15 +1895,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * @return - if the current scm is the leader and is ready.
    */
   public boolean checkLeader() {
-    // For NON-HA setup, the node will always be the leader
-    if (!SCMHAUtils.isSCMHAEnabled(configuration)) {
-      return true;
-    } else {
-      // FOR HA setup, the node has to be the leader and ready to serve
-      // requests.
-      return getScmHAManager().getRatisServer().getDivision().getInfo()
+    // The node has to be the leader and ready to serve requests.
+    return getScmHAManager().getRatisServer().getDivision().getInfo()
           .isLeaderReady();
-    }
   }
 
   private void checkAdminAccess(String op) throws IOException {
@@ -2176,23 +2140,19 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public String getPrimordialNode() {
-    if (SCMHAUtils.isSCMHAEnabled(configuration)) {
-      String primordialNode = SCMHAUtils.getPrimordialSCM(configuration);
-      // primordialNode can be nodeId too . If it is then return hostname.
-      if (SCMHAUtils.getSCMNodeIds(configuration).contains(primordialNode)) {
-        List<SCMNodeDetails> localAndPeerNodes =
-            new ArrayList<>(scmHANodeDetails.getPeerNodeDetails());
-        localAndPeerNodes.add(getSCMHANodeDetails().getLocalNodeDetails());
-        for (SCMNodeDetails nodes : localAndPeerNodes) {
-          if (nodes.getNodeId().equals(primordialNode)) {
-            return nodes.getHostName();
-          }
+    String primordialNode = SCMHAUtils.getPrimordialSCM(configuration);
+    // primordialNode can be nodeId too . If it is then return hostname.
+    if (SCMHAUtils.getSCMNodeIds(configuration).contains(primordialNode)) {
+      List<SCMNodeDetails> localAndPeerNodes =
+          new ArrayList<>(scmHANodeDetails.getPeerNodeDetails());
+      localAndPeerNodes.add(getSCMHANodeDetails().getLocalNodeDetails());
+      for (SCMNodeDetails nodes : localAndPeerNodes) {
+        if (nodes.getNodeId().equals(primordialNode)) {
+          return nodes.getHostName();
         }
-
       }
-      return primordialNode;
     }
-    return null;
+    return primordialNode;
   }
 
   @Override

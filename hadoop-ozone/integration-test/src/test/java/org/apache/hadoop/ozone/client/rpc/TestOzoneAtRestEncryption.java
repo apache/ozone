@@ -60,6 +60,7 @@ import java.util.Random;
 import java.util.TreeMap;
 import java.util.UUID;
 import javax.xml.bind.DatatypeConverter;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.kms.KMSClientProvider;
 import org.apache.hadoop.crypto.key.kms.server.MiniKMS;
@@ -651,9 +652,8 @@ class TestOzoneAtRestEncryption {
 
       // Read different data lengths and starting from different offsets and
       // verify the data matches.
-      Random random = new Random();
-      int randomSize = random.nextInt(keySize / 2);
-      int randomOffset = random.nextInt(keySize - randomSize);
+      int randomSize = RandomUtils.secure().randomInt(0, keySize / 2);
+      int randomOffset = RandomUtils.secure().randomInt(0, keySize - randomSize);
 
       int[] readDataSizes = {keySize, keySize / 3 + 1, BLOCK_SIZE,
           BLOCK_SIZE * 2 + 1, CHUNK_SIZE, CHUNK_SIZE / 4 - 1,

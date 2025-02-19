@@ -85,11 +85,13 @@ public class ListIterator {
       return value;
     }
 
+    @Override
     public int compareTo(HeapEntry other) {
       return Comparator.comparing(HeapEntry::getKey)
           .thenComparing(HeapEntry::getEntryIteratorId).compare(this, other);
     }
 
+    @Override
     public boolean equals(Object other) {
 
       if (!(other instanceof HeapEntry)) {
@@ -101,6 +103,7 @@ public class ListIterator {
       return this.compareTo(that) == 0;
     }
 
+    @Override
     public int hashCode() {
       return key.hashCode();
     }
@@ -153,6 +156,7 @@ public class ListIterator {
       }
     }
 
+    @Override
     public boolean hasNext() {
       try {
         getNextKey();
@@ -162,6 +166,7 @@ public class ListIterator {
       return currentEntry != null;
     }
 
+    @Override
     public HeapEntry next() {
       if (hasNext()) {
         HeapEntry ret = currentEntry;
@@ -171,6 +176,7 @@ public class ListIterator {
       throw new NoSuchElementException();
     }
 
+    @Override
     public void close() throws IOException {
       tableIterator.close();
     }
@@ -240,16 +246,19 @@ public class ListIterator {
       return cacheKeyMap.containsKey(key);
     }
 
+    @Override
     public boolean hasNext() {
       return cacheCreatedKeyIter.hasNext();
     }
 
+    @Override
     public HeapEntry next() {
       Map.Entry<String, Value> entry = cacheCreatedKeyIter.next();
       return new HeapEntry(this.entryIteratorId, this.tableName,
           entry.getKey(), entry.getValue());
     }
 
+    @Override
     public void close() {
       // Nothing to close here
     }
@@ -323,10 +332,12 @@ public class ListIterator {
 
     }
 
+    @Override
     public boolean hasNext() {
       return !minHeap.isEmpty();
     }
 
+    @Override
     public HeapEntry next() {
       HeapEntry heapEntry = minHeap.remove();
       // remove the least element and
@@ -339,6 +350,7 @@ public class ListIterator {
       return heapEntry;
     }
 
+    @Override
     public void close() throws IOException {
       IOUtils.closeQuietly(iterators);
     }

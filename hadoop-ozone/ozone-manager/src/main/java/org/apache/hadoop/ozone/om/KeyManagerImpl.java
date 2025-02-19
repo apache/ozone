@@ -132,6 +132,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
+import org.apache.hadoop.ozone.om.helpers.MultipartUploadKeys;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -801,6 +802,7 @@ public class KeyManagerImpl implements KeyManager {
     return snapshotDeletingService;
   }
 
+  @Override
   public SnapshotDirectoryCleaningService getSnapshotDirectoryService() {
     return snapshotDirectoryCleaningService;
   }
@@ -815,7 +817,9 @@ public class KeyManagerImpl implements KeyManager {
   
   @Override
   public OmMultipartUploadList listMultipartUploads(String volumeName,
-      String bucketName, String prefix) throws OMException {
+      String bucketName,
+      String prefix, String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination)
+      throws OMException {
     Preconditions.checkNotNull(volumeName);
     Preconditions.checkNotNull(bucketName);
 
@@ -823,11 +827,11 @@ public class KeyManagerImpl implements KeyManager {
         bucketName);
     try {
 
-      Set<String> multipartUploadKeys =
-          metadataManager
-              .getMultipartUploadKeys(volumeName, bucketName, prefix);
+      MultipartUploadKeys multipartUploadKeys = metadataManager
+          .getMultipartUploadKeys(volumeName, bucketName, prefix, keyMarker, uploadIdMarker, maxUploads,
+              !withPagination);
 
-      List<OmMultipartUpload> collect = multipartUploadKeys.stream()
+      List<OmMultipartUpload> collect = multipartUploadKeys.getKeys().stream()
           .map(OmMultipartUpload::from)
           .peek(upload -> {
             try {
@@ -843,14 +847,17 @@ public class KeyManagerImpl implements KeyManager {
                       multipartKeyInfo.getReplicationConfig());
             } catch (IOException e) {
               LOG.warn(
-                  "Open key entry for multipart upload record can be read  {}",
+                  "Open key entry for multipart upload record can't be read  {}",
                   metadataManager.getOzoneKey(upload.getVolumeName(),
                           upload.getBucketName(), upload.getKeyName()));
             }
           })
           .collect(Collectors.toList());
 
-      return new OmMultipartUploadList(collect);
+      return new OmMultipartUploadList(collect,
+          multipartUploadKeys.getNextKeyMarker(),
+          multipartUploadKeys.getNextUploadIdMarker(),
+          multipartUploadKeys.isTruncated());
 
     } catch (IOException ex) {
       LOG.error("List Multipart Uploads Failed: volume: " + volumeName +
@@ -1636,6 +1643,7 @@ public class KeyManagerImpl implements KeyManager {
     return listStatus(args, recursive, startKey, numEntries, null);
   }
 
+  @Override
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
                                           String startKey, long numEntries,
                                           String clientAddress)

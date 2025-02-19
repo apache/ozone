@@ -190,6 +190,7 @@ public class ObjectEndpoint extends EndpointBase {
   @Inject
   private OzoneConfiguration ozoneConfiguration;
 
+  @Override
   @PostConstruct
   public void init() {
     bufferSize = (int) ozoneConfiguration.getStorageSize(
