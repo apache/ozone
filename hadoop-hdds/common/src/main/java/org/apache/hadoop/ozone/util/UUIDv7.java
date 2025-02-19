@@ -26,7 +26,7 @@ import java.util.UUID;
  * https://antonz.org/uuidv7/
  */
 public final class UUIDv7 {
-  private static final SecureRandom RANDOM = new SecureRandom();
+  private static final ThreadLocal<SecureRandom> GENERATOR = ThreadLocal.withInitial(SecureRandom::new);
 
   // Private constructor to prevent instantiation
   private UUIDv7() {
@@ -43,7 +43,7 @@ public final class UUIDv7 {
   public static byte[] randomBytes() {
     // random bytes
     byte[] value = new byte[16];
-    RANDOM.nextBytes(value);
+    GENERATOR.get().nextBytes(value);
 
     // current timestamp in ms
     ByteBuffer timestamp = ByteBuffer.allocate(Long.BYTES);
