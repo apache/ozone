@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -94,13 +95,15 @@ public class TestReservedVolumeSpace {
     float percentage = conf.getFloat(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT,
         HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT);
 
-    long volumeCapacity = hddsVolume.getCurrentUsage().getCapacity();
-    long volumeAvailable = hddsVolume.getCurrentUsage().getAvailable();
+    SpaceUsageSource currentUsage = hddsVolume.getCurrentUsage();
+    long volumeCapacity = currentUsage.getCapacity();
+    long volumeAvailable = currentUsage.getAvailable();
     VolumeUsage usage = hddsVolume.getVolumeInfo().get().getUsageForTesting();
 
     //Gets the actual total capacity
-    long totalCapacity = usage.realUsage().getCapacity();
-    long totalAvailable = usage.realUsage().getAvailable();
+    SpaceUsageSource realUsage = usage.realUsage();
+    long totalCapacity = realUsage.getCapacity();
+    long totalAvailable = realUsage.getAvailable();
     long reservedCapacity = usage.getReservedBytes();
     long reservedCalculated = (long) Math.ceil(totalCapacity * percentage);
 

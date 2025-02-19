@@ -73,7 +73,7 @@ public class VolumeUsage {
    * |----used----|   (avail)   |+++reserved+++|---other---|
    * }
    * </pre>
-   * B) avail = fsAvail - Max(reserved, 0);
+   * B) avail = fsAvail - reserved;
    */
   public SpaceUsageSource getCurrentUsage() {
     SpaceUsageSource real = realUsage();
