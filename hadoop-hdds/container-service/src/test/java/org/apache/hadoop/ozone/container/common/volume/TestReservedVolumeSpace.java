@@ -95,15 +95,18 @@ public class TestReservedVolumeSpace {
         HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT);
 
     long volumeCapacity = hddsVolume.getCurrentUsage().getCapacity();
+    long volumeAvailable = hddsVolume.getCurrentUsage().getAvailable();
     VolumeUsage usage = hddsVolume.getVolumeInfo().get().getUsageForTesting();
 
     //Gets the actual total capacity
     long totalCapacity = usage.realUsage().getCapacity();
+    long totalAvailable = usage.realUsage().getAvailable();
     long reservedCapacity = usage.getReservedBytes();
     long reservedCalculated = (long) Math.ceil(totalCapacity * percentage);
 
     assertEquals(reservedCalculated, reservedCapacity);
     assertEquals(totalCapacity - reservedCapacity, volumeCapacity);
+    assertEquals(totalAvailable - reservedCapacity, volumeAvailable);
   }
 
   /**
