@@ -18,80 +18,102 @@
 
 package org.apache.hadoop.ozone.dn.checksum;
 
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.client.ObjectStore;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
-import org.apache.hadoop.ozone.security.SecretKeyTestClient;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
-import org.apache.commons.io.IOUtils;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.ozone.HddsDatanodeService;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.TestHelper;
-import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
-import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Collectors;
-
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphabetic;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_ENABLED;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
+import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_EXPIRY_DURATION;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_CHECK_DURATION;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
+import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager.getContainerChecksumFile;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.readChecksumFile;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.writeContainerDataTreeProto;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.File;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.util.List;
+import java.util.Properties;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.minikdc.MiniKdc;
+import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.HddsDatanodeService;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
+import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.ratis.util.ExitUtils;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * This class tests container commands for reconciliation.
@@ -107,34 +129,32 @@ public class TestContainerCommandReconciliation {
 
   @TempDir
   private static File testDir;
+  @TempDir
+  private static File workDir;
+  private static MiniKdc miniKdc;
+  private static File ozoneKeytab;
+  private static File spnegoKeytab;
+  private static File testUserKeytab;
+  private static String testUserPrincipal;
+  private static String host;
 
   @BeforeAll
   public static void init() throws Exception {
-    testDir = GenericTestUtils.getTestDir(
-        TestContainerCommandReconciliation.class.getSimpleName());
     conf = new OzoneConfiguration();
-    // Add security configuration.
-    // conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-    conf.setBoolean(HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED, true);
-    conf.setBoolean(HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED, true);
-    conf.setBoolean(HDDS_GRPC_TLS_ENABLED, true);
-    conf.setInt(HDDS_BLOCK_TOKEN_EXPIRY_TIME, 1000);
-    // conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.name());
-    conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
+    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
     conf.set(OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     conf.setStorageSize(OZONE_SCM_CHUNK_SIZE_KEY, 1024 * 1024, StorageUnit.BYTES);
     conf.setStorageSize(OZONE_SCM_BLOCK_SIZE, 2 * 1024 * 1024, StorageUnit.BYTES);
     // Disable the container scanner so it does not create merkle tree files that interfere with this test.
     conf.getObject(ContainerScannerConfiguration.class).setEnabled(false);
-    cluster = MiniOzoneCluster.newBuilder(conf)
-            .setCertificateClient(new CertificateClientTestImpl(conf))
-            .setSecretKeyClient(new SecretKeyTestClient())
-            .setNumDatanodes(3)
-            .build();
-    cluster.waitForClusterToBeReady();
-    rpcClient = OzoneClientFactory.getRpcClient(conf);
-    store = rpcClient.getObjectStore();
-    dnClient = new DNContainerOperationClient(conf, null, null);
+
+    ExitUtils.disableSystemExit();
+
+    startMiniKdc();
+    setSecureConfig();
+    createCredentialsInKDC();
+    setSecretKeysConfig();
+    startCluster();
   }
 
   @AfterAll
@@ -147,8 +167,12 @@ public class TestContainerCommandReconciliation {
       dnClient.close();
     }
 
+    if (miniKdc != null) {
+      miniKdc.stop();
+    }
+
     if (cluster != null) {
-      cluster.shutdown();
+      cluster.stop();
     }
   }
 
@@ -316,8 +340,13 @@ public class TestContainerCommandReconciliation {
     Pair<Long, byte[]> containerAndData = getDataAndContainer(true, 20 * 1024 * 1024, volume, bucket);
     long containerID = containerAndData.getLeft();
     byte[] data = containerAndData.getRight();
-    TestHelper.waitForReplicasContainerState(cluster, containerID, ContainerReplicaProto.State.CLOSED);
-    HddsDatanodeService hddsDatanodeService = cluster.getHddsDatanodes().get(0);
+    // Get the datanodes where the container replicas are stored.
+    List<DatanodeDetails> dataNodeDetails = cluster.getStorageContainerManager().getContainerManager()
+        .getContainerReplicas(ContainerID.valueOf(containerID))
+        .stream().map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toList());
+    Assertions.assertEquals(3, dataNodeDetails.size());
+    HddsDatanodeService hddsDatanodeService = cluster.getHddsDatanode(dataNodeDetails.get(0));
     DatanodeStateMachine datanodeStateMachine = hddsDatanodeService.getDatanodeStateMachine();
     Container<?> container = datanodeStateMachine.getContainer().getContainerSet().getContainer(containerID);
     KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
@@ -326,21 +355,19 @@ public class TestContainerCommandReconciliation {
         .getHandler(ContainerProtos.ContainerType.KeyValueContainer);
 
     BlockManager blockManager = kvHandler.getBlockManager();
-    List<BlockData> blockDatas = blockManager.listBlock(container, -1, 100);
-    List<BlockData> deletedBlocks = new ArrayList<>();
+    List<BlockData> blockDataList = blockManager.listBlock(container, -1, 100);
     String chunksPath = container.getContainerData().getChunksPath();
     long oldDataChecksum = oldContainerChecksumInfo.getContainerMerkleTree().getDataChecksum();
 
     // 2. Delete some blocks to simulate missing blocks.
     try (DBHandle db = BlockUtils.getDB(containerData, conf);
          BatchOperation op = db.getStore().getBatchHandler().initBatchOperation()) {
-      for (int i = 0; i < blockDatas.size(); i += 2) {
-        BlockData blockData = blockDatas.get(i);
+      for (int i = 0; i < blockDataList.size(); i += 2) {
+        BlockData blockData = blockDataList.get(i);
         // Delete the block metadata from the container db
         db.getStore().getBlockDataTable().deleteWithBatch(op, containerData.getBlockKey(blockData.getLocalID()));
         // Delete the block file.
         Files.deleteIfExists(Paths.get(chunksPath + "/" + blockData.getBlockID().getLocalID() + ".block"));
-        deletedBlocks.add(blockData);
       }
       db.getStore().getBatchHandler().commitBatchOperation(op);
       db.getStore().flushDB();
@@ -375,11 +402,7 @@ public class TestContainerCommandReconciliation {
         .map(HddsProtos.SCMContainerReplicaProto::getDataChecksum)
         .collect(Collectors.toSet());
     assertEquals(1, dataChecksums.size());
-    cluster.getHddsDatanodes().get(1).stop();
-    cluster.getHddsDatanodes().get(2).stop();
     TestHelper.validateData(KEY_NAME, data, store, volume, bucket);
-    cluster.getHddsDatanodes().get(1).start();
-    cluster.getHddsDatanodes().get(2).start();
   }
 
   @Test
@@ -390,8 +413,13 @@ public class TestContainerCommandReconciliation {
     Pair<Long, byte[]> containerAndData = getDataAndContainer(true, 20 * 1024 * 1024, volume, bucket);
     long containerID = containerAndData.getLeft();
     byte[] data = containerAndData.getRight();
-    TestHelper.waitForReplicasContainerState(cluster, containerID, ContainerReplicaProto.State.CLOSED);
-    HddsDatanodeService hddsDatanodeService = cluster.getHddsDatanodes().get(0);
+    // Get the datanodes where the container replicas are stored.
+    List<DatanodeDetails> dataNodeDetails = cluster.getStorageContainerManager().getContainerManager()
+        .getContainerReplicas(ContainerID.valueOf(containerID))
+        .stream().map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toList());
+    Assertions.assertEquals(3, dataNodeDetails.size());
+    HddsDatanodeService hddsDatanodeService = cluster.getHddsDatanode(dataNodeDetails.get(0));
     DatanodeStateMachine datanodeStateMachine = hddsDatanodeService.getDatanodeStateMachine();
     Container<?> container = datanodeStateMachine.getContainer().getContainerSet().getContainer(containerID);
     KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
@@ -483,11 +511,7 @@ public class TestContainerCommandReconciliation {
         .map(HddsProtos.SCMContainerReplicaProto::getDataChecksum)
         .collect(Collectors.toSet());
     assertEquals(1, dataChecksums.size());
-    cluster.getHddsDatanodes().get(1).stop();
-    cluster.getHddsDatanodes().get(2).stop();
     TestHelper.validateData(KEY_NAME, data, store, volume, bucket);
-    cluster.getHddsDatanodes().get(1).start();
-    cluster.getHddsDatanodes().get(2).start();
   }
 
   private Pair<Long, byte[]> getDataAndContainer(boolean close, int dataLen, String volumeName, String bucketName)
@@ -525,8 +549,84 @@ public class TestContainerCommandReconciliation {
       KeyValueContainer keyValueContainer =
           (KeyValueContainer) dn.getDatanodeStateMachine().getContainer().getController()
               .getContainer(containerID);
-      keyValueHandler.getChecksumManager().writeContainerDataTree(
-          keyValueContainer.getContainerData(), tree);
+      if (keyValueContainer != null) {
+        keyValueHandler.getChecksumManager().writeContainerDataTree(
+            keyValueContainer.getContainerData(), tree);
+      }
     }
+  }
+
+  private static void setSecretKeysConfig() {
+    // Secret key lifecycle configs.
+    conf.set(HDDS_SECRET_KEY_ROTATE_CHECK_DURATION, "500s");
+    conf.set(HDDS_SECRET_KEY_ROTATE_DURATION, "500s");
+    conf.set(HDDS_SECRET_KEY_EXPIRY_DURATION, "500s");
+
+    // enable tokens
+    conf.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
+    conf.setBoolean(HDDS_CONTAINER_TOKEN_ENABLED, true);
+  }
+
+  private static void createCredentialsInKDC() throws Exception {
+    ScmConfig scmConfig = conf.getObject(ScmConfig.class);
+    SCMHTTPServerConfig httpServerConfig =
+        conf.getObject(SCMHTTPServerConfig.class);
+    createPrincipal(ozoneKeytab, scmConfig.getKerberosPrincipal());
+    createPrincipal(spnegoKeytab, httpServerConfig.getKerberosPrincipal());
+    createPrincipal(testUserKeytab, testUserPrincipal);
+  }
+
+  private static void createPrincipal(File keytab, String... principal)
+      throws Exception {
+    miniKdc.createPrincipal(keytab, principal);
+  }
+
+  private static void startMiniKdc() throws Exception {
+    Properties securityProperties = MiniKdc.createConf();
+    miniKdc = new MiniKdc(securityProperties, workDir);
+    miniKdc.start();
+  }
+
+  private static void setSecureConfig() throws IOException {
+    conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
+    host = InetAddress.getLocalHost().getCanonicalHostName()
+        .toLowerCase();
+    conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.name());
+    String curUser = UserGroupInformation.getCurrentUser().getUserName();
+    conf.set(OZONE_ADMINISTRATORS, curUser);
+    String realm = miniKdc.getRealm();
+    String hostAndRealm = host + "@" + realm;
+    conf.set(HDDS_SCM_KERBEROS_PRINCIPAL_KEY, "scm/" + hostAndRealm);
+    conf.set(HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY, "HTTP_SCM/" + hostAndRealm);
+    conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, "scm/" + hostAndRealm);
+    conf.set(OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY, "HTTP_OM/" + hostAndRealm);
+    conf.set(DFS_DATANODE_KERBEROS_PRINCIPAL_KEY, "scm/" + hostAndRealm);
+
+    ozoneKeytab = new File(workDir, "scm.keytab");
+    spnegoKeytab = new File(workDir, "http.keytab");
+    testUserKeytab = new File(workDir, "testuser.keytab");
+    testUserPrincipal = "test@" + realm;
+
+    conf.set(HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY, ozoneKeytab.getAbsolutePath());
+    conf.set(HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY, spnegoKeytab.getAbsolutePath());
+    conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY, ozoneKeytab.getAbsolutePath());
+    conf.set(OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE, spnegoKeytab.getAbsolutePath());
+    conf.set(DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY, ozoneKeytab.getAbsolutePath());
+  }
+
+  private static void startCluster() throws Exception {
+    OzoneManager.setTestSecureOmFlag(true);
+    cluster = MiniOzoneCluster.newHABuilder(conf)
+        .setSCMServiceId("SecureSCM")
+        .setNumOfStorageContainerManagers(3)
+        .setNumOfOzoneManagers(1)
+        .setNumDatanodes(3)
+        .build();
+    cluster.waitForClusterToBeReady();
+    rpcClient = OzoneClientFactory.getRpcClient(conf);
+    store = rpcClient.getObjectStore();
+    SecretKeyClient secretKeyClient =  cluster.getStorageContainerManager().getSecretKeyManager();
+    CertificateClient certClient = cluster.getStorageContainerManager().getScmCertificateClient();
+    dnClient = new DNContainerOperationClient(conf, certClient, secretKeyClient);
   }
 }

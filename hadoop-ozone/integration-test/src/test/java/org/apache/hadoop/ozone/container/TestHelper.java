@@ -18,6 +18,14 @@
 
 package org.apache.hadoop.ozone.container;
 
+import static java.util.stream.Collectors.toList;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.io.IOException;
 import java.security.MessageDigest;
 import java.util.ArrayList;
@@ -27,12 +35,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
-
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -59,21 +65,12 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
-
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.statemachine.StateMachine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static java.util.stream.Collectors.toList;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Helpers for container tests.
@@ -389,20 +386,6 @@ public final class TestHelper {
         HddsProtos.LifeCycleState state = cluster.getStorageContainerManager().getContainerManager()
             .getContainer(ContainerID.valueOf(containerID)).getState();
         return state == lifeCycleState;
-      } catch (ContainerNotFoundException e) {
-        return false;
-      }
-    }, 500, 100 * 1000);
-  }
-
-  public static void waitForReplicasContainerState(MiniOzoneCluster cluster, long containerID,
-                                                   ContainerReplicaProto.State state)
-      throws InterruptedException, TimeoutException {
-    GenericTestUtils.waitFor(() ->  {
-      try {
-        Set<ContainerReplica> replicas = cluster.getStorageContainerManager().getContainerManager()
-            .getContainerReplicas(ContainerID.valueOf(containerID));
-        return replicas.stream().allMatch(r -> r.getState() == state);
       } catch (ContainerNotFoundException e) {
         return false;
       }
