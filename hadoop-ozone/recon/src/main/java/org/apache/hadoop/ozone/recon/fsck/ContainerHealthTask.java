@@ -235,7 +235,7 @@ public class ContainerHealthTask extends ReconScmTask {
     unhealthyContainerStateStatsMap.put(
         UnHealthyContainerStates.NEGATIVE_SIZE, new HashMap<>());
     unhealthyContainerStateStatsMap.put(
-            UnHealthyContainerStates.CHECKSUM_ERROR, new HashMap<>());
+            UnHealthyContainerStates.REPLICA_MISMATCH, new HashMap<>());
   }
 
   private ContainerHealthStatus setCurrentContainer(long recordId)
@@ -502,7 +502,7 @@ public class ContainerHealthTask extends ReconScmTask {
       case OVER_REPLICATED:
         returnValue = keepOverReplicatedRecord(container, rec);
         break;
-      case CHECKSUM_ERROR:
+      case REPLICA_MISMATCH:
         returnValue = keepDataChecksumMismatchedRecord(container, rec);
         break;
       default:
@@ -600,11 +600,11 @@ public class ContainerHealthTask extends ReconScmTask {
 
       if (container.isDataChecksumMismatched()
               && !recordForStateExists.contains(
-              UnHealthyContainerStates.CHECKSUM_ERROR.toString())) {
+              UnHealthyContainerStates.REPLICA_MISMATCH.toString())) {
         records.add(recordForState(
-                container, UnHealthyContainerStates.CHECKSUM_ERROR, time));
+                container, UnHealthyContainerStates.REPLICA_MISMATCH, time));
         populateContainerStats(container,
-                UnHealthyContainerStates.CHECKSUM_ERROR,
+                UnHealthyContainerStates.REPLICA_MISMATCH,
                 unhealthyContainerStateStatsMap);
       }
 

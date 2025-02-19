@@ -372,7 +372,7 @@ public class TestContainerHealthTaskRecordGenerator {
                     unhealthyContainerStateStatsMap);
     assertEquals(1, records.size());
     assertEquals(1, unhealthyContainerStateStatsMap.get(
-                    UnHealthyContainerStates.CHECKSUM_ERROR)
+                    UnHealthyContainerStates.REPLICA_MISMATCH)
             .getOrDefault(CONTAINER_COUNT, 0L));
 
     logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
@@ -388,7 +388,7 @@ public class TestContainerHealthTaskRecordGenerator {
                     unhealthyContainerStateStatsMap);
     assertEquals(0, records.size());
     assertEquals(0, unhealthyContainerStateStatsMap.get(
-                    UnHealthyContainerStates.CHECKSUM_ERROR)
+                    UnHealthyContainerStates.REPLICA_MISMATCH)
             .getOrDefault(CONTAINER_COUNT, 0L));
 
     logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
@@ -695,7 +695,7 @@ public class TestContainerHealthTaskRecordGenerator {
     unhealthyContainerStateStatsMap.put(
         UnHealthyContainerStates.NEGATIVE_SIZE, new HashMap<>());
     unhealthyContainerStateStatsMap.put(
-        UnHealthyContainerStates.CHECKSUM_ERROR, new HashMap<>());
+        UnHealthyContainerStates.REPLICA_MISMATCH, new HashMap<>());
   }
 
   private void logUnhealthyContainerStats(

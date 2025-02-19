@@ -84,7 +84,7 @@ public class UnhealthyContainersResponse {
         UnHealthyContainerStates.MIS_REPLICATED.toString())) {
       this.misReplicatedCount = count;
     } else if (state.equals(
-        UnHealthyContainerStates.CHECKSUM_ERROR.toString())) {
+        UnHealthyContainerStates.REPLICA_MISMATCH.toString())) {
       this.dataChecksumMismatchCount = count;
     }
   }
