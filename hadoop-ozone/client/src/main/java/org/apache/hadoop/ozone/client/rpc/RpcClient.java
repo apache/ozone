@@ -2124,10 +2124,16 @@ public class RpcClient implements ClientProtocol {
 
   @Override
   public OzoneMultipartUploadList listMultipartUploads(String volumeName,
-      String bucketName, String prefix) throws IOException {
+      String bucketName, String prefix, String keyMarker, String uploadIdMarker, int maxUploads) throws IOException {
 
-    OmMultipartUploadList omMultipartUploadList =
-        ozoneManagerClient.listMultipartUploads(volumeName, bucketName, prefix);
+    OmMultipartUploadList omMultipartUploadList;
+    if (omVersion.compareTo(OzoneManagerVersion.S3_LIST_MULTIPART_UPLOADS_PAGINATION) >= 0) {
+      omMultipartUploadList = ozoneManagerClient.listMultipartUploads(volumeName, bucketName, prefix, keyMarker,
+          uploadIdMarker, maxUploads, true);
+    } else {
+      omMultipartUploadList = ozoneManagerClient.listMultipartUploads(volumeName, bucketName, prefix, keyMarker,
+          uploadIdMarker, maxUploads, false);
+    }
     List<OzoneMultipartUpload> uploads = omMultipartUploadList.getUploads()
         .stream()
         .map(upload -> new OzoneMultipartUpload(upload.getVolumeName(),
@@ -2137,7 +2143,10 @@ public class RpcClient implements ClientProtocol {
             upload.getCreationTime(),
             upload.getReplicationConfig()))
         .collect(Collectors.toList());
-    OzoneMultipartUploadList result = new OzoneMultipartUploadList(uploads);
+    OzoneMultipartUploadList result = new OzoneMultipartUploadList(uploads,
+        omMultipartUploadList.getNextKeyMarker(),
+        omMultipartUploadList.getNextUploadIdMarker(),
+        omMultipartUploadList.isTruncated());
     return result;
   }
 

@@ -606,9 +606,12 @@ public interface OzoneManagerProtocol
 
   /**
    * List in-flight uploads.
+   * withPagination is for backward compatible as older listMultipartUploads does
+   * not support pagination.
    */
   OmMultipartUploadList listMultipartUploads(String volumeName,
-      String bucketName, String prefix) throws IOException;
+      String bucketName, String prefix,
+      String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination) throws IOException;
 
   /**
    * Gets s3Secret for given kerberos user.

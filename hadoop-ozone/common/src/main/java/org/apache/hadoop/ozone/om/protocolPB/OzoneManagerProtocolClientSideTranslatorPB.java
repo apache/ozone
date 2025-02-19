@@ -1808,12 +1808,17 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @Override
   public OmMultipartUploadList listMultipartUploads(String volumeName,
       String bucketName,
-      String prefix) throws IOException {
+      String prefix,
+      String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination) throws IOException {
     ListMultipartUploadsRequest request = ListMultipartUploadsRequest
         .newBuilder()
         .setVolume(volumeName)
         .setBucket(bucketName)
         .setPrefix(prefix == null ? "" : prefix)
+        .setKeyMarker(keyMarker == null ? "" : keyMarker)
+        .setUploadIdMarker(uploadIdMarker == null ? "" : uploadIdMarker)
+        .setMaxUploads(maxUploads)
+        .setWithPagination(withPagination)
         .build();
 
     OMRequest omRequest = createOMRequest(Type.ListMultipartUploads)
@@ -1837,7 +1842,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             ))
             .collect(Collectors.toList());
 
-    OmMultipartUploadList response = new OmMultipartUploadList(uploadList);
+    OmMultipartUploadList response = new OmMultipartUploadList(uploadList,
+        listMultipartUploadsResponse.getNextKeyMarker(),
+        listMultipartUploadsResponse.getNextUploadIdMarker(),
+        listMultipartUploadsResponse.getIsTruncated());
 
     return response;
   }

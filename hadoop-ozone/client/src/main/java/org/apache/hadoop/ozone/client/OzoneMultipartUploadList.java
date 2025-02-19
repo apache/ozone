@@ -26,11 +26,20 @@ import java.util.List;
 public class OzoneMultipartUploadList {
 
   private List<OzoneMultipartUpload> uploads;
+  private String nextKeyMarker;
+  private String nextUploadIdMarker;
+  private boolean isTruncated;
 
   public OzoneMultipartUploadList(
-      List<OzoneMultipartUpload> uploads) {
+      List<OzoneMultipartUpload> uploads,
+      String nextKeyMarker,
+      String nextUploadIdMarker,
+      boolean isTruncated) {
     Preconditions.checkNotNull(uploads);
     this.uploads = uploads;
+    this.nextKeyMarker = nextKeyMarker;
+    this.nextUploadIdMarker = nextUploadIdMarker;
+    this.isTruncated = isTruncated;
   }
 
   public List<OzoneMultipartUpload> getUploads() {
@@ -40,5 +49,17 @@ public class OzoneMultipartUploadList {
   public void setUploads(
       List<OzoneMultipartUpload> uploads) {
     this.uploads = uploads;
+  }
+
+  public String getNextKeyMarker() {
+    return nextKeyMarker;
+  }
+
+  public String getNextUploadIdMarker() {
+    return nextUploadIdMarker;
+  }
+
+  public boolean isTruncated() {
+    return isTruncated;
   }
 }

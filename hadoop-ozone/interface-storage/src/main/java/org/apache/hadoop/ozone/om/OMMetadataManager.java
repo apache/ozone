@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
+import org.apache.hadoop.ozone.om.helpers.MultipartUploadKeys;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
@@ -493,8 +494,9 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * Return the existing upload keys which includes volumeName, bucketName,
    * keyName.
    */
-  Set<String> getMultipartUploadKeys(String volumeName,
-      String bucketName, String prefix) throws IOException;
+  MultipartUploadKeys getMultipartUploadKeys(String volumeName,
+          String bucketName, String prefix, String keyMarker, String uploadIdMarker, int maxUploads,
+          boolean noPagination) throws IOException;
 
   /**
    * Gets the DirectoryTable.
