@@ -169,7 +169,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     LOG.info("{}: leader changed to {}", groupMemberId, newLeaderId);
     // if the node is leader (can be ready or not ready, need update index)
     if (ozoneManager.getOmRatisServer().checkLeaderStatus() != OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER) {
-      indexGenerator.changeLeader();
+      indexGenerator.onLeaderChange();
     }
   }
 
