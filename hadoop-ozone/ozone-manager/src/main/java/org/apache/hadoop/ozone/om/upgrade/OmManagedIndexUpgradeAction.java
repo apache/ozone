@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
-import org.apache.hadoop.ozone.om.OzoneManager;
-
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MANAGED_INDEX;
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
+
+import org.apache.hadoop.ozone.om.OzoneManager;
 
 /**
  * initialize om managed index generator to provide index for further request handling.
