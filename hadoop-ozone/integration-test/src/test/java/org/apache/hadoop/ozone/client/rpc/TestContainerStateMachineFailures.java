@@ -267,6 +267,7 @@ public class TestContainerStateMachineFailures {
 
 
   @Test
+  @Flaky("HDDS-12215")
   public void testContainerStateMachineRestartWithDNChangePipeline()
       throws Exception {
     try (OzoneOutputStream key = objectStore.getVolume(volumeName).getBucket(bucketName)
