@@ -179,6 +179,7 @@ public class ContainerBalancerTask implements Runnable {
   /**
    * Run the container balancer task.
    */
+  @Override
   public void run() {
     try {
       if (delayStart) {

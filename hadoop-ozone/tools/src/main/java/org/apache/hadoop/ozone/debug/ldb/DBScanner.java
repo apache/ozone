@@ -903,6 +903,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
     }
 
     private final class WriterTask implements Runnable {
+      @Override
       public void run() {
         try {
           while (!stop) {
