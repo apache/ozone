@@ -32,20 +32,16 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.Iterator;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.ozone.client.ObjectStore;
-import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
-import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
@@ -101,7 +97,7 @@ public class Checksums extends Handler {
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
 
-    findCandidateKeys(client, address);
+    ReplicasUtils.findCandidateKeys(client, address, processKeyConsumer);
   }
 
   private void downloadReplicasAndCreateManifest(
@@ -203,54 +199,16 @@ public class Checksums extends Handler {
     return dir;
   }
 
-  private void findCandidateKeys(OzoneClient ozoneClient, OzoneAddress address) throws IOException {
-    ObjectStore objectStore = ozoneClient.getObjectStore();
-    String volumeName = address.getVolumeName();
-    String bucketName = address.getBucketName();
-    String keyName = address.getKeyName();
-    if (!keyName.isEmpty()) {
-      processKey(ozoneClient, volumeName, bucketName, keyName);
-    } else if (!bucketName.isEmpty()) {
-      OzoneVolume volume = objectStore.getVolume(volumeName);
-      OzoneBucket bucket = volume.getBucket(bucketName);
-      checkBucket(bucket, ozoneClient);
-    } else if (!volumeName.isEmpty()) {
-      OzoneVolume volume = objectStore.getVolume(volumeName);
-      checkVolume(volume, ozoneClient);
-    } else {
-      for (Iterator<? extends OzoneVolume> it = objectStore.listVolumes(null); it.hasNext();) {
-        checkVolume(it.next(), ozoneClient);
-      }
-    }
-  }
-
-  private void checkVolume(OzoneVolume volume, OzoneClient ozoneClient) throws IOException {
-    for (Iterator<? extends OzoneBucket> it = volume.listBuckets(null); it.hasNext();) {
-      OzoneBucket bucket = it.next();
-      checkBucket(bucket, ozoneClient);
-    }
-  }
-
-  private void checkBucket(OzoneBucket bucket, OzoneClient ozoneClient) throws IOException {
-    String volumeName = bucket.getVolumeName();
-    String bucketName = bucket.getName();
-    for (Iterator<? extends OzoneKey> it = bucket.listKeys(null); it.hasNext();) {
-      OzoneKey key = it.next();
-//    TODO: Remove this check once HDDS-12094 is fixed
-      if (key.getName().endsWith("/")) {
-        continue;
-      }
-      processKey(ozoneClient, volumeName, bucketName, key.getName());
-    }
-  }
-
-  private void processKey(OzoneClient client, String volumeName, String bucketName, String keyName) throws IOException {
+  private BiConsumer<OzoneClient, ReplicasUtils.KeyParts> processKeyConsumer = (client, keyParts)
+      -> {
+    String volumeName = keyParts.getVolumeName();
+    String bucketName = keyParts.getBucketName();
+    String keyName = keyParts.getKeyName();
     System.out.println("Processing key : " + volumeName + "/" + bucketName + "/" + keyName);
-    boolean isChecksumVerifyEnabled
-        = getConf().getBoolean("ozone.client.verify.checksum", true);
-    RpcClient newClient = getClient(isChecksumVerifyEnabled);
-
+    boolean isChecksumVerifyEnabled = getConf().getBoolean("ozone.client.verify.checksum", true);
+    RpcClient newClient = null;
     try {
+      newClient = getClient(isChecksumVerifyEnabled);
       ClientProtocol noChecksumClient;
       ClientProtocol checksumClient;
       if (isChecksumVerifyEnabled) {
@@ -282,10 +240,18 @@ public class Checksums extends Handler {
       System.out.println("Writing manifest file : " + manifestFileName);
       File manifestFile = new File(dir, manifestFileName);
       Files.write(manifestFile.toPath(), prettyJson.getBytes(StandardCharsets.UTF_8));
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     } finally {
-      newClient.close();
+      if (newClient != null) {
+        try {
+          newClient.close();
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }
     }
-  }
+  };
 
   private RpcClient getClient(boolean isChecksumVerifyEnabled) throws IOException {
     if (rpcClient != null) {
@@ -297,4 +263,6 @@ public class Checksums extends Handler {
     rpcClient = new RpcClient(configuration, null);
     return rpcClient;
   }
+
+
 }

@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.debug.replicas;
 
 import org.apache.hadoop.hdds.cli.DebugSubcommand;
-import org.apache.hadoop.ozone.debug.ReplicasVerify;
 import org.apache.hadoop.ozone.debug.replicas.chunk.ChunkKeyHandler;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
