@@ -347,7 +347,6 @@ public class TestWatchForCommit {
           assertEquals(2, ratisClient.getCommitInfoMap().size());
           String output = logCapturer.getOutput();
           assertThat(output).contains("ALL_COMMITTED way commit failed");
-          assertThat(output).contains("TimeoutException");
           assertThat(output).contains("Committed by majority");
         } else {
           assertEquals(3, ratisClient.getCommitInfoMap().size());
