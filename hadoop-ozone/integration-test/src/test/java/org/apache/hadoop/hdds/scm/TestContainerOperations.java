@@ -19,6 +19,10 @@ package org.apache.hadoop.hdds.scm;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.REPLICATION;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -38,10 +42,12 @@ import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -201,6 +207,69 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
 
       assertEquals(1, usageInfoList.size());
       assertEquals(expected, usageInfoList.get(0).getContainerCount());
+    }
+  }
+
+  @Test
+  public void testHealthyNodesCount() throws Exception {
+    List<HddsProtos.Node> nodes = storageClient.queryNode(null, HEALTHY,
+        HddsProtos.QueryScope.CLUSTER, "");
+    assertEquals(cluster().getHddsDatanodes().size(), nodes.size(), "Expected live nodes");
+  }
+
+  @Test
+  public void testNodeOperationalStates() throws Exception {
+    StorageContainerManager scm = cluster().getStorageContainerManager();
+    NodeManager nm = scm.getScmNodeManager();
+    final int numOfDatanodes = nm.getAllNodes().size();
+
+    // Set one node to be something other than IN_SERVICE
+    DatanodeDetails node = nm.getAllNodes().get(0);
+    nm.setNodeOperationalState(node, DECOMMISSIONING);
+
+    // All nodes should be returned as they are all in service
+    int nodeCount = storageClient.queryNode(IN_SERVICE, HEALTHY,
+        HddsProtos.QueryScope.CLUSTER, "").size();
+    assertEquals(numOfDatanodes - 1, nodeCount);
+
+    // null acts as wildcard for opState
+    nodeCount = storageClient.queryNode(null, HEALTHY,
+        HddsProtos.QueryScope.CLUSTER, "").size();
+    assertEquals(numOfDatanodes, nodeCount);
+
+    // null acts as wildcard for nodeState
+    nodeCount = storageClient.queryNode(IN_SERVICE, null,
+        HddsProtos.QueryScope.CLUSTER, "").size();
+    assertEquals(numOfDatanodes - 1, nodeCount);
+
+    // Both null - should return all nodes
+    nodeCount = storageClient.queryNode(null, null,
+        HddsProtos.QueryScope.CLUSTER, "").size();
+    assertEquals(numOfDatanodes, nodeCount);
+
+    // No node should be returned
+    nodeCount = storageClient.queryNode(IN_MAINTENANCE, HEALTHY,
+        HddsProtos.QueryScope.CLUSTER, "").size();
+    assertEquals(0, nodeCount);
+
+    // Test all operational states by looping over them all and setting the
+    // state manually.
+    node = nm.getAllNodes().get(0);
+    HddsProtos.NodeOperationalState originalState = nm.getNodeStatus(node).getOperationalState();
+    try {
+      for (HddsProtos.NodeOperationalState s :
+          HddsProtos.NodeOperationalState.values()) {
+        nm.setNodeOperationalState(node, s);
+        nodeCount = storageClient.queryNode(s, HEALTHY,
+            HddsProtos.QueryScope.CLUSTER, "").size();
+        if (s == IN_SERVICE) {
+          assertEquals(5, nodeCount);
+        } else {
+          assertEquals(1, nodeCount);
+        }
+      }
+    } finally {
+      nm.setNodeOperationalState(node, originalState);
     }
   }
 }
