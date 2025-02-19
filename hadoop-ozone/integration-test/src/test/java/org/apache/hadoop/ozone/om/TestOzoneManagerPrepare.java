@@ -54,7 +54,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Prepare
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ozone.test.tag.Slow;
-import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
