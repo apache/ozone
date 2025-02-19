@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug;
+package org.apache.hadoop.ozone.debug.replicas;
 
 import static java.util.Collections.emptySet;
 import static java.util.Comparator.comparing;
@@ -25,10 +25,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -49,13 +49,11 @@ import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
-import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneKeyLocation;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.shell.Handler;
@@ -98,62 +96,30 @@ public class FindMissingPadding extends Handler implements DebugSubcommand {
 
   @Override
   protected void execute(OzoneClient ozoneClient, OzoneAddress address) throws IOException {
-    findCandidateKeys(ozoneClient, address);
+    ReplicasUtils.findCandidateKeys(ozoneClient, address, checkKeyConsumer);
     checkContainers(ozoneClient);
     handleAffectedKeys();
   }
 
-  private void findCandidateKeys(OzoneClient ozoneClient, OzoneAddress address) throws IOException {
+  private BiConsumer<OzoneClient, ReplicasUtils.KeyParts> checkKeyConsumer = (ozoneClient, keyParts)
+      -> {
     ObjectStore objectStore = ozoneClient.getObjectStore();
     ClientProtocol rpcClient = objectStore.getClientProxy();
-    String volumeName = address.getVolumeName();
-    String bucketName = address.getBucketName();
-    String keyName = address.getKeyName();
-    if (!keyName.isEmpty()) {
-      checkKey(rpcClient, volumeName, bucketName, keyName);
-    } else if (!bucketName.isEmpty()) {
-      OzoneVolume volume = objectStore.getVolume(volumeName);
-      OzoneBucket bucket = volume.getBucket(bucketName);
-      checkBucket(bucket, rpcClient);
-    } else if (!volumeName.isEmpty()) {
-      OzoneVolume volume = objectStore.getVolume(volumeName);
-      checkVolume(volume, rpcClient);
-    } else {
-      for (Iterator<? extends OzoneVolume> it = objectStore.listVolumes(null); it.hasNext();) {
-        checkVolume(it.next(), rpcClient);
-      }
-    }
-  }
-
-  private void checkVolume(OzoneVolume volume, ClientProtocol rpcClient) throws IOException {
-    for (Iterator<? extends OzoneBucket> it = volume.listBuckets(null); it.hasNext();) {
-      OzoneBucket bucket = it.next();
-      checkBucket(bucket, rpcClient);
-    }
-  }
-
-  private void checkBucket(OzoneBucket bucket, ClientProtocol rpcClient) throws IOException {
-    String volumeName = bucket.getVolumeName();
-    String bucketName = bucket.getName();
-    for (Iterator<? extends OzoneKey> it = bucket.listKeys(null); it.hasNext();) {
-      OzoneKey key = it.next();
-      if (isEC(key)) {
-        checkKey(rpcClient, volumeName, bucketName, key.getName());
-      } else {
-        LOG.trace("Key {}/{}/{} is not EC", volumeName, bucketName, key.getName());
-      }
-    }
-  }
-
-  private void checkKey(ClientProtocol rpcClient, String volumeName, String bucketName, String keyName)
-      throws IOException {
-    OzoneKeyDetails keyDetails = rpcClient.getKeyDetails(volumeName, bucketName, keyName);
-    if (isEC(keyDetails)) {
+    try {
+      OzoneKeyDetails keyDetails =
+          rpcClient.getKeyDetails(keyParts.getVolumeName(), keyParts.getBucketName(), keyParts.getKeyName());
       checkECKey(keyDetails);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
-  }
+  };
 
   private void checkECKey(OzoneKeyDetails keyDetails) {
+    if (!isEC(keyDetails)) {
+      LOG.trace("Key {}/{}/{} is not EC", keyDetails.getVolumeName(), keyDetails.getBucketName(), keyDetails.getName());
+      return;
+    }
+
     List<OzoneKeyLocation> locations = keyDetails.getOzoneKeyLocations();
     if (!locations.isEmpty()) {
       ECReplicationConfig ecConfig = (ECReplicationConfig) keyDetails.getReplicationConfig();
