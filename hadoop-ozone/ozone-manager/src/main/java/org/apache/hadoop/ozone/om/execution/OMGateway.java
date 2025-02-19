@@ -32,35 +32,38 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * entry for execution flow for write request.
  */
-public class OMExecutionFlow {
+public class OMGateway {
+  private static final Logger LOG = LoggerFactory.getLogger(OMGateway.class);
 
   private final OzoneManager ozoneManager;
-  private final OMPerformanceMetrics perfMetrics;
   private final OmLockOpr omLockOpr;
+  private final OMPerformanceMetrics perfMetrics;
 
-  public OMExecutionFlow(OzoneManager om) {
+  public OMGateway(OzoneManager om) throws IOException {
     this.ozoneManager = om;
-    this.perfMetrics = ozoneManager.getPerfMetrics();
     this.omLockOpr = new OmLockOpr();
+    this.perfMetrics = ozoneManager.getPerfMetrics();
   }
 
-  /**
-   * External request handling.
-   * 
-   * @param omRequest the request
-   * @return OMResponse the response of execution
-   * @throws ServiceException the exception on execution
-   */
+  public void start() {
+    // TODO: with pre-ratis execution flow, this is required to manage flow
+  }
+
+  public void stop() {
+  }
+
   public OMResponse submit(OMRequest omRequest) throws ServiceException {
-    // TODO: currently have only execution after ratis submission, but with new flow can have switch later
-    return submitExecutionToRatis(omRequest);
+    // TODO: currently have only old flow, but with new flow can have switch later
+    return submitOldFlow(omRequest);
   }
 
-  private OMResponse submitExecutionToRatis(OMRequest request) throws ServiceException {
+  private OMResponse submitOldFlow(OMRequest request) throws ServiceException {
     // 1. create client request and preExecute
     OMClientRequest omClientRequest = null;
     final OMRequest requestToSubmit;
@@ -89,7 +92,7 @@ public class OMExecutionFlow {
       return response;
     } catch (IOException e) {
       throw new ServiceException(e.getMessage(), e);
-    }  finally {
+    } finally {
       performUnlock(omClientRequest, omLockOpr, lockInfo);
     }
   }
