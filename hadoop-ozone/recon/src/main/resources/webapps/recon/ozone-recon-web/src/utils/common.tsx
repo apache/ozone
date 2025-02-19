@@ -66,6 +66,16 @@ export const byteToSize = (bytes: number, decimals: number) => {
   return isNaN(i) ? `Not Defined` : `${Number.parseFloat((bytes / (k ** i)).toFixed(dm))} ${sizes[i]}`;
 };
 
+/**
+ * The function transforms the provided number to a comma separated value
+ * Ex: 1000 will be 1,000
+ * @param num The number to convert
+ * @returns The number separated at every thousandth place by commas
+ */
+export function numberWithCommas(num: number) {
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
 export const nullAwareLocaleCompare = (a: string, b: string) => {
   if (!a && !b) {
     return 0;
