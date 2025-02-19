@@ -1,29 +1,40 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.diskbalancer;
 
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
-import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -35,41 +46,30 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.UUID;
-
-import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * This is a test class for DiskBalancerService.
  */
 @Timeout(30)
 public class TestDiskBalancerService {
+  @TempDir
+  private Path tmpDir;
+
   private File testRoot;
   private String scmId;
   private String datanodeUuid;
   private OzoneConfiguration conf = new OzoneConfiguration();
 
-  private ContainerLayoutVersion layout;
   private String schemaVersion;
   private MutableVolumeSet volumeSet;
 
   @BeforeEach
   public void init() throws IOException {
-    testRoot = GenericTestUtils
-        .getTestDir(TestDiskBalancerService.class.getSimpleName());
+    testRoot = tmpDir.toFile();
     if (testRoot.exists()) {
       FileUtils.cleanDirectory(testRoot);
     }
@@ -96,7 +96,7 @@ public class TestDiskBalancerService {
     setLayoutAndSchemaForTest(versionInfo);
     // Increase volume's usedBytes
     for (StorageVolume volume : volumeSet.getVolumeMap().values()) {
-      volume.incrementUsedSpace(volume.getCapacity() / 2);
+      volume.incrementUsedSpace(volume.getCurrentUsage().getCapacity() / 2);
     }
 
     ContainerSet containerSet = new ContainerSet(1000);
@@ -184,7 +184,6 @@ public class TestDiskBalancerService {
   }
 
   private void setLayoutAndSchemaForTest(ContainerTestVersionInfo versionInfo) {
-    this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }

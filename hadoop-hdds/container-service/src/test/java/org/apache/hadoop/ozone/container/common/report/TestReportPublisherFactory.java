@@ -24,10 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CRLStatusReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto;
-
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -53,17 +51,6 @@ public class TestReportPublisherFactory {
     ReportPublisher publisher = factory
         .getPublisherFor(NodeReportProto.class);
     assertEquals(NodeReportPublisher.class, publisher.getClass());
-    assertEquals(conf, publisher.getConf());
-  }
-
-  @Test
-  public void testGetCRLStatusReportPublisher() {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    ReportPublisherFactory factory = new ReportPublisherFactory(conf);
-    ReportPublisher publisher = factory
-        .getPublisherFor(CRLStatusReport.class);
-    assertEquals(
-        CRLStatusReportPublisher.class, publisher.getClass());
     assertEquals(conf, publisher.getConf());
   }
 

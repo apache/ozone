@@ -31,12 +31,14 @@ import static org.mockito.Mockito.when;
 import com.google.protobuf.Proto2Utils;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -45,6 +47,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
@@ -57,7 +60,6 @@ import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerInfo;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -70,17 +72,18 @@ public class TestHeartbeatEndpointTask {
   private static final InetSocketAddress TEST_SCM_ENDPOINT =
       new InetSocketAddress("test-scm-1", 9861);
 
-  private OzoneConfiguration conf;
   private DatanodeStateMachine datanodeStateMachine;
   private OzoneContainer container;
 
   @BeforeEach
   public void setup() {
-    conf = new OzoneConfiguration();
     datanodeStateMachine = mock(DatanodeStateMachine.class);
     container = mock(OzoneContainer.class);
     when(container.getDiskBalancerInfo()).thenReturn(new DiskBalancerInfo(true, 10, 20, 30));
     when(datanodeStateMachine.getContainer()).thenReturn(container);
+    PipelineReportsProto pipelineReportsProto = mock(PipelineReportsProto.class);
+    when(pipelineReportsProto.getPipelineReportList()).thenReturn(Collections.emptyList());
+    when(container.getPipelineReport()).thenReturn(pipelineReportsProto);
   }
 
   @Test
@@ -108,11 +111,12 @@ public class TestHeartbeatEndpointTask {
                     .build())
                 .build());
 
+    OzoneConfiguration conf = new OzoneConfiguration();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
     // WHEN
-    HeartbeatEndpointTask task = getHeartbeatEndpointTask(context, scm);
+    HeartbeatEndpointTask task = getHeartbeatEndpointTask(conf, context, scm);
     task.call();
 
     // THEN
@@ -137,10 +141,12 @@ public class TestHeartbeatEndpointTask {
                 .setTerm(termInSCM)
                 .build());
 
+    OzoneConfiguration conf = new OzoneConfiguration();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
     context.setTermOfLeaderSCM(1);
-    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(context, scm);
+    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
+        conf, context, scm);
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
     assertTrue(heartbeat.hasDatanodeDetails());
@@ -155,6 +161,7 @@ public class TestHeartbeatEndpointTask {
 
   @Test
   public void testheartbeatWithNodeReports() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -171,7 +178,8 @@ public class TestHeartbeatEndpointTask {
                         .getDatanodeDetails().getUuid())
                 .build());
 
-    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(context, scm);
+    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
+        conf, context, scm);
     context.addEndpoint(TEST_SCM_ENDPOINT);
     context.refreshFullReport(NodeReportProto.getDefaultInstance());
     endpointTask.call();
@@ -185,6 +193,7 @@ public class TestHeartbeatEndpointTask {
 
   @Test
   public void testheartbeatWithContainerReports() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -201,7 +210,8 @@ public class TestHeartbeatEndpointTask {
                         .getDatanodeDetails().getUuid())
                 .build());
 
-    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(context, scm);
+    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
+        conf, context, scm);
     context.addEndpoint(TEST_SCM_ENDPOINT);
     context.refreshFullReport(ContainerReportsProto.getDefaultInstance());
     endpointTask.call();
@@ -215,6 +225,7 @@ public class TestHeartbeatEndpointTask {
 
   @Test
   public void testheartbeatWithCommandStatusReports() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -231,7 +242,8 @@ public class TestHeartbeatEndpointTask {
                         .getDatanodeDetails().getUuid())
                 .build());
 
-    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(context, scm);
+    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
+        conf, context, scm);
     context.addEndpoint(TEST_SCM_ENDPOINT);
     context.addIncrementalReport(
         CommandStatusReportsProto.getDefaultInstance());
@@ -246,6 +258,7 @@ public class TestHeartbeatEndpointTask {
 
   @Test
   public void testheartbeatWithContainerActions() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -262,7 +275,8 @@ public class TestHeartbeatEndpointTask {
                         .getDatanodeDetails().getUuid())
                 .build());
 
-    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(context, scm);
+    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
+        conf, context, scm);
     context.addEndpoint(TEST_SCM_ENDPOINT);
     context.addContainerAction(getContainerAction());
     endpointTask.call();
@@ -276,6 +290,7 @@ public class TestHeartbeatEndpointTask {
 
   @Test
   public void testheartbeatWithAllReports() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -301,7 +316,8 @@ public class TestHeartbeatEndpointTask {
                         .getDatanodeDetails().getUuid())
                 .build());
 
-    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(context, scm);
+    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
+        conf, context, scm);
     context.addEndpoint(TEST_SCM_ENDPOINT);
     context.refreshFullReport(NodeReportProto.getDefaultInstance());
     context.refreshFullReport(ContainerReportsProto.getDefaultInstance());
@@ -330,12 +346,14 @@ public class TestHeartbeatEndpointTask {
    * Creates HeartbeatEndpointTask with the given conf, context and
    * StorageContainerManager client side proxy.
    *
+   * @param conf Configuration
    * @param context StateContext
    * @param proxy StorageContainerDatanodeProtocolClientSideTranslatorPB
    *
    * @return HeartbeatEndpointTask
    */
   private HeartbeatEndpointTask getHeartbeatEndpointTask(
+      ConfigurationSource conf,
       StateContext context,
       StorageContainerDatanodeProtocolClientSideTranslatorPB proxy) {
     DatanodeDetails datanodeDetails = DatanodeDetails.newBuilder()

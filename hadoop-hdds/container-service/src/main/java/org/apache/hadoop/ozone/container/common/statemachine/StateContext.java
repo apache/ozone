@@ -58,6 +58,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
@@ -102,7 +103,7 @@ public class StateContext {
       IncrementalContainerReportProto.getDescriptor().getFullName();
   @VisibleForTesting
   static final String CRL_STATUS_REPORT_PROTO_NAME =
-      CRLStatusReport.getDescriptor().getFullName();
+      StorageContainerDatanodeProtocolProtos.CRLStatusReport.getDescriptor().getFullName();
   @VisibleForTesting
   static final String DISK_BALANCER_REPORT_PROTO_NAME =
       DiskBalancerReportProto.getDescriptor().getFullName();

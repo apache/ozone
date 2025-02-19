@@ -212,16 +212,7 @@ public final class SCMEvents {
       DELETE_BLOCK_STATUS =
       new TypedEvent<>(CommandStatusReportHandler.DeleteBlockStatus.class,
           "Delete_Block_Status");
-
-  /**
-   * A CRL status report will be sent by datanodes. This report is received
-   * and processed by SCMDatanodeHeartbeatDispatcher.
-   */
-  public static final TypedEvent<CRLStatusReportFromDatanode>
-      CRL_STATUS_REPORT =
-      new TypedEvent<>(CRLStatusReportFromDatanode.class,
-          "Crl_Status_Report");
-
+  
   /**
    * DiskBalancer reports are send out by Datanodes. This report is received by
    * SCMDatanodeHeartbeatDispatcher and DiskBalancer_Report Event is generated.

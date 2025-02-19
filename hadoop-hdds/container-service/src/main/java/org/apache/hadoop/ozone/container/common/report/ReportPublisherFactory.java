@@ -52,7 +52,6 @@ public class ReportPublisherFactory {
         CommandStatusReportPublisher.class);
     report2publisher.put(PipelineReportsProto.class,
             PipelineReportPublisher.class);
-    report2publisher.put(CRLStatusReport.class, CRLStatusReportPublisher.class);
     report2publisher.put(DiskBalancerReportProto.class,
         DiskBalancerReportPublisher.class);
   }

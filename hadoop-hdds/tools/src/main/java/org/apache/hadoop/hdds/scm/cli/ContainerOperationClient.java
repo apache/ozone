@@ -603,6 +603,7 @@ public class ContainerOperationClient implements ScmClient {
     return storageContainerLocationClient.getMetrics(query);
   }
 
+  @Override
   public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerReport(
       int count) throws IOException {
     return storageContainerLocationClient.getDiskBalancerReport(count,

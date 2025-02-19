@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.container.common.interfaces.Container.Scan
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Iterator;
 import java.util.Map;
@@ -38,17 +39,6 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.file.Path;
-import java.time.Instant;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
-
-import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 
 /**
  * Control plane for container management in datanode.
