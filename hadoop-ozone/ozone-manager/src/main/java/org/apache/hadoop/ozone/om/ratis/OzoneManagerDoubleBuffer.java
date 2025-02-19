@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -46,7 +45,6 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
-import org.apache.hadoop.ozone.om.execution.common.BiConsumerX;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -56,6 +54,7 @@ import org.apache.hadoop.util.Time;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.Preconditions;
+import org.apache.ratis.util.function.CheckedBiConsumer;
 import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,7 +105,7 @@ public final class OzoneManagerDoubleBuffer {
   public static final class Builder {
     private OMMetadataManager omMetadataManager;
     private Consumer<TermIndex> updateLastAppliedIndex = termIndex -> { };
-    private BiConsumerX<BatchOperation, Long> updateOmCommitIndex = (m, n) -> { };
+    private CheckedBiConsumer<BatchOperation, Long, IOException> updateOmCommitIndex = (m, n) -> { };
     private boolean isTracingEnabled = false;
     private int maxUnFlushedTransactionCount = 0;
     private FlushNotifier flushNotifier;
@@ -125,7 +124,7 @@ public final class OzoneManagerDoubleBuffer {
       return this;
     }
 
-    Builder setUpdateOmCommitIndex(BiConsumerX<BatchOperation, Long> updateOmCommitIndex) {
+    Builder setUpdateOmCommitIndex(CheckedBiConsumer<BatchOperation, Long, IOException> updateOmCommitIndex) {
       this.updateOmCommitIndex = updateOmCommitIndex;
       return this;
     }
@@ -191,7 +190,7 @@ public final class OzoneManagerDoubleBuffer {
   private final OMMetadataManager omMetadataManager;
 
   private final Consumer<TermIndex> updateLastAppliedIndex;
-  private final BiConsumerX<BatchOperation, Long> updateOmCommitIndex;
+  private final CheckedBiConsumer<BatchOperation, Long, IOException> updateOmCommitIndex;
 
   private final S3SecretManager s3SecretManager;
 
@@ -346,8 +345,7 @@ public final class OzoneManagerDoubleBuffer {
         .map(Entry::getTermIndex)
         .sorted()
         .collect(Collectors.toList());
-    final long index = buffer.stream().max(Comparator.comparing(Entry::getIndex)).orElse(new Entry(null, null, 0))
-        .getIndex();
+    final long index = buffer.stream().mapToLong(Entry::getIndex).max().orElse(0);
     final int flushedTransactionsSize = flushedTransactions.size();
     final TermIndex lastTransaction = flushedTransactions.get(flushedTransactionsSize - 1);
 
