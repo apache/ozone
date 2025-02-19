@@ -121,7 +121,7 @@ public abstract class TestSCMContainerManagerMetrics implements NonHATests.TestC
     assertEquals(getLongCounter("NumSuccessfulDeleteContainers",
         metrics), numSuccessfulDeleteContainers);
     assertEquals(getLongCounter("NumFailureDeleteContainers",
-        metrics), ++numFailureDeleteContainers);
+        metrics), numFailureDeleteContainers + 1);
 
     long currentValue = getLongCounter("NumListContainerOps", metrics);
     containerManager.getContainers(
