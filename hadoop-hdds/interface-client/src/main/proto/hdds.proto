@@ -33,8 +33,12 @@ message UUID {
    required int64 leastSigBits = 2;
 }
 
+message DatanodeIDProto {
+    required UUID uuid = 1;
+}
+
 message DatanodeDetailsProto {
-    // deprecated, please use uuid128 instead
+    // deprecated, please use DatanodeIDProto instead
     optional string uuid = 1;  // UUID assigned to the Datanode.
     required string ipAddress = 2;     // IP address
     required string hostName = 3;      // hostname
@@ -49,6 +53,8 @@ message DatanodeDetailsProto {
     // TODO(runzhiwang): when uuid is gone, specify 1 as the index of uuid128 and mark as required
     optional UUID uuid128 = 100; // UUID with 128 bits assigned to the Datanode.
     optional uint32 level = 101;
+    // TODO: Replace UUID with DatanodeID and  make it required
+    optional DatanodeIDProto id = 102;
 }
 
 /**
@@ -123,14 +129,20 @@ message Pipeline {
     optional ReplicationType type = 3 [default = STAND_ALONE];
     optional ReplicationFactor factor = 4 [default = ONE];
     required PipelineID id = 5;
+    // TODO: Deprecate this and replace with leaderDatanodeID
     optional string leaderID = 6;
     repeated uint32 memberOrders = 7;
     optional uint64 creationTimeStamp = 8;
+    // TODO: Deprecate this and replace with suggestedLeaderDatanodeID
     optional UUID suggestedLeaderID = 9;
     repeated uint32 memberReplicaIndexes = 10;
     optional ECReplicationConfig ecReplicationConfig = 11;
-    // TODO(runzhiwang): when leaderID is gone, specify 6 as the index of leaderID128
+
+    // TODO: Replace UUID with DatanodeIDProto
     optional UUID leaderID128 = 100;
+
+    optional DatanodeIDProto leaderDatanodeID = 101;
+    optional DatanodeIDProto suggestedLeaderDatanodeID = 102;
 }
 
 message KeyValue {
@@ -324,6 +336,7 @@ enum ScmOps {
 }
 
 message ExcludeListProto {
+    // TODO: Replace with DatanodeID
     repeated string datanodes = 1;
     // Replace int64 with ContainerID message
     repeated int64 containerIds = 2;
