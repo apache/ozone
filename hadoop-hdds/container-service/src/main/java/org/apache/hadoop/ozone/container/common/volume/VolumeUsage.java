@@ -77,8 +77,8 @@ public class VolumeUsage {
    * |<-       capacity      ->|
    * }
    * </pre>
-   * capacity = usableCapacity - reserved;
-   * avail = fsAvail - reserved;
+   * capacity = max(usableCapacity - reserved, 0);
+   * avail = max(fsAvail - reserved, 0);
    */
   public SpaceUsageSource getCurrentUsage() {
     SpaceUsageSource real = realUsage();
