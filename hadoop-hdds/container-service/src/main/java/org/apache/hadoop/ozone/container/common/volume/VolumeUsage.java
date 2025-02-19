@@ -68,20 +68,23 @@ public class VolumeUsage {
   /**
    * <pre>
    * {@code
-   * Calculate available space use method B.
+   * Calculate available space.
+   * |----used----|                 fsFree                 |
    * |----used----|          fsAvail           |---other---|
    * |----used----|   (avail)   |+++reserved+++|---other---|
+   * |<-                    fsCapacity                   ->|
+   * |<-           usableCapacity            ->|
+   * |<-       capacity      ->|
    * }
    * </pre>
-   * B) avail = fsAvail - reserved;
+   * capacity = usableCapacity - reserved;
+   * avail = fsAvail - reserved;
    */
   public SpaceUsageSource getCurrentUsage() {
     SpaceUsageSource real = realUsage();
 
-    return reservedInBytes == 0
-        ? real
-        : new SpaceUsageSource.Fixed(
-            Math.max(real.getCapacity() - reservedInBytes, 0),
+    return new SpaceUsageSource.Fixed(
+            Math.max(getUsableCapacity(real) - reservedInBytes, 0),
             Math.max(real.getAvailable() - reservedInBytes, 0),
             real.getUsedSpace());
   }
@@ -92,6 +95,10 @@ public class VolumeUsage {
 
   public void decrementUsedSpace(long reclaimedSpace) {
     source.decrementUsedSpace(reclaimedSpace);
+  }
+
+  private static long getUsableCapacity(SpaceUsageSource usage) {
+    return usage.getUsedSpace() + usage.getAvailable();
   }
 
   public synchronized void start() {

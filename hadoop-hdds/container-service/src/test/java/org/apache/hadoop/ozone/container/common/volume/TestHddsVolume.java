@@ -274,18 +274,15 @@ public class TestHddsVolume {
 
   /**
    * Test conservative avail space.
-   * |----used----|   (avail)   |++++++++reserved++++++++|
-   * |<-     capacity         ->|
-   *              |     fsAvail      |-------other-------|
-   *                          ->|~~~~|<-
-   *                       remainingReserved
-   * |<-                   fsCapacity                  ->|
-   * A) avail = capacity - used
-   * B) avail = fsAvail - Max(reserved - other, 0);
+   * |----used----|                 fsFree                 |
+   * |----used----|          fsAvail           |---other---|
+   * |----used----|   (avail)   |+++reserved+++|---other---|
+   * |<-                    fsCapacity                   ->|
+   * |<-           usableCapacity            ->|
+   * |<-       capacity      ->|
    *
-   * So, conservatively, avail = Max(Min(A, B), 0);
-   * This test avail == A, which implies there are deletes
-   * that release space, but 'du' report is delayed.
+   * avail = fsAvail - reserved;
+   * capacity = usableCapacity - reserved;
    */
   @Test
   public void testReportUsedBiggerThanActualUsed() throws IOException {
