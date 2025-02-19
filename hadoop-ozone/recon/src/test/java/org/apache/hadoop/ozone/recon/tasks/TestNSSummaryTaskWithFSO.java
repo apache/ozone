@@ -51,19 +51,21 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test for NSSummaryTaskWithFSO.
  */
-public final class TestNSSummaryTaskWithFSO {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class TestNSSummaryTaskWithFSO {
 
-  private static ReconNamespaceSummaryManager reconNamespaceSummaryManager;
-  private static OMMetadataManager omMetadataManager;
-  private static ReconOMMetadataManager reconOMMetadataManager;
-  private static NSSummaryTaskWithFSO nSSummaryTaskWithFso;
+  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
+  private OMMetadataManager omMetadataManager;
+  private ReconOMMetadataManager reconOMMetadataManager;
+  private NSSummaryTaskWithFSO nSSummaryTaskWithFso;
 
-  private static OzoneConfiguration ozoneConfiguration;
+  private OzoneConfiguration ozoneConfiguration;
 
   // Object names in FSO-enabled format
   private static final String VOL = "vol";
@@ -112,11 +114,8 @@ public final class TestNSSummaryTaskWithFSO {
   private static Set<Long> bucketTwoAns = new HashSet<>();
   private static Set<Long> dirOneAns = new HashSet<>();
 
-  private TestNSSummaryTaskWithFSO() {
-  }
-
   @BeforeAll
-  public static void setUp(@TempDir File tmpDir) throws Exception {
+  void setUp(@TempDir File tmpDir) throws Exception {
     ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.setLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
         10);
@@ -599,7 +598,7 @@ public final class TestNSSummaryTaskWithFSO {
    *
    * @throws IOException
    */
-  private static void populateOMDB() throws IOException {
+  private void populateOMDB() throws IOException {
     writeKeyToOm(reconOMMetadataManager,
         KEY_ONE,
         BUCKET_ONE,

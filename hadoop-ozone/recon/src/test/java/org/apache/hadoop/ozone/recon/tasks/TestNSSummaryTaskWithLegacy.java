@@ -53,18 +53,20 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test for NSSummaryTaskWithLegacy.
  */
-public final class TestNSSummaryTaskWithLegacy {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class TestNSSummaryTaskWithLegacy {
 
-  private static ReconNamespaceSummaryManager reconNamespaceSummaryManager;
-  private static OMMetadataManager omMetadataManager;
-  private static ReconOMMetadataManager reconOMMetadataManager;
-  private static NSSummaryTaskWithLegacy nSSummaryTaskWithLegacy;
-  private static OzoneConfiguration omConfiguration;
+  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
+  private OMMetadataManager omMetadataManager;
+  private ReconOMMetadataManager reconOMMetadataManager;
+  private NSSummaryTaskWithLegacy nSSummaryTaskWithLegacy;
+  private OzoneConfiguration omConfiguration;
 
   // Object names
   private static final String VOL = "vol";
@@ -112,15 +114,12 @@ public final class TestNSSummaryTaskWithLegacy {
   private static final long KEY_FOUR_SIZE = 2050L;
   private static final long KEY_FIVE_SIZE = 100L;
 
-  private static Set<Long> bucketOneAns = new HashSet<>();
-  private static Set<Long> bucketTwoAns = new HashSet<>();
-  private static Set<Long> dirOneAns = new HashSet<>();
-
-  private TestNSSummaryTaskWithLegacy() {
-  }
+  private final Set<Long> bucketOneAns = new HashSet<>();
+  private final Set<Long> bucketTwoAns = new HashSet<>();
+  private final Set<Long> dirOneAns = new HashSet<>();
 
   @BeforeAll
-  public static void setUp(@TempDir File tmpDir) throws Exception {
+  void setUp(@TempDir File tmpDir) throws Exception {
     initializeNewOmMetadataManager(new File(tmpDir, "om"));
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         getMockOzoneManagerServiceProvider();
@@ -599,7 +598,7 @@ public final class TestNSSummaryTaskWithLegacy {
    *
    * @throws IOException
    */
-  private static void populateOMDB() throws IOException {
+  private void populateOMDB() throws IOException {
     writeKeyToOm(reconOMMetadataManager,
         KEY_ONE,
         BUCKET_ONE,
@@ -684,7 +683,7 @@ public final class TestNSSummaryTaskWithLegacy {
    * buckets.
    * @throws IOException ioEx
    */
-  private static void initializeNewOmMetadataManager(
+  private void initializeNewOmMetadataManager(
       File omDbDir)
       throws IOException {
     omConfiguration = new OzoneConfiguration();

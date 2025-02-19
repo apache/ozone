@@ -181,6 +181,7 @@ public abstract class OzoneSecretManager<T extends TokenIdentifier>
     return newKey;
   }
 
+  @Override
   public void notifyCertificateRenewed(CertificateClient client,
       String oldCertId, String newCertId) {
     if (!oldCertId.equals(getCertSerialId())) {

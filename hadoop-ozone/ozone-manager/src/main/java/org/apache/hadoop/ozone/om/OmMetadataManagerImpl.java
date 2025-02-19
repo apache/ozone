@@ -48,6 +48,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +56,7 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
@@ -87,6 +89,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
+import org.apache.hadoop.ozone.om.helpers.MultipartUploadKeys;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
@@ -1933,46 +1936,83 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public Set<String> getMultipartUploadKeys(
-      String volumeName, String bucketName, String prefix) throws IOException {
+  public MultipartUploadKeys getMultipartUploadKeys(
+      String volumeName, String bucketName, String prefix, String keyMarker,
+      String uploadIdMarker, int maxUploads, boolean noPagination) throws IOException {
 
-    Set<String> response = new TreeSet<>();
-    Set<String> aborted = new TreeSet<>();
-
-    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmMultipartKeyInfo>>>
-        cacheIterator = getMultipartInfoTable().cacheIterator();
+    MultipartUploadKeys.Builder resultBuilder = MultipartUploadKeys.newBuilder();
+    SortedSet<String> responseKeys = new TreeSet<>();
+    Set<String> aborted = new HashSet<>();
 
     String prefixKey =
         OmMultipartUpload.getDbKey(volumeName, bucketName, prefix);
 
+    if (StringUtil.isNotBlank(keyMarker)) {
+      prefix = keyMarker;
+      if (StringUtil.isNotBlank(uploadIdMarker)) {
+        prefix = prefix + OM_KEY_PREFIX + uploadIdMarker;
+      }
+    }
+    String seekKey = OmMultipartUpload.getDbKey(volumeName, bucketName, prefix);
+
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmMultipartKeyInfo>>>
+        cacheIterator = getMultipartInfoTable().cacheIterator();
     // First iterate all the entries in cache.
     while (cacheIterator.hasNext()) {
       Map.Entry<CacheKey<String>, CacheValue<OmMultipartKeyInfo>> cacheEntry =
           cacheIterator.next();
-      if (cacheEntry.getKey().getCacheKey().startsWith(prefixKey)) {
+      String cacheKey = cacheEntry.getKey().getCacheKey();
+      if (cacheKey.startsWith(prefixKey)) {
         // Check if it is marked for delete, due to abort mpu
-        if (cacheEntry.getValue().getCacheValue() != null) {
-          response.add(cacheEntry.getKey().getCacheKey());
+        if (cacheEntry.getValue().getCacheValue() != null &&
+            cacheKey.compareTo(seekKey) >= 0) {
+          responseKeys.add(cacheKey);
         } else {
-          aborted.add(cacheEntry.getKey().getCacheKey());
+          aborted.add(cacheKey);
         }
       }
     }
 
-    // prefixed iterator will only iterate until keys match the prefix
+    int dbKeysCount = 0;
+    // the prefix iterator will only iterate keys that match the given prefix
+    // so we don't need to check if the key is started with prefixKey again
     try (TableIterator<String, ? extends KeyValue<String, OmMultipartKeyInfo>>
         iterator = getMultipartInfoTable().iterator(prefixKey)) {
+      iterator.seek(seekKey);
 
-      while (iterator.hasNext()) {
+      while (iterator.hasNext() && (noPagination || dbKeysCount < maxUploads + 1)) {
         KeyValue<String, OmMultipartKeyInfo> entry = iterator.next();
         // If it is marked for abort, skip it.
         if (!aborted.contains(entry.getKey())) {
-          response.add(entry.getKey());
+          responseKeys.add(entry.getKey());
+          dbKeysCount++;
         }
       }
     }
 
-    return response;
+    if (noPagination) {
+      resultBuilder.setKeys(responseKeys);
+      return resultBuilder.build();
+    }
+
+    String lastKey = responseKeys.stream()
+        .skip(maxUploads)
+        .findFirst()
+        .orElse(null);
+    if (lastKey != null) {
+      // implies the keyset size is greater than maxUploads
+      OmMultipartUpload lastKeyMultipartUpload = OmMultipartUpload.from(lastKey);
+      resultBuilder.setNextKeyMarker(lastKeyMultipartUpload.getKeyName())
+          .setNextUploadIdMarker(lastKeyMultipartUpload.getUploadId())
+          .setIsTruncated(true);
+      
+      // keep the [0, maxUploads] keys
+      responseKeys = responseKeys.subSet(responseKeys.first(), lastKey);
+    }
+
+    return resultBuilder
+      .setKeys(responseKeys)
+      .build();
   }
 
   @Override

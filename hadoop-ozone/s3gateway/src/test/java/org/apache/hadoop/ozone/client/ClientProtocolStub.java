@@ -382,7 +382,10 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public OzoneMultipartUploadList listMultipartUploads(String volumename,
                                                        String bucketName,
-                                                       String prefix)
+                                                       String prefix,
+                                                       String keyMarker,
+                                                       String uploadIdMarker,
+                                                       int maxUploads)
       throws IOException {
     return null;
   }

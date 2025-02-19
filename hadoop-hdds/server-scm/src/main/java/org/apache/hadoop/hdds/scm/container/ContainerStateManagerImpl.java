@@ -446,6 +446,7 @@ public final class ContainerStateManagerImpl
     }
   }
 
+  @Override
   public ContainerInfo getMatchingContainer(final long size, String owner,
       PipelineID pipelineID, NavigableSet<ContainerID> containerIDs) {
     if (containerIDs.isEmpty()) {
@@ -504,6 +505,7 @@ public final class ContainerStateManagerImpl
   }
 
 
+  @Override
   public void removeContainer(final HddsProtos.ContainerID id)
       throws IOException {
     final ContainerID cid = ContainerID.getFromProtobuf(id);

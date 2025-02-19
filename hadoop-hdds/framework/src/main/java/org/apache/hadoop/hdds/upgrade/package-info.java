@@ -15,32 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.response.key;
-
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-
 /**
- * OmKeyResponse.
+ * This package contains SCM Upgrade related classes.
  */
-public abstract class OmKeyResponse extends OMClientResponse {
-
-  private BucketLayout bucketLayout;
-
-  public OmKeyResponse(OzoneManagerProtocolProtos.OMResponse omResponse,
-      BucketLayout bucketLayoutArg) {
-    super(omResponse);
-    this.bucketLayout = bucketLayoutArg;
-  }
-
-  public OmKeyResponse(OzoneManagerProtocolProtos.OMResponse omResponse) {
-    super(omResponse);
-    this.bucketLayout = BucketLayout.DEFAULT;
-  }
-
-  @Override
-  public BucketLayout getBucketLayout() {
-    return bucketLayout;
-  }
-}
+package org.apache.hadoop.hdds.upgrade;
