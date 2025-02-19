@@ -177,10 +177,7 @@ public class NSSummaryTask implements ReconOmTask {
     } catch (IOException ioEx) {
       LOG.error("Unable to clear NSSummary table in Recon DB. ",
           ioEx);
-      return new TaskResult.Builder()
-          .setTaskName(getTaskName())
-          .setTaskSuccess(false)
-          .build();
+      return buildTaskResult(false);
     }
 
     tasks.add(() -> nsSummaryTaskWithFSO
@@ -200,18 +197,12 @@ public class NSSummaryTask implements ReconOmTask {
       results = executorService.invokeAll(tasks);
       for (int i = 0; i < results.size(); i++) {
         if (results.get(i).get().equals(false)) {
-          return new TaskResult.Builder()
-              .setTaskName(getTaskName())
-              .setTaskSuccess(false)
-              .build();
+          return buildTaskResult(false);
         }
       }
     } catch (InterruptedException | ExecutionException ex) {
       LOG.error("Error while reprocessing NSSummary table in Recon DB.", ex);
-      return new TaskResult.Builder()
-          .setTaskName(getTaskName())
-          .setTaskSuccess(false)
-          .build();
+      return buildTaskResult(false);
     } finally {
       executorService.shutdown();
 
@@ -224,10 +215,7 @@ public class NSSummaryTask implements ReconOmTask {
       LOG.debug("Task execution time: {} milliseconds", durationInMillis);
     }
 
-    return new TaskResult.Builder()
-        .setTaskName(getTaskName())
-        .setTaskSuccess(true)
-        .build();
+    return buildTaskResult(true);
   }
 
 }

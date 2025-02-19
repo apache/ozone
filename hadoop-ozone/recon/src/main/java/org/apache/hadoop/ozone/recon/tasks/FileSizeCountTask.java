@@ -92,17 +92,11 @@ public class FileSizeCountTask implements ReconOmTask {
         reprocessBucketLayout(BucketLayout.LEGACY, omMetadataManager,
             fileSizeCountMap);
     if (!statusFSO && !statusOBS) {
-      return new TaskResult.Builder()
-          .setTaskName(getTaskName())
-          .setTaskSuccess(false)
-          .build();
+      return buildTaskResult(false);
     }
     writeCountsToDB(fileSizeCountMap);
     LOG.debug("Completed a 'reprocess' run of FileSizeCountTask.");
-    return new TaskResult.Builder()
-        .setTaskName(getTaskName())
-        .setTaskSuccess(true)
-        .build();
+    return buildTaskResult(true);
   }
 
   private boolean reprocessBucketLayout(BucketLayout bucketLayout,
@@ -202,10 +196,7 @@ public class FileSizeCountTask implements ReconOmTask {
         } catch (Exception e) {
           LOG.error("Unexpected exception while processing key {}.",
               updatedKey, e);
-          return new TaskResult.Builder()
-              .setTaskName(getTaskName())
-              .setTaskSuccess(false)
-              .build();
+          return buildTaskResult(false);
         }
       } else {
         LOG.warn("Unexpected value type {} for key {}. Skipping processing.",
@@ -215,10 +206,7 @@ public class FileSizeCountTask implements ReconOmTask {
     writeCountsToDB(fileSizeCountMap);
     LOG.debug("{} successfully processed in {} milliseconds",
         getTaskName(), (System.currentTimeMillis() - startTime));
-    return new TaskResult.Builder()
-        .setTaskName(getTaskName())
-        .setTaskSuccess(true)
-        .build();
+    return buildTaskResult(true);
   }
 
   /**

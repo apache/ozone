@@ -129,10 +129,7 @@ public class OmTableInsightTask implements ReconOmTask {
         }
       } catch (IOException ioEx) {
         LOG.error("Unable to populate Table Count in Recon DB.", ioEx);
-        return new TaskResult.Builder()
-            .setTaskName(getTaskName())
-            .setTaskSuccess(false)
-            .build();
+        return buildTaskResult(false);
       }
     }
     // Write the data to the DB
@@ -147,10 +144,7 @@ public class OmTableInsightTask implements ReconOmTask {
     }
 
     LOG.debug("Completed a 'reprocess' run of OmTableInsightTask.");
-    return new TaskResult.Builder()
-        .setTaskName(getTaskName())
-        .setTaskSuccess(true)
-        .build();
+    return buildTaskResult(true);
   }
 
   @Override
@@ -207,10 +201,7 @@ public class OmTableInsightTask implements ReconOmTask {
         LOG.error(
             "Unexpected exception while processing the table {}, Action: {}",
             tableName, omdbUpdateEvent.getAction(), e);
-        return new TaskResult.Builder()
-            .setTaskName(getTaskName())
-            .setTaskSuccess(false)
-            .build();
+        return buildTaskResult(false);
       }
     }
     // Write the updated count and size information to the database
@@ -225,10 +216,7 @@ public class OmTableInsightTask implements ReconOmTask {
     }
     LOG.debug("{} successfully processed in {} milliseconds",
         getTaskName(), (System.currentTimeMillis() - startTime));
-    return new TaskResult.Builder()
-        .setTaskName(getTaskName())
-        .setTaskSuccess(true)
-        .build();
+    return buildTaskResult(true);
   }
 
   private void handlePutEvent(OMDBUpdateEvent<String, Object> event,

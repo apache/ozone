@@ -137,4 +137,11 @@ public interface ReconOmTask {
           '}';
     }
   }
+
+  default TaskResult buildTaskResult(boolean success) {
+    return new TaskResult.Builder()
+        .setTaskName(getTaskName())
+        .setTaskSuccess(success)
+        .build();
+  }
 }

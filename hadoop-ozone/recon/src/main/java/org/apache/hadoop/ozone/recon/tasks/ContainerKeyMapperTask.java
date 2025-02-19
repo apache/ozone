@@ -116,10 +116,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
                 containerKeyCountMap);
             if (!checkAndCallFlushToDB(containerKeyMap)) {
               LOG.error("Unable to flush containerKey information to the DB");
-              return new TaskResult.Builder()
-                  .setTaskName(getTaskName())
-                  .setTaskSuccess(false)
-                  .build();
+              return buildTaskResult(false);
             }
             omKeyCount++;
           }
@@ -132,10 +129,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
           containerKeyCountMap)) {
         LOG.error("Unable to flush Container Key Count and " +
             "remaining Container Key information to the DB");
-        return new TaskResult.Builder()
-            .setTaskName(getTaskName())
-            .setTaskSuccess(false)
-            .build();
+        return buildTaskResult(false);
       }
 
       LOG.debug("Completed 'reprocess' of ContainerKeyMapperTask.");
@@ -146,15 +140,9 @@ public class ContainerKeyMapperTask implements ReconOmTask {
     } catch (IOException ioEx) {
       LOG.error("Unable to populate Container Key data in Recon DB. ",
           ioEx);
-      return new TaskResult.Builder()
-          .setTaskName(getTaskName())
-          .setTaskSuccess(false)
-          .build();
+      return buildTaskResult(false);
     }
-    return new TaskResult.Builder()
-        .setTaskName(getTaskName())
-        .setTaskSuccess(true)
-        .build();
+    return buildTaskResult(true);
   }
 
   private boolean flushAndCommitContainerKeyInfoToDB(
@@ -257,27 +245,18 @@ public class ContainerKeyMapperTask implements ReconOmTask {
       } catch (IOException e) {
         LOG.error("Unexpected exception while updating key data : {} ",
             updatedKey, e);
-        return new TaskResult.Builder()
-            .setTaskName(getTaskName())
-            .setTaskSuccess(false)
-            .build();
+        return buildTaskResult(false);
       }
     }
     try {
       writeToTheDB(containerKeyMap, containerKeyCountMap, deletedKeyCountList);
     } catch (IOException e) {
       LOG.error("Unable to write Container Key Prefix data in Recon DB.", e);
-      return new TaskResult.Builder()
-          .setTaskName(getTaskName())
-          .setTaskSuccess(false)
-          .build();
+      return buildTaskResult(false);
     }
     LOG.debug("{} successfully processed {} OM DB update event(s) in {} milliseconds.",
         getTaskName(), eventCount, (System.currentTimeMillis() - startTime));
-    return new TaskResult.Builder()
-        .setTaskName(getTaskName())
-        .setTaskSuccess(true)
-        .build();
+    return buildTaskResult(true);
   }
 
   private void writeToTheDB(Map<ContainerKeyPrefix, Integer> containerKeyMap,

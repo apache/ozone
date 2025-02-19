@@ -54,30 +54,18 @@ public class DummyReconDBTask implements ReconOmTask {
   public TaskResult process(
       OMUpdateEventBatch events, Map<String, Integer> seekPos) {
     if (++callCtr <= numFailuresAllowed) {
-      return new TaskResult.Builder()
-          .setTaskName(getTaskName())
-          .setTaskSuccess(false)
-          .build();
+      return buildTaskResult(false);
     } else {
-      return new TaskResult.Builder()
-          .setTaskName(getTaskName())
-          .setTaskSuccess(true)
-          .build();
+      return buildTaskResult(true);
     }
   }
 
   @Override
   public TaskResult reprocess(OMMetadataManager omMetadataManager) {
     if (++callCtr <= numFailuresAllowed) {
-      return new TaskResult.Builder()
-          .setTaskName(getTaskName())
-          .setTaskSuccess(false)
-          .build();
+      return buildTaskResult(false);
     } else {
-      return new TaskResult.Builder()
-          .setTaskName(getTaskName())
-          .setTaskSuccess(true)
-          .build();
+      return buildTaskResult(true);
     }
   }
 
