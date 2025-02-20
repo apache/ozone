@@ -21,13 +21,10 @@ import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateActi
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.UPDATE;
 import static org.hadoop.ozone.recon.schema.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.AdditionalAnswers.returnsElementsOf;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -493,6 +490,36 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     recordToFind.value1("vol2");
     assertEquals(1, fileCountBySizeDao.findById(recordToFind)
         .getCount().longValue());
+  }
+
+
+  @Test
+  public void testTruncateTableExceptionPropagation() {
+    // Mock DSLContext and FileCountBySizeDao
+    DSLContext mockDslContext = mock(DSLContext.class);
+    FileCountBySizeDao mockDao = mock(FileCountBySizeDao.class);
+
+    // Mock schema definition and ensure it returns our mocked DSLContext
+    UtilizationSchemaDefinition mockSchema = mock(UtilizationSchemaDefinition.class);
+    when(mockSchema.getDSLContext()).thenReturn(mockDslContext);
+
+    // Mock delete operation to throw an exception
+    when(mockDslContext.delete(FILE_COUNT_BY_SIZE))
+        .thenThrow(new RuntimeException("Simulated DB failure"));
+
+    // Create instances of FileSizeCountTaskOBS and FileSizeCountTaskFSO using mocks
+    FileSizeCountTaskOBS fileSizeCountTaskOBS = new FileSizeCountTaskOBS(mockDao, mockSchema);
+    FileSizeCountTaskFSO fileSizeCountTaskFSO = new FileSizeCountTaskFSO(mockDao, mockSchema);
+
+    // Mock OMMetadataManager
+    OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
+
+    // Verify that an exception is thrown from reprocess() for both tasks.
+    assertThrows(RuntimeException.class, () -> fileSizeCountTaskOBS.reprocess(omMetadataManager),
+        "Expected reprocess to propagate exception but it didn't.");
+
+    assertThrows(RuntimeException.class, () -> fileSizeCountTaskFSO.reprocess(omMetadataManager),
+        "Expected reprocess to propagate exception but it didn't.");
   }
 
 }
