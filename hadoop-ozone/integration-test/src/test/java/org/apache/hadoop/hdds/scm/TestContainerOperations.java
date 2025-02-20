@@ -70,7 +70,6 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
   private static final int CONTAINER_LIST_LIMIT = 1;
 
   private ScmClient storageClient;
-  private StorageContainerLocationProtocolClientSideTranslatorPB storageContainerLocationClient;
   private XceiverClientManager xceiverClientManager;
 
   @BeforeAll
@@ -78,25 +77,23 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
     OzoneConfiguration clientConf = new OzoneConfiguration(cluster().getConf());
     clientConf.setInt(ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT, CONTAINER_LIST_LIMIT);
     storageClient = new ContainerOperationClient(clientConf);
-    storageContainerLocationClient = cluster().getStorageContainerLocationClient();
     xceiverClientManager = new XceiverClientManager(cluster().getConf());
   }
 
   @AfterAll
   void cleanup() {
-    IOUtils.closeQuietly(storageContainerLocationClient, xceiverClientManager);
+    IOUtils.closeQuietly(xceiverClientManager);
   }
 
   @Test
   void testContainerStateMachineIdempotency() throws Exception {
-    ContainerWithPipeline container = storageContainerLocationClient
-        .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
+    ContainerWithPipeline container = storageClient.createContainer(HddsProtos
+        .ReplicationType.RATIS, HddsProtos.ReplicationFactor
+        .ONE, OzoneConsts.OZONE);
     long containerID = container.getContainerInfo().getContainerID();
     Pipeline pipeline = container.getPipeline();
     XceiverClientSpi client = xceiverClientManager.acquireClient(pipeline);
-    //create the container
-    ContainerProtocolCalls.createContainer(client, containerID, null);
+
     // call create Container again
     BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
     byte[] data =
@@ -227,7 +224,7 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
     DatanodeDetails node = nm.getAllNodes().get(0);
     nm.setNodeOperationalState(node, DECOMMISSIONING);
 
-    // All nodes should be returned as they are all in service
+    // Nodes not in DECOMMISSIONING state should be returned as they are in service
     int nodeCount = storageClient.queryNode(IN_SERVICE, HEALTHY,
         HddsProtos.QueryScope.CLUSTER, "").size();
     assertEquals(numOfDatanodes - 1, nodeCount);
@@ -263,7 +260,7 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
         nodeCount = storageClient.queryNode(s, HEALTHY,
             HddsProtos.QueryScope.CLUSTER, "").size();
         if (s == IN_SERVICE) {
-          assertEquals(5, nodeCount);
+          assertEquals(cluster().getHddsDatanodes().size(), nodeCount);
         } else {
           assertEquals(1, nodeCount);
         }
