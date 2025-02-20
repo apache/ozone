@@ -813,7 +813,7 @@ public class TestContainerEndpoint {
 
     assertEquals(Collections.EMPTY_LIST, responseObject.getContainers());
 
-    putContainerInfos(14);
+    putContainerInfos(15);
     uuid1 = newDatanode("host1", "127.0.0.1");
     uuid2 = newDatanode("host2", "127.0.0.2");
     uuid3 = newDatanode("host3", "127.0.0.3");
@@ -1122,8 +1122,8 @@ public class TestContainerEndpoint {
     }
     for (int i = 0; i < dataChecksum; i++) {
       createUnhealthyRecord(++cid,
-              UnHealthyContainerStates.REPLICA_MISMATCH.toString(),
-              3, 3, 0, null, true);
+          UnHealthyContainerStates.REPLICA_MISMATCH.toString(),
+          3, 3, 0, null, true);
     }
   }
 

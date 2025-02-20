@@ -608,7 +608,6 @@ public class ContainerHealthTask extends ReconScmTask {
                 unhealthyContainerStateStatsMap);
       }
 
-
       return records;
     }
 

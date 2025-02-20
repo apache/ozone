@@ -112,7 +112,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     // Create 7 containers. The first 5 will have various unhealthy states
     // defined below. The container with ID=6 will be healthy and
     // container with ID=7 will be EMPTY_MISSING (but not inserted into DB)
-    List<ContainerInfo> mockContainers = getMockContainers(7);
+    List<ContainerInfo> mockContainers = getMockContainers(8);
     when(scmMock.getScmServiceProvider()).thenReturn(scmClientMock);
     when(scmMock.getContainerManager()).thenReturn(containerManagerMock);
     when(containerManagerMock.getContainers(any(ContainerID.class),
@@ -181,6 +181,15 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     when(reconContainerMetadataManager.getKeyCountForContainer(
         7L)).thenReturn(5L);  // Indicates non-empty container 7 for now
 
+    // container ID 8 - REPLICA_MISMATCH
+    ContainerInfo containerInfo8 =
+        TestContainerInfo.newBuilderForTest().setContainerID(8).setReplicationConfig(replicationConfig).build();
+    when(containerManagerMock.getContainer(ContainerID.valueOf(8L))).thenReturn(containerInfo8);
+    Set<ContainerReplica> mismatchReplicas = getMockReplicasChecksumMismatch(8L,
+        State.CLOSED, State.CLOSED, State.CLOSED);
+    when(containerManagerMock.getContainerReplicas(containerInfo8.containerID()))
+        .thenReturn(mismatchReplicas);
+
     List<UnhealthyContainers> all = unHealthyContainersTableHandle.findAll();
     assertThat(all).isEmpty();
 
@@ -199,7 +208,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
     // Ensure unhealthy container count in DB matches expected
     LambdaTestUtils.await(60000, 1000, () ->
-        (unHealthyContainersTableHandle.count() == 5));
+        (unHealthyContainersTableHandle.count() == 6));
 
     // Check for UNDER_REPLICATED container states
     UnhealthyContainers rec =
@@ -240,6 +249,12 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     assertEquals(1, rec.getActualReplicaCount().intValue());
     assertNotNull(rec.getReason());
 
+    rec = unHealthyContainersTableHandle.fetchByContainerId(8L).get(0);
+    assertEquals("REPLICA_MISMATCH", rec.getContainerState());
+    assertEquals(0, rec.getReplicaDelta().intValue());
+    assertEquals(3, rec.getExpectedReplicaCount().intValue());
+    assertEquals(3, rec.getActualReplicaCount().intValue());
+
     ReconTaskStatus taskStatus =
         reconTaskStatusDao.findById(containerHealthTask.getTaskName());
     assertThat(taskStatus.getLastUpdatedTimestamp())
@@ -271,7 +286,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
     // Ensure count is reduced after EMPTY_MISSING containers are not inserted
     LambdaTestUtils.await(60000, 1000, () ->
-        (unHealthyContainersTableHandle.count() == 2));
+        (unHealthyContainersTableHandle.count() == 3));
 
     rec = unHealthyContainersTableHandle.fetchByContainerId(1L).get(0);
     assertEquals("UNDER_REPLICATED", rec.getContainerState());
@@ -295,7 +310,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
     // Just check once again that count remains consistent
     LambdaTestUtils.await(60000, 1000, () ->
-        (unHealthyContainersTableHandle.count() == 2));
+        (unHealthyContainersTableHandle.count() == 3));
   }
 
   @Test
@@ -422,6 +437,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
       case MIS_REPLICATED:
       case NEGATIVE_SIZE:
+      case REPLICA_MISMATCH:
         unhealthyContainer.setExpectedReplicaCount(3);
         unhealthyContainer.setActualReplicaCount(3);
         unhealthyContainer.setReplicaDelta(0);
@@ -583,7 +599,25 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
           .setContainerState(s)
           .setContainerID(ContainerID.valueOf(containerId))
           .setSequenceId(1)
+          .setDataChecksum(1234L)
           .build());
+    }
+    return replicas;
+  }
+
+  private Set<ContainerReplica> getMockReplicasChecksumMismatch(
+      long containerId, State...states) {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    long checksum = 1234L;
+    for (State s : states) {
+      replicas.add(ContainerReplica.newBuilder()
+          .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
+          .setContainerState(s)
+          .setContainerID(ContainerID.valueOf(containerId))
+          .setSequenceId(1)
+          .setDataChecksum(checksum)
+          .build());
+      checksum++;
     }
     return replicas;
   }
