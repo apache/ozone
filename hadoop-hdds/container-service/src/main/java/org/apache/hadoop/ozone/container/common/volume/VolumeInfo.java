@@ -40,6 +40,7 @@ import org.slf4j.LoggerFactory;
  * - avail: remaining space for hdds usage.
  * - reserved: total space for other usage.
  * - capacity: total space for hdds usage.
+ * - usableCapacity: total space for hdds usage, include hdds reserved space.
  * - other: space used by other service consuming the same volume,
  *          including system level reserved spaces.
  * - fsAvail: reported remaining space from local fs.
@@ -54,9 +55,10 @@ import org.slf4j.LoggerFactory;
  * <pre>
  * {@code
  * |----used----|   (avail)   |++mvfs++|+++reserved+++|---other---|
- * |<-     capacity                  ->|
- *              |<-     fsAvail                     ->|
- *              |<-        fsFree                               ->|
+ * |<-         capacity              ->|
+ * |<-              usableCapacity                  ->|
+ *              |<-            fsAvail              ->|
+ *              |<-            fsFree                           ->|
  * |<-                       fsCapacity                         ->|
  * }</pre>
  * <pre>
@@ -67,7 +69,8 @@ import org.slf4j.LoggerFactory;
  * Get from cmd line:
  *     used: from cmd 'du' (by default)
  * Get from calculation:
- *     capacity = fsCapacity - other - reserved = used + fsAvail - reserved
+ *     usableCapacity = fsCapacity - other = used + fsAvail
+ *     capacity = usableCapacity - reserved = fsCapacity - other - reserved = used + fsAvail - reserved
  *
  * The avail is the result we want from calculation.
  * avail = capacity - used
