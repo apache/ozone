@@ -41,8 +41,8 @@ import org.slf4j.LoggerFactory;
  * - reserved: total space for other usage.
  * - capacity: total space for hdds usage.
  * - usableCapacity: total space for hdds usage, include hdds reserved space.
- * - other: space used by other service consuming the same volume,
- *          including system level reserved spaces.
+ * - other: space used by other service consuming the same volume.
+ * - sysReserve: system level reserved spaces.
  * - fsAvail: reported remaining space from local fs.
  * - fsUsed: reported total used space from local fs.
  * - fsCapacity: reported total capacity from local fs.
@@ -54,12 +54,11 @@ import org.slf4j.LoggerFactory;
  *
  * <pre>
  * {@code
- * |----used----|   (avail)   |++mvfs++|+++reserved+++|---other---|
+ * |----used----|   (avail)   |++mvfs++|+++reserved+++|---other---|--sysReserve--|
  * |<-         capacity              ->|
  * |<-              usableCapacity                  ->|
  *              |<-            fsAvail              ->|
- *              |<-            fsFree                           ->|
- * |<-                       fsCapacity                         ->|
+ * |<-                       fsCapacity                                        ->|
  * }</pre>
  * <pre>
  * What we could directly get from local fs:
@@ -69,8 +68,10 @@ import org.slf4j.LoggerFactory;
  * Get from cmd line:
  *     used: from cmd 'du' (by default)
  * Get from calculation:
- *     usableCapacity = fsCapacity - other = used + fsAvail
- *     capacity = usableCapacity - reserved = fsCapacity - other - reserved = used + fsAvail - reserved
+ *     usableCapacity = fsCapacity - other - sysReserve = used + fsAvail
+ *     capacity = usableCapacity - reserved
+ *              = fsCapacity - other - sysReserve - reserved
+ *              = used + fsAvail - reserved
  *
  * The avail is the result we want from calculation.
  * avail = capacity - used
