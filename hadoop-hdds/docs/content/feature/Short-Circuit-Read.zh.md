@@ -73,7 +73,7 @@ Datanode 需要能创建该路径. 同时，除了启动 Ozone 服务的用户�
 ```XML
 <property>
    <name>ozone.client.read.short-circuit</name>
-   <value>false</value>
+   <value>true</value>
 </property>
 <property>
    <name>ozone.domain.socket.path</name>

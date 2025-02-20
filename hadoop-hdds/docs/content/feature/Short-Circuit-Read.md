@@ -75,7 +75,7 @@ To enable short-circuit read, here is an example configuration.
 ```XML
 <property>
    <name>ozone.client.read.short-circuit</name>
-   <value>false</value>
+   <value>true</value>
 </property>
 <property>
    <name>ozone.domain.socket.path</name>
