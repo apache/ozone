@@ -24,12 +24,9 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -112,7 +109,7 @@ public class DBCheckpointServlet extends HttpServlet
         "temp-bootstrap-data").toFile();
     if (bootstrapTempData.exists()) {
       try {
-        deleteContents(bootstrapTempData.toPath());
+        FileUtils.cleanDirectory(bootstrapTempData);
       } catch (IOException e) {
         throw new ServletException(e);
       }
@@ -131,24 +128,6 @@ public class DBCheckpointServlet extends HttpServlet
     } else {
       return true;
     }
-  }
-
-  private void deleteContents(Path directory) throws IOException {
-    Files.walkFileTree(directory, new SimpleFileVisitor<Path>() {
-      @Override
-      public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-        Files.delete(file); // Delete file
-        return FileVisitResult.CONTINUE;
-      }
-
-      @Override
-      public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-        if (!dir.equals(directory)) { // Skip deleting the root directory
-          Files.delete(dir);
-        }
-        return FileVisitResult.CONTINUE;
-      }
-    });
   }
 
   /**
