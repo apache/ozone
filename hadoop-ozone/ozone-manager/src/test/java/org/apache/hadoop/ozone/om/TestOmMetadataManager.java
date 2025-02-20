@@ -28,9 +28,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCK
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -62,7 +60,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
-import org.apache.hadoop.ozone.om.helpers.MultipartUploadKeys;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -1152,53 +1149,44 @@ public class TestOmMetadataManager {
     Collections.sort(expectedKeys);
 
     // List first page without markers
-    MultipartUploadKeys result = omMetadataManager.getMultipartUploadKeys(
+    List<OmMultipartUpload> result = omMetadataManager.getMultipartUploadKeys(
         volumeName, bucketName, prefix, null, null, maxUploads, false);
 
-    assertEquals(maxUploads, result.getKeys().size());
-    assertTrue(result.isTruncated());
-    assertNotNull(result.getNextKeyMarker());
-    assertNotNull(result.getNextUploadIdMarker());
+    assertEquals(maxUploads + 1, result.size());
 
     // List next page using markers from first page
-    MultipartUploadKeys nextPage = omMetadataManager.getMultipartUploadKeys(
+    List<OmMultipartUpload> nextPage = omMetadataManager.getMultipartUploadKeys(
         volumeName, bucketName, prefix,
-        result.getNextKeyMarker(),
-        result.getNextUploadIdMarker(),
+        result.get(result.size() - 1).getKeyName(),
+        result.get(result.size() - 1).getUploadId(),
         maxUploads, false);
 
-    assertEquals(maxUploads, nextPage.getKeys().size());
-    assertTrue(nextPage.isTruncated());
+    assertEquals(maxUploads + 1, nextPage.size());
 
     // List with different prefix
-    MultipartUploadKeys differentPrefix = omMetadataManager.getMultipartUploadKeys(
+    List<OmMultipartUpload> differentPrefix = omMetadataManager.getMultipartUploadKeys(
         volumeName, bucketName, "different/", null, null, maxUploads, false);
 
-    assertEquals(0, differentPrefix.getKeys().size());
-    assertFalse(differentPrefix.isTruncated());
+    assertEquals(0, differentPrefix.size());
 
     // List all entries with large maxUploads
-    MultipartUploadKeys allEntries = omMetadataManager.getMultipartUploadKeys(
+    List<OmMultipartUpload> allEntries = omMetadataManager.getMultipartUploadKeys(
         volumeName, bucketName, prefix, null, null, 100, false);
 
-    assertEquals(25, allEntries.getKeys().size());
-    assertFalse(allEntries.isTruncated());
+    assertEquals(25, allEntries.size());
 
     // Verify all keys are present
     List<String> actualKeys = new ArrayList<>();
-    for (String dbKey : allEntries.getKeys()) {
-      OmMultipartUpload mpu = OmMultipartUpload.from(dbKey);
+    for (OmMultipartUpload mpu : allEntries) {
       actualKeys.add(mpu.getKeyName());
     }
     Collections.sort(actualKeys);
     assertEquals(expectedKeys, actualKeys);
 
     // Test with no pagination
-    MultipartUploadKeys noPagination = omMetadataManager.getMultipartUploadKeys(
+    List<OmMultipartUpload> noPagination = omMetadataManager.getMultipartUploadKeys(
         volumeName, bucketName, prefix, null, null, 10, true);
 
-    assertEquals(25, noPagination.getKeys().size());
-    assertFalse(noPagination.isTruncated());
-    
+    assertEquals(25, noPagination.size());
   }
 }

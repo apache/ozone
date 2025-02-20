@@ -79,7 +79,6 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -132,7 +131,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
-import org.apache.hadoop.ozone.om.helpers.MultipartUploadKeys;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -826,38 +824,25 @@ public class KeyManagerImpl implements KeyManager {
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     try {
-
-      MultipartUploadKeys multipartUploadKeys = metadataManager
+      List<OmMultipartUpload> multipartUploadKeys = metadataManager
           .getMultipartUploadKeys(volumeName, bucketName, prefix, keyMarker, uploadIdMarker, maxUploads,
               !withPagination);
+      OmMultipartUploadList.Builder resultBuilder = OmMultipartUploadList.newBuilder();
 
-      List<OmMultipartUpload> collect = multipartUploadKeys.getKeys().stream()
-          .map(OmMultipartUpload::from)
-          .peek(upload -> {
-            try {
-              Table<String, OmMultipartKeyInfo> keyInfoTable =
-                  metadataManager.getMultipartInfoTable();
+      if (withPagination && multipartUploadKeys.size() == maxUploads + 1) {
+        int lastIndex = multipartUploadKeys.size() - 1;
+        OmMultipartUpload lastUpload = multipartUploadKeys.get(lastIndex);
+        resultBuilder.setNextKeyMarker(lastUpload.getKeyName())
+            .setNextUploadIdMarker(lastUpload.getUploadId())
+            .setIsTruncated(true);
 
-              OmMultipartKeyInfo multipartKeyInfo =
-                  keyInfoTable.get(upload.getDbKey());
+        // remove next upload from the list
+        multipartUploadKeys.remove(lastIndex);
+      }
 
-              upload.setCreationTime(
-                  Instant.ofEpochMilli(multipartKeyInfo.getCreationTime()));
-              upload.setReplicationConfig(
-                      multipartKeyInfo.getReplicationConfig());
-            } catch (IOException e) {
-              LOG.warn(
-                  "Open key entry for multipart upload record can't be read  {}",
-                  metadataManager.getOzoneKey(upload.getVolumeName(),
-                          upload.getBucketName(), upload.getKeyName()));
-            }
-          })
-          .collect(Collectors.toList());
-
-      return new OmMultipartUploadList(collect,
-          multipartUploadKeys.getNextKeyMarker(),
-          multipartUploadKeys.getNextUploadIdMarker(),
-          multipartUploadKeys.isTruncated());
+      return resultBuilder
+          .setUploads(multipartUploadKeys)
+          .build();
 
     } catch (IOException ex) {
       LOG.error("List Multipart Uploads Failed: volume: " + volumeName +

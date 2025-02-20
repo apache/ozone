@@ -1842,10 +1842,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             ))
             .collect(Collectors.toList());
 
-    OmMultipartUploadList response = new OmMultipartUploadList(uploadList,
-        listMultipartUploadsResponse.getNextKeyMarker(),
-        listMultipartUploadsResponse.getNextUploadIdMarker(),
-        listMultipartUploadsResponse.getIsTruncated());
+    OmMultipartUploadList response = OmMultipartUploadList.newBuilder()
+        .setUploads(uploadList)
+        .setNextKeyMarker(listMultipartUploadsResponse.getNextKeyMarker())
+        .setNextUploadIdMarker(listMultipartUploadsResponse.getNextUploadIdMarker())
+        .setIsTruncated(listMultipartUploadsResponse.getIsTruncated())
+        .build();
 
     return response;
   }
