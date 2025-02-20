@@ -112,6 +112,7 @@ public class DatanodeSchemaTwoDBDefinition
     return DELETE_TRANSACTION;
   }
 
+  @Override
   public DBColumnFamilyDefinition<String, Long> getFinalizeBlocksColumnFamily() {
     return FINALIZE_BLOCKS;
   }

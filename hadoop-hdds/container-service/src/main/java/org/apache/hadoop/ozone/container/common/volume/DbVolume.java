@@ -104,6 +104,7 @@ public class DbVolume extends StorageVolume {
       return this;
     }
 
+    @Override
     public DbVolume build() throws IOException {
       return new DbVolume(this);
     }

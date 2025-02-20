@@ -228,6 +228,7 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
     return metaTable;
   }
 
+  @Override
   public Table<String, ByteString> getStatefulServiceConfigTable() {
     return statefulServiceConfigTable;
   }

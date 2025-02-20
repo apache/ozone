@@ -206,10 +206,12 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
     return dropped.value();
   }
 
+  @Override
   public long longWaitInQueueEvents() {
     return longWaitInQueue.value();
   }
   
+  @Override
   public long longTimeExecutionEvents() {
     return longTimeExecution.value();
   }
