@@ -40,7 +40,8 @@ import org.slf4j.LoggerFactory;
  * - avail: remaining space for hdds usage.
  * - reserved: total space for other usage.
  * - capacity: total space for hdds usage.
- * - other: space used by other service consuming the same volume.
+ * - other: space used by other service consuming the same volume,
+ *          including system level reserved spaces.
  * - fsAvail: reported remaining space from local fs.
  * - fsUsed: reported total used space from local fs.
  * - fsCapacity: reported total capacity from local fs.
@@ -52,40 +53,31 @@ import org.slf4j.LoggerFactory;
  *
  * <pre>
  * {@code
- * |----used----|   (avail)   |++mvfs++|++++reserved+++++++|
+ * |----used----|   (avail)   |++mvfs++|+++reserved+++|---other---|
  * |<-     capacity                  ->|
- *              |     fsAvail      |-------other-----------|
- * |<-                   fsCapacity                      ->|
+ *              |<-     fsAvail                     ->|
+ *              |<-        fsFree                               ->|
+ * |<-                       fsCapacity                         ->|
  * }</pre>
  * <pre>
  * What we could directly get from local fs:
- *     fsCapacity, fsAvail, (fsUsed = fsCapacity - fsAvail)
+ *     fsCapacity, fsAvail, (fsUsed = fsCapacity - fsFree)
  * We could get from config:
  *     reserved
  * Get from cmd line:
  *     used: from cmd 'du' (by default)
  * Get from calculation:
- *     capacity = fsCapacity - reserved
- *     other = fsUsed - used
+ *     capacity = fsCapacity - other - reserved = used + fsAvail - reserved
  *
  * The avail is the result we want from calculation.
- * So, it could be:
- * A) avail = capacity - used
- * B) avail = fsAvail - Max(reserved - other, 0);
+ * avail = capacity - used
  *
  * To be Conservative, we could get min
- *     avail = Max(Min(A, B), 0);
+ *     avail = Max(capacity - used, 0);
  *
- * If we have a dedicated disk for hdds and are not using the reserved space,
- * then we should use DedicatedDiskSpaceUsage for
- * `hdds.datanode.du.factory.classname`,
- * Then it is much simpler, since we don't care about other usage:
- * {@code
- *  |----used----|             (avail)/fsAvail              |
- *  |<-              capacity/fsCapacity                  ->|
- * }
- *
- *  We have avail == fsAvail.
+ * Most servers have a system level reserved space for each disks, so the "other"
+ * part should always exists, even the system level reserved space is 0, it will
+ * not affect the above calculation.
  *  </pre>
  */
 public final class VolumeInfo {
