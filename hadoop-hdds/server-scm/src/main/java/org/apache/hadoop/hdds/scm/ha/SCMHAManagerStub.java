@@ -291,6 +291,5 @@ public final class SCMHAManagerStub implements SCMHAManager {
     public RaftPeerId getLeaderId() {
       return leaderId;
     }
-
   }
 }

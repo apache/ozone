@@ -429,5 +429,4 @@ public class SCMRatisServerImpl implements SCMRatisServer {
           division.getRaftConf().getPeer(RaftPeerId.valueOf(leaderId));
     }
   }
-
 }
