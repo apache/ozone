@@ -745,7 +745,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         request.getBucketName(),
         request.getStartKey(),
         request.getPrefix(),
-        (int) Math.min(getMaxListSize(), request.getCount()));
+        limitListSizeInt(request.getCount()));
     for (OmKeyInfo key : listKeysResult.getKeys()) {
       resp.addKeyInfo(key.getProtobuf(true, clientVersion));
     }
@@ -763,7 +763,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         request.getBucketName(),
         request.getStartKey(),
         request.getPrefix(),
-        (int) Math.min(getMaxListSize(), request.getCount()));
+        limitListSizeInt(request.getCount()));
     for (BasicOmKeyInfo key : listKeysLightResult.getKeys()) {
       resp.addBasicKeyInfo(key.getProtobuf());
     }
@@ -1237,7 +1237,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         request.hasAllowPartialPrefix() && request.getAllowPartialPrefix();
     List<OzoneFileStatus> statuses =
         impl.listStatus(omKeyArgs, request.getRecursive(),
-            request.getStartKey(), Math.min(getMaxListSize(), request.getNumEntries()),
+            request.getStartKey(), limitListSize(request.getNumEntries()),
             allowPartialPrefixes);
     ListStatusResponse.Builder
         listStatusResponseBuilder =
@@ -1263,7 +1263,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         request.hasAllowPartialPrefix() && request.getAllowPartialPrefix();
     List<OzoneFileStatusLight> statuses =
         impl.listStatusLight(omKeyArgs, request.getRecursive(),
-            request.getStartKey(), Math.min(getMaxListSize(), request.getNumEntries()),
+            request.getStartKey(), limitListSize(request.getNumEntries()),
             allowPartialPrefixes);
     ListStatusLightResponse.Builder
         listStatusLightResponseBuilder =
@@ -1491,7 +1491,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       throws IOException {
     ListSnapshotResponse implResponse = impl.listSnapshot(
         request.getVolumeName(), request.getBucketName(), request.getPrefix(),
-        request.getPrevSnapshot(), (int) Math.min(request.getMaxListResult(), getMaxListSize()));
+        request.getPrevSnapshot(), limitListSizeInt(request.getMaxListResult()));
 
     List<OzoneManagerProtocolProtos.SnapshotInfo> snapshotInfoList = implResponse.getSnapshotInfos()
         .stream().map(SnapshotInfo::getProtobuf).collect(Collectors.toList());
@@ -1567,7 +1567,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return OzoneManagerProtocolProtos.StartQuotaRepairResponse.newBuilder().build();
   }
 
-  private long getMaxListSize() {
-    return impl.getConfig().getMaxListSize();
+  private int limitListSizeInt(int requestedSize) {
+    return Math.toIntExact(limitListSize(requestedSize));
   }
+
+  private long limitListSize(long requestedSize) {
+    return Math.min(requestedSize, impl.getConfig().getMaxListSize());
+  }
+
 }
