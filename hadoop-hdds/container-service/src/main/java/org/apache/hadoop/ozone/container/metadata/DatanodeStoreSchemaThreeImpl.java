@@ -139,7 +139,8 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
         prefix);
   }
 
-  public void loadKVContainerData(File dumpDir, DatanodeStoreSchemaThreeImpl store) throws IOException {
+  public void loadKVContainerData(File dumpDir, DatanodeStoreSchemaThreeImpl store)
+      throws IOException, RocksDBException {
     try (BatchOperation batch = store.getBatchHandler().initBatchOperation()) {
       processTable(batch, getTableDumpFile(getMetadataTable(), dumpDir),
           FixedLengthStringCodec.get(), LongCodec.get(), getMetadataTable());
@@ -157,7 +158,7 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
   }
 
   private <K, V> void processTable(BatchOperation batch, File tableDumpFile,
-      Codec<K> keyCodec, Codec<V> valueCodec, Table<K, V> table) throws IOException {
+      Codec<K> keyCodec, Codec<V> valueCodec, Table<K, V> table) throws IOException, RocksDBException {
     try (ManagedSstFileReader sstFileReader = new ManagedSstFileReader(new ManagedOptions());
          ManagedSstFileReaderIterator iterator =
              ManagedSstFileReaderIterator.managed(sstFileReader.newIterator(new ManagedReadOptions()))) {
@@ -169,8 +170,6 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
         V decodedValue = valueCodec.fromPersistedFormat(value);
         table.putWithBatch(batch, decodedKey, decodedValue);
       }
-    } catch (RocksDBException e) {
-      LOG.error("Failed to import SST file", e);
     }
   }
 

@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
+import org.rocksdb.RocksDBException;
 
 /**
  * Utils functions to help block functions.
@@ -329,7 +330,7 @@ public final class BlockUtils {
       File dumpDir = DatanodeStoreSchemaThreeImpl.getDumpDir(metaDir);
       try {
         store.loadKVContainerData(dumpDir, store);
-      } catch (IOException e) {
+      } catch (IOException | RocksDBException e) {
         // Don't delete unloaded or partially loaded files on failure,
         // but delete all partially loaded metadata.
         store.removeKVContainerData(containerID);
