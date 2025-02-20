@@ -21,10 +21,14 @@ import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateActi
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.UPDATE;
 import static org.hadoop.ozone.recon.schema.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.AdditionalAnswers.returnsElementsOf;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -508,8 +512,8 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         .thenThrow(new RuntimeException("Simulated DB failure"));
 
     // Create instances of FileSizeCountTaskOBS and FileSizeCountTaskFSO using mocks
-    FileSizeCountTaskOBS fileSizeCountTaskOBS = new FileSizeCountTaskOBS(mockDao, mockSchema);
-    FileSizeCountTaskFSO fileSizeCountTaskFSO = new FileSizeCountTaskFSO(mockDao, mockSchema);
+    fileSizeCountTaskOBS = new FileSizeCountTaskOBS(mockDao, mockSchema);
+    fileSizeCountTaskFSO = new FileSizeCountTaskFSO(mockDao, mockSchema);
 
     // Mock OMMetadataManager
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
