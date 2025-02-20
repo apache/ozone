@@ -675,13 +675,10 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     uploadIds.add(uploadId1);
     String uploadId2 = initiateMultipartUpload(bucketName, multipartKey1, null, null, null);
     uploadIds.add(uploadId2);
-    // TODO: Currently, Ozone sorts based on uploadId instead of MPU init time within the same key.
-    //  Remove this sorting step once HDDS-11532 has been implemented
-    Collections.sort(uploadIds);
+
     String uploadId3 = initiateMultipartUpload(bucketName, multipartKey2, null, null, null);
     uploadIds.add(uploadId3);
 
-    // TODO: Add test for max uploads threshold and marker once HDDS-11530 has been implemented
     ListMultipartUploadsRequest listMultipartUploadsRequest = new ListMultipartUploadsRequest(bucketName);
 
     MultipartUploadListing result = s3Client.listMultipartUploads(listMultipartUploadsRequest);
