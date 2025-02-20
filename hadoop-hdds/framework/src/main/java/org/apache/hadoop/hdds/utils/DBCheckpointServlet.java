@@ -111,7 +111,8 @@ public class DBCheckpointServlet extends HttpServlet
       try {
         FileUtils.cleanDirectory(bootstrapTempData);
       } catch (IOException e) {
-        throw new ServletException(e);
+        LOG.error("Failed to clean-up: {} dir.", bootstrapTempData);
+        throw new ServletException("Failed to clean-up: " + bootstrapTempData);
       }
     }
     if (!bootstrapTempData.exists() &&
