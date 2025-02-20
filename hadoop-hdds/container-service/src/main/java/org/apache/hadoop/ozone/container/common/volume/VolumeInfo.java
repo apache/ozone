@@ -79,7 +79,7 @@ import org.slf4j.LoggerFactory;
  * To be Conservative, we could get min
  *     avail = Max(capacity - used, 0);
  *
- * Most servers have a system level reserved space for each disks, so the "other"
+ * Most servers have a system level reserved space for each disks, so the "sysReserve"
  * part should always exists, even the system level reserved space is 0, it will
  * not affect the above calculation.
  *  </pre>
