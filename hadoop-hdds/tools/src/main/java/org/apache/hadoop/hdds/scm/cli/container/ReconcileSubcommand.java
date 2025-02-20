@@ -26,6 +26,7 @@ import java.util.Iterator;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.SequenceWriter;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -183,13 +184,17 @@ public class ReconcileSubcommand extends ScmSubcommand {
   static class ReplicaWrapper {
     private final DatanodeWrapper datanode;
     private final String state;
-    private final int replicaIndex;
+    private int replicaIndex;
+    @JsonSerialize(using = JsonUtils.ChecksumSerializer.class)
     private final long dataChecksum;
 
     ReplicaWrapper(ContainerReplicaInfo replica) {
       this.datanode = new DatanodeWrapper(replica.getDatanodeDetails());
       this.state = replica.getState();
-      this.replicaIndex = replica.getReplicaIndex();
+      // Only display replica index when it has a positive value for EC.
+      if (replica.getReplicaIndex() > 0) {
+        this.replicaIndex = replica.getReplicaIndex();
+      }
       this.dataChecksum = replica.getDataChecksum();
     }
 
