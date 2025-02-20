@@ -43,7 +43,6 @@ public class WrappedStripedLock {
    * lock the list of keys in order.
    * Sample code for lock and unlock handling:
    * <code>
-   *   List<Lock> locks = new ArrayList<>();
    *   try {
    *     if (!wrappedStripedLock.lock(keyList, locks)) {
    *       // timeout occurred, release lock if any in reverse order
@@ -112,7 +111,6 @@ public class WrappedStripedLock {
    * lock the list of keys in order.
    * Sample code for lock and unlock handling:
    * <code>
-   *   List<Lock> locks = new ArrayList<>();
    *   try {
    *     if (!wrappedStripedLock.lock(keyList, locks)) {
    *       // timeout occurred, release lock if any in reverse order
