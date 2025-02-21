@@ -132,6 +132,7 @@ public class DatanodeStateMachine implements Closeable {
 
   private final DatanodeQueueMetrics queueMetrics;
   private final ReconfigurationHandler reconfigurationHandler;
+  private final DNContainerOperationClient dnClient;
   /**
    * Constructs a datanode state machine.
    * @param datanodeDetails - DatanodeDetails used to identify a datanode
@@ -229,7 +230,7 @@ public class DatanodeStateMachine implements Closeable {
 
     // TODO HDDS-11218 combine the clients used for reconstruction and reconciliation so they share the same cache of
     //  datanode clients.
-    DNContainerOperationClient dnClient = new DNContainerOperationClient(conf, certClient, secretKeyClient);
+    dnClient = new DNContainerOperationClient(conf, certClient, secretKeyClient);
 
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
         .setNameFormat(threadNamePrefix + "PipelineCommandHandlerThread-%d")
@@ -751,5 +752,10 @@ public class DatanodeStateMachine implements Closeable {
 
   public ReconfigurationHandler getReconfigurationHandler() {
     return reconfigurationHandler;
+  }
+
+  @VisibleForTesting
+  public DNContainerOperationClient getDnContainerOperationClientClient() {
+    return dnClient;
   }
 }
