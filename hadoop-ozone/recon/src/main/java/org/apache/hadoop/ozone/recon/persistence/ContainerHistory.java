@@ -31,10 +31,12 @@ public class ContainerHistory implements Serializable {
   private long lastSeenTime;
   private long lastBcsId;
   private String state;
+  private long dataChecksum;
 
+  @SuppressWarnings("parameternumber")
   public ContainerHistory(long containerId, String datanodeUuid,
                           String datanodeHost, long firstSeenTime,
-                          long lastSeenTime, long lastBcsId, String state) {
+                          long lastSeenTime, long lastBcsId, String state, long dataChecksum) {
     this.containerId = containerId;
     this.datanodeUuid = datanodeUuid;
     this.datanodeHost = datanodeHost;
@@ -42,6 +44,7 @@ public class ContainerHistory implements Serializable {
     this.lastSeenTime = lastSeenTime;
     this.lastBcsId = lastBcsId;
     this.state = state;
+    this.dataChecksum = dataChecksum;
   }
 
   // Default constructor, used by jackson lib for object deserialization.
@@ -98,5 +101,13 @@ public class ContainerHistory implements Serializable {
 
   public void setState(String state) {
     this.state = state;
+  }
+
+  public long getDataChecksum() {
+    return dataChecksum;
+  }
+
+  public void setDataChecksum(long dataChecksum) {
+    this.dataChecksum = dataChecksum;
   }
 }
