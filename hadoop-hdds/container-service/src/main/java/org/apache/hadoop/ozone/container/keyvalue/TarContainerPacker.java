@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -42,8 +43,10 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
@@ -90,6 +93,7 @@ public class TarContainerPacker
     Path dbRoot = getDbPath(containerUntarDir, containerData);
     Path chunksRoot = getChunkPath(containerUntarDir, containerData);
     byte[] descriptorFileContent = innerUnpack(input, dbRoot, chunksRoot);
+    persistCustomContainerState(container, descriptorFileContent, ContainerProtos.ContainerDataProto.State.RECOVERING);
 
     if (!Files.exists(destContainerDir)) {
       Files.createDirectories(destContainerDir);
@@ -106,6 +110,17 @@ public class TarContainerPacker
           CONTAINER_ALREADY_EXISTS);
     }
     return descriptorFileContent;
+  }
+
+  private void persistCustomContainerState(Container<KeyValueContainerData> container,
+      byte[] descriptorContent, ContainerProtos.ContainerDataProto.State state) throws IOException {
+    Preconditions.checkNotNull(descriptorContent,
+        "Container descriptor is missing for container {}" + container.getContainerData().getContainerID());
+
+    KeyValueContainerData originalContainerData =
+        (KeyValueContainerData) ContainerDataYaml.readContainer(descriptorContent);
+    originalContainerData.setState(state);
+    container.update(originalContainerData.getMetadata(), true);
   }
 
   private void extractEntry(ArchiveEntry entry, InputStream input, long size,
