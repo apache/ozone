@@ -125,11 +125,7 @@ Basic code conventions followed by Ozone:
 
 These are checked by tools like Checkstyle and RAT.
 
-For IntelliJ users, Ozone checkstyle is shared via standard configuration folder and will be automatically imported when the project is open:
-
-```
-./.idea/codeStyle
-```
+Ozone checkstyle is shared via .editorconfig configuration file and will be automatically imported when the project is open.
 
 See https://www.jetbrains.com/help/idea/configure-project-settings.html#share-project-through-vcs for detailed instructions.
 

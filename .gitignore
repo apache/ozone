@@ -9,6 +9,7 @@
 *.suo
 *.vcxproj.user
 *.patch
+.idea
 .svn
 .classpath
 .project
@@ -18,11 +19,6 @@ target
 build
 dependency-reduced-pom.xml
 make-build-debug
-
-# IntelliJ IDEA
-.idea
-!.idea/codeStyles/codeStyleConfig.xml
-!.idea/codeStyles/Project.xml
 
 # Filesystem contract test options and credentials
 auth-keys.xml
