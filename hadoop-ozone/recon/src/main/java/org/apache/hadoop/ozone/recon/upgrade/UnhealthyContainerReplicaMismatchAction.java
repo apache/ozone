@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.recon.upgrade;
 
 import static org.apache.hadoop.ozone.recon.upgrade.ReconLayoutFeature.UNHEALTHY_CONTAINER_REPLICA_MISMATCH;
@@ -23,10 +24,10 @@ import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_
 import static org.jooq.impl.DSL.field;
 import static org.jooq.impl.DSL.name;
 
-import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Arrays;
+import javax.sql.DataSource;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.jooq.DSLContext;
