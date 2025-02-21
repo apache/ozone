@@ -125,7 +125,7 @@ Basic code conventions followed by Ozone:
 
 These are checked by tools like Checkstyle and RAT.
 
-Ozone checkstyle is shared via .editorconfig configuration file and will be automatically imported when the project is open.
+Ozone code style is shared via `.editorconfig` configuration file and will be automatically imported when the project is opened.
 
 See https://www.jetbrains.com/help/idea/configure-project-settings.html#share-project-through-vcs for detailed instructions.
 
@@ -166,13 +166,13 @@ Ozone components depend on maven classpath. We generate classpath descriptor fro
 
 As a result, it's straightforward to start _all_ the components from IDE as the right classpath (without provided scope) has already been set.
 
-Ozone project already has pre-defined run configurations shared via standard IDE folder for run configurations:
+Ozone project has pre-defined run configurations shared via standard IDE folder for run configurations:
 
 ```
-./.run
+.run
 ```
 
-They will be automatically imported into IDE on project import. 
+They will be automatically added to the IDE on project import.
 
 You can use the installed Run configurations in the following order:
 
