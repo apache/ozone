@@ -316,8 +316,7 @@ public class TestHddsVolume {
     // fsCapacity = 500, fsAvail = 190, reserved = 100
     // After fix:
     // fsCapacity = 500, fsAvail = 190, used = 0
-    // usableCapacity = used + fsAvail = 0 + 190 = 190
-    // capacity = max(usableCapacity - reserved, 0) = max(190 - 100, 0) = 90
+    // capacity = max(fsCapacity - reserved, 0) = max(500 - 100, 0) = 400
     // avail = max(fsAvail - reserved, 0) = max(190 - 100, 0) = 90
     SpaceUsageSource spaceUsage = fixed(500, 190, 0);
     SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(
@@ -327,7 +326,7 @@ public class TestHddsVolume {
     HddsVolume volume = volumeBuilder.build();
 
     SpaceUsageSource usage = volume.getCurrentUsage();
-    assertEquals(90, usage.getCapacity());
+    assertEquals(400, usage.getCapacity());
     assertEquals(90, usage.getAvailable());
 
     // Shutdown the volume.
@@ -343,8 +342,7 @@ public class TestHddsVolume {
     // fsCapacity = 500, fsAvail = 300, reserved = 100
     // After fix:
     // fsCapacity = 500, fsAvail = 300, used = 0
-    // usableCapacity = used + fsAvail = 0 + 300 = 300
-    // capacity = max(usableCapacity - reserved, 0) = max(300 - 100, 0) = 200
+    // capacity = max(fsCapacity - reserved, 0) = max(500 - 100, 0) = 400
     // avail = max(fsAvail - reserved, 0) = max(300 - 100, 0) = 200
     SpaceUsageSource spaceUsage = fixed(500, 300, 0);
     SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(
@@ -354,7 +352,7 @@ public class TestHddsVolume {
     HddsVolume volume = volumeBuilder.build();
 
     SpaceUsageSource usage = volume.getCurrentUsage();
-    assertEquals(200, usage.getCapacity());
+    assertEquals(400, usage.getCapacity());
     assertEquals(200, usage.getAvailable());
 
     // Shutdown the volume.
@@ -370,8 +368,7 @@ public class TestHddsVolume {
     // fsCapacity = 500, fsAvail = 40, reserved = 100
     // After fix:
     // fsCapacity = 500, fsAvail = 40, used = 450
-    // usableCapacity = used + fsAvail = 450 + 40 = 490
-    // capacity = max(usableCapacity - reserved, 0) = max(490 - 100, 0) = 390
+    // capacity = max(fsCapacity - reserved, 0) = max(500 - 100, 0) = 400
     // avail = max(fsAvail - reserved, 0) = max(40 - 100, 0) = 0
     SpaceUsageSource spaceUsage = fixed(500, 40, 450);
     SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(
@@ -381,7 +378,7 @@ public class TestHddsVolume {
     HddsVolume volume = volumeBuilder.build();
 
     SpaceUsageSource usage = volume.getCurrentUsage();
-    assertEquals(390, usage.getCapacity());
+    assertEquals(400, usage.getCapacity());
     assertEquals(0, usage.getAvailable());
 
     // Shutdown the volume.
