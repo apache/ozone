@@ -21,12 +21,13 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.PostConstruct;
+import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
 
 /**
  * Ozone Manager configuration.
  */
 @ConfigGroup(prefix = "ozone.om")
-public class OmConfig {
+public class OmConfig extends ReconfigurableConfig {
 
   /** This config needs to be enabled, when S3G created objects used via FileSystem API. */
   @Config(
@@ -48,6 +49,7 @@ public class OmConfig {
       key = "server.list.max.size",
       defaultValue = "1000",
       description = "Configuration property to configure the max server side response size for list calls on om.",
+      reconfigurable = true,
       tags = { ConfigTag.OM, ConfigTag.OZONE }
   )
   private long maxListSize;
