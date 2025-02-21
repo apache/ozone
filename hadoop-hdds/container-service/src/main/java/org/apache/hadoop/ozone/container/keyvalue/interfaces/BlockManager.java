@@ -50,6 +50,17 @@ public interface BlockManager {
       throws IOException;
 
   /**
+   * Puts or overwrites a block to a closed container.
+   *
+   * @param container - Container for which block need to be added.
+   * @param data - Block Data.
+   * @param overwriteBcsId - To overwrite bcsId in the block data.
+   * @return length of the Block.
+   */
+  long putBlockForClosedContainer(Container container, BlockData data, boolean overwriteBcsId)
+          throws IOException;
+
+  /**
    * Gets an existing block.
    *
    * @param container - Container from which block needs to be fetched.
@@ -78,6 +89,15 @@ public interface BlockManager {
    */
   List<BlockData> listBlock(Container container, long startLocalID, int count)
       throws IOException;
+
+  /**
+   * Check if a block exists in the container.
+   *
+   * @param container - Container from which blocks need to be listed.
+   * @param blockID - BlockID of the Block.
+   * @return True if block exists, false otherwise.
+   */
+  boolean blockExists(Container container, BlockID blockID) throws IOException;
 
   /**
    * Returns last committed length of the block.

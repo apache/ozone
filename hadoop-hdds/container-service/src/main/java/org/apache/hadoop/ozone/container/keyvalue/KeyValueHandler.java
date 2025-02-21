@@ -1101,9 +1101,9 @@ public class KeyValueHandler extends Handler {
    * Handle Put Block operation for closed container. Calls BlockManager to process the request.
    *
    */
-  public void putBlockForClosedContainer(List<ContainerProtos.ChunkInfo> chunkInfos, KeyValueContainer kvContainer,
-                                          BlockData blockData, long blockCommitSequenceId)
-      throws IOException {
+  public void putBlockForClosedContainer(KeyValueContainer kvContainer, BlockData blockData,
+                                         long blockCommitSequenceId, boolean overwriteBscId)
+          throws IOException {
     Preconditions.checkNotNull(kvContainer);
     Preconditions.checkNotNull(blockData);
     long startTime = Time.monotonicNowNanos();
@@ -1112,11 +1112,12 @@ public class KeyValueHandler extends Handler {
       throw new IOException("Container #" + kvContainer.getContainerData().getContainerID() +
           " is not in closed state, Container state is " + kvContainer.getContainerState());
     }
-    blockData.setChunks(chunkInfos);
     // To be set from the Replica's BCSId
-    blockData.setBlockCommitSequenceId(blockCommitSequenceId);
+    if (overwriteBscId) {
+      blockData.setBlockCommitSequenceId(blockCommitSequenceId);
+    }
 
-    blockManager.putBlock(kvContainer, blockData, false);
+    blockManager.putBlockForClosedContainer(kvContainer, blockData, overwriteBscId);
     ContainerProtos.BlockData blockDataProto = blockData.getProtoBufMessage();
     final long numBytes = blockDataProto.getSerializedSize();
     // Increment write stats for PutBlock after write.
