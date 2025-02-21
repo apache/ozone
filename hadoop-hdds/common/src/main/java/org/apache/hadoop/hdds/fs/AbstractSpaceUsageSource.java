@@ -87,6 +87,7 @@ public abstract class AbstractSpaceUsageSource implements SpaceUsageSource {
 
   @Override
   public long getCapacity() {
-    return file.getTotalSpace();
+    // system reserve: fsFree - fsUsable
+    return file.getTotalSpace() - (file.getFreeSpace() - file.getUsableSpace());
   }
 }

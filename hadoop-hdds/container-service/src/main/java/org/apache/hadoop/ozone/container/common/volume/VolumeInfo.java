@@ -55,26 +55,30 @@ import org.slf4j.LoggerFactory;
  * <pre>
  * {@code
  * |----used----|   (avail)   |++mvfs++|+++reserved+++|---other---|--sysReserve--|
- * |<-         capacity              ->|
- * |<-              usableCapacity                  ->|
- *              |<-            fsAvail              ->|
- * |<-                       fsCapacity                                        ->|
+ * |     1      |             2        |       3      |     4     |      5       |
  * }</pre>
  * <pre>
  * What we could directly get from local fs:
- *     fsCapacity, fsAvail, (fsUsed = fsCapacity - fsFree)
+ *     fsCapacity: 1 + 2 + 3 + 4 + 5
+ *     fsUsed: 1 + 4
+ *     fsAvail: 2 + 3
+ *     fsFree: 2 + 3 + 5
  * We could get from config:
- *     reserved
- * Get from cmd line:
- *     used: from cmd 'du' (by default)
+ *     reserved: 3
  * Get from calculation:
- *     usableCapacity = fsCapacity - other - sysReserve = used + fsAvail
- *     capacity = usableCapacity - reserved
- *              = fsCapacity - other - sysReserve - reserved
- *              = used + fsAvail - reserved
+ *     used:
+ *         - 1: from cmd 'du' (by default)
+ *         - 1 + 4: from FileSystem metadata
+ *     sysReserve = 5
+ *                = fsFree - fsAvail
+ *     usableCapacity = 1 + 2 + 3 + 4
+ *                    = fsCapacity - sysReserve
+ *     capacity = 1 + 2 + 4
+ *              = usableCapacity - reserved
  *
  * The avail is the result we want from calculation.
- * avail = capacity - used
+ * avail = 2
+ *       = fsAvail - reserved
  *
  * To be Conservative, we could get min
  *     avail = Max(capacity - used, 0);

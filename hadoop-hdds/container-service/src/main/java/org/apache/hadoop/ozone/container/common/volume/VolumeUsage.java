@@ -83,10 +83,12 @@ public class VolumeUsage {
   public SpaceUsageSource getCurrentUsage() {
     SpaceUsageSource real = realUsage();
 
-    return new SpaceUsageSource.Fixed(
-            Math.max(getUsableCapacity(real) - reservedInBytes, 0),
-            Math.max(real.getAvailable() - reservedInBytes, 0),
-            real.getUsedSpace());
+    return reservedInBytes == 0
+        ? real
+        : new SpaceUsageSource.Fixed(
+        Math.max(real.getCapacity() - reservedInBytes, 0),
+        Math.max(real.getAvailable() - reservedInBytes, 0),
+        real.getUsedSpace());
   }
 
   public void incrementUsedSpace(long usedSpace) {
