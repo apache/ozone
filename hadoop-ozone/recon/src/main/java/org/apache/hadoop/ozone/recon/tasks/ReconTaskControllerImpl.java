@@ -39,6 +39,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.types.NamedCallableTask;
 import org.apache.hadoop.ozone.recon.tasks.types.TaskExecutionException;
@@ -122,6 +123,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       }
 
       // Reprocess the failed tasks.
+      ReconConstants.resetTableTruncatedFlags();
       if (!retryFailedTasks.isEmpty()) {
         tasks.clear();
         for (String taskName : failedTasks) {
@@ -154,6 +156,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   @Override
   public synchronized void reInitializeTasks(ReconOMMetadataManager omMetadataManager) {
     Collection<NamedCallableTask<Pair<String, Boolean>>> tasks = new ArrayList<>();
+    ReconConstants.resetTableTruncatedFlags();
     for (Map.Entry<String, ReconOmTask> taskEntry :
         reconOmTasks.entrySet()) {
       ReconOmTask task = taskEntry.getValue();
