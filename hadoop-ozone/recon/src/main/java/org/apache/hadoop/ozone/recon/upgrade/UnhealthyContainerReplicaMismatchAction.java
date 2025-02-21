@@ -30,7 +30,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Arrays;
 
-import static org.apache.hadoop.ozone.recon.upgrade.ReconLayoutFeature.UNHEALTHY_CONTAINER_DATA_CHECKSUM;
+import static org.apache.hadoop.ozone.recon.upgrade.ReconLayoutFeature.UNHEALTHY_CONTAINER_REPLICA_MISMATCH;
 import static org.apache.hadoop.ozone.recon.upgrade.ReconUpgradeAction.UpgradeActionType.FINALIZE;
 import static org.hadoop.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
 import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
@@ -41,8 +41,8 @@ import static org.jooq.impl.DSL.name;
  * Upgrade action for handling the addition of a new unhealthy container state in Recon, which will be for containers,
  * that have replicas with different data checksums.
  */
-@UpgradeActionRecon(feature = UNHEALTHY_CONTAINER_DATA_CHECKSUM, type = FINALIZE)
-public class UnhealthyContainerDataChecksumAction implements ReconUpgradeAction {
+@UpgradeActionRecon(feature = UNHEALTHY_CONTAINER_REPLICA_MISMATCH, type = FINALIZE)
+public class UnhealthyContainerReplicaMismatchAction implements ReconUpgradeAction {
   private static final Logger LOG = LoggerFactory.getLogger(InitialConstraintUpgradeAction.class);
   private DataSource dataSource;
   private DSLContext dslContext;
@@ -60,7 +60,7 @@ public class UnhealthyContainerDataChecksumAction implements ReconUpgradeAction 
       // Add the updated constraint with all enum states
       addUpdatedConstraint();
     } catch (SQLException e) {
-      throw new SQLException("Failed to execute UnhealthyContainerDataChecksumAction", e);
+      throw new SQLException("Failed to execute UnhealthyContainerReplicaMismatchAction", e);
     }
   }
 

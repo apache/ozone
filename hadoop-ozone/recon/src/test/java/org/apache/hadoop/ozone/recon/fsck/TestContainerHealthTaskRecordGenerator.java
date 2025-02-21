@@ -362,8 +362,8 @@ public class TestContainerHealthTaskRecordGenerator {
     logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
     initializeUnhealthyContainerStateStatsMap(unhealthyContainerStateStatsMap);
 
-    // Data checksum mismatch
-    replicas = generateDataChecksumMismatchedReplicas(container, CLOSED, CLOSED, CLOSED);
+    // Replica mismatch
+    replicas = generateMismatchedReplicas(container, CLOSED, CLOSED, CLOSED);
     status =
             new ContainerHealthStatus(container, replicas, placementPolicy,
                     reconContainerMetadataManager, CONF);
@@ -379,7 +379,7 @@ public class TestContainerHealthTaskRecordGenerator {
     initializeUnhealthyContainerStateStatsMap(unhealthyContainerStateStatsMap);
 
     // Same data checksum replicas
-    replicas = generateSameDataChecksumReplicas(container, CLOSED, CLOSED, CLOSED);
+    replicas = generateReplicas(container, CLOSED, CLOSED, CLOSED);
     status =
             new ContainerHealthStatus(container, replicas, placementPolicy,
                     reconContainerMetadataManager, CONF);
@@ -644,37 +644,24 @@ public class TestContainerHealthTaskRecordGenerator {
           .setContainerID(cont.containerID())
           .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
           .setContainerState(s)
+          .setDataChecksum(1234L)
           .build());
     }
     return replicas;
   }
 
-  private Set<ContainerReplica> generateDataChecksumMismatchedReplicas(ContainerInfo cont,
-                                                                       ContainerReplicaProto.State...states) {
+  private Set<ContainerReplica> generateMismatchedReplicas(ContainerInfo cont,
+                                                 ContainerReplicaProto.State...states) {
     Set<ContainerReplica> replicas = new HashSet<>();
-    long dataChecksum = 10L;
+    long checksum = 1234L;
     for (ContainerReplicaProto.State s : states) {
       replicas.add(new ContainerReplica.ContainerReplicaBuilder()
-              .setContainerID(cont.containerID())
-              .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
-              .setContainerState(s)
-              .setDataChecksum(dataChecksum)
-              .build());
-      dataChecksum++;
-    }
-    return replicas;
-  }
-
-  private Set<ContainerReplica> generateSameDataChecksumReplicas(ContainerInfo cont,
-                                                                       ContainerReplicaProto.State...states) {
-    Set<ContainerReplica> replicas = new HashSet<>();
-    for (ContainerReplicaProto.State s : states) {
-      replicas.add(new ContainerReplica.ContainerReplicaBuilder()
-              .setContainerID(cont.containerID())
-              .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
-              .setContainerState(s)
-              .setDataChecksum(10L)
-              .build());
+          .setContainerID(cont.containerID())
+          .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
+          .setContainerState(s)
+          .setDataChecksum(checksum)
+          .build());
+      checksum++;
     }
     return replicas;
   }

@@ -503,7 +503,7 @@ public class ContainerHealthTask extends ReconScmTask {
         returnValue = keepOverReplicatedRecord(container, rec);
         break;
       case REPLICA_MISMATCH:
-        returnValue = keepDataChecksumMismatchedRecord(container, rec);
+        returnValue = keepReplicaMismatchRecord(container, rec);
         break;
       default:
         returnValue = false;
@@ -665,7 +665,7 @@ public class ContainerHealthTask extends ReconScmTask {
       return false;
     }
 
-    private static boolean keepDataChecksumMismatchedRecord(
+    private static boolean keepReplicaMismatchRecord(
             ContainerHealthStatus container, UnhealthyContainersRecord rec) {
       if (container.isDataChecksumMismatched()) {
         updateExpectedReplicaCount(rec, container.expectedPlacementCount());
