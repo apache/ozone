@@ -142,7 +142,7 @@ public class TestS3GatewayMetrics {
     bucketEndpoint.get(bucketName, null,
         null, null, 1000, null,
         null, "random", null,
-        null, null).getEntity();
+        null, null, null, 0, null).getEntity();
 
     long curMetric = metrics.getGetBucketSuccess();
     assertEquals(1L, curMetric - oriMetric);
@@ -155,7 +155,7 @@ public class TestS3GatewayMetrics {
     // Searching for a bucket that does not exist
     OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
         "newBucket", null, null, null, 1000, null, null, "random", null,
-        null, null));
+        null, null, null, 0, null));
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), e.getCode());
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
         e.getErrorMessage());
@@ -219,7 +219,7 @@ public class TestS3GatewayMetrics {
     Response response =
         bucketEndpoint.get(bucketName, null, null,
             null, 0, null, null,
-            null, null, "acl", null);
+            null, null, "acl", null, null, 0, null);
     long curMetric = metrics.getGetAclSuccess();
     assertEquals(HTTP_OK, response.getStatus());
     assertEquals(1L, curMetric - oriMetric);
@@ -232,7 +232,7 @@ public class TestS3GatewayMetrics {
     // Failing the getACL endpoint by applying ACL on a non-Existent Bucket
     OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
         "random_bucket", null, null, null, 0, null,
-        null, null, null, "acl", null));
+        null, null, null, "acl", null, null, 0, null));
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), e.getCode());
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
         e.getErrorMessage());

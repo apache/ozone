@@ -22,7 +22,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR;
 
-import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
@@ -83,24 +82,12 @@ public final class SCMHAUtils {
     // not used
   }
 
-  // This will be removed in follow-up Jira. Ref. HDDS-11754
-  private static boolean isRatisEnabled = true;
-  public static boolean isSCMHAEnabled(ConfigurationSource conf) {
-    return isRatisEnabled;
-  }
-
-  public static void setRatisEnabled(boolean value) {
-    isRatisEnabled = value;
-  }
-
   public static String getPrimordialSCM(ConfigurationSource conf) {
     return conf.get(ScmConfigKeys.OZONE_SCM_PRIMORDIAL_NODE_ID_KEY);
   }
 
   public static boolean isPrimordialSCM(ConfigurationSource conf,
       String selfNodeId, String hostName) {
-    // This should only be called if SCM HA is enabled.
-    Preconditions.checkArgument(isSCMHAEnabled(conf));
     String primordialNode = getPrimordialSCM(conf);
     return primordialNode != null && (primordialNode
         .equals(selfNodeId) || primordialNode.equals(hostName));

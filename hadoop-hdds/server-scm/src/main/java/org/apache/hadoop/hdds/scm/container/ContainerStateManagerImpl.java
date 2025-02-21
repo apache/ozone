@@ -35,7 +35,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LOCK_
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Striped;
 import java.io.IOException;
-import java.lang.reflect.Proxy;
 import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -58,7 +57,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingO
 import org.apache.hadoop.hdds.scm.container.states.ContainerState;
 import org.apache.hadoop.hdds.scm.container.states.ContainerStateMap;
 import org.apache.hadoop.hdds.scm.ha.ExecutionUtil;
-import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -446,6 +444,7 @@ public final class ContainerStateManagerImpl
     }
   }
 
+  @Override
   public ContainerInfo getMatchingContainer(final long size, String owner,
       PipelineID pipelineID, NavigableSet<ContainerID> containerIDs) {
     if (containerIDs.isEmpty()) {
@@ -504,6 +503,7 @@ public final class ContainerStateManagerImpl
   }
 
 
+  @Override
   public void removeContainer(final HddsProtos.ContainerID id)
       throws IOException {
     final ContainerID cid = ContainerID.getFromProtobuf(id);
@@ -609,13 +609,8 @@ public final class ContainerStateManagerImpl
           conf, pipelineMgr, table, transactionBuffer,
           containerReplicaPendingOps);
 
-      final SCMHAInvocationHandler invocationHandler =
-          new SCMHAInvocationHandler(RequestType.CONTAINER, csm,
-              scmRatisServer);
-
-      return (ContainerStateManager) Proxy.newProxyInstance(
-          SCMHAInvocationHandler.class.getClassLoader(),
-          new Class<?>[]{ContainerStateManager.class}, invocationHandler);
+      return scmRatisServer.getProxyHandler(RequestType.CONTAINER,
+          ContainerStateManager.class, csm);
     }
 
   }

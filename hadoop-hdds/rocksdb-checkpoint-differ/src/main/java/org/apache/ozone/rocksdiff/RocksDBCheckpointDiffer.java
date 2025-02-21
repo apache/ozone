@@ -1024,6 +1024,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
   static class NodeComparator
       implements Comparator<CompactionNode>, Serializable {
+    @Override
     public int compare(CompactionNode a, CompactionNode b) {
       return a.getFileName().compareToIgnoreCase(b.getFileName());
     }

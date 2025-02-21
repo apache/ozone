@@ -48,6 +48,9 @@ public class ListMultipartUploadsResult {
   @XmlElement(name = "NextKeyMarker")
   private String nextKeyMarker;
 
+  @XmlElement(name = "Prefix")
+  private String prefix;
+
   @XmlElement(name = "NextUploadIdMarker")
   private String nextUploadIdMarker;
 
@@ -90,6 +93,14 @@ public class ListMultipartUploadsResult {
 
   public void setNextKeyMarker(String nextKeyMarker) {
     this.nextKeyMarker = nextKeyMarker;
+  }
+
+  public String getPrefix() {
+    return prefix;
+  }
+
+  public void setPrefix(String prefix) {
+    this.prefix = prefix;
   }
 
   public String getNextUploadIdMarker() {

@@ -152,6 +152,7 @@ public final class SCMNodeDetails extends NodeDetails {
     }
   }
 
+  @Override
   public String getRpcAddressString() {
     return NetUtils.getHostPortString(getRpcAddress());
   }

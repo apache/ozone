@@ -34,6 +34,7 @@ public abstract class AbstractCheck implements HealthCheck {
    * @return True if the request was handled or false if it was not and should
    *         be handled by the next handler in the chain.
    */
+  @Override
   public boolean handleChain(ContainerCheckRequest request) {
     boolean result = handle(request);
     if (!result && successor != null) {

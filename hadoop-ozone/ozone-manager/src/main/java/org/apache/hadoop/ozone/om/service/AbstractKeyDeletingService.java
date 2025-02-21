@@ -673,6 +673,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     return movedFilesCount.get();
   }
 
+  @Override
   public BootstrapStateHandler.Lock getBootstrapStateLock() {
     return lock;
   }

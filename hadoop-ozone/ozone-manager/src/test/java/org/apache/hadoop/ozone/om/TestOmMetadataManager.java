@@ -39,6 +39,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -63,6 +64,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -1105,5 +1107,86 @@ public class TestOmMetadataManager {
     for (SnapshotInfo snapshotInfo : snapshotInfos2) {
       assertTrue(snapshotInfo.getName().startsWith(snapshotName2));
     }
+  }
+
+  @Test
+  public void testGetMultipartUploadKeys() throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    String prefix = "dir/";
+    int maxUploads = 10;
+
+    // Create volume and bucket
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    addBucketsToCache(volumeName, bucketName);
+
+    List<String> expectedKeys = new ArrayList<>();
+    for (int i = 0; i < 25; i++) {
+      String key = prefix + "key" + i;
+      String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
+
+      // Create multipart key info
+      OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(
+          volumeName, bucketName, key,
+          RatisReplicationConfig.getInstance(ONE))
+          .build();
+
+      OmMultipartKeyInfo multipartKeyInfo = OMRequestTestUtils
+          .createOmMultipartKeyInfo(uploadId, Time.now(),
+              HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.ONE, 0L);
+
+      if (i % 2 == 0) {
+        OMRequestTestUtils.addMultipartInfoToTable(false, keyInfo,
+            multipartKeyInfo, 0L, omMetadataManager);
+      } else {
+        OMRequestTestUtils.addMultipartInfoToTableCache(keyInfo,
+            multipartKeyInfo, 0L, omMetadataManager);
+      }
+
+      expectedKeys.add(key);
+    }
+    Collections.sort(expectedKeys);
+
+    // List first page without markers
+    List<OmMultipartUpload> result = omMetadataManager.getMultipartUploadKeys(
+        volumeName, bucketName, prefix, null, null, maxUploads, false);
+
+    assertEquals(maxUploads + 1, result.size());
+
+    // List next page using markers from first page
+    List<OmMultipartUpload> nextPage = omMetadataManager.getMultipartUploadKeys(
+        volumeName, bucketName, prefix,
+        result.get(result.size() - 1).getKeyName(),
+        result.get(result.size() - 1).getUploadId(),
+        maxUploads, false);
+
+    assertEquals(maxUploads + 1, nextPage.size());
+
+    // List with different prefix
+    List<OmMultipartUpload> differentPrefix = omMetadataManager.getMultipartUploadKeys(
+        volumeName, bucketName, "different/", null, null, maxUploads, false);
+
+    assertEquals(0, differentPrefix.size());
+
+    // List all entries with large maxUploads
+    List<OmMultipartUpload> allEntries = omMetadataManager.getMultipartUploadKeys(
+        volumeName, bucketName, prefix, null, null, 100, false);
+
+    assertEquals(25, allEntries.size());
+
+    // Verify all keys are present
+    List<String> actualKeys = new ArrayList<>();
+    for (OmMultipartUpload mpu : allEntries) {
+      actualKeys.add(mpu.getKeyName());
+    }
+    Collections.sort(actualKeys);
+    assertEquals(expectedKeys, actualKeys);
+
+    // Test with no pagination
+    List<OmMultipartUpload> noPagination = omMetadataManager.getMultipartUploadKeys(
+        volumeName, bucketName, prefix, null, null, 10, true);
+
+    assertEquals(25, noPagination.size());
   }
 }

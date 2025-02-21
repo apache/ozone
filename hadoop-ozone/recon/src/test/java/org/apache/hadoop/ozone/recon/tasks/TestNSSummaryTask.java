@@ -52,6 +52,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
@@ -60,13 +61,14 @@ import org.junit.jupiter.api.io.TempDir;
  * support for OBS buckets. Check that the NSSummary
  * for the OBS bucket is null.
  */
-public final class TestNSSummaryTask {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class TestNSSummaryTask {
 
-  private static ReconNamespaceSummaryManager reconNamespaceSummaryManager;
-  private static OMMetadataManager omMetadataManager;
-  private static ReconOMMetadataManager reconOMMetadataManager;
-  private static NSSummaryTask nSSummaryTask;
-  private static OzoneConfiguration omConfiguration;
+  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
+  private OMMetadataManager omMetadataManager;
+  private ReconOMMetadataManager reconOMMetadataManager;
+  private NSSummaryTask nSSummaryTask;
+  private OzoneConfiguration omConfiguration;
 
   // Object names
   private static final String VOL = "vol";
@@ -100,11 +102,8 @@ public final class TestNSSummaryTask {
       ReconConstants.MAX_FILE_SIZE_UPPER_BOUND - 100L;
   private static final long KEY_FIVE_SIZE = 100L;
 
-  private TestNSSummaryTask() {
-  }
-
   @BeforeAll
-  public static void setUp(@TempDir File tmpDir) throws Exception {
+  void setUp(@TempDir File tmpDir) throws Exception {
     initializeNewOmMetadataManager(new File(tmpDir, "om"));
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         getMockOzoneManagerServiceProvider();
@@ -372,7 +371,7 @@ public final class TestNSSummaryTask {
    *
    * @throws IOException
    */
-  private static void populateOMDB() throws IOException {
+  private void populateOMDB() throws IOException {
     // Bucket1 FSO layout
     writeKeyToOm(reconOMMetadataManager,
         KEY_ONE,
@@ -419,7 +418,7 @@ public final class TestNSSummaryTask {
    * and bucket3 will have OBS layout.
    * @throws IOException ioEx
    */
-  private static void initializeNewOmMetadataManager(
+  private void initializeNewOmMetadataManager(
       File omDbDir)
       throws IOException {
     omConfiguration = new OzoneConfiguration();

@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.util.Random;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.util.Shell;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,9 +47,7 @@ public class TestDU {
   static void createFile(File newFile, int size) throws IOException {
     // write random data so that filesystems with compression enabled (e.g. ZFS)
     // can't compress the file
-    Random random = new Random();
-    byte[] data = new byte[size];
-    random.nextBytes(data);
+    byte[] data = RandomUtils.secure().randomBytes(size);
 
     assumeTrue(newFile.createNewFile());
     RandomAccessFile file = new RandomAccessFile(newFile, "rws");

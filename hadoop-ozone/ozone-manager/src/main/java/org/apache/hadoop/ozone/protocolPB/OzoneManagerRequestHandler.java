@@ -178,12 +178,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       LoggerFactory.getLogger(OzoneManagerRequestHandler.class);
   private final OzoneManager impl;
   private FaultInjector injector;
-  private long maxKeyListSize;
 
 
   public OzoneManagerRequestHandler(OzoneManager om) {
     this.impl = om;
-    this.maxKeyListSize = om.getConfig().getMaxListSize();
   }
 
   //TODO simplify it to make it shorter
@@ -747,7 +745,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         request.getBucketName(),
         request.getStartKey(),
         request.getPrefix(),
-        (int)Math.min(this.maxKeyListSize, request.getCount()));
+        limitListSizeInt(request.getCount()));
     for (OmKeyInfo key : listKeysResult.getKeys()) {
       resp.addKeyInfo(key.getProtobuf(true, clientVersion));
     }
@@ -765,7 +763,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         request.getBucketName(),
         request.getStartKey(),
         request.getPrefix(),
-        (int)Math.min(this.maxKeyListSize, request.getCount()));
+        limitListSizeInt(request.getCount()));
     for (BasicOmKeyInfo key : listKeysLightResult.getKeys()) {
       resp.addBasicKeyInfo(key.getProtobuf());
     }
@@ -923,7 +921,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     ListOpenFilesResponse.Builder resp = ListOpenFilesResponse.newBuilder();
 
     ListOpenFilesResult res =
-        impl.listOpenFiles(req.getPath(), req.getCount(), req.getToken());
+        impl.listOpenFiles(req.getPath(), limitListSizeInt(req.getCount()), req.getToken());
     // TODO: Is there a clean way to avoid ser-de for responses:
     //  OM does: ListOpenFilesResult -> ListOpenFilesResponse
     //  Client : ListOpenFilesResponse -> ListOpenFilesResult
@@ -1015,9 +1013,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       ListMultipartUploadsRequest request)
       throws IOException {
 
-    OmMultipartUploadList omMultipartUploadList =
-        impl.listMultipartUploads(request.getVolume(), request.getBucket(),
-            request.getPrefix());
+    OmMultipartUploadList omMultipartUploadList = impl.listMultipartUploads(request.getVolume(), request.getBucket(),
+        request.getPrefix(),
+        request.getKeyMarker(), request.getUploadIdMarker(), request.getMaxUploads(), request.getWithPagination());
 
     List<MultipartUploadInfo> info = omMultipartUploadList
         .getUploads()
@@ -1048,6 +1046,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     ListMultipartUploadsResponse response =
         ListMultipartUploadsResponse.newBuilder()
             .addAllUploadsList(info)
+            .setIsTruncated(omMultipartUploadList.isTruncated())
+            .setNextKeyMarker(omMultipartUploadList.getNextKeyMarker())
+            .setNextUploadIdMarker(omMultipartUploadList.getNextUploadIdMarker())
             .build();
 
     return response;
@@ -1236,7 +1237,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         request.hasAllowPartialPrefix() && request.getAllowPartialPrefix();
     List<OzoneFileStatus> statuses =
         impl.listStatus(omKeyArgs, request.getRecursive(),
-            request.getStartKey(), Math.min(this.maxKeyListSize, request.getNumEntries()),
+            request.getStartKey(), limitListSize(request.getNumEntries()),
             allowPartialPrefixes);
     ListStatusResponse.Builder
         listStatusResponseBuilder =
@@ -1262,7 +1263,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         request.hasAllowPartialPrefix() && request.getAllowPartialPrefix();
     List<OzoneFileStatusLight> statuses =
         impl.listStatusLight(omKeyArgs, request.getRecursive(),
-            request.getStartKey(), Math.min(this.maxKeyListSize, request.getNumEntries()),
+            request.getStartKey(), limitListSize(request.getNumEntries()),
             allowPartialPrefixes);
     ListStatusLightResponse.Builder
         listStatusLightResponseBuilder =
@@ -1490,7 +1491,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       throws IOException {
     ListSnapshotResponse implResponse = impl.listSnapshot(
         request.getVolumeName(), request.getBucketName(), request.getPrefix(),
-        request.getPrevSnapshot(), (int)Math.min(request.getMaxListResult(), maxKeyListSize));
+        request.getPrevSnapshot(), limitListSizeInt(request.getMaxListResult()));
 
     List<OzoneManagerProtocolProtos.SnapshotInfo> snapshotInfoList = implResponse.getSnapshotInfos()
         .stream().map(SnapshotInfo::getProtobuf).collect(Collectors.toList());
@@ -1565,4 +1566,13 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     impl.startQuotaRepair(req.getBucketsList());
     return OzoneManagerProtocolProtos.StartQuotaRepairResponse.newBuilder().build();
   }
+
+  private int limitListSizeInt(int requestedSize) {
+    return Math.toIntExact(limitListSize(requestedSize));
+  }
+
+  private long limitListSize(long requestedSize) {
+    return Math.min(requestedSize, impl.getConfig().getMaxListSize());
+  }
+
 }
