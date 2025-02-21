@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.anySet;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
@@ -231,7 +232,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
     //WHEN
     OmMultipartUploadList omMultipartUploadList =
-        keyManager.listMultipartUploads(volume, "bucket1", "");
+        keyManager.listMultipartUploads(volume, "bucket1", "", "", "", 10, false);
 
     //THEN
     List<OmMultipartUpload> uploads = omMultipartUploadList.getUploads();
@@ -252,10 +253,9 @@ class TestKeyManagerUnit extends OzoneTestBase {
     String volume = volumeName();
     String bucket = "bucket";
 
-    //GIVEN
+    // GIVEN
     createBucket(metadataManager, volume, bucket);
     createBucket(metadataManager, volume, bucket);
-
 
     // Add few to cache and few to DB.
     addinitMultipartUploadToCache(volume, bucket, "dir/key1");
@@ -266,11 +266,11 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
     initMultipartUpload(writeClient, volume, bucket, "dir/key4");
 
-    //WHEN
-    OmMultipartUploadList omMultipartUploadList =
-        keyManager.listMultipartUploads(volume, bucket, "");
+    // WHEN
+    OmMultipartUploadList omMultipartUploadList = keyManager.listMultipartUploads(volume, bucket, "", "", "", 10,
+        false);
 
-    //THEN
+    // THEN
     List<OmMultipartUpload> uploads = omMultipartUploadList.getUploads();
     assertEquals(4, uploads.size());
     assertEquals("dir/key1", uploads.get(0).getKeyName());
@@ -291,10 +291,9 @@ class TestKeyManagerUnit extends OzoneTestBase {
     OmMultipartInfo omMultipartInfo4 = initMultipartUpload(writeClient,
         volume, bucket, "dir/ozonekey4");
 
-    omMultipartUploadList =
-        keyManager.listMultipartUploads(volume, bucket, "dir/ozone");
+    omMultipartUploadList = keyManager.listMultipartUploads(volume, bucket, "dir/ozone", "", "", 10, false);
 
-    //THEN
+    // THEN
     uploads = omMultipartUploadList.getUploads();
     assertEquals(4, uploads.size());
     assertEquals("dir/ozonekey1", uploads.get(0).getKeyName());
@@ -307,10 +306,9 @@ class TestKeyManagerUnit extends OzoneTestBase {
         omMultipartInfo4.getUploadID());
 
     // Now list.
-    omMultipartUploadList =
-        keyManager.listMultipartUploads(volume, bucket, "dir/ozone");
+    omMultipartUploadList = keyManager.listMultipartUploads(volume, bucket, "dir/ozone", "", "", 10, false);
 
-    //THEN
+    // THEN
     uploads = omMultipartUploadList.getUploads();
     assertEquals(3, uploads.size());
     assertEquals("dir/ozonekey1", uploads.get(0).getKeyName());
@@ -322,10 +320,9 @@ class TestKeyManagerUnit extends OzoneTestBase {
         omMultipartInfo3.getUploadID());
 
     // Now list.
-    omMultipartUploadList =
-        keyManager.listMultipartUploads(volume, bucket, "dir/ozone");
+    omMultipartUploadList = keyManager.listMultipartUploads(volume, bucket, "dir/ozone", "", "", 10, false);
 
-    //THEN
+    // THEN
     uploads = omMultipartUploadList.getUploads();
     assertEquals(2, uploads.size());
     assertEquals("dir/ozonekey1", uploads.get(0).getKeyName());
@@ -336,7 +333,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
   @Test
   public void listMultipartUploadsWithPrefix() throws IOException {
 
-    //GIVEN
+    // GIVEN
     final String volumeName = volumeName();
     createBucket(metadataManager, volumeName, "bucket1");
     createBucket(metadataManager, volumeName, "bucket2");
@@ -349,15 +346,88 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
     initMultipartUpload(writeClient, volumeName, "bucket2", "dir/key1");
 
-    //WHEN
-    OmMultipartUploadList omMultipartUploadList =
-        keyManager.listMultipartUploads(volumeName, "bucket1", "dir");
+    // WHEN
+    OmMultipartUploadList omMultipartUploadList = keyManager.listMultipartUploads(volumeName, "bucket1", "dir", "",
+        "", 10, false);
 
-    //THEN
+    // THEN
     List<OmMultipartUpload> uploads = omMultipartUploadList.getUploads();
     assertEquals(2, uploads.size());
     assertEquals("dir/key1", uploads.get(0).getKeyName());
     assertEquals("dir/key2", uploads.get(1).getKeyName());
+  }
+
+  @Test
+  public void testListMultipartUploadsWithPagination() throws IOException {
+    // GIVEN
+    final String volumeName = volumeName();
+    final String bucketName = "bucket1";
+    createBucket(metadataManager, volumeName, bucketName);
+
+    // Create 25 multipart uploads to test pagination
+    for (int i = 0; i < 25; i++) {
+      String key = String.format("key-%03d", i); // pad with zeros for proper sorting
+      initMultipartUpload(writeClient, volumeName, bucketName, key);
+    }
+
+    // WHEN - First page (10 entries)
+    OmMultipartUploadList firstPage = keyManager.listMultipartUploads(
+        volumeName, bucketName, "", "", "", 10, true);
+
+    // THEN
+    assertEquals(10, firstPage.getUploads().size());
+    assertTrue(firstPage.isTruncated());
+    assertNotNull(firstPage.getNextKeyMarker());
+    assertNotNull(firstPage.getNextUploadIdMarker());
+
+    // Verify first page content
+    for (int i = 0; i < 10; i++) {
+      assertEquals(String.format("key-%03d", i),
+          firstPage.getUploads().get(i).getKeyName());
+    }
+
+    // WHEN - Second page using markers from first page
+    OmMultipartUploadList secondPage = keyManager.listMultipartUploads(
+        volumeName, bucketName, "",
+        firstPage.getNextKeyMarker(),
+        firstPage.getNextUploadIdMarker(),
+        10, true);
+
+    // THEN
+    assertEquals(10, secondPage.getUploads().size());
+    assertTrue(secondPage.isTruncated());
+
+    // Verify second page content
+    for (int i = 0; i < 10; i++) {
+      assertEquals(String.format("key-%03d", i + 10),
+          secondPage.getUploads().get(i).getKeyName());
+    }
+
+    // WHEN - Last page
+    OmMultipartUploadList lastPage = keyManager.listMultipartUploads(
+        volumeName, bucketName, "",
+        secondPage.getNextKeyMarker(),
+        secondPage.getNextUploadIdMarker(),
+        10, true);
+
+    // THEN
+    assertEquals(5, lastPage.getUploads().size());
+    assertFalse(lastPage.isTruncated());
+    assertEquals("", lastPage.getNextKeyMarker());
+    assertEquals("", lastPage.getNextUploadIdMarker());
+
+    // Verify last page content
+    for (int i = 0; i < 5; i++) {
+      assertEquals(String.format("key-%03d", i + 20),
+          lastPage.getUploads().get(i).getKeyName());
+    }
+
+    // Test with no pagination
+    OmMultipartUploadList noPagination = keyManager.listMultipartUploads(
+        volumeName, bucketName, "", "", "", 10, false);
+
+    assertEquals(25, noPagination.getUploads().size());
+    assertFalse(noPagination.isTruncated());
   }
 
   private void createBucket(OMMetadataManager omMetadataManager,

@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -48,6 +49,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import picocli.CommandLine;
@@ -56,6 +58,7 @@ import picocli.CommandLine;
  * Test the order of Replication config resolution.
  *
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(100)
 public class TestReplicationConfigPreference {
 
@@ -64,16 +67,16 @@ public class TestReplicationConfigPreference {
   private OzoneClient client;
   private String omServiceId;
   @TempDir
-  private static java.nio.file.Path path;
-  private static File testFile;
+  private Path path;
+  private File testFile;
   private static final String DEFAULT_BUCKET = "default";
   private static final String RATIS_BUCKET = "ratis";
   private static final String EC_BUCKET = "ecbucket";
   private static final String DEFAULT_KEY = "defaultkey";
   private static final String RATIS_KEY = "ratiskey";
   private static final String EC_KEY = "eckey";
-  private static String[] bucketList;
-  private static String[] keyList;
+  private String[] bucketList;
+  private String[] keyList;
   private static int numOfOMs = 3;
   private static final ReplicationConfig RATIS_REPL_CONF =
       ReplicationConfig.fromProtoTypeAndFactor(RATIS, THREE);
@@ -94,7 +97,7 @@ public class TestReplicationConfigPreference {
   }
 
   @BeforeAll
-  public static void init() throws Exception {
+  void init() throws Exception {
     testFile = new File(path + OZONE_URI_DELIMITER + "testFile");
     testFile.getParentFile().mkdirs();
     testFile.createNewFile();
@@ -106,7 +109,7 @@ public class TestReplicationConfigPreference {
    * shutdown MiniOzoneCluster.
    */
   @AfterAll
-  public void shutdown() {
+  void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();

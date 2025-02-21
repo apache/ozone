@@ -60,6 +60,7 @@ import java.util.Random;
 import java.util.TreeMap;
 import java.util.UUID;
 import javax.xml.bind.DatatypeConverter;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.kms.KMSClientProvider;
 import org.apache.hadoop.crypto.key.kms.server.MiniKMS;
@@ -107,6 +108,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -114,6 +116,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
+@Unhealthy("HDDS-11879")
 class TestOzoneAtRestEncryption {
 
   private static MiniOzoneCluster cluster = null;
@@ -651,9 +654,8 @@ class TestOzoneAtRestEncryption {
 
       // Read different data lengths and starting from different offsets and
       // verify the data matches.
-      Random random = new Random();
-      int randomSize = random.nextInt(keySize / 2);
-      int randomOffset = random.nextInt(keySize - randomSize);
+      int randomSize = RandomUtils.secure().randomInt(0, keySize / 2);
+      int randomOffset = RandomUtils.secure().randomInt(0, keySize - randomSize);
 
       int[] readDataSizes = {keySize, keySize / 3 + 1, BLOCK_SIZE,
           BLOCK_SIZE * 2 + 1, CHUNK_SIZE, CHUNK_SIZE / 4 - 1,

@@ -23,7 +23,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SEQUENCE_ID_BAT
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.lang.reflect.Proxy;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.time.LocalDate;
@@ -330,13 +329,7 @@ public class SequenceIdGenerator {
 
         final StateManager impl = new StateManagerImpl(table, buffer);
 
-        final SCMHAInvocationHandler invocationHandler
-            = new SCMHAInvocationHandler(SEQUENCE_ID, impl, ratisServer);
-
-        return (StateManager) Proxy.newProxyInstance(
-            SCMHAInvocationHandler.class.getClassLoader(),
-            new Class<?>[]{StateManager.class},
-            invocationHandler);
+        return ratisServer.getProxyHandler(SEQUENCE_ID, StateManager.class, impl);
       }
     }
   }

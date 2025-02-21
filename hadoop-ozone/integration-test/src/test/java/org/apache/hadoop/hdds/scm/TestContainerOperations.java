@@ -15,10 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone;
+package org.apache.hadoop.hdds.scm;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.REPLICATION;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -27,7 +31,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -35,60 +38,53 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.PlacementPolicy;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
-import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
-import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 
 /**
  * This class tests container operations (TODO currently only supports create)
  * from cblock clients.
  */
-@Timeout(value = 300, unit = TimeUnit.SECONDS)
-public class TestContainerOperations {
-  private static ScmClient storageClient;
-  private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration ozoneConf;
-  private static StorageContainerLocationProtocolClientSideTranslatorPB
-      storageContainerLocationClient;
-  private static XceiverClientManager xceiverClientManager;
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Timeout(300)
+public abstract class TestContainerOperations implements NonHATests.TestCase {
+
+  private static final int CONTAINER_LIST_LIMIT = 1;
+
+  private ScmClient storageClient;
+  private StorageContainerLocationProtocolClientSideTranslatorPB storageContainerLocationClient;
+  private XceiverClientManager xceiverClientManager;
 
   @BeforeAll
-  public static void setup() throws Exception {
-    ozoneConf = new OzoneConfiguration();
-    ozoneConf.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
-        SCMContainerPlacementCapacity.class, PlacementPolicy.class);
-    ozoneConf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT, "1");
-    cluster = MiniOzoneCluster.newBuilder(ozoneConf).setNumDatanodes(3).build();
-    storageClient = new ContainerOperationClient(ozoneConf);
-    cluster.waitForClusterToBeReady();
-    storageContainerLocationClient =
-        cluster.getStorageContainerLocationClient();
-    xceiverClientManager = new XceiverClientManager(ozoneConf);
+  void setup() throws Exception {
+    OzoneConfiguration clientConf = new OzoneConfiguration(cluster().getConf());
+    clientConf.setInt(ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT, CONTAINER_LIST_LIMIT);
+    storageClient = new ContainerOperationClient(clientConf);
+    storageContainerLocationClient = cluster().getStorageContainerLocationClient();
+    xceiverClientManager = new XceiverClientManager(cluster().getConf());
   }
 
   @AfterAll
-  public static void cleanup() throws Exception {
-    if (cluster != null) {
-      cluster.shutdown();
-    }
-    IOUtils.cleanupWithLogger(null, storageContainerLocationClient);
+  void cleanup() {
+    IOUtils.closeQuietly(storageContainerLocationClient, xceiverClientManager);
   }
 
   @Test
@@ -117,7 +113,7 @@ public class TestContainerOperations {
     ContainerProtos.ContainerCommandRequestProto putKeyRequest =
         ContainerTestHelper
             .getPutBlockRequest(pipeline, writeChunkRequest.getWriteChunk());
-    client.sendCommand(putKeyRequest).getPutBlock();
+    client.sendCommand(putKeyRequest);
     // send the putBlock again
     client.sendCommand(putKeyRequest);
 
@@ -130,7 +126,6 @@ public class TestContainerOperations {
 
   /**
    * A simple test to create a container with {@link ContainerOperationClient}.
-   * @throws Exception
    */
   @Test
   public void testCreate() throws Exception {
@@ -144,25 +139,24 @@ public class TestContainerOperations {
 
   /**
    * Test to try to list number of containers over the max number Ozone allows.
-   * @throws Exception
    */
   @Test
   public void testListContainerExceedMaxAllowedCountOperations() throws Exception {
-    // create 2 containers in cluster where the limit of max count for
-    // listing container is set to 1
-    for (int i = 0; i < 2; i++) {
+    // create n+1 containers
+    for (int i = 0; i < CONTAINER_LIST_LIMIT + 1; i++) {
       storageClient.createContainer(HddsProtos
           .ReplicationType.STAND_ALONE, HddsProtos.ReplicationFactor
           .ONE, OzoneConsts.OZONE);
     }
 
-    assertEquals(1, storageClient.listContainer(0, 2)
-        .getContainerInfoList().size());
+    int count = storageClient.listContainer(0, CONTAINER_LIST_LIMIT + 1)
+        .getContainerInfoList()
+        .size();
+    assertEquals(CONTAINER_LIST_LIMIT, count);
   }
 
   /**
    * A simple test to get Pipeline with {@link ContainerOperationClient}.
-   * @throws Exception
    */
   @Test
   public void testGetPipeline() throws Exception {
@@ -174,7 +168,7 @@ public class TestContainerOperations {
 
   @Test
   public void testDatanodeUsageInfoCompatibility() throws IOException {
-    DatanodeDetails dn = cluster.getStorageContainerManager()
+    DatanodeDetails dn = cluster().getStorageContainerManager()
         .getScmNodeManager()
         .getAllNodes()
         .get(0);
@@ -199,35 +193,83 @@ public class TestContainerOperations {
   }
 
   @Test
-  public void testDatanodeUsageInfoContainerCount() throws IOException {
-    List<DatanodeDetails> dnList = cluster.getStorageContainerManager()
+  public void testDatanodeUsageInfoContainerCount() throws Exception {
+    List<DatanodeDetails> dnList = cluster().getStorageContainerManager()
             .getScmNodeManager()
             .getAllNodes();
 
     for (DatanodeDetails dn : dnList) {
+      final int expected = cluster().getStorageContainerManager().getScmNodeManager().getContainers(dn).size();
+
       List<HddsProtos.DatanodeUsageInfoProto> usageInfoList =
               storageClient.getDatanodeUsageInfo(
                       dn.getIpAddress(), dn.getUuidString());
 
       assertEquals(1, usageInfoList.size());
-      assertEquals(0, usageInfoList.get(0).getContainerCount());
+      assertEquals(expected, usageInfoList.get(0).getContainerCount());
     }
+  }
 
-    storageClient.createContainer(HddsProtos
-            .ReplicationType.STAND_ALONE, HddsProtos.ReplicationFactor
-            .ONE, OzoneConsts.OZONE);
+  @Test
+  public void testHealthyNodesCount() throws Exception {
+    List<HddsProtos.Node> nodes = storageClient.queryNode(null, HEALTHY,
+        HddsProtos.QueryScope.CLUSTER, "");
+    assertEquals(cluster().getHddsDatanodes().size(), nodes.size(), "Expected live nodes");
+  }
 
-    int[] totalContainerCount = new int[2];
-    for (DatanodeDetails dn : dnList) {
-      List<HddsProtos.DatanodeUsageInfoProto> usageInfoList =
-              storageClient.getDatanodeUsageInfo(
-                      dn.getIpAddress(), dn.getUuidString());
+  @Test
+  public void testNodeOperationalStates() throws Exception {
+    StorageContainerManager scm = cluster().getStorageContainerManager();
+    NodeManager nm = scm.getScmNodeManager();
+    final int numOfDatanodes = nm.getAllNodes().size();
 
-      assertEquals(1, usageInfoList.size());
-      assertThat(usageInfoList.get(0).getContainerCount()).isGreaterThanOrEqualTo(0).isLessThanOrEqualTo(1);
-      totalContainerCount[(int)usageInfoList.get(0).getContainerCount()]++;
+    // Set one node to be something other than IN_SERVICE
+    DatanodeDetails node = nm.getAllNodes().get(0);
+    nm.setNodeOperationalState(node, DECOMMISSIONING);
+
+    // All nodes should be returned as they are all in service
+    int nodeCount = storageClient.queryNode(IN_SERVICE, HEALTHY,
+        HddsProtos.QueryScope.CLUSTER, "").size();
+    assertEquals(numOfDatanodes - 1, nodeCount);
+
+    // null acts as wildcard for opState
+    nodeCount = storageClient.queryNode(null, HEALTHY,
+        HddsProtos.QueryScope.CLUSTER, "").size();
+    assertEquals(numOfDatanodes, nodeCount);
+
+    // null acts as wildcard for nodeState
+    nodeCount = storageClient.queryNode(IN_SERVICE, null,
+        HddsProtos.QueryScope.CLUSTER, "").size();
+    assertEquals(numOfDatanodes - 1, nodeCount);
+
+    // Both null - should return all nodes
+    nodeCount = storageClient.queryNode(null, null,
+        HddsProtos.QueryScope.CLUSTER, "").size();
+    assertEquals(numOfDatanodes, nodeCount);
+
+    // No node should be returned
+    nodeCount = storageClient.queryNode(IN_MAINTENANCE, HEALTHY,
+        HddsProtos.QueryScope.CLUSTER, "").size();
+    assertEquals(0, nodeCount);
+
+    // Test all operational states by looping over them all and setting the
+    // state manually.
+    node = nm.getAllNodes().get(0);
+    HddsProtos.NodeOperationalState originalState = nm.getNodeStatus(node).getOperationalState();
+    try {
+      for (HddsProtos.NodeOperationalState s :
+          HddsProtos.NodeOperationalState.values()) {
+        nm.setNodeOperationalState(node, s);
+        nodeCount = storageClient.queryNode(s, HEALTHY,
+            HddsProtos.QueryScope.CLUSTER, "").size();
+        if (s == IN_SERVICE) {
+          assertEquals(5, nodeCount);
+        } else {
+          assertEquals(1, nodeCount);
+        }
+      }
+    } finally {
+      nm.setNodeOperationalState(node, originalState);
     }
-    assertEquals(2, totalContainerCount[0]);
-    assertEquals(1, totalContainerCount[1]);
   }
 }

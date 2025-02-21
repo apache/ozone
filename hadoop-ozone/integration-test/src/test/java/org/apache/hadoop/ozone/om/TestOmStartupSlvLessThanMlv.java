@@ -27,10 +27,12 @@ import java.nio.file.Paths;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.MiniOzoneClusterImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -66,11 +68,13 @@ public class TestOmStartupSlvLessThanMlv {
 
     MiniOzoneCluster.Builder clusterBuilder = MiniOzoneCluster.newBuilder(conf);
 
-    OMException omException = assertThrows(OMException.class,
-        clusterBuilder::build);
-    String expectedMessage = String.format("Cannot initialize " +
-        "VersionManager. Metadata layout version (%s) > software layout" +
-        " version (%s)", mlv, largestSlv);
-    assertEquals(expectedMessage, omException.getMessage());
+    GenericTestUtils.withLogDisabled(MiniOzoneClusterImpl.class, () -> {
+      OMException omException = assertThrows(OMException.class,
+          clusterBuilder::build);
+      String expectedMessage = String.format("Cannot initialize " +
+          "VersionManager. Metadata layout version (%s) > software layout" +
+          " version (%s)", mlv, mlv - 1);
+      assertEquals(expectedMessage, omException.getMessage());
+    });
   }
 }

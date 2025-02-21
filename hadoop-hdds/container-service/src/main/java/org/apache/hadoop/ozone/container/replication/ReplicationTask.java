@@ -92,6 +92,7 @@ public class ReplicationTask extends AbstractReplicationTask {
     return Objects.hash(getContainerId(), getTarget());
   }
 
+  @Override
   public long getContainerId() {
     return cmd.getContainerID();
   }
