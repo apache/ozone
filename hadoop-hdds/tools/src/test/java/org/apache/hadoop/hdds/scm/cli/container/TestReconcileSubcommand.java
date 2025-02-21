@@ -12,7 +12,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
 import picocli.CommandLine;
 
 import java.io.ByteArrayInputStream;
@@ -27,7 +26,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
@@ -42,6 +40,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Tests the `ozone admin container reconcile` CLI.
+ */
 public class TestReconcileSubcommand {
 
   private ScmClient scmClient;
@@ -206,13 +207,13 @@ public class TestReconcileSubcommand {
     assertTrue(output.contains("\n"));
 
     List<Object> containerOutputList = JsonUtils.getDefaultMapper()
-        .readValue(new StringReader(output), new TypeReference<List<Object>>() {});
+        .readValue(new StringReader(output), new TypeReference<List<Object>>() { });
     assertEquals(containerIDs.length, containerOutputList.size());
     for (Object containerJson: containerOutputList) {
       Map<String, Object> containerOutput = (Map<String, Object>)containerJson;
       long containerID = (Integer)containerOutput.get("containerID");
       ContainerInfo expectedContainerInfo = scmClient.getContainer(containerID);
-     List<ContainerReplicaInfo> expectedReplicas = scmClient.getContainerReplicas(containerID);
+      List<ContainerReplicaInfo> expectedReplicas = scmClient.getContainerReplicas(containerID);
 
       Map<String, Object> repConfig = (Map<String, Object>)containerOutput.get("replicationConfig");
 
@@ -289,7 +290,7 @@ public class TestReconcileSubcommand {
           .setState("CLOSED")
           .setDatanodeDetails(dn);
       if (repConfig.getReplicationType() != HddsProtos.ReplicationType.RATIS) {
-          replicaBuilder.setReplicaIndex(index++);
+        replicaBuilder.setReplicaIndex(index++);
       }
       if (replicasMatch) {
         replicaBuilder.setDataChecksum(123);
