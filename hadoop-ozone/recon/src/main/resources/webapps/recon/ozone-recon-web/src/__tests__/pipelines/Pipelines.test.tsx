@@ -51,7 +51,7 @@ vi.mock('@/v2/components/select/multiSelect.tsx', () => ({
 describe('Pipelines Component', () => {
   // Start and stop MSW server before and after all tests
   beforeAll(() => pipelineServer.listen());
-  afterEach(() => pipelineServer.resetHandlers());
+  afterEach(async () => pipelineServer.resetHandlers());
   afterAll(() => pipelineServer.close());
 
   test('renders component correctly', () => {

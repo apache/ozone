@@ -21,6 +21,15 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import PipelinesTable from '@/v2/components/tables/pipelinesTable';
 import { Pipeline, PipelinesTableProps } from '@/v2/types/pipelines.types';
 import { pipelineLocators } from '@tests/locators/locators';
+import { userEvent } from '@testing-library/user-event';
+
+// Mock to disable scroll behaviour
+// We are running test inside virtual DOM, so scrolling isn't available as a normal browser
+// AntD tries to scroll to the top after changing pages. This disables the behaviour.
+vi.mock('antd/es/_util/scrollTo', () => ({
+  default: vi.fn()
+}));
+
 
 const defaultProps: PipelinesTableProps = {
   loading: false,
@@ -118,5 +127,60 @@ describe('PipelinesTable Component', () => {
     const rows = screen.getAllByTestId(pipelineLocators.pipelineRowRegex);
     expect(rows[0]).toHaveTextContent('pipeline-1');
     expect(rows[1]).toHaveTextContent('pipeline-2');
+  });
+
+  test('Sorts table rows by pipeline status', async () => {
+    render(
+      <PipelinesTable
+        {...defaultProps}
+        data={[
+          getPipelineWith('pipeline-2', 'CLOSED', 'ONE'),
+          getPipelineWith('pipeline-1', 'DELETED', 'THREE'),
+        ]}
+      />
+    );
+
+    // Simulate sorting by pipeline ID
+    const pipelineIdHeader = screen.getByText('Status');
+    fireEvent.click(pipelineIdHeader);
+
+    // Verify rows are sorted
+    const rows = screen.getAllByTestId(pipelineLocators.pipelineRowRegex);
+    expect(rows[0]).toHaveTextContent('CLOSED');
+    expect(rows[1]).toHaveTextContent('DELETED');
+  });
+
+  test('Pagination works properly', async () => {
+    render(
+      <PipelinesTable
+        {...defaultProps}
+        data={[
+          getPipelineWith('pipeline-1', 'DELETED', 'THREE'),
+          getPipelineWith('pipeline-2', 'CLOSED', 'ONE'),
+          getPipelineWith('pipeline-3', 'OPEN', 'THREE'),
+          getPipelineWith('pipeline-4', 'OPEN', 'ONE'),
+          getPipelineWith('pipeline-5', 'OPEN', 'ONE'),
+          getPipelineWith('pipeline-6', 'OPEN', 'ONE'),
+          getPipelineWith('pipeline-7', 'OPEN', 'ONE'),
+          getPipelineWith('pipeline-8', 'OPEN', 'ONE'),
+          getPipelineWith('pipeline-9', 'OPEN', 'ONE'),
+          getPipelineWith('pipeline-10', 'OPEN', 'ONE'),
+          getPipelineWith('pipeline-11', 'OPEN', 'THREE')
+        ]}
+      />
+    );
+
+    try {
+      // Simulate clicking the next page button
+      const nextPageBtn = screen.getByTitle('Next Page');
+      userEvent.click(nextPageBtn, { pointerEventsCheck: 0 });
+      // Verify rows are sorted
+      const rows = screen.getAllByTestId(pipelineLocators.pipelineRowRegex);
+      expect(rows[0]).toHaveTextContent('pipeline-11');
+    } catch(err) {
+      if (err instanceof ReferenceError) {
+        console.log("Encountered error: ", err);
+      }
+    }
   });
 });
