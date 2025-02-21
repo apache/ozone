@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
-import org.apache.hadoop.ozone.om.helpers.MultipartUploadKeys;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
@@ -46,6 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -494,8 +494,11 @@ public interface OMMetadataManager extends DBStoreHAManager {
   /**
    * Return the existing upload keys which includes volumeName, bucketName,
    * keyName.
+   * @param noPagination if true, returns all keys; if false, applies pagination
+   * @return When paginated, returns up to maxUploads + 1 entries, where the
+   *         extra entry is used to determine the next page markers
    */
-  MultipartUploadKeys getMultipartUploadKeys(String volumeName,
+  List<OmMultipartUpload> getMultipartUploadKeys(String volumeName,
           String bucketName, String prefix, String keyMarker, String uploadIdMarker, int maxUploads,
           boolean noPagination) throws IOException;
 

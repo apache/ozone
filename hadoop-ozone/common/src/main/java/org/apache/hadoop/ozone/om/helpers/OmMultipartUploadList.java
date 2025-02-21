@@ -22,22 +22,22 @@ import java.util.List;
 /**
  * List of in-flight MPU uploads.
  */
-public class OmMultipartUploadList {
+public final class OmMultipartUploadList {
 
   private List<OmMultipartUpload> uploads;
   private String nextKeyMarker;
   private String nextUploadIdMarker;
   private boolean isTruncated;
 
-  public OmMultipartUploadList(
-      List<OmMultipartUpload> uploads,
-      String nextKeyMarker,
-      String nextUploadIdMarker,
-      boolean isTruncated) {
-    this.uploads = uploads;
-    this.nextKeyMarker = nextKeyMarker;
-    this.nextUploadIdMarker = nextUploadIdMarker;
-    this.isTruncated = isTruncated;
+  private OmMultipartUploadList(Builder builder) {
+    this.uploads = builder.uploads;
+    this.nextKeyMarker = builder.nextKeyMarker;
+    this.nextUploadIdMarker = builder.nextUploadIdMarker;
+    this.isTruncated = builder.isTruncated;
+  }
+
+  public static Builder newBuilder() {
+    return new Builder();
   }
 
   public List<OmMultipartUpload> getUploads() {
@@ -61,4 +61,40 @@ public class OmMultipartUploadList {
     return isTruncated;
   }
 
+  /**
+   * Builder class for OmMultipartUploadList.
+   */
+  public static class Builder {
+    private List<OmMultipartUpload> uploads;
+    private String nextKeyMarker = "";
+    private String nextUploadIdMarker = "";
+    private boolean isTruncated;
+
+    public Builder() {
+    }
+
+    public Builder setUploads(List<OmMultipartUpload> uploads) {
+      this.uploads = uploads;
+      return this;
+    }
+
+    public Builder setNextKeyMarker(String nextKeyMarker) {
+      this.nextKeyMarker = nextKeyMarker;
+      return this;
+    }
+
+    public Builder setNextUploadIdMarker(String nextUploadIdMarker) {
+      this.nextUploadIdMarker = nextUploadIdMarker;
+      return this;
+    }
+
+    public Builder setIsTruncated(boolean isTruncated) {
+      this.isTruncated = isTruncated;
+      return this;
+    }
+
+    public OmMultipartUploadList build() {
+      return new OmMultipartUploadList(this);
+    }
+  }
 }
