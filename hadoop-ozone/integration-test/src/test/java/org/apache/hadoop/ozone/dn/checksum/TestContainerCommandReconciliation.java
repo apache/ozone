@@ -142,8 +142,8 @@ public class TestContainerCommandReconciliation {
     conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
     conf.set(OZONE_METADATA_DIRS, testDir.getAbsolutePath());
-    conf.setStorageSize(OZONE_SCM_CHUNK_SIZE_KEY, 1024 * 1024, StorageUnit.BYTES);
-    conf.setStorageSize(OZONE_SCM_BLOCK_SIZE, 2 * 1024 * 1024, StorageUnit.BYTES);
+    conf.setStorageSize(OZONE_SCM_CHUNK_SIZE_KEY, 128 * 1024, StorageUnit.BYTES);
+    conf.setStorageSize(OZONE_SCM_BLOCK_SIZE,  512 * 1024, StorageUnit.BYTES);
     // Disable the container scanner so it does not create merkle tree files that interfere with this test.
     conf.getObject(ContainerScannerConfiguration.class).setEnabled(false);
 

@@ -101,17 +101,12 @@ public class BlockManagerImpl implements BlockManager {
   @Override
   public long putBlockForClosedContainer(Container container, BlockData data, boolean overwriteBcsId)
           throws IOException {
-    return persistPutBlockForClosedContainer((KeyValueContainer) container, data, overwriteBcsId);
-  }
-
-  private long persistPutBlockForClosedContainer(KeyValueContainer container, BlockData data, boolean overwriteBcsId)
-          throws IOException {
     Preconditions.checkNotNull(data, "BlockData cannot be null for put " +
-            "operation.");
+        "operation.");
     Preconditions.checkState(data.getContainerID() >= 0, "Container Id " +
-            "cannot be negative");
+        "cannot be negative");
 
-    KeyValueContainerData containerData = container.getContainerData();
+    KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
 
     // We are not locking the key manager since RocksDB serializes all actions
     // against a single DB. We rely on DB level locking to avoid conflicts.
@@ -130,7 +125,7 @@ public class BlockManagerImpl implements BlockManager {
 
       // update the blockData as well as BlockCommitSequenceId here
       try (BatchOperation batch = db.getStore().getBatchHandler()
-              .initBatchOperation()) {
+          .initBatchOperation()) {
         // If block exists in cache, blockCount should not be incremented.
         if (db.getStore().getBlockDataTable().get(containerData.getBlockKey(localID)) == null) {
           // Block does not exist in DB => blockCount needs to be
@@ -149,13 +144,14 @@ public class BlockManagerImpl implements BlockManager {
         // block length is used, And also on restart the blocks committed to DB
         // is only used to compute the bytes used. This is done to keep the
         // current behavior and avoid DB write during write chunk operation.
+        // Write UTs for this
         db.getStore().getMetadataTable().putWithBatch(batch, containerData.getBytesUsedKey(),
-                containerData.getBytesUsed());
+            containerData.getBytesUsed());
 
         // Set Block Count for a container.
         if (incrBlockCount) {
           db.getStore().getMetadataTable().putWithBatch(batch, containerData.getBlockCountKey(),
-                  containerData.getBlockCount() + 1);
+              containerData.getBlockCount() + 1);
         }
 
         db.getStore().getBatchHandler().commitBatchOperation(batch);
@@ -171,8 +167,8 @@ public class BlockManagerImpl implements BlockManager {
       }
 
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Block " + data.getBlockID() + " successfully committed with bcsId "
-                        + bcsId + " chunk size " + data.getChunks().size());
+        LOG.debug("Block {} successfully persisted for closed container {} with bcsId {} chunk size {}",
+            data.getBlockID(), containerData.getContainerID(), bcsId, data.getChunks().size());
       }
       return data.getSize();
     }

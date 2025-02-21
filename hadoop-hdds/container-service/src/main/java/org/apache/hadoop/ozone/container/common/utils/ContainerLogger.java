@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.common.utils;
 import static org.apache.hadoop.hdds.HddsUtils.checksumToString;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.apache.logging.log4j.LogManager;
@@ -153,8 +154,15 @@ public final class ContainerLogger {
    * @param containerData The container that was reconciled on this datanode.
    * @param oldDataChecksum The old data checksum.
    */
-  public static void logReconciled(ContainerData containerData, long oldDataChecksum) {
-    LOG.info(getMessage(containerData, "Container reconciled. Old checksum is " + checksumToString(oldDataChecksum)));
+  public static void logReconciled(ContainerData containerData, long oldDataChecksum, DatanodeDetails peer) {
+    if (containerData.getDataChecksum() == oldDataChecksum) {
+      LOG.info(getMessage(containerData, "Container reconciled with peer " + peer.toString() +
+          ". No change in checksum. Current checksum is " + checksumToString(containerData.getDataChecksum())));
+    } else {
+      LOG.warn(getMessage(containerData, "Container reconciled with peer " + peer.toString() +
+          ". Checksum updated from " + checksumToString(oldDataChecksum) + " to "
+          + checksumToString(containerData.getDataChecksum())));
+    }
   }
 
   private static String getMessage(ContainerData containerData,
