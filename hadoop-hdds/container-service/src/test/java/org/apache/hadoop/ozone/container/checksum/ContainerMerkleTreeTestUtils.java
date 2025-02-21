@@ -1,34 +1,26 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.checksum;
 
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.ozone.HddsDatanodeService;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import static org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager.getContainerChecksumFile;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -45,11 +37,18 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import static org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager.getContainerChecksumFile;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.ozone.HddsDatanodeService;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 /**
  * Helper methods for testing container checksum tree files and container reconciliation.
@@ -74,7 +73,7 @@ public final class ContainerMerkleTreeTestUtils {
       prevBlockID = currentBlockID;
 
       assertEquals(expectedBlockTree.getBlockID(), actualBlockTree.getBlockID());
-      assertEquals(expectedBlockTree.getBlockChecksum(), actualBlockTree.getBlockChecksum());
+      assertEquals(expectedBlockTree.getDataChecksum(), actualBlockTree.getDataChecksum());
 
       long prevChunkOffset = -1;
       for (int chunkIndex = 0; chunkIndex < expectedBlockTree.getChunkMerkleTreeCount(); chunkIndex++) {
@@ -88,7 +87,7 @@ public final class ContainerMerkleTreeTestUtils {
 
         assertEquals(expectedChunkTree.getOffset(), actualChunkTree.getOffset());
         assertEquals(expectedChunkTree.getLength(), actualChunkTree.getLength());
-        assertEquals(expectedChunkTree.getChunkChecksum(), actualChunkTree.getChunkChecksum());
+        assertEquals(expectedChunkTree.getDataChecksum(), actualChunkTree.getDataChecksum());
       }
     }
   }
@@ -138,15 +137,15 @@ public final class ContainerMerkleTreeTestUtils {
   }
 
   /**
-   * Builds a {@link ContainerMerkleTree} representing arbitrary data. This can be used to test that the same
+   * Builds a {@link ContainerMerkleTreeWriter} representing arbitrary data. This can be used to test that the same
    * structure is preserved throughout serialization, deserialization, and API calls.
    */
-  public static ContainerMerkleTree buildTestTree(ConfigurationSource conf) {
+  public static ContainerMerkleTreeWriter buildTestTree(ConfigurationSource conf) {
     return buildTestTree(conf, 5);
   }
 
-  public static ContainerMerkleTree buildTestTree(ConfigurationSource conf, int numBlocks) {
-    ContainerMerkleTree tree = new ContainerMerkleTree();
+  public static ContainerMerkleTreeWriter buildTestTree(ConfigurationSource conf, int numBlocks) {
+    ContainerMerkleTreeWriter tree = new ContainerMerkleTreeWriter();
     byte byteValue = 1;
     for (int blockIndex = 1; blockIndex <= numBlocks; blockIndex++) {
       List<ContainerProtos.ChunkInfo> chunks = new ArrayList<>();
@@ -162,7 +161,7 @@ public final class ContainerMerkleTreeTestUtils {
    * Returns a Pair of merkle tree and the expected container diff for that merkle tree.
    */
   public static Pair<ContainerProtos.ContainerMerkleTree, ContainerDiffReport>
-      buildTestTreeWithMismatches(ContainerMerkleTree originalTree, int numMissingBlocks, int numMissingChunks,
+      buildTestTreeWithMismatches(ContainerMerkleTreeWriter originalTree, int numMissingBlocks, int numMissingChunks,
                                   int numCorruptChunks) {
 
     ContainerProtos.ContainerMerkleTree.Builder treeBuilder = originalTree.toProto().toBuilder();
@@ -215,7 +214,7 @@ public final class ContainerMerkleTreeTestUtils {
         ContainerProtos.ChunkMerkleTree chunkMerkleTree = blockBuilder.getChunkMerkleTree(randomChunkIndex);
         diff.addMissingChunk(blockBuilder.getBlockID(), chunkMerkleTree);
         blockBuilder.removeChunkMerkleTree(randomChunkIndex);
-        blockBuilder.setBlockChecksum(random.nextLong());
+        blockBuilder.setDataChecksum(random.nextLong());
         treeBuilder.setDataChecksum(random.nextLong());
       }
     }
@@ -248,9 +247,9 @@ public final class ContainerMerkleTreeTestUtils {
         // Corrupt the selected chunk
         ContainerProtos.ChunkMerkleTree.Builder chunkBuilder = blockBuilder.getChunkMerkleTreeBuilder(randomChunkIndex);
         diff.addCorruptChunk(blockBuilder.getBlockID(), chunkBuilder.build());
-        chunkBuilder.setChunkChecksum(chunkBuilder.getChunkChecksum() + random.nextInt(1000) + 1);
+        chunkBuilder.setDataChecksum(chunkBuilder.getDataChecksum() + random.nextInt(1000) + 1);
         chunkBuilder.setIsHealthy(false);
-        blockBuilder.setBlockChecksum(random.nextLong());
+        blockBuilder.setDataChecksum(random.nextLong());
         treeBuilder.setDataChecksum(random.nextLong());
       }
     }
@@ -277,7 +276,7 @@ public final class ContainerMerkleTreeTestUtils {
       assertEquals(expectedBlockMerkleTree.getBlockID(), actualBlockMerkleTree.getBlockID());
       assertEquals(expectedBlockMerkleTree.getChunkMerkleTreeCount(),
           actualBlockMerkleTree.getChunkMerkleTreeCount());
-      assertEquals(expectedBlockMerkleTree.getBlockChecksum(), actualBlockMerkleTree.getBlockChecksum());
+      assertEquals(expectedBlockMerkleTree.getDataChecksum(), actualBlockMerkleTree.getDataChecksum());
       assertEqualsChunkMerkleTree(expectedBlockMerkleTree.getChunkMerkleTreeList(),
           actualBlockMerkleTree.getChunkMerkleTreeList(), expectedBlockMerkleTree.getBlockID());
     }
@@ -326,7 +325,7 @@ public final class ContainerMerkleTreeTestUtils {
       ContainerProtos.ChunkMerkleTree actualChunk = actualChunkMerkleTreeList.get(j);
       assertEquals(expectedChunk.getOffset(), actualChunk.getOffset(), "Mismatch in chunk offset for block "
           + blockId);
-      assertEquals(expectedChunk.getChunkChecksum(), actualChunk.getChunkChecksum(),
+      assertEquals(expectedChunk.getDataChecksum(), actualChunk.getDataChecksum(),
           "Mismatch in chunk checksum for block " + blockId);
     }
   }

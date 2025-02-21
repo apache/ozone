@@ -1,47 +1,25 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.StringUtils;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdfs.util.Canceler;
-import org.apache.hadoop.hdfs.util.DataTransferThrottler;
-import org.apache.hadoop.ozone.common.Checksum;
-import org.apache.hadoop.ozone.common.ChecksumData;
-import org.apache.hadoop.ozone.common.OzoneChecksumException;
-import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTree;
-import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
-import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
-import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
-import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
-import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -51,7 +29,28 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
-
+import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdfs.util.Canceler;
+import org.apache.hadoop.hdfs.util.DataTransferThrottler;
+import org.apache.hadoop.ozone.common.Checksum;
+import org.apache.hadoop.ozone.common.ChecksumData;
+import org.apache.hadoop.ozone.common.OzoneChecksumException;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError.FailureType;
 import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
@@ -61,13 +60,10 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
-
 /**
  * Class to run integrity checks on Datanode Containers.
  * Provide infra for Data Scrubbing
  */
-
 public class KeyValueContainerCheck {
 
   private static final Logger LOG =
@@ -193,7 +189,7 @@ public class KeyValueContainerCheck {
     LOG.debug("Running data checks for container {}", containerID);
     try {
       // TODO HDDS-10374 this tree will get updated with the container's contents as it is scanned.
-      ContainerMerkleTree dataTree = new ContainerMerkleTree();
+      ContainerMerkleTreeWriter dataTree = new ContainerMerkleTreeWriter();
       List<ContainerScanError> dataErrors = scanData(dataTree, throttler, canceler);
       if (containerIsDeleted()) {
         return DataScanResult.deleted();
@@ -209,8 +205,8 @@ public class KeyValueContainerCheck {
     }
   }
 
-  private List<ContainerScanError> scanData(ContainerMerkleTree currentTree, DataTransferThrottler throttler,
-      Canceler canceler) {
+  private List<ContainerScanError> scanData(ContainerMerkleTreeWriter currentTree, DataTransferThrottler throttler,
+                                            Canceler canceler) {
     Preconditions.checkState(containerDataFromDisk != null,
         "invoke loadContainerData prior to calling this function");
 
@@ -253,7 +249,7 @@ public class KeyValueContainerCheck {
     String dbType;
     Preconditions
         .checkState(containerDataFromDisk != null, "Container File not loaded");
-    
+
     List<ContainerScanError> errors = new ArrayList<>();
 
     // If the file checksum does not match, we will not try to read the file.
@@ -341,7 +337,7 @@ public class KeyValueContainerCheck {
   }
 
   private List<ContainerScanError> scanBlock(DBHandle db, File dbFile, BlockData block,
-      DataTransferThrottler throttler, Canceler canceler, ContainerMerkleTree currentTree) {
+      DataTransferThrottler throttler, Canceler canceler, ContainerMerkleTreeWriter currentTree) {
     ContainerLayoutVersion layout = containerDataFromDisk.getLayoutVersion();
 
     List<ContainerScanError> blockErrors = new ArrayList<>();
@@ -418,7 +414,7 @@ public class KeyValueContainerCheck {
   @SuppressWarnings("checkstyle:ParameterNumber")
   private static List<ContainerScanError> verifyChecksum(BlockData block,
       ContainerProtos.ChunkInfo chunk, File chunkFile, ContainerLayoutVersion layout, ByteBuffer buffer,
-      ContainerMerkleTree currentTree, DataTransferThrottler throttler, Canceler canceler) {
+      ContainerMerkleTreeWriter currentTree, DataTransferThrottler throttler, Canceler canceler) {
 
     List<ContainerScanError> scanErrors = new ArrayList<>();
 
