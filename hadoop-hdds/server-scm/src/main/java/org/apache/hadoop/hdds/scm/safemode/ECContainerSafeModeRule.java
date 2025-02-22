@@ -188,6 +188,8 @@ public class ECContainerSafeModeRule extends SafeModeExitRule<NodeRegistrationCo
     ecMaxContainer = ecContainers.size();
     long ecCutOff = (long) Math.ceil(ecMaxContainer * safeModeCutoff);
     getSafeModeMetrics().setNumContainerWithECDataReplicaReportedThreshold(ecCutOff);
+
+    LOG.info("Refreshed Containers with ec n replica threshold count {}.", ecCutOff);
   }
 
   private boolean isClosed(ContainerInfo container) {

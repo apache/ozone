@@ -165,6 +165,8 @@ public class RatisContainerSafeModeRule extends SafeModeExitRule<NodeRegistratio
     ratisMaxContainer = ratisContainers.size();
     long ratisCutOff = (long) Math.ceil(ratisMaxContainer * safeModeCutoff);
     getSafeModeMetrics().setNumContainerWithOneReplicaReportedThreshold(ratisCutOff);
+
+    LOG.info("Refreshed Containers with one replica threshold count {}.", ratisCutOff);
   }
 
   private boolean isClosed(ContainerInfo container) {
