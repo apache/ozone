@@ -65,12 +65,15 @@ public final class SafeModeRuleFactory {
 
   private void loadRules() {
     // TODO: Use annotation to load the rules. (HDDS-11730)
-    SafeModeExitRule<?> containerRule = new ContainerSafeModeRule(eventQueue, 
+    SafeModeExitRule<?> ratisContainerRule = new RatisContainerSafeModeRule(eventQueue,
+        config, containerManager, safeModeManager);
+    SafeModeExitRule<?> ecContainerRule = new ECContainerSafeModeRule(eventQueue,
         config, containerManager, safeModeManager);
     SafeModeExitRule<?> datanodeRule = new DataNodeSafeModeRule(eventQueue, 
         config, safeModeManager);
 
-    safeModeRules.add(containerRule);
+    safeModeRules.add(ratisContainerRule);
+    safeModeRules.add(ecContainerRule);
     safeModeRules.add(datanodeRule);
 
     preCheckRules.add(datanodeRule);

@@ -575,9 +575,13 @@ public class TestSCMSafeModeManager {
     // the threshold will reach 100%.
     testECContainerThreshold(containers.subList(10, 20), 1.0, data);
 
-    ContainerSafeModeRule containerSafeModeRule =
-        scmSafeModeManager.getContainerSafeModeRule();
-    assertTrue(containerSafeModeRule.validate());
+    ECContainerSafeModeRule ecContainerSafeModeRule =
+        scmSafeModeManager.getECContainerSafeModeRule();
+    assertTrue(ecContainerSafeModeRule.validate());
+
+    RatisContainerSafeModeRule ratisContainerSafeModeRule =
+        scmSafeModeManager.getRatisContainerSafeModeRule();
+    assertTrue(ratisContainerSafeModeRule.validate());
   }
 
   private void testSafeModeDataNodes(int numOfDns) throws Exception {
