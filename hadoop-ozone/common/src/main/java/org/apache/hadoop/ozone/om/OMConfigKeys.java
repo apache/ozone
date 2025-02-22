@@ -1,24 +1,23 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.om;
 
 import java.util.concurrent.TimeUnit;
-
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -342,12 +341,12 @@ public final class OMConfigKeys {
   public static final boolean OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT =
           false;
 
-  // This config needs to be enabled, when S3G created objects used via
-  // FileSystem API.
+  @Deprecated
   public static final String OZONE_OM_ENABLE_FILESYSTEM_PATHS =
-      "ozone.om.enable.filesystem.paths";
+      OmConfig.Keys.ENABLE_FILESYSTEM_PATHS;
+  @Deprecated
   public static final boolean OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT =
-      false;
+      OmConfig.Defaults.ENABLE_FILESYSTEM_PATHS;
 
   public static final String OZONE_SERVER_DEFAULT_REPLICATION_KEY =
       "ozone.server.default.replication";
@@ -619,9 +618,4 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_MAX_BUCKET =
       "ozone.om.max.buckets";
   public static final int OZONE_OM_MAX_BUCKET_DEFAULT = 100000;
-  /**
-   * Configuration property to configure the max server side response size for list calls.
-   */
-  public static final String OZONE_OM_SERVER_LIST_MAX_SIZE = "ozone.om.server.list.max.size";
-  public static final int OZONE_OM_SERVER_LIST_MAX_SIZE_DEFAULT = 1000;
 }

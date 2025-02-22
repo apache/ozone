@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,6 +17,13 @@
 
 package org.apache.hadoop.ozone.recon.fsck;
 
+import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT;
+import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
+import static org.apache.hadoop.ozone.recon.ReconConstants.TOTAL_KEYS;
+import static org.apache.hadoop.ozone.recon.ReconConstants.TOTAL_USED_BYTES;
+import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING;
+
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -28,8 +34,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -54,13 +58,6 @@ import org.hadoop.ozone.recon.schema.tables.records.UnhealthyContainersRecord;
 import org.jooq.Cursor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT;
-import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
-import static org.apache.hadoop.ozone.recon.ReconConstants.TOTAL_KEYS;
-import static org.apache.hadoop.ozone.recon.ReconConstants.TOTAL_USED_BYTES;
-import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING;
-
 
 /**
  * Class that scans the list of containers and keeps track of containers with

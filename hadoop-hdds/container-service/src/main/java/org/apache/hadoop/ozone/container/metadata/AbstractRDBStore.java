@@ -1,13 +1,10 @@
-package org.apache.hadoop.ozone.container.metadata;
-
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -16,10 +13,15 @@ package org.apache.hadoop.ozone.container.metadata;
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
+package org.apache.hadoop.ozone.container.metadata;
+
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
+import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE;
+
 import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
@@ -30,11 +32,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
 import org.rocksdb.InfoLogLevel;
-
-import java.io.IOException;
-
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
-import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE;
 
 /**
  * Abstract Interface defining the way to interact with any rocksDB in the datanode.
@@ -59,6 +56,7 @@ public abstract class AbstractRDBStore<DEF extends DBDefinition> implements DBSt
     start(config);
   }
 
+  @Override
   public void start(ConfigurationSource config)
       throws IOException {
     if (this.store == null) {
@@ -84,6 +82,7 @@ public abstract class AbstractRDBStore<DEF extends DBDefinition> implements DBSt
   protected abstract DBStore initDBStore(DBStoreBuilder dbStoreBuilder, ManagedDBOptions options,
                                          ConfigurationSource config) throws IOException;
 
+  @Override
   public synchronized void stop() throws Exception {
     if (store != null) {
       store.close();
@@ -91,10 +90,12 @@ public abstract class AbstractRDBStore<DEF extends DBDefinition> implements DBSt
     }
   }
 
+  @Override
   public DBStore getStore() {
     return this.store;
   }
 
+  @Override
   public synchronized boolean isClosed() {
     if (this.store == null) {
       return true;
@@ -102,23 +103,28 @@ public abstract class AbstractRDBStore<DEF extends DBDefinition> implements DBSt
     return this.store.isClosed();
   }
 
+  @Override
   public BatchOperationHandler getBatchHandler() {
     return this.store;
   }
 
+  @Override
   public void close() throws IOException {
     this.store.close();
     this.cfOptions.close();
   }
 
+  @Override
   public void flushDB() throws IOException {
     store.flushDB();
   }
 
+  @Override
   public void flushLog(boolean sync) throws IOException {
     store.flushLog(sync);
   }
 
+  @Override
   public void compactDB() throws IOException {
     store.compactDB();
   }

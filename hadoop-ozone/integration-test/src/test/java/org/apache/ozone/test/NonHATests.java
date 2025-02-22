@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +14,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.ozone.test;
 
+import org.apache.hadoop.hdds.scm.TestContainerOperations;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.TestInstance;
@@ -44,6 +45,14 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
 
   @Nested
   class AllocateContainer extends org.apache.hadoop.hdds.scm.TestAllocateContainer {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class ContainerOperations extends TestContainerOperations {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -84,6 +93,22 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
 
   @Nested
   class SCMNodeManagerMXBean extends org.apache.hadoop.hdds.scm.TestSCMNodeManagerMXBean {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class XceiverClientManager extends org.apache.hadoop.hdds.scm.TestXceiverClientManager {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class SCMContainerManagerMetrics extends org.apache.hadoop.hdds.scm.container.metrics.TestSCMContainerManagerMetrics {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -147,14 +172,6 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class ObjectStore extends org.apache.hadoop.ozone.om.TestObjectStore {
-    @Override
-    public MiniOzoneCluster cluster() {
-      return getCluster();
-    }
-  }
-
-  @Nested
   class BucketLayoutWithOlderClient extends org.apache.hadoop.ozone.om.TestBucketLayoutWithOlderClient {
     @Override
     public MiniOzoneCluster cluster() {
@@ -163,7 +180,47 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
+  class ListKeys extends org.apache.hadoop.ozone.om.TestListKeys {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class ListKeysWithFSO extends org.apache.hadoop.ozone.om.TestListKeysWithFSO {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class ListStatus extends org.apache.hadoop.ozone.om.TestListStatus {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class ObjectStore extends org.apache.hadoop.ozone.om.TestObjectStore {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
   class ObjectStoreWithFSO extends org.apache.hadoop.ozone.om.TestObjectStoreWithFSO {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class ObjectStoreWithLegacyFS extends org.apache.hadoop.ozone.om.TestObjectStoreWithLegacyFS {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();

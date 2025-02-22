@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,14 +13,17 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
+
 package org.apache.hadoop.hdds.security.x509.keys;
 
-import org.apache.ratis.util.function.CheckedFunction;
-import org.bouncycastle.util.io.pem.PemObject;
-import org.bouncycastle.util.io.pem.PemReader;
-import org.bouncycastle.util.io.pem.PemWriter;
+// We used UTF-8 before, but a PEM file do contain only readable characters that are in the US_ASCII character set,
+// and UTF-8 is interoperable with US_ASCII in this case.
+// Based on general considerations of RFC-7468 , we stick to the US_ASCII charset for encoding and decoding.
+// See: (https://datatracker.ietf.org/doc/html/rfc7468#section-2)
+import static java.nio.charset.StandardCharsets.US_ASCII;
+import static org.apache.hadoop.hdds.security.SecurityConstants.PEM_ENCAPSULATION_BOUNDARY_LABEL_PRIVATE_KEY;
+import static org.apache.hadoop.hdds.security.SecurityConstants.PEM_ENCAPSULATION_BOUNDARY_LABEL_PUBLIC_KEY;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -36,14 +38,10 @@ import java.security.PublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
-
-// We used UTF-8 before, but a PEM file do contain only readable characters that are in the US_ASCII character set,
-// and UTF-8 is interoperable with US_ASCII in this case.
-// Based on general considerations of RFC-7468 , we stick to the US_ASCII charset for encoding and decoding.
-// See: (https://datatracker.ietf.org/doc/html/rfc7468#section-2)
-import static java.nio.charset.StandardCharsets.US_ASCII;
-import static org.apache.hadoop.hdds.security.SecurityConstants.PEM_ENCAPSULATION_BOUNDARY_LABEL_PRIVATE_KEY;
-import static org.apache.hadoop.hdds.security.SecurityConstants.PEM_ENCAPSULATION_BOUNDARY_LABEL_PUBLIC_KEY;
+import org.apache.ratis.util.function.CheckedFunction;
+import org.bouncycastle.util.io.pem.PemObject;
+import org.bouncycastle.util.io.pem.PemReader;
+import org.bouncycastle.util.io.pem.PemWriter;
 
 /**
  * KeyCodec for encoding and decoding private and public keys.

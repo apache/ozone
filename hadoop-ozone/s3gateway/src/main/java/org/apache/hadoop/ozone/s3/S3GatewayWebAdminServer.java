@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +14,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.s3;
+
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_AUTH_CONFIG_PREFIX;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_AUTH_TYPE;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_BIND_HOST_DEFAULT;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_KEYTAB_FILE;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTPS_BIND_HOST_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTPS_BIND_PORT_DEFAULT;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTP_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTP_BIND_HOST_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTP_BIND_PORT_DEFAULT;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTP_ENABLED_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL;
+import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_AUTH_TYPE_DEFAULT;
+import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_AUTH_TYPE_KEY;
+import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_ENABLED_KEY;
+import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_ENABLED_KEY_DEFAULT;
+import static org.apache.hadoop.security.authentication.server.AuthenticationFilter.AUTH_TYPE;
 
 import com.google.common.base.Strings;
 import java.io.IOException;
@@ -35,24 +53,6 @@ import org.eclipse.jetty.servlet.FilterMapping;
 import org.eclipse.jetty.servlet.ServletHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTPS_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTPS_BIND_HOST_KEY;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTPS_BIND_PORT_DEFAULT;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTP_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTP_BIND_HOST_KEY;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTP_BIND_PORT_DEFAULT;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTP_ENABLED_KEY;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_AUTH_CONFIG_PREFIX;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_AUTH_TYPE;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_BIND_HOST_DEFAULT;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_KEYTAB_FILE;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL;
-import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_AUTH_TYPE_KEY;
-import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_AUTH_TYPE_DEFAULT;
-import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_ENABLED_KEY;
-import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_ENABLED_KEY_DEFAULT;
-import static org.apache.hadoop.security.authentication.server.AuthenticationFilter.AUTH_TYPE;
 
 /**
  * HTTP server for serving static content and Ozone-specific endpoints (/conf, etc.).

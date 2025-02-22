@@ -21,17 +21,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.Random;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-
 /**
  * Test base of common utilities for tests not only raw coders but also block
  * coders.
  */
 @SuppressWarnings({"checkstyle:VisibilityModifier", "checkstyle:HiddenField"})
 public abstract class TestCoderBase {
-  protected static final Random RAND = new Random();
   private static int fixedDataGenerator = 0;
   protected boolean allowDump = true;
   protected int numDataUnits;
@@ -406,14 +404,14 @@ public abstract class TestCoderBase {
    */
   protected void fillDummyData(ByteBuffer buffer, int len) {
     byte[] dummy = new byte[len];
-    RAND.nextBytes(dummy);
+    dummy = RandomUtils.secure().randomBytes(dummy.length);
     buffer.put(dummy);
   }
 
   protected byte[] generateData(int len) {
     byte[] buffer = new byte[len];
     for (int i = 0; i < buffer.length; i++) {
-      buffer[i] = (byte) RAND.nextInt(256);
+      buffer[i] = (byte) RandomUtils.secure().randomInt(0, 256);
     }
     return buffer;
   }
@@ -512,7 +510,7 @@ public abstract class TestCoderBase {
    * Make some chunk messy or not correct any more.
    */
   protected void corruptSomeChunk(ECChunk[] chunks) {
-    int idx = new Random().nextInt(chunks.length);
+    int idx = RandomUtils.secure().randomInt(1, chunks.length);
     ByteBuffer buffer = chunks[idx].getBuffer();
     if (buffer.hasRemaining()) {
       buffer.position(buffer.position() + 1);

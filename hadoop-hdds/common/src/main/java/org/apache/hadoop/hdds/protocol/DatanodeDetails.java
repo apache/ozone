@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +17,16 @@
 
 package org.apache.hadoop.hdds.protocol;
 
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.RATIS_DATASTREAM_PORT_IN_DATANODEDETAILS;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.WEBUI_PORTS_IN_DATANODEDETAILS;
+import static org.apache.hadoop.ozone.ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableSet;
+import com.google.protobuf.ByteString;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -25,36 +34,24 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.collect.ImmutableSet;
-import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.hdds.scm.net.NetUtils;
-import org.apache.hadoop.ozone.util.StringWithByteString;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtendedDatanodeDetailsProto;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
+import org.apache.hadoop.hdds.scm.net.NetUtils;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
-
-import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.upgrade.BelongsToHDDSLayoutVersion;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.util.StringWithByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.WEBUI_PORTS_IN_DATANODEDETAILS;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.RATIS_DATASTREAM_PORT_IN_DATANODEDETAILS;
-import static org.apache.hadoop.ozone.ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS;
 
 /**
  * DatanodeDetails class contains details about DataNode like:

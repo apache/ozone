@@ -318,12 +318,58 @@ Test Multipart Upload Put With Copy and range with IfModifiedSince
                         Compare files           /tmp/10mb        /tmp/part-result
 
 Test Multipart Upload list
-    ${uploadID1} =      Initiate MPU    ${BUCKET}    ${PREFIX}/listtest/key1
-    ${uploadID2} =      Initiate MPU    ${BUCKET}    ${PREFIX}/listtest/key2
+    # Create 25 multipart uploads to test pagination
+    ${uploadIDs}=    Create List
+    FOR    ${index}    IN RANGE    25
+        ${key}=    Set Variable    ${PREFIX}/listtest/key-${index}
+        ${uploadID}=    Initiate MPU    ${BUCKET}    ${key}
+        Append To List    ${uploadIDs}    ${uploadID}
+    END
 
-    ${result} =         Execute AWSS3APICli     list-multipart-uploads --bucket ${BUCKET} --prefix ${PREFIX}/listtest
-                        Should contain          ${result}    ${uploadID1}
-                        Should contain          ${result}    ${uploadID2}
+    # Test listing with max-items=10 (should get 3 pages: 10, 10, 5)
+    ${result}=    Execute AWSS3APICli    list-multipart-uploads --bucket ${BUCKET} --prefix ${PREFIX}/listtest --max-items 10
+    
+    # Verify first page
+    ${count}=    Execute and checkrc    echo '${result}' | jq -r '.Uploads | length'    0
+    Should Be Equal    ${count}    10
+    
+    ${hasNext}=    Execute and checkrc    echo '${result}' | jq -r 'has("NextToken")'    0
+    Should Be Equal    ${hasNext}    true
+    
+    ${nextToken}=    Execute and checkrc    echo '${result}' | jq -r '.NextToken'    0
+    Should Not Be Empty    ${nextToken}
 
-    ${count} =          Execute and checkrc      echo '${result}' | jq -r '.Uploads | length'  0
-                        Should Be Equal          ${count}     2
+    # Get second page
+    ${result}=    Execute AWSS3APICli    list-multipart-uploads --bucket ${BUCKET} --prefix ${PREFIX}/listtest --max-items 10 --starting-token ${nextToken}
+    
+    # Verify second page
+    ${count}=    Execute and checkrc    echo '${result}' | jq -r '.Uploads | length'    0
+    Should Be Equal    ${count}    10
+    
+    ${hasNext}=    Execute and checkrc    echo '${result}' | jq -r 'has("NextToken")'    0
+    Should Be Equal    ${hasNext}    true
+    
+    ${nextToken}=    Execute and checkrc    echo '${result}' | jq -r '.NextToken'    0
+    Should Not Be Empty    ${nextToken}
+
+    # Get last page
+    ${result}=    Execute AWSS3APICli    list-multipart-uploads --bucket ${BUCKET} --prefix ${PREFIX}/listtest --max-items 10 --starting-token ${nextToken}
+    
+    # Verify last page
+    ${count}=    Execute and checkrc    echo '${result}' | jq -r '.Uploads | length'    0
+    Should Be Equal    ${count}    5
+    
+    ${hasNext}=    Execute and checkrc    echo '${result}' | jq -r 'has("NextToken")'    0
+    Should Be Equal    ${hasNext}    false
+
+    # Test prefix filtering
+    ${result}=    Execute AWSS3APICli    list-multipart-uploads --bucket ${BUCKET} --prefix ${PREFIX}/listtest/key-1
+    ${count}=    Execute and checkrc    echo '${result}' | jq -r '.Uploads | length'    0
+    Should Be Equal    ${count}    11    # Should match key-1, key-10 through key-19
+
+    # Cleanup
+    FOR    ${index}    IN RANGE    25
+        ${key}=    Set Variable    ${PREFIX}/listtest/key-${index}
+        ${uploadID}=    Get From List    ${uploadIDs}    ${index}
+        Abort MPU    ${BUCKET}    ${key}    ${uploadID}    0
+    END

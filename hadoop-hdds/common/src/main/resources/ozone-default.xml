@@ -172,7 +172,7 @@
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
     <description>Determines where on the local filesystem HDDS data will be
-      stored. Defaults to dfs.datanode.data.dir if not specified.
+      stored. Defaults to hdds.datanode.data.dir if not specified.
       The directories should be tagged with corresponding storage types
       ([SSD]/[DISK]/[ARCHIVE]/[RAM_DISK]) for storage policies. The default
       storage type will be DISK if the directory does not have a storage type
@@ -3559,21 +3559,6 @@
   </property>
 
   <property>
-    <name>ozone.om.enable.filesystem.paths</name>
-    <tag>OZONE, OM</tag>
-    <value>false</value>
-    <description>If true, key names will be interpreted as file system paths.
-      "/" will be treated as a special character and paths will be normalized
-      and must follow Unix filesystem path naming conventions. This flag will
-      be helpful when objects created by S3G need to be accessed using OFS/O3Fs.
-      If false, it will fallback to default behavior of Key/MPU create
-      requests where key paths are not normalized and any intermediate
-      directories will not be created or any file checks happens to check
-      filesystem semantics.
-    </description>
-  </property>
-
-  <property>
     <name>ozone.om.key.path.lock.enabled</name>
     <tag>OZONE, OM</tag>
     <value>false</value>
@@ -4556,15 +4541,6 @@
       This setting specifies the interval (in seconds) for monitoring percentile performance metrics.
       It helps in tracking the read and write performance of DataNodes in real-time,
       allowing for better identification and analysis of performance issues.
-    </description>
-  </property>
-
-  <property>
-    <name>ozone.om.server.list.max.size</name>
-    <value>1000</value>
-    <tag>OZONE, OM</tag>
-    <description>
-      Configuration property to configure the max server side response size for list calls on om.
     </description>
   </property>
 </configuration>
