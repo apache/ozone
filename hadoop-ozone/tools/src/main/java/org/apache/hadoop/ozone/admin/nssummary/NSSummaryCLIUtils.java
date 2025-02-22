@@ -37,10 +37,6 @@ import picocli.CommandLine.Help.Ansi;
  */
 public final class NSSummaryCLIUtils {
 
-  private NSSummaryCLIUtils() {
-
-  }
-
   private static final String OFS_PREFIX = "ofs://";
 
   public static String makeHttpCall(StringBuilder url, String path,
@@ -153,5 +149,9 @@ public final class NSSummaryCLIUtils {
       return path.substring(OFS_PREFIX.length());
     }
     return path.substring(idx);
+  }
+
+  private NSSummaryCLIUtils() {
+
   }
 }

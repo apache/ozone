@@ -96,13 +96,13 @@ import org.slf4j.LoggerFactory;
 @Singleton
 public class ReconUtils {
 
-  public ReconUtils() {
-  }
-
   private static Logger log = LoggerFactory.getLogger(
       ReconUtils.class);
 
   private static AtomicBoolean rebuildTriggered = new AtomicBoolean(false);
+
+  public ReconUtils() {
+  }
 
   public static File getReconScmDbDir(ConfigurationSource conf) {
     return new ReconUtils().getReconDbDir(conf, OZONE_RECON_SCM_DB_DIR);

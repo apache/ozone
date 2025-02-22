@@ -22,10 +22,6 @@ package org.apache.hadoop.ozone.containerlog.parser;
  */
 public final class DBConsts {
 
-  private DBConsts() {
-    //Never constructed
-  }
-
   public static final String DRIVER = "org.sqlite.JDBC";
   public static final String CONNECTION_PREFIX = "jdbc:sqlite:";
   public static final String DATABASE_NAME = "container_datanode.db";
@@ -35,4 +31,7 @@ public final class DBConsts {
   public static final String DATANODE_CONTAINER_LOG_TABLE_NAME = "DatanodeContainerLogTable";
   public static final String CONTAINER_LOG_TABLE_NAME = "ContainerLogTable";
 
+  private DBConsts() {
+    //Never constructed
+  }
 }

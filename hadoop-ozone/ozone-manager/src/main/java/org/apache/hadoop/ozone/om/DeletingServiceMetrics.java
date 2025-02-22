@@ -35,6 +35,37 @@ public final class DeletingServiceMetrics {
       DeletingServiceMetrics.class.getSimpleName();
   private MetricsRegistry registry;
 
+  /*
+   * Total directory deletion metrics across all iterations of DirectoryDeletingService since last restart.
+   */
+  @Metric("Total no. of deleted directories sent for purge")
+  private MutableGaugeLong numDirsSentForPurge;
+  @Metric("Total no. of sub-directories sent for purge")
+  private MutableGaugeLong numSubDirsSentForPurge;
+  @Metric("Total no. of sub-files sent for purge")
+  private MutableGaugeLong numSubFilesSentForPurge;
+  /*
+   * Total key deletion metrics across all iterations of KeyDeletingService since last restart.
+   */
+  @Metric("Total no. of keys processed")
+  private MutableGaugeLong numKeysProcessed;
+  @Metric("Total no. of deleted keys sent for purge")
+  private MutableGaugeLong numKeysSentForPurge;
+  /*
+   * Directory purge request metrics.
+   */
+  @Metric("Total no. of directories purged")
+  private MutableGaugeLong numDirsPurged;
+  @Metric("Total no. of subFiles moved to deletedTable")
+  private MutableGaugeLong numSubFilesMovedToDeletedTable;
+  @Metric("Total no. of subDirectories moved to deletedDirTable")
+  private MutableGaugeLong numSubDirsMovedToDeletedDirTable;
+  /*
+   * Key purge request metrics.
+   */
+  @Metric("Total no. of keys purged")
+  private MutableGaugeLong numKeysPurged;
+
   private DeletingServiceMetrics() {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
   }
@@ -56,16 +87,6 @@ public final class DeletingServiceMetrics {
   public static void unregister() {
     DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
   }
-
-  /*
-   * Total directory deletion metrics across all iterations of DirectoryDeletingService since last restart.
-   */
-  @Metric("Total no. of deleted directories sent for purge")
-  private MutableGaugeLong numDirsSentForPurge;
-  @Metric("Total no. of sub-directories sent for purge")
-  private MutableGaugeLong numSubDirsSentForPurge;
-  @Metric("Total no. of sub-files sent for purge")
-  private MutableGaugeLong numSubFilesSentForPurge;
 
   public void incrNumDirsSentForPurge(long dirDel) {
     numDirsSentForPurge.incr(dirDel);
@@ -97,14 +118,6 @@ public final class DeletingServiceMetrics {
     return numSubFilesSentForPurge.value();
   }
 
-  /*
-   * Total key deletion metrics across all iterations of KeyDeletingService since last restart.
-   */
-  @Metric("Total no. of keys processed")
-  private MutableGaugeLong numKeysProcessed;
-  @Metric("Total no. of deleted keys sent for purge")
-  private MutableGaugeLong numKeysSentForPurge;
-
   public void incrNumKeysProcessed(long keysProcessed) {
     this.numKeysProcessed.incr(keysProcessed);
   }
@@ -112,16 +125,6 @@ public final class DeletingServiceMetrics {
   public void incrNumKeysSentForPurge(long keysPurge) {
     this.numKeysSentForPurge.incr(keysPurge);
   }
-
-  /*
-   * Directory purge request metrics.
-   */
-  @Metric("Total no. of directories purged")
-  private MutableGaugeLong numDirsPurged;
-  @Metric("Total no. of subFiles moved to deletedTable")
-  private MutableGaugeLong numSubFilesMovedToDeletedTable;
-  @Metric("Total no. of subDirectories moved to deletedDirTable")
-  private MutableGaugeLong numSubDirsMovedToDeletedDirTable;
 
   public void incrNumDirPurged(long dirPurged) {
     this.numDirsPurged.incr(dirPurged);
@@ -146,12 +149,6 @@ public final class DeletingServiceMetrics {
   public long getNumSubDirsMovedToDeletedDirTable() {
     return numSubDirsMovedToDeletedDirTable.value();
   }
-
-  /*
-   * Key purge request metrics.
-   */
-  @Metric("Total no. of keys purged")
-  private MutableGaugeLong numKeysPurged;
 
   public void incrNumKeysPurged(long keysPurged) {
     this.numKeysPurged.incr(keysPurged);

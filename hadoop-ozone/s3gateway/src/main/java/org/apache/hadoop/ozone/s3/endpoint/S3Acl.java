@@ -63,10 +63,6 @@ public final class S3Acl {
     // Allows grantee above all permissions on the bucket
     FULL_CONTROL("FULL_CONTROL");
 
-    public String getValue() {
-      return value;
-    }
-
     /**
      * String value for this Enum.
      */
@@ -77,6 +73,10 @@ public final class S3Acl {
      */
     ACLType(String val) {
       value = val;
+    }
+
+    public String getValue() {
+      return value;
     }
 
     public static ACLType getType(String typeStr) {
@@ -96,14 +96,6 @@ public final class S3Acl {
     USER("CanonicalUser", true, "id"),
     GROUP("Group", false, "url"),
     USER_BY_EMAIL("AmazonCustomerByEmail", false, "emailAddress");
-
-    public String getGranteeType() {
-      return granteeType;
-    }
-
-    public String getHeaderType() {
-      return granteeInHeader;
-    }
 
     /**
      *  Grantee type in body XML.
@@ -129,6 +121,14 @@ public final class S3Acl {
       granteeType = val;
       supported = support;
       granteeInHeader = headerType;
+    }
+
+    public String getGranteeType() {
+      return granteeType;
+    }
+
+    public String getHeaderType() {
+      return granteeInHeader;
     }
 
     boolean isSupported() {
