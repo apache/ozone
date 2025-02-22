@@ -635,8 +635,10 @@ public final class HddsServerUtil {
     archiveOutputStream.putArchiveEntry(archiveEntry);
     try (FileInputStream fis = new FileInputStream(file)) {
       IOUtils.copy(fis, archiveOutputStream);
+      archiveOutputStream.flush();
+    } finally {
+      archiveOutputStream.closeArchiveEntry();
     }
-    archiveOutputStream.closeArchiveEntry();
   }
 
   // Mark tarball completed.
