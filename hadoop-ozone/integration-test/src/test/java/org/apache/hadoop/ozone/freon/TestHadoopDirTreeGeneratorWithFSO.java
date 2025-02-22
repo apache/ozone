@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 public class TestHadoopDirTreeGeneratorWithFSO
     extends TestHadoopDirTreeGenerator {
 
+  @Override
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration conf = new OzoneConfiguration();
     OMRequestTestUtils.configureFSOptimizedPaths(conf, true);

@@ -1757,6 +1757,7 @@
               <ruleset>dev-support/pmd/pmd-ruleset.xml</ruleset>
             </rulesets>
             <printFailingErrors>true</printFailingErrors>
+            <includeTests>true</includeTests>
           </configuration>
         </plugin>
       </plugins>

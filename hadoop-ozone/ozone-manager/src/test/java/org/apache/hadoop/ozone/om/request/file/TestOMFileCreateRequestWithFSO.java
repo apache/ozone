@@ -45,6 +45,7 @@ import org.junit.jupiter.api.Test;
  */
 public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
 
+  @Override
   @Test
   public void testValidateAndUpdateCacheWithNonRecursive() throws Exception {
     testNonRecursivePath(UUID.randomUUID().toString(), false, false, false);
@@ -76,6 +77,7 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     testNonRecursivePath("a/b/e", false, false, false);
   }
 
+  @Override
   @Test
   public void testValidateAndUpdateCacheWithNamespaceQuotaExceeded()
       throws Exception {
@@ -100,6 +102,7 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
         OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
   }
 
+  @Override
   @Test
   public void testValidateAndUpdateCacheWithRecursiveAndOverWrite()
           throws Exception {
@@ -129,6 +132,7 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     testNonRecursivePath(key, false, true, true);
   }
 
+  @Override
   @Test
   public void testValidateAndUpdateCacheWithNonRecursiveAndOverWrite()
           throws Exception {
@@ -159,6 +163,7 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     testNonRecursivePath(key, false, false, true);
   }
 
+  @Override
   @Test
   public void testCreateFileInheritParentDefaultAcls()
       throws Exception {
