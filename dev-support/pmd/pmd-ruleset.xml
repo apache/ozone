@@ -26,6 +26,7 @@
     PMD Ruleset for Apache Ozone
   </description>
 
+  <rule ref="category/java/bestpractices.xml/ForLoopCanBeForeach"/>
   <rule ref="category/java/bestpractices.xml/MissingOverride"/>
 
   <exclude-pattern>.*/generated-sources/.*</exclude-pattern>

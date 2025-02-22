@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
+import java.util.Collections;
 import java.util.LinkedList;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileStatus;
@@ -168,9 +169,7 @@ public class TestHadoopNestedDirGenerator {
       FileStatus[] temp = fs.listStatus(f.getPath());
       if (temp.length > 0) {
         ++depth;
-        for (int i = 0; i < temp.length; i++) {
-          queue.add(temp[i]);
-        }
+        Collections.addAll(queue, temp);
       }
       if (span == 0) {
         p = f.getPath();

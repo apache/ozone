@@ -227,14 +227,11 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     String[] pathComponents = StringUtils.split(key, '/');
     long parentId = bucketId;
     OmDirectoryInfo dirInfo = null;
-    for (int indx = 0; indx < pathComponents.length; indx++) {
-      String pathElement = pathComponents[indx];
+    for (String pathElement : pathComponents) {
       // Reached last component, which is file name
       // directory
-      String dbKey = omMetadataManager.getOzonePathKey(volumeId,
-              bucketId, parentId, pathElement);
-      dirInfo =
-              omMetadataManager.getDirectoryTable().get(dbKey);
+      String dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId, parentId, pathElement);
+      dirInfo = omMetadataManager.getDirectoryTable().get(dbKey);
       parentId = dirInfo.getObjectID();
     }
     return dirInfo;

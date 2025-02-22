@@ -148,8 +148,8 @@ public class NSSummaryTask implements ReconOmTask {
         threadFactory);
     try {
       results = executorService.invokeAll(tasks);
-      for (int i = 0; i < results.size(); i++) {
-        if (results.get(i).get().equals(false)) {
+      for (Future<Boolean> result : results) {
+        if (result.get().equals(false)) {
           return new ImmutablePair<>(getTaskName(), false);
         }
       }

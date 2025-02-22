@@ -854,14 +854,12 @@ abstract class AbstractOzoneFileSystemTest {
     Set<String> actualPaths = new TreeSet<>();
     ArrayList<String> actualPathList = new ArrayList<>();
     if (numDirs != fileStatuses.length) {
-      for (int i = 0; i < fileStatuses.length; i++) {
-        boolean duplicate =
-                actualPaths.add(fileStatuses[i].getPath().getName());
+      for (FileStatus fileStatus : fileStatuses) {
+        boolean duplicate = actualPaths.add(fileStatus.getPath().getName());
         if (!duplicate) {
-          LOG.info("Duplicate path:{} in FileStatusList",
-                  fileStatuses[i].getPath().getName());
+          LOG.info("Duplicate path:{} in FileStatusList", fileStatus.getPath().getName());
         }
-        actualPathList.add(fileStatuses[i].getPath().getName());
+        actualPathList.add(fileStatus.getPath().getName());
       }
       if (numDirs != actualPathList.size()) {
         LOG.info("actualPathsSize: {}", actualPaths.size());

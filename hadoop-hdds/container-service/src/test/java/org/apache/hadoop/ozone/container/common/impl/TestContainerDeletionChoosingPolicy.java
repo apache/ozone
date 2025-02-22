@@ -193,9 +193,9 @@ public class TestContainerDeletionChoosingPolicy {
     // the empty deletion blocks container should not be chosen
     int containerCount = 0;
     int c = 0;
-    for (int i = 0; i < numberOfBlocks.size(); i++) {
+    for (Integer numberOfBlock : numberOfBlocks) {
       containerCount++;
-      c = c + numberOfBlocks.get(i);
+      c = c + numberOfBlock;
       if (c >= (numContainers + 1)) {
         break;
       }
