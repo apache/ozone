@@ -453,6 +453,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     shutdownHddsDatanode(getHddsDatanodeIndex(dn));
   }
 
+  @Override
   public String getClusterId() {
     return scm.getClientProtocolServer().getScmInfo().getClusterId();
   }

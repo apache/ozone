@@ -55,6 +55,7 @@ public class TestBackgroundContainerMetadataScanner extends
 
   private BackgroundContainerMetadataScanner scanner;
 
+  @Override
   @BeforeEach
   public void setup() {
     super.setup();
