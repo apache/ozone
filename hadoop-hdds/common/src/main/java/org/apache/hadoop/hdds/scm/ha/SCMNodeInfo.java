@@ -40,6 +40,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_SERVICE_ID;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalInt;
+import net.jcip.annotations.Immutable;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.ha.ConfUtils;
@@ -52,6 +53,7 @@ import org.slf4j.LoggerFactory;
  * This class is used by SCM clients like OzoneManager, Client, Admin
  * commands to figure out SCM Node Information to make contact to SCM.
  */
+@Immutable
 public class SCMNodeInfo {
 
   private static final Logger LOG = LoggerFactory.getLogger(SCMNodeInfo.class);

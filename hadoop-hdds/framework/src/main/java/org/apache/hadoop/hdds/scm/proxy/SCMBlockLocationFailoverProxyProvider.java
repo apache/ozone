@@ -33,8 +33,6 @@ public class SCMBlockLocationFailoverProxyProvider extends
 
   public SCMBlockLocationFailoverProxyProvider(ConfigurationSource conf) {
     super(ScmBlockLocationProtocolPB.class, conf, null);
-    LOG.info("Created block location fail-over proxy with {} nodes: {}",
-        getSCMNodeIds(), getSCMProxyInfoList());
   }
 
   @Override

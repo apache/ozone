@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.proxy;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -54,8 +53,6 @@ import org.slf4j.Logger;
  * connecting to another SCM node from the list of proxies.
  */
 public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyProvider<T> {
-
-  private final Logger logger;
 
   private final SCMClientConfig scmClientConfig;
 
@@ -94,8 +91,6 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
    */
   public SCMFailoverProxyProviderBase(Class<T> protocol, ConfigurationSource conf,
       UserGroupInformation userGroupInformation) {
-    this.logger = getLogger();
-    Preconditions.checkNotNull(logger);
     this.protocolClass = protocol;
     this.conf = conf;
 
@@ -103,7 +98,7 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
       try {
         this.ugi = UserGroupInformation.getCurrentUser();
       } catch (IOException ex) {
-        logger.error("Unable to fetch user credentials from UGI", ex);
+        getLogger().error("Unable to fetch user credentials from UGI", ex);
         throw new RuntimeException(ex);
       }
     } else {
@@ -122,7 +117,7 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
     this.maxRetryCount = scmClientConfig.getRetryCount();
     this.retryInterval = scmClientConfig.getRetryInterval();
 
-    logger.info("Created fail-over proxy for protocol {} with {} nodes: {}", protocol.getSimpleName(),
+    getLogger().info("Created fail-over proxy for protocol {} with {} nodes: {}", protocol.getSimpleName(),
         scmNodeIds.size(), scmProxyInfoMap.values());
   }
 
@@ -206,7 +201,7 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
     } else {
       nextProxyIndex();
     }
-    logger.debug("Failing over to next proxy. {}", getCurrentProxySCMNodeId());
+    getLogger().debug("Failing over to next proxy. {}", getCurrentProxySCMNodeId());
   }
 
   public synchronized void performFailoverToAssignedLeader(String newLeader,
@@ -220,10 +215,10 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
                   .equals(snle.getSuggestedLeader())).findFirst();
       if (matchedProxyInfo.isPresent()) {
         newLeader = matchedProxyInfo.get().getNodeId();
-        logger.debug("Performing failover to suggested leader {}, nodeId {}",
+        getLogger().debug("Performing failover to suggested leader {}, nodeId {}",
             snle.getSuggestedLeader(), newLeader);
       } else {
-        logger.debug("Suggested leader {} does not match with any of the " +
+        getLogger().debug("Suggested leader {} does not match with any of the " +
                 "proxyInfo address {}", snle.getSuggestedLeader(),
             Arrays.toString(scmProxyInfoMap.values().toArray()));
       }
@@ -269,7 +264,7 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
     if (!currentProxySCMNodeId.equals(newLeaderNodeId)) {
       if (scmProxyInfoMap.containsKey(newLeaderNodeId)) {
         updatedLeaderNodeID = newLeaderNodeId;
-        logger.debug("Updated LeaderNodeID {}", updatedLeaderNodeID);
+        getLogger().debug("Updated LeaderNodeID {}", updatedLeaderNodeID);
       } else {
         updatedLeaderNodeID = null;
       }
@@ -286,11 +281,11 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
     try {
       T scmProxy = createSCMProxy(address);
       // Create proxyInfo here, to make it work with all Hadoop versions.
-      proxyInfo = new ProxyInfo<T>(scmProxy, scmProxyInfo.toString());
+      proxyInfo = new ProxyInfo<>(scmProxy, scmProxyInfo.toString());
       scmProxies.put(nodeId, proxyInfo);
       return proxyInfo;
     } catch (IOException ioe) {
-      logger.error("{} Failed to create RPC proxy to SCM at {}",
+      getLogger().error("{} Failed to create RPC proxy to SCM at {}",
           this.getClass().getSimpleName(), address, ioe);
       throw new RuntimeException(ioe);
     }
@@ -316,14 +311,14 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
       @Override
       public RetryAction shouldRetry(Exception e, int retry,
                                      int failover, boolean b) {
-        if (logger.isDebugEnabled()) {
+        if (getLogger().isDebugEnabled()) {
           if (e.getCause() != null) {
-            logger.debug("RetryProxy: SCM Server {}: {}: {}",
+            getLogger().debug("RetryProxy: SCM Server {}: {}: {}",
                 getCurrentProxySCMNodeId(),
                 e.getCause().getClass().getSimpleName(),
                 e.getCause().getMessage());
           } else {
-            logger.debug("RetryProxy: SCM {}: {}", getCurrentProxySCMNodeId(),
+            getLogger().debug("RetryProxy: SCM {}: {}", getCurrentProxySCMNodeId(),
                 e.getMessage());
           }
         }
