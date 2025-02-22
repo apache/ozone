@@ -50,7 +50,7 @@ import org.slf4j.Logger;
  * A failover proxy provider base abstract class.
  * Provides common methods for failover proxy provider
  * implementations. Failover proxy provider allows clients to configure
- * multiple OMs to connect to. In case of SCM failover, client can try
+ * multiple SCMs to connect to. In case of SCM failover, client can try
  * connecting to another SCM node from the list of proxies.
  */
 public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyProvider<T> {
