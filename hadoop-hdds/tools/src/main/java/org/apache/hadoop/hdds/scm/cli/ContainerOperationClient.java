@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetVolumeInfosResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -601,6 +602,28 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public String getMetrics(String query) throws IOException {
     return storageContainerLocationClient.getMetrics(query);
+  }
+
+  /**
+   * Get getVolumeInfos based on query conditions.
+   *
+   * @param displayMode Represents the mode for displaying volumes.
+   * Options include "all" for all volumes, "failed" for failed volumes,
+   * and "normal" for normal volumes.
+   * @param uuid datanode uuid String.
+   * @param hostName datanode hostName String.
+   * @param pageSize Records displayed per page.
+   * @param currentPage The current page number.
+   * @return Volume Information List.
+   * @throws IOException
+   * I/O exceptions that may occur during the process of querying the volume.
+   */
+  @Override
+  public GetVolumeInfosResponseProto getVolumeInfos(String displayMode, String uuid,
+      String hostName, int pageSize, int currentPage) throws IOException {
+    GetVolumeInfosResponseProto response = storageContainerLocationClient.getVolumeInfos(
+            displayMode, uuid, hostName, pageSize, currentPage);
+    return response;
   }
 
 }

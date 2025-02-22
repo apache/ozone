@@ -217,7 +217,7 @@ public class PipelineManagerImpl implements PipelineManager {
 
   /**
    * Add a previously built pipeline to the pipeline manager. This will allow
-   * the pipline to be used by clients in the system.
+   * the pipeline to be used by clients in the system.
    * @param pipeline
    * @throws IOException
    */

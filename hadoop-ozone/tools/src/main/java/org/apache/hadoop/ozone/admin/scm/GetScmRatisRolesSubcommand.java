@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.server.JsonUtils;
-import org.apache.hadoop.ozone.utils.FormattingCLIUtils;
+import org.apache.hadoop.hdds.utils.FormattingCLIUtils;
 import picocli.CommandLine;
 
 /**

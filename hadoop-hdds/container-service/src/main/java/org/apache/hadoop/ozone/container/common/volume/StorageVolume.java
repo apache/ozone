@@ -26,6 +26,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.LinkedList;
 import java.util.Objects;
 import java.util.Optional;
@@ -136,6 +137,7 @@ public abstract class StorageVolume
   private AtomicInteger currentIOFailureCount;
   private Queue<Boolean> ioTestSlidingWindow;
   private int healthCheckFileSize;
+  private Instant failureTime = Instant.MIN;
 
   protected StorageVolume(Builder<?> b) throws IOException {
     if (!b.failedVolume) {
@@ -379,6 +381,7 @@ public abstract class StorageVolume
     private boolean failedVolume = false;
     private String datanodeUuid;
     private String clusterID;
+    private Instant failureTime;
 
     public Builder(String volumeRootStr, String storageDirStr) {
       this.volumeRootStr = volumeRootStr;
@@ -425,6 +428,11 @@ public abstract class StorageVolume
       return this.getThis();
     }
 
+    public T failureTime(Instant volFailureTime) {
+      this.failureTime = volFailureTime;
+      return this.getThis();
+    }
+
     public abstract StorageVolume build() throws IOException;
 
     public String getVolumeRootStr() {
@@ -437,6 +445,10 @@ public abstract class StorageVolume
 
     public StorageType getStorageType() {
       return this.storageType;
+    }
+
+    public Instant getFailureTime() {
+      return failureTime;
     }
   }
 
@@ -493,6 +505,10 @@ public abstract class StorageVolume
             .orElse(StorageType.DEFAULT);
   }
 
+  public Instant getFailureTime() {
+    return failureTime;
+  }
+
   public String getStorageID() {
     return storageID;
   }
@@ -519,6 +535,14 @@ public abstract class StorageVolume
 
   public void setState(VolumeState state) {
     this.state = state;
+  }
+
+  public void setFailureTime(Instant failureTime) {
+    this.failureTime = failureTime;
+  }
+
+  public void resetFailureTime() {
+    this.failureTime = Instant.MIN;
   }
 
   public boolean isFailed() {
