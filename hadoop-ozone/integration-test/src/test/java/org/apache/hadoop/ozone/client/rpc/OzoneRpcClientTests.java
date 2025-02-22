@@ -57,6 +57,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.slf4j.event.Level.DEBUG;
 
 import java.io.File;
@@ -130,6 +131,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.audit.AuditLogTestUtils;
@@ -1226,6 +1228,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @ParameterizedTest
   @EnumSource
   void rewriteKey(BucketLayout layout) throws IOException {
+    checkFeatureEnable();
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
     OmKeyArgs keyArgs = toOmKeyArgs(keyDetails);
@@ -1243,6 +1246,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @ParameterizedTest
   @EnumSource
   void overwriteAfterRewrite(BucketLayout layout) throws IOException {
+    checkFeatureEnable();
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
     rewriteKey(bucket, keyDetails, "rewrite".getBytes(UTF_8));
@@ -1257,6 +1261,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @ParameterizedTest
   @EnumSource
   void rewriteAfterRename(BucketLayout layout) throws IOException {
+    checkFeatureEnable();
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
     String newKeyName = "rewriteAfterRename-" + layout;
@@ -1277,6 +1282,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @ParameterizedTest
   @EnumSource
   void renameAfterRewrite(BucketLayout layout) throws IOException {
+    checkFeatureEnable();
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
     final byte[] rewriteContent = "rewrite".getBytes(UTF_8);
@@ -1294,6 +1300,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @ParameterizedTest
   @EnumSource
   void rewriteFailsDueToOutdatedGeneration(BucketLayout layout) throws IOException {
+    checkFeatureEnable();
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
     OmKeyArgs keyArgs = toOmKeyArgs(keyDetails);
@@ -1317,6 +1324,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @ParameterizedTest
   @EnumSource
   void rewriteFailsDueToOutdatedGenerationAtCommit(BucketLayout layout) throws IOException {
+    checkFeatureEnable();
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
     final byte[] overwriteContent = "overwrite".getBytes(UTF_8);
@@ -1351,6 +1359,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @ParameterizedTest
   @EnumSource
   void cannotRewriteDeletedKey(BucketLayout layout) throws IOException {
+    checkFeatureEnable();
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
     bucket.deleteKey(keyDetails.getName());
@@ -1363,6 +1372,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @ParameterizedTest
   @EnumSource
   void cannotRewriteRenamedKey(BucketLayout layout) throws IOException {
+    checkFeatureEnable();
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
     bucket.renameKey(keyDetails.getName(), "newKeyName-" + layout.name());
@@ -1438,6 +1448,14 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   private static void assertMetadataUnchanged(OzoneKeyDetails original, OzoneKeyDetails rewritten) {
     assertEquals(original.getOwner(), rewritten.getOwner());
     assertEquals(original.getMetadata(), rewritten.getMetadata());
+  }
+
+  private static void checkFeatureEnable() {
+    try {
+      cluster.getOzoneManager().checkFeatureEnabled(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+    } catch (OMException e) {
+      assumeFalse(OMException.ResultCodes.NOT_SUPPORTED_OPERATION == e.getResult());
+    }
   }
 
   @Test
