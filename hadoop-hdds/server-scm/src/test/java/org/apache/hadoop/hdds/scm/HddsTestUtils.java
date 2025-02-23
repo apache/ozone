@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
@@ -51,7 +52,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -223,8 +223,8 @@ public final class HddsTestUtils {
     return createStorageReport(nodeId, path,
         random.nextInt(1000),
         random.nextInt(500),
-        random.nextInt(500),
-        StorageTypeProto.DISK);
+        random.nextInt(500), 
+        StorageType.DISK_TYPE);
   }
 
   /**
@@ -240,7 +240,7 @@ public final class HddsTestUtils {
         random.nextInt(1000),
         random.nextInt(500),
         random.nextInt(500),
-        StorageTypeProto.DISK);
+        StorageType.DISK_TYPE);
   }
 
   public static StorageReportProto createStorageReport(UUID nodeId, String path,
@@ -249,11 +249,11 @@ public final class HddsTestUtils {
         capacity,
         0,
         capacity,
-        StorageTypeProto.DISK);
+        StorageType.DISK_TYPE);
   }
 
   public static StorageReportProto createStorageReport(UUID nodeId, String path,
-       long capacity, long used, long remaining, StorageTypeProto type) {
+       long capacity, long used, long remaining, StorageType type) {
     return createStorageReport(nodeId, path, capacity, used, remaining,
             type, false);
   }
@@ -270,7 +270,7 @@ public final class HddsTestUtils {
      * @return StorageReportProto
      */
   public static StorageReportProto createStorageReport(UUID nodeId, String path,
-      long capacity, long used, long remaining, StorageTypeProto type,
+      long capacity, long used, long remaining, StorageType type,
                                                        boolean failed) {
     Preconditions.checkNotNull(nodeId);
     Preconditions.checkNotNull(path);
@@ -281,9 +281,9 @@ public final class HddsTestUtils {
         .setScmUsed(used)
         .setFailed(failed)
         .setRemaining(remaining);
-    StorageTypeProto storageTypeProto =
-        type == null ? StorageTypeProto.DISK : type;
-    srb.setStorageType(storageTypeProto);
+    StorageType storageType =
+        type == null ? StorageType.DISK_TYPE : type;
+    srb.setStorageTypeProto(storageType);
     return srb.build();
   }
 
@@ -293,12 +293,12 @@ public final class HddsTestUtils {
         capacity,
         0,
         capacity,
-        StorageTypeProto.DISK, false);
+        StorageType.DISK_TYPE, false);
   }
 
   public static MetadataStorageReportProto createMetadataStorageReport(
       String path, long capacity, long used, long remaining,
-      StorageTypeProto type) {
+      StorageType type) {
     return createMetadataStorageReport(path, capacity, used, remaining,
         type, false);
   }
@@ -316,7 +316,7 @@ public final class HddsTestUtils {
    */
   public static MetadataStorageReportProto createMetadataStorageReport(
       String path, long capacity, long used, long remaining,
-      StorageTypeProto type, boolean failed) {
+      StorageType type, boolean failed) {
     Preconditions.checkNotNull(path);
     MetadataStorageReportProto.Builder srb = MetadataStorageReportProto
         .newBuilder();
@@ -325,9 +325,9 @@ public final class HddsTestUtils {
         .setScmUsed(used)
         .setFailed(failed)
         .setRemaining(remaining);
-    StorageTypeProto storageTypeProto =
-        type == null ? StorageTypeProto.DISK : type;
-    srb.setStorageType(storageTypeProto);
+    StorageType storageType =
+        type == null ? StorageType.DISK_TYPE : type;
+    srb.setStorageTypeProto(storageType);
     return srb.build();
   }
 
