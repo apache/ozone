@@ -1228,7 +1228,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @ParameterizedTest
   @EnumSource
   void rewriteKey(BucketLayout layout) throws IOException {
-    checkFeatureEnable();
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
     OmKeyArgs keyArgs = toOmKeyArgs(keyDetails);
@@ -1246,7 +1246,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @ParameterizedTest
   @EnumSource
   void overwriteAfterRewrite(BucketLayout layout) throws IOException {
-    checkFeatureEnable();
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
     rewriteKey(bucket, keyDetails, "rewrite".getBytes(UTF_8));
@@ -1261,7 +1261,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @ParameterizedTest
   @EnumSource
   void rewriteAfterRename(BucketLayout layout) throws IOException {
-    checkFeatureEnable();
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
     String newKeyName = "rewriteAfterRename-" + layout;
@@ -1282,7 +1282,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @ParameterizedTest
   @EnumSource
   void renameAfterRewrite(BucketLayout layout) throws IOException {
-    checkFeatureEnable();
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
     final byte[] rewriteContent = "rewrite".getBytes(UTF_8);
@@ -1300,7 +1300,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @ParameterizedTest
   @EnumSource
   void rewriteFailsDueToOutdatedGeneration(BucketLayout layout) throws IOException {
-    checkFeatureEnable();
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
     OmKeyArgs keyArgs = toOmKeyArgs(keyDetails);
@@ -1324,7 +1324,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @ParameterizedTest
   @EnumSource
   void rewriteFailsDueToOutdatedGenerationAtCommit(BucketLayout layout) throws IOException {
-    checkFeatureEnable();
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
     final byte[] overwriteContent = "overwrite".getBytes(UTF_8);
@@ -1359,7 +1359,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @ParameterizedTest
   @EnumSource
   void cannotRewriteDeletedKey(BucketLayout layout) throws IOException {
-    checkFeatureEnable();
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
     bucket.deleteKey(keyDetails.getName());
@@ -1372,7 +1372,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @ParameterizedTest
   @EnumSource
   void cannotRewriteRenamedKey(BucketLayout layout) throws IOException {
-    checkFeatureEnable();
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
     bucket.renameKey(keyDetails.getName(), "newKeyName-" + layout.name());
@@ -1450,9 +1450,9 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     assertEquals(original.getMetadata(), rewritten.getMetadata());
   }
 
-  private static void checkFeatureEnable() {
+  private static void checkFeatureEnable(OzoneManagerVersion feature) {
     try {
-      cluster.getOzoneManager().checkFeatureEnabled(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+      cluster.getOzoneManager().checkFeatureEnabled(feature);
     } catch (OMException e) {
       assumeFalse(OMException.ResultCodes.NOT_SUPPORTED_OPERATION == e.getResult());
     }
