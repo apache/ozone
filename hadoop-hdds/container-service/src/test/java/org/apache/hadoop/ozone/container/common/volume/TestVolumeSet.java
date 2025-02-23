@@ -185,10 +185,10 @@ public class TestVolumeSet {
     // Create the root volume dir and create a sub-directory within it.
     File newVolume = new File(volume3, HDDS_VOLUME_DIR);
     System.out.println("new volume root: " + newVolume);
-    newVolume.mkdirs();
+    assertTrue(newVolume.mkdirs());
     assertTrue(newVolume.exists(), "Failed to create new volume root");
     File dataDir = new File(newVolume, "chunks");
-    dataDir.mkdirs();
+    assertTrue(dataDir.mkdirs());
     assertTrue(dataDir.exists());
 
     // The new volume is in an inconsistent state as the root dir is
