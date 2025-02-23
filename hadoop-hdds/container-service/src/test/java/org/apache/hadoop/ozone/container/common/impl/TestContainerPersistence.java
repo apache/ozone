@@ -38,7 +38,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -660,7 +659,6 @@ public class TestContainerPersistence {
     KeyValueContainerData cNewData =
         (KeyValueContainerData) container.getContainerData();
     assertNotNull(cNewData);
-    Path dataDir = Paths.get(cNewData.getChunksPath());
 
     // Read chunk via file system and verify.
     Checksum checksum = new Checksum(ChecksumType.CRC32, 1024 * 1024);
