@@ -381,8 +381,9 @@ public class TestTarContainerPacker {
   private File writeSingleFile(Path parentPath, String fileName,
       String content) throws IOException {
     Path path = parentPath.resolve(fileName).normalize();
-    assertNotNull(path);
-    Files.createDirectories(path.getParent());
+    Path parent = path.getParent();
+    assertNotNull(parent);
+    Files.createDirectories(parent);
     File file = path.toFile();
     FileOutputStream fileStream = new FileOutputStream(file);
     try (OutputStreamWriter writer = new OutputStreamWriter(fileStream,
