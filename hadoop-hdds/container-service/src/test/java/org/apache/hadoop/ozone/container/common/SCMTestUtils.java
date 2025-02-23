@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
 import com.google.protobuf.BlockingService;
@@ -121,14 +122,14 @@ public final class SCMTestUtils {
   }
 
   public static OzoneConfiguration getConf(File testDir) {
-    testDir.mkdirs();
+    assertTrue(testDir.mkdirs());
     OzoneConfiguration conf = new OzoneConfiguration();
     File datanodeDir = new File(testDir, "datanode");
     File metadataDir = new File(testDir, "metadata");
     File datanodeIdDir = new File(testDir, "datanodeID");
-    datanodeDir.mkdirs();
-    metadataDir.mkdirs();
-    datanodeIdDir.mkdirs();
+    assertTrue(datanodeDir.mkdirs());
+    assertTrue(metadataDir.mkdirs());
+    assertTrue(datanodeIdDir.mkdirs());
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
         datanodeDir.getAbsolutePath());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
