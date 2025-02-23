@@ -360,7 +360,7 @@ public abstract class TestOmSnapshotFileSystem {
   private void createKey(OzoneBucket ozoneBucket, String key, int length,
                          byte[] input) throws Exception {
 
-    TestDataUtil.createKey(ozoneBucket, key, new String(input));
+    TestDataUtil.createKey(ozoneBucket, key, new String(input, StandardCharsets.UTF_8));
 
     // Read the key with given key name.
     OzoneInputStream ozoneInputStream = ozoneBucket.readKey(key);

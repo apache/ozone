@@ -647,7 +647,7 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     byte[] input = new byte[length];
     Arrays.fill(input, (byte) 96);
     for (String key : keys) {
-      createKey(ozoneBucket, key, new String(input));
+      createKey(ozoneBucket, key, new String(input, StandardCharsets.UTF_8));
 
       // Read the key with given key name.
       OzoneInputStream ozoneInputStream = ozoneBucket.readKey(key);

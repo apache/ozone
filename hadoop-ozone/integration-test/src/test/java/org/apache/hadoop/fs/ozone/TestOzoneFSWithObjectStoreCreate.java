@@ -418,7 +418,7 @@ public class TestOzoneFSWithObjectStoreCreate {
                                   byte[] input)
       throws Exception {
     
-    createKey(ozoneBucket, key, new String(input));
+    createKey(ozoneBucket, key, new String(input, UTF_8));
 
     // Read the key with given key name.
     OzoneInputStream ozoneInputStream = ozoneBucket.readKey(key);

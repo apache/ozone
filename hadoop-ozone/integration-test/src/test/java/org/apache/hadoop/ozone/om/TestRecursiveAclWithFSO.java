@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -250,7 +251,7 @@ public abstract class TestRecursiveAclWithFSO implements NonHATests.TestCase {
       byte[] input = new byte[length];
       Arrays.fill(input, (byte) 96);
       String keyName = UUID.randomUUID().toString();
-      createKey(ozoneBucket, keyName, new String(input));
+      createKey(ozoneBucket, keyName, new String(input, StandardCharsets.UTF_8));
       obj = OzoneObjInfo.Builder.newBuilder().setVolumeName(volume.getName())
           .setBucketName(ozoneBucket.getName()).setKeyName(keyName)
           .setResType(OzoneObj.ResourceType.KEY).setStoreType(OZONE).build();
@@ -334,7 +335,7 @@ public abstract class TestRecursiveAclWithFSO implements NonHATests.TestCase {
     byte[] input = new byte[length];
     Arrays.fill(input, (byte) 96);
     for (String key : keys) {
-      createKey(ozoneBucket, key, new String(input));
+      createKey(ozoneBucket, key, new String(input, StandardCharsets.UTF_8));
       setKeyAcl(objectStore, ozoneBucket.getVolumeName(), ozoneBucket.getName(),
           key, aclWorldAll);
     }
