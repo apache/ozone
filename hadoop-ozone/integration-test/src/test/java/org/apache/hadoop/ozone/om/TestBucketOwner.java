@@ -177,7 +177,7 @@ public abstract class TestBucketOwner implements NonHATests.TestCase {
       OzoneBucket ozoneBucket = volume.getBucket("bucket1");
       //Key Create
       byte[] bytes = new byte[10];
-      createKey(ozoneBucket, "key2",new String(bytes));
+      createKey(ozoneBucket, "key2", new String(bytes));
       //Key Delete
       ozoneBucket.deleteKey("key2");
       //List Keys
