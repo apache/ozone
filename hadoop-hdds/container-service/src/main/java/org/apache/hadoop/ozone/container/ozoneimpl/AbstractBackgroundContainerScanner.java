@@ -37,6 +37,8 @@ public abstract class AbstractBackgroundContainerScanner extends Thread {
 
   private final AtomicBoolean stopping;
   private final AtomicBoolean pausing = new AtomicBoolean();
+  private int numUnHealthyEachIteration = 0;
+  private int numContainersScannedEachIteration = 0;
 
   public AbstractBackgroundContainerScanner(String name,
       long dataScanInterval) {
@@ -52,8 +54,6 @@ public abstract class AbstractBackgroundContainerScanner extends Thread {
     try {
       while (!stopping.get()) {
         runIteration();
-        metrics.resetNumContainersScanned();
-        metrics.resetNumUnhealthyContainers();
       }
       LOG.info("{} exiting.", this);
     } catch (Exception e) {
@@ -67,6 +67,8 @@ public abstract class AbstractBackgroundContainerScanner extends Thread {
 
   @VisibleForTesting
   public final void runIteration() {
+    numUnHealthyEachIteration = 0;
+    numContainersScannedEachIteration = 0;
     final boolean paused = pausing.get();
     long startTime = System.nanoTime();
     if (!paused) {
@@ -81,6 +83,11 @@ public abstract class AbstractBackgroundContainerScanner extends Thread {
     } else {
       AbstractContainerScannerMetrics metrics = getMetrics();
       metrics.incNumScanIterations();
+      metrics.incTotalRunTime(TimeUnit.NANOSECONDS.toMillis(totalDuration));
+      metrics.resetNumContainersScanned();
+      metrics.resetNumUnhealthyContainers();
+      metrics.incNumContainersScanned(numContainersScannedEachIteration);
+      metrics.incNumUnHealthyContainers(numUnHealthyEachIteration);
       LOG.info("Completed an iteration in {} minutes." +
               " Number of iterations (since the data-node restart) : {}" +
               ", Number of containers scanned in this iteration : {}" +
@@ -132,6 +139,14 @@ public abstract class AbstractBackgroundContainerScanner extends Thread {
         Thread.currentThread().interrupt();
       }
     }
+  }
+
+  public void incNumUnHealthyEachIteration() {
+    numUnHealthyEachIteration++;
+  }
+
+  public void incNumContainersScannedEachIteration() {
+    numContainersScannedEachIteration++;
   }
 
   /**
