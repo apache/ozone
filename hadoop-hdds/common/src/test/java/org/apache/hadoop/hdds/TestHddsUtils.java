@@ -68,21 +68,21 @@ public class TestHddsUtils {
 
   @Test
   void validatePath() {
-    HddsUtils.validatePath(Paths.get("/"), Paths.get("/"));
-    HddsUtils.validatePath(Paths.get("/a"), Paths.get("/"));
-    HddsUtils.validatePath(Paths.get("/a"), Paths.get("/a"));
-    HddsUtils.validatePath(Paths.get("/a/b"), Paths.get("/a"));
-    HddsUtils.validatePath(Paths.get("/a/b/c"), Paths.get("/a"));
-    HddsUtils.validatePath(Paths.get("/a/../a/b"), Paths.get("/a"));
+    HddsUtils.validatePath(Paths.get("root"), Paths.get("root"));
+    HddsUtils.validatePath(Paths.get("root/a"), Paths.get("root"));
+    HddsUtils.validatePath(Paths.get("root/a"), Paths.get("root/a"));
+    HddsUtils.validatePath(Paths.get("root/a/b"), Paths.get("root/a"));
+    HddsUtils.validatePath(Paths.get("root/a/b/c"), Paths.get("root/a"));
+    HddsUtils.validatePath(Paths.get("root/a/../a/b"), Paths.get("root/a"));
 
     assertThrows(IllegalArgumentException.class,
-        () -> HddsUtils.validatePath(Paths.get("/b/c"), Paths.get("/a")));
+        () -> HddsUtils.validatePath(Paths.get("root/b/c"), Paths.get("root/a")));
     assertThrows(IllegalArgumentException.class,
-        () -> HddsUtils.validatePath(Paths.get("/"), Paths.get("/a")));
+        () -> HddsUtils.validatePath(Paths.get("root"), Paths.get("root/a")));
     assertThrows(IllegalArgumentException.class,
-        () -> HddsUtils.validatePath(Paths.get("/a/.."), Paths.get("/a")));
+        () -> HddsUtils.validatePath(Paths.get("root/a/.."), Paths.get("root/a")));
     assertThrows(IllegalArgumentException.class,
-        () -> HddsUtils.validatePath(Paths.get("/a/../b"), Paths.get("/a")));
+        () -> HddsUtils.validatePath(Paths.get("root/a/../b"), Paths.get("root/a")));
   }
 
   @Test
