@@ -23,39 +23,75 @@ status: draft
 I encountered the need for a retention solution within my cluster, specifically the ability to delete keys in specific paths after a certain time period.   
 This requirement closely resembled the functionality provided by AWS S3 Lifecycle configurations, particularly the Expiration part ([AWS S3 Lifecycle Configuration Examples](https://docs.aws.amazon.com/AmazonS3/latest/userguide/lifecycle-configuration-examples.html)).  
 
+
+## term
+- Lifecycle:
+  - S3 Lifecycle is a set of rules that automatically manage object storage.
+  - Each Bucket can have 0 or 1 Lifecycle, and each Lifecycle can have multiple Rules.
+- Rule:
+  - A Lifecycle Rule specifies which objects are affected and how they should be handled.
+    Each Rule includes:
+    - Filters (Prefix or Tag, etc)
+    - Lifecycle actions (deleting objects or transitioning objects)
+- Filter: Filters determine which objects a Lifecycle Rule applies to, they can be based on Prefix, Tag, etc.
+- Lifecycle actions: Actions define what a Lifecycle Rule does, including: Transition, Expiration, etc.
+- Lifecycle configurations: A definition of a Lifecycle. Users can define a Lifecycle through json or xml.
+
+
 ## Overview
 
 ### Functionality
 - User should be able to create/remove/fetch lifecycle configurations for a specific S3 bucket.
 - The lifecycle configurations will be executed periodically.
-- Depending on the rules of the lifecycle configuration there could be different actions or even multiple actions. 
-- At the moment only expiration is supported (keys get deleted).
+  - Depending on the rules of the lifecycle configuration there could be different actions or even multiple actions. 
+  - At the moment only expiration is supported (keys get deleted).
 - The lifecycle configurations supports all buckets not only S3 buckets.
-
+- Compatible with AWS S3 lifecycle management commands.
 
 ### Components
-
-- Lifecycle configurations (will be stored in DB) consists of volumeName, bucketName and a list of rules
-    - A rule contains prefix (string), Expiration and an optional Filter.
-    - Object tagging integrations for bucket lifecycle configuration.
-    - Expiration contains either days (integer) or Date (long)
-    - Filter contains prefix (string).
-- S3G bucket endpoint needs few updates to accept ?/lifecycle 
-- ClientProtocol and all implementers provides (get, list, delete and create) lifecycle configuration
-- RetentionManager:
-   - Upon startup, the OzoneManager initializes the Retention Manager based on configuration parameters such as retention interval.
-   - A background retention service is responsible for scheduling and executing tasks at specified intervals.
-   - The Retention Manager retrieves lifecycle configurations associated with buckets.
-   - Then assigns each lifecycle configuration (attached to a bucket) to a threadpool (Configurable) for further processing. 
-   - Each task will iterate through keys of a specific bucket and issue deletion request for eligible keys.
-     
+#### S3G
+- Responsible for implementing the relevant protocols defined by AWS S3, including Lifecycle addition, deletion, fetch, etc.
+#### OM
+- Responsible for saving the configuration of Lifecycle.
+- Responsible for the execution of Lifecycle.
 
 
-### Flow
-1. Users interact with lifecycle configurations via S3Gateway.
-2. Configuration details are processed by a handler.
-3. Configurations are saved/fetched from the database.
-4. RetentionManager, running periodically in the Leader OM, executes lifecycle configurations and issues deletions for eligible keys.
+## Lifecycle configurations
+- Lifecycle configurations are persisted in the DB by OM, and each Bucket can have at most 1 Lifecycle configurations.
+- Lifecycle configurations and Buckets have a 1-to-1 relationship, and Lifecycle configurations will be saved in a separate DB instead of being a field of Bucket.
+- According to Bucket, the Lifecycle configurations of the Bucket can be obtained from the DB.
+- Lifecycle configurations reference:
+
+```xml
+<LifecycleConfiguration>
+    <Rule>
+         <Element>
+    </Rule>
+    <Rule>
+         <Element>
+         <Element>
+    </Rule>
+</LifecycleConfiguration>
+```
+
+
+## Retention Manager
+RetentionManager is responsible for managing the Lifecycle of Bucket, regularly checking and performing corresponding operations according to the rules. RetentionManager will start when OM is initialized (if allowed) and run in the background.
+1. Initialization and Start:
+- The retention manager is initialized with required parameters (rate limit, max iterators, and running interval).
+- A retention service is started in the OzoneManager, running periodically based on a configured interval.
+
+2. Periodic Execution:
+
+   ![RetentionManager](https://issues.apache.org/jira/secure/attachment/13074943/RetentionManager.png)
+
+- After starting, RetentionManager obtains all Lifecycles from DB and starts a thread for each Lifecycle
+- Each thread traverses all keys of the corresponding Bucket to check whether they meet the Lifecycle rules
+  - A Lifecycle can contain multiple Rules, and RetentionManager checks whether the rules match one by one.
+  - First, filter out candidate keys based on Prefix and Tag, and then check the modification time of these keys to determine whether they are expired.
+  - If the key is expired, execute actions.
+  - The executed actions include deleting the key, converting the key, etc. The current implementation only supports deleting the key.
+- After all threads are executed, RetentionManager ends this check and goes into sleep, waiting for the next execution time.
 
 ## Limitations
 - The current solution lacks certain features:
@@ -64,13 +100,62 @@ This requirement closely resembled the functionality provided by AWS S3 Lifecycl
   
 All these kind of features can be added in the future.
 
-## Protobuf Definitions
+## Permission
+- Creating or deleting a Lifecycle on a Bucket requires write permission on the Bucket.
+- Fetching a Bucket's Lifecycle requires read permission on the Bucket.
+- Note that when a Lifecycle executes, it does not run under the identity of the user who created it. 
+    Instead, it runs under an administrator account with the necessary permissions. Therefore, once a Lifecycle is created, it will not fail due to permission issues during execution.
+
+## Conflicts in lifecycle configurations
+- For expiration deletion policies, each Lifecycle Rule independently checks whether the deletion conditions are met. Once an object meets the deletion conditions of any rule, 
+    it will be deleted according to that rule's configuration.
+- In this example:
+  - If an OBS bucket is configured to expire objects under the prefix `"a"` in 7 days and under the prefix `"a/b"` in 14 days,
+  - The deletion process will proceed as follows:
+    - On the 7th day, objects under prefix `"a"` will be deleted. Since `"a/b"` is a subdirectory of `"a"`, objects under `"a/b"` will also be deleted.
+    - On the 14th day, since the objects under `"a/b"` have already been removed, this operation will effectively do nothing.
+- As seen in this case, if the expiration action only involves deletion, conflicts are not complex. Simply executing each deletion rule in order of time is sufficient. 
+    However, if future expiration actions involve other operations (such as transition), further considerations will be needed to handle conflicts between different actions.
+
+## Bucket Layout
+Lifecycle supports all types of Bucket Layouts, but different types of Buckets support different Lifecycle Rules.
+
+- OBS/Legacy
+  - Lifecycle Rules support both prefix and tag.
+  - A rule can specify prefix and tag either separately or together. When both are specified, they are treated as "AND" conditions, consistent with AWS S3 rules. 
+      For detailed specifications, refer to [intro-lifecycle-rules-filter](https://docs.aws.amazon.com/AmazonS3/latest/userguide/intro-lifecycle-rules.html#intro-lifecycle-rules-filter).
+
+- FSO
+  - Lifecycle Rules only support prefix.
+  - Since FSO-type buckets have file system semantics, they can only delete empty directories. If a directory contains subdirectories or files, it cannot be deleted.
+  - If tag support were added, conflicts might arise. For example, if a rule attempts to delete all objects with a specific tag, but a directory A with that tag contains some files without that tag, 
+      those files will not be deleted, causing directory A to fail deletion. However, prefix-based filtering does not have this issue, so FSO buckets only support prefix.
+  - In FSO buckets, the prefix must start with "/", where "/" represents the root directory in the file system.
+  - If an FSO prefix ends with "/", it represents a directory. If the prefix does not end with "/", it represents a file with that prefix.
+
+## Protobuf Definitions (Initial Version)
 ```protobuf
 /**
 S3 lifecycles (filter, expiration, rule and configuration).
  */
 message LifecycleFilter {
   optional string prefix = 1;
+  optional LifecycleFilterTag tag = 2;
+  optional LifecycleRuleAndOperator andOperator = 3;
+}
+
+message LifecycleFilterTag {
+  required string key = 1;
+  required string value = 2;
+}
+
+message LifecycleRuleAndOperator {
+  optional string prefix = 1;
+  repeated LifecycleFilterTag tags = 2;
+}
+
+message LifecycleAction {
+  optional LifecycleExpiration expiration = 1;
 }
 
 message LifecycleExpiration {
@@ -82,7 +167,7 @@ message LifecycleRule {
   optional string id = 1;
   optional string prefix = 2;
   required bool enabled = 3;
-  optional LifecycleExpiration expiration = 4;
+  required LifecycleAction action = 4;
   optional LifecycleFilter filter = 5;
 }
 
@@ -161,21 +246,6 @@ The `OmLifecycleConfiguration` table in RocksDB is used to store lifecycle confi
   - All rules are valid according to their individual validation criteria.
 - **Conflict Resolution**: In case of overlapping lifecycle configurations the implementation follows AWS cost optimizing strategy to solve the conflicts https://docs.aws.amazon.com/AmazonS3/latest/userguide/lifecycle-configuration-examples.html#lifecycle-config-conceptual-ex5
 
-# Retention Manager
-## High-Level Flow
-
-1. **Initialization and Start:**
-   - The retention manager is initialized with required parameters (rate limit, max iterators, and running interval).
-   - A retention service is started in the OzoneManager, running periodically based on a configured interval.
-
-2. **Periodic Execution:**
-   - Each time the service runs, it checks if the current node is the leader and sleeps if it is not the leader.
-   - If it is the leader, it proceeds with the following operations:
-     * Retrieve the lifecycle configurations list.
-     * Each lifecycle configuration represents a bucket and contains a list of lifecycle rules to be applied.
-     * Lifecycle configurations are handled simultaneously by a configurable threadpool executor.
-     * The operation involves scanning the bucket's entries, and if they are eligible, performing an action (currently, deletion).
-
 ## Concurrency and Rate Limiting
 
 1. **Thread Pool:** the thread pool is configurable to allow concurrent processing of lifecycle configurations.
@@ -216,87 +286,28 @@ The implementation is substantial and should be split into several merge request
 4. Implementation of the RetentionManager.
 5. Merge all changes into a new branch (e.g., 'X'), then merge that branch into master.
 
-   
-# Files Affected
+## Performance Impact
 
-## Implemented Proposal: New Table for Lifecycle Configurations
+### List
+RetentionManager runs periodically in OM and scans Buckets during the Lifecycle check process. 
+Each Bucket is checked by a single thread, but multiple threads can run in parallel to process multiple Buckets.  
+Therefore, the number of RetentionManager execution threads should be controlled to prevent excessive parallel List operations from impacting cluster performance.  
+In the minimal case, RetentionManager can be configured to run with only one thread, meaning only one Bucket is being listed at any given time.
 
-### hdds-common
+### Action
+After RetentionManager finds expired Keys, it will delete them. 
+If a large number of Keys expire at the same time, more deletion operations may be generated. 
+Batch deletion can be used to reduce the number of deletion requests, thereby reducing the impact on cluster performance.
 
-- OzoneConfigKeys.java
-- OzoneConsts.java
+## Ozone Command
+Currently, all Lifecycle operations are supported only through S3 commands.  
+Future improvements may consider adding support for managing Lifecycle directly through Ozone's own commands.
 
-### ozone-client
+## Metrics
+Monitoring is mainly focused on RetentionManager’s execution status, including:
+- Number of List requests issued by RetentionManager.
+- Number of Keys scanned.
+- Number of expired Keys detected.
+- Number of delete requests sent.
 
-- ClientProtocol.java
-- RpcClient.java
-- OzoneLifecycleConfiguration.java
-
-### ozone-common
-
-- OmLCExpiration.java
-- OmLCFilter.java
-- OmLCRule.java
-- OmLifecycleConfiguration.java
-- OzoneManagerProtocol.java
-- OzoneManagerProtocolClientSideTranslatorPB.java
-- OMConfigKeys.java
-- OmUtils.java
-- TestOmLifeCycleConfiguration.java
-
-### ozone-integration-test
-
-- TestOzoneRpcClientAbstract.java
-- TestSecureOzoneRpcClient.java
-- TestRetentionManager.java
-- TestDataUtil.java
-
-### ozone-interface-client
-
-- OmClientProtocol.proto
-
-### ozone-interface-storage
-
-- OmLifecycleConfigurationCodec.java
-- OMMetadataManager.java
-- OMDBDefinition.java
-- OzoneManagerRatisUtils.java
-- OMBucketDeleteRequest.java
-- OMLifecycleConfigurationCreateRequest.java
-- OMLifecycleConfigurationDeleteRequest.java
-- OMBucketDeleteResponse.java
-- OMLifecycleConfigurationCreateResponse.java
-- OMLifecycleConfigurationDeleteResponse.java
-- LCOpAction.java
-- LCOpCurrentExpiration.java
-- LCOpRule.java
-- RetentionManager.java
-- RetentionManagerImpl.java
-- LifecycleConfigurationManager.java
-- LifecycleConfigurationManagerImpl.java
-- OmMetadataManagerImpl.java
-- OzoneManager.java
-- OzoneManagerRequestHandler.java
-- TestOMLifecycleConfigurationCreateRequest.java
-- TestOMLifecycleConfigurationDeleteRequest.java
-- TestOMLifecycleConfigurationRequest.java
-- TestOMLifecycleConfigurationCreateResponse.java
-- TestOMLifecycleConfigurationDeleteResponse.java
-- RetentionTestUtils.java
-- TestLCOpCurrentExpiration.java
-- TestLCOpRule.java
-- TestLifecycleConfigurationManagerImpl.java
-
-### ozone-s3gateway
-
-- BucketEndpoint.java
-- EndpointBase.java
-- LifecycleConfiguration.java
-- PutBucketLifecycleConfigurationUnmarshaller.java
-- S3ErrorTable.java
-- S3GatewayConfigKeys.java
-- TestLifecycleConfigurationDelete.java
-- TestLifecycleConfigurationGet.java
-- TestLifecycleConfigurationPut.java
-
-
+Additional metrics could include the total number of Lifecycles in the cluster, as well as execution time and frequency for each Lifecycle.
