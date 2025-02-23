@@ -516,12 +516,9 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
     byte[] input = new byte[length];
     Arrays.fill(input, (byte)96);
 
-    createKey(ozoneBucket, key1, 10, input);
-    createKey(ozoneBucket, key2, 10, input);
-    createKey(ozoneBucket, key3, 10, input);
+    createAndAssertKeys(ozoneBucket, keys);
 
     // Iterator with key name as prefix.
-
     Iterator<? extends OzoneKey> ozoneKeyIterator =
             ozoneBucket.listKeys("/dir1//", null);
 
