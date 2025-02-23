@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
+import static org.apache.hadoop.ozone.TestDataUtil.createKey;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -397,7 +398,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
     byte[] input = new byte[length];
     Arrays.fill(input, (byte)96);
 
-    createKeys(ozoneBucket, keys);
+    createAndAssertKeys(ozoneBucket, keys);
 
     // Root level listing keys
     Iterator<? extends OzoneKey> ozoneKeyIterator =
@@ -562,46 +563,35 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
     assertEquals(keys, outputKeys);
   }
 
-  private void createKeys(OzoneBucket ozoneBucket, List<String> keys)
+  private void createAndAssertKeys(OzoneBucket ozoneBucket, List<String> keys)
       throws Exception {
     int length = 10;
     byte[] input = new byte[length];
     Arrays.fill(input, (byte) 96);
     for (String key : keys) {
-      createKey(ozoneBucket, key, 10, input);
+      createKey(ozoneBucket, key, new String(input));
+
+      // Read the key with given key name.
+      OzoneInputStream ozoneInputStream = ozoneBucket.readKey(key);
+      byte[] read = new byte[length];
+      ozoneInputStream.read(read, 0, length);
+      ozoneInputStream.close();
+
+      String inputString = new String(input, StandardCharsets.UTF_8);
+      assertEquals(inputString, new String(read, StandardCharsets.UTF_8));
+
+      // Read using filesystem.
+      String rootPath = String.format("%s://%s.%s/", OZONE_URI_SCHEME,
+          bucketName, volumeName, StandardCharsets.UTF_8);
+      OzoneFileSystem o3fs = (OzoneFileSystem) FileSystem.get(new URI(rootPath),
+          conf);
+      FSDataInputStream fsDataInputStream = o3fs.open(new Path(key));
+      read = new byte[length];
+      fsDataInputStream.read(read, 0, length);
+      fsDataInputStream.close();
+
+      assertEquals(inputString, new String(read, StandardCharsets.UTF_8));
     }
-  }
-
-  private void createKey(OzoneBucket ozoneBucket, String key, int length,
-      byte[] input) throws Exception {
-
-    OzoneOutputStream ozoneOutputStream =
-            ozoneBucket.createKey(key, length);
-
-    ozoneOutputStream.write(input);
-    ozoneOutputStream.write(input, 0, 10);
-    ozoneOutputStream.close();
-
-    // Read the key with given key name.
-    OzoneInputStream ozoneInputStream = ozoneBucket.readKey(key);
-    byte[] read = new byte[length];
-    ozoneInputStream.read(read, 0, length);
-    ozoneInputStream.close();
-
-    String inputString = new String(input, StandardCharsets.UTF_8);
-    assertEquals(inputString, new String(read, StandardCharsets.UTF_8));
-
-    // Read using filesystem.
-    String rootPath = String.format("%s://%s.%s/", OZONE_URI_SCHEME,
-            bucketName, volumeName, StandardCharsets.UTF_8);
-    OzoneFileSystem o3fs = (OzoneFileSystem) FileSystem.get(new URI(rootPath),
-            conf);
-    FSDataInputStream fsDataInputStream = o3fs.open(new Path(key));
-    read = new byte[length];
-    fsDataInputStream.read(read, 0, length);
-    fsDataInputStream.close();
-
-    assertEquals(inputString, new String(read, StandardCharsets.UTF_8));
   }
 
   @Test

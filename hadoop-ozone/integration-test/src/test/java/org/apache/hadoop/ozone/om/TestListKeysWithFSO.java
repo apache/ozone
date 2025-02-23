@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_CACHE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
+import static org.apache.hadoop.ozone.TestDataUtil.createKey;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.nio.charset.StandardCharsets;
@@ -548,7 +549,7 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     keys.add("/a1/b3/e2/e21.tx");
     keys.add("/a1/b3/e3/e31.tx");
 
-    createKeys(ozoneBucket, keys);
+    createAndAssertKeys(ozoneBucket, keys);
   }
 
   private static void buildNameSpaceTree2(OzoneBucket ozoneBucket)
@@ -575,7 +576,7 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
 
     keys.add("/dir1/dir2/dir3/d11.tx");
 
-    createKeys(ozoneBucket, keys);
+    createAndAssertKeys(ozoneBucket, keys);
   }
 
 
@@ -641,33 +642,22 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     checkKeyList(keyPrefix, startKey, keys, fsoBucket, true);
   }
 
-  private static void createKeys(OzoneBucket ozoneBucket, List<String> keys)
+  private static void createAndAssertKeys(OzoneBucket ozoneBucket, List<String> keys)
       throws Exception {
     int length = 10;
     byte[] input = new byte[length];
     Arrays.fill(input, (byte) 96);
     for (String key : keys) {
-      createKey(ozoneBucket, key, 10, input);
+      createKey(ozoneBucket, key, new String(input));
+
+      // Read the key with given key name.
+      OzoneInputStream ozoneInputStream = ozoneBucket.readKey(key);
+      byte[] read = new byte[length];
+      ozoneInputStream.read(read, 0, length);
+      ozoneInputStream.close();
+
+      assertEquals(new String(input, StandardCharsets.UTF_8),
+          new String(read, StandardCharsets.UTF_8));
     }
-  }
-
-  private static void createKey(OzoneBucket ozoneBucket, String key, int length,
-      byte[] input) throws Exception {
-
-    OzoneOutputStream ozoneOutputStream =
-        ozoneBucket.createKey(key, length);
-
-    ozoneOutputStream.write(input);
-    ozoneOutputStream.write(input, 0, 10);
-    ozoneOutputStream.close();
-
-    // Read the key with given key name.
-    OzoneInputStream ozoneInputStream = ozoneBucket.readKey(key);
-    byte[] read = new byte[length];
-    ozoneInputStream.read(read, 0, length);
-    ozoneInputStream.close();
-
-    assertEquals(new String(input, StandardCharsets.UTF_8),
-        new String(read, StandardCharsets.UTF_8));
   }
 }

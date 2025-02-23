@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
+import static org.apache.hadoop.ozone.TestDataUtil.createKey;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -92,8 +93,9 @@ public abstract class TestBucketOwner implements NonHATests.TestCase {
           .getVolume(VOLUME_NAME);
       OzoneBucket ozoneBucket = volume.getBucket("bucket1");
       //Key Create
-      createKey(ozoneBucket, "key1", 10, new byte[10]);
-      createKey(ozoneBucket, "key2", 10, new byte[10]);
+      byte[] bytes = new byte[10];
+      createKey(ozoneBucket, "key1", new String(bytes));
+      createKey(ozoneBucket, "key2", new String(bytes));
       //Key Delete
       ozoneBucket.deleteKey("key1");
       //Bucket Delete
@@ -118,7 +120,8 @@ public abstract class TestBucketOwner implements NonHATests.TestCase {
       assertThrows(Exception.class, () -> {
         OzoneVolume volume = client.getObjectStore().getVolume(VOLUME_NAME);
         OzoneBucket ozoneBucket = volume.getBucket("bucket1");
-        createKey(ozoneBucket, "key3", 10, new byte[10]);
+        byte[] bytes = new byte[10];
+        createKey(ozoneBucket, "key3", new String(bytes));
       }, "Create key as non-volume and non-bucket owner should fail");
     }
     //Key Delete - should fail
@@ -174,7 +177,8 @@ public abstract class TestBucketOwner implements NonHATests.TestCase {
       OzoneVolume volume = client.getObjectStore().getVolume(VOLUME_NAME);
       OzoneBucket ozoneBucket = volume.getBucket("bucket1");
       //Key Create
-      createKey(ozoneBucket, "key2", 10, new byte[10]);
+      byte[] bytes = new byte[10];
+      createKey(ozoneBucket, "key2",new String(bytes));
       //Key Delete
       ozoneBucket.deleteKey("key2");
       //List Keys
@@ -207,13 +211,5 @@ public abstract class TestBucketOwner implements NonHATests.TestCase {
     OzoneObj obj = OzoneObjInfo.Builder.newBuilder().setVolumeName(volumeName)
         .setResType(OzoneObj.ResourceType.VOLUME).setStoreType(OZONE).build();
     assertTrue(store.setAcl(obj, OzoneAcl.parseAcls(aclString)));
-  }
-
-  private void createKey(OzoneBucket ozoneBucket, String key, int length,
-       byte[] input) throws Exception {
-    OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(key, length);
-    ozoneOutputStream.write(input);
-    ozoneOutputStream.write(input, 0, 10);
-    ozoneOutputStream.close();
   }
 }

@@ -21,6 +21,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
+import static org.apache.hadoop.ozone.TestDataUtil.createKey;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -366,9 +367,9 @@ public class TestOzoneFSWithObjectStoreCreate {
     byte[] input = new byte[length];
     Arrays.fill(input, (byte)96);
 
-    createKey(ozoneBucket, key1, 10, input);
-    createKey(ozoneBucket, key2, 10, input);
-    createKey(ozoneBucket, key3, 10, input);
+    createAndAssertKey(ozoneBucket, key1, 10, input);
+    createAndAssertKey(ozoneBucket, key2, 10, input);
+    createAndAssertKey(ozoneBucket, key3, 10, input);
 
     // Iterator with key name as prefix.
 
@@ -413,16 +414,11 @@ public class TestOzoneFSWithObjectStoreCreate {
     assertEquals(keys, outputKeys);
   }
 
-  private void createKey(OzoneBucket ozoneBucket, String key, int length,
-      byte[] input)
+  private void createAndAssertKey(OzoneBucket ozoneBucket, String key, int length,
+                                  byte[] input)
       throws Exception {
-
-    OzoneOutputStream ozoneOutputStream =
-        ozoneBucket.createKey(key, length);
-
-    ozoneOutputStream.write(input);
-    ozoneOutputStream.write(input, 0, 10);
-    ozoneOutputStream.close();
+    
+    createKey(ozoneBucket, key, new String(input));
 
     // Read the key with given key name.
     OzoneInputStream ozoneInputStream = ozoneBucket.readKey(key);
