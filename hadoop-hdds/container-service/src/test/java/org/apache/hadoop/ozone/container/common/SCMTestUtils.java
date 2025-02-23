@@ -122,7 +122,6 @@ public final class SCMTestUtils {
   }
 
   public static OzoneConfiguration getConf(File testDir) {
-    assertTrue(testDir.mkdirs());
     OzoneConfiguration conf = new OzoneConfiguration();
     File datanodeDir = new File(testDir, "datanode");
     File metadataDir = new File(testDir, "metadata");
