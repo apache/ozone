@@ -70,7 +70,7 @@ public class TestContainerDataYaml {
    */
   private File createContainerFile(long containerID, int replicaIndex)
       throws IOException {
-    new File(testRoot).mkdirs();
+    assertTrue(new File(testRoot).mkdirs());
 
     String containerPath = containerID + ".container";
 
