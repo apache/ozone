@@ -105,12 +105,11 @@ public class TestBackgroundContainerDataScanner extends
   @Override
   public void testScannerMetricsUnregisters() {
     String name = scanner.getMetrics().getName();
-
     assertNotNull(DefaultMetricsSystem.instance().getSource(name));
 
     scanner.shutdown();
-    scanner.run();
-
+    scanner.runThread();
+    
     assertNull(DefaultMetricsSystem.instance().getSource(name));
   }
 

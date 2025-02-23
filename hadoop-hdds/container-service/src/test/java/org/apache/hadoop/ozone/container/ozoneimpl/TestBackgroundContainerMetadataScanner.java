@@ -108,7 +108,7 @@ public class TestBackgroundContainerMetadataScanner extends
     assertNotNull(DefaultMetricsSystem.instance().getSource(name));
 
     scanner.shutdown();
-    scanner.run();
+    scanner.runThread();
 
     assertNull(DefaultMetricsSystem.instance().getSource(name));
   }

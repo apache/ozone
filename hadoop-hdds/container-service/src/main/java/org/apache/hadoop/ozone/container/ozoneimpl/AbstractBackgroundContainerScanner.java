@@ -46,6 +46,11 @@ public abstract class AbstractBackgroundContainerScanner extends Thread {
     setDaemon(true);
   }
 
+  @VisibleForTesting
+  public void runThread() {
+    run();
+  }
+
   @Override
   public final void run() {
     AbstractContainerScannerMetrics metrics = getMetrics();
