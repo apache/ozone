@@ -32,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.net.InetSocketAddress;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -43,6 +44,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Testing HddsUtils.
@@ -66,23 +70,37 @@ public class TestHddsUtils {
         HddsUtils.getHostName(":1234"));
   }
 
-  @Test
-  void validatePath() {
-    HddsUtils.validatePath(Paths.get("root"), Paths.get("root"));
-    HddsUtils.validatePath(Paths.get("root/a"), Paths.get("root"));
-    HddsUtils.validatePath(Paths.get("root/a"), Paths.get("root/a"));
-    HddsUtils.validatePath(Paths.get("root/a/b"), Paths.get("root/a"));
-    HddsUtils.validatePath(Paths.get("root/a/b/c"), Paths.get("root/a"));
-    HddsUtils.validatePath(Paths.get("root/a/../a/b"), Paths.get("root/a"));
+  static List<Arguments> validPaths() {
+    return Arrays.asList(
+        Arguments.of("/", "/"),
+        Arguments.of("/a", "/"),
+        Arguments.of("/a", "/a"),
+        Arguments.of("/a/b", "/a"),
+        Arguments.of("/a/b/c", "/a"),
+        Arguments.of("/a/../a/b", "/a")
+    );
+  }
 
+  @ParameterizedTest
+  @MethodSource("validPaths")
+  void validatePathAcceptsValidPath(String path, String ancestor) {
+    HddsUtils.validatePath(Paths.get(path), Paths.get(ancestor));
+  }
+
+  static List<Arguments> invalidPaths() {
+    return Arrays.asList(
+        Arguments.of("/b/c", "/a"),
+        Arguments.of("/", "/a"),
+        Arguments.of("/a/..", "/a"),
+        Arguments.of("/a/../b", "/a")
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidPaths")
+  void validatePathRejectsInvalidPath(String path, String ancestor) {
     assertThrows(IllegalArgumentException.class,
-        () -> HddsUtils.validatePath(Paths.get("root/b/c"), Paths.get("root/a")));
-    assertThrows(IllegalArgumentException.class,
-        () -> HddsUtils.validatePath(Paths.get("root"), Paths.get("root/a")));
-    assertThrows(IllegalArgumentException.class,
-        () -> HddsUtils.validatePath(Paths.get("root/a/.."), Paths.get("root/a")));
-    assertThrows(IllegalArgumentException.class,
-        () -> HddsUtils.validatePath(Paths.get("root/a/../b"), Paths.get("root/a")));
+        () -> HddsUtils.validatePath(Paths.get(path), Paths.get(ancestor)));
   }
 
   @Test
