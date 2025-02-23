@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.File;
@@ -63,7 +64,7 @@ public class TestContainerCache {
   @Test
   public void testContainerCacheEviction() throws Exception {
     File root = new File(testRoot);
-    root.mkdirs();
+    assertTrue(root.mkdirs());
 
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE, 2);
@@ -144,7 +145,7 @@ public class TestContainerCache {
   @Test
   void testConcurrentDBGet() throws Exception {
     File root = new File(testRoot);
-    root.mkdirs();
+    assertTrue(root.mkdirs());
     root.deleteOnExit();
 
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -185,7 +186,7 @@ public class TestContainerCache {
   @Test
   public void testUnderlyingDBzIsClosed() throws Exception {
     File root = new File(testRoot);
-    root.mkdirs();
+    assertTrue(root.mkdirs());
 
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE, 2);
