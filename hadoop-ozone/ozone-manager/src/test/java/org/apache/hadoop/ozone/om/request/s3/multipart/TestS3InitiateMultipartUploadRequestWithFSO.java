@@ -47,6 +47,7 @@ import org.junit.jupiter.api.Test;
 public class TestS3InitiateMultipartUploadRequestWithFSO
     extends TestS3InitiateMultipartUploadRequest {
 
+  @Override
   @Test
   public void testValidateAndUpdateCache() throws Exception {
     String volumeName = UUID.randomUUID().toString();
@@ -172,6 +173,7 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
     return request;
   }
 
+  @Override
   @Test
   public void testMultipartUploadInheritParentDefaultAcls()
       throws Exception {

@@ -37,12 +37,10 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVIC
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -59,8 +57,6 @@ import org.apache.ratis.util.TimeDuration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test for SCM HA-related configuration.
@@ -292,21 +288,4 @@ class TestSCMConfiguration {
 
   }
 
-  @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  public void testDefaultConfigWithInitializedSCM(boolean isRatisEnabled)
-      throws IOException {
-    // The default config for RatisEnabled is true.
-    assertTrue(SCMHAUtils.isSCMHAEnabled(conf));
-
-    // If the cluster is already initalized, use the value from StorageConfig.
-    SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
-    when(scmStorageConfig.getState())
-        .thenReturn(Storage.StorageState.INITIALIZED);
-    when(scmStorageConfig.isSCMHAEnabled()).thenReturn(isRatisEnabled);
-    SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
-
-    assertEquals(SCMHAUtils.isSCMHAEnabled(conf),
-        scmStorageConfig.isSCMHAEnabled());
-  }
 }

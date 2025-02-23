@@ -32,12 +32,12 @@ import java.nio.channels.WritableByteChannel;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
@@ -188,15 +188,13 @@ public class TestKeyValueStreamDataChannel {
     assertThat(max).isGreaterThanOrEqualTo(PUT_BLOCK_PROTO_SIZE);
 
     // random data
-    final byte[] data = new byte[dataSize];
-    final Random random = new Random(seed);
-    random.nextBytes(data);
+    final byte[] data = RandomUtils.secure().randomBytes(dataSize);
 
     // write output
     final Buffers buffers = new Buffers(max);
     final Output out = new Output(buffers);
     for (int offset = 0; offset < dataSize;) {
-      final int randomLength = random.nextInt(4 * max);
+      final int randomLength = RandomUtils.secure().randomInt(1, 4 * max);
       final int length = Math.min(randomLength, dataSize - offset);
       LOG.info("{}: offset = {}, length = {}", name, offset, length);
       final ByteBuffer b = ByteBuffer.wrap(data, offset, length);

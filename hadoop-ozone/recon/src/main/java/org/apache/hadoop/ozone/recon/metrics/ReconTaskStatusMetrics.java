@@ -63,6 +63,7 @@ public class ReconTaskStatusMetrics implements MetricsSource {
         .unregisterSource(SOURCE_NAME);
   }
 
+  @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
     List<ReconTaskStatus> rows = reconTaskStatusDao.findAll();
     rows.forEach((rts) -> {

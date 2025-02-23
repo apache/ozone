@@ -23,6 +23,7 @@ import org.junit.jupiter.api.TestInstance;
 /** Test Freon with mini cluster. */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestFreon extends FreonTests {
+  @Override
   protected MiniOzoneCluster createCluster() throws Exception {
     return newClusterBuilder()
         .build();

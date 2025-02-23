@@ -58,7 +58,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
-import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -613,7 +612,7 @@ public final class HddsTestUtils {
       String scmId = UUID.randomUUID().toString();
       scmStore.setClusterId(clusterId);
       scmStore.setScmId(scmId);
-      scmStore.setSCMHAFlag(SCMHAUtils.isSCMHAEnabled(conf));
+      scmStore.setSCMHAFlag(true);
       // writes the version file properties
       scmStore.initialize();
     }

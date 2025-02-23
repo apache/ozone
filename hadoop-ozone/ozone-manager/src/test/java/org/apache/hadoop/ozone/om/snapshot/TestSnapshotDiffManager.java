@@ -1585,6 +1585,7 @@ public class TestSnapshotDiffManager {
    * short-circuited based on previous one.
    */
   @Test
+  @Flaky("HDDS-12361")
   public void testGetSnapshotDiffReportJob() throws Exception {
     for (int i = 0; i < jobStatuses.size(); i++) {
       uploadSnapshotDiffJobToDb(snapshotInfo, snapshotInfoList.get(i),

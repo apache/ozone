@@ -17,6 +17,7 @@
 
 package org.apache.ozone.test;
 
+import org.apache.hadoop.hdds.scm.TestContainerOperations;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.TestInstance;
@@ -38,6 +39,14 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
 
   @Nested
   class AllocateContainer extends org.apache.hadoop.hdds.scm.TestAllocateContainer {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class ContainerOperations extends TestContainerOperations {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -78,6 +87,22 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
 
   @Nested
   class SCMNodeManagerMXBean extends org.apache.hadoop.hdds.scm.TestSCMNodeManagerMXBean {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class XceiverClientManager extends org.apache.hadoop.hdds.scm.TestXceiverClientManager {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class SCMContainerManagerMetrics extends org.apache.hadoop.hdds.scm.container.metrics.TestSCMContainerManagerMetrics {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();

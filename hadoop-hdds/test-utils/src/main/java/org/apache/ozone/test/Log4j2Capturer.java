@@ -41,6 +41,7 @@ final class Log4j2Capturer extends GenericTestUtils.LogCapturer {
     addAppender(writer());
   }
 
+  @Override
   public void stopCapturing() {
     final LoggerContext context = LoggerContext.getContext(false);
     final Configuration config = context.getConfiguration();

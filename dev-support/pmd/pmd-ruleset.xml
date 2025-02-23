@@ -22,9 +22,11 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 http://pmd.sourceforge.io/ruleset_2_0_0.xsd">
 
-    <description>
-        PMD Ruleset for Apache Ozone
-    </description>
+  <description>
+    PMD Ruleset for Apache Ozone
+  </description>
 
-    <exclude-pattern>.*/generated-sources/.*</exclude-pattern>
+  <rule ref="category/java/bestpractices.xml/MissingOverride"/>
+
+  <exclude-pattern>.*/generated-sources/.*</exclude-pattern>
 </ruleset>
