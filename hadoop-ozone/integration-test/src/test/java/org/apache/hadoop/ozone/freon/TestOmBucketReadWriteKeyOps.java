@@ -278,19 +278,8 @@ public class TestOmBucketReadWriteKeyOps {
       return this;
     }
 
-    private ParameterBuilder setLength(int lengthParam) {
-      length = lengthParam;
-      return this;
-    }
-
     private ParameterBuilder setTotalThreadCount(int totalThreadCountParam) {
       totalThreadCount = totalThreadCountParam;
-      return this;
-    }
-
-    private ParameterBuilder setReadThreadPercentage(
-        int readThreadPercentageParam) {
-      readThreadPercentage = readThreadPercentageParam;
       return this;
     }
 

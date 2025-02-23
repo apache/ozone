@@ -27,6 +27,7 @@
   </description>
 
   <rule ref="category/java/bestpractices.xml/MissingOverride"/>
+  <rule ref="category/java/bestpractices.xml/UnusedPrivateMethod"/>
 
   <exclude-pattern>.*/generated-sources/.*</exclude-pattern>
 </ruleset>

@@ -26,10 +26,8 @@ import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENAN
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Strings;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -212,26 +210,6 @@ public class TestOzoneTenantShell {
     System.arraycopy(args, 0, newArgs, 0, args.length);
     newArgs[args.length] = "--om-service-id=" + omServiceId;
     return execute(shell, newArgs);
-  }
-
-  /**
-   * Execute command, assert exception message and returns true if error
-   * was thrown.
-   */
-  private void executeWithError(OzoneShell shell, String[] args,
-                                String expectedError) {
-    if (Strings.isNullOrEmpty(expectedError)) {
-      execute(shell, args);
-    } else {
-      Exception ex = assertThrows(Exception.class, () -> execute(shell, args));
-      if (!Strings.isNullOrEmpty(expectedError)) {
-        Throwable exceptionToCheck = ex;
-        if (exceptionToCheck.getCause() != null) {
-          exceptionToCheck = exceptionToCheck.getCause();
-        }
-        assertThat(exceptionToCheck.getMessage()).contains(expectedError);
-      }
-    }
   }
 
   private String getSetConfStringFromConf(String key) {

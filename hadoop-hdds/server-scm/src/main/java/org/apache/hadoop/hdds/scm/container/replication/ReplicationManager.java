@@ -998,20 +998,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   }
 
   /**
-   * An open container is healthy if all its replicas are in the same state as
-   * the container.
-   * @param container The container to check
-   * @param replicas The replicas belonging to the container
-   * @return True if the container is healthy, false otherwise
-   */
-  private boolean isOpenContainerHealthy(
-      ContainerInfo container, Set<ContainerReplica> replicas) {
-    HddsProtos.LifeCycleState state = container.getState();
-    return replicas.stream()
-        .allMatch(r -> compareState(state, r.getState()));
-  }
-
-  /**
    * Compares the container state with the replica state.
    *
    * @param containerState ContainerState

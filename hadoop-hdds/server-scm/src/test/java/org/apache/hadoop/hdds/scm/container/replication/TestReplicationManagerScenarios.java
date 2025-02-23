@@ -498,36 +498,20 @@ public class TestReplicationManagerScenarios {
     private int underReplicatedQueue = 0;
     private int overReplicatedQueue = 0;
 
-    private void setUnderReplicated(int underReplicated) {
+    public void setUnderReplicated(int underReplicated) {
       stateCounts.put(ReplicationManagerReport.HealthState.UNDER_REPLICATED, underReplicated);
     }
 
-    private void setOverReplicated(int overReplicated) {
+    public void setOverReplicated(int overReplicated) {
       stateCounts.put(ReplicationManagerReport.HealthState.OVER_REPLICATED, overReplicated);
     }
 
-    private void setMisReplicated(int misReplicated) {
-      stateCounts.put(ReplicationManagerReport.HealthState.MIS_REPLICATED, misReplicated);
-    }
-
-    private void setUnhealthy(int unhealthy) {
+    public void setUnhealthy(int unhealthy) {
       stateCounts.put(ReplicationManagerReport.HealthState.UNHEALTHY, unhealthy);
     }
 
-    private void setMissing(int missing) {
-      stateCounts.put(ReplicationManagerReport.HealthState.MISSING, missing);
-    }
-
-    private void setEmpty(int empty) {
-      stateCounts.put(ReplicationManagerReport.HealthState.EMPTY,  empty);
-    }
-
-    private void setQuasiClosedStuck(int quasiClosedStuck) {
+    public void setQuasiClosedStuck(int quasiClosedStuck) {
       stateCounts.put(ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK, quasiClosedStuck);
-    }
-
-    private void setOpenUnhealthy(int openUnhealthy) {
-      stateCounts.put(ReplicationManagerReport.HealthState.OPEN_UNHEALTHY, openUnhealthy);
     }
 
     public int getExpected(ReplicationManagerReport.HealthState state) {
