@@ -316,7 +316,7 @@ class TestContainerReplication {
         cluster.restartHddsDatanode(allNodes.get(allNodes.size() - 1), false);
 
         // the container should have been imported on the 4th node
-        waitForReplicaCount(containerID,2, cluster);
+        waitForReplicaCount(containerID, 2, cluster);
         assertTrue(isContainerClosed(cluster, containerID, allNodes.get(allNodes.size() - 1)));
       }
     }
