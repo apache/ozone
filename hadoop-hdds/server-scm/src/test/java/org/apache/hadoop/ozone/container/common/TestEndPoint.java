@@ -137,8 +137,6 @@ public class TestEndPoint {
       assertNotNull(responseProto);
       assertEquals(VersionInfo.DESCRIPTION_KEY, responseProto.getKeys(0).getKey());
       assertEquals(VersionInfo.getLatestVersion().getDescription(), responseProto.getKeys(0).getValue());
-    } finally {
-      FileUtils.deleteDirectory(tempDir);
     }
   }
 
@@ -338,8 +336,6 @@ public class TestEndPoint {
       // This version call did NOT work, so endpoint should remain in the same
       // state.
       assertEquals(EndpointStateMachine.EndPointStates.GETVERSION, newState);
-    } finally {
-      FileUtils.deleteDirectory(tempDir);
     }
   }
 
@@ -370,8 +366,6 @@ public class TestEndPoint {
       scmServerImpl.setRpcResponseDelay(0);
       assertThat(end - start).isLessThanOrEqualTo(rpcTimeout + tolerance);
       assertEquals(EndpointStateMachine.EndPointStates.GETVERSION, newState);
-    } finally {
-      FileUtils.deleteDirectory(tempDir);
     }
   }
 
@@ -395,8 +389,6 @@ public class TestEndPoint {
       assertNotNull(responseProto.getClusterID());
       assertEquals(10, scmServerImpl.getContainerCountsForDatanode(nodeToRegister));
       assertEquals(1, scmServerImpl.getNodeReportsCount(nodeToRegister));
-    } finally {
-      FileUtils.deleteDirectory(tempDir);
     }
   }
 
@@ -458,8 +450,6 @@ public class TestEndPoint {
         registerTaskHelper(serverAddress, 1000, false)) {
       // Successful register should move us to Heartbeat state.
       assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT, rpcEndpoint.getState());
-    } finally {
-      FileUtils.deleteDirectory(tempDir);
     }
   }
 
@@ -469,8 +459,6 @@ public class TestEndPoint {
     try (EndpointStateMachine rpcEndpoint =
         registerTaskHelper(address, 1000, false)) {
       assertEquals(EndpointStateMachine.EndPointStates.REGISTER, rpcEndpoint.getState());
-    } finally {
-      FileUtils.deleteDirectory(tempDir);
     }
   }
 
@@ -482,8 +470,6 @@ public class TestEndPoint {
       // No Container ID, therefore we tell the datanode that we would like to
       // shutdown.
       assertEquals(EndpointStateMachine.EndPointStates.SHUTDOWN, rpcEndpoint.getState());
-    } finally {
-      FileUtils.deleteDirectory(tempDir);
     }
   }
 
@@ -505,7 +491,6 @@ public class TestEndPoint {
           .isLessThanOrEqualTo(rpcTimeout + tolerance);
     } finally {
       scmServerImpl.setRpcResponseDelay(0);
-      FileUtils.deleteDirectory(tempDir);
     }
   }
 
@@ -526,8 +511,6 @@ public class TestEndPoint {
           .sendHeartbeat(request);
       assertNotNull(responseProto);
       assertEquals(0, responseProto.getCommandsCount());
-    } finally {
-      FileUtils.deleteDirectory(tempDir);
     }
   }
 
@@ -564,8 +547,6 @@ public class TestEndPoint {
       assertEquals(Status.PENDING, map.get(3L).getStatus());
 
       scmServerImpl.clearScmCommandRequests();
-    } finally {
-      FileUtils.deleteDirectory(tempDir);
     }
   }
 
@@ -642,14 +623,12 @@ public class TestEndPoint {
   @Test
   public void testHeartbeatTask() throws Exception {
     heartbeatTaskHelper(serverAddress, 1000);
-    FileUtils.deleteDirectory(tempDir);
   }
 
   @Test
   public void testHeartbeatTaskToInvalidNode() throws Exception {
     InetSocketAddress invalidAddress = SCMTestUtils.getReuseableAddress();
     heartbeatTaskHelper(invalidAddress, 1000);
-    FileUtils.deleteDirectory(tempDir);
   }
 
   @Test
