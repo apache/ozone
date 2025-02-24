@@ -96,7 +96,6 @@ public class TarContainerPacker
     Path dbRoot = getDbPath(containerUntarDir, containerData);
     Path chunksRoot = getChunkPath(containerUntarDir, containerData);
     byte[] descriptorFileContent = innerUnpack(input, dbRoot, chunksRoot);
-    persistCustomContainerState(container, descriptorFileContent, ContainerProtos.ContainerDataProto.State.RECOVERING);
 
     if (!Files.exists(destContainerDir)) {
       Files.createDirectories(destContainerDir);
