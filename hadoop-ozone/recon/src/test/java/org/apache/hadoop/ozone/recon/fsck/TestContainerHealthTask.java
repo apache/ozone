@@ -67,10 +67,10 @@ import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
-import org.apache.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
-import org.apache.ozone.recon.schema.tables.daos.UnhealthyContainersDao;
-import org.apache.ozone.recon.schema.tables.pojos.ReconTaskStatus;
-import org.apache.ozone.recon.schema.tables.pojos.UnhealthyContainers;
+import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
+import org.apache.ozone.recon.schema.generated.tables.daos.UnhealthyContainersDao;
+import org.apache.ozone.recon.schema.generated.tables.pojos.ReconTaskStatus;
+import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.Test;
 

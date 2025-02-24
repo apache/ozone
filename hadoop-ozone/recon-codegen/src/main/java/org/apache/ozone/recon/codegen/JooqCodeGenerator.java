@@ -98,7 +98,7 @@ public class JooqCodeGenerator {
                 .withStrategy(new Strategy().withName(
                     "org.apache.ozone.recon.codegen.TableNamingStrategy"))
                 .withTarget(new Target()
-                    .withPackageName("org.apache.ozone.recon.schema")
+                    .withPackageName("org.apache.ozone.recon.schema.generated")
                     .withClean(true)
                     .withDirectory(outputDir)))
                 .withLogging(Logging.WARN);
