@@ -25,8 +25,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -85,11 +83,11 @@ public abstract class FileSizeCountTaskHelper {
    * @param taskName           The name of the task for logging.
    * @return A Pair of task name and boolean indicating success.
    */
-  public static Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager,
-                                                DSLContext dslContext,
-                                                FileCountBySizeDao fileCountBySizeDao,
-                                                BucketLayout bucketLayout,
-                                                String taskName) {
+  public static ReconOmTask.TaskResult reprocess(OMMetadataManager omMetadataManager,
+                                                 DSLContext dslContext,
+                                                 FileCountBySizeDao fileCountBySizeDao,
+                                                 BucketLayout bucketLayout,
+                                                 String taskName) {
     LOG.info("Starting Reprocess for {}", taskName);
     Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
     long startTime = System.currentTimeMillis();
@@ -97,12 +95,12 @@ public abstract class FileSizeCountTaskHelper {
     boolean status = reprocessBucketLayout(
         bucketLayout, omMetadataManager, fileSizeCountMap, dslContext, fileCountBySizeDao, taskName);
     if (!status) {
-      return new ImmutablePair<>(taskName, false);
+      return buildTaskResult(taskName, false);
     }
     writeCountsToDB(fileSizeCountMap, dslContext, fileCountBySizeDao);
     long endTime = System.currentTimeMillis();
     LOG.info("{} completed Reprocess in {} ms.", taskName, (endTime - startTime));
-    return new ImmutablePair<>(taskName, true);
+    return buildTaskResult(taskName, true);
   }
 
   /**
@@ -155,11 +153,11 @@ public abstract class FileSizeCountTaskHelper {
    * @param taskName           The name of the task for logging.
    * @return A Pair of task name and boolean indicating success.
    */
-  public static Pair<String, Boolean> processEvents(OMUpdateEventBatch events,
-                                                    String tableName,
-                                                    DSLContext dslContext,
-                                                    FileCountBySizeDao fileCountBySizeDao,
-                                                    String taskName) {
+  public static ReconOmTask.TaskResult processEvents(OMUpdateEventBatch events,
+                                                     String tableName,
+                                                     DSLContext dslContext,
+                                                     FileCountBySizeDao fileCountBySizeDao,
+                                                     String taskName) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
     long startTime = System.currentTimeMillis();
@@ -195,7 +193,7 @@ public abstract class FileSizeCountTaskHelper {
           }
         } catch (Exception e) {
           LOG.error("Unexpected exception while processing key {}.", updatedKey, e);
-          return new ImmutablePair<>(taskName, false);
+          return buildTaskResult(taskName, false);
         }
       } else {
         LOG.warn("Unexpected value type {} for key {}. Skipping processing.",
@@ -205,7 +203,7 @@ public abstract class FileSizeCountTaskHelper {
     writeCountsToDB(fileSizeCountMap, dslContext, fileCountBySizeDao);
     LOG.debug("{} successfully processed in {} milliseconds", taskName,
         (System.currentTimeMillis() - startTime));
-    return new ImmutablePair<>(taskName, true);
+    return buildTaskResult(taskName, true);
   }
 
   /**
@@ -327,5 +325,12 @@ public abstract class FileSizeCountTaskHelper {
     public int hashCode() {
       return (volume + bucket + fileSizeUpperBound).hashCode();
     }
+  }
+
+  public static ReconOmTask.TaskResult buildTaskResult(String taskName, boolean success) {
+    return new ReconOmTask.TaskResult.Builder()
+        .setTaskName(taskName)
+        .setTaskSuccess(success)
+        .build();
   }
 }
