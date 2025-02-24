@@ -19,8 +19,7 @@ package org.apache.hadoop.ozone.recon.tasks;
 
 import java.util.Collection;
 import java.util.Collections;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
+import java.util.Map;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 
 /**
@@ -52,20 +51,21 @@ public class DummyReconDBTask implements ReconOmTask {
   }
 
   @Override
-  public Pair<String, Boolean> process(OMUpdateEventBatch events) {
+  public TaskResult process(
+      OMUpdateEventBatch events, Map<String, Integer> seekPos) {
     if (++callCtr <= numFailuresAllowed) {
-      return new ImmutablePair<>(getTaskName(), false);
+      return buildTaskResult(false);
     } else {
-      return new ImmutablePair<>(getTaskName(), true);
+      return buildTaskResult(true);
     }
   }
 
   @Override
-  public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
+  public TaskResult reprocess(OMMetadataManager omMetadataManager) {
     if (++callCtr <= numFailuresAllowed) {
-      return new ImmutablePair<>(getTaskName(), false);
+      return buildTaskResult(false);
     } else {
-      return new ImmutablePair<>(getTaskName(), true);
+      return buildTaskResult(true);
     }
   }
 

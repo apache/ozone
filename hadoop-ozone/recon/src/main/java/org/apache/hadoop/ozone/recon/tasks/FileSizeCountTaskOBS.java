@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import com.google.inject.Inject;
-import org.apache.commons.lang3.tuple.Pair;
+import java.util.Map;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -42,7 +42,7 @@ public class FileSizeCountTaskOBS implements ReconOmTask {
   }
 
   @Override
-  public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
+  public TaskResult reprocess(OMMetadataManager omMetadataManager) {
     return FileSizeCountTaskHelper.reprocess(
         omMetadataManager,
         dslContext,
@@ -53,7 +53,7 @@ public class FileSizeCountTaskOBS implements ReconOmTask {
   }
 
   @Override
-  public Pair<String, Boolean> process(OMUpdateEventBatch events) {
+  public TaskResult process(OMUpdateEventBatch events, Map<String, Integer> subTaskSeekPosMap) {
     // This task listens only on the KEY_TABLE.
     return FileSizeCountTaskHelper.processEvents(
         events,
