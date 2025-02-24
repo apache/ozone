@@ -72,7 +72,20 @@ public class TestTarContainerPacker {
 
   private static final String TEST_CHUNK_FILE_CONTENT = "This is a chunk";
 
-  private static final String TEST_DESCRIPTOR_FILE_CONTENT = "descriptor";
+  private static final String TEST_DESCRIPTOR_FILE_CONTENT = "!<KeyValueContainerData>\n" +
+      "checksum: 2215d39f2ae1de89fec837d18dc6387d8cba22fb5943cf4616f80c4b34e2edfe\n" +
+      "chunksPath: target/test-dir/MiniOzoneClusterImpl-23c1bb30-d86a-4f79-88dc-574d8259a5b3/ozone-meta/datanode-4/data-0/hdds/23c1bb30-d86a-4f79-88dc-574d8259a5b3/current/containerDir0/1/chunks\n" +
+      "containerDBType: RocksDB\n" +
+      "containerID: 1\n" +
+      "containerType: KeyValueContainer\n" +
+      "layOutVersion: 2\n" +
+      "maxSize: 5368709120\n" +
+      "metadata: {}\n" +
+      "metadataPath: target/test-dir/MiniOzoneClusterImpl-23c1bb30-d86a-4f79-88dc-574d8259a5b3/ozone-meta/datanode-4/data-0/hdds/23c1bb30-d86a-4f79-88dc-574d8259a5b3/current/containerDir0/1/metadata\n" +
+      "originNodeId: 25a48afa-f8d8-44ff-b268-642167e5354b\n" +
+      "originPipelineId: d7faca81-407f-4a50-a399-bd478c9795e5\n" +
+      "schemaVersion: '3'\n" +
+      "state: CLOSED";
 
   private TarContainerPacker packer;
 
@@ -142,9 +155,9 @@ public class TestTarContainerPacker {
     long id = CONTAINER_ID.getAndIncrement();
 
     Path containerDir = dir.resolve(String.valueOf(id));
-    Path dbDir = containerDir.resolve("db");
     Path dataDir = containerDir.resolve("chunks");
     Path metaDir = containerDir.resolve("metadata");
+    Path dbDir = metaDir.resolve("db");
     if (createDir) {
       Files.createDirectories(metaDir);
       Files.createDirectories(dbDir);
@@ -245,9 +258,10 @@ public class TestTarContainerPacker {
     assertExampleChunkFileIsGood(
         Paths.get(destinationContainerData.getChunksPath()),
         TEST_CHUNK_FILE_NAME);
-    assertFalse(destinationContainer.getContainerFile().exists(),
-        "Descriptor file should not have been extracted by the "
-            + "unpackContainerData Call");
+
+    String containerFileData = new String(Files.readAllBytes(destinationContainer.getContainerFile().toPath()), UTF_8);
+    assertTrue(containerFileData.contains("RECOVERING"),
+        "The state of the container is not 'RECOVERING' in the container file");
     assertEquals(TEST_DESCRIPTOR_FILE_CONTENT, descriptor);
     inputForUnpackData.assertClosedExactlyOnce();
   }

@@ -159,18 +159,42 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
 
   private <K, V> void processTable(BatchOperation batch, File tableDumpFile,
       Codec<K> keyCodec, Codec<V> valueCodec, Table<K, V> table) throws IOException, RocksDBException {
-    try (ManagedSstFileReader sstFileReader = new ManagedSstFileReader(new ManagedOptions());
-         ManagedSstFileReaderIterator iterator =
-             ManagedSstFileReaderIterator.managed(sstFileReader.newIterator(new ManagedReadOptions()))) {
-      sstFileReader.open(tableDumpFile.getAbsolutePath());
-      for (iterator.get().seekToFirst(); iterator.get().isValid(); iterator.get().next()) {
-        byte[] key = iterator.get().key();
-        byte[] value = iterator.get().value();
-        K decodedKey = keyCodec.fromPersistedFormat(key);
-        V decodedValue = valueCodec.fromPersistedFormat(value);
-        table.putWithBatch(batch, decodedKey, decodedValue);
-      }
+    if (isFileEmpty(tableDumpFile)) {
+      LOG.warn("SST File {} is empty. Skipping processing.", tableDumpFile.getAbsolutePath());
+      return;
     }
+
+    try (ManagedOptions managedOptions = new ManagedOptions();
+         ManagedSstFileReader sstFileReader = new ManagedSstFileReader(managedOptions)) {
+      sstFileReader.open(tableDumpFile.getAbsolutePath());
+      try (ManagedReadOptions managedReadOptions = new ManagedReadOptions();
+           ManagedSstFileReaderIterator iterator =
+               ManagedSstFileReaderIterator.managed(sstFileReader.newIterator(managedReadOptions))) {
+        for (iterator.get().seekToFirst(); iterator.get().isValid(); iterator.get().next()) {
+          byte[] key = iterator.get().key();
+          byte[] value = iterator.get().value();
+          K decodedKey = keyCodec.fromPersistedFormat(key);
+          V decodedValue = valueCodec.fromPersistedFormat(value);
+          table.putWithBatch(batch, decodedKey, decodedValue);
+        }
+        LOG.info("ATTENTION! Finished processing SST file: {}", tableDumpFile.getAbsolutePath());
+      } catch (Exception e) {
+        LOG.error("ATTENTION! Error while processing table from SST file with ManagedSstFileReaderIterator {}: {}",
+            tableDumpFile.getAbsolutePath(), e.getMessage(), e);
+        throw e;
+      }
+    } catch (Exception e) {
+      LOG.error("ATTENTION! Error while processing table from SST file with ManagedSstFileReader {}: {}",
+          tableDumpFile.getAbsolutePath(), e.getMessage(), e);
+      throw e;
+    }
+  }
+
+  boolean isFileEmpty(File file) {
+    if (!file.exists()) {
+      return true;
+    }
+    return file.length() == 0;
   }
 
   public static File getTableDumpFile(Table<String, ?> table,

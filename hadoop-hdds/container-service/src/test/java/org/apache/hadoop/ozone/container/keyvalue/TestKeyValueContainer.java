@@ -883,6 +883,7 @@ public class TestKeyValueContainer {
           TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
           container.importContainerData(fis, packer);
           containerList.add(container);
+          assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED, container.getContainerData().getState());
         }
       }
 

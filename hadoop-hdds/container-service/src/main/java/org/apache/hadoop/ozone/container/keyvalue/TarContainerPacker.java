@@ -22,7 +22,6 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -44,6 +43,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
@@ -52,12 +52,15 @@ import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Compress/uncompress KeyValueContainer data to a tar archive.
  */
 public class TarContainerPacker
     implements ContainerPacker<KeyValueContainerData> {
+  private static final Logger LOG = LoggerFactory.getLogger(TarContainerPacker.class);
 
   static final String CHUNKS_DIR_NAME = OzoneConsts.STORAGE_DIR_CHUNKS;
 
@@ -99,9 +102,19 @@ public class TarContainerPacker
       Files.createDirectories(destContainerDir);
     }
     if (FileUtils.isEmptyDirectory(destContainerDir.toFile())) {
+      // Before the atomic move, the destination dir is empty and doesn't have a metadata directory.
+      // Writing the .container file will fail as the metadata dir doesn't exist
+      Path containerMetadataPath = Paths.get(container.getContainerData().getMetadataPath());
+      Path tempContainerMetadataPath = Paths.get(containerUntarDir.toString(),
+          containerMetadataPath.getName(containerMetadataPath.getNameCount() - 1).toString());
+      container.getContainerData().setMetadataPath(tempContainerMetadataPath.toString());
+      persistCustomContainerState(container, descriptorFileContent, State.RECOVERING);
+      container.getContainerData().setMetadataPath(containerMetadataPath.toString());
       Files.move(containerUntarDir, destContainerDir,
               StandardCopyOption.ATOMIC_MOVE,
               StandardCopyOption.REPLACE_EXISTING);
+      // Persist again to update the metadata path to point the destination dir
+      persistCustomContainerState(container, descriptorFileContent, State.RECOVERING);
     } else {
       String errorMessage = "Container " + containerId +
           " unpack failed because ContainerFile " +
@@ -112,14 +125,17 @@ public class TarContainerPacker
     return descriptorFileContent;
   }
 
-  private void persistCustomContainerState(Container<KeyValueContainerData> container,
-      byte[] descriptorContent, ContainerProtos.ContainerDataProto.State state) throws IOException {
-    Preconditions.checkNotNull(descriptorContent,
-        "Container descriptor is missing for container {}" + container.getContainerData().getContainerID());
+  private void persistCustomContainerState(Container<KeyValueContainerData> container, byte[] descriptorContent,
+      ContainerProtos.ContainerDataProto.State state) throws IOException {
+    if (descriptorContent == null) {
+      LOG.warn("Skipping persisting of custom state. Container descriptor is null for container {}",
+          container.getContainerData().getContainerID());
+      return;
+    }
 
     KeyValueContainerData originalContainerData =
         (KeyValueContainerData) ContainerDataYaml.readContainer(descriptorContent);
-    originalContainerData.setState(state);
+    container.getContainerData().setState(state);
     container.update(originalContainerData.getMetadata(), true);
   }
 
