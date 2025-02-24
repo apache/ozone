@@ -90,6 +90,8 @@ public class ReconcileSubcommand extends ScmSubcommand {
           throw new RuntimeException("Failed to process reconciliation status for " + invalidCount + " containers");
         }
       }
+      // Array writer will not add a newline to the end.
+      System.out.println();
     } else {
       int invalidCount = 0;
       while (idIterator.hasNext()) {
