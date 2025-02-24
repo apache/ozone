@@ -73,9 +73,6 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       "hdds.datanode.wait.on.all.followers";
   public static final String CONTAINER_SCHEMA_V3_ENABLED =
       "hdds.datanode.container.schema.v3.enabled";
-  public static final String CONTAINER_SCHEMA_V4_ENABLED =
-      "hdds.datanode.container.schema.v4.enabled";
-  public static final boolean CONTAINER_SCHEMA_V4_ENABLED_DEFAULT = true;
 
   static final boolean CHUNK_DATA_VALIDATION_CHECK_DEFAULT = false;
 

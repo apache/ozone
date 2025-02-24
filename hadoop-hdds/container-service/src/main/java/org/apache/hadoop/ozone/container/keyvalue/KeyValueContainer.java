@@ -30,6 +30,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V4;
 import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
+import static org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.isFinalized;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -59,6 +60,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.io.nativeio.NativeIO;
@@ -296,6 +298,10 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     long containerId = containerData.getContainerID();
     try {
       tempContainerFile = createTempFile(containerFile);
+      if (containerData.hasSchema(SCHEMA_V3) && isFinalized(HDDSLayoutFeature.DATANODE_SCHEMA_V4)) {
+        // convert container from V3 to V4 on yaml file update
+        containerData.setSchemaVersion(SCHEMA_V4);
+      }
       ContainerDataYaml.createContainerFile(
           ContainerType.KeyValueContainer, containerData, tempContainerFile);
 
@@ -648,7 +654,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
       // delete all other temporary data in case of any exception.
       try {
-        if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
+        if (containerData.sharedDB()) {
           BlockUtils.removeContainerFromDB(containerData, config);
         }
         FileUtils.deleteDirectory(new File(containerData.getMetadataPath()));
@@ -657,17 +663,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
             new File(getContainerData().getContainerPath()));
       } catch (Exception deleteex) {
         LOG.error(
-            "Can not cleanup container directory after a container import"
-                + " error (cid: {})", containerId, deleteex);
-      } finally {
-        if (containerData.sharedDB()) {
-          try {
-            BlockUtils.removeContainerFromDB(containerData, config);
-            LOG.debug("Container {} metadata is removed from DB", containerId);
-          } catch (IOException e) {
-            LOG.error("Can not remove container metadata from DB (cid: {})", containerId, e);
-          }
-        }
+            "Can not cleanup destination directories after a container import"
+                + " error (cid: {}", containerId, deleteex);
       }
       throw ex;
     } finally {
@@ -680,10 +677,14 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     containerData.setState(originalContainerData.getState());
     containerData
         .setContainerDBType(originalContainerData.getContainerDBType());
-    // migrate V3 to V4 on container import
     if (VersionedDatanodeFeatures.SchemaV4.isFinalizedAndEnabled(config) &&
         originalContainerData.hasSchema(SCHEMA_V3)) {
+      // migrate V3 to V4 on container import
       containerData.setSchemaVersion(SCHEMA_V4);
+    } else if (!VersionedDatanodeFeatures.SchemaV4.isFinalizedAndEnabled(config) &&
+        originalContainerData.hasSchema(SCHEMA_V4)) {
+      // if V4 is not finalized, covert V4 back to V3 on container import
+      containerData.setSchemaVersion(SCHEMA_V3);
     } else {
       containerData.setSchemaVersion(originalContainerData.getSchemaVersion());
     }

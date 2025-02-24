@@ -347,11 +347,10 @@ public class KeyValueContainerData extends ContainerData {
   }
 
   public static List<String> getYamlFields() {
-    if (isFinalized(HDDSLayoutFeature.DATANODE_SCHEMA_V4)) {
-      return KV_YAML_FIELDS_SCHEMA_V4;
-    } else {
-      return Collections.unmodifiableList(KV_YAML_FIELDS);
-    }
+    List<String> list = isFinalized(HDDSLayoutFeature.DATANODE_SCHEMA_V4)
+        ? KV_YAML_FIELDS_SCHEMA_V4
+        : KV_YAML_FIELDS;
+    return Collections.unmodifiableList(list);
   }
 
   /**
@@ -479,5 +478,13 @@ public class KeyValueContainerData extends ContainerData {
   public boolean sharedDB() {
     return KeyValueContainerUtil.isSameSchemaVersion(schemaVersion, SCHEMA_V3) ||
         KeyValueContainerUtil.isSameSchemaVersion(schemaVersion, SCHEMA_V4);
+  }
+
+  /**
+   * Whether this container's schema version is lower than @param version
+   */
+  public boolean olderSchemaThan(String version) {
+    String target = version != null ? version : SCHEMA_V1;
+    return Integer.parseInt(schemaVersion) < Integer.parseInt(target);
   }
 }

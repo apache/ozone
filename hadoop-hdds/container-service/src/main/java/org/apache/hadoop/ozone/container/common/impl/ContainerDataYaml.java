@@ -215,7 +215,7 @@ public final class ContainerDataYaml {
         yamlFields = new ArrayList<>(yamlFields);
         yamlFields.add(REPLICA_INDEX);
       }
-      if (!isSameSchemaVersion(((KeyValueContainerData)containerData).getSchemaVersion(), SCHEMA_V4)) {
+      if (((KeyValueContainerData)containerData).olderSchemaThan(SCHEMA_V4)) {
         yamlFields = new ArrayList<>(yamlFields);
         yamlFields.add(METADATA_PATH);
         yamlFields.add(CHUNKS_PATH);
@@ -320,7 +320,7 @@ public final class ContainerDataYaml {
             OzoneConsts.CONTAINER_DB_TYPE));
         String schemaVersion = (String) nodes.get(OzoneConsts.SCHEMA_VERSION);
         kvData.setSchemaVersion(schemaVersion);
-        if (!kvData.hasSchema(SCHEMA_V4)) {
+        if (kvData.olderSchemaThan(SCHEMA_V4)) {
           kvData.setMetadataPath((String) nodes.get(OzoneConsts.METADATA_PATH));
           kvData.setChunksPath((String) nodes.get(OzoneConsts.CHUNKS_PATH));
         }

@@ -84,10 +84,6 @@ public class TestDatanodeUpgradeToSchemaV3 {
     conf = new OzoneConfiguration();
     conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED,
         schemaV3Enabled);
-    conf.setBoolean(
-        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
-    conf.setBoolean(
-        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
     setup();
   }
 
@@ -413,7 +409,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
   public void testWriteWithV3Disabled(boolean schemaV3Enabled)
       throws Exception {
     initTests(schemaV3Enabled);
-    testWrite(true, OzoneConsts.SCHEMA_V3);
+    // After HDDS-6611, it's V4
+    testWrite(true, OzoneConsts.SCHEMA_V4);
   }
 
   public void testWrite(boolean enable, String expectedVersion)
@@ -444,8 +441,6 @@ public class TestDatanodeUpgradeToSchemaV3 {
     // Set SchemaV3 enable status
     conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED,
         enable);
-    conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V4_ENABLED,
-        false);
     dsm = UpgradeTestHelper.restartDatanode(conf, dsm, false, tempFolder, address,
         HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(),
         false);
@@ -461,7 +456,6 @@ public class TestDatanodeUpgradeToSchemaV3 {
     // If SchemaV3 is still disabled, new data should still be saved as SchemaV2
     assertEquals(expectedVersion,
         container.getContainerData().getSchemaVersion());
-    conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V4_ENABLED, true);
   }
 
   /**

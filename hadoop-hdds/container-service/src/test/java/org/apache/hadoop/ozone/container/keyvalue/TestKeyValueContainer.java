@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.container.keyvalue;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V4;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED;
-import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_SCHEMA_V4_ENABLED;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSharedDBVersion;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -1033,7 +1033,6 @@ public class TestKeyValueContainer {
       boolean schemaV3Enabled) throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     final String dir1 = dir + (schemaV3Enabled ? "/v3" : "/v2");
-    conf.setBoolean(CONTAINER_SCHEMA_V4_ENABLED, false);
 
     // create HddsVolume
     HddsVolume hddsVolume1 = new HddsVolume.Builder(dir1)
@@ -1061,7 +1060,8 @@ public class TestKeyValueContainer {
 
     // verify container schema
     if (schemaV3Enabled) {
-      assertEquals(SCHEMA_V3,
+      // After HDDS-6611, it's V4 when schemaV3Enabled is true
+      assertEquals(SCHEMA_V4,
           container.getContainerData().getSchemaVersion());
     } else {
       assertEquals(SCHEMA_V2,
@@ -1094,7 +1094,8 @@ public class TestKeyValueContainer {
       importedContainer.importContainerData(fio, packer);
     }
 
-    assertEquals(schemaV3Enabled ? SCHEMA_V3 : SCHEMA_V2,
+    // After HDDS-6611, it's V4 when schemaV3Enabled is true
+    assertEquals(schemaV3Enabled ? SCHEMA_V4 : SCHEMA_V2,
         importedContainer.getContainerData().getSchemaVersion());
     assertEquals(pendingDeleteBlockCount,
         importedContainer.getContainerData().getNumPendingDeletionBlocks());

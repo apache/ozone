@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.ozone.container.upgrade;
 
-import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_SCHEMA_V4_ENABLED;
-import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_SCHEMA_V4_ENABLED_DEFAULT;
-
 import java.io.File;
 import java.io.IOException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -154,8 +151,7 @@ public final class VersionedDatanodeFeatures {
 
   /**
    * Utilities for container Schema V4 layout feature.
-   * This schema put all container metadata info into a per-disk
-   * rocksdb instance instead of a per-container instance.
+   * Compared to Schema V3, this schema doesn't save chunksPath and metadataPath into container yaml file.
    */
   public static class SchemaV4 {
     public static String chooseSchemaVersion(ConfigurationSource conf) {
@@ -168,9 +164,7 @@ public final class VersionedDatanodeFeatures {
 
     public static boolean isFinalizedAndEnabled(ConfigurationSource conf) {
       DatanodeConfiguration dcf = conf.getObject(DatanodeConfiguration.class);
-      if (isFinalized(HDDSLayoutFeature.DATANODE_SCHEMA_V4) &&
-          dcf.getContainerSchemaV3Enabled() &&
-          conf.getBoolean(CONTAINER_SCHEMA_V4_ENABLED, CONTAINER_SCHEMA_V4_ENABLED_DEFAULT)) {
+      if (isFinalized(HDDSLayoutFeature.DATANODE_SCHEMA_V4) && dcf.getContainerSchemaV3Enabled()) {
         return true;
       }
       return false;

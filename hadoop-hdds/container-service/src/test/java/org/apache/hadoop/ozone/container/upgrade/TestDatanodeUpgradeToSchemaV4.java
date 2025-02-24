@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.upgrade;
 import static org.apache.hadoop.ozone.OzoneConsts.CHUNKS_PATH;
 import static org.apache.hadoop.ozone.OzoneConsts.METADATA_PATH;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V4;
 import static org.apache.hadoop.ozone.OzoneConsts.STORAGE_DIR_CHUNKS;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
@@ -41,6 +42,7 @@ import java.nio.file.attribute.FileTime;
 import java.util.Collections;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -48,7 +50,6 @@ import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.ScmTestMock;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
@@ -84,8 +85,6 @@ public class TestDatanodeUpgradeToSchemaV4 {
     boolean schemaV3Enabled = enable;
     conf = new OzoneConfiguration();
     conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED, schemaV3Enabled);
-    conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
-    conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
     setup();
   }
 
@@ -148,18 +147,25 @@ public class TestDatanodeUpgradeToSchemaV4 {
     File yamlFile = container.getContainerFile();
     String content =
         FileUtils.readFileToString(yamlFile, Charset.defaultCharset());
-    System.out.println(content);
     if (finalize) {
       if (schemaV3Enabled) {
         assertThat(content).doesNotContain(METADATA_PATH);
         assertThat(content).doesNotContain(CHUNKS_PATH);
+        // V3 is converted to V4 on container yaml file update during container close.
+        assertTrue(container.getContainerData().getSchemaVersion().equals(SCHEMA_V4));
       } else {
         assertThat(content).contains(METADATA_PATH);
         assertThat(content).contains(CHUNKS_PATH);
+        assertTrue(container.getContainerData().getSchemaVersion().equals(SCHEMA_V2));
       }
     } else {
       assertThat(content).contains(METADATA_PATH);
       assertThat(content).contains(CHUNKS_PATH);
+      if (schemaV3Enabled) {
+        assertTrue(container.getContainerData().getSchemaVersion().equals(SCHEMA_V3));
+      } else {
+        assertTrue(container.getContainerData().getSchemaVersion().equals(SCHEMA_V2));
+      }
     }
     assertEquals(yamlFile.getParentFile().getParentFile().toPath().resolve(STORAGE_DIR_CHUNKS).toString(),
         container.getContainerData().getChunksPath());
@@ -183,7 +189,7 @@ public class TestDatanodeUpgradeToSchemaV4 {
     container.delete();
     assertFalse(new File(container.getContainerData().getContainerPath()).exists());
     if (schemaV3Enabled) {
-      assertTrue(container.getContainerData().getDbFile().exists());
+      assertThat(container.getContainerData().getDbFile()).exists();
     }
 
     //create a new one
@@ -205,31 +211,22 @@ public class TestDatanodeUpgradeToSchemaV4 {
       ContainerUtils.verifyChecksum(data, conf);
     }
 
-    // sleep 1s to make sure creationTime will change
+    // sleep 1s to make sure creationTime will have different value.
     Thread.sleep(1000);
     try (FileInputStream fis = new FileInputStream(folderToExport)) {
       newContainer.importContainerData(fis, packer);
     }
 
-    assertEquals(newContainerData.getContainerDBType(), oldContainerData.getContainerDBType());
-    assertEquals(newContainerData.getState(), oldContainerData.getState());
-    assertEquals(newContainerData.getBlockCount(), oldContainerData.getBlockCount());
-    assertEquals(newContainerData.getLayoutVersion(), oldContainerData.getLayoutVersion());
-    assertEquals(newContainerData.getMaxSize(), oldContainerData.getMaxSize());
-    assertEquals(newContainerData.getBytesUsed(), oldContainerData.getBytesUsed());
-    assertEquals(newContainerData.getMetadataPath(), oldContainerData.getMetadataPath());
-    assertEquals(newContainerData.getChunksPath(), oldContainerData.getChunksPath());
-    assertEquals(newContainerData.getContainerPath(), oldContainerData.getContainerPath());
-    assertTrue(new File(newContainerData.getContainerPath()).exists());
-    assertTrue(new File(newContainerData.getChunksPath()).exists());
-    assertTrue(new File(newContainerData.getMetadataPath()).exists());
+    assertTrue(isContainerEqual(newContainerData, oldContainerData));
+    assertThat(new File(newContainerData.getContainerPath())).exists();
+    assertThat(new File(newContainerData.getChunksPath())).exists();
+    assertThat(new File(newContainerData.getMetadataPath())).exists();
     if (schemaV3Enabled) {
-      assertTrue(newContainerData.getDbFile().exists());
+      assertThat(newContainerData.getDbFile()).exists();
       assertEquals(newContainerData.getDbFile(), oldContainerData.getDbFile());
     }
     yamlFile = newContainer.getContainerFile();
     content = FileUtils.readFileToString(yamlFile, Charset.defaultCharset());
-    System.out.println(content);
     if (finalize) {
       if (schemaV3Enabled) {
         assertThat(content).doesNotContain(METADATA_PATH);
@@ -337,26 +334,18 @@ public class TestDatanodeUpgradeToSchemaV4 {
       ContainerUtils.verifyChecksum(data, conf);
     }
 
-    // sleep 1s to make sure creationTime will change
+    // sleep 1s to make sure creationTime will have different value.
     Thread.sleep(1000);
     try (FileInputStream fis = new FileInputStream(folderToExport)) {
       newContainer.importContainerData(fis, packer);
     }
 
-    assertEquals(newContainerData.getContainerDBType(), oldContainerData.getContainerDBType());
-    assertEquals(newContainerData.getState(), oldContainerData.getState());
-    assertEquals(newContainerData.getBlockCount(), oldContainerData.getBlockCount());
-    assertEquals(newContainerData.getLayoutVersion(), oldContainerData.getLayoutVersion());
-    assertEquals(newContainerData.getMaxSize(), oldContainerData.getMaxSize());
-    assertEquals(newContainerData.getBytesUsed(), oldContainerData.getBytesUsed());
-    assertEquals(newContainerData.getMetadataPath(), oldContainerData.getMetadataPath());
-    assertEquals(newContainerData.getChunksPath(), oldContainerData.getChunksPath());
-    assertEquals(newContainerData.getContainerPath(), oldContainerData.getContainerPath());
-    assertTrue(new File(newContainerData.getContainerPath()).exists());
-    assertTrue(new File(newContainerData.getChunksPath()).exists());
-    assertTrue(new File(newContainerData.getMetadataPath()).exists());
+    assertTrue(isContainerEqual(newContainerData, oldContainerData));
+    assertThat(new File(newContainerData.getContainerPath())).exists();
+    assertThat(new File(newContainerData.getChunksPath())).exists();
+    assertThat(new File(newContainerData.getMetadataPath())).exists();
     if (schemaV3Enabled) {
-      assertTrue(newContainerData.getDbFile().exists());
+      assertThat(newContainerData.getDbFile()).exists();
       assertEquals(newContainerData.getDbFile(), oldContainerData.getDbFile());
     }
     yamlFile = newContainer.getContainerFile();
@@ -379,5 +368,19 @@ public class TestDatanodeUpgradeToSchemaV4 {
     FileTime creationTime2 = (FileTime) Files.getAttribute(
         Paths.get(newContainer.getContainerData().getContainerPath()), "creationTime");
     assertNotEquals(creationTime1.toInstant(), creationTime2.toInstant());
+  }
+
+  private boolean isContainerEqual(KeyValueContainerData containerData1, KeyValueContainerData containerData2) {
+    return new EqualsBuilder()
+        .append(containerData1.getContainerID(), containerData2.getContainerID())
+        .append(containerData1.getContainerDBType(), containerData2.getContainerDBType())
+        .append(containerData1.getState(), containerData2.getState())
+        .append(containerData1.getLayoutVersion(), containerData2.getLayoutVersion())
+        .append(containerData1.getBlockCount(), containerData2.getBlockCount())
+        .append(containerData1.getBytesUsed(), containerData2.getBytesUsed())
+        .append(containerData1.getMetadataPath(), containerData2.getMetadataPath())
+        .append(containerData1.getContainerPath(), containerData2.getContainerPath())
+        .append(containerData1.getChunksPath(), containerData2.getChunksPath())
+        .isEquals();
   }
 }
