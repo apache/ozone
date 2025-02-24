@@ -29,4 +29,7 @@
   <Match>
     <Package name="org.apache.ozone.recon.schema.generated.tables.pojos"/>
   </Match>
+  <Match>
+    <Package name="org.apache.ozone.recon.schema.generated.tables.records"/>
+  </Match>
 </FindBugsFilter>
