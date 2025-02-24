@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.hadoop.ozone.recon.schema;
+package org.apache.ozone.recon.schema;
 
 import java.sql.SQLException;
 

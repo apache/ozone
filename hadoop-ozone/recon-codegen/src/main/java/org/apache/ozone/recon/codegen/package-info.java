@@ -16,6 +16,6 @@
  */
 
 /**
- * Classes in this package define the schema for Recon Sql database.
+ * Recon code generation support for entities and daos.
  */
-package org.hadoop.ozone.recon.schema;
+package org.apache.ozone.recon.codegen;

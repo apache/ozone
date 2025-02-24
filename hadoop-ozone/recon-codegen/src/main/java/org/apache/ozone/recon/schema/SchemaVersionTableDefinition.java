@@ -15,10 +15,10 @@
  * limitations under the License.
  */
 
-package org.hadoop.ozone.recon.schema;
+package org.apache.ozone.recon.schema;
 
-import static org.hadoop.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
-import static org.hadoop.ozone.recon.codegen.SqlDbUtils.listAllTables;
+import static org.apache.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
+import static org.apache.ozone.recon.codegen.SqlDbUtils.listAllTables;
 import static org.jooq.impl.DSL.name;
 
 import com.google.inject.Inject;

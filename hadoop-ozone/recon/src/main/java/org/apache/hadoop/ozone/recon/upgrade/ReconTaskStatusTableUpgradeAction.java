@@ -17,13 +17,14 @@
 
 package org.apache.hadoop.ozone.recon.upgrade;
 
-import static org.hadoop.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
-import static org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition.RECON_TASK_STATUS_TABLE_NAME;
+import static org.apache.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
+import static org.apache.ozone.recon.schema.ReconTaskSchemaDefinition.RECON_TASK_STATUS_TABLE_NAME;
 
 import java.sql.Connection;
 import java.sql.SQLException;
 import javax.sql.DataSource;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
+import org.apache.ozone.recon.schema.ReconTaskSchemaDefinition;
 import org.jooq.DSLContext;
 import org.jooq.exception.DataAccessException;
 import org.jooq.impl.DSL;
@@ -34,7 +35,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Upgrade action for TASK_STATUS_STATISTICS feature layout change, which adds
  * <code>last_task_run_status</code> and <code>current_task_run_status</code> columns to
- * {@link org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition} in case it is missing .
+ * {@link ReconTaskSchemaDefinition} in case it is missing .
  */
 @UpgradeActionRecon(feature = ReconLayoutFeature.TASK_STATUS_STATISTICS,
     type = ReconUpgradeAction.UpgradeActionType.FINALIZE)

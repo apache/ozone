@@ -18,8 +18,8 @@
 package org.apache.hadoop.ozone.recon.tasks.updater;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
+import org.apache.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
+import org.apache.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.jooq.exception.DataAccessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -18,12 +18,12 @@
 <FindBugsFilter>
   <!-- Generated Code -->
   <Match>
-    <Package name="org.hadoop.ozone.recon.schema"/>
+    <Package name="org.apache.ozone.recon.schema"/>
   </Match>
   <Match>
-    <Package name="org.hadoop.ozone.recon.schema.tables"/>
+    <Package name="org.apache.ozone.recon.schema.tables"/>
   </Match>
   <Match>
-    <Package name="org.hadoop.ozone.recon.schema.tables.pojos"/>
+    <Package name="org.apache.ozone.recon.schema.tables.pojos"/>
   </Match>
 </FindBugsFilter>

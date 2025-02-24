@@ -17,20 +17,20 @@
 
 package org.apache.hadoop.ozone.recon.persistence;
 
-import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.ALL_REPLICAS_BAD;
-import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.UNDER_REPLICATED;
-import static org.hadoop.ozone.recon.schema.tables.UnhealthyContainersTable.UNHEALTHY_CONTAINERS;
+import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.ALL_REPLICAS_BAD;
+import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.UNDER_REPLICATED;
+import static org.apache.ozone.recon.schema.tables.UnhealthyContainersTable.UNHEALTHY_CONTAINERS;
 import static org.jooq.impl.DSL.count;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.util.List;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
-import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
-import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
-import org.hadoop.ozone.recon.schema.tables.daos.UnhealthyContainersDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
-import org.hadoop.ozone.recon.schema.tables.records.UnhealthyContainersRecord;
+import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
+import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
+import org.apache.ozone.recon.schema.tables.daos.UnhealthyContainersDao;
+import org.apache.ozone.recon.schema.tables.pojos.UnhealthyContainers;
+import org.apache.ozone.recon.schema.tables.records.UnhealthyContainersRecord;
 import org.jooq.Cursor;
 import org.jooq.DSLContext;
 import org.jooq.Record;

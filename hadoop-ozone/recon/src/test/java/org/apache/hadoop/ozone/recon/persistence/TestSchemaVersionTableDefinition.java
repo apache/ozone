@@ -17,11 +17,11 @@
 
 package org.apache.hadoop.ozone.recon.persistence;
 
-import static org.hadoop.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
-import static org.hadoop.ozone.recon.codegen.SqlDbUtils.listAllTables;
-import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
-import static org.hadoop.ozone.recon.schema.SchemaVersionTableDefinition.SCHEMA_VERSION_TABLE_NAME;
-import static org.hadoop.ozone.recon.schema.StatsSchemaDefinition.GLOBAL_STATS_TABLE_NAME;
+import static org.apache.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
+import static org.apache.ozone.recon.codegen.SqlDbUtils.listAllTables;
+import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
+import static org.apache.ozone.recon.schema.SchemaVersionTableDefinition.SCHEMA_VERSION_TABLE_NAME;
+import static org.apache.ozone.recon.schema.StatsSchemaDefinition.GLOBAL_STATS_TABLE_NAME;
 import static org.jooq.impl.DSL.name;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
@@ -39,7 +39,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconSchemaVersionTableManager;
 import org.apache.hadoop.ozone.recon.upgrade.ReconLayoutVersionManager;
-import org.hadoop.ozone.recon.schema.SchemaVersionTableDefinition;
+import org.apache.ozone.recon.schema.SchemaVersionTableDefinition;
 import org.jooq.DSLContext;
 import org.jooq.Record1;
 import org.jooq.impl.DSL;
