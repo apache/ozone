@@ -334,8 +334,8 @@ public class OzoneContainer {
     }
 
     try {
-      for (int i = 0; i < volumeThreads.size(); i++) {
-        volumeThreads.get(i).join();
+      for (Thread volumeThread : volumeThreads) {
+        volumeThread.join();
       }
       try (TableIterator<Long, ? extends Table.KeyValue<Long, String>> itr =
                containerSet.getContainerIdsTable().iterator()) {
@@ -597,20 +597,22 @@ public class OzoneContainer {
     StorageContainerDatanodeProtocolProtos.NodeReportProto.Builder nrb
             = StorageContainerDatanodeProtocolProtos.
             NodeReportProto.newBuilder();
-    for (int i = 0; i < reports.length; i++) {
-      nrb.addStorageReport(reports[i].getProtoBufMessage(config));
+
+    for (StorageLocationReport report : reports) {
+      nrb.addStorageReport(report.getProtoBufMessage(config));
     }
 
     StorageLocationReport[] metaReports = metaVolumeSet.getStorageReport();
-    for (int i = 0; i < metaReports.length; i++) {
-      nrb.addMetadataStorageReport(
-          metaReports[i].getMetadataProtoBufMessage());
+
+    for (StorageLocationReport metaReport : metaReports) {
+      nrb.addMetadataStorageReport(metaReport.getMetadataProtoBufMessage());
     }
 
     if (dbVolumeSet != null) {
       StorageLocationReport[] dbReports = dbVolumeSet.getStorageReport();
-      for (int i = 0; i < dbReports.length; i++) {
-        nrb.addDbStorageReport(dbReports[i].getProtoBufMessage());
+
+      for (StorageLocationReport dbReport : dbReports) {
+        nrb.addDbStorageReport(dbReport.getProtoBufMessage());
       }
     }
 

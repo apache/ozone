@@ -568,8 +568,8 @@ public class TestContainerPersistence {
     List<ContainerData> results = new LinkedList<>();
     while (counter < count) {
       containerSet.listContainer(prevKey, step, results);
-      for (int y = 0; y < results.size(); y++) {
-        testMap.remove(results.get(y).getContainerID());
+      for (ContainerData result : results) {
+        testMap.remove(result.getContainerID());
       }
       counter += step;
       long nextKey = results.get(results.size() - 1).getContainerID();

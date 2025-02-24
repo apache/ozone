@@ -757,10 +757,9 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
     String[] pathComponents = StringUtils.split(parentKey, '/');
     long parentId = bucketId;
     OmDirectoryInfo dirInfo = null;
-    for (int indx = 0; indx < pathComponents.length; indx++) {
-      String pathElement = pathComponents[indx];
-      String dbKey = omMetadataManager.getOzonePathKey(volumeId,
-              bucketId, parentId, pathElement);
+
+    for (String pathElement : pathComponents) {
+      String dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId, parentId, pathElement);
       dirInfo = omMetadataManager.getDirectoryTable().get(dbKey);
       parentId = dirInfo.getObjectID();
     }
