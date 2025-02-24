@@ -17,6 +17,7 @@
 
 package org.apache.ozone.test;
 
+import org.apache.hadoop.hdds.scm.TestContainerOperations;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.TestInstance;
@@ -31,12 +32,6 @@ import org.junit.jupiter.api.TestInstance;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
 
-  /** Hook method for subclasses. */
-  MiniOzoneCluster.Builder newClusterBuilder() {
-    return MiniOzoneCluster.newBuilder(createOzoneConfig())
-        .setNumDatanodes(5);
-  }
-
   /** Test cases for non-HA cluster should implement this. */
   public interface TestCase {
     MiniOzoneCluster cluster();
@@ -44,6 +39,14 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
 
   @Nested
   class AllocateContainer extends org.apache.hadoop.hdds.scm.TestAllocateContainer {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class ContainerOperations extends TestContainerOperations {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -91,6 +94,22 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
+  class XceiverClientManager extends org.apache.hadoop.hdds.scm.TestXceiverClientManager {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class SCMContainerManagerMetrics extends org.apache.hadoop.hdds.scm.container.metrics.TestSCMContainerManagerMetrics {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
   class Node2PipelineMap extends org.apache.hadoop.hdds.scm.pipeline.TestNode2PipelineMap {
     @Override
     public MiniOzoneCluster cluster() {
@@ -124,14 +143,6 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
 
   @Nested
   class DiscardPreallocatedBlocks extends org.apache.hadoop.ozone.client.rpc.TestDiscardPreallocatedBlocks {
-    @Override
-    public MiniOzoneCluster cluster() {
-      return getCluster();
-    }
-  }
-
-  @Nested
-  class DNRPCLoadGenerator extends org.apache.hadoop.ozone.freon.TestDNRPCLoadGenerator {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();

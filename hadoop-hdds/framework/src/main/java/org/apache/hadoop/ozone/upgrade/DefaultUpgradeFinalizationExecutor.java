@@ -36,6 +36,7 @@ public class DefaultUpgradeFinalizationExecutor<T>
   public DefaultUpgradeFinalizationExecutor() {
   }
 
+  @Override
   public void execute(T component, BasicUpgradeFinalizer<T, ?> finalizer)
       throws IOException {
     try {

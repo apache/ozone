@@ -36,10 +36,12 @@ import org.junit.jupiter.api.Test;
 public class TestS3InitiateMultipartUploadResponseWithFSO
     extends TestS3InitiateMultipartUploadResponse {
 
+  @Override
   public BucketLayout getBucketLayout() {
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 
+  @Override
   @Test
   public void testAddDBToBatch() throws Exception {
     String volumeName = UUID.randomUUID().toString();

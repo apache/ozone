@@ -107,6 +107,7 @@ public abstract class AbstractContractDistCpTest
    * are allowed to take time, especially to remote stores.
    * @return the current test timeout
    */
+  @Override
   protected int getTestTimeoutMillis() {
     return 15  * 60 * 1000;
   }

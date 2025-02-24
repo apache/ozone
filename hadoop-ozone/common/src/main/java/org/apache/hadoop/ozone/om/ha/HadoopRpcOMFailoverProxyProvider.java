@@ -67,6 +67,7 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
     this.delegationTokenService = computeDelegationTokenService();
   }
 
+  @Override
   protected void loadOMClientConfigs(ConfigurationSource config, String omSvcId)
       throws IOException {
     Map<String, ProxyInfo<T>> omProxies = new HashMap<>();

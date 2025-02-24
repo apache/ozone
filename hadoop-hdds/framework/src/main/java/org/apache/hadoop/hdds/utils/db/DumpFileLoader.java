@@ -34,5 +34,6 @@ public interface DumpFileLoader extends Closeable {
   /**
    * Close this file loader.
    */
+  @Override
   void close();
 }

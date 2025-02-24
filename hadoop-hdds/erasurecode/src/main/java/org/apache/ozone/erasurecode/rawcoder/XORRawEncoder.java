@@ -35,6 +35,7 @@ public class XORRawEncoder extends RawErasureEncoder {
     super(ecReplicationConfig);
   }
 
+  @Override
   protected void doEncode(ByteBufferEncodingState encodingState) {
     CoderUtil.resetOutputBuffers(encodingState.outputs,
         encodingState.encodeLength);

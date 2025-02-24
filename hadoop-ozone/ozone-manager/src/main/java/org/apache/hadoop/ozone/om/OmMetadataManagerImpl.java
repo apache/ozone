@@ -45,9 +45,11 @@ import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -55,8 +57,8 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -1933,46 +1935,74 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public Set<String> getMultipartUploadKeys(
-      String volumeName, String bucketName, String prefix) throws IOException {
+  public List<OmMultipartUpload> getMultipartUploadKeys(
+      String volumeName, String bucketName, String prefix, String keyMarker,
+      String uploadIdMarker, int maxUploads, boolean noPagination) throws IOException {
 
-    Set<String> response = new TreeSet<>();
-    Set<String> aborted = new TreeSet<>();
-
-    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmMultipartKeyInfo>>>
-        cacheIterator = getMultipartInfoTable().cacheIterator();
+    SortedMap<String, OmMultipartKeyInfo> responseKeys = new TreeMap<>();
+    Set<String> aborted = new HashSet<>();
 
     String prefixKey =
         OmMultipartUpload.getDbKey(volumeName, bucketName, prefix);
 
+    if (StringUtil.isNotBlank(keyMarker)) {
+      prefix = keyMarker;
+      if (StringUtil.isNotBlank(uploadIdMarker)) {
+        prefix = prefix + OM_KEY_PREFIX + uploadIdMarker;
+      }
+    }
+    String seekKey = OmMultipartUpload.getDbKey(volumeName, bucketName, prefix);
+
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmMultipartKeyInfo>>>
+        cacheIterator = getMultipartInfoTable().cacheIterator();
     // First iterate all the entries in cache.
     while (cacheIterator.hasNext()) {
       Map.Entry<CacheKey<String>, CacheValue<OmMultipartKeyInfo>> cacheEntry =
           cacheIterator.next();
-      if (cacheEntry.getKey().getCacheKey().startsWith(prefixKey)) {
+      String cacheKey = cacheEntry.getKey().getCacheKey();
+      if (cacheKey.startsWith(prefixKey)) {
         // Check if it is marked for delete, due to abort mpu
-        if (cacheEntry.getValue().getCacheValue() != null) {
-          response.add(cacheEntry.getKey().getCacheKey());
+        OmMultipartKeyInfo multipartKeyInfo = cacheEntry.getValue().getCacheValue();
+        if (multipartKeyInfo != null &&
+            cacheKey.compareTo(seekKey) >= 0) {
+          responseKeys.put(cacheKey, multipartKeyInfo);
         } else {
-          aborted.add(cacheEntry.getKey().getCacheKey());
+          aborted.add(cacheKey);
         }
       }
     }
 
-    // prefixed iterator will only iterate until keys match the prefix
+    int dbKeysCount = 0;
+    // the prefix iterator will only iterate keys that match the given prefix
+    // so we don't need to check if the key is started with prefixKey again
     try (TableIterator<String, ? extends KeyValue<String, OmMultipartKeyInfo>>
         iterator = getMultipartInfoTable().iterator(prefixKey)) {
+      iterator.seek(seekKey);
 
-      while (iterator.hasNext()) {
+      while (iterator.hasNext() && (noPagination || dbKeysCount < maxUploads + 1)) {
         KeyValue<String, OmMultipartKeyInfo> entry = iterator.next();
         // If it is marked for abort, skip it.
         if (!aborted.contains(entry.getKey())) {
-          response.add(entry.getKey());
+          responseKeys.put(entry.getKey(), entry.getValue());
+          dbKeysCount++;
         }
       }
     }
 
-    return response;
+    List<OmMultipartUpload> result = new ArrayList<>(responseKeys.size());
+
+    for (Map.Entry<String, OmMultipartKeyInfo> entry : responseKeys.entrySet()) {
+      OmMultipartUpload multipartUpload = OmMultipartUpload.from(entry.getKey());
+
+      multipartUpload.setCreationTime(
+          Instant.ofEpochMilli(entry.getValue().getCreationTime()));
+      multipartUpload.setReplicationConfig(
+          entry.getValue().getReplicationConfig());
+
+      result.add(multipartUpload);
+    }
+
+    return noPagination || result.size() <= maxUploads ? result : result.subList(0, maxUploads + 1);
   }
 
   @Override

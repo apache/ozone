@@ -23,6 +23,8 @@ import static java.nio.file.Files.newOutputStream;
 import static org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker.CONTAINER_FILE_NAME;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -395,7 +397,9 @@ public class TestTarContainerPacker {
   private File writeSingleFile(Path parentPath, String fileName,
       String content) throws IOException {
     Path path = parentPath.resolve(fileName).normalize();
-    Files.createDirectories(path.getParent());
+    Path parent = path.getParent();
+    assertNotNull(parent);
+    Files.createDirectories(parent);
     File file = path.toFile();
     FileOutputStream fileStream = new FileOutputStream(file);
     try (OutputStreamWriter writer = new OutputStreamWriter(fileStream,

@@ -176,6 +176,7 @@ public class StorageContainerServiceProviderImpl
         .equals("kerberos");
   }
 
+  @Override
   public DBCheckpoint getSCMDBSnapshot() {
     String snapshotFileName = RECON_SCM_SNAPSHOT_DB + "_" +
         System.currentTimeMillis();

@@ -53,6 +53,7 @@ class Log4j1Capturer extends GenericTestUtils.LogCapturer {
     logger.addAppender(appender);
   }
 
+  @Override
   public void stopCapturing() {
     logger.removeAppender(appender);
   }

@@ -20,11 +20,9 @@ package org.apache.hadoop.hdds.scm.server.upgrade;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.lang.reflect.Proxy;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
-import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
@@ -331,14 +329,9 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
       Preconditions.checkNotNull(finalizationStore);
       Preconditions.checkNotNull(transactionBuffer);
       Preconditions.checkNotNull(upgradeFinalizer);
-      final SCMHAInvocationHandler invocationHandler =
-          new SCMHAInvocationHandler(SCMRatisProtocol.RequestType.FINALIZE,
-              new FinalizationStateManagerImpl(this),
-              scmRatisServer);
 
-      return (FinalizationStateManager) Proxy.newProxyInstance(
-          SCMHAInvocationHandler.class.getClassLoader(),
-          new Class<?>[]{FinalizationStateManager.class}, invocationHandler);
+      return scmRatisServer.getProxyHandler(SCMRatisProtocol.RequestType.FINALIZE,
+        FinalizationStateManager.class, new FinalizationStateManagerImpl(this));
     }
   }
 }

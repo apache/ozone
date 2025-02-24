@@ -26,8 +26,10 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_AL
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.Set;
 import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -44,10 +46,15 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
 
   @Test
   void reconfigurableProperties() {
-    assertProperties(getSubject(),
-        ImmutableSet.of(OZONE_ADMINISTRATORS, OZONE_READONLY_ADMINISTRATORS,
-            OZONE_OM_VOLUME_LISTALL_ALLOWED,
-            OZONE_KEY_DELETING_LIMIT_PER_TASK));
+    Set<String> expected = ImmutableSet.<String>builder()
+        .add(OZONE_ADMINISTRATORS)
+        .add(OZONE_KEY_DELETING_LIMIT_PER_TASK)
+        .add(OZONE_OM_VOLUME_LISTALL_ALLOWED)
+        .add(OZONE_READONLY_ADMINISTRATORS)
+        .addAll(new OmConfig().reconfigurableProperties())
+        .build();
+
+    assertProperties(getSubject(), expected);
   }
 
   @Test
@@ -71,6 +78,17 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
     assertEquals(
         ImmutableSet.of(newValue),
         cluster().getOzoneManager().getOmReadOnlyAdminUsernames());
+  }
+
+  @Test
+  public void maxListSize() throws ReconfigurationException {
+    final long initialValue = cluster().getOzoneManager().getConfig().getMaxListSize();
+
+    getSubject().reconfigurePropertyImpl(OmConfig.Keys.SERVER_LIST_MAX_SIZE,
+        String.valueOf(initialValue + 1));
+
+    assertEquals(initialValue + 1,
+        cluster().getOzoneManager().getConfig().getMaxListSize());
   }
 
   @Test

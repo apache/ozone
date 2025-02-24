@@ -197,6 +197,7 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
     return new File(metaDir, DUMP_DIR);
   }
 
+  @Override
   public void compactionIfNeeded() throws Exception {
     // Calculate number of files per level and size per level
     RocksDatabase rocksDB = ((RDBStore)getStore()).getDb();

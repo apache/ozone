@@ -453,6 +453,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     shutdownHddsDatanode(getHddsDatanodeIndex(dn));
   }
 
+  @Override
   public String getClusterId() {
     return scm.getClientProtocolServer().getScmInfo().getClusterId();
   }
@@ -661,6 +662,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         }
         stopSCM(scm);
         removeConfiguration();
+
+        LOG.warn("Unable to build MiniOzoneCluster", ex);
 
         if (ex instanceof IOException) {
           throw (IOException) ex;

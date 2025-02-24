@@ -15,21 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.freon;
-
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-
 /**
- * Test for HadoopDirTreeGenerator - prefix layout.
+ * This package contains SCM Upgrade related classes.
  */
-public class TestHadoopDirTreeGeneratorWithFSO
-    extends TestHadoopDirTreeGenerator {
-
-  protected OzoneConfiguration getOzoneConfiguration() {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    OMRequestTestUtils.configureFSOptimizedPaths(conf, true);
-    return conf;
-  }
-
-}
+package org.apache.hadoop.hdds.upgrade;

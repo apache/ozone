@@ -48,12 +48,12 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -102,7 +102,6 @@ class TestContainerReplication {
   private static final String VOLUME = "vol1";
   private static final String BUCKET = "bucket1";
   private static final String KEY = "key1";
-
   private static final List<Class<? extends PlacementPolicy>> POLICIES = asList(
       SCMContainerPlacementCapacity.class,
       SCMContainerPlacementRackAware.class,
@@ -209,8 +208,7 @@ class TestContainerReplication {
     try (OutputStream out = bucket.createKey(KEY, 0, new ECReplicationConfig("RS-3-2-1k"),
         new HashMap<>())) {
       byte[] b = new byte[size];
-      Random random = new Random();
-      random.nextBytes(b);
+      b = RandomUtils.secure().randomBytes(b.length);
       out.write(b);
       return b;
     }

@@ -149,21 +149,21 @@ public class TestTypedRDBTableStore {
     //Assert we find only expected keys in the Table.
     try (Table<String, String> testTable = createTypedTable(
         "Fourth")) {
-      for (int x = 0; x < deletedKeys.size(); x++) {
-        testTable.put(deletedKeys.get(x), value);
-        testTable.delete(deletedKeys.get(x));
+      for (String deletedKey : deletedKeys) {
+        testTable.put(deletedKey, value);
+        testTable.delete(deletedKey);
       }
 
-      for (int x = 0; x < validKeys.size(); x++) {
-        testTable.put(validKeys.get(x), value);
+      for (String validKey : validKeys) {
+        testTable.put(validKey, value);
       }
 
-      for (int x = 0; x < validKeys.size(); x++) {
-        assertNotNull(testTable.get(validKeys.get(0)));
+      for (String validKey : validKeys) {
+        assertNotNull(testTable.get(validKey));
       }
 
-      for (int x = 0; x < deletedKeys.size(); x++) {
-        assertNull(testTable.get(deletedKeys.get(0)));
+      for (String deletedKey : deletedKeys) {
+        assertNull(testTable.get(deletedKey));
       }
     }
   }
