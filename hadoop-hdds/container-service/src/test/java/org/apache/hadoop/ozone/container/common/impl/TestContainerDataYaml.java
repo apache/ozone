@@ -167,6 +167,8 @@ public class TestContainerDataYaml {
         kvData.lastDataScanTime().get().toEpochMilli());
     assertEquals(SCAN_TIME.toEpochMilli(),
         kvData.getDataScanTimestamp().longValue());
+
+    cleanup();
   }
 
   @ContainerLayoutTestInfo.ContainerTest

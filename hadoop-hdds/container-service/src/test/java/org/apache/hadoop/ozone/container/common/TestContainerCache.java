@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileSystemTestHelper;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -140,13 +141,14 @@ public class TestContainerCache {
       db4.close();
       db5.close();
     });
+
+    FileUtils.deleteDirectory(root);
   }
 
   @Test
   void testConcurrentDBGet() throws Exception {
     File root = new File(testRoot);
     assertTrue(root.mkdirs());
-    root.deleteOnExit();
 
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE, 2);
@@ -181,6 +183,7 @@ public class TestContainerCache {
     db.close();
     assertEquals(1, cache.size());
     db.cleanup();
+    FileUtils.deleteDirectory(root);
   }
 
   @Test
@@ -218,5 +221,6 @@ public class TestContainerCache {
     db3.close();
     db4.close();
     cache.clear();
+    FileUtils.deleteDirectory(root);
   }
 }
