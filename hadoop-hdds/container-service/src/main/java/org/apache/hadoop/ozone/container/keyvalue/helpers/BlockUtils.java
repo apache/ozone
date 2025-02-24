@@ -329,7 +329,7 @@ public final class BlockUtils {
       File metaDir = new File(containerData.getMetadataPath());
       File dumpDir = DatanodeStoreSchemaThreeImpl.getDumpDir(metaDir);
       try {
-        store.loadKVContainerData(dumpDir, store);
+        store.loadKVContainerData(dumpDir);
       } catch (IOException | RocksDBException e) {
         // Don't delete unloaded or partially loaded files on failure,
         // but delete all partially loaded metadata.

@@ -139,9 +139,9 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
         prefix);
   }
 
-  public void loadKVContainerData(File dumpDir, DatanodeStoreSchemaThreeImpl store)
+  public void loadKVContainerData(File dumpDir)
       throws IOException, RocksDBException {
-    try (BatchOperation batch = store.getBatchHandler().initBatchOperation()) {
+    try (BatchOperation batch = getBatchHandler().initBatchOperation()) {
       processTable(batch, getTableDumpFile(getMetadataTable(), dumpDir),
           FixedLengthStringCodec.get(), LongCodec.get(), getMetadataTable());
       processTable(batch, getTableDumpFile(getBlockDataTable(), dumpDir),
@@ -153,7 +153,7 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
       processTable(batch, getTableDumpFile(getDeleteTransactionTable(), dumpDir), FixedLengthStringCodec.get(),
           Proto2Codec.get(DeletedBlocksTransaction.getDefaultInstance()), getDeleteTransactionTable());
 
-      store.getStore().commitBatchOperation(batch);
+      getStore().commitBatchOperation(batch);
     }
   }
 
@@ -177,16 +177,7 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
           V decodedValue = valueCodec.fromPersistedFormat(value);
           table.putWithBatch(batch, decodedKey, decodedValue);
         }
-        LOG.info("ATTENTION! Finished processing SST file: {}", tableDumpFile.getAbsolutePath());
-      } catch (Exception e) {
-        LOG.error("ATTENTION! Error while processing table from SST file with ManagedSstFileReaderIterator {}: {}",
-            tableDumpFile.getAbsolutePath(), e.getMessage(), e);
-        throw e;
       }
-    } catch (Exception e) {
-      LOG.error("ATTENTION! Error while processing table from SST file with ManagedSstFileReader {}: {}",
-          tableDumpFile.getAbsolutePath(), e.getMessage(), e);
-      throw e;
     }
   }
 
