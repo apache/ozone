@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Optional;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -647,7 +649,8 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     byte[] input = new byte[length];
     Arrays.fill(input, (byte) 96);
     for (String key : keys) {
-      createKey(ozoneBucket, key, new String(input, StandardCharsets.UTF_8));
+      createKey(ozoneBucket, key, ReplicationFactor.THREE,
+          ReplicationType.RATIS, new String(input, StandardCharsets.UTF_8));
 
       // Read the key with given key name.
       OzoneInputStream ozoneInputStream = ozoneBucket.readKey(key);
