@@ -60,6 +60,14 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
+  class OzoneFileSystemMissingParent extends org.apache.hadoop.fs.ozone.TestOzoneFileSystemMissingParent {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
   class AllocateContainer extends org.apache.hadoop.hdds.scm.TestAllocateContainer {
     @Override
     public MiniOzoneCluster cluster() {
