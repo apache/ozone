@@ -243,6 +243,7 @@ public class TestOmBucketReadWriteFileOps {
     assertThat(writeHeldSamples).isPositive();
   }
 
+  @SuppressWarnings("PMD.UnusedPrivateMethod")  //TODO remove suppression after HDDS-12315
   private static class ParameterBuilder {
 
     private String volumeName = "vol1";
@@ -293,8 +294,19 @@ public class TestOmBucketReadWriteFileOps {
       return this;
     }
 
+    private ParameterBuilder setLength(int lengthParam) {
+      length = lengthParam;
+      return this;
+    }
+
     private ParameterBuilder setTotalThreadCount(int totalThreadCountParam) {
       totalThreadCount = totalThreadCountParam;
+      return this;
+    }
+
+    private ParameterBuilder setReadThreadPercentage(
+        int readThreadPercentageParam) {
+      readThreadPercentage = readThreadPercentageParam;
       return this;
     }
 
