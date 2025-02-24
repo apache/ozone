@@ -1334,7 +1334,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     Preconditions.checkNotNull(scmNodeInfoList, "scmNodeInfoList is null");
 
     InetSocketAddress scmAddress = null;
-    if (SCMHAUtils.getScmServiceId(conf) != null) {
+    if (HddsUtils.getScmServiceId(conf) != null) {
       for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
         if (haDetails.getLocalNodeDetails().getNodeId() != null
             && haDetails.getLocalNodeDetails().getNodeId().equals(

@@ -33,7 +33,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEF
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 
 import com.google.common.base.Preconditions;
 import com.google.common.net.HostAndPort;
@@ -73,7 +75,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
@@ -121,7 +122,7 @@ public final class HddsUtils {
   public static Collection<InetSocketAddress> getScmAddressForClients(
       ConfigurationSource conf) {
 
-    if (SCMHAUtils.getScmServiceId(conf) != null) {
+    if (getScmServiceId(conf) != null) {
       List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
       Collection<InetSocketAddress> scmAddressList =
           new HashSet<>(scmNodeInfoList.size());
@@ -284,7 +285,7 @@ public final class HddsUtils {
 
     // First check HA style config, if not defined fall back to OZONE_SCM_NAMES
 
-    if (SCMHAUtils.getScmServiceId(conf) != null) {
+    if (getScmServiceId(conf) != null) {
       List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
       Collection<InetSocketAddress> scmAddressList =
           new HashSet<>(scmNodeInfoList.size());
@@ -892,5 +893,32 @@ public final class HddsUtils {
       warning = warning.concat(debugMessage);
     }
     log.warn(warning);
+  }
+
+  /**
+   * Get SCM ServiceId from OzoneConfiguration.
+   * @return SCM service id if defined, else null.
+   */
+  public static String getScmServiceId(ConfigurationSource conf) {
+
+    String localScmServiceId = conf.getTrimmed(
+        ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID);
+
+    Collection<String> scmServiceIds;
+
+    if (localScmServiceId == null) {
+      // There is no default scm service id is being set, fall back to ozone
+      // .scm.service.ids.
+      scmServiceIds = conf.getTrimmedStringCollection(
+          OZONE_SCM_SERVICE_IDS_KEY);
+      if (scmServiceIds.size() > 1) {
+        throw new ConfigurationException("When multiple SCM Service Ids are " +
+            "configured," + OZONE_SCM_DEFAULT_SERVICE_ID + " need to be " +
+            "defined");
+      } else if (scmServiceIds.size() == 1) {
+        localScmServiceId = scmServiceIds.iterator().next();
+      }
+    }
+    return localScmServiceId;
   }
 }

@@ -41,6 +41,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalInt;
 import net.jcip.annotations.Immutable;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.ha.ConfUtils;
@@ -74,7 +75,7 @@ public class SCMNodeInfo {
     // If service Id is not defined, fall back to non-HA config.
 
     List<SCMNodeInfo> scmNodeInfoList = new ArrayList<>();
-    String scmServiceId = SCMHAUtils.getScmServiceId(conf);
+    String scmServiceId = HddsUtils.getScmServiceId(conf);
     if (scmServiceId != null) {
       ArrayList< String > scmNodeIds = new ArrayList<>(
           SCMHAUtils.getSCMNodeIds(conf, scmServiceId));
