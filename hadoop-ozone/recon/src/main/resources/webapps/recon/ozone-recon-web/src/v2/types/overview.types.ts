@@ -33,6 +33,11 @@ export type ClusterStateResponse = {
   omServiceId: string;
 }
 
+type Task = {
+  taskRunning: boolean;
+  taskStatus: boolean;
+}
+
 export type OverviewState = {
   loading: boolean;
   datanodes: string;
@@ -56,6 +61,7 @@ export type OverviewState = {
   deletePendingSummarytotalDeletedKeys: number;
   scmServiceId: string;
   omServiceId: string;
+  omTask: Task;
 }
 
 export type StorageReport = {
