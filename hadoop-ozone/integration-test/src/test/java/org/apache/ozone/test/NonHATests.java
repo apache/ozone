@@ -32,12 +32,6 @@ import org.junit.jupiter.api.TestInstance;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
 
-  /** Hook method for subclasses. */
-  MiniOzoneCluster.Builder newClusterBuilder() {
-    return MiniOzoneCluster.newBuilder(createOzoneConfig())
-        .setNumDatanodes(5);
-  }
-
   /** Test cases for non-HA cluster should implement this. */
   public interface TestCase {
     MiniOzoneCluster cluster();
@@ -149,14 +143,6 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
 
   @Nested
   class DiscardPreallocatedBlocks extends org.apache.hadoop.ozone.client.rpc.TestDiscardPreallocatedBlocks {
-    @Override
-    public MiniOzoneCluster cluster() {
-      return getCluster();
-    }
-  }
-
-  @Nested
-  class DNRPCLoadGenerator extends org.apache.hadoop.ozone.freon.TestDNRPCLoadGenerator {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
