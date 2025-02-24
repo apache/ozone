@@ -205,16 +205,13 @@ public class TestOmMetadataManager {
 
   @Test
   public void testListBuckets() throws Exception {
-
     String volumeName1 = "volumeA";
     String prefixBucketNameWithOzoneOwner = "ozoneBucket";
     String prefixBucketNameWithHadoopOwner = "hadoopBucket";
 
     OMRequestTestUtils.addVolumeToDB(volumeName1, omMetadataManager);
 
-
     TreeSet<String> volumeABucketsPrefixWithOzoneOwner = new TreeSet<>();
-    TreeSet<String> volumeABucketsPrefixWithHadoopOwner = new TreeSet<>();
 
     // Add exact name in prefixBucketNameWithOzoneOwner without postfix.
     volumeABucketsPrefixWithOzoneOwner.add(prefixBucketNameWithOzoneOwner);
@@ -225,24 +222,18 @@ public class TestOmMetadataManager {
             prefixBucketNameWithOzoneOwner + i);
         addBucketsToCache(volumeName1, prefixBucketNameWithOzoneOwner + i);
       } else {
-        volumeABucketsPrefixWithHadoopOwner.add(
-            prefixBucketNameWithHadoopOwner + i);
         addBucketsToCache(volumeName1, prefixBucketNameWithHadoopOwner + i);
       }
     }
 
     String volumeName2 = "volumeB";
-    TreeSet<String> volumeBBucketsPrefixWithOzoneOwner = new TreeSet<>();
     TreeSet<String> volumeBBucketsPrefixWithHadoopOwner = new TreeSet<>();
     OMRequestTestUtils.addVolumeToDB(volumeName2, omMetadataManager);
 
     // Add exact name in prefixBucketNameWithOzoneOwner without postfix.
-    volumeBBucketsPrefixWithOzoneOwner.add(prefixBucketNameWithOzoneOwner);
     addBucketsToCache(volumeName2, prefixBucketNameWithOzoneOwner);
     for (int i = 1; i < 100; i++) {
       if (i % 2 == 0) { // This part adds 49 buckets.
-        volumeBBucketsPrefixWithOzoneOwner.add(
-            prefixBucketNameWithOzoneOwner + i);
         addBucketsToCache(volumeName2, prefixBucketNameWithOzoneOwner + i);
       } else {
         volumeBBucketsPrefixWithHadoopOwner.add(
@@ -250,6 +241,8 @@ public class TestOmMetadataManager {
         addBucketsToCache(volumeName2, prefixBucketNameWithHadoopOwner + i);
       }
     }
+
+    // VOLUME A
 
     // List all buckets which have prefix ozoneBucket
     List<OmBucketInfo> omBucketInfoList =
@@ -291,7 +284,7 @@ public class TestOmMetadataManager {
       assertNotEquals(prefixBucketNameWithOzoneOwner + 10, omBucketInfo.getBucketName());
     }
 
-
+    // VOLUME B
 
     omBucketInfoList = omMetadataManager.listBuckets(volumeName2,
         null, prefixBucketNameWithHadoopOwner, 100, false);
@@ -370,26 +363,19 @@ public class TestOmMetadataManager {
     String prefixKeyB = "key-b";
     String prefixKeyC = "key-c";
     TreeSet<String> keysASet = new TreeSet<>();
-    TreeSet<String> keysBSet = new TreeSet<>();
-    TreeSet<String> keysCSet = new TreeSet<>();
     for (int i = 1; i <= 100; i++) {
       if (i % 2 == 0) {
         keysASet.add(prefixKeyA + i);
         addKeysToOM(volumeNameA, ozoneBucket, prefixKeyA + i, i);
       } else {
-        keysBSet.add(prefixKeyB + i);
         addKeysToOM(volumeNameA, hadoopBucket, prefixKeyB + i, i);
       }
     }
-    keysCSet.add(prefixKeyC + 1);
     addKeysToOM(volumeNameA, ozoneTestBucket, prefixKeyC + 0, 0);
 
-    TreeSet<String> keysAVolumeBSet = new TreeSet<>();
     TreeSet<String> keysBVolumeBSet = new TreeSet<>();
     for (int i = 1; i <= 100; i++) {
       if (i % 2 == 0) {
-        keysAVolumeBSet.add(
-            prefixKeyA + i);
         addKeysToOM(volumeNameB, ozoneBucket, prefixKeyA + i, i);
       } else {
         keysBVolumeBSet.add(
@@ -524,6 +510,7 @@ public class TestOmMetadataManager {
 
     // As in total 100, 50 are marked for delete. It should list only 50 keys.
     assertEquals(50, omKeyInfoList.size());
+    assertEquals(50, deleteKeySet.size());
 
     TreeSet<String> expectedKeys = new TreeSet<>();
 
@@ -593,7 +580,6 @@ public class TestOmMetadataManager {
     }
 
     int numOpenKeys = 3;
-    List<String> openKeys = new ArrayList<>();
     for (int i = 0; i < numOpenKeys; i++) {
       final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyPrefix + i,
               RatisReplicationConfig.getInstance(ONE))
@@ -613,7 +599,6 @@ public class TestOmMetadataManager {
         dbOpenKeyName = omMetadataManager.getOpenKey(volumeName, bucketName,
             keyInfo.getKeyName(), clientID);
       }
-      openKeys.add(dbOpenKeyName);
     }
 
     String dbPrefix;
