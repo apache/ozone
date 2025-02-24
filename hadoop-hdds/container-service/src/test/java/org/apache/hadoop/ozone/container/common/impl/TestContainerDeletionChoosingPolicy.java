@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -39,7 +38,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService.ContainerBlockInfo;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDeletionChoosingPolicy;
@@ -83,8 +81,6 @@ public class TestContainerDeletionChoosingPolicy {
     conf.set(
         ScmConfigKeys.OZONE_SCM_KEY_VALUE_CONTAINER_DELETION_CHOOSING_POLICY,
         RandomContainerDeletionChoosingPolicy.class.getName());
-    List<StorageLocation> pathLists = new LinkedList<>();
-    pathLists.add(StorageLocation.parse(containerDir.getAbsolutePath()));
     containerSet = new ContainerSet(1000);
 
     int numContainers = 10;
@@ -146,8 +142,6 @@ public class TestContainerDeletionChoosingPolicy {
     conf.set(
         ScmConfigKeys.OZONE_SCM_KEY_VALUE_CONTAINER_DELETION_CHOOSING_POLICY,
         TopNOrderedContainerDeletionChoosingPolicy.class.getName());
-    List<StorageLocation> pathLists = new LinkedList<>();
-    pathLists.add(StorageLocation.parse(containerDir.getAbsolutePath()));
     containerSet = new ContainerSet(1000);
 
     int numContainers = 10;
