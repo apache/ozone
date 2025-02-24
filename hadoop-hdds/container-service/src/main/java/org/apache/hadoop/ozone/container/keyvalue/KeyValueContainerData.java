@@ -481,7 +481,7 @@ public class KeyValueContainerData extends ContainerData {
   }
 
   /**
-   * Whether this container's schema version is lower than @param version
+   * Whether this container's schema version is lower than @param version.
    */
   public boolean olderSchemaThan(String version) {
     String target = version != null ? version : SCHEMA_V1;
