@@ -33,6 +33,11 @@ public interface OmTransport {
   OMResponse submitRequest(OMRequest payload) throws IOException;
 
   /**
+   * The main method to send out the request on the defined transport to a specific OM node.
+   */
+  OMResponse submitRequest(String omNodeId, OMRequest payload) throws IOException;
+
+  /**
    * Return the addresses of the Ozone Managers, used for delegation token.
    */
   Text getDelegationTokenService();

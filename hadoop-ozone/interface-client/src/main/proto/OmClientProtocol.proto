@@ -179,6 +179,13 @@ message OMRequest {
 
   optional LayoutVersion layoutVersion = 6;
 
+  // If omNodeID is specified, this means that this client request is specifically
+  // made to the particular OM node, regardless whether the OM node is a leader.
+  // OM needs to rejects the request if the omNodeID is not equal to its own node ID.
+  // If omNodeID is not specified, this means that this client request is expected
+  // to be sent to the leader.
+  optional string omNodeId = 7;
+
   optional CreateVolumeRequest              createVolumeRequest            = 11;
   optional SetVolumePropertyRequest         setVolumePropertyRequest       = 12;
   optional CheckVolumeAccessRequest         checkVolumeAccessRequest       = 13;

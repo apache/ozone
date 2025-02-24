@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.ha;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
-import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -59,8 +58,7 @@ import org.slf4j.LoggerFactory;
  * multiple OMs to connect to. In case of OM failover, client can try
  * connecting to another OM node from the list of proxies.
  */
-public abstract class OMFailoverProxyProviderBase<T> implements
-    FailoverProxyProvider<T>, Closeable {
+public abstract class OMFailoverProxyProviderBase<T> implements FailoverProxyProvider<T> {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(OMFailoverProxyProviderBase.class);
@@ -83,11 +81,11 @@ public abstract class OMFailoverProxyProviderBase<T> implements
   // before attempting to contact all the OMs again. For other exceptions
   // such as LeaderNotReadyException, the same OM is contacted again with a
   // linearly increasing wait time.
-  private Set<String> attemptedOMs = new HashSet<>();
+  private final Set<String> attemptedOMs = new HashSet<>();
   private String lastAttemptedOM;
   private int numAttemptsOnSameOM = 0;
   private final long waitBetweenRetries;
-  private Set<String> accessControlExceptionOMs = new HashSet<>();
+  private final Set<String> accessControlExceptionOMs = new HashSet<>();
   private boolean performFailoverDone;
 
   private final UserGroupInformation ugi;

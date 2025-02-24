@@ -210,6 +210,11 @@ public class GrpcOmTransport implements OmTransport {
     return resp.get();
   }
 
+  @Override
+  public OMResponse submitRequest(String omNodeId, OMRequest payload) throws IOException {
+    throw new UnsupportedOperationException("gRPC client does not support submitting a request to a specific OM node");
+  }
+
   private Exception unwrapException(Exception ex) {
     Exception grpcException = null;
     try {
