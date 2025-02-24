@@ -52,6 +52,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmUtils;
@@ -178,7 +179,7 @@ public class SCMHANodeDetails {
     boolean isSCMddressSet = false;
 
     for (String serviceId : scmServiceIds) {
-      Collection<String> scmNodeIds = SCMHAUtils.getSCMNodeIds(conf, serviceId);
+      Collection<String> scmNodeIds = HddsUtils.getSCMNodeIds(conf, serviceId);
 
       // TODO: need to fall back to ozone.scm.names in case scm node ids are
       // not defined.

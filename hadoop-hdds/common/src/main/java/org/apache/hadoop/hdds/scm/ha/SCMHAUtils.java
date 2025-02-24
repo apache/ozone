@@ -26,7 +26,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -88,14 +87,6 @@ public final class SCMHAUtils {
     String primordialNode = getPrimordialSCM(conf);
     return primordialNode != null && (primordialNode
         .equals(selfNodeId) || primordialNode.equals(hostName));
-  }
-  /**
-   * Get a collection of all scmNodeIds for the given scmServiceId.
-   */
-  public static Collection<String> getSCMNodeIds(ConfigurationSource conf,
-                                                 String scmServiceId) {
-    String key = ConfUtils.addSuffix(ScmConfigKeys.OZONE_SCM_NODES_KEY, scmServiceId);
-    return conf.getTrimmedStringCollection(key);
   }
 
   /**
@@ -160,17 +151,6 @@ public final class SCMHAUtils {
       conf.set(scmNodesKey, String.join(",", partsLeft));
     }
     return conf;
-  }
-
-  /**
-   * Get SCM Node Id list.
-   * @param configuration
-   * @return list of node ids.
-   */
-  public static Collection<String> getSCMNodeIds(
-      ConfigurationSource configuration) {
-    String scmServiceId = HddsUtils.getScmServiceId(configuration);
-    return getSCMNodeIds(configuration, scmServiceId);
   }
 
   public static Throwable unwrapException(Exception e) {

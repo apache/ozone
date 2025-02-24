@@ -78,7 +78,7 @@ public class SCMNodeInfo {
     String scmServiceId = HddsUtils.getScmServiceId(conf);
     if (scmServiceId != null) {
       ArrayList< String > scmNodeIds = new ArrayList<>(
-          SCMHAUtils.getSCMNodeIds(conf, scmServiceId));
+          HddsUtils.getSCMNodeIds(conf, scmServiceId));
       if (scmNodeIds.size() == 0) {
         throw new ConfigurationException(
             String.format("Configuration does not have any value set for %s " +

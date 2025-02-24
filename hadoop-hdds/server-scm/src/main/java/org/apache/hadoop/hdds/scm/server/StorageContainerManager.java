@@ -2137,7 +2137,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public String getPrimordialNode() {
     String primordialNode = SCMHAUtils.getPrimordialSCM(configuration);
     // primordialNode can be nodeId too . If it is then return hostname.
-    if (SCMHAUtils.getSCMNodeIds(configuration).contains(primordialNode)) {
+    if (HddsUtils.getSCMNodeIds(configuration).contains(primordialNode)) {
       List<SCMNodeDetails> localAndPeerNodes =
           new ArrayList<>(scmHANodeDetails.getPeerNodeDetails());
       localAndPeerNodes.add(getSCMHANodeDetails().getLocalNodeDetails());

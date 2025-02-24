@@ -85,6 +85,7 @@ import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.DNS;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.conf.OzoneServiceConfig;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -920,5 +921,25 @@ public final class HddsUtils {
       }
     }
     return localScmServiceId;
+  }
+
+  /**
+   * Get a collection of all scmNodeIds for the given scmServiceId.
+   */
+  public static Collection<String> getSCMNodeIds(ConfigurationSource conf,
+                                                 String scmServiceId) {
+    String key = ConfUtils.addSuffix(ScmConfigKeys.OZONE_SCM_NODES_KEY, scmServiceId);
+    return conf.getTrimmedStringCollection(key);
+  }
+
+  /**
+   * Get SCM Node Id list.
+   * @param configuration
+   * @return list of node ids.
+   */
+  public static Collection<String> getSCMNodeIds(
+      ConfigurationSource configuration) {
+    String scmServiceId = getScmServiceId(configuration);
+    return getSCMNodeIds(configuration, scmServiceId);
   }
 }
