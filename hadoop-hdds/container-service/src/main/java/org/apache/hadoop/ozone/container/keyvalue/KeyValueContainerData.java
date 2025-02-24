@@ -485,6 +485,7 @@ public class KeyValueContainerData extends ContainerData {
    */
   public boolean olderSchemaThan(String version) {
     String target = version != null ? version : SCHEMA_V1;
-    return Integer.parseInt(schemaVersion) < Integer.parseInt(target);
+    String self = schemaVersion != null ? schemaVersion : SCHEMA_V1;
+    return Integer.parseInt(self) < Integer.parseInt(target);
   }
 }
