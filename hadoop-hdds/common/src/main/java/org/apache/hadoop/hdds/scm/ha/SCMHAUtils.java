@@ -94,20 +94,8 @@ public final class SCMHAUtils {
    */
   public static Collection<String> getSCMNodeIds(ConfigurationSource conf,
                                                  String scmServiceId) {
-    String key = addSuffix(ScmConfigKeys.OZONE_SCM_NODES_KEY, scmServiceId);
+    String key = ConfUtils.addSuffix(ScmConfigKeys.OZONE_SCM_NODES_KEY, scmServiceId);
     return conf.getTrimmedStringCollection(key);
-  }
-
-  /**
-   * Add non empty and non null suffix to a key.
-   */
-  private static String addSuffix(String key, String suffix) {
-    if (suffix == null || suffix.isEmpty()) {
-      return key;
-    }
-    assert !suffix.startsWith(".") :
-        "suffix '" + suffix + "' should not already have '.' prepended.";
-    return key + "." + suffix;
   }
 
   /**
