@@ -215,7 +215,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
 
     long startTime = System.currentTimeMillis();
     reconTaskController.registerTask(reconOmTaskMock);
-    reconTaskController.reInitializeTasks(omMetadataManagerMock);
+    reconTaskController.reInitializeTasks(omMetadataManagerMock, null);
     long endTime = System.currentTimeMillis();
 
     verify(reconOmTaskMock, times(1))
