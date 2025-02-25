@@ -18,8 +18,6 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR;
 
 import com.google.common.base.Strings;
@@ -28,10 +26,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
@@ -92,26 +88,6 @@ public final class SCMHAUtils {
     return primordialNode != null && (primordialNode
         .equals(selfNodeId) || primordialNode.equals(hostName));
   }
-  /**
-   * Get a collection of all scmNodeIds for the given scmServiceId.
-   */
-  public static Collection<String> getSCMNodeIds(ConfigurationSource conf,
-                                                 String scmServiceId) {
-    String key = addSuffix(ScmConfigKeys.OZONE_SCM_NODES_KEY, scmServiceId);
-    return conf.getTrimmedStringCollection(key);
-  }
-
-  /**
-   * Add non empty and non null suffix to a key.
-   */
-  private static String addSuffix(String key, String suffix) {
-    if (suffix == null || suffix.isEmpty()) {
-      return key;
-    }
-    assert !suffix.startsWith(".") :
-        "suffix '" + suffix + "' should not already have '.' prepended.";
-    return key + "." + suffix;
-  }
 
   /**
    * Get the local directory where ratis logs will be stored.
@@ -151,34 +127,6 @@ public final class SCMHAUtils {
   }
 
   /**
-   * Get SCM ServiceId from OzoneConfiguration.
-   * @param conf
-   * @return SCM service id if defined, else null.
-   */
-  public static String getScmServiceId(ConfigurationSource conf) {
-
-    String localScmServiceId = conf.getTrimmed(
-        ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID);
-
-    Collection<String> scmServiceIds;
-
-    if (localScmServiceId == null) {
-      // There is no default scm service id is being set, fall back to ozone
-      // .scm.service.ids.
-      scmServiceIds = conf.getTrimmedStringCollection(
-          OZONE_SCM_SERVICE_IDS_KEY);
-      if (scmServiceIds.size() > 1) {
-        throw new ConfigurationException("When multiple SCM Service Ids are " +
-            "configured," + OZONE_SCM_DEFAULT_SERVICE_ID + " need to be " +
-            "defined");
-      } else if (scmServiceIds.size() == 1) {
-        localScmServiceId = scmServiceIds.iterator().next();
-      }
-    }
-    return localScmServiceId;
-  }
-
-  /**
    * Removes the self node from the list of nodes in the
    * configuration.
    * @param configuration OzoneConfiguration
@@ -190,7 +138,7 @@ public final class SCMHAUtils {
       OzoneConfiguration configuration, String selfId) {
     final OzoneConfiguration conf = new OzoneConfiguration(configuration);
     String scmNodesKey = ConfUtils.addKeySuffixes(
-        ScmConfigKeys.OZONE_SCM_NODES_KEY, getScmServiceId(conf));
+        ScmConfigKeys.OZONE_SCM_NODES_KEY, HddsUtils.getScmServiceId(conf));
     String scmNodes = conf.get(scmNodesKey);
     if (scmNodes != null) {
       String[] parts = scmNodes.split(",");
@@ -203,17 +151,6 @@ public final class SCMHAUtils {
       conf.set(scmNodesKey, String.join(",", partsLeft));
     }
     return conf;
-  }
-
-  /**
-   * Get SCM Node Id list.
-   * @param configuration
-   * @return list of node ids.
-   */
-  public static Collection<String> getSCMNodeIds(
-      ConfigurationSource configuration) {
-    String scmServiceId = getScmServiceId(configuration);
-    return getSCMNodeIds(configuration, scmServiceId);
   }
 
   public static Throwable unwrapException(Exception e) {

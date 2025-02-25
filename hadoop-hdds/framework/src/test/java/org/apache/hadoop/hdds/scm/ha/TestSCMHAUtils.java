@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.Collection;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.junit.jupiter.api.Test;
@@ -45,7 +46,7 @@ class TestSCMHAUtils {
 
     OzoneConfiguration output = SCMHAUtils.removeSelfId(input, selfId);
     Collection<String> nodesWithoutSelf =
-        SCMHAUtils.getSCMNodeIds(output, service);
+        HddsUtils.getSCMNodeIds(output, service);
 
     assertEquals(2, nodesWithoutSelf.size());
     assertThat(nodesWithoutSelf).doesNotContain(selfId);
