@@ -98,7 +98,7 @@ public class JooqCodeGenerator {
                     .withDaos(true)
                     .withEmptyCatalogs(true))
                 .withStrategy(new Strategy().withName(
-                    "org.apache.ozone.recon.codegen.TableNamingStrategy"))
+                    TableNamingStrategy.class.getName()))
                 .withTarget(new Target()
                     .withPackageName("org.apache.ozone.recon.schema.generated")
                     .withClean(true)
