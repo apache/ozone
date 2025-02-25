@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Set;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -220,7 +221,7 @@ public class TestNSSummaryTask {
     @BeforeEach
     public void setUp() throws IOException {
       nSSummaryTask.reprocess(reconOMMetadataManager);
-      nSSummaryTask.process(processEventBatch());
+      nSSummaryTask.process(processEventBatch(), Collections.emptyMap());
 
       nsSummaryForBucket1 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);

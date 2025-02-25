@@ -515,10 +515,10 @@ public class TestEndPoint {
   }
 
   @Test
-  public void testHeartbeatWithCommandStatusReport() throws Exception {
+  public void testHeartbeatWithCommandStatusReport(@TempDir File endPointTempDir) throws Exception {
     DatanodeDetails dataNode = randomDatanodeDetails();
     try (EndpointStateMachine rpcEndPoint =
-        createEndpoint(SCMTestUtils.getConf(tempDir),
+        createEndpoint(SCMTestUtils.getConf(endPointTempDir),
             serverAddress, 1000)) {
       // Add some scmCommands for heartbeat response
       addScmCommands();

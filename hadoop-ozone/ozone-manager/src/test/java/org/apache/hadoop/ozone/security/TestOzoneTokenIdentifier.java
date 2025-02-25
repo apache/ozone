@@ -208,7 +208,6 @@ public class TestOzoneTokenIdentifier {
   public void testSymmetricTokenPerfHelper(String hmacAlgorithm, int keyLen) {
     final int testTokenCount = 1000;
     List<OzoneTokenIdentifier> tokenIds = new ArrayList<>();
-    List<byte[]> tokenPasswordSym = new ArrayList<>();
     for (int i = 0; i < testTokenCount; i++) {
       tokenIds.add(generateTestToken());
     }
@@ -234,8 +233,7 @@ public class TestOzoneTokenIdentifier {
 
     long startTime = Time.monotonicNowNanos();
     for (int i = 0; i < testTokenCount; i++) {
-      tokenPasswordSym.add(
-          signTokenSymmetric(tokenIds.get(i), mac, secretKey));
+      signTokenSymmetric(tokenIds.get(i), mac, secretKey);
     }
     long duration = Time.monotonicNowNanos() - startTime;
     LOG.info("Average token sign time with {}({} symmetric key) is {} ns",

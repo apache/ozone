@@ -15,22 +15,18 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.freon;
+package org.apache.ozone.test;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.junit.jupiter.api.TestInstance;
 
-/**
- * Test for HadoopDirTreeGenerator - prefix layout.
- */
-public class TestHadoopDirTreeGeneratorWithFSO
-    extends TestHadoopDirTreeGenerator {
-
+/** Test Freon with mini cluster. */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class TestFreon extends FreonTests {
   @Override
-  protected OzoneConfiguration getOzoneConfiguration() {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    OMRequestTestUtils.configureFSOptimizedPaths(conf, true);
-    return conf;
+  protected MiniOzoneCluster createCluster() throws Exception {
+    return newClusterBuilder()
+        .build();
   }
 
 }

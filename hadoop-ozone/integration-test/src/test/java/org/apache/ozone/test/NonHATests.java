@@ -32,15 +32,49 @@ import org.junit.jupiter.api.TestInstance;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
 
-  /** Hook method for subclasses. */
-  MiniOzoneCluster.Builder newClusterBuilder() {
-    return MiniOzoneCluster.newBuilder(createOzoneConfig())
-        .setNumDatanodes(5);
-  }
-
   /** Test cases for non-HA cluster should implement this. */
   public interface TestCase {
     MiniOzoneCluster cluster();
+  }
+
+  @Nested
+  class OzoneFSBucketLayout extends org.apache.hadoop.fs.ozone.TestOzoneFSBucketLayout {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class OzoneFSInputStream extends org.apache.hadoop.fs.ozone.TestOzoneFSInputStream {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class OzoneFSWithObjectStoreCreate extends org.apache.hadoop.fs.ozone.TestOzoneFSWithObjectStoreCreate {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class OzoneFileSystemMetrics extends org.apache.hadoop.fs.ozone.TestOzoneFileSystemMetrics {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class OzoneFileSystemMissingParent extends org.apache.hadoop.fs.ozone.TestOzoneFileSystemMissingParent {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
   }
 
   @Nested
@@ -149,14 +183,6 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
 
   @Nested
   class DiscardPreallocatedBlocks extends org.apache.hadoop.ozone.client.rpc.TestDiscardPreallocatedBlocks {
-    @Override
-    public MiniOzoneCluster cluster() {
-      return getCluster();
-    }
-  }
-
-  @Nested
-  class DNRPCLoadGenerator extends org.apache.hadoop.ozone.freon.TestDNRPCLoadGenerator {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();

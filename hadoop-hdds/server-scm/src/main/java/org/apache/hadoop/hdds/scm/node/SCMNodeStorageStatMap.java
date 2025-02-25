@@ -34,7 +34,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.slf4j.Logger;
@@ -124,19 +123,6 @@ public class SCMNodeStorageStatMap implements SCMNodeStorageStatMXBean {
     }
   }
 
-  //TODO: This should be called once SCMNodeManager gets Started.
-  private void registerMXBean() {
-    this.scmNodeStorageInfoBean = MBeans.register("StorageContainerManager",
-        "scmNodeStorageInfo", this);
-  }
-
-  //TODO: Unregister call should happen as a part of SCMNodeManager shutdown.
-  private void unregisterMXBean() {
-    if (this.scmNodeStorageInfoBean != null) {
-      MBeans.unregister(this.scmNodeStorageInfoBean);
-      this.scmNodeStorageInfoBean = null;
-    }
-  }
   /**
    * Updates the Container list of an existing DN.
    *

@@ -78,6 +78,17 @@ public class OmConfig extends ReconfigurableConfig {
     }
   }
 
+  public OmConfig copy() {
+    OmConfig copy = new OmConfig();
+    copy.setFrom(this);
+    return copy;
+  }
+
+  public void setFrom(OmConfig other) {
+    fileSystemPathEnabled = other.fileSystemPathEnabled;
+    maxListSize = other.maxListSize;
+  }
+
   /**
    * String keys for tests and grep.
    */
