@@ -670,6 +670,47 @@ public class TestContainerReportHandler {
   @Test
   public void testClosingToQuasiClosedWithMismatchingBCSID()
       throws NodeNotFoundException, IOException {
+    /*
+     * Negative test. When a replica with a (lower) mismatching bcsId gets reported,
+     * expect the ContainerReportHandler thread to not throw uncaught exception
+     * (which could lead to ContainerReportHandler thread crash before HDDS-12150)
+     */
+    final ContainerReportHandler reportHandler =
+        new ContainerReportHandler(nodeManager, containerManager);
+    final Iterator<DatanodeDetails> nodeIterator =
+        nodeManager.getNodes(NodeStatus.inServiceHealthy()).iterator();
+
+    final DatanodeDetails dn1 = nodeIterator.next();
+    final DatanodeDetails dn2 = nodeIterator.next();
+    final DatanodeDetails dn3 = nodeIterator.next();
+
+    // sequenceId 10000L set here
+    final ContainerInfo container1 = getContainer(LifeCycleState.CLOSING);
+
+    nodeManager.addContainer(dn1, container1.containerID());
+    nodeManager.addContainer(dn2, container1.containerID());
+    nodeManager.addContainer(dn3, container1.containerID());
+
+    containerStateManager.addContainer(container1.getProtobuf());
+
+    // Generate container report with replica in CLOSED state with lower bcsId
+    final ContainerReportsProto containerReport = getContainerReportsProto(
+        container1.containerID(), ContainerReplicaProto.State.CLOSED,
+        dn1.getUuidString(),
+        2000L);
+    final ContainerReportFromDatanode containerReportFromDatanode =
+        new ContainerReportFromDatanode(dn1, containerReport);
+
+    // Handler should NOT throw IllegalArgumentException
+    try {
+      reportHandler.onMessage(containerReportFromDatanode, publisher);
+    } catch (IllegalArgumentException iaEx) {
+      fail("Handler should not throw IllegalArgumentException: " + iaEx.getMessage());
+    }
+
+    // Because the container report is ignored, the container remains in QUASI_CLOSED for SCM
+    assertEquals(LifeCycleState.CLOSING, containerManager.getContainer(container1.containerID()).getState());
+
   }
 
   @Test
