@@ -45,6 +45,31 @@ public interface UpgradeFinalizer<T> {
   Logger LOG = LoggerFactory.getLogger(UpgradeFinalizer.class);
 
   /**
+   * Default message can be used to indicate the starting of finalization.
+   */
+  StatusAndMessages STARTING_MSG = new StatusAndMessages(
+      Status.STARTING_FINALIZATION,
+      Arrays.asList("Starting Finalization")
+  );
+
+  StatusAndMessages FINALIZATION_IN_PROGRESS_MSG = new StatusAndMessages(
+      Status.FINALIZATION_IN_PROGRESS,
+      Arrays.asList("Finalization in progress")
+  );
+
+  StatusAndMessages FINALIZATION_REQUIRED_MSG = new StatusAndMessages(
+      Status.FINALIZATION_REQUIRED,
+      Arrays.asList("Finalization required")
+  );
+
+  /**
+   * Default message to provide when the service is in ALREADY_FINALIZED state.
+   */
+  StatusAndMessages FINALIZED_MSG = new StatusAndMessages(
+      Status.ALREADY_FINALIZED, Collections.emptyList()
+  );
+
+  /**
    * Represents the current state in which the service is with regards to
    * finalization after an upgrade.
    * The state transitions are the following:
@@ -101,31 +126,6 @@ public interface UpgradeFinalizer<T> {
       return msgs;
     }
   }
-
-  /**
-   * Default message can be used to indicate the starting of finalization.
-   */
-  StatusAndMessages STARTING_MSG = new StatusAndMessages(
-      Status.STARTING_FINALIZATION,
-      Arrays.asList("Starting Finalization")
-  );
-
-  StatusAndMessages FINALIZATION_IN_PROGRESS_MSG = new StatusAndMessages(
-      Status.FINALIZATION_IN_PROGRESS,
-      Arrays.asList("Finalization in progress")
-  );
-
-  StatusAndMessages FINALIZATION_REQUIRED_MSG = new StatusAndMessages(
-      Status.FINALIZATION_REQUIRED,
-      Arrays.asList("Finalization required")
-  );
-
-  /**
-   * Default message to provide when the service is in ALREADY_FINALIZED state.
-   */
-  StatusAndMessages FINALIZED_MSG = new StatusAndMessages(
-      Status.ALREADY_FINALIZED, Collections.emptyList()
-  );
 
   /**
    * Finalize the metadata upgrade.

@@ -41,11 +41,11 @@ public final class ContainerID implements Comparable<ContainerID> {
 
   public static final ContainerID MIN = ContainerID.valueOf(0);
 
+  private final long id;
+
   public static Codec<ContainerID> getCodec() {
     return CODEC;
   }
-
-  private final long id;
 
   /**
    * Constructs ContainerID.

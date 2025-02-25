@@ -276,12 +276,6 @@ public final class HddsConfigKeys {
   public static final String HDDS_SECRET_KEY_ROTATE_CHECK_DURATION_DEFAULT
       = "10m";
 
-  /**
-   * Do not instantiate.
-   */
-  private HddsConfigKeys() {
-  }
-
   // Enable TLS for GRPC clients/server in ozone.
   public static final String HDDS_GRPC_TLS_ENABLED = "hdds.grpc.tls.enabled";
   public static final boolean HDDS_GRPC_TLS_ENABLED_DEFAULT = false;
@@ -405,4 +399,8 @@ public final class HddsConfigKeys {
 
   public static final String OZONE_DATANODE_IO_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY =
       "ozone.volume.io.percentiles.intervals.seconds";
+
+  /** Do not instantiate. */
+  private HddsConfigKeys() {
+  }
 }
