@@ -276,11 +276,10 @@ public class TestHddsVolume {
    * |----used----|          fsAvail           |---other---|
    * |----used----|   (avail)   |+++reserved+++|---other---|
    * |<-                    fsCapacity                   ->|
-   * |<-           usableCapacity            ->|
    * |<-       capacity      ->|
    *
+   * capacity = max(fsCapacity - reserved, 0);
    * avail = max(fsAvail - reserved, 0);
-   * capacity = max(usableCapacity - reserved, 0);
    */
   @Test
   public void testReportUsedBiggerThanActualUsed() throws IOException {
@@ -288,8 +287,7 @@ public class TestHddsVolume {
     // used = 300(cached value from previous refresh)
     // After fix:
     // fsCapacity = 500, fsAvail = 200, used = 300;
-    // usableCapacity = used + fsAvail = 300 + 200 = 500
-    // capacity = max(usableCapacity - reserved, 0) = max(500 - 100, 0) = 400
+    // capacity = max(fsCapacity - reserved, 0) = max(500 - 100, 0) = 400
     // avail = max(fsAvail - reserved, 0) = max(200 - 100, 0) = 100
     SpaceUsageSource spaceUsage = fixed(500, 290, 300);
     SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(

@@ -71,11 +71,11 @@ public class VolumeUsage {
    * |----used----|          fsAvail           |---other---|
    * |----used----|   (avail)   |+++reserved+++|---other---|
    * |<-                    fsCapacity                   ->|
-   * |<-           usableCapacity            ->|
    * |<-       capacity      ->|
    * }
    * </pre>
-   * capacity = max(usableCapacity - reserved, 0);
+   * fsCapacity has already removed sysReserved here.
+   * capacity = max(fsCapacity - reserved, 0);
    * avail = max(fsAvail - reserved, 0);
    */
   public SpaceUsageSource getCurrentUsage() {
@@ -95,10 +95,6 @@ public class VolumeUsage {
 
   public void decrementUsedSpace(long reclaimedSpace) {
     source.decrementUsedSpace(reclaimedSpace);
-  }
-
-  private static long getUsableCapacity(SpaceUsageSource usage) {
-    return usage.getUsedSpace() + usage.getAvailable();
   }
 
   public synchronized void start() {
