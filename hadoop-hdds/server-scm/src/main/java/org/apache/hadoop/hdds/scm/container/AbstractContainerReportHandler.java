@@ -306,12 +306,15 @@ public class AbstractContainerReportHandler {
           }
         }
 
-        logger.info("Moving container {} to CLOSED state, datanode {} " +
-            "reported CLOSED replica with index {}.", containerId, datanode,
-            replica.getReplicaIndex());
         if (!verifyBcsId(replica.getBlockCommitSequenceId(), container.getSequenceId(), datanode, containerId)) {
-          return true;  // ignored = true
+          logger.warn("Ignored moving container {} from CLOSING to CLOSED state because replica bcsId ({}) " +
+                  "reported by datanode {} does not match sequenceId ({{}}).",
+              containerId, replica.getBlockCommitSequenceId(), datanode, container.getSequenceId());
+          return true;
         }
+        logger.info("Moving container {} to CLOSED state, datanode {} " +
+                "reported CLOSED replica with index {}.", containerId, datanode,
+            replica.getReplicaIndex());
         containerManager.updateContainerState(containerId,
             LifeCycleEvent.CLOSE);
       }
@@ -334,11 +337,15 @@ public class AbstractContainerReportHandler {
        *
        */
       if (replica.getState() == State.CLOSED) {
-        logger.info("Moving container {} to CLOSED state, datanode {} " +
-            "reported CLOSED replica.", containerId, datanode);
         if (!verifyBcsId(replica.getBlockCommitSequenceId(), container.getSequenceId(), datanode, containerId)) {
-          return true;  // ignored = true
+          logger.warn("Ignored moving container {} from QUASI_CLOSED to CLOSED state because replica bcsId ({}) " +
+                  "reported by datanode {} does not match sequenceId ({{}}).",
+              containerId, replica.getBlockCommitSequenceId(), datanode, container.getSequenceId());
+          return true;
         }
+        logger.info("Moving container {} to CLOSED state, datanode {} " +
+                "reported CLOSED replica with index {}.", containerId, datanode,
+            replica.getReplicaIndex());
         containerManager.updateContainerState(containerId,
             LifeCycleEvent.FORCE_CLOSE);
       }
@@ -386,10 +393,9 @@ public class AbstractContainerReportHandler {
    * @param datanode DatanodeDetails for logging
    * @param containerId ContainerID for logging
    * @return true if verification has passed, false otherwise
-   * @throws IOException Thrown when bcsIds do not match
    */
   private boolean verifyBcsId(long replicaBcsId, long containerBcsId,
-      DatanodeDetails datanode, ContainerID containerId) throws IOException {
+      DatanodeDetails datanode, ContainerID containerId) {
 
     if (replicaBcsId != containerBcsId) {
       final String errMsg = "Unexpected bcsId for container " + containerId +

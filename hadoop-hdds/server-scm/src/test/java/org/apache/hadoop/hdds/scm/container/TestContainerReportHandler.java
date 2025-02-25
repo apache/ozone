@@ -763,6 +763,7 @@ public class TestContainerReportHandler {
     final DatanodeDetails dn2 = nodeIterator.next();
     final DatanodeDetails dn3 = nodeIterator.next();
 
+    // sequenceId 10000L set here
     final ContainerInfo container1 = getContainer(LifeCycleState.QUASI_CLOSED);
 
     nodeManager.addContainer(dn1, container1.containerID());
@@ -771,11 +772,11 @@ public class TestContainerReportHandler {
 
     containerStateManager.addContainer(container1.getProtobuf());
 
+    // Generate container report with replica in CLOSED state with lower bcsId
     final ContainerReportsProto containerReport = getContainerReportsProto(
         container1.containerID(), ContainerReplicaProto.State.CLOSED,
         dn1.getUuidString(),
         2000L);
-
     final ContainerReportFromDatanode containerReportFromDatanode =
         new ContainerReportFromDatanode(dn1, containerReport);
 
