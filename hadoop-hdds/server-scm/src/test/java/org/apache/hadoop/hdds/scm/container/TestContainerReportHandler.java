@@ -742,7 +742,7 @@ public class TestContainerReportHandler {
 
   @ParameterizedTest
   @EnumSource(value = LifeCycleState.class, names = {"CLOSING", "QUASI_CLOSED"})
-  public void testContainerStateTransitionToQuasiClosedWithMismatchingBCSID(LifeCycleState lcState)
+  public void testContainerStateTransitionToClosedWithMismatchingBCSID(LifeCycleState lcState)
       throws NodeNotFoundException, IOException {
     /*
      * Negative test. When a replica with a (lower) mismatching bcsId gets reported,
