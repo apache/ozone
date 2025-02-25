@@ -632,7 +632,7 @@ jobs:
           java-version: ${{ env.TEST_JAVA_VERSION }}
       - name: Execute tests
         run: |
-          hadoop-ozone/dev-support/checks/integration.sh -Ptest-recon ${{ inputs.ratis_args }}
+          hadoop-ozone/dev-support/checks/integration.sh -Ptest-${{ matrix.profile }} ${{ inputs.ratis_args }}
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
       - name: Summary of failures
