@@ -477,7 +477,7 @@ public class TestOzoneManagerServiceProviderImpl {
 
     ReconTaskController reconTaskControllerMock = getMockTaskController();
     doNothing().when(reconTaskControllerMock)
-        .reInitializeTasks(omMetadataManager);
+        .reInitializeTasks(omMetadataManager, null);
     ReconTaskStatusUpdaterManager reconTaskStatusUpdaterManager = getMockTaskStatusUpdaterManager();
 
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
@@ -494,7 +494,7 @@ public class TestOzoneManagerServiceProviderImpl {
     verify(reconTaskStatusUpdaterManager).getTaskStatusUpdater(taskNameCaptor.capture());
     assertEquals(OmSnapshotRequest.name(), taskNameCaptor.getValue());
     verify(reconTaskControllerMock, times(1))
-        .reInitializeTasks(omMetadataManager);
+        .reInitializeTasks(omMetadataManager, null);
     assertEquals(1, metrics.getNumSnapshotRequests());
   }
 
@@ -544,7 +544,7 @@ public class TestOzoneManagerServiceProviderImpl {
 
     ReconTaskController reconTaskControllerMock = getMockTaskController();
     doNothing().when(reconTaskControllerMock)
-        .reInitializeTasks(omMetadataManager);
+        .reInitializeTasks(omMetadataManager, null);
     ReconTaskStatusUpdaterManager reconTaskStatusUpdaterManager = getMockTaskStatusUpdaterManager();
 
     OzoneManagerProtocol protocol = getMockOzoneManagerClientWithThrow();
@@ -562,7 +562,7 @@ public class TestOzoneManagerServiceProviderImpl {
     verify(reconTaskStatusUpdaterManager).getTaskStatusUpdater(captor.capture());
     assertEquals(OmSnapshotRequest.name(), captor.getValue());
     verify(reconTaskControllerMock, times(1))
-        .reInitializeTasks(omMetadataManager);
+        .reInitializeTasks(omMetadataManager, null);
     assertEquals(1, metrics.getNumSnapshotRequests());
   }
 
