@@ -277,7 +277,6 @@ public class TestDatanodeUpgradeToSchemaV4 {
     File yamlFile = container.getContainerFile();
     String content =
         FileUtils.readFileToString(yamlFile, Charset.defaultCharset());
-    System.out.println(content);
     // yaml file contains chunkPath and metadataPath
     assertThat(content).contains(METADATA_PATH);
     assertThat(content).contains(CHUNKS_PATH);
@@ -350,7 +349,6 @@ public class TestDatanodeUpgradeToSchemaV4 {
     }
     yamlFile = newContainer.getContainerFile();
     content = FileUtils.readFileToString(yamlFile, Charset.defaultCharset());
-    System.out.println(content);
     if (schemaV3Enabled) {
       assertThat(content).doesNotContain(METADATA_PATH);
       assertThat(content).doesNotContain(CHUNKS_PATH);
