@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.utils;
 
-import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL;
@@ -41,6 +40,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.sanitizeUserArgs;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_DATA_DIR_KEY;
 
 import com.google.common.base.Strings;
 import com.google.protobuf.BlockingService;
@@ -67,7 +67,6 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -409,11 +408,11 @@ public final class HddsServerUtil {
     Collection<String> rawLocations = conf.getTrimmedStringCollection(
         HDDS_DATANODE_DIR_KEY);
     if (rawLocations.isEmpty()) {
-      rawLocations = conf.getTrimmedStringCollection(DFS_DATANODE_DATA_DIR_KEY);
+      rawLocations = conf.getTrimmedStringCollection(HDDS_DATANODE_DATA_DIR_KEY);
     }
     if (rawLocations.isEmpty()) {
       throw new IllegalArgumentException("No location configured in either "
-          + HDDS_DATANODE_DIR_KEY + " or " + DFS_DATANODE_DATA_DIR_KEY);
+          + HDDS_DATANODE_DIR_KEY + " or " + HDDS_DATANODE_DATA_DIR_KEY);
     }
     return rawLocations;
   }
@@ -580,7 +579,7 @@ public final class HddsServerUtil {
     MetricsSystem metricsSystem = DefaultMetricsSystem.initialize(serverName);
     try {
       JvmMetrics.create(serverName,
-          configuration.get(DFSConfigKeysLegacy.DFS_METRICS_SESSION_ID_KEY),
+          configuration.get(OzoneConfigKeys.HDDS_METRICS_SESSION_ID_KEY),
           DefaultMetricsSystem.instance());
       CpuMetrics.create();
     } catch (MetricsException e) {
