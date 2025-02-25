@@ -29,7 +29,6 @@ import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
@@ -60,7 +59,6 @@ import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageConfig;
 import org.apache.hadoop.ozone.recon.security.ReconCertificateClient;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
-import org.apache.hadoop.security.SecurityUtil;
 import org.apache.ratis.proto.RaftProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -184,39 +182,30 @@ public class StorageContainerServiceProviderImpl
         ".tar");
     try {
       try {
-        List<String> ratisRoles = scmClient.getScmInfo().getRatisPeerRoles();
+        List<String> ratisRoles = scmClient.getScmInfo().getPeerRoles();
         for (String ratisRole : ratisRoles) {
           String[] role = ratisRole.split(":");
-          // This explicit role length check is to support older versions where we cannot change the default value
-          // without breaking backward compatibility during upgrade, because if Ratis is not enabled then the roles
-          // command output is generated outside of Ratis. It will not have the Ratis terminologies.
-          if (role.length > 2) {
-            if (role[2].equals(RaftProtos.RaftPeerRole.LEADER.toString())) {
-              String hostAddress = role[4].trim();
-              int grpcPort = configuration.getInt(
-                  ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY,
-                  ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT);
+          if (role[2].equals(RaftProtos.RaftPeerRole.LEADER.toString())) {
+            String hostAddress = role[4].trim();
+            int grpcPort = configuration.getInt(
+                ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY,
+                ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT);
 
-              SecurityConfig secConf = new SecurityConfig(configuration);
-              SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
-                  getScmSecurityClientWithMaxRetry(
-                      configuration, getCurrentUser());
-              try (ReconCertificateClient certClient =
-                       new ReconCertificateClient(
-                           secConf, scmSecurityClient, reconStorage, null, null);
-                   SCMSnapshotDownloader downloadClient = new InterSCMGrpcClient(
-                       hostAddress, grpcPort, configuration, certClient)) {
-                downloadClient.download(targetFile.toPath()).get();
-              } catch (ExecutionException | InterruptedException e) {
-                LOG.error("Rocks DB checkpoint downloading failed: {}", e);
-                throw new IOException(e);
-              }
-              LOG.info("Downloaded SCM Snapshot from Leader SCM");
-              break;
+            SecurityConfig secConf = new SecurityConfig(configuration);
+            SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
+                getScmSecurityClientWithMaxRetry(
+                    configuration, getCurrentUser());
+            try (ReconCertificateClient certClient =
+                     new ReconCertificateClient(
+                         secConf, scmSecurityClient, reconStorage, null, null);
+                 SCMSnapshotDownloader downloadClient = new InterSCMGrpcClient(
+                     hostAddress, grpcPort, configuration, certClient)) {
+              downloadClient.download(targetFile.toPath()).get();
+            } catch (ExecutionException | InterruptedException e) {
+              LOG.error("Rocks DB checkpoint downloading failed: {}", e);
+              throw new IOException(e);
             }
-          } else {
-            fetchSCMDBSnapshotUsingHttpClient(targetFile);
-            LOG.info("Downloaded SCM Snapshot from SCM");
+            LOG.info("Downloaded SCM Snapshot from Leader SCM");
             break;
           }
         }
@@ -231,17 +220,6 @@ public class StorageContainerServiceProviderImpl
       LOG.error("Unable to obtain SCM DB Snapshot: {} ", e);
     }
     return null;
-  }
-
-  private void fetchSCMDBSnapshotUsingHttpClient(File targetFile) throws IOException {
-    SecurityUtil.doAsLoginUser(() -> {
-      try (InputStream inputStream = reconUtils.makeHttpCall(
-          connectionFactory, getScmDBSnapshotUrl(),
-          isOmSpnegoEnabled()).getInputStream()) {
-        FileUtils.copyInputStreamToFile(inputStream, targetFile);
-      }
-      return null;
-    });
   }
 
   @NotNull

@@ -1000,8 +1000,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     return HddsProtos.GetScmInfoResponseProto.newBuilder()
         .setClusterId(scmInfo.getClusterId())
         .setScmId(scmInfo.getScmId())
-        .addAllPeerRoles(scmInfo.getRatisPeerRoles())
-        .setScmRatisEnabled(scmInfo.getScmRatisEnabled())
+        .addAllPeerRoles(scmInfo.getPeerRoles())
         .build();
   }
 
