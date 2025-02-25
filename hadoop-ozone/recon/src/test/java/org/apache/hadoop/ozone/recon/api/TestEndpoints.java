@@ -1268,10 +1268,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     LambdaTestUtils.await(30000, 1000, check);
   }
 
-  private BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
-  }
-
   @Test
   public void testExplicitRemovalOfDecommissionedNode() throws Exception {
     Response response = nodeEndpoint.getDatanodes();

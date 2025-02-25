@@ -2324,10 +2324,6 @@ abstract class AbstractOzoneFileSystemTest {
     return status;
   }
 
-  private void assertCounter(long value, String key) {
-    assertEquals(value, statistics.getLong(key).longValue());
-  }
-
   @Test
   void testSnapshotRead() throws Exception {
     // Init data

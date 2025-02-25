@@ -1036,27 +1036,6 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
     assertTrue(addAcl);
   }
 
-  private void testAddLinkAcl(String remoteUserName, OzoneObj ozoneObj,
-      OzoneAcl userAcl) throws Exception {
-    ObjectStore objectStore = getObjectStore();
-    boolean addAcl = objectStore.addAcl(ozoneObj, userAcl);
-    assertTrue(addAcl);
-
-    List<OzoneAcl> acls = objectStore.getAcl(ozoneObj);
-
-    assertTrue(containsAcl(userAcl, acls));
-
-    // Add an already existing acl.
-    addAcl = objectStore.addAcl(ozoneObj, userAcl);
-    assertFalse(addAcl);
-
-    // Add an acl by changing acl type with same type, name and scope.
-    userAcl = new OzoneAcl(USER, remoteUserName,
-        DEFAULT, WRITE);
-    addAcl = objectStore.addAcl(ozoneObj, userAcl);
-    assertTrue(addAcl);
-  }
-
   private void testRemoveAcl(String remoteUserName, OzoneObj ozoneObj,
       OzoneAcl userAcl) throws Exception {
     ObjectStore objectStore = getObjectStore();
