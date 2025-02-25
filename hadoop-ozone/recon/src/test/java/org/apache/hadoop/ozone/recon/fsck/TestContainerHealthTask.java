@@ -237,7 +237,11 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     // Read private field value
     ContainerHealthMetrics containerHealthMetrics = (ContainerHealthMetrics) field.get(containerHealthTask);
 
+    // Only Container ID: 7 is MISSING, so count of missing container count metrics should be equal to 1
     assertEquals(1, containerHealthMetrics.getMissingContainerCount());
+    // Container ID: 1 and Container ID: 2, both are UNDER_REPLICATED, so UNDER_REPLICATED
+    // container count metric should be 2
+    assertEquals(2, containerHealthMetrics.getUnderReplicatedContainerCount());
 
     rec = unHealthyContainersTableHandle.fetchByContainerId(4L).get(0);
     assertEquals("OVER_REPLICATED", rec.getContainerState());
@@ -259,7 +263,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(1L)))
         .thenReturn(getMockReplicas(1L, State.CLOSED, State.CLOSED));
 
-    // ID 2 was missing - make it healthy now
+    // ID 2 was UNDER_REPLICATED - make it healthy now
     when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(2L)))
         .thenReturn(getMockReplicas(2L,
             State.CLOSED, State.CLOSED, State.CLOSED));

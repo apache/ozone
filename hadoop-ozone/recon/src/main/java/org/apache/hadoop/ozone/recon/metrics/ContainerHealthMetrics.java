@@ -36,14 +36,20 @@ public final class ContainerHealthMetrics {
   private static final String SOURCE_NAME =
       ContainerHealthMetrics.class.getSimpleName();
 
+  private static ContainerHealthMetrics instance;
+
   private ContainerHealthMetrics() {
   }
 
   public static ContainerHealthMetrics create() {
+    if (instance != null) {
+      return instance;
+    }
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME,
+    instance = ms.register(SOURCE_NAME,
         "Recon Container Health Task Metrics",
         new ContainerHealthMetrics());
+    return instance;
   }
 
   public void unRegister() {
@@ -82,5 +88,9 @@ public final class ContainerHealthMetrics {
 
   public long getCorruptedContainerCount() {
     return corruptedContainerCount.value();
+  }
+
+  public static synchronized ContainerHealthMetrics getMetrics() {
+    return instance;
   }
 }
