@@ -294,12 +294,9 @@ public class TestOMRatisSnapshots {
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);
     readKeys(newKeys);
-    // TODO: Enable this part after RATIS-1481 used
-    /*
-    Assert.assertNotNull(followerOMMetaMngr.getKeyTable(
+    assertNotNull(followerOMMetaMngr.getKeyTable(
         TEST_BUCKET_LAYOUT).get(followerOMMetaMngr.getOzoneKey(
         volumeName, bucketName, newKeys.get(0))));
-     */
 
     checkSnapshot(leaderOM, followerOM, snapshotName, keys, snapshotInfo);
     int sstFileCount = 0;
