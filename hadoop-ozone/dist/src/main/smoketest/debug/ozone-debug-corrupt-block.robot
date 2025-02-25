@@ -27,8 +27,8 @@ ${TESTFILE}            testfile
 ${CORRUPT_DATANODE}    ozone_datanode_1.ozone_default
 
 *** Test Cases ***
-Test ozone debug read-replicas with corrupt block replica
-    ${directory} =                      Execute read-replicas CLI tool
+Test ozone debug checksums with corrupt block replica
+    ${directory} =                      Execute replicas verify checksums CLI tool
     Set Test Variable    ${DIR}         ${directory}
 
     ${count_files} =                    Count Files In Directory    ${directory}
