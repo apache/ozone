@@ -48,10 +48,6 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
       ContainerInfo::getProtobuf,
       ContainerInfo.class);
 
-  public static Codec<ContainerInfo> getCodec() {
-    return CODEC;
-  }
-
   private HddsProtos.LifeCycleState state;
   // The wall-clock ms since the epoch at which the current state enters.
   private Instant stateEnterTime;
@@ -103,6 +99,10 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     sequenceId = b.sequenceId;
     replicationConfig = b.replicationConfig;
     clock = b.clock;
+  }
+
+  public static Codec<ContainerInfo> getCodec() {
+    return CODEC;
   }
 
   public static ContainerInfo fromProtobuf(HddsProtos.ContainerInfoProto info) {

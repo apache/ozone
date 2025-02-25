@@ -26,9 +26,6 @@ package org.apache.hadoop.hdds;
 @Deprecated
 public final class DFSConfigKeysLegacy {
 
-  private DFSConfigKeysLegacy() {
-  }
-
   public static final String DFS_DATANODE_DNS_INTERFACE_KEY =
       "hdds.datanode.dns.interface";
   public static final String DFS_DATANODE_DNS_NAMESERVER_KEY =
@@ -68,6 +65,8 @@ public final class DFSConfigKeysLegacy {
   public static final String DFS_METRICS_PERCENTILES_INTERVALS_KEY =
       "hdds.metrics.percentiles.intervals";
 
+  private DFSConfigKeysLegacy() {
+  }
 }
 
 
