@@ -506,12 +506,28 @@ public class TestReplicationManagerScenarios {
       stateCounts.put(ReplicationManagerReport.HealthState.OVER_REPLICATED, overReplicated);
     }
 
+    public void setMisReplicated(int misReplicated) {
+      stateCounts.put(ReplicationManagerReport.HealthState.MIS_REPLICATED, misReplicated);
+    }
+
     public void setUnhealthy(int unhealthy) {
       stateCounts.put(ReplicationManagerReport.HealthState.UNHEALTHY, unhealthy);
     }
 
+    public void setMissing(int missing) {
+      stateCounts.put(ReplicationManagerReport.HealthState.MISSING, missing);
+    }
+
+    public void setEmpty(int empty) {
+      stateCounts.put(ReplicationManagerReport.HealthState.EMPTY,  empty);
+    }
+
     public void setQuasiClosedStuck(int quasiClosedStuck) {
       stateCounts.put(ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK, quasiClosedStuck);
+    }
+
+    public void setOpenUnhealthy(int openUnhealthy) {
+      stateCounts.put(ReplicationManagerReport.HealthState.OPEN_UNHEALTHY, openUnhealthy);
     }
 
     public int getExpected(ReplicationManagerReport.HealthState state) {
