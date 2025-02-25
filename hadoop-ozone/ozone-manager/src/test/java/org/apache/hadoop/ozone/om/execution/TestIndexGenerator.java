@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.execution;
 
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MANAGED_INDEX;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -24,12 +25,14 @@ import static org.mockito.Mockito.when;
 
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 /**
  * Tests Index generator changes.
@@ -41,6 +44,7 @@ public class TestIndexGenerator {
     OMMetadataManager metaManager = mock(OMMetadataManager.class);
     when(om.getMetadataManager()).thenReturn(metaManager);
     OMLayoutVersionManager verManager = mock(OMLayoutVersionManager.class);
+    when(verManager.isAllowed(Mockito.eq(MANAGED_INDEX))).thenReturn(true);
     when(om.getVersionManager()).thenReturn(verManager);
     Table<String, TransactionInfo> txInfoTable = mock(Table.class);
     when(metaManager.getTransactionInfoTable()).thenReturn(txInfoTable);
@@ -66,13 +70,16 @@ public class TestIndexGenerator {
     when(verManager.needsFinalization()).thenReturn(true);
     Table<String, TransactionInfo> txInfoTable = mock(Table.class);
     when(metaManager.getTransactionInfoTable()).thenReturn(txInfoTable);
+    DBStore dbstore = mock(DBStore.class);
+    when(metaManager.getStore()).thenReturn(dbstore);
+    BatchOperation batchOpr = mock(BatchOperation.class);
+    when(dbstore.initBatchOperation()).thenReturn(batchOpr);
     TransactionInfo txInfo = TransactionInfo.valueOf(-1, 110);
     when(txInfoTable.get(anyString())).thenReturn(null).thenReturn(txInfo);
     when(txInfoTable.getSkipCache(anyString())).thenReturn(txInfo);
     IndexGenerator indexGenerator = new IndexGenerator(om);
     assertEquals(indexGenerator.nextIndex(), -1);
 
-    BatchOperation batchOpr = mock(BatchOperation.class);
     indexGenerator.saveIndex(batchOpr, 114);
     indexGenerator.onLeaderChange();
     assertEquals(indexGenerator.nextIndex(), -1);

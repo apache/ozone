@@ -140,7 +140,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       storage.init(raftStorage);
       LOG.info("{}: initialize {} with {}", getId(), id, getLastAppliedTermIndex());
     });
-    indexGenerator.initialize();
   }
 
   @Override
