@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainerReports;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -166,7 +167,7 @@ public class TestContainerReportHandler {
                Map<DatanodeDetails, Integer> expectedReplicaMap) {
     final ContainerReportsProto containerReport = getContainerReportsProto(
             container.containerID(), ContainerReplicaProto.State.CLOSED,
-            dn.getUuidString(), 2000000000L, 100000000L, replicaIndex);
+            dn.getUuidString(), 2000000000L, 100000000L, 10000L, replicaIndex);
     final ContainerReportFromDatanode containerReportFromDatanode =
             new ContainerReportFromDatanode(dn, containerReport);
     final ContainerReportHandler reportHandler = new ContainerReportHandler(
@@ -601,7 +602,7 @@ public class TestContainerReportHandler {
 
   @Test
   public void testClosingToQuasiClosed()
-      throws NodeNotFoundException, IOException, TimeoutException {
+      throws NodeNotFoundException, IOException {
     /*
      * The container is in CLOSING state and all the replicas are in
      * OPEN/CLOSING state.
@@ -667,8 +668,13 @@ public class TestContainerReportHandler {
   }
 
   @Test
+  public void testClosingToQuasiClosedWithMismatchingBCSID()
+      throws NodeNotFoundException, IOException {
+  }
+
+  @Test
   public void testQuasiClosedToClosed()
-      throws NodeNotFoundException, IOException, TimeoutException {
+      throws NodeNotFoundException, IOException {
     /*
      * The container is in QUASI_CLOSED state.
      *  - One of the replica is in QUASI_CLOSED state
@@ -735,6 +741,51 @@ public class TestContainerReportHandler {
     reportHandler.onMessage(containerReportFromDatanode, publisher);
 
     assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(containerOne.containerID()).getState());
+  }
+
+  @Test
+  public void testQuasiClosedToClosedAttemptWithMismatchingBCSID()
+      throws NodeNotFoundException, IOException {
+    /*
+     * Negative test. When a replica with a (lower) mismatching bcsId gets reported,
+     * expect the ContainerReportHandler thread to not throw uncaught exception
+     * (which could lead to ContainerReportHandler thread crash before HDDS-12150)
+     */
+    final ContainerReportHandler reportHandler =
+        new ContainerReportHandler(nodeManager, containerManager);
+    final Iterator<DatanodeDetails> nodeIterator =
+        nodeManager.getNodes(NodeStatus.inServiceHealthy()).iterator();
+
+    final DatanodeDetails dn1 = nodeIterator.next();
+    final DatanodeDetails dn2 = nodeIterator.next();
+    final DatanodeDetails dn3 = nodeIterator.next();
+
+    // sequenceId 10000L set here
+    final ContainerInfo container1 = getContainer(LifeCycleState.QUASI_CLOSED);
+
+    nodeManager.addContainer(dn1, container1.containerID());
+    nodeManager.addContainer(dn2, container1.containerID());
+    nodeManager.addContainer(dn3, container1.containerID());
+
+    containerStateManager.addContainer(container1.getProtobuf());
+
+    // Generate container report with replica in CLOSED state with lower bcsId
+    final ContainerReportsProto containerReport = getContainerReportsProto(
+        container1.containerID(), ContainerReplicaProto.State.CLOSED,
+        dn1.getUuidString(),
+        2000L);
+    final ContainerReportFromDatanode containerReportFromDatanode =
+        new ContainerReportFromDatanode(dn1, containerReport);
+
+    // Handler should NOT throw IllegalArgumentException
+    try {
+      reportHandler.onMessage(containerReportFromDatanode, publisher);
+    } catch (IllegalArgumentException iaEx) {
+      fail("Handler should not throw IllegalArgumentException: " + iaEx.getMessage());
+    }
+
+    // Because the container report is ignored, the container remains in QUASI_CLOSED for SCM
+    assertEquals(LifeCycleState.QUASI_CLOSED, containerManager.getContainer(container1.containerID()).getState());
   }
 
   @Test
@@ -1092,7 +1143,7 @@ public class TestContainerReportHandler {
       DatanodeDetails dn, long bytesUsed, long keyCount, int replicaIndex) {
     ContainerReportsProto containerReport = getContainerReportsProto(
         containerId, state, dn.getUuidString(), bytesUsed, keyCount,
-        replicaIndex);
+        10000L, replicaIndex);
 
     return new ContainerReportFromDatanode(dn, containerReport);
   }
@@ -1101,20 +1152,34 @@ public class TestContainerReportHandler {
       final ContainerID containerId, final ContainerReplicaProto.State state,
       final String originNodeId) {
     return getContainerReportsProto(containerId, state, originNodeId,
-        2000000000L, 100000000L, 0);
+        2000000000L, 100000000L, 10000L, 0);
+  }
+
+  protected static ContainerReportsProto getContainerReportsProto(
+      final ContainerID containerId, final ContainerReplicaProto.State state,
+      final String originNodeId, final long bcsId) {
+    return getContainerReportsProto(containerId, state, originNodeId,
+        2000000000L, 100000000L, bcsId, 0);
   }
 
   protected static ContainerReportsProto getContainerReportsProto(
       final ContainerID containerId, final ContainerReplicaProto.State state,
       final String originNodeId, int replicaIndex) {
     return getContainerReportsProto(containerId, state, originNodeId,
-        2000000000L, 100000000L, replicaIndex);
+        2000000000L, 100000000L, 10000L, replicaIndex);
+  }
+
+  protected static ContainerReportsProto getContainerReportsProto(
+      final ContainerID containerId, final ContainerReplicaProto.State state,
+      final String originNodeId, final long bcsId, int replicaIndex) {
+    return getContainerReportsProto(containerId, state, originNodeId,
+        2000000000L, 100000000L, bcsId, replicaIndex);
   }
 
   protected static ContainerReportsProto getContainerReportsProto(
       final ContainerID containerId, final ContainerReplicaProto.State state,
       final String originNodeId, final long usedBytes, final long keyCount,
-      final int replicaIndex) {
+      final long bcsId, final int replicaIndex) {
     final ContainerReportsProto.Builder crBuilder =
         ContainerReportsProto.newBuilder();
     final ContainerReplicaProto replicaProto =
@@ -1130,7 +1195,7 @@ public class TestContainerReportHandler {
             .setWriteCount(100000000L)
             .setReadBytes(2000000000L)
             .setWriteBytes(2000000000L)
-            .setBlockCommitSequenceId(10000L)
+            .setBlockCommitSequenceId(bcsId)
             .setDeleteTransactionId(0)
             .setReplicaIndex(replicaIndex)
             .build();
