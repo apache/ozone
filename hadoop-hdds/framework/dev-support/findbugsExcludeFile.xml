@@ -19,6 +19,4 @@
     <Class name="org.apache.hadoop.hdds.utils.ProtocolMessageMetrics"></Class>
     <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT" />
   </Match>
-
-  <!-- Test -->
 </FindBugsFilter>

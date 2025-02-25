@@ -18,6 +18,4 @@
   <Match>
     <Package name="org.apache.hadoop.hdds.protocol.proto"/>
   </Match>
-
-  <!-- Test -->
 </FindBugsFilter>

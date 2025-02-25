@@ -19,6 +19,4 @@
     <Class name="org.apache.hadoop.hdds.scm.storage.ByteArrayReader"></Class>
     <Bug pattern="EI_EXPOSE_REP2" /> <!-- "Deep copy byte[] has bad impact on performance" -->
   </Match>
-
-  <!-- Test -->
 </FindBugsFilter>
