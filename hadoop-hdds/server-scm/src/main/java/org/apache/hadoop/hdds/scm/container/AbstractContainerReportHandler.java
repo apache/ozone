@@ -308,7 +308,7 @@ public class AbstractContainerReportHandler {
               containerId, replica.getBlockCommitSequenceId(), datanode, container.getSequenceId());
           return true;
         }
-        logger.info("Moving container {} to CLOSED state, datanode {} " +
+        logger.info("Moving container {} from CLOSING to CLOSED state, datanode {} " +
                 "reported CLOSED replica with index {}.", containerId, datanode,
             replica.getReplicaIndex());
         containerManager.updateContainerState(containerId,
@@ -339,7 +339,7 @@ public class AbstractContainerReportHandler {
               containerId, replica.getBlockCommitSequenceId(), datanode, container.getSequenceId());
           return true;
         }
-        logger.info("Moving container {} to CLOSED state, datanode {} " +
+        logger.info("Moving container {} from QUASI_CLOSED to CLOSED state, datanode {} " +
                 "reported CLOSED replica with index {}.", containerId, datanode,
             replica.getReplicaIndex());
         containerManager.updateContainerState(containerId,
