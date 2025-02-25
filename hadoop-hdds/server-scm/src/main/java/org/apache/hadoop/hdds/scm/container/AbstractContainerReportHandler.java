@@ -132,6 +132,13 @@ public class AbstractContainerReportHandler {
                                     final ContainerInfo containerInfo,
                                     final ContainerReplicaProto replicaProto)
       throws ContainerNotFoundException {
+    if (containerInfo.getState() == HddsProtos.LifeCycleState.CLOSED && containerInfo.getSequenceId() <
+        replicaProto.getBlockCommitSequenceId()) {
+      logger.error(
+          "There is a CLOSED container with lower sequence ID than a replica. Container: {}, Container's " +
+              "sequence ID: {}, Replica: {}, Replica's sequence ID: {}, Datanode: {}.", containerInfo,
+          containerInfo.getSequenceId(), replicaProto, replicaProto.getBlockCommitSequenceId(), datanodeDetails);
+    }
 
     if (isHealthy(replicaProto::getState)) {
       if (containerInfo.getSequenceId() <
