@@ -122,9 +122,9 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
+import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
+import org.apache.ozone.recon.schema.generated.tables.daos.ContainerCountBySizeDao;
 import org.apache.ratis.util.ExitUtils;
-import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
-import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

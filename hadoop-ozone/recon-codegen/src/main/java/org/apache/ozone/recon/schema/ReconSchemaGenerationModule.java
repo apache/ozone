@@ -15,20 +15,15 @@
  * limitations under the License.
  */
 
-package org.hadoop.ozone.recon.codegen;
+package org.apache.ozone.recon.schema;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.multibindings.Multibinder;
-import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
-import org.hadoop.ozone.recon.schema.ReconSchemaDefinition;
-import org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition;
-import org.hadoop.ozone.recon.schema.SchemaVersionTableDefinition;
-import org.hadoop.ozone.recon.schema.StatsSchemaDefinition;
-import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
+import org.apache.ozone.recon.codegen.JooqCodeGenerator;
 
 /**
  * Bindings for DDL generation and used by
- * {@link org.hadoop.ozone.recon.codegen.JooqCodeGenerator}.
+ * {@link JooqCodeGenerator}.
  */
 public class ReconSchemaGenerationModule extends AbstractModule {
   @Override

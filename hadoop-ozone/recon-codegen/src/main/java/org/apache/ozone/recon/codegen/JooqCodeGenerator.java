@@ -15,10 +15,7 @@
  * limitations under the License.
  */
 
-package org.hadoop.ozone.recon.codegen;
-
-import static org.hadoop.ozone.recon.codegen.SqlDbUtils.DERBY_DRIVER_CLASS;
-import static org.hadoop.ozone.recon.codegen.SqlDbUtils.createNewDerbyDatabase;
+package org.apache.ozone.recon.codegen;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
@@ -33,7 +30,9 @@ import javax.sql.DataSource;
 import org.apache.commons.io.FileUtils;
 import org.apache.derby.jdbc.EmbeddedDataSource;
 import org.apache.hadoop.util.Time;
-import org.hadoop.ozone.recon.schema.ReconSchemaDefinition;
+import org.apache.ozone.recon.schema.ReconSchemaDefinition;
+import org.apache.ozone.recon.schema.ReconSchemaGenerationModule;
+import org.apache.ozone.recon.schema.SqlDbUtils;
 import org.jooq.codegen.GenerationTool;
 import org.jooq.meta.jaxb.Configuration;
 import org.jooq.meta.jaxb.Database;
@@ -86,7 +85,7 @@ public class JooqCodeGenerator {
     Configuration configuration =
         new Configuration()
             .withJdbc(new Jdbc()
-                .withDriver(DERBY_DRIVER_CLASS)
+                .withDriver(SqlDbUtils.DERBY_DRIVER_CLASS)
                 .withUrl(JDBC_URL))
             .withGenerator(new Generator()
                 .withDatabase(new Database()
@@ -99,9 +98,9 @@ public class JooqCodeGenerator {
                     .withDaos(true)
                     .withEmptyCatalogs(true))
                 .withStrategy(new Strategy().withName(
-                    "org.hadoop.ozone.recon.codegen.TableNamingStrategy"))
+                    TableNamingStrategy.class.getName()))
                 .withTarget(new Target()
-                    .withPackageName("org.hadoop.ozone.recon.schema")
+                    .withPackageName("org.apache.ozone.recon.schema.generated")
                     .withClean(true)
                     .withDirectory(outputDir)))
                 .withLogging(Logging.WARN);
@@ -115,7 +114,7 @@ public class JooqCodeGenerator {
     private static EmbeddedDataSource dataSource;
     static {
       try {
-        createNewDerbyDatabase(JDBC_URL, RECON_SCHEMA_NAME);
+        SqlDbUtils.createNewDerbyDatabase(JDBC_URL, RECON_SCHEMA_NAME);
       } catch (Exception e) {
         LOG.error("Error creating Recon Derby DB.", e);
       }

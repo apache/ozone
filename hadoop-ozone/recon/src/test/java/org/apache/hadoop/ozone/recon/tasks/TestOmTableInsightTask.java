@@ -34,7 +34,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeOpen
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.DELETE;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.UPDATE;
-import static org.hadoop.ozone.recon.schema.tables.GlobalStatsTable.GLOBAL_STATS;
+import static org.apache.ozone.recon.schema.generated.tables.GlobalStatsTable.GLOBAL_STATS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -65,7 +65,7 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
-import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
+import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

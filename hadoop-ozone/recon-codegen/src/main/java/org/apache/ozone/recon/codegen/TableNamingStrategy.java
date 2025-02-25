@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.hadoop.ozone.recon.codegen;
+package org.apache.ozone.recon.codegen;
 
 import org.jooq.codegen.DefaultGeneratorStrategy;
 import org.jooq.meta.Definition;

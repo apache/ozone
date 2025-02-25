@@ -78,8 +78,8 @@ import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
-import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
+import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
+import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

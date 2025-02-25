@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETED;
-import static org.hadoop.ozone.recon.schema.tables.ContainerCountBySizeTable.CONTAINER_COUNT_BY_SIZE;
+import static org.apache.ozone.recon.schema.generated.tables.ContainerCountBySizeTable.CONTAINER_COUNT_BY_SIZE;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
@@ -35,10 +35,10 @@ import org.apache.hadoop.ozone.recon.scm.ReconScmTask;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
-import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
-import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
-import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.ContainerCountBySize;
+import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
+import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
+import org.apache.ozone.recon.schema.generated.tables.daos.ContainerCountBySizeDao;
+import org.apache.ozone.recon.schema.generated.tables.pojos.ContainerCountBySize;
 import org.jooq.DSLContext;
 import org.jooq.Record1;
 import org.slf4j.Logger;
