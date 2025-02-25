@@ -75,6 +75,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Test the behaviour of the ContainerReportHandler.
@@ -668,52 +670,6 @@ public class TestContainerReportHandler {
   }
 
   @Test
-  public void testClosingToQuasiClosedWithMismatchingBCSID()
-      throws NodeNotFoundException, IOException {
-    /*
-     * Negative test. When a replica with a (lower) mismatching bcsId gets reported,
-     * expect the ContainerReportHandler thread to not throw uncaught exception
-     * (which could lead to ContainerReportHandler thread crash before HDDS-12150)
-     */
-    final ContainerReportHandler reportHandler =
-        new ContainerReportHandler(nodeManager, containerManager);
-    final Iterator<DatanodeDetails> nodeIterator =
-        nodeManager.getNodes(NodeStatus.inServiceHealthy()).iterator();
-
-    final DatanodeDetails dn1 = nodeIterator.next();
-    final DatanodeDetails dn2 = nodeIterator.next();
-    final DatanodeDetails dn3 = nodeIterator.next();
-
-    // sequenceId 10000L set here
-    final ContainerInfo container1 = getContainer(LifeCycleState.CLOSING);
-
-    nodeManager.addContainer(dn1, container1.containerID());
-    nodeManager.addContainer(dn2, container1.containerID());
-    nodeManager.addContainer(dn3, container1.containerID());
-
-    containerStateManager.addContainer(container1.getProtobuf());
-
-    // Generate container report with replica in CLOSED state with lower bcsId
-    final ContainerReportsProto containerReport = getContainerReportsProto(
-        container1.containerID(), ContainerReplicaProto.State.CLOSED,
-        dn1.getUuidString(),
-        2000L);
-    final ContainerReportFromDatanode containerReportFromDatanode =
-        new ContainerReportFromDatanode(dn1, containerReport);
-
-    // Handler should NOT throw IllegalArgumentException
-    try {
-      reportHandler.onMessage(containerReportFromDatanode, publisher);
-    } catch (IllegalArgumentException iaEx) {
-      fail("Handler should not throw IllegalArgumentException: " + iaEx.getMessage());
-    }
-
-    // Because the container report is ignored, the container remains in QUASI_CLOSED for SCM
-    assertEquals(LifeCycleState.CLOSING, containerManager.getContainer(container1.containerID()).getState());
-
-  }
-
-  @Test
   public void testQuasiClosedToClosed()
       throws NodeNotFoundException, IOException {
     /*
@@ -784,8 +740,9 @@ public class TestContainerReportHandler {
     assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(containerOne.containerID()).getState());
   }
 
-  @Test
-  public void testQuasiClosedToClosedAttemptWithMismatchingBCSID()
+  @ParameterizedTest
+  @EnumSource(value = LifeCycleState.class, names = {"CLOSING", "QUASI_CLOSED"})
+  public void testContainerStateTransitionToQuasiClosedWithMismatchingBCSID(LifeCycleState lcState)
       throws NodeNotFoundException, IOException {
     /*
      * Negative test. When a replica with a (lower) mismatching bcsId gets reported,
@@ -802,7 +759,7 @@ public class TestContainerReportHandler {
     final DatanodeDetails dn3 = nodeIterator.next();
 
     // sequenceId 10000L set here
-    final ContainerInfo container1 = getContainer(LifeCycleState.QUASI_CLOSED);
+    final ContainerInfo container1 = getContainer(lcState);
 
     nodeManager.addContainer(dn1, container1.containerID());
     nodeManager.addContainer(dn2, container1.containerID());
@@ -825,8 +782,8 @@ public class TestContainerReportHandler {
       fail("Handler should not throw IllegalArgumentException: " + iaEx.getMessage());
     }
 
-    // Because the container report is ignored, the container remains in QUASI_CLOSED for SCM
-    assertEquals(LifeCycleState.QUASI_CLOSED, containerManager.getContainer(container1.containerID()).getState());
+    // Because the container report is ignored, the container remains in the same previous state in SCM
+    assertEquals(lcState, containerManager.getContainer(container1.containerID()).getState());
   }
 
   @Test
