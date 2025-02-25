@@ -258,24 +258,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       description = "Timeout for the thread used to process the delete" +
           " block command to wait for the container lock."
   )
-  private long blockDeleteMaxLockWaitTimeoutMs =
-      Duration.ofMillis(100).toMillis();
-
-  public Duration getBlockDeletionInterval() {
-    return blockDeletionInterval;
-  }
-
-  public void setRecoveringContainerScrubInterval(Duration duration) {
-    recoveringContainerScrubInterval = duration;
-  }
-
-  public Duration getRecoveringContainerScrubInterval() {
-    return recoveringContainerScrubInterval;
-  }
-
-  public void setBlockDeletionInterval(Duration duration) {
-    blockDeletionInterval = duration;
-  }
+  private long blockDeleteMaxLockWaitTimeoutMs = Duration.ofMillis(100).toMillis();
 
   @Config(key = "block.deleting.limit.per.interval",
       defaultValue = "5000",
@@ -286,10 +269,6 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           "Number of blocks to be deleted in an interval."
   )
   private int blockLimitPerInterval = 5000;
-
-  public int getBlockDeletionLimit() {
-    return blockLimitPerInterval;
-  }
 
   @Config(key = "block.deleting.max.lock.holding.time",
       defaultValue = "1s",
@@ -304,20 +283,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           + "which means the actual execution time may exceed this limit. "
           + "Unit could be defined with postfix (ns,ms,s,m,h,d). "
   )
-  private long blockDeletingMaxLockHoldingTime =
-      Duration.ofSeconds(1).toMillis();
-
-  public Duration getBlockDeletingMaxLockHoldingTime() {
-    return Duration.ofMillis(blockDeletingMaxLockHoldingTime);
-  }
-
-  public void setBlockDeletingMaxLockHoldingTime(Duration maxLockHoldingTime) {
-    blockDeletingMaxLockHoldingTime = maxLockHoldingTime.toMillis();
-  }
-
-  public void setBlockDeletionLimit(int limit) {
-    this.blockLimitPerInterval = limit;
-  }
+  private long blockDeletingMaxLockHoldingTime = Duration.ofSeconds(1).toMillis();
 
   @Config(key = "periodic.disk.check.interval.minutes",
       defaultValue = "60",
@@ -438,14 +404,6 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
 
   private boolean waitOnAllFollowers = WAIT_ON_ALL_FOLLOWERS_DEFAULT;
-
-  public boolean waitOnAllFollowers() {
-    return waitOnAllFollowers;
-  }
-
-  public void setWaitOnAllFollowers(boolean val) {
-    this.waitOnAllFollowers = val;
-  }
 
   @Config(key = "container.schema.v3.enabled",
       defaultValue = "true",
@@ -582,8 +540,48 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private long deleteContainerTimeoutMs = Duration.ofSeconds(60).toMillis();
 
+  public Duration getBlockDeletionInterval() {
+    return blockDeletionInterval;
+  }
+
+  public void setRecoveringContainerScrubInterval(Duration duration) {
+    recoveringContainerScrubInterval = duration;
+  }
+
+  public Duration getRecoveringContainerScrubInterval() {
+    return recoveringContainerScrubInterval;
+  }
+
+  public void setBlockDeletionInterval(Duration duration) {
+    blockDeletionInterval = duration;
+  }
+
+  public int getBlockDeletionLimit() {
+    return blockLimitPerInterval;
+  }
+
   public long getDeleteContainerTimeoutMs() {
     return deleteContainerTimeoutMs;
+  }
+
+  public Duration getBlockDeletingMaxLockHoldingTime() {
+    return Duration.ofMillis(blockDeletingMaxLockHoldingTime);
+  }
+
+  public void setBlockDeletingMaxLockHoldingTime(Duration maxLockHoldingTime) {
+    blockDeletingMaxLockHoldingTime = maxLockHoldingTime.toMillis();
+  }
+
+  public boolean waitOnAllFollowers() {
+    return waitOnAllFollowers;
+  }
+
+  public void setWaitOnAllFollowers(boolean val) {
+    this.waitOnAllFollowers = val;
+  }
+
+  public void setBlockDeletionLimit(int limit) {
+    this.blockLimitPerInterval = limit;
   }
 
   @PostConstruct

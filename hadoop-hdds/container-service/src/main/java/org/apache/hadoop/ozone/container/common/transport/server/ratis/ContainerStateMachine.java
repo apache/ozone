@@ -127,8 +127,33 @@ import org.slf4j.LoggerFactory;
  *    Then, WriteChunk commit and CreateContainer will be executed in the same order.
  */
 public class ContainerStateMachine extends BaseStateMachine {
-  static final Logger LOG =
-      LoggerFactory.getLogger(ContainerStateMachine.class);
+  static final Logger LOG = LoggerFactory.getLogger(ContainerStateMachine.class);
+
+  private final SimpleStateMachineStorage storage = new SimpleStateMachineStorage();
+  private final ContainerDispatcher dispatcher;
+  private final ContainerController containerController;
+  private final XceiverServerRatis ratisServer;
+  private final ConcurrentHashMap<Long, CompletableFuture<ContainerCommandResponseProto>> writeChunkFutureMap;
+
+  // keeps track of the containers created per pipeline
+  private final Map<Long, Long> container2BCSIDMap;
+  private final TaskQueueMap containerTaskQueues = new TaskQueueMap();
+  private final ExecutorService executor;
+  private final List<ThreadPoolExecutor> chunkExecutors;
+  private final Map<Long, Long> applyTransactionCompletionMap;
+  private final Cache<Long, ByteString> stateMachineDataCache;
+  private final AtomicBoolean stateMachineHealthy;
+
+  private final Semaphore applyTransactionSemaphore;
+  private final boolean waitOnBothFollowers;
+  private final HddsDatanodeService datanodeService;
+  private static Semaphore semaphore = new Semaphore(1);
+  private final AtomicBoolean peersValidated;
+
+  /**
+   * CSM metrics.
+   */
+  private final CSMMetrics metrics;
 
   static class TaskQueueMap {
     private final Map<Long, TaskQueue> map = new HashMap<>();
@@ -180,34 +205,6 @@ public class ContainerStateMachine extends BaseStateMachine {
       return startTime;
     }
   }
-
-  private final SimpleStateMachineStorage storage =
-      new SimpleStateMachineStorage();
-  private final ContainerDispatcher dispatcher;
-  private final ContainerController containerController;
-  private final XceiverServerRatis ratisServer;
-  private final ConcurrentHashMap<Long,
-      CompletableFuture<ContainerCommandResponseProto>> writeChunkFutureMap;
-
-  // keeps track of the containers created per pipeline
-  private final Map<Long, Long> container2BCSIDMap;
-  private final TaskQueueMap containerTaskQueues = new TaskQueueMap();
-  private final ExecutorService executor;
-  private final List<ThreadPoolExecutor> chunkExecutors;
-  private final Map<Long, Long> applyTransactionCompletionMap;
-  private final Cache<Long, ByteString> stateMachineDataCache;
-  private final AtomicBoolean stateMachineHealthy;
-
-  private final Semaphore applyTransactionSemaphore;
-  private final boolean waitOnBothFollowers;
-  private final HddsDatanodeService datanodeService;
-  private static Semaphore semaphore = new Semaphore(1);
-  private final AtomicBoolean peersValidated;
-
-  /**
-   * CSM metrics.
-   */
-  private final CSMMetrics metrics;
 
   @SuppressWarnings("parameternumber")
   public ContainerStateMachine(HddsDatanodeService hddsDatanodeService, RaftGroupId gid,

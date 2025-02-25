@@ -29,19 +29,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
  * of replication tasks.
  */
 public abstract class AbstractReplicationTask {
-
-  /**
-   * ENUM representing the different status values a replication task can
-   * have.
-   */
-  public enum Status {
-    QUEUED,
-    IN_PROGRESS,
-    FAILED,
-    DONE,
-    SKIPPED
-  }
-
   private volatile Status status = Status.QUEUED;
 
   private final long containerId;
@@ -161,5 +148,17 @@ public abstract class AbstractReplicationTask {
       sb.append(", queued at ").append(getQueued());
     }
     return sb.toString();
+  }
+
+  /**
+   * ENUM representing the different status values a replication task can
+   * have.
+   */
+  public enum Status {
+    QUEUED,
+    IN_PROGRESS,
+    FAILED,
+    DONE,
+    SKIPPED
   }
 }

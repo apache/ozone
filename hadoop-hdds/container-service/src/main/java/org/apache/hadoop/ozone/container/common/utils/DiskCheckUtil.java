@@ -35,11 +35,12 @@ import org.slf4j.LoggerFactory;
  * where the disk is mounted.
  */
 public final class DiskCheckUtil {
-  private DiskCheckUtil() { }
-
   // For testing purposes, an alternate check implementation can be provided
   // to inject failures.
   private static DiskChecks impl = new DiskChecksImpl();
+
+  private DiskCheckUtil() {
+  }
 
   @VisibleForTesting
   public static void setTestImpl(DiskChecks diskChecks) {
