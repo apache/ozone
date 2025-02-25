@@ -31,9 +31,12 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -44,6 +47,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.ozone.recon.metrics.ContainerHealthMetrics;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconScmTask;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
@@ -85,6 +89,7 @@ public class ContainerHealthTask extends ReconScmTask {
   private final OzoneConfiguration conf;
 
   private final ReconTaskStatusUpdater taskStatusUpdater;
+  private final ContainerHealthMetrics containerHealthMetrics;
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public ContainerHealthTask(
@@ -104,6 +109,7 @@ public class ContainerHealthTask extends ReconScmTask {
     this.conf = conf;
     interval = reconTaskConfig.getMissingContainerTaskInterval().toMillis();
     this.taskStatusUpdater = getTaskStatusUpdater();
+    this.containerHealthMetrics = ContainerHealthMetrics.create();
   }
 
   @Override
@@ -143,13 +149,13 @@ public class ContainerHealthTask extends ReconScmTask {
       long currentTime = System.currentTimeMillis();
       long existingCount = processExistingDBRecords(currentTime,
           unhealthyContainerStateStatsMap);
-      LOG.debug("Container Health task thread took {} milliseconds to" +
+      LOG.info("Container Health task thread took {} milliseconds to" +
               " process {} existing database records.",
           Time.monotonicNow() - start, existingCount);
 
       start = Time.monotonicNow();
       checkAndProcessContainers(unhealthyContainerStateStatsMap, currentTime);
-      LOG.debug("Container Health Task thread took {} milliseconds to process containers",
+      LOG.info("Container Health Task thread took {} milliseconds to process containers",
           Time.monotonicNow() - start);
       taskStatusUpdater.setLastTaskRunStatus(0);
       processedContainers.clear();
@@ -164,6 +170,7 @@ public class ContainerHealthTask extends ReconScmTask {
     ContainerID startID = ContainerID.valueOf(1);
     List<ContainerInfo> containers = containerManager.getContainers(startID,
         FETCH_COUNT);
+    LOG.info("containers size: {}", containers.size());
     long start;
     long iterationCount = 0;
     while (!containers.isEmpty()) {
@@ -172,7 +179,7 @@ public class ContainerHealthTask extends ReconScmTask {
           .filter(c -> !processedContainers.contains(c))
           .forEach(c -> processContainer(c, currentTime,
               unhealthyContainerStateStatsMap));
-      LOG.debug("Container Health task thread took {} milliseconds for" +
+      LOG.info("Container Health task thread took {} milliseconds for" +
               " processing {} containers.", Time.monotonicNow() - start,
           containers.size());
       logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
@@ -192,28 +199,57 @@ public class ContainerHealthTask extends ReconScmTask {
   }
 
   private void logUnhealthyContainerStats(
-      Map<UnHealthyContainerStates, Map<String, Long>>
-          unhealthyContainerStateStatsMap) {
-    unhealthyContainerStateStatsMapForTesting =
-        new HashMap<>(unhealthyContainerStateStatsMap);
+      Map<UnHealthyContainerStates, Map<String, Long>> unhealthyContainerStateStatsMap) {
+
+    LOG.info("called logUnhealthyContainerStats...");
+    unhealthyContainerStateStatsMapForTesting = new HashMap<>(unhealthyContainerStateStatsMap);
+
     // If any EMPTY_MISSING containers, then it is possible that such
     // containers got stuck in the closing state which never got
     // any replicas created on the datanodes. In this case, we log it as
     // EMPTY_MISSING in unhealthy container statistics but do not add it to the table.
-    unhealthyContainerStateStatsMap.entrySet().forEach(stateEntry -> {
-      UnHealthyContainerStates unhealthyContainerState = stateEntry.getKey();
-      Map<String, Long> containerStateStatsMap = stateEntry.getValue();
-      StringBuilder logMsgBuilder =
-          new StringBuilder(unhealthyContainerState.toString());
-      logMsgBuilder.append(" **Container State Stats:** \n\t");
-      containerStateStatsMap.entrySet().forEach(statsEntry -> {
-        logMsgBuilder.append(statsEntry.getKey());
-        logMsgBuilder.append(" -> ");
-        logMsgBuilder.append(statsEntry.getValue());
-        logMsgBuilder.append(" , ");
-      });
-      LOG.info(logMsgBuilder.toString());
+    unhealthyContainerStateStatsMap.forEach((unhealthyContainerState, containerStateStatsMap) -> {
+      // Reset metrics to zero if the map is empty for MISSING or UNDER_REPLICATED
+      Optional.of(containerStateStatsMap)
+          .filter(Map::isEmpty)
+          .ifPresent(emptyMap -> resetContainerHealthMetrics(unhealthyContainerState));
+
+      // Process and log the container state statistics
+      String logMessage = containerStateStatsMap.entrySet().stream()
+          .peek(entry -> updateContainerHealthMetrics(unhealthyContainerState, entry))
+          .map(entry -> entry.getKey() + " -> " + entry.getValue())
+          .collect(Collectors.joining(" , ", unhealthyContainerState + " **Container State Stats:** \n\t", ""));
+
+      if (!containerStateStatsMap.isEmpty()) {
+        LOG.info(logMessage);
+      }
     });
+  }
+
+  /**
+   * Helper method to update container health metrics using functional approach.
+   */
+  private void updateContainerHealthMetrics(UnHealthyContainerStates state, Map.Entry<String, Long> entry) {
+    Map<UnHealthyContainerStates, Consumer<Long>> metricUpdaters = new HashMap<>();
+    metricUpdaters.put(UnHealthyContainerStates.MISSING, containerHealthMetrics::setMissingContainerCount);
+    metricUpdaters.put(UnHealthyContainerStates.UNDER_REPLICATED,
+        containerHealthMetrics::setUnderReplicatedContainerCount);
+
+    Optional.ofNullable(metricUpdaters.get(state))
+        .filter(updater -> CONTAINER_COUNT.equals(entry.getKey()))
+        .ifPresent(updater -> updater.accept(entry.getValue()));
+  }
+
+  /**
+   * Resets container health metrics to zero using a functional approach.
+   */
+  private void resetContainerHealthMetrics(UnHealthyContainerStates state) {
+    Map<UnHealthyContainerStates, Consumer<Long>> resetActions = new HashMap<>();
+    resetActions.put(UnHealthyContainerStates.MISSING, containerHealthMetrics::setMissingContainerCount);
+    resetActions.put(UnHealthyContainerStates.UNDER_REPLICATED,
+        containerHealthMetrics::setUnderReplicatedContainerCount);
+
+    Optional.ofNullable(resetActions.get(state)).ifPresent(action -> action.accept(0L));
   }
 
   private void initializeUnhealthyContainerStateStatsMap(
@@ -703,6 +739,12 @@ public class ContainerHealthTask extends ReconScmTask {
     }
   }
 
+  @Override
+  public synchronized void stop() {
+    super.stop();
+    this.containerHealthMetrics.unRegister();
+  }
+
   /**
    * Expose the logger for testing purposes.
    *
@@ -721,4 +763,8 @@ public class ContainerHealthTask extends ReconScmTask {
     return unhealthyContainerStateStatsMapForTesting;
   }
 
+  @VisibleForTesting
+  public ContainerHealthMetrics getMetrics() {
+    return containerHealthMetrics;
+  }
 }

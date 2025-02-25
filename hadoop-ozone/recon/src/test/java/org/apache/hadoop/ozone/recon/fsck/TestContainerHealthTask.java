@@ -34,6 +34,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -58,6 +59,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.TestContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
+import org.apache.hadoop.ozone.recon.metrics.ContainerHealthMetrics;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -226,6 +228,18 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     assertEquals("MISSING", rec.getContainerState());
     assertEquals(3, rec.getReplicaDelta().intValue());
 
+    Field field = ContainerHealthTask.class.getDeclaredField("containerHealthMetrics");
+    field.setAccessible(true);
+
+    // Read private field value
+    ContainerHealthMetrics containerHealthMetrics = (ContainerHealthMetrics) field.get(containerHealthTask);
+
+    // Only Container ID: 7 is MISSING, so count of missing container count metrics should be equal to 1
+    assertEquals(1, containerHealthMetrics.getMissingContainerCount());
+    // Container ID: 1 and Container ID: 2, both are UNDER_REPLICATED, so UNDER_REPLICATED
+    // container count metric should be 2
+    assertEquals(2, containerHealthMetrics.getUnderReplicatedContainerCount());
+
     rec = unHealthyContainersTableHandle.fetchByContainerId(4L).get(0);
     assertEquals("OVER_REPLICATED", rec.getContainerState());
     assertEquals(-2, rec.getReplicaDelta().intValue());
@@ -246,7 +260,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(1L)))
         .thenReturn(getMockReplicas(1L, State.CLOSED, State.CLOSED));
 
-    // ID 2 was missing - make it healthy now
+    // ID 2 was UNDER_REPLICATED - make it healthy now
     when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(2L)))
         .thenReturn(getMockReplicas(2L,
             State.CLOSED, State.CLOSED, State.CLOSED));
