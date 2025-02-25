@@ -272,27 +272,23 @@ public class TestHddsVolume {
 
   /**
    * Test conservative avail space.
-   * |----used----|   (avail)   |++++++++reserved++++++++|
-   * |<-     capacity         ->|
-   *              |     fsAvail      |-------other-------|
-   *                          ->|~~~~|<-
-   *                       remainingReserved
-   * |<-                   fsCapacity                  ->|
-   * A) avail = capacity - used
-   * B) avail = fsAvail - Max(reserved - other, 0);
+   * |----used----|                 fsFree                 |
+   * |----used----|          fsAvail           |---other---|
+   * |----used----|   (avail)   |+++reserved+++|---other---|
+   * |<-                    fsCapacity                   ->|
+   * |<-       capacity      ->|
    *
-   * So, conservatively, avail = Max(Min(A, B), 0);
-   * This test avail == A, which implies there are deletes
-   * that release space, but 'du' report is delayed.
+   * capacity = max(fsCapacity - reserved, 0);
+   * avail = max(fsAvail - reserved, 0);
    */
   @Test
   public void testReportUsedBiggerThanActualUsed() throws IOException {
     // fsCapacity = 500, fsAvail = 290, reserved = 100
     // used = 300(cached value from previous refresh)
-    // actual used = 200(due to deletes)
-    // so, other = max((500 - 290 - 300, 0) = 0
-    // actual other = 10(system usage)
-    // A = 500 - 100 - 300 = 100, B = 290 - max((100 - 0), 0) = 190
+    // After fix:
+    // fsCapacity = 500, fsAvail = 200, used = 300;
+    // capacity = max(fsCapacity - reserved, 0) = max(500 - 100, 0) = 400
+    // avail = max(fsAvail - reserved, 0) = max(200 - 100, 0) = 100
     SpaceUsageSource spaceUsage = fixed(500, 290, 300);
     SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(
         spaceUsage, Duration.ZERO, inMemory(new AtomicLong(0)));
@@ -310,17 +306,14 @@ public class TestHddsVolume {
 
   /**
    * Continue the above.
-   * This test avail == B, which implies there are new allocates
-   * that consumes space, but 'du' report is delayed.
    */
   @Test
   public void testReportUsedSmallerThanActualUsed() throws IOException {
     // fsCapacity = 500, fsAvail = 190, reserved = 100
-    // used = 0(cached value from previous refresh)
-    // actual used = 300(new allocates)
-    // so, other = max(500 - 190 - 0, 0) = 310
-    // actual other = 10(system usage)
-    // A = 500 - 100 - 0 = 400, B = 190 - max((100 - 310), 0) = 190
+    // After fix:
+    // fsCapacity = 500, fsAvail = 190, used = 0
+    // capacity = max(fsCapacity - reserved, 0) = max(500 - 100, 0) = 400
+    // avail = max(fsAvail - reserved, 0) = max(190 - 100, 0) = 90
     SpaceUsageSource spaceUsage = fixed(500, 190, 0);
     SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(
         spaceUsage, Duration.ZERO, inMemory(new AtomicLong(0)));
@@ -330,7 +323,7 @@ public class TestHddsVolume {
 
     SpaceUsageSource usage = volume.getCurrentUsage();
     assertEquals(400, usage.getCapacity());
-    assertEquals(190, usage.getAvailable());
+    assertEquals(90, usage.getAvailable());
 
     // Shutdown the volume.
     volume.shutdown();
@@ -343,11 +336,10 @@ public class TestHddsVolume {
   @Test
   public void testOverUsedReservedSpace() throws IOException {
     // fsCapacity = 500, fsAvail = 300, reserved = 100
-    // used = 0(cached value from previous refresh)
-    // actual used = 0(no writes yet)
-    // so, other = max(500 - 300 - 0, 0) = 200
-    // actual other = 200(e.g. yarn usage + system usage)
-    // A = 500 - 100 - 0 = 400, B = 300 - max((100 - 200), 0) = 300
+    // After fix:
+    // fsCapacity = 500, fsAvail = 300, used = 0
+    // capacity = max(fsCapacity - reserved, 0) = max(500 - 100, 0) = 400
+    // avail = max(fsAvail - reserved, 0) = max(300 - 100, 0) = 200
     SpaceUsageSource spaceUsage = fixed(500, 300, 0);
     SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(
         spaceUsage, Duration.ZERO, inMemory(new AtomicLong(0)));
@@ -357,7 +349,7 @@ public class TestHddsVolume {
 
     SpaceUsageSource usage = volume.getCurrentUsage();
     assertEquals(400, usage.getCapacity());
-    assertEquals(300, usage.getAvailable());
+    assertEquals(200, usage.getAvailable());
 
     // Shutdown the volume.
     volume.shutdown();
@@ -370,11 +362,10 @@ public class TestHddsVolume {
   @Test
   public void testOverUsedHddsSpace() throws IOException {
     // fsCapacity = 500, fsAvail = 40, reserved = 100
-    // used = 450(exact report)
-    // actual used = 450
-    // so, other = max(500 - 40 - 450, 0) = 10
-    // actual other = 10(e.g. system usage)
-    // A = 500 - 100 - 450 = -50, B = 40 - max((100 - 10), 0) = -50
+    // After fix:
+    // fsCapacity = 500, fsAvail = 40, used = 450
+    // capacity = max(fsCapacity - reserved, 0) = max(500 - 100, 0) = 400
+    // avail = max(fsAvail - reserved, 0) = max(40 - 100, 0) = 0
     SpaceUsageSource spaceUsage = fixed(500, 40, 450);
     SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(
         spaceUsage, Duration.ZERO, inMemory(new AtomicLong(0)));
