@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.NettyMetrics;
+import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.HddsDatanodeStopService;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
@@ -745,4 +746,17 @@ public class DatanodeStateMachine implements Closeable {
   public ReconfigurationHandler getReconfigurationHandler() {
     return reconfigurationHandler;
   }
+
+  public void fillReplicatorSupervisorMetrics(MetricsCollector collector, boolean all) {
+    replicationSupervisorMetrics.getMetrics(collector, all);
+  }
+
+  public MeasuredReplicator getPullReplicatorWithMetrics() {
+    return pullReplicatorWithMetrics;
+  }
+
+  public MeasuredReplicator getPushReplicatorWithMetrics() {
+    return pushReplicatorWithMetrics;
+  }
+
 }
