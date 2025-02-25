@@ -47,7 +47,6 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-hadoop-dependency-server</artifactId>
-      <scope>compile</scope>
       <exclusions>
         <exclusion>
           <groupId>com.sun.xml.bind</groupId>

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.repair.om;
 
+import jakarta.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -97,11 +98,14 @@ public class FSORepairTool extends RepairTool {
       description = "Verbose output. Show all intermediate steps.")
   private boolean verbose;
 
+  @Nonnull
+  @Override
+  protected Component serviceToBeOffline() {
+    return Component.OM;
+  }
+
   @Override
   public void execute() throws Exception {
-    if (checkIfServiceIsRunning("OM")) {
-      return;
-    }
     try {
       Impl repairTool = new Impl();
       repairTool.run();
@@ -397,7 +401,7 @@ public class FSORepairTool extends RepairTool {
 
         RepeatedOmKeyInfo originalRepeatedKeyInfo = deletedTable.get(fileKey);
         RepeatedOmKeyInfo updatedRepeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-            fileInfo, fileInfo.getUpdateID(), true);
+            fileInfo, fileInfo.getUpdateID());
         // NOTE: The FSO code seems to write the open key entry with the whole
         // path, using the object's names instead of their ID. This would only
         // be possible when the file is deleted explicitly, and not part of a

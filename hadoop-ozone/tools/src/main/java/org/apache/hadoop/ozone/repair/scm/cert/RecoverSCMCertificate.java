@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.repair.scm.cert;
 
+import jakarta.annotation.Nonnull;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
@@ -71,11 +72,14 @@ public class RecoverSCMCertificate extends RepairTool {
       description = "SCM DB Path")
   private String dbPath;
 
+  @Nonnull
+  @Override
+  protected Component serviceToBeOffline() {
+    return Component.SCM;
+  }
+
   @Override
   public void execute() throws Exception {
-    if (checkIfServiceIsRunning("SCM")) {
-      return;
-    }
     dbPath = removeTrailingSlashIfNeeded(dbPath);
     String tableName = VALID_SCM_CERTS.getName();
     DBDefinition dbDefinition =
