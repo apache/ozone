@@ -562,10 +562,11 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
 
   private void createAndAssertKeys(OzoneBucket ozoneBucket, List<String> keys)
       throws Exception {
-    int length = 10;
-    byte[] input = new byte[length];
-    Arrays.fill(input, (byte) 96);
     for (String key : keys) {
+      int length = 10;
+      byte[] input = new byte[length];
+      Arrays.fill(input, (byte) 96);
+
       createKey(ozoneBucket, key, new String(input, StandardCharsets.UTF_8));
 
       // Read the key with given key name.
