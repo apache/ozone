@@ -37,6 +37,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -516,7 +517,9 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
     byte[] input = new byte[length];
     Arrays.fill(input, (byte)96);
 
-    createAndAssertKeys(ozoneBucket, keys);
+    createAndAssertKeys(ozoneBucket, Collections.singletonList(key1));
+    createAndAssertKeys(ozoneBucket, Collections.singletonList(key2));
+    createAndAssertKeys(ozoneBucket, Collections.singletonList(key3));
 
     // Iterator with key name as prefix.
     Iterator<? extends OzoneKey> ozoneKeyIterator =
