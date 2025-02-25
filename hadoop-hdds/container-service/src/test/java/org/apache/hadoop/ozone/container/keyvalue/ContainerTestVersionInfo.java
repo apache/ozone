@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
-import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSharedDBVersion;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -55,6 +55,7 @@ public class ContainerTestVersionInfo {
       OzoneConsts.SCHEMA_V1,
       OzoneConsts.SCHEMA_V2,
       OzoneConsts.SCHEMA_V3,
+      OzoneConsts.SCHEMA_V4
   };
 
   private final String schemaVersion;
@@ -93,7 +94,7 @@ public class ContainerTestVersionInfo {
   }
   public static void setTestSchemaVersion(String schemaVersion,
       OzoneConfiguration conf) {
-    if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
+    if (isSharedDBVersion(schemaVersion)) {
       ContainerTestUtils.enableSchemaV3(conf);
     } else {
       ContainerTestUtils.disableSchemaV3(conf);

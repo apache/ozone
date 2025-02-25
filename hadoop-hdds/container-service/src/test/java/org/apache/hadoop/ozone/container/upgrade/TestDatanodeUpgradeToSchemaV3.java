@@ -47,7 +47,6 @@ import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
@@ -84,10 +83,6 @@ public class TestDatanodeUpgradeToSchemaV3 {
     conf = new OzoneConfiguration();
     conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED,
         schemaV3Enabled);
-    conf.setBoolean(
-        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
-    conf.setBoolean(
-        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
     setup();
   }
 
@@ -413,7 +408,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
   public void testWriteWithV3Disabled(boolean schemaV3Enabled)
       throws Exception {
     initTests(schemaV3Enabled);
-    testWrite(true, OzoneConsts.SCHEMA_V3);
+    // After HDDS-6611, it's V4
+    testWrite(true, OzoneConsts.SCHEMA_V4);
   }
 
   public void testWrite(boolean enable, String expectedVersion)

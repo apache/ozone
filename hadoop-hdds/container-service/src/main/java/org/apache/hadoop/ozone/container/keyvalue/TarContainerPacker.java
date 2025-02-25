@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_ALREADY_EXISTS;
-import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.BufferedOutputStream;
@@ -185,7 +184,7 @@ public class TarContainerPacker
   }
 
   public static Path getDbPath(KeyValueContainerData containerData) {
-    if (containerData.hasSchema(SCHEMA_V3)) {
+    if (containerData.sharedDB()) {
       return DatanodeStoreSchemaThreeImpl.getDumpDir(
           new File(containerData.getMetadataPath())).toPath();
     } else {
@@ -203,7 +202,7 @@ public class TarContainerPacker
     Path dbPath = Paths.get(containerData.getDbFile().getPath());
     Path relativePath = containerPath.relativize(dbPath);
 
-    if (containerData.hasSchema(SCHEMA_V3)) {
+    if (containerData.sharedDB()) {
       Path metadataDir = KeyValueContainerLocationUtil.getContainerMetaDataPath(
           baseDir.toString()).toPath();
       return DatanodeStoreSchemaThreeImpl.getDumpDir(metadataDir.toFile())

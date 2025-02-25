@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V4;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -105,6 +106,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     schemaHandlers.put(SCHEMA_V1, this::markBlocksForDeletionSchemaV1);
     schemaHandlers.put(SCHEMA_V2, this::markBlocksForDeletionSchemaV2);
     schemaHandlers.put(SCHEMA_V3, this::markBlocksForDeletionSchemaV3);
+    schemaHandlers.put(SCHEMA_V4, this::markBlocksForDeletionSchemaV3);
 
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
         .setNameFormat(threadNamePrefix +
