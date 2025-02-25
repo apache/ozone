@@ -339,7 +339,7 @@ public class TestIncrementalContainerReportHandler {
   }
 
   @Test
-  public void testClosingToQuasiClosed() throws IOException, TimeoutException {
+  public void testClosingToQuasiClosed() throws IOException {
     final IncrementalContainerReportHandler reportHandler =
         new IncrementalContainerReportHandler(
             nodeManager, containerManager, scmContext);
@@ -372,7 +372,7 @@ public class TestIncrementalContainerReportHandler {
   }
 
   @Test
-  public void testQuasiClosedToClosed() throws IOException, TimeoutException {
+  public void testQuasiClosedToClosed() throws IOException {
     final IncrementalContainerReportHandler reportHandler =
         new IncrementalContainerReportHandler(
             nodeManager, containerManager, scmContext);

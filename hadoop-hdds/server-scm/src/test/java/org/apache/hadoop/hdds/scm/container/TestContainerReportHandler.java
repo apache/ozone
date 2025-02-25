@@ -746,8 +746,8 @@ public class TestContainerReportHandler {
       throws NodeNotFoundException, IOException {
     /*
      * Negative test. When a replica with a (lower) mismatching bcsId gets reported,
-     * expect the ContainerReportHandler thread to not throw uncaught exception
-     * (which could lead to ContainerReportHandler thread crash before HDDS-12150)
+     * expect the ContainerReportHandler thread to not throw uncaught exception.
+     * (That exception lead to ContainerReportHandler thread crash before HDDS-12150.)
      */
     final ContainerReportHandler reportHandler =
         new ContainerReportHandler(nodeManager, containerManager);
@@ -758,7 +758,7 @@ public class TestContainerReportHandler {
     final DatanodeDetails dn2 = nodeIterator.next();
     final DatanodeDetails dn3 = nodeIterator.next();
 
-    // sequenceId 10000L set here
+    // Initial sequenceId 10000L is set here
     final ContainerInfo container1 = getContainer(lcState);
 
     nodeManager.addContainer(dn1, container1.containerID());
@@ -767,7 +767,7 @@ public class TestContainerReportHandler {
 
     containerStateManager.addContainer(container1.getProtobuf());
 
-    // Generate container report with replica in CLOSED state with lower bcsId
+    // Generate container report with replica in CLOSED state with intentional lower bcsId
     final ContainerReportsProto containerReport = getContainerReportsProto(
         container1.containerID(), ContainerReplicaProto.State.CLOSED,
         dn1.getUuidString(),

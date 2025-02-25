@@ -304,7 +304,7 @@ public class AbstractContainerReportHandler {
 
         if (!verifyBcsId(replica.getBlockCommitSequenceId(), container.getSequenceId(), datanode, containerId)) {
           logger.warn("Ignored moving container {} from CLOSING to CLOSED state because replica bcsId ({}) " +
-                  "reported by datanode {} does not match sequenceId ({{}}).",
+                  "reported by datanode {} does not match sequenceId ({}).",
               containerId, replica.getBlockCommitSequenceId(), datanode, container.getSequenceId());
           return true;
         }
@@ -335,7 +335,7 @@ public class AbstractContainerReportHandler {
       if (replica.getState() == State.CLOSED) {
         if (!verifyBcsId(replica.getBlockCommitSequenceId(), container.getSequenceId(), datanode, containerId)) {
           logger.warn("Ignored moving container {} from QUASI_CLOSED to CLOSED state because replica bcsId ({}) " +
-                  "reported by datanode {} does not match sequenceId ({{}}).",
+                  "reported by datanode {} does not match sequenceId ({}).",
               containerId, replica.getBlockCommitSequenceId(), datanode, container.getSequenceId());
           return true;
         }
