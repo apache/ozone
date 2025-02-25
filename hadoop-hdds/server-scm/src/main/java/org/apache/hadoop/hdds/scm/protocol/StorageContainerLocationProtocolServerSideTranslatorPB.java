@@ -1362,16 +1362,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   /**
    * Get getVolumeInfos based on query conditions.
    *
-   * @param displayMode Represents the mode for displaying volumes.
-   * Options include "all" for all volumes, "failed" for failed volumes,
-   * and "normal" for normal volumes.
-   * @param uuid datanode uuid String.
-   * @param hostName datanode hostName String.
-   * @param pageSize Records displayed per page.
-   * @param currentPage The current page number.
-   * @return Volume Information List.
+   * @param request The request object containing the parameters to
+   * fetch volume information (GetVolumeInfosRequestProto).
+   * @return  A response object containing the volume information
+   * (GetVolumeInfosResponseProto).
    * @throws IOException
-   * I/O exceptions that may occur during the process of querying the volume.
+   * If an input/output exception occurs while processing the request.
    */
   public GetVolumeInfosResponseProto getVolumeInfos(
       GetVolumeInfosRequestProto request) throws IOException {
