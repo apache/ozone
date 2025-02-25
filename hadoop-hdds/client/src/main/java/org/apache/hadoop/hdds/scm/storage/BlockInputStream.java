@@ -62,8 +62,10 @@ import org.slf4j.LoggerFactory;
  */
 public class BlockInputStream extends BlockExtendedInputStream {
 
-  public static final Logger LOG =
-      LoggerFactory.getLogger(BlockInputStream.class);
+  public static final Logger LOG = LoggerFactory.getLogger(BlockInputStream.class);
+
+  private static final List<Validator> VALIDATORS =
+      ContainerProtocolCalls.toValidatorList((request, response) -> validate(response));
 
   private final BlockID blockID;
   private long length;
@@ -299,10 +301,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
         .build();
     pipelineRef.set(readPipeline);
   }
-
-  private static final List<Validator> VALIDATORS
-      = ContainerProtocolCalls.toValidatorList(
-          (request, response) -> validate(response));
 
   private static void validate(ContainerCommandResponseProto response)
       throws IOException {
