@@ -1643,8 +1643,8 @@ public class TestSCMNodeManager {
         Thread.sleep(100);
       }
 
-      final long expectedScmUsed = usedPerHeartbeat * (heartbeatCount - 1);
-      final long expectedRemaining = capacity - expectedScmUsed;
+      long expectedScmUsed = usedPerHeartbeat * (heartbeatCount - 1);
+      long expectedRemaining = capacity - expectedScmUsed;
 
       GenericTestUtils.waitFor(
           () -> nodeManager.getStats().getScmUsed().get() == expectedScmUsed,
