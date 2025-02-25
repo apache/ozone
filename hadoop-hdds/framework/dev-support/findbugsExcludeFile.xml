@@ -21,12 +21,4 @@
   </Match>
 
   <!-- Test -->
-  <Match>
-    <Class name="org.apache.hadoop.hdds.server.http.TestRatisDropwizardExports"></Class>
-    <Bug pattern="DLS_DEAD_LOCAL_STORE" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.hdds.utils.BufferedMetricsCollector$BufferedMetricsRecordBuilderImpl"></Class>
-    <Bug pattern="URF_UNREAD_FIELD" />
-  </Match>
 </FindBugsFilter>
