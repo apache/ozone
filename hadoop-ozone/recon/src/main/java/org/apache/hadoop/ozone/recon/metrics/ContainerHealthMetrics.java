@@ -40,7 +40,7 @@ public final class ContainerHealthMetrics {
   private ContainerHealthMetrics() {
   }
 
-  public static ContainerHealthMetrics create() {
+  public static synchronized ContainerHealthMetrics create() {
     if (instance != null) {
       return instance;
     }
