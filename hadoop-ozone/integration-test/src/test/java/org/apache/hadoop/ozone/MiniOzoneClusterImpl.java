@@ -102,7 +102,7 @@ import org.apache.hadoop.ozone.s3.OzoneClientCache;
 import org.apache.hadoop.ozone.s3.OzoneConfigurationHolder;
 import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.ozone.recon.codegen.ReconSqlDbConfig;
+import org.apache.ozone.recon.schema.ReconSqlDbConfig;
 import org.apache.ozone.test.GenericTestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

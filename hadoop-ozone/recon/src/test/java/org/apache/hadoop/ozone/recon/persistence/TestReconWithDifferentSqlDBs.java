@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.recon.persistence;
 
 import static org.apache.hadoop.ozone.recon.ReconControllerModule.ReconDaoBindingModule.RECON_DAO_LIST;
-import static org.apache.ozone.recon.codegen.SqlDbUtils.SQLITE_DRIVER_CLASS;
+import static org.apache.ozone.recon.schema.SqlDbUtils.SQLITE_DRIVER_CLASS;
 import static org.apache.ozone.recon.schema.generated.Tables.RECON_TASK_STATUS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;

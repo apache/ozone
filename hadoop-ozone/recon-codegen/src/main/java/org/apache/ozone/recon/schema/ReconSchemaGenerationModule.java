@@ -15,16 +15,11 @@
  * limitations under the License.
  */
 
-package org.apache.ozone.recon.codegen;
+package org.apache.ozone.recon.schema;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.multibindings.Multibinder;
-import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
-import org.apache.ozone.recon.schema.ReconSchemaDefinition;
-import org.apache.ozone.recon.schema.ReconTaskSchemaDefinition;
-import org.apache.ozone.recon.schema.SchemaVersionTableDefinition;
-import org.apache.ozone.recon.schema.StatsSchemaDefinition;
-import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
+import org.apache.ozone.recon.codegen.JooqCodeGenerator;
 
 /**
  * Bindings for DDL generation and used by

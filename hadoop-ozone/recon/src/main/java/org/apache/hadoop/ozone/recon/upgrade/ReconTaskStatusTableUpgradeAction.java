@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.recon.upgrade;
 
-import static org.apache.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
 import static org.apache.ozone.recon.schema.ReconTaskSchemaDefinition.RECON_TASK_STATUS_TABLE_NAME;
+import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
 
 import java.sql.Connection;
 import java.sql.SQLException;

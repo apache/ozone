@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.recon.upgrade;
 
 import static org.apache.hadoop.ozone.recon.upgrade.ReconLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.recon.upgrade.ReconUpgradeAction.UpgradeActionType.FINALIZE;
-import static org.apache.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
 import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
+import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
 import static org.jooq.impl.DSL.field;
 import static org.jooq.impl.DSL.name;
 

@@ -68,7 +68,7 @@ import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ozone.recon.codegen.ReconSqlDbConfig;
+import org.apache.ozone.recon.schema.ReconSqlDbConfig;
 import org.apache.ozone.recon.schema.generated.tables.daos.ClusterGrowthDailyDao;
 import org.apache.ozone.recon.schema.generated.tables.daos.ContainerCountBySizeDao;
 import org.apache.ozone.recon.schema.generated.tables.daos.FileCountBySizeDao;

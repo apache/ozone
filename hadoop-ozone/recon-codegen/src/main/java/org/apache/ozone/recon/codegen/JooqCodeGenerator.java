@@ -31,6 +31,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.derby.jdbc.EmbeddedDataSource;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.recon.schema.ReconSchemaDefinition;
+import org.apache.ozone.recon.schema.ReconSchemaGenerationModule;
+import org.apache.ozone.recon.schema.SqlDbUtils;
 import org.jooq.codegen.GenerationTool;
 import org.jooq.meta.jaxb.Configuration;
 import org.jooq.meta.jaxb.Database;

@@ -17,7 +17,7 @@
 
 package org.apache.ozone.recon.schema;
 
-import static org.apache.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
+import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
 import static org.jooq.impl.DSL.field;
 import static org.jooq.impl.DSL.name;
 
