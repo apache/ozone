@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,9 +14,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -25,8 +26,6 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-
-import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,20 +35,7 @@ import org.slf4j.LoggerFactory;
 @ConfigGroup(prefix = "ozone.client")
 public class OzoneClientConfig {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OzoneClientConfig.class);
-
-  /**
-   * Enum for indicating what mode to use when combining chunk and block
-   * checksums to define an aggregate FileChecksum. This should be considered
-   * a client-side runtime option rather than a persistent property of any
-   * stored metadata, which is why this is not part of ChecksumOpt, which
-   * deals with properties of files at rest.
-   */
-  public enum ChecksumCombineMode {
-    MD5MD5CRC,  // MD5 of block checksums, which are MD5 over chunk CRCs
-    COMPOSITE_CRC  // Block/chunk-independent composite CRC
-  }
+  private static final Logger LOG = LoggerFactory.getLogger(OzoneClientConfig.class);
 
   @Config(key = "stream.buffer.flush.size",
       defaultValue = "16MB",
@@ -559,5 +545,17 @@ public class OzoneClientConfig {
 
   public int getMaxConcurrentWritePerKey() {
     return this.maxConcurrentWritePerKey;
+  }
+
+  /**
+   * Enum for indicating what mode to use when combining chunk and block
+   * checksums to define an aggregate FileChecksum. This should be considered
+   * a client-side runtime option rather than a persistent property of any
+   * stored metadata, which is why this is not part of ChecksumOpt, which
+   * deals with properties of files at rest.
+   */
+  public enum ChecksumCombineMode {
+    MD5MD5CRC,  // MD5 of block checksums, which are MD5 over chunk CRCs
+    COMPOSITE_CRC  // Block/chunk-independent composite CRC
   }
 }

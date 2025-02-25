@@ -138,7 +138,7 @@
     <json-simple.version>1.1.1</json-simple.version>
     <jsp-api.version>2.1</jsp-api.version>
     <jsr311-api.version>1.1.1</jsr311-api.version>
-    <junit5.version>5.11.4</junit5.version>
+    <junit5.version>5.12.0</junit5.version>
     <kerby.version>1.0.1</kerby.version>
     <kotlin.version>1.9.25</kotlin.version>
     <license-maven-plugin.version>2.5.0</license-maven-plugin.version>
@@ -165,8 +165,7 @@
     <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
     <maven-surefire-plugin.argLine>-Xmx8192m -XX:+HeapDumpOnOutOfMemoryError</maven-surefire-plugin.argLine>
     <maven-surefire-plugin.argLineAccessArgs />
-    <!-- if surefire is upgraded, dependency on junit-jupiter-engine can be removed -->
-    <maven-surefire-plugin.version>3.0.0-M4</maven-surefire-plugin.version>
+    <maven-surefire-plugin.version>3.5.2</maven-surefire-plugin.version>
     <maven-surefire-report-plugin.version>${maven-surefire-plugin.version}</maven-surefire-report-plugin.version>
     <maven-war-plugin.version>3.4.0</maven-war-plugin.version>
     <maven.core.version>3.9.9</maven.core.version>
@@ -187,6 +186,7 @@
     <ozone.version>2.0.0-SNAPSHOT</ozone.version>
     <picocli.version>4.7.5</picocli.version>
     <plexus-archiver.version>4.2.2</plexus-archiver.version>
+    <pmd.version>3.26.0</pmd.version>
     <!-- Enable Reproducible Builds mode -->
     <project.build.outputTimestamp>2023-01-01T00:00:00Z</project.build.outputTimestamp>
     <!-- platform encoding override -->
@@ -218,7 +218,7 @@
     <sortpom-maven-plugin.version>3.0.1</sortpom-maven-plugin.version>
     <spotbugs.version>3.1.12.2</spotbugs.version>
     <spring.version>5.3.39</spring.version>
-    <sqlite.version>3.49.0.0</sqlite.version>
+    <sqlite.version>3.49.1.0</sqlite.version>
     <stax2.version>4.2.2</stax2.version>
     <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
     <surefire.fork.timeout>1200</surefire.fork.timeout>
@@ -233,7 +233,7 @@
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
     <woodstox.version>5.4.0</woodstox.version>
     <zookeeper.version>3.8.4</zookeeper.version>
-    <zstd-jni.version>1.5.6-9</zstd-jni.version>
+    <zstd-jni.version>1.5.7-1</zstd-jni.version>
   </properties>
 
   <dependencyManagement>
@@ -1300,12 +1300,6 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <!-- required for Surefire versions before 3.0.0-M5 -->
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter-engine</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-params</artifactId>
       <scope>test</scope>
@@ -1754,6 +1748,18 @@
           <artifactId>cyclonedx-maven-plugin</artifactId>
           <version>${cyclonedx.version}</version>
         </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-pmd-plugin</artifactId>
+          <version>${pmd.version}</version>
+          <configuration>
+            <rulesets>
+              <ruleset>dev-support/pmd/pmd-ruleset.xml</ruleset>
+            </rulesets>
+            <printFailingErrors>true</printFailingErrors>
+            <includeTests>true</includeTests>
+          </configuration>
+        </plugin>
       </plugins>
     </pluginManagement>
 
@@ -1859,7 +1865,7 @@
               <goal>prepare-agent</goal>
             </goals>
             <configuration>
-              <includes>org.apache.hadoop.hdds.*,org.apache.hadoop.ozone.*,org.apache.hadoop.fs.ozone.*,org.apache.ozone.*,org.hadoop.ozone.*</includes>
+              <includes>org.apache.hadoop.hdds.*,org.apache.hadoop.ozone.*,org.apache.hadoop.fs.ozone.*,org.apache.ozone.*</includes>
             </configuration>
           </execution>
         </executions>
