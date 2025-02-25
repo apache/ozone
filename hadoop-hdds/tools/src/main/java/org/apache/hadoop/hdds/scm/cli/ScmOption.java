@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import picocli.CommandLine;
 
 /**
@@ -68,7 +67,7 @@ public class ScmOption extends AbstractMixin {
 
     if (StringUtils.isNotEmpty(scmServiceId)) {
       conf.set(ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID, scmServiceId);
-    } else if (StringUtils.isBlank(SCMHAUtils.getScmServiceId(conf))) {
+    } else if (StringUtils.isBlank(HddsUtils.getScmServiceId(conf))) {
       // Scm service id is not passed, and scm service id is not defined in
       // the config, assuming it should be non-HA cluster.
       if (!HddsUtils.getHostNameFromConfigKeys(conf,
