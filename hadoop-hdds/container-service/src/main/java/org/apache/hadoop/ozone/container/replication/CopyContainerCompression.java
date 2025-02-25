@@ -51,17 +51,15 @@ public enum CopyContainerCompression {
   SNAPPY(CompressorStreamFactory.SNAPPY_FRAMED),
   ZSTD(CompressorStreamFactory.ZSTANDARD);
 
+  private static final Logger LOG = LoggerFactory.getLogger(CopyContainerCompression.class);
+
   private final String compressorFactoryName;
+
+  private static final CopyContainerCompression DEFAULT_COMPRESSION = CopyContainerCompression.NO_COMPRESSION;
 
   CopyContainerCompression(String compressorFactoryName) {
     this.compressorFactoryName = compressorFactoryName;
   }
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(CopyContainerCompression.class);
-
-  private static final CopyContainerCompression DEFAULT_COMPRESSION =
-      CopyContainerCompression.NO_COMPRESSION;
 
   public static CopyContainerCompression getConf(ConfigurationSource conf) {
     try {

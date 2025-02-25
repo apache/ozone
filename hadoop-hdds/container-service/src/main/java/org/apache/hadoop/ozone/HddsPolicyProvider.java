@@ -36,8 +36,14 @@ import org.apache.ratis.util.MemoizedSupplier;
 @Unstable
 public final class HddsPolicyProvider extends PolicyProvider {
 
-  private static final Supplier<HddsPolicyProvider> SUPPLIER =
-      MemoizedSupplier.valueOf(HddsPolicyProvider::new);
+  private static final Supplier<HddsPolicyProvider> SUPPLIER = MemoizedSupplier.valueOf(HddsPolicyProvider::new);
+
+  private static final List<Service> DN_SERVICES =
+      Collections.singletonList(
+          new Service(
+              OZONE_SECURITY_RECONFIGURE_PROTOCOL_ACL,
+              ReconfigureProtocol.class)
+      );
 
   private HddsPolicyProvider() {
   }
@@ -48,12 +54,6 @@ public final class HddsPolicyProvider extends PolicyProvider {
     return SUPPLIER.get();
   }
 
-  private static final List<Service> DN_SERVICES =
-      Collections.singletonList(
-          new Service(
-              OZONE_SECURITY_RECONFIGURE_PROTOCOL_ACL,
-              ReconfigureProtocol.class)
-      );
 
   @Override
   public Service[] getServices() {
