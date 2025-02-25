@@ -1099,7 +1099,12 @@ public class KeyValueHandler extends Handler {
 
   /**
    * Handle Put Block operation for closed container. Calls BlockManager to process the request.
-   *
+   * This is primarily used by container reconciliation process to persist the block data for closed container.
+   * @param kvContainer - Container for which block data need to be persisted.
+   * @param blockData - Block Data to be persisted (BlockData should have the chunks).
+   * @param blockCommitSequenceId - Block Commit Sequence ID for the block.
+   * @param overwriteBscId - To overwrite bcsId in the block data. In case of chunk failure during reconciliation,
+   *                      we do not want to overwrite the bcsId as this block is incomplete in its current state.
    */
   public void putBlockForClosedContainer(KeyValueContainer kvContainer, BlockData blockData,
                                          long blockCommitSequenceId, boolean overwriteBscId)

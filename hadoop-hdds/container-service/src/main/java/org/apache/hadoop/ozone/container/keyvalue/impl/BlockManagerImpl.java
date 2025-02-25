@@ -144,7 +144,6 @@ public class BlockManagerImpl implements BlockManager {
         // block length is used, And also on restart the blocks committed to DB
         // is only used to compute the bytes used. This is done to keep the
         // current behavior and avoid DB write during write chunk operation.
-        // Write UTs for this
         db.getStore().getMetadataTable().putWithBatch(batch, containerData.getBytesUsedKey(),
             containerData.getBytesUsed());
 
@@ -440,19 +439,6 @@ public class BlockManagerImpl implements BlockManager {
       }
     } finally {
       container.readUnlock();
-    }
-  }
-
-  @Override
-  public boolean blockExists(Container container, BlockID blockID) throws IOException {
-    KeyValueContainerData containerData = (KeyValueContainerData) container
-        .getContainerData();
-    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
-      // This is a post condition that acts as a hint to the user.
-      // Should never fail.
-      Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
-      String blockKey = containerData.getBlockKey(blockID.getLocalID());
-      return db.getStore().getBlockDataTable().isExist(blockKey);
     }
   }
 
