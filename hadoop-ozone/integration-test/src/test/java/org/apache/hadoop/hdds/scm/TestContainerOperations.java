@@ -220,7 +220,8 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
     final int numOfDatanodes = nm.getAllNodes().size();
 
     // Set one node to be something other than IN_SERVICE
-    DatanodeDetails node = nm.getAllNodes().get(0);
+    final DatanodeDetails node = nm.getAllNodes().get(0);
+    HddsProtos.NodeOperationalState originalState = nm.getNodeStatus(node).getOperationalState();
     nm.setNodeOperationalState(node, DECOMMISSIONING);
 
     // Nodes not in DECOMMISSIONING state should be returned as they are in service
@@ -250,8 +251,6 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
 
     // Test all operational states by looping over them all and setting the
     // state manually.
-    node = nm.getAllNodes().get(0);
-    HddsProtos.NodeOperationalState originalState = nm.getNodeStatus(node).getOperationalState();
     try {
       for (HddsProtos.NodeOperationalState s :
           HddsProtos.NodeOperationalState.values()) {
