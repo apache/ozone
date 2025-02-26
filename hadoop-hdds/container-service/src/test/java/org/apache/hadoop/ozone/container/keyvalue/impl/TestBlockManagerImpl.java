@@ -236,7 +236,7 @@ public class TestBlockManagerImpl {
       assertEquals(1, db.getStore().getMetadataTable().get(containerData.getBcsIdKey()));
 
       // 3. Put Block with bcsId = 2, Overwrite = true
-      // This should succeed as we are overwriting the BcsId, The container BcsId should be updated to 3
+      // This should succeed as we are overwriting the BcsId, The container BcsId should be updated to 2
       // The block count should not change.
       blockManager.putBlockForClosedContainer(keyValueContainer, blockData2, true);
       fromGetBlockData = blockManager.getBlock(keyValueContainer, blockData2.getBlockID());
