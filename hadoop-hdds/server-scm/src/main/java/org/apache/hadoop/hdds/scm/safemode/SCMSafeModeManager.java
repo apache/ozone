@@ -345,6 +345,10 @@ public class SCMSafeModeManager implements SafeModeManager {
         exitRules.get(ATLEAST_ONE_DATANODE_REPORTED_PIPELINE_EXIT_RULE);
   }
 
+  public DataNodeSafeModeRule getDataNodeSafeModeRule() {
+    return (DataNodeSafeModeRule) exitRules.get(DN_EXIT_RULE);
+  }
+
 
   /**
    * Class used during SafeMode status event.
