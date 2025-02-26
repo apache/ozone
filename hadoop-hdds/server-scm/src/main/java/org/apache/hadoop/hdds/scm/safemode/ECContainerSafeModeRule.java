@@ -24,6 +24,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -35,6 +36,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -92,7 +94,32 @@ public class ECContainerSafeModeRule extends SafeModeExitRule<NodeRegistrationCo
     if (validateBasedOnReportProcessing()) {
       return getCurrentContainerThreshold() >= safeModeCutoff;
     }
-    return false;
+
+    final List<ContainerInfo> containers = containerManager.getContainers(
+        ReplicationType.EC);
+
+    return containers.stream()
+        .filter(this::isClosed)
+        .map(ContainerInfo::containerID)
+        .noneMatch(this::isMissing);
+  }
+
+  /**
+   * Checks if the container has at least the minimum required number of replicas.
+   */
+  private boolean isMissing(ContainerID id) {
+    try {
+      int minReplica = getMinReplica(id.getId());
+      return containerManager.getContainerReplicas(id).size() < minReplica;
+    } catch (ContainerNotFoundException ex) {
+      /*
+       * This should never happen, in case this happens the container
+       * somehow got removed from SCM.
+       * Safemode rule doesn't have to log/fix this. We will just exclude this
+       * from the rule validation.
+       */
+      return false;
+    }
   }
 
   @VisibleForTesting
