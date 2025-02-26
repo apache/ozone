@@ -4,8 +4,7 @@
       {
         "builtIn": 1,
         "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
+          "type": "grafana"
         },
         "enable": true,
         "hide": true,
@@ -34,8 +33,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "bea0bb1j1v3eof"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -113,8 +111,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "bea0bb1j1v3eof"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "om_metrics_num_snapshot_active{instance=~\".*:9874\"}",
@@ -140,8 +137,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "bea0bb1j1v3eof"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -219,8 +215,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "bea0bb1j1v3eof"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "om_metrics_num_snapshot_creates{instance=~\".*:9874\"}",
@@ -248,8 +243,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "bea0bb1j1v3eof"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -327,8 +321,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "bea0bb1j1v3eof"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "om_metrics_num_snapshot_purges{instance=~\".*9874\"}",
@@ -343,8 +336,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "bea0bb1j1v3eof"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -422,8 +414,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "bea0bb1j1v3eof"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "om_metrics_num_snapshot_deletes",
@@ -438,8 +429,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "bea0bb1j1v3eof"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -517,8 +507,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "bea0bb1j1v3eof"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -544,8 +533,7 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Test",
-  "uid": "aedw8g8jvx4hsf",
-  "version": 17,
+  "title": "Ozone - OM Snapshot Metrics",
+  "version": 19,
   "weekStart": ""
 }
