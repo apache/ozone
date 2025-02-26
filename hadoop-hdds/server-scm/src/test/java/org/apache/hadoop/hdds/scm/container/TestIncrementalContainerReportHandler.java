@@ -60,6 +60,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.Mockito;
 
 import java.io.File;
@@ -358,7 +360,7 @@ public class TestIncrementalContainerReportHandler {
   }
 
   @Test
-  public void testClosingToQuasiClosed() throws IOException, TimeoutException {
+  public void testClosingToQuasiClosed() throws IOException {
     final IncrementalContainerReportHandler reportHandler =
         new IncrementalContainerReportHandler(
             nodeManager, containerManager, scmContext);
@@ -392,7 +394,7 @@ public class TestIncrementalContainerReportHandler {
   }
 
   @Test
-  public void testQuasiClosedToClosed() throws IOException, TimeoutException {
+  public void testQuasiClosedToClosed() throws IOException {
     final IncrementalContainerReportHandler reportHandler =
         new IncrementalContainerReportHandler(
             nodeManager, containerManager, scmContext);
@@ -426,6 +428,59 @@ public class TestIncrementalContainerReportHandler {
     reportHandler.onMessage(icr, publisher);
     Assertions.assertEquals(LifeCycleState.CLOSED,
         containerManager.getContainer(container.containerID()).getState());
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = LifeCycleState.class, names = {"CLOSING", "QUASI_CLOSED"})
+  public void testContainerStateTransitionToClosedWithMismatchingBCSID(LifeCycleState lcState) throws IOException {
+    /*
+     * Negative test. When a replica with a (lower) mismatching bcsId gets reported,
+     * expect the ContainerReportHandler thread to not throw uncaught exception.
+     * (That exception lead to ContainerReportHandler thread crash before HDDS-12150.)
+     */
+    final IncrementalContainerReportHandler reportHandler =
+        new IncrementalContainerReportHandler(nodeManager, containerManager, scmContext);
+
+    // Initial sequenceId 10000L is set here
+    final ContainerInfo container = getContainer(lcState);
+    final DatanodeDetails datanodeOne = randomDatanodeDetails();
+    final DatanodeDetails datanodeTwo = randomDatanodeDetails();
+    final DatanodeDetails datanodeThree = randomDatanodeDetails();
+    nodeManager.register(datanodeOne, null, null);
+    nodeManager.register(datanodeTwo, null, null);
+    nodeManager.register(datanodeThree, null, null);
+
+    final Set<ContainerReplica> containerReplicas = getReplicas(
+        container.containerID(),
+        ContainerReplicaProto.State.CLOSING,
+        datanodeOne, datanodeTwo);
+    containerReplicas.addAll(getReplicas(
+        container.containerID(),
+        ContainerReplicaProto.State.QUASI_CLOSED,
+        datanodeThree));
+
+    containerStateManager.addContainer(container.getProtobuf());
+    containerReplicas.forEach(r -> containerStateManager.updateContainerReplica(
+        container.containerID(), r));
+
+    // Generate incremental container report with replica in CLOSED state with intentional lower bcsId
+    final IncrementalContainerReportProto containerReport =
+        getIncrementalContainerReportProto(container.containerID(),
+            CLOSED, datanodeThree.getUuidString(), false, 0,
+            2000L);
+    final IncrementalContainerReportFromDatanode icr =
+        new IncrementalContainerReportFromDatanode(
+            datanodeOne, containerReport);
+
+    // Handler should NOT throw IllegalArgumentException
+    try {
+      reportHandler.onMessage(icr, publisher);
+    } catch (IllegalArgumentException iaEx) {
+      Assertions.fail("Handler should not throw IllegalArgumentException: " + iaEx.getMessage());
+    }
+
+    // Because the container report is ignored, the container remains in the same previous state in SCM
+    Assertions.assertEquals(lcState, containerManager.getContainer(container.containerID()).getState());
   }
 
   @Test
@@ -605,11 +660,23 @@ public class TestIncrementalContainerReportHandler {
 
   private static IncrementalContainerReportProto
       getIncrementalContainerReportProto(
-            final ContainerID containerId,
-            final ContainerReplicaProto.State state,
-            final String originNodeId,
-            final boolean hasReplicaIndex,
-            final int replicaIndex) {
+          final ContainerID containerId,
+          final ContainerReplicaProto.State state,
+          final String originNodeId,
+          final boolean hasReplicaIndex,
+          final int replicaIndex) {
+    return getIncrementalContainerReportProto(containerId, state, originNodeId,
+        hasReplicaIndex, replicaIndex, 10000L);
+  }
+
+  private static IncrementalContainerReportProto
+      getIncrementalContainerReportProto(
+          final ContainerID containerId,
+          final ContainerReplicaProto.State state,
+          final String originNodeId,
+          final boolean hasReplicaIndex,
+          final int replicaIndex,
+          final long bcsId) {
     final ContainerReplicaProto.Builder replicaProto =
             ContainerReplicaProto.newBuilder()
                     .setContainerID(containerId.getId())
@@ -623,7 +690,7 @@ public class TestIncrementalContainerReportHandler {
                     .setWriteCount(100000000L)
                     .setReadBytes(2000000000L)
                     .setWriteBytes(2000000000L)
-                    .setBlockCommitSequenceId(10000L)
+                    .setBlockCommitSequenceId(bcsId)
                     .setDeleteTransactionId(0);
     if (hasReplicaIndex) {
       replicaProto.setReplicaIndex(replicaIndex);
