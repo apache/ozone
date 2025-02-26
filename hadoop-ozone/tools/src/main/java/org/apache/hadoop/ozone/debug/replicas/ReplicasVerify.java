@@ -96,14 +96,14 @@ public class ReplicasVerify extends Handler {
       OzoneVolume volume = objectStore.getVolume(volumeName);
       checkVolume(volume);
     } else {
-      for (Iterator<? extends OzoneVolume> it = objectStore.listVolumes(null); it.hasNext(); ) {
+      for (Iterator<? extends OzoneVolume> it = objectStore.listVolumes(null); it.hasNext();) {
         checkVolume(it.next());
       }
     }
   }
 
   void checkVolume(OzoneVolume volume) throws IOException {
-    for (Iterator<? extends OzoneBucket> it = volume.listBuckets(null); it.hasNext(); ) {
+    for (Iterator<? extends OzoneBucket> it = volume.listBuckets(null); it.hasNext();) {
       OzoneBucket bucket = it.next();
       checkBucket(bucket);
     }
@@ -112,7 +112,7 @@ public class ReplicasVerify extends Handler {
   void checkBucket(OzoneBucket bucket) throws IOException {
     String volumeName = bucket.getVolumeName();
     String bucketName = bucket.getName();
-    for (Iterator<? extends OzoneKey> it = bucket.listKeys(null); it.hasNext(); ) {
+    for (Iterator<? extends OzoneKey> it = bucket.listKeys(null); it.hasNext();) {
       OzoneKey key = it.next();
 //    TODO: Remove this check once HDDS-12094 is fixed
       if (key.getName().endsWith("/")) {
