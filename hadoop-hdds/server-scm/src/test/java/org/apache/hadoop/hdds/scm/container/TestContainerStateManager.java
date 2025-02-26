@@ -161,7 +161,7 @@ public class TestContainerStateManager {
     HddsProtos.ContainerInfoProto container = builder.build();
     HddsProtos.ContainerID cid = HddsProtos.ContainerID.newBuilder().setId(container.getContainerID()).build();
     containerStateManager.addContainer(container);
-    containerStateManager.transitionDeletingToClosedState(cid);
+    containerStateManager.transitionDeletingOrDeletedToClosedState(cid);
     assertEquals(HddsProtos.LifeCycleState.CLOSED, containerStateManager.getContainer(ContainerID.getFromProtobuf(cid))
         .getState());
   }
@@ -181,7 +181,7 @@ public class TestContainerStateManager {
     HddsProtos.ContainerID cid = HddsProtos.ContainerID.newBuilder().setId(container.getContainerID()).build();
     containerStateManager.addContainer(container);
     try {
-      containerStateManager.transitionDeletingToClosedState(cid);
+      containerStateManager.transitionDeletingOrDeletedToClosedState(cid);
       fail("Was expecting an Exception, but did not catch any.");
     } catch (IOException e) {
       assertInstanceOf(InvalidContainerStateException.class, e.getCause().getCause());

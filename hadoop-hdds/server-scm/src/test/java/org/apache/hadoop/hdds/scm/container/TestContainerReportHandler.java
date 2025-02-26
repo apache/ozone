@@ -151,9 +151,9 @@ public class TestContainerReportHandler {
         any(ContainerID.class), any(ContainerReplica.class));
 
     doAnswer(invocation -> {
-      containerStateManager.transitionDeletingToClosedState(((ContainerID) invocation.getArgument(0)).getProtobuf());
+      containerStateManager.transitionDeletingOrDeletedToClosedState(((ContainerID) invocation.getArgument(0)).getProtobuf());
       return null;
-    }).when(containerManager).transitionDeletingToClosedState(any(ContainerID.class));
+    }).when(containerManager).transitionDeletingOrDeletedToClosedState(any(ContainerID.class));
   }
 
   @AfterEach

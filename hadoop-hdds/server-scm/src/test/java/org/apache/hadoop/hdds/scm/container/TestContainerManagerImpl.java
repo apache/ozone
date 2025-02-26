@@ -163,8 +163,8 @@ public class TestContainerManagerImpl {
     assertEquals(LifeCycleState.DELETING, containerManager.getContainer(ecCid).getState());
 
     // DELETING -> CLOSED
-    containerManager.transitionDeletingToClosedState(cid);
-    containerManager.transitionDeletingToClosedState(ecCid);
+    containerManager.transitionDeletingOrDeletedToClosedState(cid);
+    containerManager.transitionDeletingOrDeletedToClosedState(ecCid);
     // the containers should be back in CLOSED state now
     assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(cid).getState());
     assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(ecCid).getState());
@@ -178,13 +178,13 @@ public class TestContainerManagerImpl {
             ReplicationFactor.THREE), "admin");
     final ContainerID cid = container.containerID();
     assertEquals(LifeCycleState.OPEN, containerManager.getContainer(cid).getState());
-    assertThrows(IOException.class, () -> containerManager.transitionDeletingToClosedState(cid));
+    assertThrows(IOException.class, () -> containerManager.transitionDeletingOrDeletedToClosedState(cid));
 
     // test for EC container
     final ContainerInfo ecContainer = containerManager.allocateContainer(new ECReplicationConfig(3, 2), "admin");
     final ContainerID ecCid = ecContainer.containerID();
     assertEquals(LifeCycleState.OPEN, containerManager.getContainer(ecCid).getState());
-    assertThrows(IOException.class, () -> containerManager.transitionDeletingToClosedState(ecCid));
+    assertThrows(IOException.class, () -> containerManager.transitionDeletingOrDeletedToClosedState(ecCid));
   }
 
   @Test
