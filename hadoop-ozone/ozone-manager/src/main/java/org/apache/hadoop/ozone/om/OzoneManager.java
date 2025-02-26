@@ -451,7 +451,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final int preallocateBlocksMax;
   private final boolean grpcBlockTokenEnabled;
   private final BucketLayout defaultBucketLayout;
-  private final ReplicationConfig defaultReplicationConfig;
+  private ReplicationConfig defaultReplicationConfig;
 
   private final boolean isS3MultiTenancyEnabled;
   private final boolean isStrictS3;
@@ -607,7 +607,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     // Validates the default server-side replication configs.
-    this.defaultReplicationConfig = getDefaultReplicationConfig();
+    setReplicationFromConfig();
     InetSocketAddress omNodeRpcAddr = omNodeDetails.getRpcAddress();
     // Honor property 'hadoop.security.token.service.use_ip'
     omRpcAddressTxt = new Text(SecurityUtil.buildTokenService(omNodeRpcAddr));
@@ -4480,18 +4480,22 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public ReplicationConfig getDefaultReplicationConfig() {
-    if (this.defaultReplicationConfig != null) {
-      return this.defaultReplicationConfig;
+    if (defaultReplicationConfig == null) {
+      setReplicationFromConfig();
     }
+    return defaultReplicationConfig;
+  }
 
+  public void setReplicationFromConfig() {
     final String replication = configuration.getTrimmed(
         OZONE_SERVER_DEFAULT_REPLICATION_KEY,
         OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT);
     final String type = configuration.getTrimmed(
         OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY,
         OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT);
-    return ReplicationConfig.parse(ReplicationType.valueOf(type),
+    defaultReplicationConfig = ReplicationConfig.parse(ReplicationType.valueOf(type),
         replication, configuration);
+    LOG.info("Set default replication in OM: {}/{} -> {}", type, replication, defaultReplicationConfig);
   }
 
   public BucketLayout getOMDefaultBucketLayout() {
