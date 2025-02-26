@@ -33,41 +33,26 @@ import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Map;
-import java.util.function.BiConsumer;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.shell.Handler;
-import org.apache.hadoop.ozone.shell.OzoneAddress;
-import org.apache.hadoop.ozone.shell.Shell;
-import picocli.CommandLine;
+import org.slf4j.Logger;
 
 /**
  * Class that downloads every replica for all the blocks associated with a
  * given key. It also generates a manifest file with information about the
  * downloaded replicas.
  */
-@CommandLine.Command(name = "checksums",
-    description = "Reads every replica for all the blocks associated with a " +
-        "given key.",
-    aliases = {"--checksums"})
-public class Checksums extends Handler {
-
-  @CommandLine.Option(names = {"--outputDir", "-o", "--output-dir"},
-      description = "Destination where the directory will be created" +
-          " for the downloaded replicas and the manifest file.",
-      defaultValue = "/opt/hadoop")
-  private String outputDir;
+public class Checksums  {
 
   private static final String JSON_PROPERTY_FILE_NAME = "filename";
   private static final String JSON_PROPERTY_FILE_SIZE = "datasize";
@@ -82,22 +67,18 @@ public class Checksums extends Handler {
   private static final String JSON_PROPERTY_REPLICA_UUID = "uuid";
   private static final String JSON_PROPERTY_REPLICA_EXCEPTION = "exception";
 
-  @CommandLine.Parameters(arity = "1",
-      description = Shell.OZONE_URI_DESCRIPTION)
-  private String uri;
 
+  private String outputDir;
   private RpcClient rpcClient = null;
+  private OzoneClient client;
+  private Logger log;
+  private OzoneConfiguration ozoneConfiguration;
 
-  @Override
-  protected OzoneAddress getAddress() throws OzoneClientException {
-    return new OzoneAddress(uri);
-  }
-
-  @Override
-  protected void execute(OzoneClient client, OzoneAddress address)
-      throws IOException {
-
-    ReplicasUtils.findCandidateKeys(client, address, processKeyConsumer);
+  public Checksums(OzoneClient client, String outputDir, Logger log, OzoneConfiguration conf) {
+    this.client = client;
+    this.outputDir = outputDir;
+    this.log = log;
+    this.ozoneConfiguration = conf;
   }
 
   private void downloadReplicasAndCreateManifest(
@@ -114,8 +95,8 @@ public class Checksums extends Handler {
       ArrayNode replicasJson = JsonUtils.createArrayNode();
 
       blockIndex += 1;
-      blockJson.put(JSON_PROPERTY_BLOCK_INDEX, blockIndex);
       OmKeyLocationInfo locationInfo = block.getKey();
+      blockJson.put(JSON_PROPERTY_BLOCK_INDEX, blockIndex);
       blockJson.put(JSON_PROPERTY_BLOCK_CONTAINERID,
           locationInfo.getContainerID());
       blockJson.put(JSON_PROPERTY_BLOCK_LOCALID, locationInfo.getLocalID());
@@ -137,7 +118,6 @@ public class Checksums extends Handler {
 
         String fileName = keyName + "_block" + blockIndex + "_" +
             datanode.getHostName();
-        System.out.println("Writing : " + fileName);
         Path path = new File(dir, fileName).toPath();
 
         try (InputStream is = replica.getValue()) {
@@ -157,7 +137,7 @@ public class Checksums extends Handler {
       blockJson.set(JSON_PROPERTY_BLOCK_REPLICAS, replicasJson);
       blocks.add(blockJson);
 
-      IOUtils.close(LOG, blockReplicasWithoutChecksum.values());
+      IOUtils.close(log, blockReplicasWithoutChecksum.values());
     }
   }
 
@@ -189,7 +169,7 @@ public class Checksums extends Handler {
     System.out.println("Creating directory : " + directoryName);
     File dir = new File(outputDir, directoryName);
     if (!dir.exists()) {
-      if (dir.mkdir()) {
+      if (dir.mkdirs()) {
         System.out.println("Successfully created!");
       } else {
         throw new IOException(String.format(
@@ -199,15 +179,16 @@ public class Checksums extends Handler {
     return dir;
   }
 
-  private BiConsumer<OzoneClient, ReplicasUtils.KeyParts> processKeyConsumer = (client, keyParts)
-      -> {
+  void processKeyConsumer(KeyParts keyParts) {
     String volumeName = keyParts.getVolumeName();
     String bucketName = keyParts.getBucketName();
     String keyName = keyParts.getKeyName();
     System.out.println("Processing key : " + volumeName + "/" + bucketName + "/" + keyName);
-    boolean isChecksumVerifyEnabled = getConf().getBoolean("ozone.client.verify.checksum", true);
+    boolean isChecksumVerifyEnabled = ozoneConfiguration.getBoolean("ozone.client.verify.checksum", true);
     RpcClient newClient = null;
     try {
+      OzoneConfiguration configuration = new OzoneConfiguration(ozoneConfiguration);
+      configuration.setBoolean("ozone.client.verify.checksum", !isChecksumVerifyEnabled);
       newClient = getClient(isChecksumVerifyEnabled);
       ClientProtocol noChecksumClient;
       ClientProtocol checksumClient;
@@ -219,7 +200,11 @@ public class Checksums extends Handler {
         noChecksumClient = client.getObjectStore().getClientProxy();
       }
 
-      File dir = createDirectory(volumeName, bucketName, keyName);
+      // Multilevel keys will have a '/' in their names. This interferes with
+      // directory and file creation process. Flatten the keys to fix this.
+      String sanitizedKeyName = keyName.replace("/", "_");
+
+      File dir = createDirectory(volumeName, bucketName, sanitizedKeyName);
       OzoneKeyDetails keyInfoDetails = checksumClient.getKeyDetails(volumeName, bucketName, keyName);
       Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> replicas =
           checksumClient.getKeysEveryReplicas(volumeName, bucketName, keyName);
@@ -231,34 +216,25 @@ public class Checksums extends Handler {
       result.put(JSON_PROPERTY_FILE_SIZE, keyInfoDetails.getDataSize());
 
       ArrayNode blocks = JsonUtils.createArrayNode();
-      downloadReplicasAndCreateManifest(keyName, replicas, replicasWithoutChecksum, dir, blocks);
+      downloadReplicasAndCreateManifest(sanitizedKeyName, replicas, replicasWithoutChecksum, dir, blocks);
       result.set(JSON_PROPERTY_FILE_BLOCKS, blocks);
 
       String prettyJson = JsonUtils.toJsonStringWithDefaultPrettyPrinter(result);
 
-      String manifestFileName = keyName + "_manifest";
-      System.out.println("Writing manifest file : " + manifestFileName);
+      String manifestFileName = sanitizedKeyName + "_manifest";
       File manifestFile = new File(dir, manifestFileName);
       Files.write(manifestFile.toPath(), prettyJson.getBytes(StandardCharsets.UTF_8));
     } catch (IOException e) {
       throw new RuntimeException(e);
-    } finally {
-      if (newClient != null) {
-        try {
-          newClient.close();
-        } catch (IOException e) {
-          throw new RuntimeException(e);
-        }
-      }
     }
-  };
+  }
 
   private RpcClient getClient(boolean isChecksumVerifyEnabled) throws IOException {
     if (rpcClient != null) {
       return rpcClient;
     }
 
-    OzoneConfiguration configuration = new OzoneConfiguration(getConf());
+    OzoneConfiguration configuration = new OzoneConfiguration(ozoneConfiguration);
     configuration.setBoolean("ozone.client.verify.checksum", !isChecksumVerifyEnabled);
     rpcClient = new RpcClient(configuration, null);
     return rpcClient;

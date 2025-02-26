@@ -21,6 +21,7 @@ import static java.util.Collections.emptySet;
 import static java.util.Comparator.comparing;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -28,11 +29,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
-import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -50,37 +50,26 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneKeyLocation;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
-import org.apache.hadoop.ozone.shell.Handler;
-import org.apache.hadoop.ozone.shell.OzoneAddress;
-import org.apache.hadoop.ozone.shell.Shell;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.StringUtils;
-import org.kohsuke.MetaInfServices;
-import picocli.CommandLine;
+import org.slf4j.Logger;
 
 /**
  * Find EC keys affected by missing padding blocks (HDDS-10681).
  */
-@CommandLine.Command(name = "find-missing-padding",
-    aliases = { "fmp" },
-    description = "List all keys with any missing padding, optionally limited to a volume/bucket/key URI.")
-@MetaInfServices(DebugSubcommand.class)
-public class FindMissingPadding extends Handler implements DebugSubcommand {
+public class FindMissingPadding {
 
-  @CommandLine.Mixin
+  private OzoneClient ozoneClient;
   private ScmOption scmOption;
-
-  @CommandLine.Parameters(arity = "0..1",
-      description = Shell.OZONE_URI_DESCRIPTION)
-  private String uri;
-
+  private Logger log;
+  private PrintWriter printWriter;
+  private OzoneConfiguration ozoneConfiguration;
   /**
    * Keys possibly affected (those with any block under threshold size),
    * grouped by container ID and block (local) ID.
@@ -89,20 +78,21 @@ public class FindMissingPadding extends Handler implements DebugSubcommand {
 
   private final Set<OzoneKey> affectedKeys = new HashSet<>();
 
-  @Override
-  protected OzoneAddress getAddress() throws OzoneClientException {
-    return new OzoneAddress(uri);
+  public FindMissingPadding(OzoneClient ozoneClient, ScmOption scmOption, Logger log,
+      PrintWriter printWriter, OzoneConfiguration ozoneConfiguration) {
+    this.ozoneClient = ozoneClient;
+    this.scmOption = scmOption;
+    this.log = log;
+    this.printWriter = printWriter;
+    this.ozoneConfiguration = ozoneConfiguration;
   }
 
-  @Override
-  protected void execute(OzoneClient ozoneClient, OzoneAddress address) throws IOException {
-    ReplicasUtils.findCandidateKeys(ozoneClient, address, checkKeyConsumer);
-    checkContainers(ozoneClient);
+  protected void execute() throws IOException {
+    checkContainers();
     handleAffectedKeys();
   }
 
-  private BiConsumer<OzoneClient, ReplicasUtils.KeyParts> checkKeyConsumer = (ozoneClient, keyParts)
-      -> {
+  public void checkKeyConsumer(KeyParts keyParts) {
     ObjectStore objectStore = ozoneClient.getObjectStore();
     ClientProtocol rpcClient = objectStore.getClientProxy();
     try {
@@ -112,11 +102,11 @@ public class FindMissingPadding extends Handler implements DebugSubcommand {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-  };
+  }
 
   private void checkECKey(OzoneKeyDetails keyDetails) {
     if (!isEC(keyDetails)) {
-      LOG.trace("Key {}/{}/{} is not EC", keyDetails.getVolumeName(), keyDetails.getBucketName(), keyDetails.getName());
+      log.trace("Key {}/{}/{} is not EC", keyDetails.getVolumeName(), keyDetails.getBucketName(), keyDetails.getName());
       return;
     }
 
@@ -133,7 +123,7 @@ public class FindMissingPadding extends Handler implements DebugSubcommand {
         }
       }
     } else {
-      LOG.trace("Key {}/{}/{} has no locations",
+      log.trace("Key {}/{}/{} has no locations",
           keyDetails.getVolumeName(), keyDetails.getBucketName(), keyDetails.getName());
     }
   }
@@ -142,14 +132,14 @@ public class FindMissingPadding extends Handler implements DebugSubcommand {
     return key.getReplicationConfig().getReplicationType() == HddsProtos.ReplicationType.EC;
   }
 
-  private void checkContainers(OzoneClient ozoneClient) throws IOException {
+  private void checkContainers() throws IOException {
     if (candidateKeys.isEmpty()) {
       return;
     }
 
-    SecurityConfig securityConfig = new SecurityConfig(getConf());
+    SecurityConfig securityConfig = new SecurityConfig(ozoneConfiguration);
     final boolean tokenEnabled = securityConfig.isSecurityEnabled() && securityConfig.isContainerTokenEnabled();
-    StorageContainerLocationProtocol scmContainerClient = HAUtils.getScmContainerClient(getConf());
+    StorageContainerLocationProtocol scmContainerClient = HAUtils.getScmContainerClient(ozoneConfiguration);
     RpcClient rpcClient = (RpcClient) ozoneClient.getProxy();
     XceiverClientFactory xceiverClientManager = rpcClient.getXceiverClientManager();
     Pipeline.Builder pipelineBuilder = Pipeline.newBuilder()
@@ -164,7 +154,7 @@ public class FindMissingPadding extends Handler implements DebugSubcommand {
 
         ContainerInfo container = scmClient.getContainer(containerID);
         if (container.getState() != HddsProtos.LifeCycleState.CLOSED) {
-          LOG.trace("Skip container {} as it is not CLOSED, rather {}", containerID, container.getState());
+          log.trace("Skip container {} as it is not CLOSED, rather {}", containerID, container.getState());
           continue;
         }
 
@@ -174,7 +164,7 @@ public class FindMissingPadding extends Handler implements DebugSubcommand {
 
         List<ContainerReplicaInfo> containerReplicas = scmClient.getContainerReplicas(containerID);
 
-        LOG.debug("Container {} replicas: {}", containerID, containerReplicas.stream()
+        log.debug("Container {} replicas: {}", containerID, containerReplicas.stream()
             .sorted(comparing(ContainerReplicaInfo::getReplicaIndex)
                 .thenComparing(ContainerReplicaInfo::getState)
                 .thenComparing(r -> r.getDatanodeDetails().getUuidString()))
@@ -185,7 +175,7 @@ public class FindMissingPadding extends Handler implements DebugSubcommand {
 
         for (ContainerReplicaInfo replica : containerReplicas) {
           if (!HddsProtos.LifeCycleState.CLOSED.name().equals(replica.getState())) {
-            LOG.trace("Ignore container {} replica {} at {} in {} state",
+            log.trace("Ignore container {} replica {} at {} in {} state",
                 replica.getContainerID(), replica.getReplicaIndex(), replica.getDatanodeDetails(), replica.getState());
             continue;
           }
@@ -202,10 +192,10 @@ public class FindMissingPadding extends Handler implements DebugSubcommand {
               missingBlocks.remove(blockData.getBlockID().getLocalID());
             }
             if (missingBlocks.isEmpty()) {
-              LOG.debug("All {} blocks in container {} found on replica {} at {}",
+              log.debug("All {} blocks in container {} found on replica {} at {}",
                   blockToKeysMap.keySet().size(), containerID, replica.getReplicaIndex(), replica.getDatanodeDetails());
             } else {
-              LOG.info("Found {} blocks missing from container {} on replica {} at {}",
+              log.info("Found {} blocks missing from container {} on replica {} at {}",
                   missingBlocks.size(), containerID, replica.getReplicaIndex(), replica.getDatanodeDetails());
               missingBlocks.forEach(b -> affectedKeys.addAll(blockToKeysMap.getOrDefault(b, emptySet())));
             }
@@ -219,11 +209,11 @@ public class FindMissingPadding extends Handler implements DebugSubcommand {
 
   private void handleAffectedKeys() {
     if (!affectedKeys.isEmpty()) {
-      out().println(StringUtils.join("\t", Arrays.asList(
+      printWriter.println(StringUtils.join("\t", Arrays.asList(
           "Key", "Size", "Replication"
       )));
       for (OzoneKey key : affectedKeys) {
-        out().println(StringUtils.join("\t", Arrays.asList(
+        printWriter.println(StringUtils.join("\t", Arrays.asList(
             key.getVolumeName() + "/" + key.getBucketName() + "/" + key.getName(),
             key.getDataSize(),
             key.getReplicationConfig().getReplication()
