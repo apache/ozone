@@ -26,7 +26,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
@@ -44,7 +43,6 @@ import org.slf4j.LoggerFactory;
 public class HeatMapUtil {
   private static final Logger LOG =
       LoggerFactory.getLogger(HeatMapUtil.class);
-  private OzoneConfiguration ozoneConfiguration;
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final ReconOMMetadataManager omMetadataManager;
   private final OzoneStorageContainerManager reconSCM;
@@ -53,12 +51,10 @@ public class HeatMapUtil {
   public HeatMapUtil(ReconNamespaceSummaryManager
                       namespaceSummaryManager,
                      ReconOMMetadataManager omMetadataManager,
-                     OzoneStorageContainerManager reconSCM,
-                     OzoneConfiguration ozoneConfiguration) {
+                     OzoneStorageContainerManager reconSCM) {
     this.reconNamespaceSummaryManager = namespaceSummaryManager;
     this.omMetadataManager = omMetadataManager;
     this.reconSCM = reconSCM;
-    this.ozoneConfiguration = ozoneConfiguration;
   }
 
   private long getEntitySize(String path) throws IOException {

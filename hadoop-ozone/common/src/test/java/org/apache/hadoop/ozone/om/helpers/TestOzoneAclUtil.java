@@ -48,9 +48,6 @@ public class TestOzoneAclUtil {
   private static final OzoneAcl USER1 = new OzoneAcl(USER, "user1",
       ACCESS, ACLType.READ_ACL);
 
-  private static final OzoneAcl USER2 = new OzoneAcl(USER, "user2",
-      ACCESS, ACLType.WRITE);
-
   private static final OzoneAcl GROUP1 = new OzoneAcl(GROUP, "group1",
       ACCESS, ACLType.ALL);
 

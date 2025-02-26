@@ -102,7 +102,6 @@ public class MockNodeManager implements NodeManager {
   private final List<DatanodeDetails> deadNodes;
   private final Map<DatanodeDetails, SCMNodeStat> nodeMetricMap;
   private final SCMNodeStat aggregateStat;
-  private boolean safemode;
   private final Map<UUID, List<SCMCommand>> commandMap;
   private Node2PipelineMap node2PipelineMap;
   private final Node2ContainerMap node2ContainerMap;
@@ -142,7 +141,6 @@ public class MockNodeManager implements NodeManager {
         populateNodeMetric(dd, x);
       }
     }
-    safemode = false;
     this.commandMap = new HashMap<>();
     numHealthyDisksPerDatanode = 1;
     numRaftLogDisksPerDatanode = 1;
@@ -169,7 +167,6 @@ public class MockNodeManager implements NodeManager {
           "be empty");
     }
 
-    safemode = false;
     this.commandMap = new HashMap<>();
     numHealthyDisksPerDatanode = 1;
     numRaftLogDisksPerDatanode = 1;
@@ -205,7 +202,6 @@ public class MockNodeManager implements NodeManager {
           " empty");
     }
 
-    safemode = false;
     this.commandMap = new HashMap<>();
     numHealthyDisksPerDatanode = 1;
     numRaftLogDisksPerDatanode = 1;
@@ -241,15 +237,6 @@ public class MockNodeManager implements NodeManager {
     }
 
   }
-
-  /**
-   * Sets the safe mode value.
-   * @param safemode boolean
-   */
-  public void setSafemode(boolean safemode) {
-    this.safemode = safemode;
-  }
-
 
   /**
    * Gets all Live Datanodes that is currently communicating with SCM.

@@ -150,8 +150,6 @@ public abstract class AbstractContractDistCpTest
 
   private Path outputFile4;
 
-  private Path outputFile5;
-
   private Path inputDirUnderOutputDir;
 
   @Override
@@ -218,7 +216,6 @@ public abstract class AbstractContractDistCpTest
     outputFile3 = new Path(outputSubDir2, "file3");
     outputSubDir4 = new Path(inputDirUnderOutputDir, "subDir4/subDir4");
     outputFile4 = new Path(outputSubDir4, "file4");
-    outputFile5 = new Path(outputSubDir4, "file5");
   }
 
   /**
