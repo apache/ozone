@@ -126,7 +126,7 @@ public class BlockManagerImpl implements BlockManager {
       // update the blockData as well as BlockCommitSequenceId here
       try (BatchOperation batch = db.getStore().getBatchHandler()
           .initBatchOperation()) {
-        // If block exists in cache, blockCount should not be incremented.
+        // If block already exists in the DB, blockCount should not be incremented.
         if (db.getStore().getBlockDataTable().get(containerData.getBlockKey(localID)) == null) {
           // Block does not exist in DB => blockCount needs to be
           // incremented when the block is added into DB.
