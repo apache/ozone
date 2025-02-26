@@ -142,10 +142,7 @@ public class RatisContainerSafeModeRule extends SafeModeExitRule<NodeRegistratio
   /**
    * Record the reported Container.
    *
-   * We will differentiate and count according to the type of Container.
-   *
    * @param containerID containerID
-   * @param isEcContainer true, means ECContainer, false, means not ECContainer.
    */
   private void recordReportedContainer(long containerID) {
     ratisContainerWithMinReplicas.getAndAdd(1);

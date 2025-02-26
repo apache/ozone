@@ -103,9 +103,6 @@ public class ECContainerSafeModeRule extends SafeModeExitRule<NodeRegistrationCo
   /**
    * Get the minimum replica.
    *
-   * If it is a Ratis Contianer, the minimum copy is 1.
-   * If it is an EC Container, the minimum copy will be the number of Data in replicationConfig.
-   *
    * @param pContainerID containerID
    * @return MinReplica.
    */
@@ -155,10 +152,7 @@ public class ECContainerSafeModeRule extends SafeModeExitRule<NodeRegistrationCo
   /**
    * Record the reported Container.
    *
-   * We will differentiate and count according to the type of Container.
-   *
    * @param containerID containerID
-   * @param isEcContainer true, means ECContainer, false, means not ECContainer.
    */
   private void recordReportedContainer(long containerID, boolean isEcContainer) {
 
