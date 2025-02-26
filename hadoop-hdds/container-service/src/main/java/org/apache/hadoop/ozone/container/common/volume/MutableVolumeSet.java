@@ -216,14 +216,16 @@ public class MutableVolumeSet implements VolumeSet {
     Set<? extends StorageVolume> failedVolumes;
     try {
       failedVolumes = checker.checkAllVolumes(allVolumes);
+      if (failedVolumes.size() > 0) {
+        LOG.warn("checkAllVolumes got {} failed volumes - {}",
+            failedVolumes.size(), failedVolumes);
+      }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new IOException("Interrupted while running disk check", e);
     }
 
-    if (failedVolumes.size() > 0) {
-      LOG.warn("checkAllVolumes got {} failed volumes - {}",
-          failedVolumes.size(), failedVolumes);
+    if (failedVolumeMap.size() > 0 || failedVolumes.size() > 0) {
       handleVolumeFailures(failedVolumes);
     } else {
       LOG.debug("checkAllVolumes encountered no failures");
@@ -478,7 +480,7 @@ public class MutableVolumeSet implements VolumeSet {
             rootDir = volumeInfo.get().getRootDir();
             SpaceUsageSource usage = volumeInfo.get().getCurrentUsage();
             scmUsed = usage.getUsedSpace();
-            remaining = usage.getAvailable();
+            remaining = volume.getStorageState() == HddsVolume.VolumeState.READ_ONLY ? 0 : usage.getAvailable();
             capacity = usage.getCapacity();
             committed = (volume instanceof HddsVolume) ?
                 ((HddsVolume) volume).getCommittedBytes() : 0;
