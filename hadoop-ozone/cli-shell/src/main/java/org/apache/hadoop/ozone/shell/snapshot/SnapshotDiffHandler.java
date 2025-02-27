@@ -94,7 +94,7 @@ public class SnapshotDiffHandler extends Handler {
 
   @CommandLine.Option(
       names = {"-n", "--om-node-id"},
-      description = "The id of OM node to get the snapshot information from")
+      description = "The id of OM node to get the snapshot diff from")
   private String omNodeId;
 
   @Override
