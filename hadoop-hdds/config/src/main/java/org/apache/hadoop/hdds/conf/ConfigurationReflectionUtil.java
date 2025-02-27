@@ -345,7 +345,8 @@ public final class ConfigurationReflectionUtil {
     }
   }
 
-  static String getFullKey(
+  /** Compose the full config property name to be used for {@code configGroup} and {@code configAnnotation}. */
+  public static String getFullKey(
       ConfigGroup configGroup, Config configAnnotation) {
     return getFullKey(getPrefix(configGroup), configAnnotation);
   }
