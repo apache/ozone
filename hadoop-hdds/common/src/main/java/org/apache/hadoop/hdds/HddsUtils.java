@@ -17,14 +17,14 @@
 
 package org.apache.hadoop.hdds;
 
-import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DNS_INTERFACE_KEY;
-import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DNS_NAMESERVER_KEY;
-import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_HOST_NAME_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_BIND_HOST_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_PORT_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DNS_INTERFACE_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DNS_NAMESERVER_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HOST_NAME_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
@@ -363,7 +363,7 @@ public final class HddsUtils {
    */
   public static String getHostName(ConfigurationSource conf)
       throws UnknownHostException {
-    String name = conf.get(DFS_DATANODE_HOST_NAME_KEY);
+    String name = conf.get(HDDS_DATANODE_HOST_NAME_KEY);
     if (name == null) {
       String dnsInterface = conf.get(
           CommonConfigurationKeysPublic.HADOOP_SECURITY_DNS_INTERFACE_KEY);
@@ -373,9 +373,9 @@ public final class HddsUtils {
 
       if (dnsInterface == null) {
         // Try the legacy configuration keys.
-        dnsInterface = conf.get(DFS_DATANODE_DNS_INTERFACE_KEY);
-        dnsInterface = conf.get(DFS_DATANODE_DNS_INTERFACE_KEY);
-        nameServer = conf.get(DFS_DATANODE_DNS_NAMESERVER_KEY);
+        dnsInterface = conf.get(HDDS_DATANODE_DNS_INTERFACE_KEY);
+        dnsInterface = conf.get(HDDS_DATANODE_DNS_INTERFACE_KEY);
+        nameServer = conf.get(HDDS_DATANODE_DNS_NAMESERVER_KEY);
       } else {
         // If HADOOP_SECURITY_DNS_* is set then also attempt hosts file
         // resolution if DNS fails. We will not use hosts file resolution

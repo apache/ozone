@@ -629,6 +629,10 @@ public final class ScmConfigKeys {
       "ozone.scm.ha.dbtransactionbuffer.flush.interval";
   public static final long
       OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT = 600 * 1000L;
+
+  public static final String NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY =
+      "net.topology.node.switch.mapping.impl";
+
   /**
    * Never constructed.
    */

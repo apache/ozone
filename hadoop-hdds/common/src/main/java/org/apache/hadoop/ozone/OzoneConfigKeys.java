@@ -600,7 +600,6 @@ public final class OzoneConfigKeys {
       OZONE_CLIENT_BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_DEFAULT_MS =
       300 * 1000;
 
-
   // Values for bucket layout configurations.
   public static final String OZONE_BUCKET_LAYOUT_LEGACY =
       "LEGACY";
