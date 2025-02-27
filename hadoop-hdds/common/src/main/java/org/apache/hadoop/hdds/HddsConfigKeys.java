@@ -74,6 +74,8 @@ public final class HddsConfigKeys {
   public static final String HDDS_CONTAINER_CLOSE_THRESHOLD =
       "hdds.container.close.threshold";
   public static final float HDDS_CONTAINER_CLOSE_THRESHOLD_DEFAULT = 0.9f;
+  public static final String HDDS_CONTAINER_EXPORT_TMPDIR =
+      "hdds.container.export.tmpdir";
   public static final String HDDS_SCM_SAFEMODE_ENABLED =
       "hdds.scm.safemode.enabled";
 

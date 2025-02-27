@@ -45,8 +45,8 @@ public interface ContainerPacker<CONTAINERDATA extends ContainerData> {
    * Compress all the container data (chunk data, metadata db AND container
    * descriptor) to one single archive.
    */
-  void pack(Container<CONTAINERDATA> container, OutputStream destination)
-      throws IOException;
+  void pack(Container<CONTAINERDATA> container, Path baseDir,
+      OutputStream destination) throws IOException;
 
   /**
    * Read the descriptor from the finished archive to get the data before

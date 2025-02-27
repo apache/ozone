@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_EXPORT_TMPDIR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_ALREADY_EXISTS;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_FILES_CREATE_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
@@ -28,6 +29,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IO_EXCEPTION;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil.getContainerMetaDataPath;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -48,6 +50,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -97,6 +100,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   private final Object dumpLock = new Object();
 
   private final KeyValueContainerData containerData;
+  private final String metadataExportPath;
   private ConfigurationSource config;
 
   // Cache of Blocks (LocalIDs) awaiting final PutBlock call after the stream
@@ -130,6 +134,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     DatanodeConfiguration dnConf =
         config.getObject(DatanodeConfiguration.class);
     bCheckChunksFilePath = dnConf.getCheckEmptyContainerDir();
+    metadataExportPath = config.get(HDDS_CONTAINER_EXPORT_TMPDIR);
   }
 
   @VisibleForTesting
@@ -180,8 +185,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
               .chooseSchemaVersion(config);
           containerData.setSchemaVersion(schemaVersion);
 
-          containerMetaDataPath = KeyValueContainerLocationUtil
-              .getContainerMetaDataPath(hddsVolumeDir, idDir, containerID);
+          containerMetaDataPath = getContainerMetaDataPath(
+              hddsVolumeDir, idDir, containerID);
           containerData.setMetadataPath(containerMetaDataPath.getPath());
 
           File chunksPath = KeyValueContainerLocationUtil.getChunksLocationPath(
@@ -267,8 +272,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     long containerId = containerData.getContainerID();
     String hddsVolumeDir = containerVolume.getHddsRootDir().getAbsolutePath();
 
-    File containerMetaDataPath = KeyValueContainerLocationUtil
-        .getContainerMetaDataPath(hddsVolumeDir, clusterId, containerId);
+    File containerMetaDataPath = getContainerMetaDataPath(
+        hddsVolumeDir, clusterId, containerId);
 
     File chunksPath = KeyValueContainerLocationUtil.getChunksLocationPath(
         hddsVolumeDir, clusterId, containerId);
@@ -675,8 +680,12 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     update(originalContainerData.getMetadata(), true);
 
     if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
+      File metaDir = (StringUtils.isEmpty(metadataExportPath)) ?
+          new File(containerData.getMetadataPath()) :
+          getContainerMetaDataPath(metadataExportPath
+              + File.separator + containerData.getContainerID());
       // load metadata from received dump files before we try to parse kv
-      BlockUtils.loadKVContainerDataFromFiles(containerData, config);
+      BlockUtils.loadKVContainerDataFromFiles(containerData, config, metaDir);
     }
 
     //fill in memory stat counter (keycount, byte usage)
@@ -1006,11 +1015,15 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       // We seldom got concurrent exports for a container,
       // so it should not influence performance much.
       synchronized (dumpLock) {
-        BlockUtils.dumpKVContainerDataToFiles(containerData, config);
-        packer.pack(this, destination);
+        File metaDir = (StringUtils.isEmpty(metadataExportPath)) ?
+            new File(containerData.getMetadataPath()) :
+            getContainerMetaDataPath(metadataExportPath
+                + File.separator + containerData.getContainerID());
+        BlockUtils.dumpKVContainerDataToFiles(containerData, config, metaDir);
+        packer.pack(this, metaDir.toPath().getParent(), destination);
       }
     } else {
-      packer.pack(this, destination);
+      packer.pack(this, null, destination);
     }
   }
 }
