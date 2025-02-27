@@ -1378,6 +1378,16 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   public ListSnapshotResponse listSnapshot(
       String volumeName, String bucketName, String snapshotPrefix,
       String prevSnapshot, int maxListResult) throws IOException {
+    return listSnapshot(volumeName, bucketName, snapshotPrefix, prevSnapshot, maxListResult, null);
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public ListSnapshotResponse listSnapshot(
+      String volumeName, String bucketName, String snapshotPrefix,
+      String prevSnapshot, int maxListResult, String omNodeId) throws IOException {
     final OzoneManagerProtocolProtos.ListSnapshotRequest.Builder
         requestBuilder =
         OzoneManagerProtocolProtos.ListSnapshotRequest.newBuilder()
@@ -1393,10 +1403,14 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       requestBuilder.setPrefix(snapshotPrefix);
     }
 
-    final OMRequest omRequest = createOMRequest(Type.ListSnapshot)
-        .setListSnapshotRequest(requestBuilder)
-        .build();
-    final OMResponse omResponse = submitRequest(omRequest);
+    final OMRequest.Builder omRequest = createOMRequest(Type.ListSnapshot)
+        .setListSnapshotRequest(requestBuilder);
+
+    if (StringUtils.isNotBlank(omNodeId)) {
+      omRequest.setOmNodeId(omNodeId);
+    }
+
+    final OMResponse omResponse = submitRequest(omRequest.build());
     handleError(omResponse);
     OzoneManagerProtocolProtos.ListSnapshotResponse response = omResponse.getListSnapshotResponse();
     List<SnapshotInfo> snapshotInfos = response

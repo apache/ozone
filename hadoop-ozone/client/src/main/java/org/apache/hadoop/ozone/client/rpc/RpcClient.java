@@ -1192,6 +1192,32 @@ public class RpcClient implements ClientProtocol {
   }
 
   /**
+   * List snapshots in a volume/bucket.
+   * @param volumeName     volume name
+   * @param bucketName     bucket name
+   * @param snapshotPrefix snapshot prefix to match
+   * @param prevSnapshot   snapshots will be listed after this snapshot name
+   * @param maxListResult  max number of snapshots to return
+   * @param omNodeId       OM node ID to get the list of snapshots from
+   * @return list of snapshots for volume/bucket path.
+   * @throws IOException
+   */
+  @Override
+  public ListSnapshotResponse listSnapshot(
+      String volumeName, String bucketName, String snapshotPrefix,
+      String prevSnapshot, int maxListResult, String omNodeId) throws IOException {
+    Preconditions.checkArgument(StringUtils.isNotBlank(volumeName),
+        "volume can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(bucketName),
+        "bucket can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(omNodeId),
+        "OM node ID can't be null or empty.");
+
+    return ozoneManagerClient.listSnapshot(volumeName, bucketName, snapshotPrefix,
+        prevSnapshot, maxListResult, omNodeId);
+  }
+
+  /**
    * Assign admin role to an accessId in a tenant.
    * @param accessId access ID.
    * @param tenantId tenant name.

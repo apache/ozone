@@ -34,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -383,6 +384,60 @@ public class TestOzoneManagerHASnapshot {
     OzoneSnapshot snapshotInfoFromLeader = store.getSnapshotInfo(volumeName, bucketName,
         snapshotName);
     assertEquals(snapshotInfoFromFollower.getSnapshotId(), snapshotInfoFromLeader.getSnapshotId());
+  }
+
+  @Test
+  public void testListSnapshotsFromNonLeader() throws Exception {
+    createFileKey(ozoneBucket, "keyToSnapshot-" + RandomStringUtils.randomNumeric(10));
+
+    List<String> snapshotNames = new ArrayList<>();
+    for (int i = 0; i < 10; i++) {
+      String snapshotName = "snaptolist-" + RandomStringUtils.randomNumeric(10);
+      // Create snapshot (write operation) should be directed to leader
+      store.createSnapshot(volumeName, bucketName, snapshotName);
+      snapshotNames.add(snapshotName);
+    }
+
+    OzoneManager omLeader = cluster.getOMLeader();
+    assertNotNull(omLeader);
+    // Get the first non-leader OM
+    final OzoneManager finalNonLeaderOM = getFirstNonLeader();
+    await(120_0000, 100, () -> {
+      SnapshotInfo snapshotInfo;
+      try {
+        for (String snapshotName : snapshotNames) {
+          snapshotInfo = finalNonLeaderOM.getMetadataManager()
+              .getSnapshotInfoTable()
+              .get(SnapshotInfo.getTableKey(volumeName,
+                  bucketName,
+                  snapshotName));
+          if (snapshotInfo == null) {
+            return false;
+          }
+        }
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+      return true;
+    });
+
+
+    Iterator<OzoneSnapshot> leaderSnapshotIter = store.listSnapshot(volumeName, bucketName, null, null);
+    int leaderSnapshotCount = 0;
+    while (leaderSnapshotIter.hasNext()) {
+      leaderSnapshotIter.next();
+      leaderSnapshotCount++;
+    }
+
+    Iterator<OzoneSnapshot> followerSnapshotIter = store.listSnapshot(volumeName, bucketName, null,
+        null, finalNonLeaderOM.getOMNodeId());
+    int followerSnapshotCount = 0;
+    while (followerSnapshotIter.hasNext()) {
+      followerSnapshotIter.next();
+      followerSnapshotCount++;
+    }
+
+    assertEquals(leaderSnapshotCount, followerSnapshotCount);
   }
 
   @Test

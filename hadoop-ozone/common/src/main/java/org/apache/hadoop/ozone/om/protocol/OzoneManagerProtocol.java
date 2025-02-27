@@ -818,6 +818,24 @@ public interface OzoneManagerProtocol
   }
 
   /**
+   * List snapshots in a volume/bucket.
+   * @param volumeName     volume name
+   * @param bucketName     bucket name
+   * @param snapshotPrefix snapshot prefix to match
+   * @param prevSnapshot   snapshots will be listed after this snapshot name
+   * @param maxListResult  max number of snapshots to return
+   * @param omNodeId       OM node ID to get the list of snapshots from
+   * @return list of snapshots for volume/bucket path.
+   * @throws IOException
+   */
+  default ListSnapshotResponse listSnapshot(
+      String volumeName, String bucketName, String snapshotPrefix,
+      String prevSnapshot, int maxListResult, String omNodeId) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented");
+  }
+
+  /**
    * Get the differences between two snapshots.
    * @param volumeName Name of the volume to which the snapshotted bucket belong
    * @param bucketName Name of the bucket to which the snapshots belong

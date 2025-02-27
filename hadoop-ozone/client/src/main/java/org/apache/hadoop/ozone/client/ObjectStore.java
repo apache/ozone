@@ -636,6 +636,24 @@ public class ObjectStore {
   }
 
   /**
+   * List snapshots in a volume/bucket.
+   * @param volumeName     volume name
+   * @param bucketName     bucket name
+   * @param snapshotPrefix snapshot prefix to match
+   * @param prevSnapshot   snapshots will be listed after this snapshot name
+   * @param omNodeId       OM node ID to list the snapshots
+   * @return an iterator of snapshots for volume/bucket snapshot path.
+   * @throws IOException
+   */
+  public Iterator<OzoneSnapshot> listSnapshot(String volumeName,
+                                              String bucketName,
+                                              String snapshotPrefix,
+                                              String prevSnapshot,
+                                              String omNodeId) throws IOException {
+    return new SnapshotIterator(volumeName, bucketName, snapshotPrefix, prevSnapshot, omNodeId);
+  }
+
+  /**
    * An Iterator to iterate over {@link OzoneSnapshot} list.
    */
   private final class SnapshotIterator implements Iterator<OzoneSnapshot> {
@@ -643,6 +661,7 @@ public class ObjectStore {
     private final String volumeName;
     private final String bucketName;
     private final String snapshotPrefix;
+    private final String omNodeId;
     private String lastSnapshot = null;
 
     private Iterator<OzoneSnapshot> currentIterator;
@@ -654,8 +673,22 @@ public class ObjectStore {
       this.volumeName = volumeName;
       this.bucketName = bucketName;
       this.snapshotPrefix = snapshotPrefix;
+      this.omNodeId = null;
       // Initialized the currentIterator and continuationToken.
       getNextListOfSnapshots(prevSnapshot);
+    }
+
+    SnapshotIterator(String volumeName,
+                     String bucketName,
+                     String snapshotPrefix,
+                     String prevSnapshot,
+                     String omNodeId) throws IOException {
+      this.volumeName = volumeName;
+      this.bucketName = bucketName;
+      this.snapshotPrefix = snapshotPrefix;
+      this.omNodeId = omNodeId;
+      // Initialized the currentIterator and continuationToken
+      getNextListOfSnapshots(prevSnapshot, omNodeId);
     }
 
     @Override
@@ -663,7 +696,11 @@ public class ObjectStore {
       if (!currentIterator.hasNext() && StringUtils.isNotEmpty(lastSnapshot)) {
         try {
           // fetch the next page if lastSnapshot is not null.
-          getNextListOfSnapshots(lastSnapshot);
+          if (!StringUtils.isBlank(omNodeId)) {
+            getNextListOfSnapshots(lastSnapshot, omNodeId);
+          } else {
+            getNextListOfSnapshots(lastSnapshot);
+          }
         } catch (IOException e) {
           LOG.error("Error retrieving next batch of list results", e);
         }
@@ -682,6 +719,13 @@ public class ObjectStore {
     private void getNextListOfSnapshots(String startSnapshot) throws IOException {
       ListSnapshotResponse response =
           proxy.listSnapshot(volumeName, bucketName, snapshotPrefix, startSnapshot, listCacheSize);
+      currentIterator = response.getSnapshotInfos().stream().map(OzoneSnapshot::fromSnapshotInfo).iterator();
+      lastSnapshot = response.getLastSnapshot();
+    }
+
+    private void getNextListOfSnapshots(String startSnapshot, String nodeId) throws IOException {
+      ListSnapshotResponse response =
+          proxy.listSnapshot(volumeName, bucketName, snapshotPrefix, startSnapshot, listCacheSize, nodeId);
       currentIterator = response.getSnapshotInfos().stream().map(OzoneSnapshot::fromSnapshotInfo).iterator();
       lastSnapshot = response.getLastSnapshot();
     }

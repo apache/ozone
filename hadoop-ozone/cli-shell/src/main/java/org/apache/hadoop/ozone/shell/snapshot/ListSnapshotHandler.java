@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.shell.snapshot;
 
 import java.io.IOException;
 import java.util.Iterator;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.shell.Handler;
@@ -42,6 +43,11 @@ public class ListSnapshotHandler extends Handler {
   @CommandLine.Mixin
   private ListOptions listOptions;
 
+  @CommandLine.Option(
+      names = {"-n", "--om-node-id"},
+      description = "The id of OM node to ist the snapshots from")
+  private String omNodeId;
+
   @Override
   protected OzoneAddress getAddress() {
     return snapshotPath.getValue();
@@ -53,9 +59,17 @@ public class ListSnapshotHandler extends Handler {
     String volumeName = snapshotPath.getValue().getVolumeName();
     String bucketName = snapshotPath.getValue().getBucketName();
 
-    Iterator<OzoneSnapshot> snapshotInfos = client.getObjectStore()
-        .listSnapshot(volumeName, bucketName, listOptions.getPrefix(),
-            listOptions.getStartItem());
+    Iterator<OzoneSnapshot> snapshotInfos;
+    if (StringUtils.isEmpty(omNodeId)) {
+      snapshotInfos = client.getObjectStore()
+          .listSnapshot(volumeName, bucketName, listOptions.getPrefix(),
+              listOptions.getStartItem());
+    } else {
+      snapshotInfos = client.getObjectStore()
+          .listSnapshot(volumeName, bucketName, listOptions.getPrefix(),
+              listOptions.getStartItem(), omNodeId);
+    }
+
     int counter = printAsJsonArray(snapshotInfos, listOptions.getLimit());
     if (isVerbose()) {
       err().printf("Found : %d snapshots for o3://%s/%s %n", counter,
