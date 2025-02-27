@@ -62,8 +62,8 @@ public final class ContainerHealthMetrics {
   @Metric(about = "Number of under replicated containers detected in Recon.")
   private MutableGaugeLong underReplicatedContainerCount;
 
-  @Metric(about = "Number of corrupted containers detected in Recon.")
-  private MutableGaugeLong corruptedContainerCount;
+  @Metric(about = "Number of replica mismatch containers detected in Recon.")
+  private MutableGaugeLong replicaMisMatchContainerCount;
 
   public void setMissingContainerCount(long missingContainerCount) {
     this.missingContainerCount.set(missingContainerCount);
@@ -73,8 +73,8 @@ public final class ContainerHealthMetrics {
     this.underReplicatedContainerCount.set(underReplicatedContainerCount);
   }
 
-  public void setCorruptedContainerCount(long corruptedContainerCount) {
-    this.corruptedContainerCount.set(corruptedContainerCount);
+  public void setReplicaMisMatchContainerCount(long replicaMisMatchContainerCount) {
+    this.replicaMisMatchContainerCount.set(replicaMisMatchContainerCount);
   }
 
   public long getMissingContainerCount() {
@@ -85,8 +85,8 @@ public final class ContainerHealthMetrics {
     return underReplicatedContainerCount.value();
   }
 
-  public long getCorruptedContainerCount() {
-    return corruptedContainerCount.value();
+  public long getReplicaMisMatchContainerCount() {
+    return replicaMisMatchContainerCount.value();
   }
 
   public static synchronized ContainerHealthMetrics getMetrics() {
