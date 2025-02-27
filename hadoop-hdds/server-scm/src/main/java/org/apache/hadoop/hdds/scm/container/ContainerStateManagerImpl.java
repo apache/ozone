@@ -371,6 +371,11 @@ public final class ContainerStateManagerImpl
 
   @Override
   public void transitionDeletingOrDeletedToClosedState(HddsProtos.ContainerID containerID) throws IOException {
+    transitionDeletingOrDeletedContainer(containerID, CLOSED);
+  }
+
+  private void transitionDeletingOrDeletedContainer(HddsProtos.ContainerID containerID, LifeCycleState newState)
+      throws IOException {
     final ContainerID id = ContainerID.getFromProtobuf(containerID);
 
     try (AutoCloseableLock ignored = writeLock(id)) {
@@ -379,18 +384,28 @@ public final class ContainerStateManagerImpl
         final LifeCycleState oldState = oldInfo.getState();
         if (oldState != DELETING && oldState != DELETED) {
           throw new InvalidContainerStateException("Cannot transition container " + id + " from " + oldState +
-              " back to CLOSED. The container must be in the DELETING state.");
+                " to " + newState + ". The container must be in the DELETING or DELETED state.");
+        }
+        if (newState != CLOSED && newState != QUASI_CLOSED) {
+          throw new InvalidContainerStateException("Cannot transition container " + id + " from " + oldState +
+              " to " + newState + ". The new state must be CLOSED or QUASI_CLOSED.");
         }
         ExecutionUtil.create(() -> {
-          containers.updateState(id, oldState, CLOSED);
+          containers.updateState(id, oldState, newState);
           transactionBuffer.addToBuffer(containerStore, id, containers.getContainerInfo(id));
         }).onException(() -> {
           transactionBuffer.addToBuffer(containerStore, id, oldInfo);
-          containers.updateState(id, CLOSED, oldState);
+          containers.updateState(id, newState, oldState);
         }).execute();
       }
     }
   }
+
+  @Override
+  public void transitionDeletingOrDeletedToQuasiClosedState(HddsProtos.ContainerID containerID) throws IOException {
+    transitionDeletingOrDeletedContainer(containerID, QUASI_CLOSED);
+  }
+
 
   @Override
   public Set<ContainerReplica> getContainerReplicas(final ContainerID id) {
