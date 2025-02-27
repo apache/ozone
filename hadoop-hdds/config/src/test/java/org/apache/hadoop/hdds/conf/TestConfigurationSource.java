@@ -69,4 +69,27 @@ class TestConfigurationSource {
     assertEquals("updated", obj.getDynamic());
     assertEquals(orig.getWaitTime(), obj.getWaitTime());
   }
+
+  @Test
+  void getPropertyWithPrefixIncludedInName() {
+    MutableConfigurationSource conf = new InMemoryConfiguration();
+    String value = "newValue";
+    conf.set("ozone.test.config.with.prefix.included", value);
+
+    ConfigurationExample subject = conf.getObject(ConfigurationExample.class);
+
+    assertEquals(value, subject.getWithPrefix());
+  }
+
+  @Test
+  void setPropertyWithPrefixIncludedInName() {
+    MutableConfigurationSource conf = new InMemoryConfiguration();
+    ConfigurationExample subject = conf.getObject(ConfigurationExample.class);
+
+    String value = "newValue";
+    subject.setWithPrefix(value);
+    conf.setFromObject(subject);
+
+    assertEquals(value, conf.get("ozone.test.config.with.prefix.included"));
+  }
 }

@@ -72,6 +72,10 @@ public class ConfigurationExample extends ConfigurationExampleParent {
       description = "Test dynamic property", tags = {})
   private String dynamic;
 
+  @Config(key = "ozone.test.config.with.prefix.included", defaultValue = "any",
+      description = "Test property whose name includes the group prefix", tags = {})
+  private String withPrefix;
+
   public void setClientAddress(String clientAddress) {
     this.clientAddress = clientAddress;
   }
@@ -94,6 +98,10 @@ public class ConfigurationExample extends ConfigurationExampleParent {
 
   public void setThreshold(double threshold) {
     this.threshold = threshold;
+  }
+
+  public void setWithPrefix(String newValue) {
+    withPrefix = newValue;
   }
 
   public String getClientAddress() {
@@ -126,5 +134,9 @@ public class ConfigurationExample extends ConfigurationExampleParent {
 
   public String getDynamic() {
     return dynamic;
+  }
+
+  public String getWithPrefix() {
+    return withPrefix;
   }
 }
