@@ -518,7 +518,7 @@ public class MutableVolumeSet implements VolumeSet {
         builder.setStorageLocation(volume.getStorageDir()
             .getAbsolutePath()).setId(volume.getStorageID()).setFailed(true)
             .setCapacity(0).setRemaining(0).setScmUsed(0).setStorageType(
-            volume.getStorageType()).setFailureTime(volume.getFailureTime().toEpochMilli());
+            volume.getStorageType()).setFailureTime(0);
         StorageLocationReport r = builder.build();
         reports[counter++] = r;
       }
