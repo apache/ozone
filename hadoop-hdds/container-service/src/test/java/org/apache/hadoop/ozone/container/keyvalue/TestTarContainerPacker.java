@@ -190,7 +190,7 @@ public class TestTarContainerPacker {
     SpyOutputStream outputForPack =
         new SpyOutputStream(newOutputStream(targetFile));
     packer.pack(sourceContainer,
-        new File(sourceContainerData.getMetadataPath()).toPath(),
+        new File(sourceContainerData.getMetadataPath()).toPath().getParent(),
         outputForPack);
 
     //THEN: check the result
