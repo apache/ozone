@@ -357,27 +357,16 @@ public class AbstractContainerReportHandler {
        * HDDS-11136: If a DELETING container has a non-empty CLOSED replica, the container should be moved back to
        * CLOSED state.
        *
-       * HDDS-12421: If a DELETING or DELETED container has a non-empty replica, the container should also be moved
-       * back to CLOSED or QUASI_CLOSED state depending on this replica.
+       * HDDS-12421: If a DELETED container has a non-empty CLOSED replica, the container should also be moved back to
+       * CLOSED state.
        */
-      State replicaState = replica.getState();
+      boolean replicaStateAllowed = replica.getState() == State.CLOSED;
       boolean replicaNotEmpty = replica.hasIsEmpty() && !replica.getIsEmpty();
-      if (replicaNotEmpty) {
-        if (replicaState == State.CLOSED) {
-          logger.info("Moving container {} from {} to CLOSED state, datanode {} reported replica with state={}, " +
-                  "isEmpty={}, bcsid={}, keyCount={}, and origin={}.", container, container.getState(),
-              datanode.getHostName(),
-              replica.getState(), false, replica.getBlockCommitSequenceId(), replica.getKeyCount(),
-              replica.getOriginNodeId());
-          containerManager.transitionDeletingOrDeletedToClosedState(containerId);
-        } else if (container.getReplicationType().equals(HddsProtos.ReplicationType.RATIS)) {
-          // this is only for RATIS, not for EC containers
-          logger.info("Moving container {} from {} to QUASI_CLOSED state, datanode {} reported replica with " +
-                  "state={}, isEmpty={}, bcsid={}, keyCount={}, and origin={}.", container, container.getState(),
-              datanode.getHostName(), replica.getState(), false, replica.getBlockCommitSequenceId(),
-              replica.getKeyCount(), replica.getOriginNodeId());
-          containerManager.transitionDeletingOrDeletedToQuasiClosedState(containerId);
-        }
+      if (replicaStateAllowed && replicaNotEmpty) {
+        logger.info("Moving container {} from {} to CLOSED state, datanode {} reported replica with state={}, " +
+            "isEmpty={} and keyCount={}.",
+            replica.getState(), containerId, datanode.getHostName(), replica.getState(), false, replica.getKeyCount());
+        containerManager.transitionDeletingOrDeletedToClosedState(containerId);
       }
       break;
     default:

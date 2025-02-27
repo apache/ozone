@@ -311,21 +311,6 @@ public class ContainerManagerImpl implements ContainerManager {
   }
 
   @Override
-  public void transitionDeletingOrDeletedToQuasiClosedState(ContainerID containerID) throws IOException {
-    HddsProtos.ContainerID proto = containerID.getProtobuf();
-    lock.lock();
-    try {
-      if (containerExist(containerID)) {
-        containerStateManager.transitionDeletingOrDeletedToQuasiClosedState(proto);
-      } else {
-        throwContainerNotFoundException(containerID);
-      }
-    } finally {
-      lock.unlock();
-    }
-  }
-
-  @Override
   public Set<ContainerReplica> getContainerReplicas(final ContainerID id)
       throws ContainerNotFoundException {
     return Optional.ofNullable(containerStateManager

@@ -170,17 +170,6 @@ public interface ContainerStateManager {
   void transitionDeletingOrDeletedToClosedState(HddsProtos.ContainerID id) throws IOException;
 
   /**
-   * Bypasses the container state machine to change a container's state from DELETING or DELETED to QUASI_CLOSED. This
-   * API was introduced to fix a bug (HDDS-12421), and should be used with care otherwise.
-   *
-   * @see <a href="https://issues.apache.org/jira/browse/HDDS-12421">HDDS-12421</a>
-   * @param id id of the container to transition
-   * @throws IOException
-   */
-  @Replicate
-  void transitionDeletingOrDeletedToQuasiClosedState(HddsProtos.ContainerID id) throws IOException;
-
-  /**
    *
    */
   // Make this as @Replicate
