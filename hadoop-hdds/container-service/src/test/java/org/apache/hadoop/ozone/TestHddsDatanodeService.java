@@ -98,7 +98,7 @@ public class TestHddsDatanodeService {
     conf.setBoolean(HDDS_CONTAINER_TOKEN_ENABLED, true);
 
     String volumeDir = testDir + OZONE_URI_DELIMITER + "disk1";
-    conf.set(OzoneConfigKeys.HDDS_DATANODE_DATA_DIR_KEY, volumeDir);
+    conf.set(HddsConfigKeys.HDDS_DATANODE_DATA_DIR_KEY, volumeDir);
   }
 
   @ParameterizedTest

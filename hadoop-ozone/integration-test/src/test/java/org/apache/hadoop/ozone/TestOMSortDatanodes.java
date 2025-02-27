@@ -182,8 +182,8 @@ public class TestOMSortDatanodes {
 
   private String nodeAddress(DatanodeDetails dn) {
     boolean useHostname = config.getBoolean(
-        OzoneConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
-        OzoneConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+        HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
+        HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
     return useHostname ? dn.getHostName() : dn.getIpAddress();
   }
 }

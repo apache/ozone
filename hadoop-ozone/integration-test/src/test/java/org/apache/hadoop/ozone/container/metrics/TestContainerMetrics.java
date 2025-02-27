@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -88,7 +89,7 @@ public class TestContainerMetrics {
   @BeforeAll
   public static void setup() {
     DefaultMetricsSystem.setMiniClusterMode(true);
-    CONF.setInt(OzoneConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY,
+    CONF.setInt(HddsConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY,
         DFS_METRICS_PERCENTILES_INTERVALS);
     CONF.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, false);
     CONF.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDir.toString());

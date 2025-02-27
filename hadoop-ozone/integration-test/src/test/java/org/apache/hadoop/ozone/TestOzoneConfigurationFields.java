@@ -133,18 +133,18 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         OzoneConfigKeys.HDDS_SCM_CLIENT_RPC_TIME_OUT,
         OzoneConfigKeys.HDDS_SCM_CLIENT_MAX_RETRY_TIMEOUT,
         OzoneConfigKeys.HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY,
-        OzoneConfigKeys.HDDS_DATANODE_DNS_INTERFACE_KEY,
-        OzoneConfigKeys.HDDS_DATANODE_DNS_NAMESERVER_KEY,
-        OzoneConfigKeys.HDDS_DATANODE_HOST_NAME_KEY,
-        OzoneConfigKeys.HDDS_DATANODE_DATA_DIR_KEY,
-        OzoneConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
-        OzoneConfigKeys.HDDS_XFRAME_OPTION_ENABLED,
-        OzoneConfigKeys.HDDS_XFRAME_OPTION_VALUE,
-        OzoneConfigKeys.HDDS_METRICS_SESSION_ID_KEY,
-        OzoneConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
-        OzoneConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY,
-        OzoneConfigKeys.HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY,
-        OzoneConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY
+        HddsConfigKeys.HDDS_DATANODE_DNS_INTERFACE_KEY,
+        HddsConfigKeys.HDDS_DATANODE_DNS_NAMESERVER_KEY,
+        HddsConfigKeys.HDDS_DATANODE_HOST_NAME_KEY,
+        HddsConfigKeys.HDDS_DATANODE_DATA_DIR_KEY,
+        HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
+        HddsConfigKeys.HDDS_XFRAME_OPTION_ENABLED,
+        HddsConfigKeys.HDDS_XFRAME_OPTION_VALUE,
+        HddsConfigKeys.HDDS_METRICS_SESSION_ID_KEY,
+        ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+        HddsConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY,
+        HddsConfigKeys.HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY,
+        HddsConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY
     ));
   }
 }

@@ -127,12 +127,12 @@ public abstract class BaseHttpServer {
       }
 
       final boolean xFrameEnabled = conf.getBoolean(
-          OzoneConfigKeys.HDDS_XFRAME_OPTION_ENABLED,
-          OzoneConfigKeys.HDDS_XFRAME_OPTION_ENABLED_DEFAULT);
+          HddsConfigKeys.HDDS_XFRAME_OPTION_ENABLED,
+          HddsConfigKeys.HDDS_XFRAME_OPTION_ENABLED_DEFAULT);
 
       final String xFrameOptionValue = conf.getTrimmed(
-          OzoneConfigKeys.HDDS_XFRAME_OPTION_VALUE,
-          OzoneConfigKeys.HDDS_XFRAME_OPTION_VALUE_DEFAULT);
+          HddsConfigKeys.HDDS_XFRAME_OPTION_VALUE,
+          HddsConfigKeys.HDDS_XFRAME_OPTION_VALUE_DEFAULT);
 
       builder.configureXFrame(xFrameEnabled).setXFrameOption(xFrameOptionValue);
 

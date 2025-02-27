@@ -90,7 +90,7 @@ public class TestVolumeSetDiskChecks {
   @AfterEach
   public void cleanup() {
     final Collection<String> dirs = conf.getTrimmedStringCollection(
-        OzoneConfigKeys.HDDS_DATANODE_DATA_DIR_KEY);
+        HddsConfigKeys.HDDS_DATANODE_DATA_DIR_KEY);
 
     for (String d: dirs) {
       FileUtils.deleteQuietly(new File(d));
@@ -115,7 +115,7 @@ public class TestVolumeSetDiskChecks {
 
     // Verify that the Ozone dirs were created during initialization.
     Collection<String> dirs = conf.getTrimmedStringCollection(
-        OzoneConfigKeys.HDDS_DATANODE_DATA_DIR_KEY);
+        HddsConfigKeys.HDDS_DATANODE_DATA_DIR_KEY);
     for (String d : dirs) {
       assertTrue(new File(d).isDirectory());
     }
@@ -222,7 +222,7 @@ public class TestVolumeSetDiskChecks {
     for (int i = 0; i < numDirs; ++i) {
       dirs.add(new File(dir, randomAlphanumeric(10)).toString());
     }
-    ozoneConf.set(OzoneConfigKeys.HDDS_DATANODE_DATA_DIR_KEY,
+    ozoneConf.set(HddsConfigKeys.HDDS_DATANODE_DATA_DIR_KEY,
         String.join(",", dirs));
 
     final List<String> metaDirs = new ArrayList<>();

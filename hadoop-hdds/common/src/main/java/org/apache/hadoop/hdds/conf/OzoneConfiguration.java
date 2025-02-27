@@ -47,6 +47,7 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
@@ -314,7 +315,7 @@ public class OzoneConfiguration extends Configuration
            HDDS_DATANODE_RATIS_PREFIX_KEY + "."
            + RaftServerConfigKeys.PREFIX + "." + "rpc.slowness.timeout"),
         new DeprecationDelta("dfs.datanode.keytab.file",
-            OzoneConfigKeys.HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY),
+            HddsConfigKeys.HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY),
         new DeprecationDelta("ozone.scm.chunk.layout",
             ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY),
         new DeprecationDelta("hdds.datanode.replication.work.dir",
@@ -380,21 +381,21 @@ public class OzoneConfiguration extends Configuration
         new DeprecationDelta("dfs.ratis.snapshot.threshold",
             ScmConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_KEY),
         new DeprecationDelta("dfs.datanode.dns.interface",
-            OzoneConfigKeys.HDDS_DATANODE_DNS_INTERFACE_KEY),
+            HddsConfigKeys.HDDS_DATANODE_DNS_INTERFACE_KEY),
         new DeprecationDelta("dfs.datanode.dns.nameserver",
-            OzoneConfigKeys.HDDS_DATANODE_DNS_NAMESERVER_KEY),
+            HddsConfigKeys.HDDS_DATANODE_DNS_NAMESERVER_KEY),
         new DeprecationDelta("dfs.datanode.hostname",
-            OzoneConfigKeys.HDDS_DATANODE_HOST_NAME_KEY),
+            HddsConfigKeys.HDDS_DATANODE_HOST_NAME_KEY),
         new DeprecationDelta("dfs.datanode.data.dir",
-            OzoneConfigKeys.HDDS_DATANODE_DATA_DIR_KEY),
+            HddsConfigKeys.HDDS_DATANODE_DATA_DIR_KEY),
         new DeprecationDelta("dfs.datanode.use.datanode.hostname",
-            OzoneConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME),
+            HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME),
         new DeprecationDelta("dfs.xframe.enabled",
-            OzoneConfigKeys.HDDS_XFRAME_OPTION_ENABLED),
+            HddsConfigKeys.HDDS_XFRAME_OPTION_ENABLED),
         new DeprecationDelta("dfs.xframe.value",
-            OzoneConfigKeys.HDDS_XFRAME_OPTION_VALUE),
+            HddsConfigKeys.HDDS_XFRAME_OPTION_VALUE),
         new DeprecationDelta("dfs.metrics.session-id",
-            OzoneConfigKeys.HDDS_METRICS_SESSION_ID_KEY),
+            HddsConfigKeys.HDDS_METRICS_SESSION_ID_KEY),
         new DeprecationDelta("dfs.client.https.keystore.resource",
             OzoneConfigKeys.OZONE_CLIENT_HTTPS_KEYSTORE_RESOURCE_KEY),
         new DeprecationDelta("dfs.https.server.keystore.resource",
@@ -402,11 +403,11 @@ public class OzoneConfiguration extends Configuration
         new DeprecationDelta("dfs.http.policy",
             OzoneConfigKeys.OZONE_HTTP_POLICY_KEY),
         new DeprecationDelta("dfs.datanode.kerberos.principal",
-            OzoneConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY),
+            HddsConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY),
         new DeprecationDelta("dfs.datanode.kerberos.keytab.file",
-            OzoneConfigKeys.HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY),
+            HddsConfigKeys.HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY),
         new DeprecationDelta("dfs.metrics.percentiles.intervals",
-            OzoneConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY),
+            HddsConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY),
     });
   }
 

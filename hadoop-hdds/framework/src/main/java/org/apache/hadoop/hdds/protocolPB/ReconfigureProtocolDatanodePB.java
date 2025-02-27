@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.hdds.protocolPB;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.ipc.ProtocolInfo;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.security.KerberosInfo;
 
 /**
@@ -28,6 +28,6 @@ import org.apache.hadoop.security.KerberosInfo;
 @ProtocolInfo(
     protocolName = "org.apache.hadoop.hdds.protocol.ReconfigureProtocol",
     protocolVersion = 1)
-@KerberosInfo(serverPrincipal = OzoneConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY)
+@KerberosInfo(serverPrincipal = HddsConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY)
 public interface ReconfigureProtocolDatanodePB extends ReconfigureProtocolPB {
 }

@@ -722,7 +722,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
         conf.getClass(
-            OzoneConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+            ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
             TableMapping.class, DNSToSwitchMapping.class);
     DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
         dnsToSwitchMappingClass, conf);
