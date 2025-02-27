@@ -44,7 +44,7 @@ class TestConfigurationSource {
   }
   @Test
   void reconfigurableProperties() {
-    String prefix = "ozone.scm.client";
+    String prefix = "ozone.test.config";
     ImmutableSet<String> expected = ImmutableSet.of(
         prefix + ".dynamic",
         prefix + ".grandpa.dyna"
@@ -62,8 +62,8 @@ class TestConfigurationSource {
     ConfigurationExample orig = subject.getObject(ConfigurationExample.class);
     ConfigurationExample obj = subject.getObject(ConfigurationExample.class);
 
-    subject.set("ozone.scm.client.dynamic", "updated");
-    subject.setLong("ozone.scm.client.wait", orig.getWaitTime() + 42);
+    subject.set("ozone.test.config.dynamic", "updated");
+    subject.setLong("ozone.test.config.wait", orig.getWaitTime() + 42);
     subject.reconfigure(ConfigurationExample.class, obj);
 
     assertEquals("updated", obj.getDynamic());

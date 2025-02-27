@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Example configuration to test the configuration injection.
  */
-@ConfigGroup(prefix = "ozone.scm.client")
+@ConfigGroup(prefix = "ozone.test.config")
 public class ConfigurationExample extends ConfigurationExampleParent {
 
   @Config(key = "address", defaultValue = "localhost", description = "Client "
