@@ -31,17 +31,25 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
+import org.apache.hadoop.hdds.utils.db.LongCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReaderIterator;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.rocksdb.LiveFileMetaData;
+import org.rocksdb.RocksDBException;
 
 /**
  * Constructs a datanode store in accordance with schema version 3, which uses
@@ -132,17 +140,52 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
   }
 
   public void loadKVContainerData(File dumpDir)
-      throws IOException {
-    getMetadataTable().loadFromFile(
-        getTableDumpFile(getMetadataTable(), dumpDir));
-    getBlockDataTable().loadFromFile(
-        getTableDumpFile(getBlockDataTable(), dumpDir));
-    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.HBASE_SUPPORT)) {
-      getLastChunkInfoTable().loadFromFile(
-          getTableDumpFile(getLastChunkInfoTable(), dumpDir));
+      throws IOException, RocksDBException {
+    try (BatchOperation batch = getBatchHandler().initBatchOperation()) {
+      processTable(batch, getTableDumpFile(getMetadataTable(), dumpDir),
+          FixedLengthStringCodec.get(), LongCodec.get(), getMetadataTable());
+      processTable(batch, getTableDumpFile(getBlockDataTable(), dumpDir),
+          FixedLengthStringCodec.get(), BlockData.getCodec(), getBlockDataTable());
+      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.HBASE_SUPPORT)) {
+        processTable(batch, getTableDumpFile(getLastChunkInfoTable(), dumpDir),
+            FixedLengthStringCodec.get(), BlockData.getCodec(), getLastChunkInfoTable());
+      }
+      processTable(batch, getTableDumpFile(getDeleteTransactionTable(), dumpDir), FixedLengthStringCodec.get(),
+          Proto2Codec.get(DeletedBlocksTransaction.getDefaultInstance()), getDeleteTransactionTable());
+
+      getStore().commitBatchOperation(batch);
     }
-    getDeleteTransactionTable().loadFromFile(
-        getTableDumpFile(getDeleteTransactionTable(), dumpDir));
+  }
+
+  private <K, V> void processTable(BatchOperation batch, File tableDumpFile,
+      Codec<K> keyCodec, Codec<V> valueCodec, Table<K, V> table) throws IOException, RocksDBException {
+    if (isFileEmpty(tableDumpFile)) {
+      LOG.warn("SST File {} is empty. Skipping processing.", tableDumpFile.getAbsolutePath());
+      return;
+    }
+
+    try (ManagedOptions managedOptions = new ManagedOptions();
+         ManagedSstFileReader sstFileReader = new ManagedSstFileReader(managedOptions)) {
+      sstFileReader.open(tableDumpFile.getAbsolutePath());
+      try (ManagedReadOptions managedReadOptions = new ManagedReadOptions();
+           ManagedSstFileReaderIterator iterator =
+               ManagedSstFileReaderIterator.managed(sstFileReader.newIterator(managedReadOptions))) {
+        for (iterator.get().seekToFirst(); iterator.get().isValid(); iterator.get().next()) {
+          byte[] key = iterator.get().key();
+          byte[] value = iterator.get().value();
+          K decodedKey = keyCodec.fromPersistedFormat(key);
+          V decodedValue = valueCodec.fromPersistedFormat(value);
+          table.putWithBatch(batch, decodedKey, decodedValue);
+        }
+      }
+    }
+  }
+
+  boolean isFileEmpty(File file) {
+    if (!file.exists()) {
+      return true;
+    }
+    return file.length() == 0;
   }
 
   public static File getTableDumpFile(Table<String, ?> table,
