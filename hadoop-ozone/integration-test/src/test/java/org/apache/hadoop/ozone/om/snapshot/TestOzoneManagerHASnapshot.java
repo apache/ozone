@@ -358,7 +358,6 @@ public class TestOzoneManagerHASnapshot {
 
     // Create snapshot (write operation) should be directed to leader
     store.createSnapshot(volumeName, bucketName, snapshotName);
-    List<OzoneManager> ozoneManagers = cluster.getOzoneManagersList();
 
     OzoneManager omLeader = cluster.getOMLeader();
     assertNotNull(omLeader);
