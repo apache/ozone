@@ -238,6 +238,13 @@ public class ContainerHealthTask extends ReconScmTask {
     Optional.ofNullable(metricUpdaters.get(state))
         .filter(updater -> CONTAINER_COUNT.equals(entry.getKey()))
         .ifPresent(updater -> updater.accept(entry.getValue()));
+
+    if (state == UnHealthyContainerStates.UNDER_REPLICATED ||
+        state == UnHealthyContainerStates.MISSING) {
+      LOG.info("Container Health Metrics Updated.. {}, {}",
+          containerHealthMetrics.getMissingContainerCount(),
+          containerHealthMetrics.getUnderReplicatedContainerCount());
+    }
   }
 
   /**
@@ -349,8 +356,8 @@ public class ContainerHealthTask extends ReconScmTask {
           // If the container is marked as MISSING and it's deleted in SCM, remove the record
           if (currentContainer.isMissing() && containerDeletedInSCM(currentContainer.getContainer())) {
             rec.delete();
-            LOG.info("DELETED existing unhealthy container record...for Container: {}",
-                currentContainer.getContainerID());
+            LOG.info("DELETED existing MISSING unhealthy container record...as container deleted " +
+                    "in SCM as well: {}", currentContainer.getContainerID());
           }
 
           existingRecords.add(rec.getContainerState());
@@ -725,6 +732,7 @@ public class ContainerHealthTask extends ReconScmTask {
           (totalUsedBytes, value) -> (value == null) ?
               container.getContainer().getUsedBytes() :
               (value + container.getContainer().getUsedBytes()));
+      LOG.info("ContainerStats Populated...for container : {} {}", container.getContainerID(), unhealthyState);
     }
   }
 
@@ -750,10 +758,5 @@ public class ContainerHealthTask extends ReconScmTask {
   @VisibleForTesting
   public Map<UnHealthyContainerStates, Map<String, Long>> getUnhealthyContainerStateStatsMap() {
     return unhealthyContainerStateStatsMapForTesting;
-  }
-
-  @VisibleForTesting
-  public ContainerHealthMetrics getMetrics() {
-    return containerHealthMetrics;
   }
 }
