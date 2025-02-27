@@ -159,7 +159,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
     updateCertSerialId(certSerialId);
   }
-  
+
   private KeyStorage keyStorage() throws IOException {
     if (keyStorage == null) {
       keyStorage = new KeyStorage(securityConfig, component);
