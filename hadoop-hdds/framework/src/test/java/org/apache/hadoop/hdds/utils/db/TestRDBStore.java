@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_METRICS_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -40,11 +41,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,6 +56,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
+import org.slf4j.event.Level;
 
 /**
  * RDBStore Tests.
@@ -439,5 +444,25 @@ public class TestRDBStore {
         assertArrayEquals(content1, content2);
       }
     }
+  }
+
+  @Test
+  public void testDisableRDBStoreMetrics(@TempDir File dbFile)
+      throws IOException, InterruptedException, TimeoutException {
+    GenericTestUtils.setLogLevel(RDBStore.getLogger(), Level.DEBUG);
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    configuration.set(OZONE_METADATA_STORE_ROCKSDB_METRICS_ENABLED, "false");
+    GenericTestUtils.LogCapturer logCapture =
+        GenericTestUtils.LogCapturer.captureLogs(RDBStore.getLogger());
+    RDBStore dbStore = new RDBStore(
+        dbFile, options, null, new ManagedWriteOptions(), configSet,
+        CodecRegistry.newBuilder().build(), false, 1000, null, false,
+        MAX_DB_UPDATES_SIZE_THRESHOLD, true, configuration, "");
+
+    // Verify RocksDBStoreMetrics registration is skipped.
+    String msg = "Skipped Metrics registration during RocksDB init";
+    GenericTestUtils.waitFor(() -> {
+      return logCapture.getOutput().contains(msg);
+    }, 100, 30_000);
   }
 }

@@ -732,6 +732,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.metastore.rocksdb.metrics.enabled</name>
+    <value>true</value>
+    <tag>OZONE, OM, RECON, STORAGE, PERFORMANCE</tag>
+    <description>
+      Skip collecting RocksDBStore metrics.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.db.dirs</name>
     <value/>
     <tag>OZONE, SCM, STORAGE, PERFORMANCE</tag>

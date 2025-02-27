@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_METRICS_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_METRICS_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.COMPACTION_LOG_TABLE;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_LOG_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_SST_BACKUP_DIR;
@@ -118,13 +120,20 @@ public class RDBStore implements DBStore {
         dbJmxBeanName = dbFile.getName();
       }
       // Use statistics instead of dbOptions.statistics() to avoid repeated init.
-      metrics = RocksDBStoreMetrics.create(statistics, db, dbJmxBeanName);
-      if (metrics == null) {
-        LOG.warn("Metrics registration failed during RocksDB init, " +
+      if (configuration != null && !configuration.getBoolean(
+          OZONE_METADATA_STORE_ROCKSDB_METRICS_ENABLED,
+          OZONE_METADATA_STORE_ROCKSDB_METRICS_ENABLED_DEFAULT)) {
+        LOG.debug("Skipped Metrics registration during RocksDB init, " +
             "db path :{}", dbJmxBeanName);
       } else {
-        LOG.debug("Metrics registration succeed during RocksDB init, " +
-            "db path :{}", dbJmxBeanName);
+        metrics = RocksDBStoreMetrics.create(statistics, db, dbJmxBeanName);
+        if (metrics == null) {
+          LOG.warn("Metrics registration failed during RocksDB init, " +
+              "db path :{}", dbJmxBeanName);
+        } else {
+          LOG.debug("Metrics registration succeed during RocksDB init, " +
+              "db path :{}", dbJmxBeanName);
+        }
       }
 
       // Create checkpoints and snapshot directories if not exists.

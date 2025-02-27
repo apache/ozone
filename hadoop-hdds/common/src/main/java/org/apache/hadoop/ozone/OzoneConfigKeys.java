@@ -164,6 +164,11 @@ public final class OzoneConfigKeys {
   public static final String
       OZONE_METADATA_STORE_ROCKSDB_CF_WRITE_BUFFER_SIZE_DEFAULT = "128MB";
 
+  public static final String OZONE_METADATA_STORE_ROCKSDB_METRICS_ENABLED =
+      "ozone.metastore.rocksdb.metrics.enabled";
+  public static final boolean
+      OZONE_METADATA_STORE_ROCKSDB_METRICS_ENABLED_DEFAULT = true;
+
   public static final String OZONE_UNSAFEBYTEOPERATIONS_ENABLED =
       "ozone.UnsafeByteOperations.enabled";
   public static final boolean OZONE_UNSAFEBYTEOPERATIONS_ENABLED_DEFAULT
