@@ -40,7 +40,6 @@ import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -323,16 +322,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
     String remoteUser = getRemoteUser().getShortUserName();
     List<AllocatedBlock> allocatedBlocks;
     try {
-      AtomicBoolean performPrefetch = new AtomicBoolean(true);
       allocatedBlocks = captureLatencyNs(perfMetrics.getGetBlocksFromPrefetchQueueLatencyNs(),
           () -> prefetchClient.getBlocks(scmBlockSize, numBlocks, replicationConfig, serviceID, excludeList,
-              clientMachine, clusterMap, performPrefetch));
-
-      if (performPrefetch.get()) {
-        captureLatencyNs(perfMetrics.getPrefetchBlocksLatencyNs(),
-            () -> prefetchClient.prefetchBlocks(scmBlockSize, numBlocks * blockPrefetchFactor, replicationConfig,
-                serviceID, excludeList));
-      }
+              clientMachine, clusterMap));
     } catch (SCMException ex) {
       omMetrics.incNumBlockAllocateCallFails();
       if (ex.getResult()
