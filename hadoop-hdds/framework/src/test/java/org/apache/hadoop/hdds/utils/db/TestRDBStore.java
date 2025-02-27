@@ -454,8 +454,7 @@ public class TestRDBStore {
     configuration.set(OZONE_METADATA_STORE_ROCKSDB_METRICS_ENABLED, "false");
     GenericTestUtils.LogCapturer logCapture =
         GenericTestUtils.LogCapturer.captureLogs(RDBStore.getLogger());
-    RDBStore dbStore = new RDBStore(
-        dbFile, options, null, new ManagedWriteOptions(), configSet,
+    new RDBStore(dbFile, options, null, new ManagedWriteOptions(), configSet,
         CodecRegistry.newBuilder().build(), false, 1000, null, false,
         MAX_DB_UPDATES_SIZE_THRESHOLD, true, configuration, "");
 
