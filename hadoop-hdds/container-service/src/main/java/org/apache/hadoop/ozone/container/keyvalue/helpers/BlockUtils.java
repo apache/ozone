@@ -279,7 +279,7 @@ public final class BlockUtils {
    */
   public static void dumpKVContainerDataToFiles(
       KeyValueContainerData containerData,
-      ConfigurationSource conf) throws IOException {
+      ConfigurationSource conf, File metaDir) throws IOException {
     try (DBHandle db = getDB(containerData, conf)) {
       Preconditions.checkState(db.getStore()
           instanceof DatanodeStoreSchemaThreeImpl);
@@ -287,7 +287,6 @@ public final class BlockUtils {
       DatanodeStoreSchemaThreeImpl store = (DatanodeStoreSchemaThreeImpl)
           db.getStore();
       long containerID = containerData.getContainerID();
-      File metaDir = new File(containerData.getMetadataPath());
       File dumpDir = DatanodeStoreSchemaThreeImpl.getDumpDir(metaDir);
       // cleanup old files first
       deleteAllDumpFiles(dumpDir);
@@ -317,7 +316,7 @@ public final class BlockUtils {
    */
   public static void loadKVContainerDataFromFiles(
       KeyValueContainerData containerData,
-      ConfigurationSource conf) throws IOException {
+      ConfigurationSource conf, File metaDir) throws IOException {
     try (DBHandle db = getDB(containerData, conf)) {
       Preconditions.checkState(db.getStore()
           instanceof DatanodeStoreSchemaThreeImpl);
@@ -325,7 +324,6 @@ public final class BlockUtils {
       DatanodeStoreSchemaThreeImpl store = (DatanodeStoreSchemaThreeImpl)
           db.getStore();
       long containerID = containerData.getContainerID();
-      File metaDir = new File(containerData.getMetadataPath());
       File dumpDir = DatanodeStoreSchemaThreeImpl.getDumpDir(metaDir);
       try {
         store.loadKVContainerData(dumpDir);

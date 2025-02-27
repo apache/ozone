@@ -1394,6 +1394,15 @@
     </description>
   </property>
   <property>
+    <name>hdds.container.export.tmpdir</name>
+    <value/>
+    <tag>OZONE, CONTAINER</tag>
+    <description>
+      Configure custom directory to dump container metadata with
+      SchemaV3 during container export.
+    </description>
+  </property>
+  <property>
     <name>ozone.rest.client.http.connection.max</name>
     <value>100</value>
     <tag>OZONE, CLIENT</tag>

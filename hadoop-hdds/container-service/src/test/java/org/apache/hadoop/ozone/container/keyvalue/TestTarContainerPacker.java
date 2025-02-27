@@ -189,7 +189,9 @@ public class TestTarContainerPacker {
     //WHEN: pack it
     SpyOutputStream outputForPack =
         new SpyOutputStream(newOutputStream(targetFile));
-    packer.pack(sourceContainer, outputForPack);
+    packer.pack(sourceContainer,
+        new File(sourceContainerData.getMetadataPath()).toPath(),
+        outputForPack);
 
     //THEN: check the result
     TarArchiveInputStream tarStream = null;

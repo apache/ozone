@@ -148,7 +148,7 @@ public class TarContainerPacker
    */
   @Override
   public void pack(Container<KeyValueContainerData> container,
-      OutputStream output)
+      Path baseDir, OutputStream output)
       throws IOException {
 
     KeyValueContainerData containerData = container.getContainerData();
@@ -157,7 +157,7 @@ public class TarContainerPacker
       includeFile(container.getContainerFile(), CONTAINER_FILE_NAME,
           archiveOutput);
 
-      includePath(getDbPath(containerData), DB_DIR_NAME,
+      includePath(getDbPath(baseDir, containerData), DB_DIR_NAME,
           archiveOutput);
 
       includePath(Paths.get(containerData.getChunksPath()), CHUNKS_DIR_NAME,
@@ -195,7 +195,7 @@ public class TarContainerPacker
 
   public static Path getDbPath(Path baseDir,
       KeyValueContainerData containerData) {
-    if (baseDir.toAbsolutePath().toString().equals(
+    if (baseDir == null || baseDir.toAbsolutePath().toString().equals(
         containerData.getContainerPath())) {
       return getDbPath(containerData);
     }

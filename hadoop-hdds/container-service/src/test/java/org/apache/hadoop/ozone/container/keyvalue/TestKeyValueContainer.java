@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_EXPORT_TMPDIR;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
@@ -104,6 +105,8 @@ public class TestKeyValueContainer {
 
   @TempDir
   private File folder;
+  @TempDir
+  private File metaDir;
 
   private String scmId = UUID.randomUUID().toString();
   private VolumeSet volumeSet;
@@ -422,6 +425,59 @@ public class TestKeyValueContainer {
         }
       });
     }
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testContainerImpExpCustomMetaDir(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    CONF.set(HDDS_CONTAINER_EXPORT_TMPDIR, metaDir.getPath());
+    init(versionInfo);
+    long containerId = keyValueContainer.getContainerData().getContainerID();
+    createContainer();
+    long numberOfKeysToWrite = 12;
+    closeContainer();
+    populate(numberOfKeysToWrite);
+
+    //destination path
+    File folderToExport = Files.createFile(
+        folder.toPath().resolve("export.tar")).toFile();
+    TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
+
+    //export the container
+    try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
+      keyValueContainer
+          .exportContainerData(fos, packer);
+    }
+
+    //delete the original one
+    KeyValueContainerUtil.removeContainer(
+        keyValueContainer.getContainerData(), CONF);
+    keyValueContainer.delete();
+
+    //create a new one
+    KeyValueContainerData containerData =
+        new KeyValueContainerData(containerId,
+            keyValueContainerData.getLayoutVersion(),
+            keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
+            datanodeId.toString());
+    containerData.setSchemaVersion(keyValueContainerData.getSchemaVersion());
+    KeyValueContainer container = new KeyValueContainer(containerData, CONF);
+
+    HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
+        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
+
+    container.populatePathFields(scmId, containerVolume);
+    try (FileInputStream fis = new FileInputStream(folderToExport)) {
+      container.importContainerData(fis, packer);
+    }
+
+    assertEquals("value1", containerData.getMetadata().get("key1"));
+    assertEquals(keyValueContainerData.getState(),
+        containerData.getState());
+    assertEquals(numberOfKeysToWrite,
+        containerData.getBlockCount());
+
+    CONF.unset(HDDS_CONTAINER_EXPORT_TMPDIR);
   }
 
   private void checkContainerFilesPresent(KeyValueContainerData data,
