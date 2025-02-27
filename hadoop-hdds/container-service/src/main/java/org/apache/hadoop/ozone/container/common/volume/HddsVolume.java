@@ -84,6 +84,8 @@ public class HddsVolume extends StorageVolume {
 
   private final AtomicLong committedBytes = new AtomicLong(); // till Open containers become full
 
+  private final AtomicLong containerImportCommittedBytes = new AtomicLong();
+
   // Mentions the type of volume
   private final VolumeType type = VolumeType.DATA_VOLUME;
   // The dedicated DbVolume that the db instance of this HddsVolume resides.
@@ -303,6 +305,14 @@ public class HddsVolume extends StorageVolume {
    */
   public long getCommittedBytes() {
     return committedBytes.get();
+  }
+
+  public long incImportContainerCommitBytes(long delta) {
+    return containerImportCommittedBytes.addAndGet(delta);
+  }
+
+  public long getContainerImportCommittedBytes() {
+    return containerImportCommittedBytes.get();
   }
 
   public void setDbVolume(DbVolume dbVolume) {
