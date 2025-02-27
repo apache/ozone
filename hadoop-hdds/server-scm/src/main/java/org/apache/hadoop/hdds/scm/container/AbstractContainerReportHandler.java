@@ -362,7 +362,7 @@ public class AbstractContainerReportHandler {
        */
 
       boolean replicaIsEmpty = replica.hasIsEmpty() && replica.getIsEmpty();
-      // If container is in DELETED state and the report replica is empty, delete the empty replica.
+      // If container is in DELETED state and the reported replica is empty, delete the empty replica.
       if (container.getState() == HddsProtos.LifeCycleState.DELETED && replicaIsEmpty) {
         deleteReplica(containerId, datanode, publisher, "DELETED");
         ignored = true;
