@@ -360,12 +360,22 @@ public class AbstractContainerReportHandler {
        * HDDS-12421: If a DELETED container has a non-empty CLOSED replica, the container should also be moved back to
        * CLOSED state.
        */
+
+      boolean replicaIsEmpty = replica.hasIsEmpty() && replica.getIsEmpty();
+      // If container is in DELETED state and the report replica is empty, delete the empty replica.
+      if (container.getState() == HddsProtos.LifeCycleState.DELETED && replicaIsEmpty) {
+        deleteReplica(containerId, datanode, publisher, "DELETED");
+        ignored = true;
+        break;
+      }
+
       boolean replicaStateAllowed = replica.getState() == State.CLOSED;
       boolean replicaNotEmpty = replica.hasIsEmpty() && !replica.getIsEmpty();
       if (replicaStateAllowed && replicaNotEmpty) {
         logger.info("Moving container {} from {} to CLOSED state, datanode {} reported replica with state={}, " +
-            "isEmpty={} and keyCount={}.",
-            replica.getState(), containerId, datanode.getHostName(), replica.getState(), false, replica.getKeyCount());
+            "isEmpty={}, bcsId={}, keyCount={}, and origin={}",
+            container, container.getState(), datanode.getHostName(), replica.getState(),
+            replica.getIsEmpty(), replica.getBlockCommitSequenceId(), replica.getKeyCount(), replica.getOriginNodeId());
         containerManager.transitionDeletingOrDeletedToClosedState(containerId);
       }
       break;

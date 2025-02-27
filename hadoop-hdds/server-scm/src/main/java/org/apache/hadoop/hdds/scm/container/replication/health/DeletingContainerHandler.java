@@ -88,6 +88,7 @@ public class DeletingContainerHandler extends AbstractCheck {
     //resend deleteCommand if needed
     request.getContainerReplicas().stream()
         .filter(r -> !pendingDelete.contains(r.getDatanodeDetails()))
+        .filter(r -> !r.isEmpty())
         .forEach(rp -> {
           try {
             replicationManager.sendDeleteCommand(
