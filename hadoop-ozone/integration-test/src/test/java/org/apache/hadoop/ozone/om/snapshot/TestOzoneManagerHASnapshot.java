@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -343,6 +344,50 @@ public class TestOzoneManagerHASnapshot {
     });
     omDoubleBuffer.awaitFlush();
     checkSnapshotIsPurgedFromDB(omFollower, tableKey);
+  }
+
+  @Test
+  public void testGetSnapshotInfoFromNonLeader() throws Exception {
+    createFileKey(ozoneBucket, "keyToSnapshot-" + RandomStringUtils.randomNumeric(10));
+
+    String snapshotName = "snaptoread-" + RandomStringUtils.randomNumeric(10);
+
+    // Create snapshot (write operation) should be directed to leader
+    store.createSnapshot(volumeName, bucketName, snapshotName);
+    List<OzoneManager> ozoneManagers = cluster.getOzoneManagersList();
+
+    OzoneManager omLeader = cluster.getOMLeader();
+    assertNotNull(omLeader);
+    // Get the first non-leader OM
+    OzoneManager nonLeaderOM = null;
+    for (OzoneManager ozoneManager : ozoneManagers) {
+      if (!Objects.equals(omLeader, ozoneManager)) {
+        nonLeaderOM = ozoneManager;
+      }
+    }
+    assertNotNull(nonLeaderOM);
+
+    final OzoneManager finalNonLeaderOM = nonLeaderOM;
+    await(120_0000, 100, () -> {
+      SnapshotInfo snapshotInfo;
+      try {
+        snapshotInfo = finalNonLeaderOM.getMetadataManager()
+            .getSnapshotInfoTable()
+            .get(SnapshotInfo.getTableKey(volumeName,
+                bucketName,
+                snapshotName));
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+      return snapshotInfo != null;
+    });
+
+    assertFalse(finalNonLeaderOM.isLeaderReady());
+    OzoneSnapshot snapshotInfoFromFollower = store.getSnapshotInfo(volumeName, bucketName,
+        snapshotName, finalNonLeaderOM.getOMNodeId());
+    OzoneSnapshot snapshotInfoFromLeader = store.getSnapshotInfo(volumeName, bucketName,
+        snapshotName);
+    assertEquals(snapshotInfoFromFollower.getSnapshotId(), snapshotInfoFromLeader.getSnapshotId());
   }
 
   private void createSnapshot(String volName, String buckName, String snapName) throws IOException {

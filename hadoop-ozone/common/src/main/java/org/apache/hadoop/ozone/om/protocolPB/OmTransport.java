@@ -34,6 +34,7 @@ public interface OmTransport {
 
   /**
    * The main method to send out the request on the defined transport to a specific OM node.
+   * Note that this request will not failover to another OM node in case of failure.
    */
   OMResponse submitRequest(String omNodeId, OMRequest payload) throws IOException;
 

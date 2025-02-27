@@ -1021,6 +1021,30 @@ public class RpcClient implements ClientProtocol {
   }
 
   /**
+   * {@inheritDoc}
+   */
+  @Override
+  public OzoneSnapshot getSnapshotInfo(String volumeName,
+                                       String bucketName,
+                                       String snapshotName,
+                                       String omNodeId) throws IOException {
+    Preconditions.checkArgument(StringUtils.isNotBlank(volumeName),
+        "volume can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(bucketName),
+        "bucket can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(snapshotName),
+        "snapshot name can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(omNodeId),
+        "OM node ID can't be null or empty.");
+    if (omVersion.compareTo(OzoneManagerVersion.SNAPSHOT_READ_FROM_NON_LEADER) < 0) {
+      throw new IOException("OzoneManager does not snapshot read from non-leader OM.");
+    }
+    SnapshotInfo snapshotInfo = ozoneManagerClient.getSnapshotInfo(volumeName,
+        bucketName, snapshotName, omNodeId);
+    return OzoneSnapshot.fromSnapshotInfo(snapshotInfo);
+  }
+
+  /**
    * Create an image of the current compaction log DAG in the OM.
    * @param fileNamePrefix  file name prefix of the image file.
    * @param graphType       type of node name to use in the graph image.

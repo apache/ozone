@@ -310,7 +310,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    */
   private OMResponse submitRequest(OMRequest omRequest)
       throws IOException {
-    OMRequest.Builder  builder = OMRequest.newBuilder(omRequest);
+    OMRequest.Builder builder = OMRequest.newBuilder(omRequest);
     // Insert S3 Authentication information for each request.
     if (getThreadLocalS3Auth() != null) {
       builder.setS3Authentication(
@@ -336,9 +336,18 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         CallerContext.setCurrent(callerContext);
       }
     }
-    OMResponse response =
-        transport.submitRequest(
-            builder.setTraceID(TracingUtil.exportCurrentSpan()).build());
+
+    OMResponse response;
+    if (omRequest.hasOmNodeId()) {
+      // The request is sent to the particular OM node without failover
+      response = transport.submitRequest(
+          omRequest.getOmNodeId(),
+          builder.setTraceID(TracingUtil.exportCurrentSpan()).build());
+    } else {
+      // The request is eventually sent to the OM leader through failover mechanisms
+      response = transport.submitRequest(
+          builder.setTraceID(TracingUtil.exportCurrentSpan()).build());
+    }
     return response;
   }
 
@@ -1319,6 +1328,30 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     final OMRequest omRequest = createOMRequest(Type.GetSnapshotInfo)
         .setSnapshotInfoRequest(requestBuilder)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+    handleError(omResponse);
+    return SnapshotInfo.getFromProtobuf(omResponse.getSnapshotInfoResponse()
+        .getSnapshotInfo());
+  }
+
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public SnapshotInfo getSnapshotInfo(String volumeName, String bucketName,
+                                      String snapshotName, String omNodeId) throws IOException {
+    Preconditions.checkNotNull(omNodeId);
+    final SnapshotInfoRequest.Builder requestBuilder =
+        SnapshotInfoRequest.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setSnapshotName(snapshotName);
+
+    final OMRequest omRequest = createOMRequest(Type.GetSnapshotInfo)
+        .setSnapshotInfoRequest(requestBuilder)
+        .setOmNodeId(omNodeId)
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
     handleError(omResponse);

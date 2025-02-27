@@ -723,6 +723,12 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public OzoneSnapshot getSnapshotInfo(String volumeName, String bucketName, String snapshotName,
+                                       String omNodeId) throws IOException {
+    return null;
+  }
+
+  @Override
   public String printCompactionLogDag(String fileNamePrefix,
                                       String graphType) throws IOException {
     return null;

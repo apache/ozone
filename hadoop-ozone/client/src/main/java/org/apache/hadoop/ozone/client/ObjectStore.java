@@ -604,6 +604,22 @@ public class ObjectStore {
   }
 
   /**
+   * Returns snapshot info for volume/bucket snapshot path.
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @param snapshotName snapshot name
+   * @param omNodeId OM node ID to get the snapshot info
+   * @return snapshot info for volume/bucket snapshot path.
+   * @throws IOException
+   */
+  public OzoneSnapshot getSnapshotInfo(String volumeName,
+                                       String bucketName,
+                                       String snapshotName,
+                                       String omNodeId) throws IOException {
+    return proxy.getSnapshotInfo(volumeName, bucketName, snapshotName, omNodeId);
+  }
+
+  /**
    * List snapshots in a volume/bucket.
    * @param volumeName     volume name
    * @param bucketName     bucket name

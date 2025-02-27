@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.shell.snapshot;
 
 import java.io.IOException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.shell.Handler;
@@ -39,6 +40,11 @@ public class InfoSnapshotHandler extends Handler {
       index = "1", arity = "1")
   private String snapshotName;
 
+  @CommandLine.Option(
+      names = {"-n", "--node-id"},
+      description = "The id of OM node to get the snapshot information from")
+  private String omNodeId;
+
   @Override
   protected OzoneAddress getAddress() {
     return snapshotPath.getValue();
@@ -50,8 +56,14 @@ public class InfoSnapshotHandler extends Handler {
     String volumeName = snapshotPath.getValue().getVolumeName();
     String bucketName = snapshotPath.getValue().getBucketName();
 
-    OzoneSnapshot ozoneSnapshot = client.getObjectStore()
-        .getSnapshotInfo(volumeName, bucketName, snapshotName);
+    OzoneSnapshot ozoneSnapshot;
+    if (StringUtils.isEmpty(omNodeId)) {
+      ozoneSnapshot = client.getObjectStore()
+          .getSnapshotInfo(volumeName, bucketName, snapshotName);
+    } else {
+      ozoneSnapshot = client.getObjectStore()
+          .getSnapshotInfo(volumeName, bucketName, snapshotName, omNodeId);
+    }
 
     if (isVerbose()) {
       err().printf("Snapshot info for snapshot: %s under o3://%s/%s %n ",
