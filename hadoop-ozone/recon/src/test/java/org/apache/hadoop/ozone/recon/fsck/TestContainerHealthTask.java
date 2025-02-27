@@ -186,7 +186,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     long currentTime = System.currentTimeMillis();
     ReconTaskStatusDao reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
     ReconTaskConfig reconTaskConfig = new ReconTaskConfig();
-    reconTaskConfig.setMissingContainerTaskInterval(Duration.ofSeconds(5));
+    reconTaskConfig.setMissingContainerTaskInterval(Duration.ofSeconds(10));
 
     // Start container health task
     ContainerHealthTask containerHealthTask =
@@ -260,7 +260,8 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(1L)))
         .thenReturn(getMockReplicas(1L, State.CLOSED, State.CLOSED));
 
-    // ID 2 was UNDER_REPLICATED - make it healthy now
+    // ID 2 was UNDER_REPLICATED - make it healthy now and after this step, UNDER_REPLICATED
+    // container count metric will be 1.
     when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(2L)))
         .thenReturn(getMockReplicas(2L,
             State.CLOSED, State.CLOSED, State.CLOSED));
@@ -292,9 +293,17 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     assertEquals(0,
         unHealthyContainersTableHandle.fetchByContainerId(2L).size());
 
+    // Now since container ID: 2 is gone back to HEALTHY state in above step, so UNDER-REPLICATED
+    // container count should be just 1 (denoting only for container ID : 1)
+    assertEquals(1, containerHealthMetrics.getUnderReplicatedContainerCount());
+
     // Assert that for container 7 no records exist in DB because it's now EMPTY_MISSING
     assertEquals(0,
         unHealthyContainersTableHandle.fetchByContainerId(7L).size());
+
+    // Since Container ID: 7 is now EMPTY_MISSING, so MISSING container count metric
+    // will now be 0 as there is no missing container now.
+    assertEquals(0, containerHealthMetrics.getMissingContainerCount());
 
     rec = unHealthyContainersTableHandle.fetchByContainerId(4L).get(0);
     assertEquals("OVER_REPLICATED", rec.getContainerState());
@@ -307,6 +316,12 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     // Just check once again that count remains consistent
     LambdaTestUtils.await(60000, 1000, () ->
         (unHealthyContainersTableHandle.count() == 2));
+
+    // Since other container states have been changing, but no change in UNDER_REPLICATED
+    // container count, UNDER_REPLICATED count metric should not be affected from previous
+    // assertion count.
+    assertEquals(1, containerHealthMetrics.getUnderReplicatedContainerCount());
+    assertEquals(0, containerHealthMetrics.getMissingContainerCount());
   }
 
   @Test

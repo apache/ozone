@@ -159,6 +159,7 @@ public class ContainerHealthTask extends ReconScmTask {
           Time.monotonicNow() - start);
       taskStatusUpdater.setLastTaskRunStatus(0);
       processedContainers.clear();
+      logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
     } finally {
       lock.writeLock().unlock();
     }
@@ -182,7 +183,6 @@ public class ContainerHealthTask extends ReconScmTask {
       LOG.info("Container Health task thread took {} milliseconds for" +
               " processing {} containers.", Time.monotonicNow() - start,
           containers.size());
-      logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
       if (containers.size() >= FETCH_COUNT) {
         startID = ContainerID.valueOf(
             containers.get(containers.size() - 1).getContainerID() + 1);
@@ -565,9 +565,8 @@ public class ContainerHealthTask extends ReconScmTask {
         return records;
       }
 
-      if (container.isMissing()
-          && !recordForStateExists.contains(
-          UnHealthyContainerStates.MISSING.toString())) {
+      if (container.isMissing()) {
+        boolean shouldAddRecord = !recordForStateExists.contains(UnHealthyContainerStates.MISSING.toString());
         if (!container.isEmpty()) {
           LOG.info("Non-empty container {} is missing. It has {} " +
                   "keys and {} bytes used according to SCM metadata. " +
@@ -575,57 +574,47 @@ public class ContainerHealthTask extends ReconScmTask {
                   "keys (and their metadata) mapped to this container.",
               container.getContainerID(), container.getNumKeys(),
               container.getContainer().getUsedBytes());
-          records.add(
-              recordForState(container, UnHealthyContainerStates.MISSING,
-                  time));
-          populateContainerStats(container, UnHealthyContainerStates.MISSING,
-              unhealthyContainerStateStatsMap);
+
+          if (shouldAddRecord) {
+            records.add(recordForState(container, UnHealthyContainerStates.MISSING, time));
+          }
+          populateContainerStats(container, UnHealthyContainerStates.MISSING, unhealthyContainerStateStatsMap);
         } else {
-          handleEmptyMissingContainers(container, time,
-              unhealthyContainerStateStatsMap);
+          handleEmptyMissingContainers(container, time, unhealthyContainerStateStatsMap);
         }
-        // A container cannot have any other records if it is missing so return
+        // A container cannot have any other records if it is missing, so return
         return records;
       }
 
       // For Negative sized containers we only log but not insert into DB
-      if (container.getContainer().getUsedBytes() < 0
-          && !recordForStateExists.contains(
-          UnHealthyContainerStates.NEGATIVE_SIZE.toString())) {
+      if (container.getContainer().getUsedBytes() < 0) {
         handleNegativeSizedContainers(container, time,
             unhealthyContainerStateStatsMap);
       }
 
-      if (container.isUnderReplicated()
-          && !recordForStateExists.contains(
-              UnHealthyContainerStates.UNDER_REPLICATED.toString())) {
-        records.add(recordForState(
-            container, UnHealthyContainerStates.UNDER_REPLICATED, time));
-        populateContainerStats(container,
-            UnHealthyContainerStates.UNDER_REPLICATED,
-            unhealthyContainerStateStatsMap);
+      if (container.isUnderReplicated()) {
+        boolean shouldAddRecord = !recordForStateExists.contains(UnHealthyContainerStates.UNDER_REPLICATED.toString());
+        if (shouldAddRecord) {
+          records.add(recordForState(container, UnHealthyContainerStates.UNDER_REPLICATED, time));
+        }
+        populateContainerStats(container, UnHealthyContainerStates.UNDER_REPLICATED, unhealthyContainerStateStatsMap);
       }
 
-      if (container.isOverReplicated()
-          && !recordForStateExists.contains(
-              UnHealthyContainerStates.OVER_REPLICATED.toString())) {
-        records.add(recordForState(
-            container, UnHealthyContainerStates.OVER_REPLICATED, time));
-        populateContainerStats(container,
-            UnHealthyContainerStates.OVER_REPLICATED,
-            unhealthyContainerStateStatsMap);
+      if (container.isOverReplicated()) {
+        boolean shouldAddRecord = !recordForStateExists.contains(UnHealthyContainerStates.OVER_REPLICATED.toString());
+        if (shouldAddRecord) {
+          records.add(recordForState(container, UnHealthyContainerStates.OVER_REPLICATED, time));
+        }
+        populateContainerStats(container, UnHealthyContainerStates.OVER_REPLICATED, unhealthyContainerStateStatsMap);
       }
 
-      if (container.isMisReplicated()
-          && !recordForStateExists.contains(
-              UnHealthyContainerStates.MIS_REPLICATED.toString())) {
-        records.add(recordForState(
-            container, UnHealthyContainerStates.MIS_REPLICATED, time));
-        populateContainerStats(container,
-            UnHealthyContainerStates.MIS_REPLICATED,
-            unhealthyContainerStateStatsMap);
+      if (container.isMisReplicated()) {
+        boolean shouldAddRecord = !recordForStateExists.contains(UnHealthyContainerStates.MIS_REPLICATED.toString());
+        if (shouldAddRecord) {
+          records.add(recordForState(container, UnHealthyContainerStates.MIS_REPLICATED, time));
+        }
+        populateContainerStats(container, UnHealthyContainerStates.MIS_REPLICATED, unhealthyContainerStateStatsMap);
       }
-
       return records;
     }
 
