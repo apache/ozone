@@ -53,6 +53,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Testing ContainerStatemanager.
@@ -147,11 +149,14 @@ public class TestContainerStateManager {
     assertEquals(3, c1.getReplicationConfig().getRequiredNodes());
   }
 
-  @Test
-  public void testTransitionDeletingToClosedState() throws IOException {
+  @ParameterizedTest
+  @EnumSource(value = HddsProtos.LifeCycleState.class,
+      names = {"DELETING", "DELETED"})
+  public void testTransitionDeletingOrDeletedToClosedState(HddsProtos.LifeCycleState lifeCycleState)
+      throws IOException {
     HddsProtos.ContainerInfoProto.Builder builder = HddsProtos.ContainerInfoProto.newBuilder();
     builder.setContainerID(1)
-        .setState(HddsProtos.LifeCycleState.DELETING)
+        .setState(lifeCycleState)
         .setUsedBytes(0)
         .setNumberOfKeys(0)
         .setOwner("root")
