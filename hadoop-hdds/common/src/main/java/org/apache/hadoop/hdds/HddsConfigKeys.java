@@ -407,15 +407,15 @@ public final class HddsConfigKeys {
       "ozone.volume.io.percentiles.intervals.seconds";
 
   public static final String HDDS_DATANODE_DNS_INTERFACE_KEY =
-          "hdds.datanode.dns.interface";
+      "hdds.datanode.dns.interface";
   public static final String HDDS_DATANODE_DNS_NAMESERVER_KEY =
-          "hdds.datanode.dns.nameserver";
+      "hdds.datanode.dns.nameserver";
   public static final String HDDS_DATANODE_HOST_NAME_KEY =
-          "hdds.datanode.hostname";
+      "hdds.datanode.hostname";
   public static final String HDDS_DATANODE_DATA_DIR_KEY =
-          "hdds.datanode.data.dir";
+      "hdds.datanode.data.dir";
   public static final String HDDS_DATANODE_USE_DN_HOSTNAME =
-          "hdds.datanode.use.datanode.hostname";
+      "hdds.datanode.use.datanode.hostname";
   public static final boolean HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT = false;
 
   public static final String HDDS_XFRAME_OPTION_ENABLED = "hdds.xframe.enabled";
@@ -424,13 +424,13 @@ public final class HddsConfigKeys {
   public static final String HDDS_XFRAME_OPTION_VALUE_DEFAULT = "SAMEORIGIN";
 
   public static final String HDDS_METRICS_SESSION_ID_KEY =
-          "hdds.metrics.session-id";
+      "hdds.metrics.session-id";
 
   public static final String HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY =
-          "hdds.datanode.kerberos.principal";
+      "hdds.datanode.kerberos.principal";
   public static final String HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY =
-          "hdds.datanode.kerberos.keytab.file";
+      "hdds.datanode.kerberos.keytab.file";
   public static final String HDDS_METRICS_PERCENTILES_INTERVALS_KEY =
-          "hdds.metrics.percentiles.intervals";
+      "hdds.metrics.percentiles.intervals";
 
 }
