@@ -99,7 +99,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   protected int processKeyDeletes(List<BlockGroup> keyBlocksList,
       KeyManager manager,
       HashMap<String, RepeatedOmKeyInfo> keysToModify,
-      String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException {
+      String snapTableKey, UUID expectedPreviousSnapshotId, long run) throws IOException {
 
     long startTime = Time.monotonicNow();
     int delCount = 0;
@@ -121,7 +121,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     if (blockDeletionResults != null) {
       startTime = Time.monotonicNow();
       delCount = submitPurgeKeysRequest(blockDeletionResults,
-          keysToModify, snapTableKey, expectedPreviousSnapshotId);
+          keysToModify, snapTableKey, expectedPreviousSnapshotId, run);
       int limit = ozoneManager.getConfiguration().getInt(OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK,
           OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
       LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms. Limit per task is {}.",
@@ -137,7 +137,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
    * @param keysToModify Updated list of RepeatedOmKeyInfo
    */
   private int submitPurgeKeysRequest(List<DeleteBlockGroupResult> results,
-      HashMap<String, RepeatedOmKeyInfo> keysToModify, String snapTableKey, UUID expectedPreviousSnapshotId) {
+      HashMap<String, RepeatedOmKeyInfo> keysToModify, String snapTableKey,
+      UUID expectedPreviousSnapshotId, long run) {
     Map<Pair<String, String>, List<String>> purgeKeysMapPerBucket =
         new HashMap<>();
 
@@ -216,7 +217,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
     // Submit PurgeKeys request to OM
     try {
-      OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, runCount.get());
+      OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, run);
     } catch (ServiceException e) {
       LOG.error("PurgeKey request failed. Will retry at next run.", e);
       return 0;
