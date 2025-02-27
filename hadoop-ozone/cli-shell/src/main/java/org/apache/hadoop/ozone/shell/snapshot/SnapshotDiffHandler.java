@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.bucket.BucketUri;
+import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import picocli.CommandLine;
@@ -91,6 +92,11 @@ public class SnapshotDiffHandler extends Handler {
       description = "Format output as JSON")
   private boolean json;
 
+  @CommandLine.Option(
+      names = {"-n", "--om-node-id"},
+      description = "The id of OM node to get the snapshot information from")
+  private String omNodeId;
+
   @Override
   protected OzoneAddress getAddress() {
     return snapshotPath.getValue();
@@ -106,16 +112,22 @@ public class SnapshotDiffHandler extends Handler {
     OmUtils.validateSnapshotName(toSnapshot);
 
     if (cancel) {
-      cancelSnapshotDiff(client.getObjectStore(), volumeName, bucketName);
+      cancelSnapshotDiff(client.getObjectStore(), volumeName, bucketName, omNodeId);
     } else {
-      getSnapshotDiff(client.getObjectStore(), volumeName, bucketName);
+      getSnapshotDiff(client.getObjectStore(), volumeName, bucketName, omNodeId);
     }
   }
 
   private void getSnapshotDiff(ObjectStore store, String volumeName,
-                               String bucketName) throws IOException {
-    SnapshotDiffResponse diffResponse = store.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
-        token, pageSize, forceFullDiff, diffDisableNativeLibs);
+                               String bucketName, String nodeId) throws IOException {
+    SnapshotDiffResponse diffResponse;
+    if (StringUtils.isEmpty(nodeId)) {
+      diffResponse = store.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
+          token, pageSize, forceFullDiff, diffDisableNativeLibs);
+    } else {
+      diffResponse = store.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
+          token, pageSize, forceFullDiff, diffDisableNativeLibs, nodeId);
+    }
     try (PrintWriter writer = out()) {
       if (json) {
         writer.println(toJsonStringWithDefaultPrettyPrinter(getJsonObject(diffResponse)));
@@ -126,9 +138,15 @@ public class SnapshotDiffHandler extends Handler {
   }
 
   private void cancelSnapshotDiff(ObjectStore store, String volumeName,
-                                  String bucketName) throws IOException {
+                                  String bucketName, String nodeId) throws IOException {
     try (PrintWriter writer = out()) {
-      writer.println(store.cancelSnapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot));
+      CancelSnapshotDiffResponse cancelResponse;
+      if (StringUtils.isEmpty(nodeId)) {
+        cancelResponse = store.cancelSnapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot);
+      } else {
+        cancelResponse = store.cancelSnapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot, nodeId);
+      }
+      writer.println(cancelResponse);
     }
   }
 

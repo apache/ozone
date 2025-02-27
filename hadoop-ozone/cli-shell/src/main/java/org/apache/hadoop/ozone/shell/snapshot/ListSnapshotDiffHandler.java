@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.shell.snapshot;
 
 import java.io.IOException;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneSnapshotDiff;
 import org.apache.hadoop.ozone.shell.Handler;
@@ -48,6 +49,11 @@ public class ListSnapshotDiffHandler extends Handler {
       defaultValue = "false")
   private boolean listAll;
 
+  @CommandLine.Option(
+      names = {"-n", "--om-node-id"},
+      description = "The id of OM node to get the snapshot information from")
+  private String omNodeId;
+
   @Override
   protected OzoneAddress getAddress() {
     return snapshotPath.getValue();
@@ -60,9 +66,14 @@ public class ListSnapshotDiffHandler extends Handler {
     String volumeName = snapshotPath.getValue().getVolumeName();
     String bucketName = snapshotPath.getValue().getBucketName();
 
-    List<OzoneSnapshotDiff> jobList =
-        client.getObjectStore().listSnapshotDiffJobs(
-            volumeName, bucketName, jobStatus, listAll);
+    List<OzoneSnapshotDiff> jobList;
+    if (StringUtils.isEmpty(omNodeId)) {
+      jobList = client.getObjectStore().listSnapshotDiffJobs(
+          volumeName, bucketName, jobStatus, listAll);
+    } else {
+      jobList = client.getObjectStore().listSnapshotDiffJobs(
+          volumeName, bucketName, jobStatus, listAll, omNodeId);
+    }
 
     int counter = printAsJsonArray(jobList.iterator(),
         jobList.size());

@@ -41,7 +41,7 @@ public class InfoSnapshotHandler extends Handler {
   private String snapshotName;
 
   @CommandLine.Option(
-      names = {"-n", "--node-id"},
+      names = {"-n", "--om-node-id"},
       description = "The id of OM node to get the snapshot information from")
   private String omNodeId;
 

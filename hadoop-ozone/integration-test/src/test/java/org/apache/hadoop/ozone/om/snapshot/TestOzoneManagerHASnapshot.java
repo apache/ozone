@@ -20,8 +20,11 @@ package org.apache.hadoop.ozone.om.snapshot;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.CANCELLED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.FAILED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.REJECTED;
 import static org.apache.ozone.test.LambdaTestUtils.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -51,6 +54,7 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
+import org.apache.hadoop.ozone.client.OzoneSnapshotDiff;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -359,15 +363,7 @@ public class TestOzoneManagerHASnapshot {
     OzoneManager omLeader = cluster.getOMLeader();
     assertNotNull(omLeader);
     // Get the first non-leader OM
-    OzoneManager nonLeaderOM = null;
-    for (OzoneManager ozoneManager : ozoneManagers) {
-      if (!Objects.equals(omLeader, ozoneManager)) {
-        nonLeaderOM = ozoneManager;
-      }
-    }
-    assertNotNull(nonLeaderOM);
-
-    final OzoneManager finalNonLeaderOM = nonLeaderOM;
+    final OzoneManager finalNonLeaderOM = getFirstNonLeader();
     await(120_0000, 100, () -> {
       SnapshotInfo snapshotInfo;
       try {
@@ -390,6 +386,101 @@ public class TestOzoneManagerHASnapshot {
     assertEquals(snapshotInfoFromFollower.getSnapshotId(), snapshotInfoFromLeader.getSnapshotId());
   }
 
+  @Test
+  public void testSnapshotDiffOnNonLeader() throws Exception {
+    String snapshot1 = "snaptodiff-" + RandomStringUtils.randomNumeric(10);
+    String snapshot2 = "snaptodiff-" + RandomStringUtils.randomNumeric(10);
+
+    createFileKey(ozoneBucket, "keytodiff-" + RandomStringUtils.randomNumeric(10));
+    store.createSnapshot(volumeName, bucketName, snapshot1);
+
+    for (int i = 0; i < 100; i++) {
+      createFileKey(ozoneBucket, "keytodiff-" + RandomStringUtils.randomNumeric(10));
+    }
+
+    store.createSnapshot(volumeName, bucketName, snapshot2);
+
+    List<OzoneSnapshotDiff> originalLeaderSnapshotDiffJobs = store.listSnapshotDiffJobs(
+        volumeName, bucketName, "", true);
+
+    // Get snapdiff from leader first
+    SnapshotDiffResponse leaderSnapdiffResponse =
+        store.snapshotDiff(volumeName, bucketName,
+            snapshot1, snapshot2, null, 0, false, false);
+
+    assertEquals(IN_PROGRESS, leaderSnapdiffResponse.getJobStatus());
+
+    await(120_000, 100, () -> {
+      SnapshotDiffResponse snapshotDiffResponse;
+      try {
+        snapshotDiffResponse = store.snapshotDiff(volumeName, bucketName,
+            snapshot1, snapshot2, null, 0, false, false);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+      if (snapshotDiffResponse == null) {
+        throw new NullPointerException();
+      }
+
+      if (snapshotDiffResponse.getJobStatus().equals(REJECTED) || snapshotDiffResponse.getJobStatus().equals(FAILED)
+          || snapshotDiffResponse.getJobStatus().equals(CANCELLED)) {
+        throw new Exception("Snapdiff failed");
+      }
+
+      return snapshotDiffResponse.getJobStatus().equals(DONE);
+    });
+
+    List<OzoneSnapshotDiff> leaderSnapshotDiffJobs = store.listSnapshotDiffJobs(volumeName, bucketName, "", true);
+    assertEquals(originalLeaderSnapshotDiffJobs.size() + 1, leaderSnapshotDiffJobs.size());
+
+    // To compare with the follower snapshot diff later
+    leaderSnapdiffResponse = store.snapshotDiff(volumeName, bucketName,
+        snapshot1, snapshot2, null, 0, false, false);
+
+
+    final OzoneManager finalNonLeaderOM = getFirstNonLeader();
+    List<OzoneSnapshotDiff> originalFollowerSnapshotDiffJobs = store.listSnapshotDiffJobs(
+        volumeName, bucketName, "", true, finalNonLeaderOM.getOMNodeId());
+
+    // Snapdiff from the follower
+    SnapshotDiffResponse followerResponse =
+        store.snapshotDiff(volumeName, bucketName,
+            snapshot1, snapshot2, null, 0, false, false, finalNonLeaderOM.getOMNodeId());
+
+    assertEquals(IN_PROGRESS, followerResponse.getJobStatus());
+    await(120_000, 100, () -> {
+      SnapshotDiffResponse snapshotDiffResponse;
+      try {
+        snapshotDiffResponse = store.snapshotDiff(volumeName, bucketName,
+            snapshot1, snapshot2, null, 0, false, false,
+            finalNonLeaderOM.getOMNodeId());
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+      if (snapshotDiffResponse == null) {
+        throw new NullPointerException();
+      }
+
+      if (snapshotDiffResponse.getJobStatus().equals(REJECTED) || snapshotDiffResponse.getJobStatus().equals(FAILED)
+          || snapshotDiffResponse.getJobStatus().equals(CANCELLED)) {
+        throw new Exception("Snapdiff failed");
+      }
+
+      return snapshotDiffResponse.getJobStatus().equals(DONE);
+    });
+
+    List<OzoneSnapshotDiff> followerSnapshotDiffJobs = store.listSnapshotDiffJobs(
+        volumeName, bucketName, "", true, finalNonLeaderOM.getOMNodeId());
+    assertEquals(originalFollowerSnapshotDiffJobs.size() + 1, followerSnapshotDiffJobs.size());
+
+    SnapshotDiffResponse followerSnapdiffResponse = store.snapshotDiff(volumeName, bucketName,
+        snapshot1, snapshot2, null, 0, false, false, finalNonLeaderOM.getOMNodeId());
+
+    assertEquals(leaderSnapdiffResponse.getSnapshotDiffReport().getDiffList(),
+        followerSnapdiffResponse.getSnapshotDiffReport().getDiffList());
+  }
+
+
   private void createSnapshot(String volName, String buckName, String snapName) throws IOException {
     store.createSnapshot(volName, buckName, snapName);
 
@@ -411,5 +502,19 @@ public class TestOzoneManagerHASnapshot {
         throw new RuntimeException(e);
       }
     }, 1000, 60000);
+  }
+
+  private OzoneManager getFirstNonLeader() {
+    OzoneManager omLeader = cluster.getOzoneManager();
+    // Get the first non-leader OM
+    OzoneManager nonLeaderOM = null;
+    for (OzoneManager ozoneManager : cluster.getOzoneManagersList()) {
+      if (!Objects.equals(omLeader, ozoneManager)) {
+        nonLeaderOM = ozoneManager;
+        break;
+      }
+    }
+    assertNotNull(nonLeaderOM);
+    return nonLeaderOM;
   }
 }

@@ -775,7 +775,7 @@ public interface OzoneManagerProtocol
    * @param volumeName volume name
    * @param bucketName bucket name
    * @param snapshotName snapshot name
-   * @param omNodeId OM node ID to get the snapshot info from
+   * @param omNodeId OM node ID to get the snapshot info from, if unspecified will get from OM leader
    * @return snapshot info for volume/bucket snapshot path.
    * @throws IOException
    */
@@ -844,6 +844,34 @@ public interface OzoneManagerProtocol
   }
 
   /**
+   * Get the differences between two snapshots.
+   * @param volumeName Name of the volume to which the snapshotted bucket belong
+   * @param bucketName Name of the bucket to which the snapshots belong
+   * @param fromSnapshot The name of the starting snapshot
+   * @param toSnapshot The name of the ending snapshot
+   * @param token to get the index to return diff report from.
+   * @param pageSize maximum entries returned to the report.
+   * @param forceFullDiff request to force full diff, skipping DAG optimization
+   * @param omNodeId OM node ID to send the snapshot diff request.
+   * @return the difference report between two snapshots
+   * @throws IOException in case of any exception while generating snapshot diff
+   */
+  @SuppressWarnings("parameternumber")
+  default SnapshotDiffResponse snapshotDiff(String volumeName,
+                                            String bucketName,
+                                            String fromSnapshot,
+                                            String toSnapshot,
+                                            String token,
+                                            int pageSize,
+                                            boolean forceFullDiff,
+                                            boolean disableNativeDiff,
+                                            String omNodeId)
+      throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented");
+  }
+
+  /**
    * Cancel snapshot diff job.
    * @param volumeName Name of the volume to which the snapshotted bucket belong
    * @param bucketName Name of the bucket to which the snapshots belong
@@ -862,6 +890,26 @@ public interface OzoneManagerProtocol
   }
 
   /**
+   * Cancel snapshot diff job.
+   * @param volumeName Name of the volume to which the snapshotted bucket belong
+   * @param bucketName Name of the bucket to which the snapshots belong
+   * @param fromSnapshot The name of the starting snapshot
+   * @param toSnapshot The name of the ending snapshot
+   * @param omNodeId OM node ID to send the cancel snapshot diff jobs request
+   * @return the success if cancel succeeds.
+   * @throws IOException in case of any exception while cancelling snap diff job
+   */
+  default CancelSnapshotDiffResponse cancelSnapshotDiff(String volumeName,
+                                                        String bucketName,
+                                                        String fromSnapshot,
+                                                        String toSnapshot,
+                                                        String omNodeId)
+      throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented");
+  }
+
+  /**
    * Get a list of the SnapshotDiff jobs for a bucket based on the JobStatus.
    * @param volumeName Name of the volume to which the snapshotted bucket belong
    * @param bucketName Name of the bucket to which the snapshots belong
@@ -873,6 +921,25 @@ public interface OzoneManagerProtocol
                                                      String bucketName,
                                                      String jobStatus,
                                                      boolean listAll)
+      throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented");
+  }
+
+  /**
+   * Get a list of the SnapshotDiff jobs for a bucket based on the JobStatus.
+   * @param volumeName Name of the volume to which the snapshotted bucket belong
+   * @param bucketName Name of the bucket to which the snapshots belong
+   * @param jobStatus JobStatus to be used to filter the snapshot diff jobs
+   * @param omNodeId OM node ID to get the list of SnapshotDiff jobs from, if unspecified will get from OM leader
+   * @return a list of SnapshotDiffJob objects
+   * @throws IOException in case there is a failure while getting a response.
+   */
+  default List<SnapshotDiffJob> listSnapshotDiffJobs(String volumeName,
+                                                     String bucketName,
+                                                     String jobStatus,
+                                                     boolean listAll,
+                                                     String omNodeId)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented");

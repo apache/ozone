@@ -1320,19 +1320,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @Override
   public SnapshotInfo getSnapshotInfo(String volumeName, String bucketName,
                                       String snapshotName) throws IOException {
-    final SnapshotInfoRequest.Builder requestBuilder =
-        SnapshotInfoRequest.newBuilder()
-            .setVolumeName(volumeName)
-            .setBucketName(bucketName)
-            .setSnapshotName(snapshotName);
-
-    final OMRequest omRequest = createOMRequest(Type.GetSnapshotInfo)
-        .setSnapshotInfoRequest(requestBuilder)
-        .build();
-    final OMResponse omResponse = submitRequest(omRequest);
-    handleError(omResponse);
-    return SnapshotInfo.getFromProtobuf(omResponse.getSnapshotInfoResponse()
-        .getSnapshotInfo());
+    return getSnapshotInfo(volumeName, bucketName, snapshotName, null);
   }
 
 
@@ -1342,18 +1330,18 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @Override
   public SnapshotInfo getSnapshotInfo(String volumeName, String bucketName,
                                       String snapshotName, String omNodeId) throws IOException {
-    Preconditions.checkNotNull(omNodeId);
     final SnapshotInfoRequest.Builder requestBuilder =
         SnapshotInfoRequest.newBuilder()
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setSnapshotName(snapshotName);
 
-    final OMRequest omRequest = createOMRequest(Type.GetSnapshotInfo)
-        .setSnapshotInfoRequest(requestBuilder)
-        .setOmNodeId(omNodeId)
-        .build();
-    final OMResponse omResponse = submitRequest(omRequest);
+    final OMRequest.Builder omRequest = createOMRequest(Type.GetSnapshotInfo)
+        .setSnapshotInfoRequest(requestBuilder);
+    if (!StringUtils.isBlank(omNodeId)) {
+      omRequest.setOmNodeId(omNodeId);
+    }
+    final OMResponse omResponse = submitRequest(omRequest.build());
     handleError(omResponse);
     return SnapshotInfo.getFromProtobuf(omResponse.getSnapshotInfoResponse()
         .getSnapshotInfo());
@@ -1443,6 +1431,24 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                                            boolean forceFullDiff,
                                            boolean disableNativeDiff)
       throws IOException {
+    return snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot, token,
+        pageSize, forceFullDiff, disableNativeDiff, null);
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public SnapshotDiffResponse snapshotDiff(String volumeName,
+                                           String bucketName,
+                                           String fromSnapshot,
+                                           String toSnapshot,
+                                           String token,
+                                           int pageSize,
+                                           boolean forceFullDiff,
+                                           boolean disableNativeDiff,
+                                           String omNodeId)
+      throws IOException {
     final OzoneManagerProtocolProtos.SnapshotDiffRequest.Builder
         requestBuilder =
         OzoneManagerProtocolProtos.SnapshotDiffRequest.newBuilder()
@@ -1458,10 +1464,14 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       requestBuilder.setToken(token);
     }
 
-    final OMRequest omRequest = createOMRequest(Type.SnapshotDiff)
-        .setSnapshotDiffRequest(requestBuilder)
-        .build();
-    final OMResponse omResponse = submitRequest(omRequest);
+    final OMRequest.Builder omRequest = createOMRequest(Type.SnapshotDiff)
+        .setSnapshotDiffRequest(requestBuilder);
+
+    if (!StringUtils.isBlank(omNodeId)) {
+      omRequest.setOmNodeId(omNodeId);
+    }
+
+    final OMResponse omResponse = submitRequest(omRequest.build());
     handleError(omResponse);
     OzoneManagerProtocolProtos.SnapshotDiffResponse diffResponse =
         omResponse.getSnapshotDiffResponse();
@@ -1482,6 +1492,15 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                                                        String fromSnapshot,
                                                        String toSnapshot)
       throws IOException {
+    return cancelSnapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot, null);
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public CancelSnapshotDiffResponse cancelSnapshotDiff(String volumeName, String bucketName,
+      String fromSnapshot, String toSnapshot, String omNodeId) throws IOException {
     final OzoneManagerProtocolProtos.CancelSnapshotDiffRequest.Builder
         requestBuilder =
         OzoneManagerProtocolProtos.CancelSnapshotDiffRequest.newBuilder()
@@ -1490,11 +1509,14 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .setFromSnapshot(fromSnapshot)
             .setToSnapshot(toSnapshot);
 
-    final OMRequest omRequest = createOMRequest(Type.CancelSnapshotDiff)
-        .setCancelSnapshotDiffRequest(requestBuilder)
-        .build();
+    final OMRequest.Builder omRequest = createOMRequest(Type.CancelSnapshotDiff)
+        .setCancelSnapshotDiffRequest(requestBuilder);
 
-    final OMResponse omResponse = submitRequest(omRequest);
+    if (!StringUtils.isBlank(omNodeId)) {
+      omRequest.setOmNodeId(omNodeId);
+    }
+
+    final OMResponse omResponse = submitRequest(omRequest.build());
     handleError(omResponse);
     OzoneManagerProtocolProtos.CancelSnapshotDiffResponse diffResponse =
         omResponse.getCancelSnapshotDiffResponse();
@@ -1511,6 +1533,15 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                                                     String jobStatus,
                                                     boolean listAll)
       throws IOException {
+    return listSnapshotDiffJobs(volumeName, bucketName, jobStatus, listAll, null);
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public List<SnapshotDiffJob> listSnapshotDiffJobs(String volumeName, String bucketName, String jobStatus,
+                                                    boolean listAll, String omNodeId) throws IOException {
     final OzoneManagerProtocolProtos
         .ListSnapshotDiffJobRequest.Builder requestBuilder =
         OzoneManagerProtocolProtos
@@ -1520,10 +1551,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .setJobStatus(jobStatus)
             .setListAll(listAll);
 
-    final OMRequest omRequest = createOMRequest(Type.ListSnapshotDiffJobs)
-        .setListSnapshotDiffJobRequest(requestBuilder)
-        .build();
-    final OMResponse omResponse = submitRequest(omRequest);
+    final OMRequest.Builder omRequest = createOMRequest(Type.ListSnapshotDiffJobs)
+        .setListSnapshotDiffJobRequest(requestBuilder);
+    if (!StringUtils.isBlank(omNodeId)) {
+      omRequest.setOmNodeId(omNodeId);
+    }
+    final OMResponse omResponse = submitRequest(omRequest.build());
     handleError(omResponse);
     return omResponse.getListSnapshotDiffJobResponse()
         .getSnapshotDiffJobList().stream()
