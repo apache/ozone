@@ -73,9 +73,6 @@ public class TestHealthyPipelineSafeModeRule {
     ContainerManager containerManager = mock(ContainerManager.class);
     when(containerManager.getContainers()).thenReturn(containers);
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFile.getPath());
-    // enable pipeline check
-    config.setBoolean(
-            HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
     config.setBoolean(
             HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
     SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(config);
@@ -128,8 +125,6 @@ public class TestHealthyPipelineSafeModeRule {
     when(containerManager.getContainers()).thenReturn(containers);
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFile.getPath());
     // enable pipeline check
-    config.setBoolean(
-            HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
     config.setBoolean(
             HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
 
@@ -223,9 +218,6 @@ public class TestHealthyPipelineSafeModeRule {
     ContainerManager containerManager = mock(ContainerManager.class);
     when(containerManager.getContainers()).thenReturn(containers);
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFile.getPath());
-    // enable pipeline check
-    config.setBoolean(
-            HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
     config.setBoolean(
             HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
 
