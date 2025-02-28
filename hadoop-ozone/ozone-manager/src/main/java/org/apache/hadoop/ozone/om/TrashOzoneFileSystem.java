@@ -71,8 +71,6 @@ public class TrashOzoneFileSystem extends FileSystem {
 
   private final OzoneManager ozoneManager;
 
-  private final String userName;
-
   private final AtomicLong runCount;
 
   private static final ClientId CLIENT_ID = ClientId.randomId();
@@ -84,8 +82,6 @@ public class TrashOzoneFileSystem extends FileSystem {
 
   public TrashOzoneFileSystem(OzoneManager ozoneManager) throws IOException {
     this.ozoneManager = ozoneManager;
-    this.userName =
-          UserGroupInformation.getCurrentUser().getShortUserName();
     this.runCount = new AtomicLong(0);
     setConf(ozoneManager.getConfiguration());
     ozoneConfiguration = OzoneConfiguration.of(getConf());

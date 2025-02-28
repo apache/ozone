@@ -72,7 +72,6 @@ import org.slf4j.LoggerFactory;
  */
 public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
-  private OzoneConfiguration conf;
   private EventPublisher eventQueue;
   private NodeManager nodeManager;
   private ReplicationManager replicationManager;
@@ -144,7 +143,6 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
       EventPublisher eventQueue,
       NodeManager nodeManager,
       ReplicationManager replicationManager) {
-    this.conf = conf;
     this.eventQueue = eventQueue;
     this.nodeManager = nodeManager;
     this.replicationManager = replicationManager;

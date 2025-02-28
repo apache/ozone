@@ -65,16 +65,6 @@ public class TestOzoneTokenIdentifier {
 
   private static final Logger LOG = LoggerFactory
       .getLogger(TestOzoneTokenIdentifier.class);
-  private static String sslConfsDir;
-  private static final String EXCLUDE_CIPHERS =
-      "TLS_ECDHE_RSA_WITH_RC4_128_SHA,"
-          + "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA,  \n"
-          + "SSL_RSA_WITH_DES_CBC_SHA,"
-          + "SSL_DHE_RSA_WITH_DES_CBC_SHA,  "
-          + "SSL_RSA_EXPORT_WITH_RC4_40_MD5,\t \n"
-          + "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA,"
-          + "SSL_RSA_WITH_RC4_128_MD5";
-
 
   @Test
   public void testSignToken(@TempDir Path baseDir) throws GeneralSecurityException, IOException {

@@ -53,7 +53,6 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       LoggerFactory.getLogger(PipelinePlacementPolicy.class);
   private final NodeManager nodeManager;
   private final PipelineStateManager stateManager;
-  private final ConfigurationSource conf;
   private final int heavyNodeCriteria;
   private static final int REQUIRED_RACKS = 2;
 
@@ -75,7 +74,6 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
                                  final ConfigurationSource conf) {
     super(nodeManager, conf);
     this.nodeManager = nodeManager;
-    this.conf = conf;
     this.stateManager = stateManager;
     String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
     this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);

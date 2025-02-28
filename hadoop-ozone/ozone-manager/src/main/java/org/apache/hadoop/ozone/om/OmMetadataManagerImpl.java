@@ -311,7 +311,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table snapshotRenamedTable;
   private Table compactionLogTable;
 
-  private boolean ignorePipelineinKey;
   private Table deletedDirTable;
 
   private OzoneManager ozoneManager;
@@ -349,9 +348,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
     this.lock = new OzoneManagerLock(conf);
     this.omEpoch = OmUtils.getOMEpoch();
-    // For test purpose only
-    ignorePipelineinKey = conf.getBoolean(
-        "ozone.om.ignore.pipeline", Boolean.TRUE);
     start(conf);
   }
 
