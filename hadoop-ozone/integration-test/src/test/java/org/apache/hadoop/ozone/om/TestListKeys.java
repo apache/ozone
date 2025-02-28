@@ -377,16 +377,19 @@ public abstract class TestListKeys implements NonHATests.TestCase {
     byte[] input = new byte[length];
     Arrays.fill(input, (byte) 96);
     for (String key : keys) {
-      createKey(ozoneBucket, key, ReplicationFactor.THREE, ReplicationType.RATIS,
-          new String(input, StandardCharsets.UTF_8));
-
+      createKey(ozoneBucket, key, ReplicationFactor.THREE, ReplicationType.RATIS, input);
       // Read the key with given key name.
-      OzoneInputStream ozoneInputStream = ozoneBucket.readKey(key);
-      byte[] read = new byte[length];
-      ozoneInputStream.read(read, 0, length);
-      ozoneInputStream.close();
-
-      assertEquals(new String(input, StandardCharsets.UTF_8), new String(read, StandardCharsets.UTF_8));
+      readkey(ozoneBucket, key, length, input);
     }
+  }
+
+  private static void readkey(OzoneBucket ozoneBucket, String key, int length, byte[] input)
+  throws Exception{
+    OzoneInputStream ozoneInputStream = ozoneBucket.readKey(key);
+    byte[] read = new byte[length];
+    ozoneInputStream.read(read, 0, length);
+    ozoneInputStream.close();
+
+    assertEquals(new String(input, StandardCharsets.UTF_8), new String(read, StandardCharsets.UTF_8));
   }
 }

@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -109,6 +110,20 @@ public final class TestDataUtil {
                                String content) throws IOException {
     createKey(bucket, keyName, ReplicationFactor.ONE,
         ReplicationType.RATIS, content);
+  }
+
+  public static void createKey(OzoneBucket bucket, String keyName,
+                               byte[] content) throws IOException {
+    createKey(bucket, keyName, ReplicationFactor.ONE,
+        ReplicationType.RATIS, new String(content));
+  }
+
+  public static void createKey(OzoneBucket bucket, String keyName,
+                               ReplicationFactor repFactor, ReplicationType repType, byte[] content)
+      throws IOException {
+    ReplicationConfig repConfig = ReplicationConfig
+        .fromTypeAndFactor(repType, repFactor);
+    createKey(bucket, keyName, repConfig, new String(content, UTF_8));
   }
 
   public static void createKey(OzoneBucket bucket, String keyName,

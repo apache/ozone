@@ -414,13 +414,18 @@ public class TestOzoneFSWithObjectStoreCreate {
     assertEquals(keys, outputKeys);
   }
 
-  private void createAndAssertKey(OzoneBucket ozoneBucket, String key, int length,
-                                  byte[] input)
+  private void createAndAssertKey(OzoneBucket ozoneBucket, String key, int length, byte[] input)
       throws Exception {
     
-    createKey(ozoneBucket, key, new String(input, UTF_8));
-
+    createKey(ozoneBucket, key, input);
     // Read the key with given key name.
+    readKey(ozoneBucket, key, length, input);
+
+  }
+
+  private void readKey(OzoneBucket ozoneBucket, String key, int length, byte[] input)
+      throws Exception{
+
     OzoneInputStream ozoneInputStream = ozoneBucket.readKey(key);
     byte[] read = new byte[length];
     ozoneInputStream.read(read, 0, length);

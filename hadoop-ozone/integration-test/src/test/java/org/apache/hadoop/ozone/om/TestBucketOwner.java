@@ -25,7 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -93,9 +92,8 @@ public abstract class TestBucketOwner implements NonHATests.TestCase {
           .getVolume(VOLUME_NAME);
       OzoneBucket ozoneBucket = volume.getBucket("bucket1");
       //Key Create
-      byte[] bytes = new byte[10];
-      createKey(ozoneBucket, "key1", new String(bytes, StandardCharsets.UTF_8));
-      createKey(ozoneBucket, "key2", new String(bytes, StandardCharsets.UTF_8));
+      createKey(ozoneBucket, "key1", new byte[10]);
+      createKey(ozoneBucket, "key2", new byte[10]);
       //Key Delete
       ozoneBucket.deleteKey("key1");
       //Bucket Delete
@@ -120,8 +118,7 @@ public abstract class TestBucketOwner implements NonHATests.TestCase {
       assertThrows(Exception.class, () -> {
         OzoneVolume volume = client.getObjectStore().getVolume(VOLUME_NAME);
         OzoneBucket ozoneBucket = volume.getBucket("bucket1");
-        byte[] bytes = new byte[10];
-        createKey(ozoneBucket, "key3", new String(bytes, StandardCharsets.UTF_8));
+        createKey(ozoneBucket, "key3", new byte[10]);
       }, "Create key as non-volume and non-bucket owner should fail");
     }
     //Key Delete - should fail
@@ -176,9 +173,7 @@ public abstract class TestBucketOwner implements NonHATests.TestCase {
     try (OzoneClient client = cluster().newClient()) {
       OzoneVolume volume = client.getObjectStore().getVolume(VOLUME_NAME);
       OzoneBucket ozoneBucket = volume.getBucket("bucket1");
-      //Key Create
-      byte[] bytes = new byte[10];
-      createKey(ozoneBucket, "key2", new String(bytes, StandardCharsets.UTF_8));
+      createKey(ozoneBucket, "key2", new byte[10]);
       //Key Delete
       ozoneBucket.deleteKey("key2");
       //List Keys
