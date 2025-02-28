@@ -47,23 +47,23 @@ import picocli.CommandLine;
  */
 class TestContainerBalancerSubCommand {
 
-  public static final Pattern DURATION = Pattern.compile(
+  private static final Pattern DURATION = Pattern.compile(
       "^Balancing duration: \\d{1}s$", Pattern.MULTILINE);
-  public static final Pattern FAILED_TO_START = Pattern.compile(
+  private static final Pattern FAILED_TO_START = Pattern.compile(
       "^Failed\\sto\\sstart\\sContainer\\sBalancer.");
-  public static final Pattern IS_NOT_RUNNING = Pattern.compile(
+  private static final Pattern IS_NOT_RUNNING = Pattern.compile(
       "^ContainerBalancer\\sis\\sNot\\sRunning.");
   private static final Pattern IS_RUNNING = Pattern.compile(
       "^ContainerBalancer\\sis\\sRunning.$", Pattern.MULTILINE);
-  public static final Pattern STARTED_AT = Pattern.compile(
+  private static final Pattern STARTED_AT = Pattern.compile(
       "^Started at: (\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})$", Pattern.MULTILINE);
-  public static final Pattern STARTED_SUCCESSFULLY = Pattern.compile(
+  private static final Pattern STARTED_SUCCESSFULLY = Pattern.compile(
       "^Container\\sBalancer\\sstarted\\ssuccessfully.");
-  public static final Pattern WAITING_TO_STOP = Pattern.compile(
+  private static final Pattern WAITING_TO_STOP = Pattern.compile(
       "^Sending\\sstop\\scommand.\\sWaiting\\sfor\\sContainer\\sBalancer\\sto\\sstop...\\n" +
       "Container\\sBalancer\\sstopped.");
 
-  public static final String BALANCER_CONFIG_OUTPUT = "Container Balancer Configuration values:\n" +
+  private static final String BALANCER_CONFIG_OUTPUT = "Container Balancer Configuration values:\n" +
       "Key                                                Value\n" +
       "Threshold                                          10.0\n" +
       "Max Datanodes to Involve per Iteration(percent)    20\n" +
