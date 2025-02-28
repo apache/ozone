@@ -366,10 +366,15 @@ public class XbeiverServerRatis implements XbeiverServerSpi {
             }
 
             String uuidString = String.valueOf(bucket.hashCode() % 10);
+//            String uuidString = String.valueOf(bucket.hashCode() % 100);
             RaftGroupId raftGroupId = RaftGroupId.valueOf(
                     UUID.nameUUIDFromBytes(uuidString.getBytes())
 //                    UUID.nameUUIDFromBytes(uuidString.getBytes())
             );
+//            RaftGroupId raftGroupId = RaftGroupId.valueOf(
+//                    UUID.nameUUIDFromBytes("test".getBytes())
+////                    UUID.nameUUIDFromBytes(uuidString.getBytes())
+//            );
 //            LOG.error("Try process request. RAFT group {} for bucket {}", raftGroupId, bucket);
 //            LOG.error("Current thread: {}", Thread.currentThread().getName());
 //            ReentrantReadWriteLock lock = lockMap.computeIfAbsent(raftGroupId, any -> new ReentrantReadWriteLock());
@@ -464,14 +469,14 @@ public class XbeiverServerRatis implements XbeiverServerSpi {
                     omResponse = createOmResponse(omRequest, raftClientReply);
                     finished = true;
                 } catch (Exception e) {
-                    if (currentRetryCount > 500) {
+                    if (currentRetryCount > 5000) {
                         finished = true;
                         throw new RuntimeException(e);
                     }
                     currentRetryCount++;
 //                    LOG.error("Retrying request {}, {}, {}", bucket, e.getMessage(), currentRetryCount);
                     try {
-                        Thread.sleep(100);
+                        Thread.sleep(10);
                     } catch (InterruptedException ex) {
 //                        LOG.error("Sleep interrupted", e);
                     }
@@ -481,6 +486,7 @@ public class XbeiverServerRatis implements XbeiverServerSpi {
 //                    lock.readLock().unlock();
 //                }
             }
+            LOG.error("Created response: {}", omResponse);
             return omResponse;
         } else {
 //            LOG.info("Rejecting write request on OM {} because it is in prepare " +
@@ -770,7 +776,7 @@ public class XbeiverServerRatis implements XbeiverServerSpi {
 
         // Set the ratis port number
         if (rpc == SupportedRpcType.GRPC) {
-//            GrpcConfigKeys.Admin.setPort(properties, adminPort);
+            GrpcConfigKeys.Admin.setPort(properties, adminPort);
             GrpcConfigKeys.Client.setPort(properties, clientPort);
             GrpcConfigKeys.Server.setPort(properties, serverPort);
         } else if (rpc == SupportedRpcType.NETTY) {
@@ -1066,9 +1072,10 @@ public class XbeiverServerRatis implements XbeiverServerSpi {
     void handleInstallSnapshotFromLeader(RaftGroupId groupId,
                                          RaftProtos.RoleInfoProto roleInfoProto,
                                          TermIndex firstTermIndexInLog) {
-//        LOG.warn("handleInstallSnapshotFromLeader for firstTermIndexInLog={}, terminating pipeline: {}",
-//                firstTermIndexInLog, groupId);
-        handlePipelineFailure(groupId, roleInfoProto, "install snapshot notification");
+        LOG.warn("handleInstallSnapshotFromLeader for firstTermIndexInLog={}, terminating pipeline: {}",
+                firstTermIndexInLog, groupId);
+
+//        handlePipelineFailure(groupId, roleInfoProto, "install snapshot notification");
     }
 
     private void handlePipelineFailure(RaftGroupId groupId, RaftProtos.RoleInfoProto roleInfoProto, String reason) {
