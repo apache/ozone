@@ -63,6 +63,23 @@ class TestContainerBalancerSubCommand {
       "^Sending\\sstop\\scommand.\\sWaiting\\sfor\\sContainer\\sBalancer\\sto\\sstop...\\n" +
       "Container\\sBalancer\\sstopped.");
 
+  public static final String BALANCER_CONFIG_OUTPUT = "Container Balancer Configuration values:\n" +
+      "Key                                                Value\n" +
+      "Threshold                                          10.0\n" +
+      "Max Datanodes to Involve per Iteration(percent)    20\n" +
+      "Max Size to Move per Iteration                     0GB\n" +
+      "Max Size Entering Target per Iteration             26GB\n" +
+      "Max Size Leaving Source per Iteration              26GB\n" +
+      "Number of Iterations                               3\n" +
+      "Time Limit for Single Container's Movement         65min\n" +
+      "Time Limit for Single Container's Replication      50min\n" +
+      "Interval between each Iteration                    0min\n" +
+      "Whether to Enable Network Topology                 false\n" +
+      "Whether to Trigger Refresh Datanode Usage Info     false\n" +
+      "Container IDs to Exclude from Balancing            None\n" +
+      "Datanodes Specified to be Balanced                 None\n" +
+      "Datanodes Excluded from Balancing                  None";
+
   private ContainerBalancerStopSubcommand stopCmd;
   private ContainerBalancerStartSubcommand startCmd;
   private ContainerBalancerStatusSubcommand statusCmd;
@@ -239,24 +256,6 @@ class TestContainerBalancerSubCommand {
     when(scmClient.getContainerBalancerStatusInfo()).thenReturn(statusInfoResponseProto);
     statusCmd.execute(scmClient);
 
-    String balancerConfigOutput =
-        "Container Balancer Configuration values:\n" +
-        "Key                                                Value\n" +
-        "Threshold                                          10.0\n" +
-        "Max Datanodes to Involve per Iteration(percent)    20\n" +
-        "Max Size to Move per Iteration                     0GB\n" +
-        "Max Size Entering Target per Iteration             26GB\n" +
-        "Max Size Leaving Source per Iteration              26GB\n" +
-        "Number of Iterations                               3\n" +
-        "Time Limit for Single Container's Movement         65min\n" +
-        "Time Limit for Single Container's Replication      50min\n" +
-        "Interval between each Iteration                    0min\n" +
-        "Whether to Enable Network Topology                 false\n" +
-        "Whether to Trigger Refresh Datanode Usage Info     false\n" +
-        "Container IDs to Exclude from Balancing            None\n" +
-        "Datanodes Specified to be Balanced                 None\n" +
-        "Datanodes Excluded from Balancing                  None";
-
     String currentIterationOutput =
         "Current iteration info:\n" +
         "Key                                                Value\n" +
@@ -277,7 +276,7 @@ class TestContainerBalancerSubCommand {
         "7bd99815-47e7-4015-bc61-ca6ef6dfd130 -> 18 GB";
 
     assertThat(out.get()).containsPattern(IS_RUNNING)
-        .doesNotContain(balancerConfigOutput)
+        .doesNotContain(BALANCER_CONFIG_OUTPUT)
         .doesNotContain(currentIterationOutput)
         .doesNotContain("Iteration history list:");
   }
@@ -298,23 +297,6 @@ class TestContainerBalancerSubCommand {
     c.parseArgs("--verbose", "--history");
     statusCmd.execute(scmClient);
 
-    String balancerConfigOutput =
-        "Container Balancer Configuration values:\n" +
-        "Key                                                Value\n" +
-        "Threshold                                          10.0\n" +
-        "Max Datanodes to Involve per Iteration(percent)    20\n" +
-        "Max Size to Move per Iteration                     0GB\n" +
-        "Max Size Entering Target per Iteration             26GB\n" +
-        "Max Size Leaving Source per Iteration              26GB\n" +
-        "Number of Iterations                               3\n" +
-        "Time Limit for Single Container's Movement         65min\n" +
-        "Time Limit for Single Container's Replication      50min\n" +
-        "Interval between each Iteration                    0min\n" +
-        "Whether to Enable Network Topology                 false\n" +
-        "Whether to Trigger Refresh Datanode Usage Info     false\n" +
-        "Container IDs to Exclude from Balancing            None\n" +
-        "Datanodes Specified to be Balanced                 None\n" +
-        "Datanodes Excluded from Balancing                  None";
     String firstHistoryIterationOutput =
         "Key                                                Value\n" +
         "Iteration number                                   3\n" +
@@ -355,7 +337,7 @@ class TestContainerBalancerSubCommand {
         .containsPattern(IS_RUNNING)
         .containsPattern(STARTED_AT)
         .containsPattern(DURATION)
-        .contains(balancerConfigOutput)
+        .contains(BALANCER_CONFIG_OUTPUT)
         .contains("Iteration history list:")
         .contains(firstHistoryIterationOutput)
         .contains(secondHistoryIterationOutput);
@@ -376,24 +358,6 @@ class TestContainerBalancerSubCommand {
     CommandLine c = new CommandLine(statusCmd);
     c.parseArgs("--verbose");
     statusCmd.execute(scmClient);
-
-    String balancerConfigOutput =
-        "Container Balancer Configuration values:\n" +
-        "Key                                                Value\n" +
-        "Threshold                                          10.0\n" +
-        "Max Datanodes to Involve per Iteration(percent)    20\n" +
-        "Max Size to Move per Iteration                     0GB\n" +
-        "Max Size Entering Target per Iteration             26GB\n" +
-        "Max Size Leaving Source per Iteration              26GB\n" +
-        "Number of Iterations                               3\n" +
-        "Time Limit for Single Container's Movement         65min\n" +
-        "Time Limit for Single Container's Replication      50min\n" +
-        "Interval between each Iteration                    0min\n" +
-        "Whether to Enable Network Topology                 false\n" +
-        "Whether to Trigger Refresh Datanode Usage Info     false\n" +
-        "Container IDs to Exclude from Balancing            None\n" +
-        "Datanodes Specified to be Balanced                 None\n" +
-        "Datanodes Excluded from Balancing                  None";
 
     String currentIterationOutput =
         "Current iteration info:\n" +
@@ -418,7 +382,7 @@ class TestContainerBalancerSubCommand {
         .containsPattern(IS_RUNNING)
         .containsPattern(STARTED_AT)
         .containsPattern(DURATION)
-        .contains(balancerConfigOutput)
+        .contains(BALANCER_CONFIG_OUTPUT)
         .contains(currentIterationOutput)
         .doesNotContain("Iteration history list:");
   }
