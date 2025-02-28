@@ -389,18 +389,9 @@ public interface ScmClient extends Closeable {
   ContainerBalancerStatusInfoResponseProto getContainerBalancerStatusInfo() throws IOException;
 
   /**
-   * returns the list of ratis peer roles. Currently only include peer address.
+   * returns the list of SCM peer roles. Currently only include peer address.
    */
-  List<String> getScmRatisRoles() throws IOException;
-
-  /**
-   * Get the current SCM mode.
-   *
-   * @return `true` indicates that it is in RATIS mode,
-   * while `false` indicates that it is in STANDALONE mode.
-   * @throws IOException  an I/O exception of some sort has occurred.
-   */
-  boolean isScmRatisEnable() throws IOException;
+  List<String> getScmRoles() throws IOException;
 
   /**
    * Force generates new secret keys (rotate).

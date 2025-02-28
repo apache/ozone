@@ -39,7 +39,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -812,20 +811,8 @@ public class SCMClientProtocolServer implements
       ScmInfo.Builder builder =
           new ScmInfo.Builder()
               .setClusterId(scm.getScmStorageConfig().getClusterID())
-              .setScmId(scm.getScmStorageConfig().getScmId());
-      if (scm.getScmHAManager().getRatisServer() != null) {
-        builder.setRatisPeerRoles(
-            scm.getScmHAManager().getRatisServer().getRatisRoles());
-        builder.setScmRatisEnabled(true);
-      } else {
-        // In case, there is no ratis, there is no ratis role.
-        // This will just print the hostname with ratis port as the default
-        // behaviour.
-        String address = scm.getSCMHANodeDetails().getLocalNodeDetails()
-            .getRatisHostPortStr();
-        builder.setRatisPeerRoles(Arrays.asList(address));
-        builder.setScmRatisEnabled(false);
-      }
+              .setScmId(scm.getScmStorageConfig().getScmId())
+              .setPeerRoles(scm.getScmHAManager().getRatisServer().getRatisRoles());
       return builder.build();
     } catch (Exception ex) {
       auditSuccess = false;
