@@ -4649,7 +4649,7 @@
     </description>
   </property>
   <property>
-    <name>hdds.datanode.keytab.file</name>
+    <name>hdds.datanode.kerberos.keytab.file</name>
     <value></value>
     <tag>OZONE, DATANODE</tag>
     <description>
