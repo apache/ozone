@@ -131,7 +131,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.ozone.rocksdiff.CompactionNode;
@@ -297,7 +297,7 @@ public abstract class TestOmSnapshot {
     final OzoneManagerProtocol omClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
     final String upgradeClientID = "Test-Upgrade-Client-" + UUID.randomUUID();
-    UpgradeFinalizer.StatusAndMessages finalizationResponse =
+    UpgradeFinalization.StatusAndMessages finalizationResponse =
         omClient.finalizeUpgrade(upgradeClientID);
 
     // The status should transition as soon as the client call above returns
@@ -305,7 +305,7 @@ public abstract class TestOmSnapshot {
     // Wait for the finalization to be marked as done.
     // 10s timeout should be plenty.
     await(POLL_MAX_WAIT_MILLIS, POLL_INTERVAL_MILLIS, () -> {
-      final UpgradeFinalizer.StatusAndMessages progress =
+      final UpgradeFinalization.StatusAndMessages progress =
           omClient.queryUpgradeFinalizationProgress(
               upgradeClientID, false, false);
       return isDone(progress.status());

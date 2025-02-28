@@ -21,7 +21,7 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.INVAL
 
 import java.io.IOException;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 
 /**
  * Base class to help with Upgrade finalization command.
@@ -57,20 +57,20 @@ public final class FinalizeUpgradeCommandUtil {
     System.out.println("Exiting...");
   }
 
-  public static boolean isFinalized(UpgradeFinalizer.Status status) {
-    return status.equals(UpgradeFinalizer.Status.ALREADY_FINALIZED);
+  public static boolean isFinalized(UpgradeFinalization.Status status) {
+    return status.equals(UpgradeFinalization.Status.ALREADY_FINALIZED);
   }
 
-  public static boolean isDone(UpgradeFinalizer.Status status) {
-    return status.equals(UpgradeFinalizer.Status.FINALIZATION_DONE);
+  public static boolean isDone(UpgradeFinalization.Status status) {
+    return status.equals(UpgradeFinalization.Status.FINALIZATION_DONE);
   }
 
-  public static boolean isInprogress(UpgradeFinalizer.Status status) {
-    return status.equals(UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS);
+  public static boolean isInprogress(UpgradeFinalization.Status status) {
+    return status.equals(UpgradeFinalization.Status.FINALIZATION_IN_PROGRESS);
   }
 
-  public static boolean isStarting(UpgradeFinalizer.Status status) {
-    return status.equals(UpgradeFinalizer.Status.STARTING_FINALIZATION);
+  public static boolean isStarting(UpgradeFinalization.Status status) {
+    return status.equals(UpgradeFinalization.Status.STARTING_FINALIZATION);
   }
 
   public static void emitGeneralErrorMsg() {

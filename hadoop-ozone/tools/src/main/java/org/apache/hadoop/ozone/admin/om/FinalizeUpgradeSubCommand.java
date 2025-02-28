@@ -38,7 +38,7 @@ import java.util.concurrent.Future;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import picocli.CommandLine;
 
 /**
@@ -85,7 +85,7 @@ public class FinalizeUpgradeSubCommand implements Callable<Void> {
         parent.createOmClient(omServiceId, omHost, forceHA);
     String upgradeClientID = "Upgrade-Client-" + UUID.randomUUID().toString();
     try {
-      UpgradeFinalizer.StatusAndMessages finalizationResponse =
+      UpgradeFinalization.StatusAndMessages finalizationResponse =
           client.finalizeUpgrade(upgradeClientID);
       if (isFinalized(finalizationResponse.status())) {
         System.out.println("Upgrade has already been finalized.");
@@ -149,7 +149,7 @@ public class FinalizeUpgradeSubCommand implements Callable<Void> {
         Thread.sleep(500);
         // do not check for exceptions, if one happens during monitoring we
         // should report it and exit.
-        UpgradeFinalizer.StatusAndMessages progress =
+        UpgradeFinalization.StatusAndMessages progress =
             client.queryUpgradeFinalizationProgress(upgradeClientID, force,
                 false);
         // this can happen after trying to takeover the request after the fact

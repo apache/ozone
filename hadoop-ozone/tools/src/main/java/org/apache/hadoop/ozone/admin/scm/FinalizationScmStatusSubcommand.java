@@ -22,7 +22,7 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import picocli.CommandLine;
 
 /**
@@ -41,7 +41,7 @@ public class FinalizationScmStatusSubcommand extends ScmSubcommand {
   @Override
   public void execute(ScmClient client) throws IOException {
     String upgradeClientID = "Upgrade-Client-" + UUID.randomUUID().toString();
-    UpgradeFinalizer.StatusAndMessages progress =
+    UpgradeFinalization.StatusAndMessages progress =
         client.queryUpgradeFinalizationProgress(upgradeClientID, false, true);
     System.out.println(progress.status());
   }

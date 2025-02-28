@@ -243,8 +243,8 @@ import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
 import org.apache.hadoop.security.token.Token;
 
@@ -1958,7 +1958,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     UpgradeFinalizationStatus status = response.getStatus();
     return new StatusAndMessages(
-        UpgradeFinalizer.Status.valueOf(status.getStatus().name()),
+        UpgradeFinalization.Status.valueOf(status.getStatus().name()),
         status.getMessagesList()
     );
   }
@@ -1985,7 +1985,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     UpgradeFinalizationStatus status = response.getStatus();
 
     return new StatusAndMessages(
-        UpgradeFinalizer.Status.valueOf(status.getStatus().name()),
+        UpgradeFinalization.Status.valueOf(status.getStatus().name()),
         status.getMessagesList()
     );
   }
