@@ -201,7 +201,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
 
       final OMResponse response;
 
-//      LOG.error("Current thread: {}", Thread.currentThread().getName());
+//      LOG.error("Current thread: {}, command: {}", Thread.currentThread().getName(), request.getCmdType());
       if (OmUtils.isBucketWriteRequest(request)) {
         response = ozoneBucket.getWriteChannel().submitRequest(requestToSubmit);
       } else {
