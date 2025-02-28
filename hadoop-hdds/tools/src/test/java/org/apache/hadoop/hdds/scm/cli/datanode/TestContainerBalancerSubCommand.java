@@ -47,6 +47,22 @@ import picocli.CommandLine;
  */
 class TestContainerBalancerSubCommand {
 
+  public static final Pattern DURATION = Pattern.compile(
+      "^Balancing duration: \\d{1}s$", Pattern.MULTILINE);
+  public static final Pattern FAILED_TO_START = Pattern.compile(
+      "^Failed\\sto\\sstart\\sContainer\\sBalancer.");
+  public static final Pattern IS_NOT_RUNNING = Pattern.compile(
+      "^ContainerBalancer\\sis\\sNot\\sRunning.");
+  private static final Pattern IS_RUNNING = Pattern.compile(
+      "^ContainerBalancer\\sis\\sRunning.$", Pattern.MULTILINE);
+  public static final Pattern STARTED_AT = Pattern.compile(
+      "^Started at: (\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})$", Pattern.MULTILINE);
+  public static final Pattern STARTED_SUCCESSFULLY = Pattern.compile(
+      "^Container\\sBalancer\\sstarted\\ssuccessfully.");
+  public static final Pattern WAITING_TO_STOP = Pattern.compile(
+      "^Sending\\sstop\\scommand.\\sWaiting\\sfor\\sContainer\\sBalancer\\sto\\sstop...\\n" +
+      "Container\\sBalancer\\sstopped.");
+
   private ContainerBalancerStopSubcommand stopCmd;
   private ContainerBalancerStartSubcommand startCmd;
   private ContainerBalancerStatusSubcommand statusCmd;
@@ -222,10 +238,8 @@ class TestContainerBalancerSubCommand {
     //test status is running
     when(scmClient.getContainerBalancerStatusInfo()).thenReturn(statusInfoResponseProto);
     statusCmd.execute(scmClient);
-    Pattern p = Pattern.compile(
-        "^ContainerBalancer\\sis\\sRunning.");
     String output = out.get();
-    assertThat(output).containsPattern(p);
+    assertThat(output).containsPattern(IS_RUNNING);
 
     String balancerConfigOutput =
         "Container Balancer Configuration values:\n" +
@@ -285,17 +299,9 @@ class TestContainerBalancerSubCommand {
     c.parseArgs("--verbose", "--history");
     statusCmd.execute(scmClient);
     String output = out.get();
-    Pattern p = Pattern.compile(
-        "^ContainerBalancer\\sis\\sRunning.$", Pattern.MULTILINE);
-    assertThat(output).containsPattern(p);
-
-    p = Pattern.compile(
-        "^Started at: (\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})$", Pattern.MULTILINE);
-    assertThat(output).containsPattern(p);
-
-    p = Pattern.compile(
-        "^Balancing duration: \\d{1}s$", Pattern.MULTILINE);
-    assertThat(output).containsPattern(p);
+    assertThat(output).containsPattern(IS_RUNNING);
+    assertThat(output).containsPattern(STARTED_AT);
+    assertThat(output).containsPattern(DURATION);
 
     String balancerConfigOutput =
         "Container Balancer Configuration values:\n" +
@@ -372,17 +378,9 @@ class TestContainerBalancerSubCommand {
     c.parseArgs("--verbose");
     statusCmd.execute(scmClient);
     String output = out.get();
-    Pattern p = Pattern.compile(
-        "^ContainerBalancer\\sis\\sRunning.$", Pattern.MULTILINE);
-    assertThat(output).containsPattern(p);
-
-    p = Pattern.compile(
-        "^Started at: (\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})$", Pattern.MULTILINE);
-    assertThat(output).containsPattern(p);
-
-    p = Pattern.compile(
-        "^Balancing duration: \\d{1}s$", Pattern.MULTILINE);
-    assertThat(output).containsPattern(p);
+    assertThat(output).containsPattern(IS_RUNNING);
+    assertThat(output).containsPattern(STARTED_AT);
+    assertThat(output).containsPattern(DURATION);
 
     String balancerConfigOutput =
         "Container Balancer Configuration values:\n" +
@@ -438,10 +436,8 @@ class TestContainerBalancerSubCommand {
             .build());
 
     statusCmd.execute(scmClient);
-    Pattern p = Pattern.compile(
-        "^ContainerBalancer\\sis\\sNot\\sRunning.");
     String output = out.get();
-    assertThat(output).containsPattern(p);
+    assertThat(output).containsPattern(IS_NOT_RUNNING);
   }
 
   @Test
@@ -456,10 +452,8 @@ class TestContainerBalancerSubCommand {
 
     statusCmd.execute(scmClient);
 
-    Pattern p = Pattern.compile(
-        "^ContainerBalancer\\sis\\sNot\\sRunning.");
     String output = out.get();
-    assertThat(output).containsPattern(p);
+    assertThat(output).containsPattern(IS_NOT_RUNNING);
   }
 
   @Test
@@ -467,12 +461,8 @@ class TestContainerBalancerSubCommand {
     ScmClient scmClient = mock(ScmClient.class);
     stopCmd.execute(scmClient);
 
-    Pattern p = Pattern.compile("^Sending\\sstop\\scommand." +
-        "\\sWaiting\\sfor\\sContainer\\sBalancer\\sto\\sstop...\\n" +
-        "Container\\sBalancer\\sstopped.");
-
     String output = out.get();
-    assertThat(output).containsPattern(p);
+    assertThat(output).containsPattern(WAITING_TO_STOP);
   }
 
   @Test
@@ -488,10 +478,8 @@ class TestContainerBalancerSubCommand {
                 .build());
     startCmd.execute(scmClient);
 
-    Pattern p = Pattern.compile("^Container\\sBalancer\\sstarted" +
-        "\\ssuccessfully.");
     String output = out.get();
-    assertThat(output).containsPattern(p);
+    assertThat(output).containsPattern(STARTED_SUCCESSFULLY);
   }
 
   @Test
@@ -507,11 +495,8 @@ class TestContainerBalancerSubCommand {
             .build());
     startCmd.execute(scmClient);
 
-    Pattern p = Pattern.compile("^Failed\\sto\\sstart\\sContainer" +
-        "\\sBalancer.");
-
     String output = out.get();
-    assertThat(output).containsPattern(p);
+    assertThat(output).containsPattern(FAILED_TO_START);
   }
 
 }
