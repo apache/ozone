@@ -597,7 +597,7 @@ public class NodeStateManager implements Runnable, Closeable {
       // not do any harm either. Eg DECOMMISSIONING -> DECOMMISSIONED + HEALTHY
       // but the pipeline creation logic will ignore decommissioning nodes.
       if (oldStatus.getOperationalState() != newState) {
-        fireHealthStateEvent(oldStatus.getHealth(), dn);
+        fireHealthStateEvent(oldStatus.getHealth(), dni);
       }
     }
   }
