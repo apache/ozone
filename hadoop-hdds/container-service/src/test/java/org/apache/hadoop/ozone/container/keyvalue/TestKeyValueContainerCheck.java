@@ -186,6 +186,8 @@ public class TestKeyValueContainerCheck
         .thenReturn(containerData.getContainerDBType());
     when(mockContainerData.getSchemaVersion())
         .thenReturn(containerData.getSchemaVersion());
+    when(mockContainerData.sharedDB())
+        .thenReturn(containerData.sharedDB());
 
     // Mimic the scenario where scanning starts just before
     // blocks are marked for deletion.

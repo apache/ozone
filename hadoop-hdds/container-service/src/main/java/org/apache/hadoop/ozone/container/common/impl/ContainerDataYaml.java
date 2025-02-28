@@ -17,7 +17,12 @@
 
 package org.apache.hadoop.ozone.container.common.impl;
 
+import static org.apache.hadoop.ozone.OzoneConsts.CHUNKS_PATH;
+import static org.apache.hadoop.ozone.OzoneConsts.METADATA_PATH;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.REPLICA_INDEX;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V4;
+import static org.apache.hadoop.ozone.OzoneConsts.STORAGE_DIR_CHUNKS;
 import static org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData.KEYVALUE_YAML_TAG;
 
 import com.google.common.base.Preconditions;
@@ -88,7 +93,7 @@ public final class ContainerDataYaml {
           ((KeyValueContainerData) containerData).getReplicaIndex() > 0;
 
       // Create Yaml for given container type
-      Yaml yaml = getYamlForContainerType(containerType, withReplicaIndex);
+      Yaml yaml = getYamlForContainerType(containerType, containerData, withReplicaIndex);
       // Compute Checksum and update ContainerData
       containerData.computeAndSetChecksum(yaml);
 
@@ -122,9 +127,16 @@ public final class ContainerDataYaml {
       throws IOException {
     Preconditions.checkNotNull(containerFile, "containerFile cannot be null");
     try (FileInputStream inputFileStream = new FileInputStream(containerFile)) {
-      return readContainer(inputFileStream);
+      KeyValueContainerData containerData = (KeyValueContainerData) readContainer(inputFileStream);
+      if (containerData.getChunksPath() == null) {
+        containerData.setChunksPath(containerFile.getParentFile().getParentFile().getAbsolutePath()
+            .concat(OZONE_URI_DELIMITER).concat(STORAGE_DIR_CHUNKS));
+      }
+      if (containerData.getMetadataPath() == null) {
+        containerData.setMetadataPath(containerFile.getParentFile().getAbsolutePath());
+      }
+      return containerData;
     }
-
   }
 
   /**
@@ -183,11 +195,12 @@ public final class ContainerDataYaml {
    * the container properties.
    *
    * @param containerType    type of container
+   * @parm ContainerData container data
    * @param withReplicaIndex in the container yaml
    * @return Yamal representation of container properties
    * @throws StorageContainerException if the type is unrecognized
    */
-  public static Yaml getYamlForContainerType(ContainerType containerType,
+  public static Yaml getYamlForContainerType(ContainerType containerType, ContainerData containerData,
       boolean withReplicaIndex)
       throws StorageContainerException {
     PropertyUtils propertyUtils = new PropertyUtils();
@@ -200,6 +213,11 @@ public final class ContainerDataYaml {
       if (withReplicaIndex) {
         yamlFields = new ArrayList<>(yamlFields);
         yamlFields.add(REPLICA_INDEX);
+      }
+      if (((KeyValueContainerData)containerData).olderSchemaThan(SCHEMA_V4)) {
+        yamlFields = new ArrayList<>(yamlFields);
+        yamlFields.add(METADATA_PATH);
+        yamlFields.add(CHUNKS_PATH);
       }
       Representer representer = new ContainerDataRepresenter(yamlFields);
       representer.setPropertyUtils(propertyUtils);
@@ -299,9 +317,12 @@ public final class ContainerDataYaml {
 
         kvData.setContainerDBType((String)nodes.get(
             OzoneConsts.CONTAINER_DB_TYPE));
-        kvData.setMetadataPath((String) nodes.get(
-            OzoneConsts.METADATA_PATH));
-        kvData.setChunksPath((String) nodes.get(OzoneConsts.CHUNKS_PATH));
+        String schemaVersion = (String) nodes.get(OzoneConsts.SCHEMA_VERSION);
+        kvData.setSchemaVersion(schemaVersion);
+        if (kvData.olderSchemaThan(SCHEMA_V4)) {
+          kvData.setMetadataPath((String) nodes.get(OzoneConsts.METADATA_PATH));
+          kvData.setChunksPath((String) nodes.get(OzoneConsts.CHUNKS_PATH));
+        }
         Map<String, String> meta = (Map) nodes.get(OzoneConsts.METADATA);
         kvData.setMetadata(meta);
         kvData.setChecksum((String) nodes.get(OzoneConsts.CHECKSUM));
@@ -310,8 +331,6 @@ public final class ContainerDataYaml {
         String state = (String) nodes.get(OzoneConsts.STATE);
         kvData
             .setState(ContainerProtos.ContainerDataProto.State.valueOf(state));
-        String schemaVersion = (String) nodes.get(OzoneConsts.SCHEMA_VERSION);
-        kvData.setSchemaVersion(schemaVersion);
         final Object replicaIndex = nodes.get(REPLICA_INDEX);
         if (replicaIndex != null) {
           kvData.setReplicaIndex(

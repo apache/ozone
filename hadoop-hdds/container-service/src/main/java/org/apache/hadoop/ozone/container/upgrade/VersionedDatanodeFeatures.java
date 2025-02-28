@@ -148,4 +148,26 @@ public final class VersionedDatanodeFeatures {
       return false;
     }
   }
+
+  /**
+   * Utilities for container Schema V4 layout feature.
+   * Compared to Schema V3, this schema doesn't save chunksPath and metadataPath into container yaml file.
+   */
+  public static class SchemaV4 {
+    public static String chooseSchemaVersion(ConfigurationSource conf) {
+      if (isFinalizedAndEnabled(conf)) {
+        return OzoneConsts.SCHEMA_V4;
+      } else {
+        return SchemaV3.chooseSchemaVersion(conf);
+      }
+    }
+
+    public static boolean isFinalizedAndEnabled(ConfigurationSource conf) {
+      DatanodeConfiguration dcf = conf.getObject(DatanodeConfiguration.class);
+      if (isFinalized(HDDSLayoutFeature.DATANODE_SCHEMA_V4) && dcf.getContainerSchemaV3Enabled()) {
+        return true;
+      }
+      return false;
+    }
+  }
 }
