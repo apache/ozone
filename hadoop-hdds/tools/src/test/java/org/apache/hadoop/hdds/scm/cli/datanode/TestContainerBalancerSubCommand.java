@@ -18,8 +18,7 @@
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -30,7 +29,6 @@ import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.Arrays;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoProto;
@@ -233,8 +231,7 @@ class TestContainerBalancerSubCommand {
     Pattern p = Pattern.compile(
         "^ContainerBalancer\\sis\\sRunning.");
     String output = outContent.toString(DEFAULT_ENCODING);
-    Matcher m = p.matcher(output);
-    assertTrue(m.find());
+    assertThat(output).containsPattern(p);
 
     String balancerConfigOutput =
         "Container Balancer Configuration values:\n" +
@@ -253,7 +250,7 @@ class TestContainerBalancerSubCommand {
         "Container IDs to Exclude from Balancing            None\n" +
         "Datanodes Specified to be Balanced                 None\n" +
         "Datanodes Excluded from Balancing                  None";
-    assertFalse(output.contains(balancerConfigOutput));
+    assertThat(output).doesNotContain(balancerConfigOutput);
 
     String currentIterationOutput =
         "Current iteration info:\n" +
@@ -273,9 +270,9 @@ class TestContainerBalancerSubCommand {
         "Exited data from nodes                             \n" +
         "b8b9c511-c30f-4933-8938-2f272e307070 -> 30 GB\n" +
         "7bd99815-47e7-4015-bc61-ca6ef6dfd130 -> 18 GB";
-    assertFalse(output.contains(currentIterationOutput));
+    assertThat(output).doesNotContain(currentIterationOutput);
 
-    assertFalse(output.contains("Iteration history list:"));
+    assertThat(output).doesNotContain("Iteration history list:");
   }
 
   @Test
@@ -296,18 +293,15 @@ class TestContainerBalancerSubCommand {
     String output = outContent.toString(DEFAULT_ENCODING);
     Pattern p = Pattern.compile(
         "^ContainerBalancer\\sis\\sRunning.$", Pattern.MULTILINE);
-    Matcher m = p.matcher(output);
-    assertTrue(m.find());
+    assertThat(output).containsPattern(p);
 
     p = Pattern.compile(
         "^Started at: (\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})$", Pattern.MULTILINE);
-    m = p.matcher(output);
-    assertTrue(m.find());
+    assertThat(output).containsPattern(p);
 
     p = Pattern.compile(
         "^Balancing duration: \\d{1}s$", Pattern.MULTILINE);
-    m = p.matcher(output);
-    assertTrue(m.find());
+    assertThat(output).containsPattern(p);
 
     String balancerConfigOutput =
         "Container Balancer Configuration values:\n" +
@@ -326,9 +320,9 @@ class TestContainerBalancerSubCommand {
         "Container IDs to Exclude from Balancing            None\n" +
         "Datanodes Specified to be Balanced                 None\n" +
         "Datanodes Excluded from Balancing                  None";
-    assertTrue(output.contains(balancerConfigOutput));
+    assertThat(output).contains(balancerConfigOutput);
 
-    assertTrue(output.contains("Iteration history list:"));
+    assertThat(output).contains("Iteration history list:");
     String firstHistoryIterationOutput =
         "Key                                                Value\n" +
         "Iteration number                                   3\n" +
@@ -346,7 +340,7 @@ class TestContainerBalancerSubCommand {
         "Exited data from nodes                             \n" +
         "b8b9c511-c30f-4933-8938-2f272e307070 -> 30 GB\n" +
         "7bd99815-47e7-4015-bc61-ca6ef6dfd130 -> 18 GB";
-    assertTrue(output.contains(firstHistoryIterationOutput));
+    assertThat(output).contains(firstHistoryIterationOutput);
 
     String secondHistoryIterationOutput =
         "Key                                                Value\n" +
@@ -365,7 +359,7 @@ class TestContainerBalancerSubCommand {
         "Exited data from nodes                             \n" +
         "b8b9c511-c30f-4933-8938-2f272e307070 -> 15 GB\n" +
         "7bd99815-47e7-4015-bc61-ca6ef6dfd130 -> 15 GB";
-    assertTrue(output.contains(secondHistoryIterationOutput));
+    assertThat(output).contains(secondHistoryIterationOutput);
   }
 
   @Test
@@ -386,18 +380,15 @@ class TestContainerBalancerSubCommand {
     String output = outContent.toString(DEFAULT_ENCODING);
     Pattern p = Pattern.compile(
         "^ContainerBalancer\\sis\\sRunning.$", Pattern.MULTILINE);
-    Matcher m = p.matcher(output);
-    assertTrue(m.find());
+    assertThat(output).containsPattern(p);
 
     p = Pattern.compile(
         "^Started at: (\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})$", Pattern.MULTILINE);
-    m = p.matcher(output);
-    assertTrue(m.find());
+    assertThat(output).containsPattern(p);
 
     p = Pattern.compile(
         "^Balancing duration: \\d{1}s$", Pattern.MULTILINE);
-    m = p.matcher(output);
-    assertTrue(m.find());
+    assertThat(output).containsPattern(p);
 
     String balancerConfigOutput =
         "Container Balancer Configuration values:\n" +
@@ -416,7 +407,7 @@ class TestContainerBalancerSubCommand {
         "Container IDs to Exclude from Balancing            None\n" +
         "Datanodes Specified to be Balanced                 None\n" +
         "Datanodes Excluded from Balancing                  None";
-    assertTrue(output.contains(balancerConfigOutput));
+    assertThat(output).contains(balancerConfigOutput);
 
     String currentIterationOutput =
         "Current iteration info:\n" +
@@ -436,9 +427,9 @@ class TestContainerBalancerSubCommand {
         "Exited data from nodes                             \n" +
         "b8b9c511-c30f-4933-8938-2f272e307070 -> 30 GB\n" +
         "7bd99815-47e7-4015-bc61-ca6ef6dfd130 -> 18 GB";
-    assertTrue(output.contains(currentIterationOutput));
+    assertThat(output).contains(currentIterationOutput);
 
-    assertFalse(output.contains("Iteration history list:"));
+    assertThat(output).doesNotContain("Iteration history list:");
   }
 
   @Test
@@ -455,8 +446,8 @@ class TestContainerBalancerSubCommand {
     statusCmd.execute(scmClient);
     Pattern p = Pattern.compile(
         "^ContainerBalancer\\sis\\sNot\\sRunning.");
-    Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    assertTrue(m.find());
+    String output = outContent.toString(DEFAULT_ENCODING);
+    assertThat(output).containsPattern(p);
   }
 
   @Test
@@ -473,8 +464,8 @@ class TestContainerBalancerSubCommand {
 
     Pattern p = Pattern.compile(
         "^ContainerBalancer\\sis\\sNot\\sRunning.");
-    Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    assertTrue(m.find());
+    String output = outContent.toString(DEFAULT_ENCODING);
+    assertThat(output).containsPattern(p);
   }
 
   @Test
@@ -486,8 +477,8 @@ class TestContainerBalancerSubCommand {
         "\\sWaiting\\sfor\\sContainer\\sBalancer\\sto\\sstop...\\n" +
         "Container\\sBalancer\\sstopped.");
 
-    Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    assertTrue(m.find());
+    String output = outContent.toString(DEFAULT_ENCODING);
+    assertThat(output).containsPattern(p);
   }
 
   @Test
@@ -505,8 +496,8 @@ class TestContainerBalancerSubCommand {
 
     Pattern p = Pattern.compile("^Container\\sBalancer\\sstarted" +
         "\\ssuccessfully.");
-    Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    assertTrue(m.find());
+    String output = outContent.toString(DEFAULT_ENCODING);
+    assertThat(output).containsPattern(p);
   }
 
   @Test
@@ -525,8 +516,8 @@ class TestContainerBalancerSubCommand {
     Pattern p = Pattern.compile("^Failed\\sto\\sstart\\sContainer" +
         "\\sBalancer.");
 
-    Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    assertTrue(m.find());
+    String output = outContent.toString(DEFAULT_ENCODING);
+    assertThat(output).containsPattern(p);
   }
 
 }
