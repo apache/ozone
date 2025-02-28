@@ -1037,7 +1037,7 @@ public class RpcClient implements ClientProtocol {
     Preconditions.checkArgument(StringUtils.isNotBlank(omNodeId),
         "OM node ID can't be null or empty.");
     if (omVersion.compareTo(OzoneManagerVersion.SNAPSHOT_READ_FROM_NON_LEADER) < 0) {
-      throw new IOException("OzoneManager does not snapshot read from non-leader OM.");
+      throw new IOException("OzoneManager does not support snapshot read from non-leader OM.");
     }
     SnapshotInfo snapshotInfo = ozoneManagerClient.getSnapshotInfo(volumeName,
         bucketName, snapshotName, omNodeId);
@@ -1093,6 +1093,9 @@ public class RpcClient implements ClientProtocol {
         "bucket can't be null or empty.");
     Preconditions.checkArgument(StringUtils.isNotBlank(omNodeId),
         "OM node ID can't be null or empty.");
+    if (omVersion.compareTo(OzoneManagerVersion.SNAPSHOT_READ_FROM_NON_LEADER) < 0) {
+      throw new IOException("OzoneManager does not support snapshot diff from non-leader OM.");
+    }
     return ozoneManagerClient.snapshotDiff(volumeName, bucketName,
         fromSnapshot, toSnapshot, token, pageSize, forceFullDiff,
         disableNativeDiff, omNodeId);
@@ -1133,6 +1136,9 @@ public class RpcClient implements ClientProtocol {
         "toSnapshot can't be null or empty.");
     Preconditions.checkArgument(StringUtils.isNotBlank(omNodeId),
         "OM node ID can't be null or empty.");
+    if (omVersion.compareTo(OzoneManagerVersion.SNAPSHOT_READ_FROM_NON_LEADER) < 0) {
+      throw new IOException("OzoneManager does not support cancel snapshot diff from non-leader OM.");
+    }
     return ozoneManagerClient.cancelSnapshotDiff(volumeName, bucketName,
         fromSnapshot, toSnapshot, omNodeId);
   }
@@ -1163,7 +1169,9 @@ public class RpcClient implements ClientProtocol {
         "bucket can't be null or empty.");
     Preconditions.checkArgument(StringUtils.isNotBlank(omNodeId),
         "OM node ID can't be null or empty.");
-
+    if (omVersion.compareTo(OzoneManagerVersion.SNAPSHOT_READ_FROM_NON_LEADER) < 0) {
+      throw new IOException("OzoneManager does not support cancel snapshot diff from non-leader OM.");
+    }
     return ozoneManagerClient.listSnapshotDiffJobs(
             volumeName, bucketName, jobStatus, listAll, omNodeId).stream()
         .map(OzoneSnapshotDiff::fromSnapshotDiffJob)
@@ -1212,7 +1220,9 @@ public class RpcClient implements ClientProtocol {
         "bucket can't be null or empty.");
     Preconditions.checkArgument(StringUtils.isNotBlank(omNodeId),
         "OM node ID can't be null or empty.");
-
+    if (omVersion.compareTo(OzoneManagerVersion.SNAPSHOT_READ_FROM_NON_LEADER) < 0) {
+      throw new IOException("OzoneManager does not support list snapshots from non-leader OM.");
+    }
     return ozoneManagerClient.listSnapshot(volumeName, bucketName, snapshotPrefix,
         prevSnapshot, maxListResult, omNodeId);
   }
