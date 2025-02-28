@@ -194,7 +194,9 @@ public class TestContainerManagerImpl {
   }
 
   @Test
-  void testTransitionDeletingToClosedStateAllowsOnlyDeletingContainers() throws IOException {
+  void testTransitionContainerToClosedStateAllowOnlyDeletingOrDeletedContainers() throws IOException {
+    // Negative test for Ratis/EC container OPEN -> CLOSED transition
+
     // test for RATIS container
     final ContainerInfo container = containerManager.allocateContainer(
         RatisReplicationConfig.getInstance(

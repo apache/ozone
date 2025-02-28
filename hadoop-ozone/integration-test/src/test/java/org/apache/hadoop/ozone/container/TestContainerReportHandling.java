@@ -65,7 +65,7 @@ public class TestContainerReportHandling {
   private static final String KEY = "key1";
 
   /**
-   * Tests that a DELETING (or DELETED) container moves to the CLOSED state if a non-empty CLOSED replica is reported.
+   * Tests that a DELETING (or DELETED) container moves to the CLOSED state if a non-empty replica is reported.
    * To do this, the test first creates a key and closes its corresponding container. Then it moves that container to
    * DELETING (or DELETED) state using ContainerManager. Then it restarts a Datanode hosting that container,
    * making it send a full container report.

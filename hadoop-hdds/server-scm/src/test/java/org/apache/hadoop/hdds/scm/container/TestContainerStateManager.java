@@ -171,11 +171,17 @@ public class TestContainerStateManager {
         .getState());
   }
 
-  @Test
-  public void testTransitionDeletingToClosedStateAllowsOnlyDeletingContainer() throws IOException {
+  @ParameterizedTest
+  @EnumSource(value = HddsProtos.LifeCycleState.class,
+      names = {"CLOSING", "QUASI_CLOSED", "CLOSED", "RECOVERING"})
+  public void testTransitionContainerToClosedStateAllowOnlyDeletingOrDeletedContainer(
+      HddsProtos.LifeCycleState initialState) throws IOException {
+    // Negative test for non-OPEN Ratis container -> CLOSED transitions. OPEN -> CLOSED is tested in:
+    // TestContainerManagerImpl#testTransitionContainerToClosedStateAllowOnlyDeletingOrDeletedContainers
+
     HddsProtos.ContainerInfoProto.Builder builder = HddsProtos.ContainerInfoProto.newBuilder();
     builder.setContainerID(1)
-        .setState(HddsProtos.LifeCycleState.QUASI_CLOSED)
+        .setState(initialState)
         .setUsedBytes(0)
         .setNumberOfKeys(0)
         .setOwner("root")

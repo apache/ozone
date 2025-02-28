@@ -364,8 +364,7 @@ public class AbstractContainerReportHandler {
       // If container is in DELETED state and the reported replica is empty, delete the empty replica.
       // We should also do this for DELETING containers and currently DeletingContainerHandler does that
       if (container.getState() == HddsProtos.LifeCycleState.DELETED && replicaIsEmpty) {
-        // should we send a non-force delete instead?
-        deleteReplica(containerId, datanode, publisher, "DELETED");
+        deleteReplica(containerId, datanode, publisher, "DELETED", false);
         ignored = true;
         break;
       }
@@ -459,9 +458,9 @@ public class AbstractContainerReportHandler {
   }
 
   protected void deleteReplica(ContainerID containerID, DatanodeDetails dn,
-      EventPublisher publisher, String reason) {
+      EventPublisher publisher, String reason, boolean force) {
     SCMCommand<?> command = new DeleteContainerCommand(
-        containerID.getId(), true);
+        containerID.getId(), force);
     try {
       command.setTerm(scmContext.getTermOfLeader());
     } catch (NotLeaderException nle) {
