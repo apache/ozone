@@ -4543,4 +4543,141 @@
       allowing for better identification and analysis of performance issues.
     </description>
   </property>
+
+  <property>
+    <name>hdds.datanode.dns.interface</name>
+    <value>default</value>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      The name of the Network Interface from which a data node should
+      report its IP address. e.g. eth2. This setting may be required for some
+      multi-homed nodes where the DataNodes are assigned multiple hostnames
+      and it is desirable for the DataNodes to use a non-default hostname.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.dns.nameserver</name>
+    <value>default</value>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      The host name or IP address of the name server (DNS) which a DataNode
+      should use to determine its own host name.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.hostname</name>
+    <value></value>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      Optional. The hostname for the Datanode containing this
+      configuration file.  Will be different for each machine.
+      Defaults to current hostname.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.data.dir</name>
+    <value>file://${hadoop.tmp.dir}/hdds/data</value>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      Determines where on the local filesystem a HDDS data node
+      should store its blocks. If this is a comma-delimited
+      list of directories, then data will be stored in all named
+      directories, typically on different devices. The directories should be tagged
+      with corresponding storage types ([SSD]/[DISK]/[ARCHIVE]/[RAM_DISK]/[NVDIMM]) for OZONE
+      storage policies. The default storage type will be DISK if the directory does
+      not have a storage type tagged explicitly. Directories that do not exist will
+      be created if local filesystem permission allows.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.use.datanode.hostname</name>
+    <value>false</value>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      Whether datanodes should use datanode hostnames when
+      connecting to other datanodes for data transfer.
+    </description>
+  </property>
+  <property>
+    <name>hdds.xframe.enabled</name>
+    <value>true</value>
+    <tag>OZONE, HDDS</tag>
+    <description>
+      If true, then enables protection against clickjacking by returning
+      X_FRAME_OPTIONS header value set to SAMEORIGIN.
+      Clickjacking protection prevents an attacker from using transparent or
+      opaque layers to trick a user into clicking on a button
+      or link on another page.
+    </description>
+  </property>
+  <property>
+    <name>hdds.xframe.value</name>
+    <value>SAMEORIGIN</value>
+    <tag>OZONE, HDDS</tag>
+    <description>
+      This configration value allows user to specify the value for the
+      X-FRAME-OPTIONS. The possible values for this field are
+      DENY, SAMEORIGIN and ALLOW-FROM. Any other value will throw an
+      exception when datanodes are starting up.
+    </description>
+  </property>
+  <property>
+    <name>hdds.metrics.session-id</name>
+    <value></value>
+    <tag>OZONE, HDDS</tag>
+    <description>
+      Get the user-specified session identifier. The default is the empty string.
+      The session identifier is used to tag metric data that is reported to some
+      performance metrics system via the org.apache.hadoop.metrics API.  The
+      session identifier is intended, in particular, for use by Hadoop-On-Demand
+      (HOD) which allocates a virtual Hadoop cluster dynamically and transiently.
+      HOD will set the session identifier by modifying the mapred-site.xml file
+      before starting the cluster.
+      When not running under HOD, this identifer is expected to remain set to
+      the empty string.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.kerberos.principal</name>
+    <value></value>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      The DataNode service principal. This is typically set to
+      dn/_HOST@REALM.TLD. Each DataNode will substitute _HOST with its
+      own fully qualified hostname at startup. The _HOST placeholder
+      allows using the same configuration setting on all DataNodes.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.keytab.file</name>
+    <value></value>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      The keytab file used by each DataNode daemon to login as its
+      service principal. The principal name is configured with
+      hdds.datanode.kerberos.principal.
+    </description>
+  </property>
+  <property>
+    <name>hdds.metrics.percentiles.intervals</name>
+    <value></value>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      Comma-delimited set of integers denoting the desired rollover intervals
+      (in seconds) for percentile latency metrics on the Datanode.
+      By default, percentile latency metrics are disabled.
+    </description>
+  </property>
+
+  <property>
+    <name>net.topology.node.switch.mapping.impl</name>
+    <value>org.apache.hadoop.net.ScriptBasedMapping</value>
+    <tag>OZONE, SCM</tag>
+    <description>
+      The default implementation of the DNSToSwitchMapping. It
+      invokes a script specified in net.topology.script.file.name to resolve
+      node names. If the value for net.topology.script.file.name is not set, the
+      default value of DEFAULT_RACK is returned for all node names.
+    </description>
+  </property>
 </configuration>
