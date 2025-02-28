@@ -732,11 +732,11 @@
     </description>
   </property>
   <property>
-    <name>ozone.metastore.rocksdb.metrics.enabled</name>
+    <name>ozone.metastore.snapshot.rocksdb.metrics.enabled</name>
     <value>true</value>
     <tag>OZONE, OM, RECON, STORAGE, PERFORMANCE</tag>
     <description>
-      Skip collecting RocksDBStore metrics.
+      Skip collecting RocksDBStore metrics for Snapshotted DB.
     </description>
   </property>
   <property>
