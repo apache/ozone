@@ -21,6 +21,7 @@ import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableGaugeFloat;
+import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 
 /**
@@ -150,6 +151,15 @@ public class OMPerformanceMetrics {
 
   @Metric(about = "ACLs check in getObjectTagging")
   private MutableRate getObjectTaggingAclCheckLatencyNs;
+
+  @Metric("Latency of DirectoryDeletingService")
+  private MutableGaugeLong latencyDirectoryDeletingService;
+
+  @Metric("Latency of KeyDeletingService")
+  private MutableGaugeLong latencyKeyDeletingService;
+
+  @Metric("Latency of OpenKeyCleanupService")
+  private MutableGaugeLong latencyOpenKeyCleanupService;
 
   public void addLookupLatency(long latencyInNs) {
     lookupLatencyNs.add(latencyInNs);
@@ -298,5 +308,17 @@ public class OMPerformanceMetrics {
 
   public void addGetObjectTaggingLatencyNs(long latencyInNs) {
     getObjectTaggingAclCheckLatencyNs.add(latencyInNs);
+  }
+
+  public void setLatencyDirectoryDeletingService(long latencyInNs) {
+    latencyDirectoryDeletingService.set(latencyInNs);
+  }
+
+  public void setLatencyKeyDeletingService(long latencyInNs) {
+    latencyKeyDeletingService.set(latencyInNs);
+  }
+
+  public void setLatencyOpenKeyCleanupService(long latencyInNs) {
+    latencyOpenKeyCleanupService.set(latencyInNs);
   }
 }

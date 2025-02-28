@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -73,6 +74,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
   private final OzoneManager ozoneManager;
   private final DeletingServiceMetrics metrics;
+  private final OMPerformanceMetrics perfMetrics;
   private final ScmBlockLocationProtocol scmClient;
   private final ClientId clientId = ClientId.randomId();
   private final AtomicLong deletedDirsCount;
@@ -94,6 +96,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     this.movedFilesCount = new AtomicLong(0);
     this.runCount = new AtomicLong(0);
     this.metrics = ozoneManager.getDeletionMetrics();
+    this.perfMetrics = ozoneManager.getPerfMetrics();
   }
 
   protected int processKeyDeletes(List<BlockGroup> keyBlocksList,
@@ -119,14 +122,15 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     LOG.info("{} BlockGroup deletion are acked by SCM in {} ms",
         keyBlocksList.size(), Time.monotonicNow() - startTime);
     if (blockDeletionResults != null) {
-      startTime = Time.monotonicNow();
+      long purgeStartTime = Time.monotonicNow();
       delCount = submitPurgeKeysRequest(blockDeletionResults,
           keysToModify, snapTableKey, expectedPreviousSnapshotId);
       int limit = ozoneManager.getConfiguration().getInt(OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK,
           OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
       LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms. Limit per task is {}.",
-          delCount, blockDeletionResults.size(), Time.monotonicNow() - startTime, limit);
+          delCount, blockDeletionResults.size(), Time.monotonicNow() - purgeStartTime, limit);
     }
+    perfMetrics.setLatencyKeyDeletingService(Time.monotonicNowNanos() - startTime);
     return delCount;
   }
 
@@ -416,6 +420,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
           dirNum, subdirDelNum, subFileNum, (subDirNum - subdirDelNum),
           timeTakenInIteration, rnCnt);
       metrics.incrementDirectoryDeletionTotalMetrics(dirNum + subdirDelNum, subDirNum, subFileNum);
+      perfMetrics.setLatencyDirectoryDeletingService(timeTakenInIteration);
     }
   }
 
