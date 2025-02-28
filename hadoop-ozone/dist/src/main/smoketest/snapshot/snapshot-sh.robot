@@ -58,14 +58,14 @@ Snapshot List
                      Should contain      ${result}       SNAPSHOT_ACTIVE
 
 Snapshot Info
-   ${result} =       Execute             ozone sh snapshot info /${VOLUME}/${BUCKET}
+   ${result} =       Execute             ozone sh snapshot info /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE}
                      Should contain      echo '${result}' | jq '.volumeName'        ${VOLUME}
                      Should contain      echo '${result}' | jq '.bucketName'        ${BUCKET}
                      Should contain      echo '${result}' | jq '.name'              ${SNAPSHOT_ONE}
                      Should contain      echo '${result}' | jq '.snapshotStatus'    SNAPSHOT_ACTIVE
 
-   ${followerOM} =   Get One OM Follower Nod
-   ${result} =       Execute             ozone sh snapshot info /${VOLUME}/${BUCKET} --om-node-id ${followerOM}
+   ${followerOM} =   Get One OM Follower Node
+   ${result} =       Execute             ozone sh snapshot info /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE} --om-node-id ${followerOM}
                      Should contain      echo '${result}' | jq '.volumeName'        ${VOLUME}
                      Should contain      echo '${result}' | jq '.bucketName'        ${BUCKET}
                      Should contain      echo '${result}' | jq '.name'              ${SNAPSHOT_ONE}
@@ -87,12 +87,12 @@ Snapshot Diff
 
     ${followerOM} =  Get One OM Follower Node
     ${result} =      Execute                       ozone sh snapshot ls /${VOLUME}/${BUCKET} --om-node-id ${followerOM}
-                     Wait Until Keyword Succeeds   30sec   5sec   Should contain      ${result}       ${SNAPSHOT_TWO}}
+                     Wait Until Keyword Succeeds   30sec   5sec   Should contain      ${result}       ${SNAPSHOT_TWO}
                      Should contain      ${result}       SNAPSHOT_ACTIVE
 
     ${result} =     Execute             ozone sh snapshot diff /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE} ${SNAPSHOT_TWO} --om-node-id ${followerOM}
                     Should contain      ${result}       Snapshot diff job is IN_PROGRESS
-    ${result} =     Execute             ozone sh snapshot diff /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE} ${SNAPSHOT_TWO}
+    ${result} =     Execute             ozone sh snapshot diff /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE} ${SNAPSHOT_TWO} --om-node-id ${followerOM}
                     Should contain      ${result}       +    ${KEY_TWO}
                     Should contain      ${result}       +    ${KEY_THREE}
 
