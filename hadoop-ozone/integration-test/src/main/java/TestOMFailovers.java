@@ -16,7 +16,18 @@
  * limitations under the License.
  */
 
+import static java.util.concurrent.Executors.newSingleThreadExecutor;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.function.Function;
+import java.util.stream.IntStream;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -102,9 +113,9 @@ public class TestOMFailovers {
   private static AtomicLong counter = new AtomicLong();
   private static AtomicLong prevCounter = new AtomicLong();
 
-  public void testseparateDB() throws Exception {
+  public void testseparateDB(String output) throws Exception {
     DBStore dirTreeDbStore = null;
-    dirTreeDbStore = openDb(new File("/Users/sbalachandran/Documents/outputs"));
+    dirTreeDbStore = openDb(new File(output));
     if (dirTreeDbStore == null) {
       return;
     }
@@ -123,9 +134,9 @@ public class TestOMFailovers {
     Table<Long, ContainerInfo> dirTreeTable = dirTreeDbStore.getTable(DIRTREE_COLUMN_FAMILY.getName(), Long.class,
         ContainerInfo.class);
 
-    PrintWriter mismatchFile = new PrintWriter(new BufferedWriter(new FileWriter("/Users/sbalachandran/Documents/ozone/hadoop-ozone/integration-test/src/main/outputs/samefileMismatch.txt")));
-    PrintWriter bcsmismatch = new PrintWriter(new BufferedWriter(new FileWriter("/Users/sbalachandran/Documents/ozone/hadoop-ozone/integration-test/src/main/outputs/bcsidmismatch.txt")));
-    PrintWriter multipleOpen = new PrintWriter(new BufferedWriter(new FileWriter("/Users/sbalachandran/Documents/ozone/hadoop-ozone/integration-test/src/main/outputs/multipleopen.txt")));
+    PrintWriter mismatchFile = new PrintWriter(new BufferedWriter(new FileWriter(output + "/samefileMismatch.txt")));
+    PrintWriter bcsmismatch = new PrintWriter(new BufferedWriter(new FileWriter( output + "/bcsidmismatch.txt")));
+    PrintWriter multipleOpen = new PrintWriter(new BufferedWriter(new FileWriter(output + "/multipleopen.txt")));
 
     TableIterator<Long, ? extends Table.KeyValue<Long, ContainerInfo>> iterator = dirTreeTable.iterator();
     ThreadPoolExecutor pool = new ThreadPoolExecutor(30, 100, 1, TimeUnit.MINUTES, new ArrayBlockingQueue<>(2000));
@@ -188,8 +199,11 @@ public class TestOMFailovers {
     }
   }
 
-  public void run(File file, Table<Long, ContainerInfo> dirTreeTable, ConcurrentHashMap lock,
-                  RDBStore dirTreeDbStore, PrintWriter errorFiles) throws IOException {
+  public void run(File file, LoadingCache<Long, Long> lockingCache,
+                  Map<Long, ContainerInfo> containerMap,
+                  Table<Long, ContainerInfo> dirTreeTable,
+                  RDBStore dirTreeDbStore, PrintWriter errorFiles,
+                  Map<Integer, Pair<ExecutorService, ConcurrentLinkedQueue<Future<?>>>> executors) throws IOException {
     BufferedReader reader = new BufferedReader(new FileReader(file));
     String line = reader.readLine();
     String dn = file.getName().split("-")[2];
@@ -211,12 +225,32 @@ public class TestOMFailovers {
           ContainerProtos.ContainerDataProto.State state =
               ContainerProtos.ContainerDataProto.State.valueOf(split[5].split("=")[1].split("\\s+")[0]);
           String reason = String.join(" ", split[6].split("\\s+"));
-          if (lock != null) {
-            lock.compute(id, (k1, v1) -> {
-              try {
-                ContainerInfo containerInfo = dirTreeTable.get(id);
+
+          if (lockingCache != null) {
+            int val = (int) (id % executors.size());
+            if (val < 0) {
+              val = val + executors.size();
+            }
+            val = val % executors.size();
+            Pair<ExecutorService, ConcurrentLinkedQueue<Future<?>>> ex = executors.get(val);
+            while (ex.getValue().size() > 100) {
+              Future<?> front = ex.getValue().poll();
+              if (front != null) {
+                front.get();
+              }
+            }
+            ex.getValue().add(ex.getKey().submit(() -> lockingCache.asMap().compute(id, (k1, v1) -> {
+              containerMap.compute(k1, (k2, v2) -> {
+                ContainerInfo containerInfo = v2;
                 if (containerInfo == null) {
-                  containerInfo = new ContainerInfo();
+                  try {
+                    containerInfo = dirTreeTable.get(k2);
+                    if (containerInfo == null) {
+                      containerInfo = new ContainerInfo();
+                    }
+                  } catch (IOException e) {
+                    throw new RuntimeException(e);
+                  }
                 }
 
                 if (state == ContainerProtos.ContainerDataProto.State.DELETED) {
@@ -244,12 +278,10 @@ public class TestOMFailovers {
                 if (!reason.isEmpty()) {
                   dnInfoState.setStrError(dnInfoState.getStrError() + time + "\t" + reason + "\n");
                 }
-                dirTreeTable.put(id, containerInfo);
-              } catch (IOException e) {
-                throw new UncheckedIOException(e);
-              }
-              return null;
-            });
+                return containerInfo;
+              });
+              return id;
+            })));
           }
         } catch (Exception e) {
           System.out.println("Skipping Line : " + file.getAbsolutePath() + "\t" + line);
@@ -260,20 +292,6 @@ public class TestOMFailovers {
     }
     System.out.println(dn + "\t" + counter.addAndGet(cnt));
     reader.close();
-    lock.compute("lock", (k,v) -> {
-      try {
-        dirTreeDbStore.flushLog(true);
-        dirTreeDbStore.flushDB();
-        try (ManagedCompactRangeOptions options = new ManagedCompactRangeOptions()) {
-//          options.setBottommostLevelCompaction(CompactRangeOptions.BottommostLevelCompaction.kForce);
-          ((RDBStore)dirTreeDbStore).compactDB();
-        }
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-      return null;
-    });
-
   }
 
   String readableOutput(DNInfoState state) {
@@ -283,29 +301,77 @@ public class TestOMFailovers {
     return val;
   }
 
-  public void test123() throws Exception {
+  private void flush(long containerId, Map<Long, ContainerInfo> containerInfoMap,
+                     Table<Long, ContainerInfo> dirTreeTable) throws IOException {
+    containerInfoMap.compute(containerId, (k, v) -> {
+      if (v != null) {
+        try {
+          dirTreeTable.put(k, v);
+          return null;
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }
+      return null;
+    });
+  }
+
+  public void test123(String input, String output) throws Exception {
     BufferedReader reader;
 
     RDBStore dirTreeDbStore = null;
-    dirTreeDbStore = openDb(new File("/Users/sbalachandran/Documents/outputs"));
+    dirTreeDbStore = openDb(new File(output));
     if (dirTreeDbStore == null) {
       return;
     }
     Table<Long, ContainerInfo> dirTreeTable = dirTreeDbStore.getTable(DIRTREE_COLUMN_FAMILY.getName(), Long.class,
         ContainerInfo.class);
+    int size = 100000000;
+    Map<Long, ContainerInfo> containerInfoMap = new ConcurrentHashMap<>();
+    LoadingCache<Long, Long> cache = CacheBuilder.newBuilder()
+        .maximumSize(size)
+        .expireAfterWrite(100, TimeUnit.MINUTES)
+        .removalListener(notification -> {
+          try {
+            if (containerInfoMap.size() > size) {
+              flush((long)notification.getKey(), containerInfoMap, dirTreeTable);
+            }
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }).build(new CacheLoader<Long, Long>() {
+          @Override
+          public Long load(Long id) throws IOException {
+            containerInfoMap.compute(id, (k, v) -> {
+              try {
+                ContainerInfo containerInfo = v == null ? dirTreeTable.get(id) : v;
+                if (containerInfo == null) {
+                  containerInfo = new ContainerInfo();
+                }
+                return containerInfo;
+              } catch (IOException e) {
+                throw new RuntimeException(e);
+              }
+            });
+            return id;
+          }
+        });
     ExecutorService pool = new ThreadPoolExecutor(30, 100, 1, TimeUnit.MINUTES, new ArrayBlockingQueue<>(1000));
-    ConcurrentHashMap<Long, ContainerInfo> lock = new ConcurrentHashMap<>();
     List<Future<Exception>> futures = new ArrayList<>();
-    try (PrintWriter errorFiles = new PrintWriter(new BufferedWriter(new FileWriter("/Users/sbalachandran/Documents" +
-        "/ozone/hadoop-ozone/integration-test/src/main/outputs/error.txt")))) {
+    Map<Integer, Pair<ExecutorService, ConcurrentLinkedQueue<Future<?>>>> executors = new ConcurrentHashMap<>();
+    for (int i = 0; i < 100; i++) {
+      executors.put(i, Pair.of(newSingleThreadExecutor(), new ConcurrentLinkedQueue<>()));
+    }
+
+    try (PrintWriter errorFiles = new PrintWriter(new BufferedWriter(new FileWriter(output+ "/error.txt")))) {
       for (File file :
-          Objects.requireNonNull(Arrays.stream(new File("/Users/sbalachandran/Documents/code/dummyrocks/dn_container_log")
+          Objects.requireNonNull(Arrays.stream(new File(input)
               .listFiles(pathname -> pathname.getName().startsWith("dn-container.log"))).sorted()
               .sorted(Comparator.comparing(File::getName)).collect(Collectors.toList()))) {
         RDBStore finalDirTreeDbStore = dirTreeDbStore;
         futures.add(pool.submit(() -> {
           try {
-            run(file, dirTreeTable, null, finalDirTreeDbStore, errorFiles);
+            run(file, cache, containerInfoMap, dirTreeTable,finalDirTreeDbStore, errorFiles, executors);
           } catch (Exception e) {
             System.out.println(file.getAbsolutePath() + "\t" + e);
             e.printStackTrace();
@@ -320,11 +386,38 @@ public class TestOMFailovers {
           throw new RuntimeException(e);
         }
       }
+      for (Pair<ExecutorService, ConcurrentLinkedQueue<Future<?>>> entry : executors.values()) {
+        while (!entry.getValue().isEmpty()) {
+          entry.getValue().poll().get();
+        }
+      }
+      for (Long containerId : containerInfoMap.keySet()) {
+          futures.add(pool.submit(() -> {
+            try {
+              flush(containerId, containerInfoMap, dirTreeTable);
+            } catch (IOException e) {
+              return e;
+            }
+            return null;
+          }));
+      }
+      for (Future<Exception> future : futures) {
+        Exception e = future.get();
+        if ( e != null) {
+          throw new RuntimeException(e);
+        }
+      }
     } finally {
       if (dirTreeDbStore != null) {
         dirTreeDbStore.close();
         dbOptions.close();
         pool.shutdown();
+        executors.values().forEach(
+            (Pair<ExecutorService, ConcurrentLinkedQueue<Future<?>>> executor) -> {
+              executor.getKey().shutdown();
+            });
+        cache.invalidateAll();
+
       }
     }
   }
@@ -461,6 +554,8 @@ public class TestOMFailovers {
   }
 
   public static void main(String[] args) throws Exception {
-    new TestOMFailovers().testseparateDB();
+    TestOMFailovers test = new TestOMFailovers();
+    test.test123(args[0], args[1]);
+    test.testseparateDB(args[1]);
   }
 }

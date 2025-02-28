@@ -17,6 +17,7 @@
  *
  */
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
@@ -31,6 +32,7 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.rocksdb.LiveFileMetaData;
 
 import java.io.BufferedWriter;
@@ -181,14 +183,15 @@ public class FindContainerKeys {
     }
   }
 
-  public Function<List<Object[]>, Void> getParents(OmMetadataManagerImpl omMetadataManager, Map<Long, Object[]> maps) {
+  public Function<List<Object[]>, Void> getParents(OmMetadataManagerImpl omMetadataManager, Map<Long, Object[]> maps,
+   boolean deleted) {
     return (ks) -> {
       for (Object[] k : ks) {
-        OmDirectoryInfo omDirInfo = (OmDirectoryInfo) k[1];
+        WithParentObjectId omDirInfo = (WithParentObjectId) k[1];
         String[] key = ((String)k[0]).split("/");
         long parentId = Long.parseLong(key[3]);
         String keyVal = key[4];
-        maps.computeIfAbsent(omDirInfo.getObjectID(), (k1) -> new Object[]{keyVal, parentId});
+        maps.computeIfAbsent(omDirInfo.getObjectID(), (k1) -> new Object[]{keyVal, parentId, deleted});
       }
       return null;
     };
@@ -200,20 +203,28 @@ public class FindContainerKeys {
         OmBucketInfo bucketInfo = (OmBucketInfo) k[1];
         maps.computeIfAbsent(bucketInfo.getObjectID(),
             (k1) -> new Object[]{ "/" + bucketInfo.getVolumeName() + "/" + bucketInfo.getBucketName(),
-            null});
+            null, false});
       }
       return null;
     };
   }
 
-  private List<String> getPath(Map<Long, Object[]> parents, Long parentId) {
+  private Pair<List<String>, String> getPath(Map<Long, Object[]> parents, Long parentId) {
     List<String> path = new ArrayList<>();
+    boolean deleted = false;
     while (parentId != null) {
-      path.add((String) parents.get(parentId)[0]);
-      parentId = (Long) parents.get(parentId)[1];
+      if (parents.containsKey(parentId)) {
+        path.add((String) parents.get(parentId)[0]);
+        deleted = (boolean)parents.get(parentId)[2] || deleted;
+        parentId = (Long) parents.get(parentId)[1];
+      } else {
+        System.out.println("Invalid parentId: " + parentId);
+        break;
+      }
+
     }
     Collections.reverse(path);
-    return path;
+    return Pair.of(path, deleted ? "DELETED" : "PRESENT");
   }
 
   public Function<List<Object[]>, Void> getKeys(PrintWriter outFile, Set<Long> containerIds,
@@ -229,10 +240,10 @@ public class FindContainerKeys {
           String[] key = ((String)k[0]).split("/");
           long parentId = Long.parseLong(key[3]);
           String keyVal = key[4];
-          List<String> path = getPath(dirs, parentId);
+          Pair<List<String>, String> path = getPath(dirs, parentId);
 
-          outFile.println(k[0] + "\t" + path.stream().collect(Collectors.joining("/")) + "/" + keyVal
-              + "\t" + ((OmKeyInfo)k[1]).getDataSize() + "\t" + keyContainerIds.stream()
+          outFile.println(k[0] + "\t" + path.getKey().stream().collect(Collectors.joining("/")) + "/" + keyVal
+              + "\t" + path.getValue() + "\t" + ((OmKeyInfo)k[1]).getDataSize() + "\t" + keyContainerIds.stream()
               .map(blk -> blk.getContainerID() + ":" + blk.getLocalID())
               .collect(Collectors.joining(",")));
           totalSize.addAndGet(((OmKeyInfo)k[1]).getDataSize());
@@ -258,12 +269,12 @@ public class FindContainerKeys {
     FindContainerKeys omdbReader = new FindContainerKeys();
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.setInt(OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES, -1);
-    OmMetadataManagerImpl omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, new File("/tmp"),
+    OmMetadataManagerImpl omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, new File(args[0]),
         "om.db");
 //    omdbReader.flush(omMetadataManager);
-    try (Stream<String> lines  = Files.lines(Paths.get("/tmp/mismatchContainers"));
+    try (Stream<String> lines  = Files.lines(Paths.get(args[0] + "/containers.out"));
          PrintWriter outFile =
-             new PrintWriter(new BufferedWriter(new FileWriter("/tmp/" +
+             new PrintWriter(new BufferedWriter(new FileWriter(args[1] +
                  omMetadataManager.getFileTable().getName() + "_missing_containers.txt")))) {
       AtomicLong totalSize = new AtomicLong(0);
       AtomicLong cnt = new AtomicLong(0);
@@ -271,10 +282,12 @@ public class FindContainerKeys {
       System.out.println("=================== DirectoryTable ======================");
       Map<Long, Object[]> dirs = new ConcurrentHashMap<>();
       Function<List<Object[]>, Void> bucketFunction = omdbReader.getBuckets(omMetadataManager, dirs);
-      Function<List<Object[]>, Void> dirFunction = omdbReader.getParents(omMetadataManager, dirs);
+      Function<List<Object[]>, Void> dirFunction = omdbReader.getParents(omMetadataManager, dirs, false);
+      Function<List<Object[]>, Void> deletedDirFunction = omdbReader.getParents(omMetadataManager, dirs, true);
       Function<List<Object[]>, Void> function = omdbReader.getKeys(outFile, containerIds, dirs,
           totalSize, cnt);
       omdbReader.performOp(omMetadataManager, omMetadataManager.getBucketTable(), bucketFunction);
+      omdbReader.performOp(omMetadataManager, omMetadataManager.getDeletedDirTable(), deletedDirFunction);
       omdbReader.performOp(omMetadataManager, omMetadataManager.getDirectoryTable(), dirFunction);
       omdbReader.performOp(omMetadataManager, omMetadataManager.getFileTable(), function);
     } finally {
