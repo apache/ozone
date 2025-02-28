@@ -36,6 +36,7 @@ import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
@@ -443,5 +444,15 @@ public final class TestHelper {
       MiniOzoneCluster cluster) throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> countReplicas(containerID, cluster) == count,
         200, 30000);
+  }
+
+  /** Helper to set config even if {@code value} is null, which
+   * {@link OzoneConfiguration#set(String, String) does not allow. */
+  public static void setConfig(OzoneConfiguration conf, String key, String value) {
+    if (value == null) {
+      conf.unset(key);
+    } else {
+      conf.set(key, value);
+    }
   }
 }
