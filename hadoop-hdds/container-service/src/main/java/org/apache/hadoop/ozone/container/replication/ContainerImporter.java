@@ -172,4 +172,7 @@ public class ContainerImporter {
     return new TarContainerPacker(compression);
   }
 
+  public long getDefaultContainerSize() {
+    return containerSize;
+  }
 }
