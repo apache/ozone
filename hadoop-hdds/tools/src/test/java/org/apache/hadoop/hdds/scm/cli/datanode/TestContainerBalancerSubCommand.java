@@ -22,11 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.PrintStream;
-import java.io.UnsupportedEncodingException;
-import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.regex.Pattern;
@@ -38,6 +34,8 @@ import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStatusSubcommand;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStopSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,14 +47,11 @@ import picocli.CommandLine;
  */
 class TestContainerBalancerSubCommand {
 
-  private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
-  private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
-  private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
-  private final PrintStream originalOut = System.out;
-  private final PrintStream originalErr = System.err;
   private ContainerBalancerStopSubcommand stopCmd;
   private ContainerBalancerStartSubcommand startCmd;
   private ContainerBalancerStatusSubcommand statusCmd;
+  private GenericTestUtils.PrintStreamCapturer out;
+  private GenericTestUtils.PrintStreamCapturer err;
 
   private static ContainerBalancerStatusInfoResponseProto getContainerBalancerStatusInfoResponseProto(
       ContainerBalancerConfiguration config) {
@@ -201,18 +196,17 @@ class TestContainerBalancerSubCommand {
   }
 
   @BeforeEach
-  public void setup() throws UnsupportedEncodingException {
+  void setup() {
     stopCmd = new ContainerBalancerStopSubcommand();
     startCmd = new ContainerBalancerStartSubcommand();
     statusCmd = new ContainerBalancerStatusSubcommand();
-    System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
-    System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
+    out = GenericTestUtils.captureOut();
+    err = GenericTestUtils.captureErr();
   }
 
   @AfterEach
-  public void tearDown() {
-    System.setOut(originalOut);
-    System.setErr(originalErr);
+  void tearDown() {
+    IOUtils.closeQuietly(out, err);
   }
 
   @Test
@@ -230,7 +224,7 @@ class TestContainerBalancerSubCommand {
     statusCmd.execute(scmClient);
     Pattern p = Pattern.compile(
         "^ContainerBalancer\\sis\\sRunning.");
-    String output = outContent.toString(DEFAULT_ENCODING);
+    String output = out.get();
     assertThat(output).containsPattern(p);
 
     String balancerConfigOutput =
@@ -290,7 +284,7 @@ class TestContainerBalancerSubCommand {
     CommandLine c = new CommandLine(statusCmd);
     c.parseArgs("--verbose", "--history");
     statusCmd.execute(scmClient);
-    String output = outContent.toString(DEFAULT_ENCODING);
+    String output = out.get();
     Pattern p = Pattern.compile(
         "^ContainerBalancer\\sis\\sRunning.$", Pattern.MULTILINE);
     assertThat(output).containsPattern(p);
@@ -377,7 +371,7 @@ class TestContainerBalancerSubCommand {
     CommandLine c = new CommandLine(statusCmd);
     c.parseArgs("--verbose");
     statusCmd.execute(scmClient);
-    String output = outContent.toString(DEFAULT_ENCODING);
+    String output = out.get();
     Pattern p = Pattern.compile(
         "^ContainerBalancer\\sis\\sRunning.$", Pattern.MULTILINE);
     assertThat(output).containsPattern(p);
@@ -446,7 +440,7 @@ class TestContainerBalancerSubCommand {
     statusCmd.execute(scmClient);
     Pattern p = Pattern.compile(
         "^ContainerBalancer\\sis\\sNot\\sRunning.");
-    String output = outContent.toString(DEFAULT_ENCODING);
+    String output = out.get();
     assertThat(output).containsPattern(p);
   }
 
@@ -464,7 +458,7 @@ class TestContainerBalancerSubCommand {
 
     Pattern p = Pattern.compile(
         "^ContainerBalancer\\sis\\sNot\\sRunning.");
-    String output = outContent.toString(DEFAULT_ENCODING);
+    String output = out.get();
     assertThat(output).containsPattern(p);
   }
 
@@ -477,7 +471,7 @@ class TestContainerBalancerSubCommand {
         "\\sWaiting\\sfor\\sContainer\\sBalancer\\sto\\sstop...\\n" +
         "Container\\sBalancer\\sstopped.");
 
-    String output = outContent.toString(DEFAULT_ENCODING);
+    String output = out.get();
     assertThat(output).containsPattern(p);
   }
 
@@ -496,7 +490,7 @@ class TestContainerBalancerSubCommand {
 
     Pattern p = Pattern.compile("^Container\\sBalancer\\sstarted" +
         "\\ssuccessfully.");
-    String output = outContent.toString(DEFAULT_ENCODING);
+    String output = out.get();
     assertThat(output).containsPattern(p);
   }
 
@@ -516,7 +510,7 @@ class TestContainerBalancerSubCommand {
     Pattern p = Pattern.compile("^Failed\\sto\\sstart\\sContainer" +
         "\\sBalancer.");
 
-    String output = outContent.toString(DEFAULT_ENCODING);
+    String output = out.get();
     assertThat(output).containsPattern(p);
   }
 
