@@ -28,7 +28,7 @@
       { "state": "QUASI_CLOSED", "index": 0,   "datanode": "d2", "sequenceId": 12, "isEmpty": false, "origin": "o2"},
       { "state": "QUASI_CLOSED", "index": 0,   "datanode": "d3", "sequenceId": 12, "isEmpty": false, "origin": "o2"}
     ],
-    "expectation": { "underReplicated": 0, "underReplicatedQueue": 0, "overReplicated": 0, "overReplicatedQueue":  0, "quasiClosedStuck": 1},
+    "expectation": { "underReplicated": 1, "underReplicatedQueue": 1, "overReplicated": 0, "overReplicatedQueue":  0, "quasiClosedStuck": 1},
     "checkCommands": [],
     "commands": []
   },
@@ -108,7 +108,7 @@
       { "state": "QUASI_CLOSED", "index": 0,   "datanode": "d3", "sequenceId": 10, "isEmpty": false, "origin": "o2"},
       { "state": "UNHEALTHY",    "index": 0,   "datanode": "d4", "sequenceId": 11, "isEmpty": false, "origin": "o3"}
     ],
-    "expectation": { "underReplicated": 0, "underReplicatedQueue": 0, "overReplicated": 0, "overReplicatedQueue":  0, "quasiClosedStuck": 1, "unhealthy": 0 },
+    "expectation": { "underReplicated": 1, "underReplicatedQueue": 1, "overReplicated": 0, "overReplicatedQueue":  0, "quasiClosedStuck": 1, "unhealthy": 0 },
     "checkCommands": [],
     "commands": []
   }

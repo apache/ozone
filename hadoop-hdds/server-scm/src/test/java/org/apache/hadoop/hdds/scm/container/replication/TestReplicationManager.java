@@ -463,11 +463,11 @@ public class TestReplicationManager {
     storeContainerAndReplicas(container, replicas);
 
     replicationManager.processContainer(container, repQueue, repReport);
-    assertEquals(0, repReport.getStat(
+    assertEquals(1, repReport.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     assertEquals(0, repReport.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
-    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
   }
 

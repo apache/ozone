@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 /**
@@ -36,10 +37,14 @@ public class QuasiClosedStuckReplicaCount {
   private final Map<UUID, Set<ContainerReplica>> maintenanceReplicasByOrigin = new HashMap<>();
   private boolean hasOutOfServiceReplicas = false;
   private int minHealthyForMaintenance;
+  private boolean hasHealthyReplicas = false;
 
   public QuasiClosedStuckReplicaCount(Set<ContainerReplica> replicas, int minHealthyForMaintenance) {
     this.minHealthyForMaintenance = minHealthyForMaintenance;
     for (ContainerReplica r : replicas) {
+      if (r.getState() != StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY) {
+        hasHealthyReplicas = true;
+      }
       replicasByOrigin.computeIfAbsent(r.getOriginDatanodeId(), k -> new HashSet<>()).add(r);
       HddsProtos.NodeOperationalState opState = r.getDatanodeDetails().getPersistedOpState();
       if (opState == HddsProtos.NodeOperationalState.IN_SERVICE) {
@@ -56,6 +61,10 @@ public class QuasiClosedStuckReplicaCount {
 
   public boolean hasOutOfServiceReplicas() {
     return hasOutOfServiceReplicas;
+  }
+
+  public boolean hasHealthyReplicas() {
+    return hasHealthyReplicas;
   }
 
   public boolean isUnderReplicated() {

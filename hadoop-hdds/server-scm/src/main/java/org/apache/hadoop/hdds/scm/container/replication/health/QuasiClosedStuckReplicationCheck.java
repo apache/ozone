@@ -19,6 +19,10 @@ package org.apache.hadoop.hdds.scm.container.replication.health;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QUASI_CLOSED;
 
+import java.util.Set;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
@@ -43,9 +47,27 @@ public class QuasiClosedStuckReplicationCheck  extends AbstractCheck {
     if (!QuasiClosedContainerHandler.isQuasiClosedStuck(request.getContainerInfo(), request.getContainerReplicas())) {
       return false;
     }
+    if (hasEnoughOriginsWithOpen(request.getContainerInfo(), request.getContainerReplicas())) {
+      // If we have all origins with open replicas, and not unhealthy then the container should close after the close
+      // goes through, so this handler should not run.
+      return false;
+    }
+
+    if (request.getContainerReplicas().isEmpty()) {
+      // If there are no replicas, then mark as missing and return.
+      request.getReport().incrementAndSample(
+          ReplicationManagerReport.HealthState.MISSING, request.getContainerInfo().containerID());
+      return true;
+    }
 
     QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(
         request.getContainerReplicas(), request.getMaintenanceRedundancy());
+
+    if (!replicaCount.hasHealthyReplicas()) {
+      // All unhealthy are handled by a different handler
+      return false;
+    }
+
     int pendingAdd = 0;
     int pendingDelete = 0;
     for (ContainerReplicaOp op : request.getPendingOps()) {
@@ -54,13 +76,6 @@ public class QuasiClosedStuckReplicationCheck  extends AbstractCheck {
       } else if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
         pendingDelete++;
       }
-    }
-
-    if (request.getContainerReplicas().isEmpty()) {
-      // If there are no replicas, then mark as missing and return.
-      request.getReport().incrementAndSample(
-          ReplicationManagerReport.HealthState.MISSING, request.getContainerInfo().containerID());
-      return true;
     }
 
     if (replicaCount.isUnderReplicated()) {
@@ -92,6 +107,16 @@ public class QuasiClosedStuckReplicationCheck  extends AbstractCheck {
       return true;
     }
     return false;
+  }
+
+  private static boolean hasEnoughOriginsWithOpen(ContainerInfo containerInfo, Set<ContainerReplica> replicas) {
+    final long uniqueOpenReplicaCount = replicas.stream()
+        .filter(r -> r.getState() == State.QUASI_CLOSED || r.getState() == State.OPEN)
+        .map(ContainerReplica::getOriginDatanodeId)
+        .distinct()
+        .count();
+    final int replicationFactor = containerInfo.getReplicationConfig().getRequiredNodes();
+    return uniqueOpenReplicaCount >= replicationFactor;
   }
 
 }
