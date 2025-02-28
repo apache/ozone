@@ -27,6 +27,18 @@ ${KEY_ONE}
 ${KEY_TWO}
 ${KEY_THREE}
 
+*** Keywords ***
+Get OM Nodes
+    ${result} =        Execute                 ozone admin om roles --service-id=omservice --json | jq -r '[.[] | .[] | select(.serverRole == "LEADER") | .hostname], [.[] | .[] | select(.serverRole == "FOLLOWER") | .hostname] | .[]'
+    ${leader}=         Get Line                ${result}    0
+    ${follower1}=      Get Line                ${result}    1
+    ${follower2}=      Get Line                ${result}    2
+    [Return]           ${leader}    ${follower1}    ${follower2}
+
+Get One OM Follower Node
+    ${result} =        Get OM Nodes
+    [Return]           ${result}[1]
+
 *** Test Cases ***
 Snapshot Creation
     Setup volume and bucket
@@ -40,6 +52,26 @@ Snapshot List
                     Should contain      ${result}       ${SNAPSHOT_ONE}
                     Should contain      ${result}       SNAPSHOT_ACTIVE
 
+    ${followerOM} =  Get One OM Follower Node
+    ${result} =      Execute                       ozone sh snapshot ls /${VOLUME}/${BUCKET} --om-node-id ${followerOM}
+                     Wait Until Keyword Succeeds   30sec   5sec   Should contain      ${result}       ${SNAPSHOT_ONE}
+                     Should contain      ${result}       SNAPSHOT_ACTIVE
+
+Snapshot Info
+   ${result} =       Execute             ozone sh snapshot info /${VOLUME}/${BUCKET}
+                     Should contain      echo '${result}' | jq '.volumeName'        ${VOLUME}
+                     Should contain      echo '${result}' | jq '.bucketName'        ${BUCKET}
+                     Should contain      echo '${result}' | jq '.name'              ${SNAPSHOT_ONE}
+                     Should contain      echo '${result}' | jq '.snapshotStatus'    SNAPSHOT_ACTIVE
+
+   ${followerOM} =   Get One OM Follower Nod
+   ${result} =       Execute             ozone sh snapshot info /${VOLUME}/${BUCKET} --om-node-id ${followerOM}
+                     Should contain      echo '${result}' | jq '.volumeName'        ${VOLUME}
+                     Should contain      echo '${result}' | jq '.bucketName'        ${BUCKET}
+                     Should contain      echo '${result}' | jq '.name'              ${SNAPSHOT_ONE}
+                     Should contain      echo '${result}' | jq '.snapshotStatus'    SNAPSHOT_ACTIVE
+
+
 Snapshot Diff
     ${key_two} =            snapshot-setup.Create key           ${VOLUME}       ${BUCKET}       /etc/passwd
     Set Suite Variable      ${KEY_TWO}          ${key_two}
@@ -52,6 +84,18 @@ Snapshot Diff
     ${result} =     Execute             ozone sh snapshot diff /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE} ${SNAPSHOT_TWO}
                     Should contain      ${result}       +    ${KEY_TWO}
                     Should contain      ${result}       +    ${KEY_THREE}
+
+    ${followerOM} =  Get One OM Follower Node
+    ${result} =      Execute                       ozone sh snapshot ls /${VOLUME}/${BUCKET} --om-node-id ${followerOM}
+                     Wait Until Keyword Succeeds   30sec   5sec   Should contain      ${result}       ${SNAPSHOT_TWO}}
+                     Should contain      ${result}       SNAPSHOT_ACTIVE
+
+    ${result} =     Execute             ozone sh snapshot diff /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE} ${SNAPSHOT_TWO} --om-node-id ${followerOM}
+                    Should contain      ${result}       Snapshot diff job is IN_PROGRESS
+    ${result} =     Execute             ozone sh snapshot diff /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE} ${SNAPSHOT_TWO}
+                    Should contain      ${result}       +    ${KEY_TWO}
+                    Should contain      ${result}       +    ${KEY_THREE}
+
 
 Snapshot Diff as JSON
     ${result} =     Execute             ozone sh snapshot diff --json /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE} ${SNAPSHOT_TWO}
@@ -69,6 +113,13 @@ List Snapshot Diff Jobs
                     Should contain      ${result}        ${BUCKET}
                     Should contain      ${result}        ${SNAPSHOT_ONE}
                     Should contain      ${result}        ${SNAPSHOT_TWO}
+
+    ${followerOM} =  Get One OM Follower Node
+    ${result} =      Execute             ozone sh snapshot listDiff /${VOLUME}/${BUCKET} --all --om-node-id ${followerOM}
+                     Should contain      ${result}        ${VOLUME}
+                     Should contain      ${result}        ${BUCKET}
+                     Should contain      ${result}        ${SNAPSHOT_ONE}
+                     Should contain      ${result}        ${SNAPSHOT_TWO}
 
 Read Snapshot
     Key Should Match Local File         /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_ONE}/${KEY_ONE}       /etc/hosts
