@@ -363,8 +363,8 @@ public class ContainerStateMachine extends BaseStateMachine {
     return stateMachineHealthy.get();
   }
 
-  private void checkContainerHealthy(long containerId) throws StorageContainerException {
-    if (!isStateMachineHealthy() && unhealthyContainers.contains(containerId)) {
+  private void checkContainerHealthy(long containerId, boolean skipContainerUnhealthyCheck) throws StorageContainerException {
+    if (!isStateMachineHealthy() && (skipContainerUnhealthyCheck || unhealthyContainers.contains(containerId))) {
       throw new StorageContainerException(String.format("Prev writes to container %d failed, stopping all writes to " +
               "container", containerId), ContainerProtos.Result.CONTAINER_UNHEALTHY);
     }
@@ -565,7 +565,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         CompletableFuture.supplyAsync(() -> {
           try {
             try {
-              checkContainerHealthy(write.getBlockID().getContainerID());
+              checkContainerHealthy(write.getBlockID().getContainerID(), true);
             } catch (StorageContainerException e) {
               return ContainerUtils.logAndReturnError(LOG, e, requestProto);
             }
@@ -963,7 +963,7 @@ public class ContainerStateMachine extends BaseStateMachine {
           try {
             try {
               this.validatePeers();
-              this.checkContainerHealthy(containerId);
+              this.checkContainerHealthy(containerId, false);
             } catch (StorageContainerException e) {
               return ContainerUtils.logAndReturnError(LOG, e, request);
             }
