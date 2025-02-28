@@ -571,7 +571,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
   }
 
   private void readKey(OzoneBucket ozoneBucket, String key, int length, byte[] input)
-      throws Exception{
+      throws Exception {
 
     OzoneInputStream ozoneInputStream = ozoneBucket.readKey(key);
     byte[] read = new byte[length];

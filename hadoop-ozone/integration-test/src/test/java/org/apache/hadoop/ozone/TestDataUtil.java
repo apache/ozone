@@ -115,7 +115,7 @@ public final class TestDataUtil {
   public static void createKey(OzoneBucket bucket, String keyName,
                                byte[] content) throws IOException {
     createKey(bucket, keyName, ReplicationFactor.ONE,
-        ReplicationType.RATIS, new String(content));
+        ReplicationType.RATIS, new String(content, UTF_8));
   }
 
   public static void createKey(OzoneBucket bucket, String keyName,

@@ -366,7 +366,7 @@ public abstract class TestOmSnapshotFileSystem {
   }
 
   private void readkey(OzoneBucket ozoneBucket, String key, int length, byte[] input)
-      throws Exception{
+      throws Exception {
     OzoneInputStream ozoneInputStream = ozoneBucket.readKey(key);
     byte[] read = new byte[length];
     ozoneInputStream.read(read, 0, length);
