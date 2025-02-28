@@ -108,13 +108,14 @@ public final class TestDataUtil {
   public static void createKey(OzoneBucket bucket, String keyName,
                                String content) throws IOException {
     createKey(bucket, keyName, ReplicationFactor.ONE,
-        ReplicationType.RATIS, content);
+        ReplicationType.RATIS, content.getBytes(UTF_8));
   }
 
   public static void createKey(OzoneBucket bucket, String keyName,
                                byte[] content) throws IOException {
     createKey(bucket, keyName, ReplicationFactor.ONE,
-        ReplicationType.RATIS, new String(content, UTF_8));
+        ReplicationType.RATIS, content);
+
   }
 
   public static void createKey(OzoneBucket bucket, String keyName,
@@ -122,7 +123,21 @@ public final class TestDataUtil {
       throws IOException {
     ReplicationConfig repConfig = ReplicationConfig
         .fromTypeAndFactor(repType, repFactor);
-    createKey(bucket, keyName, repConfig, new String(content, UTF_8));
+    try (OutputStream stream = bucket
+        .createKey(keyName, content.length, repConfig,
+            new HashMap<>())) {
+      stream.write(content);
+    }
+  }
+
+  public static void createKey(OzoneBucket bucket, String keyName,
+                               ReplicationConfig repConfig, byte[] content)
+      throws IOException {
+    try (OutputStream stream = bucket
+        .createKey(keyName, content.length, repConfig,
+            new HashMap<>())) {
+      stream.write(content);
+    }
   }
 
   public static void createKey(OzoneBucket bucket, String keyName,
@@ -130,17 +145,13 @@ public final class TestDataUtil {
       throws IOException {
     ReplicationConfig repConfig = ReplicationConfig
         .fromTypeAndFactor(repType, repFactor);
-    createKey(bucket, keyName, repConfig, content);
+    createKey(bucket, keyName, repConfig, content.getBytes(UTF_8));
   }
 
   public static void createKey(OzoneBucket bucket, String keyName,
       ReplicationConfig repConfig, String content)
       throws IOException {
-    try (OutputStream stream = bucket
-        .createKey(keyName, content.length(), repConfig,
-            new HashMap<>())) {
-      stream.write(content.getBytes(UTF_8));
-    }
+    createKey(bucket, keyName, repConfig, content.getBytes(UTF_8));
   }
 
   public static void createKey(OzoneBucket bucket, String keyName,
