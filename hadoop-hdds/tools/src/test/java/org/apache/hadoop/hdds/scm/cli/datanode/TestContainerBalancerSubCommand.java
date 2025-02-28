@@ -238,8 +238,6 @@ class TestContainerBalancerSubCommand {
     //test status is running
     when(scmClient.getContainerBalancerStatusInfo()).thenReturn(statusInfoResponseProto);
     statusCmd.execute(scmClient);
-    String output = out.get();
-    assertThat(output).containsPattern(IS_RUNNING);
 
     String balancerConfigOutput =
         "Container Balancer Configuration values:\n" +
@@ -258,7 +256,6 @@ class TestContainerBalancerSubCommand {
         "Container IDs to Exclude from Balancing            None\n" +
         "Datanodes Specified to be Balanced                 None\n" +
         "Datanodes Excluded from Balancing                  None";
-    assertThat(output).doesNotContain(balancerConfigOutput);
 
     String currentIterationOutput =
         "Current iteration info:\n" +
@@ -278,9 +275,11 @@ class TestContainerBalancerSubCommand {
         "Exited data from nodes                             \n" +
         "b8b9c511-c30f-4933-8938-2f272e307070 -> 30 GB\n" +
         "7bd99815-47e7-4015-bc61-ca6ef6dfd130 -> 18 GB";
-    assertThat(output).doesNotContain(currentIterationOutput);
 
-    assertThat(output).doesNotContain("Iteration history list:");
+    assertThat(out.get()).containsPattern(IS_RUNNING)
+        .doesNotContain(balancerConfigOutput)
+        .doesNotContain(currentIterationOutput)
+        .doesNotContain("Iteration history list:");
   }
 
   @Test
@@ -298,10 +297,6 @@ class TestContainerBalancerSubCommand {
     CommandLine c = new CommandLine(statusCmd);
     c.parseArgs("--verbose", "--history");
     statusCmd.execute(scmClient);
-    String output = out.get();
-    assertThat(output).containsPattern(IS_RUNNING);
-    assertThat(output).containsPattern(STARTED_AT);
-    assertThat(output).containsPattern(DURATION);
 
     String balancerConfigOutput =
         "Container Balancer Configuration values:\n" +
@@ -320,9 +315,6 @@ class TestContainerBalancerSubCommand {
         "Container IDs to Exclude from Balancing            None\n" +
         "Datanodes Specified to be Balanced                 None\n" +
         "Datanodes Excluded from Balancing                  None";
-    assertThat(output).contains(balancerConfigOutput);
-
-    assertThat(output).contains("Iteration history list:");
     String firstHistoryIterationOutput =
         "Key                                                Value\n" +
         "Iteration number                                   3\n" +
@@ -340,7 +332,6 @@ class TestContainerBalancerSubCommand {
         "Exited data from nodes                             \n" +
         "b8b9c511-c30f-4933-8938-2f272e307070 -> 30 GB\n" +
         "7bd99815-47e7-4015-bc61-ca6ef6dfd130 -> 18 GB";
-    assertThat(output).contains(firstHistoryIterationOutput);
 
     String secondHistoryIterationOutput =
         "Key                                                Value\n" +
@@ -359,7 +350,15 @@ class TestContainerBalancerSubCommand {
         "Exited data from nodes                             \n" +
         "b8b9c511-c30f-4933-8938-2f272e307070 -> 15 GB\n" +
         "7bd99815-47e7-4015-bc61-ca6ef6dfd130 -> 15 GB";
-    assertThat(output).contains(secondHistoryIterationOutput);
+
+    assertThat(out.get())
+        .containsPattern(IS_RUNNING)
+        .containsPattern(STARTED_AT)
+        .containsPattern(DURATION)
+        .contains(balancerConfigOutput)
+        .contains("Iteration history list:")
+        .contains(firstHistoryIterationOutput)
+        .contains(secondHistoryIterationOutput);
   }
 
   @Test
@@ -377,10 +376,6 @@ class TestContainerBalancerSubCommand {
     CommandLine c = new CommandLine(statusCmd);
     c.parseArgs("--verbose");
     statusCmd.execute(scmClient);
-    String output = out.get();
-    assertThat(output).containsPattern(IS_RUNNING);
-    assertThat(output).containsPattern(STARTED_AT);
-    assertThat(output).containsPattern(DURATION);
 
     String balancerConfigOutput =
         "Container Balancer Configuration values:\n" +
@@ -399,7 +394,6 @@ class TestContainerBalancerSubCommand {
         "Container IDs to Exclude from Balancing            None\n" +
         "Datanodes Specified to be Balanced                 None\n" +
         "Datanodes Excluded from Balancing                  None";
-    assertThat(output).contains(balancerConfigOutput);
 
     String currentIterationOutput =
         "Current iteration info:\n" +
@@ -419,9 +413,14 @@ class TestContainerBalancerSubCommand {
         "Exited data from nodes                             \n" +
         "b8b9c511-c30f-4933-8938-2f272e307070 -> 30 GB\n" +
         "7bd99815-47e7-4015-bc61-ca6ef6dfd130 -> 18 GB";
-    assertThat(output).contains(currentIterationOutput);
 
-    assertThat(output).doesNotContain("Iteration history list:");
+    assertThat(out.get())
+        .containsPattern(IS_RUNNING)
+        .containsPattern(STARTED_AT)
+        .containsPattern(DURATION)
+        .contains(balancerConfigOutput)
+        .contains(currentIterationOutput)
+        .doesNotContain("Iteration history list:");
   }
 
   @Test
@@ -436,8 +435,7 @@ class TestContainerBalancerSubCommand {
             .build());
 
     statusCmd.execute(scmClient);
-    String output = out.get();
-    assertThat(output).containsPattern(IS_NOT_RUNNING);
+    assertThat(out.get()).containsPattern(IS_NOT_RUNNING);
   }
 
   @Test
@@ -452,8 +450,7 @@ class TestContainerBalancerSubCommand {
 
     statusCmd.execute(scmClient);
 
-    String output = out.get();
-    assertThat(output).containsPattern(IS_NOT_RUNNING);
+    assertThat(out.get()).containsPattern(IS_NOT_RUNNING);
   }
 
   @Test
@@ -461,8 +458,7 @@ class TestContainerBalancerSubCommand {
     ScmClient scmClient = mock(ScmClient.class);
     stopCmd.execute(scmClient);
 
-    String output = out.get();
-    assertThat(output).containsPattern(WAITING_TO_STOP);
+    assertThat(out.get()).containsPattern(WAITING_TO_STOP);
   }
 
   @Test
@@ -478,8 +474,7 @@ class TestContainerBalancerSubCommand {
                 .build());
     startCmd.execute(scmClient);
 
-    String output = out.get();
-    assertThat(output).containsPattern(STARTED_SUCCESSFULLY);
+    assertThat(out.get()).containsPattern(STARTED_SUCCESSFULLY);
   }
 
   @Test
@@ -495,8 +490,7 @@ class TestContainerBalancerSubCommand {
             .build());
     startCmd.execute(scmClient);
 
-    String output = out.get();
-    assertThat(output).containsPattern(FAILED_TO_START);
+    assertThat(out.get()).containsPattern(FAILED_TO_START);
   }
 
 }
