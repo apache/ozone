@@ -149,13 +149,13 @@ public class ContainerHealthTask extends ReconScmTask {
       long currentTime = System.currentTimeMillis();
       long existingCount = processExistingDBRecords(currentTime,
           unhealthyContainerStateStatsMap);
-      LOG.info("Container Health task thread took {} milliseconds to" +
+      LOG.debug("Container Health task thread took {} milliseconds to" +
               " process {} existing database records.",
           Time.monotonicNow() - start, existingCount);
 
       start = Time.monotonicNow();
       checkAndProcessContainers(unhealthyContainerStateStatsMap, currentTime);
-      LOG.info("Container Health Task thread took {} milliseconds to process containers",
+      LOG.debug("Container Health Task thread took {} milliseconds to process containers",
           Time.monotonicNow() - start);
       taskStatusUpdater.setLastTaskRunStatus(0);
       processedContainers.clear();
@@ -171,7 +171,6 @@ public class ContainerHealthTask extends ReconScmTask {
     ContainerID startID = ContainerID.valueOf(1);
     List<ContainerInfo> containers = containerManager.getContainers(startID,
         FETCH_COUNT);
-    LOG.info("containers size: {}", containers.size());
     long start;
     long iterationCount = 0;
     while (!containers.isEmpty()) {
@@ -180,7 +179,7 @@ public class ContainerHealthTask extends ReconScmTask {
           .filter(c -> !processedContainers.contains(c))
           .forEach(c -> processContainer(c, currentTime,
               unhealthyContainerStateStatsMap));
-      LOG.info("Container Health task thread took {} milliseconds for" +
+      LOG.debug("Container Health task thread took {} milliseconds for" +
               " processing {} containers.", Time.monotonicNow() - start,
           containers.size());
       if (containers.size() >= FETCH_COUNT) {
@@ -201,7 +200,6 @@ public class ContainerHealthTask extends ReconScmTask {
   private void logUnhealthyContainerStats(
       Map<UnHealthyContainerStates, Map<String, Long>> unhealthyContainerStateStatsMap) {
 
-    LOG.info("called logUnhealthyContainerStats...");
     unhealthyContainerStateStatsMapForTesting = new HashMap<>(unhealthyContainerStateStatsMap);
 
     // If any EMPTY_MISSING containers, then it is possible that such
@@ -238,13 +236,6 @@ public class ContainerHealthTask extends ReconScmTask {
     Optional.ofNullable(metricUpdaters.get(state))
         .filter(updater -> CONTAINER_COUNT.equals(entry.getKey()))
         .ifPresent(updater -> updater.accept(entry.getValue()));
-
-    if (state == UnHealthyContainerStates.UNDER_REPLICATED ||
-        state == UnHealthyContainerStates.MISSING) {
-      LOG.info("Container Health Metrics Updated.. {}, {}",
-          containerHealthMetrics.getMissingContainerCount(),
-          containerHealthMetrics.getUnderReplicatedContainerCount());
-    }
   }
 
   /**
@@ -732,7 +723,6 @@ public class ContainerHealthTask extends ReconScmTask {
           (totalUsedBytes, value) -> (value == null) ?
               container.getContainer().getUsedBytes() :
               (value + container.getContainer().getUsedBytes()));
-      LOG.info("ContainerStats Populated...for container : {} {}", container.getContainerID(), unhealthyState);
     }
   }
 
@@ -759,4 +749,5 @@ public class ContainerHealthTask extends ReconScmTask {
   public Map<UnHealthyContainerStates, Map<String, Long>> getUnhealthyContainerStateStatsMap() {
     return unhealthyContainerStateStatsMapForTesting;
   }
+
 }

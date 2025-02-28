@@ -88,7 +88,6 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
   @SuppressWarnings("checkstyle:methodlength")
   @Test
   public void testRun() throws Exception {
-    System.out.println("TestContainerHealthTask: testRun Start");
     UnhealthyContainersDao unHealthyContainersTableHandle =
         getDao(UnhealthyContainersDao.class);
 
@@ -329,7 +328,6 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
   @Test
   public void testDeletedContainer() throws Exception {
-    System.out.println("TestContainerHealthTask: testDeletedContainer Start");
     UnhealthyContainersDao unHealthyContainersTableHandle =
         getDao(UnhealthyContainersDao.class);
 
@@ -413,7 +411,6 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
   @Test
   public void testAllContainerStateInsertions() {
-    System.out.println("TestContainerHealthTask: testAllContainerStateInsertions Start");
     UnhealthyContainersDao unHealthyContainersTableHandle =
         getDao(UnhealthyContainersDao.class);
 
@@ -499,7 +496,6 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
   @Test
   public void testMissingAndEmptyMissingContainerDeletion() throws Exception {
-    System.out.println("TestContainerHealthTask: testMissingAndEmptyMissingContainerDeletion Start");
     // Setup mock DAOs and managers
     UnhealthyContainersDao unHealthyContainersTableHandle =
         getDao(UnhealthyContainersDao.class);
