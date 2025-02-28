@@ -61,7 +61,6 @@ public abstract class SingleOMFailoverProxyProviderBase<T> implements FailoverPr
   private final ConfigurationSource conf;
   private final Class<T> protocolClass;
 
-  private final String omServiceId;
   private final String omNodeId;
   private ProxyInfo<T> omProxy;
 
@@ -73,7 +72,6 @@ public abstract class SingleOMFailoverProxyProviderBase<T> implements FailoverPr
                                            String omServiceId, String omNodeId, Class<T> protocol) throws IOException {
     this.conf = configuration;
     this.protocolClass = protocol;
-    this.omServiceId = omServiceId;
     this.omNodeId = omNodeId;
     this.ugi = ugi;
 
