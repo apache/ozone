@@ -591,12 +591,12 @@ public class TestContainerReportHandler {
     ContainerReplicaProto closingReplica = builder.setState(ContainerReplicaProto.State.CLOSING).setReplicaIndex(2)
         .setOriginNodeId(dnWithClosingReplica.getUuidString()).build();
 
-    // should not transition on processing the CLOSING replica's report
+    // should transition to CLOSED on processing the CLOSING replica's report
     ContainerReportHandler containerReportHandler = new ContainerReportHandler(nodeManager, containerManager);
     ContainerReportsProto closingContainerReport = getContainerReports(closingReplica);
     containerReportHandler
         .onMessage(new ContainerReportFromDatanode(dnWithClosingReplica, closingContainerReport), publisher);
-    assertEquals(LifeCycleState.DELETING, containerStateManager.getContainer(container.containerID()).getState());
+    assertEquals(LifeCycleState.CLOSED, containerStateManager.getContainer(container.containerID()).getState());
 
     // should transition on processing the CLOSED replica's report
     ContainerReportsProto closedContainerReport = getContainerReports(closedReplica);
