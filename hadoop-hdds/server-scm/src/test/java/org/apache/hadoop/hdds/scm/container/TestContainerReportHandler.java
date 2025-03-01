@@ -1256,6 +1256,7 @@ public class TestContainerReportHandler {
         keyCount, bcsId, replicaIndex, false);
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   protected static ContainerReportsProto getContainerReportsProto(
       final ContainerID containerId, final ContainerReplicaProto.State state,
       final String originNodeId, final long usedBytes, final long keyCount,
