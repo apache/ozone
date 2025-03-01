@@ -82,6 +82,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test the behaviour of the ContainerReportHandler.
@@ -1159,12 +1160,10 @@ public class TestContainerReportHandler {
         .getNumberOfKeys());
   }
 
-  @Test
-  public void testStaleReplicaOfDeletedContainer() throws NodeNotFoundException,
-      IOException, TimeoutException {
-
-    final ContainerReportHandler reportHandler = new ContainerReportHandler(
-        nodeManager, containerManager);
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testStaleReplicaOfDeletedContainer(boolean isEmpty) throws NodeNotFoundException, IOException {
+    final ContainerReportHandler reportHandler = new ContainerReportHandler(nodeManager, containerManager);
 
     final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
         NodeStatus.inServiceHealthy()).iterator();
@@ -1178,18 +1177,22 @@ public class TestContainerReportHandler {
     nodeManager.setContainers(datanodeOne, containerIDSet);
     containerStateManager.addContainer(containerOne.getProtobuf());
 
-    // Expects the replica will be deleted.
     final ContainerReportsProto containerReport = getContainerReportsProto(
         containerOne.containerID(), ContainerReplicaProto.State.CLOSED,
-        datanodeOne.getUuidString(), 0);
+        datanodeOne.getUuidString(), 0, isEmpty);
     final ContainerReportFromDatanode containerReportFromDatanode =
         new ContainerReportFromDatanode(datanodeOne, containerReport);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
 
-    verify(publisher, times(1)).fireEvent(any(), any(CommandForDatanode.class));
-
-    assertEquals(0, containerManager.getContainerReplicas(
-        containerOne.containerID()).size());
+    if (isEmpty) {
+      // Expect the replica to be deleted when it is empty
+      verify(publisher, times(1)).fireEvent(any(), any(CommandForDatanode.class));
+      assertEquals(0, containerManager.getContainerReplicas(containerOne.containerID()).size());
+    } else {
+      // Expect the replica to stay when it is NOT empty
+      verify(publisher, times(0)).fireEvent(any(), any(CommandForDatanode.class));
+      assertEquals(1, containerManager.getContainerReplicas(containerOne.containerID()).size());
+    }
   }
 
   private ContainerReportFromDatanode getContainerReportFromDatanode(
@@ -1227,7 +1230,14 @@ public class TestContainerReportHandler {
       final ContainerID containerId, final ContainerReplicaProto.State state,
       final String originNodeId, int replicaIndex) {
     return getContainerReportsProto(containerId, state, originNodeId,
-        2000000000L, 100000000L, 10000L, replicaIndex);
+        2000000000L, 100000000L, 10000L, replicaIndex, false);
+  }
+
+  protected static ContainerReportsProto getContainerReportsProto(
+      final ContainerID containerId, final ContainerReplicaProto.State state,
+      final String originNodeId, int replicaIndex, boolean isEmpty) {
+    return getContainerReportsProto(containerId, state, originNodeId,
+        2000000000L, 100000000L, 10000L, replicaIndex, isEmpty);
   }
 
   protected static ContainerReportsProto getContainerReportsProto(
@@ -1237,10 +1247,19 @@ public class TestContainerReportHandler {
         2000000000L, 100000000L, bcsId, replicaIndex);
   }
 
+
   protected static ContainerReportsProto getContainerReportsProto(
       final ContainerID containerId, final ContainerReplicaProto.State state,
       final String originNodeId, final long usedBytes, final long keyCount,
       final long bcsId, final int replicaIndex) {
+    return getContainerReportsProto(containerId, state, originNodeId, usedBytes,
+        keyCount, bcsId, replicaIndex, false);
+  }
+
+  protected static ContainerReportsProto getContainerReportsProto(
+      final ContainerID containerId, final ContainerReplicaProto.State state,
+      final String originNodeId, final long usedBytes, final long keyCount,
+      final long bcsId, final int replicaIndex, final boolean isEmpty) {
     final ContainerReportsProto.Builder crBuilder =
         ContainerReportsProto.newBuilder();
     final ContainerReplicaProto replicaProto =
@@ -1259,6 +1278,7 @@ public class TestContainerReportHandler {
             .setBlockCommitSequenceId(bcsId)
             .setDeleteTransactionId(0)
             .setReplicaIndex(replicaIndex)
+            .setIsEmpty(isEmpty)
             .build();
     return crBuilder.addReports(replicaProto).build();
   }
