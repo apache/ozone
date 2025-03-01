@@ -211,7 +211,7 @@
     <rocksdb.version>7.7.3</rocksdb.version>
     <servlet-api.version>3.1.0</servlet-api.version>
     <shell-executable>bash</shell-executable>
-    <slf4j.version>2.0.16</slf4j.version>
+    <slf4j.version>2.0.17</slf4j.version>
     <snakeyaml.version>2.0</snakeyaml.version>
     <snappy-java.version>1.1.10.7</snappy-java.version>
     <sonar.java.binaries>${basedir}/target/classes</sonar.java.binaries>
