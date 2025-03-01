@@ -518,7 +518,7 @@ public interface MultiTenantAccessController {
     final String className = "org.apache.hadoop.ozone.om.multitenant.RangerClientMultiTenantAccessController";
     return ReflectionUtils.newInstance(
         ReflectionUtils.getClass(className, MultiTenantAccessController.class),
-        new Class<?>[] { ConfigurationSource.class },
+        new Class<?>[] {ConfigurationSource.class},
         conf
     );
   }
