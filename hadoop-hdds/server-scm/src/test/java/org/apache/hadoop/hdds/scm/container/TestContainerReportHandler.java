@@ -24,6 +24,7 @@ import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -55,6 +56,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
@@ -524,6 +526,10 @@ public class TestContainerReportHandler {
     containerReportHandler
         .onMessage(new ContainerReportFromDatanode(dnWithValidReplica, closedContainerReport), publisher);
     assertEquals(LifeCycleState.CLOSED, containerStateManager.getContainer(container.containerID()).getState());
+
+    // verify that no delete command is issued for non-empty replica, regardless of container state
+    verify(publisher, times(0))
+        .fireEvent(eq(SCMEvents.DATANODE_COMMAND), any(CommandForDatanode.class));
   }
 
   @ParameterizedTest
@@ -548,6 +554,15 @@ public class TestContainerReportHandler {
     containerReportHandler
         .onMessage(new ContainerReportFromDatanode(dnWithEmptyReplica, emptyContainerReport), publisher);
     assertEquals(containerState, containerStateManager.getContainer(container.containerID()).getState());
+
+    // verify number of datanode command fired (e.g. whether delete command is issued for a replica)
+    int countDatanodeCommandFired = 0;
+    if (containerState == LifeCycleState.DELETED) {
+      // when the container is in DELETED state, the empty replica would be removed
+      countDatanodeCommandFired++;
+    }
+    verify(publisher, times(countDatanodeCommandFired))
+        .fireEvent(eq(SCMEvents.DATANODE_COMMAND), any(CommandForDatanode.class));
   }
 
   /**
@@ -588,6 +603,10 @@ public class TestContainerReportHandler {
     containerReportHandler
         .onMessage(new ContainerReportFromDatanode(dnWithClosedReplica, closedContainerReport), publisher);
     assertEquals(LifeCycleState.CLOSED, containerStateManager.getContainer(container.containerID()).getState());
+
+    // verify that no delete command is issued for non-empty replica, regardless of container state
+    verify(publisher, times(0))
+        .fireEvent(eq(SCMEvents.DATANODE_COMMAND), any(CommandForDatanode.class));
   }
 
   /**
