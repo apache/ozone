@@ -156,7 +156,7 @@ public class InfoSubcommand extends ScmSubcommand {
       printBreak();
     }
     if (json) {
-      if (container.getPipeline().size() != 0) {
+      if (!container.getPipeline().isEmpty()) {
         ContainerWithPipelineAndReplicas wrapper =
             new ContainerWithPipelineAndReplicas(container.getContainerInfo(),
                 container.getPipeline(), replicas,

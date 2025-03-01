@@ -120,7 +120,7 @@ public abstract class TestHadoopNestedDirGenerator implements NonHATests.TestCas
     LinkedList<FileStatus> queue = new LinkedList<FileStatus>();
     FileStatus f1 = fileStatuses[0];
     queue.add(f1);
-    while (queue.size() != 0) {
+    while (!queue.isEmpty()) {
       FileStatus f = queue.poll();
       FileStatus[] temp = fs.listStatus(f.getPath());
       if (temp.length > 0) {

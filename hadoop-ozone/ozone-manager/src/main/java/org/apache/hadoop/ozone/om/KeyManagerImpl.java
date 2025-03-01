@@ -1271,7 +1271,7 @@ public class KeyManagerImpl implements KeyManager {
         bucketName);
     try {
       // Check if this is the root of the filesystem.
-      if (keyName.length() == 0) {
+      if (keyName.isEmpty()) {
         OMFileRequest.validateBucket(metadataManager, volumeName, bucketName);
         return new OzoneFileStatus();
       }
@@ -1416,7 +1416,7 @@ public class KeyManagerImpl implements KeyManager {
             bucketName);
     try {
       // Check if this is the root of the filesystem.
-      if (keyName.length() == 0) {
+      if (keyName.isEmpty()) {
         OMFileRequest.validateBucket(metadataManager, volumeName, bucketName);
         return new OzoneFileStatus();
       }

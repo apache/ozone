@@ -124,7 +124,7 @@ public abstract class BasicUpgradeFinalizer
     assertClientId(upgradeClientID);
     List<String> returningMsgs = new ArrayList<>(msgs.size() + 10);
     Status status = versionManager.getUpgradeState();
-    while (msgs.size() > 0) {
+    while (!msgs.isEmpty()) {
       returningMsgs.add(msgs.poll());
     }
     return new StatusAndMessages(status, returningMsgs);

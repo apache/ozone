@@ -366,25 +366,25 @@ public class ContainerStateMap {
     // one is empty.
     final NavigableSet<ContainerID> stateSet =
         lifeCycleStateMap.getCollection(state);
-    if (stateSet.size() == 0) {
+    if (stateSet.isEmpty()) {
       return EMPTY_SET;
     }
 
     final NavigableSet<ContainerID> ownerSet =
         ownerMap.getCollection(owner);
-    if (ownerSet.size() == 0) {
+    if (ownerSet.isEmpty()) {
       return EMPTY_SET;
     }
 
     final NavigableSet<ContainerID> factorSet =
         repConfigMap.getCollection(repConfig);
-    if (factorSet.size() == 0) {
+    if (factorSet.isEmpty()) {
       return EMPTY_SET;
     }
 
     final NavigableSet<ContainerID> typeSet =
         typeMap.getCollection(repConfig.getReplicationType());
-    if (typeSet.size() == 0) {
+    if (typeSet.isEmpty()) {
       return EMPTY_SET;
     }
 
