@@ -392,6 +392,8 @@ public class DiskBalancerService extends BackgroundService {
 
     @Override
     public BackgroundTaskResult call() {
+      //start time
+      long startTime = System.currentTimeMillis();
       long containerId = containerData.getContainerID();
       boolean destVolumeIncreased = false;
       Path diskBalancerTmpDir = null, diskBalancerDestDir = null;
@@ -446,9 +448,18 @@ public class DiskBalancerService extends BackgroundService {
         }
         oldContainer.getContainerData().getVolume()
             .decrementUsedSpace(containerSize);
+
+        // Stop timing
+        long endTime = System.currentTimeMillis();
+        metrics.addMoveSuccessTime(endTime - startTime);
+        LOG.info("Max success time spent on container move in (s) : {} ", metrics.getMoveSuccessTime() / 1000.0);
         metrics.incrSuccessCount(1);
         metrics.incrSuccessBytes(containerSize);
       } catch (IOException e) {
+        // Stop timing
+        long endTime = System.currentTimeMillis();
+        metrics.addMoveFailureTime(endTime - startTime);
+        LOG.info("Max failure time spent on container move in (s) : {} ", metrics.getMoveFailureTime() / 1000.0);
         if (diskBalancerTmpDir != null) {
           try {
             Files.deleteIfExists(diskBalancerTmpDir);
