@@ -352,26 +352,31 @@ public class AbstractContainerReportHandler {
        */
       break;
     case DELETING:
-      /*
-      HDDS-11136: If a DELETING container has a non-empty CLOSED replica, the container should be moved back to CLOSED
-      state.
-       */
-      boolean replicaStateAllowed = replica.getState() == State.CLOSED;
-      boolean replicaNotEmpty = replica.hasIsEmpty() && !replica.getIsEmpty();
-      if (replicaStateAllowed && replicaNotEmpty) {
-        logger.info("Moving DELETING container {} to CLOSED state, datanode {} reported replica with state={}, " +
-            "isEmpty={} and keyCount={}.", containerId, datanode.getHostName(), replica.getState(), false,
-            replica.getKeyCount());
-        containerManager.transitionDeletingToClosedState(containerId);
-      }
-
-      break;
     case DELETED:
       /*
-       * The container is deleted. delete the replica.
+       * HDDS-11136: If a DELETING container has a non-empty CLOSED replica, the container should be moved back to
+       * CLOSED state.
+       *
+       * HDDS-12421: If a DELETING or DELETED container has a non-empty replica, the container should also be moved
+       * back to CLOSED state.
        */
-      deleteReplica(containerId, datanode, publisher, "DELETED");
-      ignored = true;
+      boolean replicaIsEmpty = replica.hasIsEmpty() && replica.getIsEmpty();
+      // If container is in DELETED state and the reported replica is empty, delete the empty replica.
+      // We should also do this for DELETING containers and currently DeletingContainerHandler does that
+      if (container.getState() == HddsProtos.LifeCycleState.DELETED && replicaIsEmpty) {
+        deleteReplica(containerId, datanode, publisher, "DELETED", false);
+        ignored = true;
+        break;
+      }
+
+      boolean replicaStateAllowed = (replica.getState() != State.INVALID && replica.getState() != State.DELETED);
+      if (!replicaIsEmpty && replicaStateAllowed) {
+        logger.info("Moving container {} from {} to CLOSED state, datanode {} reported replica with state={}, " +
+            "isEmpty={}, bcsId={}, keyCount={}, and origin={}",
+            container, container.getState(), datanode.getHostName(), replica.getState(),
+            replica.getIsEmpty(), replica.getBlockCommitSequenceId(), replica.getKeyCount(), replica.getOriginNodeId());
+        containerManager.transitionDeletingOrDeletedToClosedState(containerId);
+      }
       break;
     default:
       break;
@@ -453,9 +458,9 @@ public class AbstractContainerReportHandler {
   }
 
   protected void deleteReplica(ContainerID containerID, DatanodeDetails dn,
-      EventPublisher publisher, String reason) {
+      EventPublisher publisher, String reason, boolean force) {
     SCMCommand<?> command = new DeleteContainerCommand(
-        containerID.getId(), true);
+        containerID.getId(), force);
     try {
       command.setTerm(scmContext.getTermOfLeader());
     } catch (NotLeaderException nle) {

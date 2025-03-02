@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
@@ -88,6 +89,7 @@ public class DeletingContainerHandler extends AbstractCheck {
     //resend deleteCommand if needed
     request.getContainerReplicas().stream()
         .filter(r -> !pendingDelete.contains(r.getDatanodeDetails()))
+        .filter(ContainerReplica::isEmpty)
         .forEach(rp -> {
           try {
             replicationManager.sendDeleteCommand(

@@ -290,12 +290,12 @@ public class ContainerManagerImpl implements ContainerManager {
   }
 
   @Override
-  public void transitionDeletingToClosedState(ContainerID containerID) throws IOException {
+  public void transitionDeletingOrDeletedToClosedState(ContainerID containerID) throws IOException {
     HddsProtos.ContainerID proto = containerID.getProtobuf();
     lock.lock();
     try {
       if (containerExist(containerID)) {
-        containerStateManager.transitionDeletingToClosedState(proto);
+        containerStateManager.transitionDeletingOrDeletedToClosedState(proto);
       } else {
         throwContainerNotFoundException(containerID);
       }

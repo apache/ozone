@@ -24,6 +24,7 @@ import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -36,6 +37,7 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -54,6 +56,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
@@ -76,7 +79,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test the behaviour of the ContainerReportHandler.
@@ -151,9 +157,10 @@ public class TestContainerReportHandler {
         any(ContainerID.class), any(ContainerReplica.class));
 
     doAnswer(invocation -> {
-      containerStateManager.transitionDeletingToClosedState(((ContainerID) invocation.getArgument(0)).getProtobuf());
+      containerStateManager.transitionDeletingOrDeletedToClosedState(
+          ((ContainerID) invocation.getArgument(0)).getProtobuf());
       return null;
-    }).when(containerManager).transitionDeletingToClosedState(any(ContainerID.class));
+    }).when(containerManager).transitionDeletingOrDeletedToClosedState(any(ContainerID.class));
   }
 
   @AfterEach
@@ -162,6 +169,40 @@ public class TestContainerReportHandler {
     if (dbStore != null) {
       dbStore.close();
     }
+  }
+
+  static Stream<Arguments> containerAndReplicaStates() {
+    // Container states to test
+    List<HddsProtos.LifeCycleState> containerStates = Arrays.asList(
+        HddsProtos.LifeCycleState.DELETING,
+        HddsProtos.LifeCycleState.DELETED
+    );
+
+    // Replica states to test
+    List<ContainerReplicaProto.State> replicaStates = Arrays.asList(
+        ContainerReplicaProto.State.QUASI_CLOSED,
+        ContainerReplicaProto.State.CLOSED,
+        ContainerReplicaProto.State.CLOSING,
+        ContainerReplicaProto.State.OPEN,
+        ContainerReplicaProto.State.UNHEALTHY
+    );
+
+    List<ContainerReplicaProto.State> invalidReplicaStates = Arrays.asList(
+        ContainerReplicaProto.State.INVALID,
+        ContainerReplicaProto.State.DELETED
+    );
+
+    // Generate all combinations, container state * replica state
+    List<Arguments> combinations = new ArrayList<>();
+    for (HddsProtos.LifeCycleState containerState : containerStates) {
+      for (ContainerReplicaProto.State replicaState : replicaStates) {
+        for (ContainerReplicaProto.State invalidState : invalidReplicaStates) {
+          combinations.add(Arguments.of(containerState, replicaState, invalidState));
+        }
+      }
+    }
+
+    return combinations.stream();
   }
 
   private void testReplicaIndexUpdate(ContainerInfo container,
@@ -446,64 +487,83 @@ public class TestContainerReportHandler {
   }
 
   /**
-   * Tests that a DELETING RATIS container transitions to CLOSED if a non-empty CLOSED replica is reported. It does not
-   * transition if a non-empty CLOSING replica is reported.
+   * Tests that a DELETING or DELETED RATIS container transitions to CLOSED if a non-empty replica in OPEN, CLOSING,
+   * CLOSED, QUASI_CLOSED or UNHEALTHY state is reported. It should not transition if the replica is in INVALID or
+   * DELETED states.
    */
-  @Test
-  public void ratisContainerShouldTransitionFromDeletingToClosedWhenNonEmptyClosedReplica() throws IOException {
-    ContainerInfo container = getContainer(LifeCycleState.DELETING);
+  @ParameterizedTest
+  @MethodSource("containerAndReplicaStates")
+  public void ratisContainerShouldTransitionFromDeletingOrDeletedToClosedWhenNonEmptyReplica(
+      LifeCycleState containerState, ContainerReplicaProto.State replicaState,
+      ContainerReplicaProto.State invalidReplicaState) throws IOException {
+    ContainerInfo container = getContainer(containerState);
     containerStateManager.addContainer(container.getProtobuf());
 
-    // set up a non-empty CLOSED replica
-    DatanodeDetails dnWithClosedReplica = nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0);
+    // set up a non-empty replica in replicaState
+    DatanodeDetails dnWithValidReplica = nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0);
     ContainerReplicaProto.Builder builder = ContainerReplicaProto.newBuilder();
-    ContainerReplicaProto closedReplica = builder.setContainerID(container.getContainerID())
+    ContainerReplicaProto validReplica = builder.setContainerID(container.getContainerID())
         .setIsEmpty(false)
-        .setState(ContainerReplicaProto.State.CLOSED)
+        .setState(replicaState)
         .setKeyCount(0)
         .setBlockCommitSequenceId(123)
-        .setOriginNodeId(dnWithClosedReplica.getUuidString()).build();
+        .setOriginNodeId(dnWithValidReplica.getUuidString()).build();
 
-    // set up a non-empty CLOSING replica
-    DatanodeDetails dnWithClosingReplica = nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(1);
-    ContainerReplicaProto closingReplica = builder.setState(ContainerReplicaProto.State.CLOSING)
-        .setOriginNodeId(dnWithClosingReplica.getUuidString()).build();
+    // set up a non-empty replica in invalidReplicaState
+    DatanodeDetails dnWithInvalidReplica = nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(1);
+    ContainerReplicaProto invalidReplica = builder.setState(invalidReplicaState)
+        .setOriginNodeId(dnWithInvalidReplica.getUuidString()).build();
 
-    // should not transition on processing the CLOSING replica's report
+    // should not transition on processing the invalid replica's report
     ContainerReportHandler containerReportHandler = new ContainerReportHandler(nodeManager, containerManager);
-    ContainerReportsProto closingContainerReport = getContainerReports(closingReplica);
+    ContainerReportsProto invalidContainerReport = getContainerReports(invalidReplica);
     containerReportHandler
-        .onMessage(new ContainerReportFromDatanode(dnWithClosingReplica, closingContainerReport), publisher);
+        .onMessage(new ContainerReportFromDatanode(dnWithInvalidReplica, invalidContainerReport), publisher);
 
-    assertEquals(LifeCycleState.DELETING, containerStateManager.getContainer(container.containerID()).getState());
+    assertEquals(containerState, containerStateManager.getContainer(container.containerID()).getState());
 
-    // should transition on processing the CLOSED replica's report
-    ContainerReportsProto closedContainerReport = getContainerReports(closedReplica);
+    // should transition on processing the valid replica's report
+    ContainerReportsProto closedContainerReport = getContainerReports(validReplica);
     containerReportHandler
-        .onMessage(new ContainerReportFromDatanode(dnWithClosedReplica, closedContainerReport), publisher);
+        .onMessage(new ContainerReportFromDatanode(dnWithValidReplica, closedContainerReport), publisher);
     assertEquals(LifeCycleState.CLOSED, containerStateManager.getContainer(container.containerID()).getState());
+
+    // verify that no delete command is issued for non-empty replica, regardless of container state
+    verify(publisher, times(0))
+        .fireEvent(eq(SCMEvents.DATANODE_COMMAND), any(CommandForDatanode.class));
   }
 
-  @Test
-  public void ratisContainerShouldNotTransitionFromDeletingToClosedWhenEmptyClosedReplica() throws IOException {
-    ContainerInfo container = getContainer(LifeCycleState.DELETING);
+  @ParameterizedTest
+  @MethodSource("containerAndReplicaStates")
+  public void ratisContainerShouldNotTransitionFromDeletingOrDeletedToClosedWhenEmptyReplica(
+      LifeCycleState containerState, ContainerReplicaProto.State replicaState) throws IOException {
+    ContainerInfo container = getContainer(containerState);
     containerStateManager.addContainer(container.getProtobuf());
 
-    // set up an empty CLOSED replica
-    DatanodeDetails dnWithClosedReplica = nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0);
+    // set up an empty replica
+    DatanodeDetails dnWithEmptyReplica = nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0);
     ContainerReplicaProto.Builder builder = ContainerReplicaProto.newBuilder();
-    ContainerReplicaProto closedReplica = builder.setContainerID(container.getContainerID())
+    ContainerReplicaProto emptyReplica = builder.setContainerID(container.getContainerID())
         .setIsEmpty(true)
-        .setState(ContainerReplicaProto.State.CLOSED)
+        .setState(replicaState)
         .setKeyCount(0)
         .setBlockCommitSequenceId(123)
-        .setOriginNodeId(dnWithClosedReplica.getUuidString()).build();
+        .setOriginNodeId(dnWithEmptyReplica.getUuidString()).build();
 
     ContainerReportHandler containerReportHandler = new ContainerReportHandler(nodeManager, containerManager);
-    ContainerReportsProto closedContainerReport = getContainerReports(closedReplica);
+    ContainerReportsProto emptyContainerReport = getContainerReports(emptyReplica);
     containerReportHandler
-        .onMessage(new ContainerReportFromDatanode(dnWithClosedReplica, closedContainerReport), publisher);
-    assertEquals(LifeCycleState.DELETING, containerStateManager.getContainer(container.containerID()).getState());
+        .onMessage(new ContainerReportFromDatanode(dnWithEmptyReplica, emptyContainerReport), publisher);
+    assertEquals(containerState, containerStateManager.getContainer(container.containerID()).getState());
+
+    // verify number of datanode command fired (e.g. whether delete command is issued for a replica)
+    int countDatanodeCommandFired = 0;
+    if (containerState == LifeCycleState.DELETED) {
+      // when the container is in DELETED state, the empty replica would be removed
+      countDatanodeCommandFired++;
+    }
+    verify(publisher, times(countDatanodeCommandFired))
+        .fireEvent(eq(SCMEvents.DATANODE_COMMAND), any(CommandForDatanode.class));
   }
 
   /**
@@ -532,18 +592,22 @@ public class TestContainerReportHandler {
     ContainerReplicaProto closingReplica = builder.setState(ContainerReplicaProto.State.CLOSING).setReplicaIndex(2)
         .setOriginNodeId(dnWithClosingReplica.getUuidString()).build();
 
-    // should not transition on processing the CLOSING replica's report
+    // should transition to CLOSED on processing the CLOSING replica's report
     ContainerReportHandler containerReportHandler = new ContainerReportHandler(nodeManager, containerManager);
     ContainerReportsProto closingContainerReport = getContainerReports(closingReplica);
     containerReportHandler
         .onMessage(new ContainerReportFromDatanode(dnWithClosingReplica, closingContainerReport), publisher);
-    assertEquals(LifeCycleState.DELETING, containerStateManager.getContainer(container.containerID()).getState());
+    assertEquals(LifeCycleState.CLOSED, containerStateManager.getContainer(container.containerID()).getState());
 
     // should transition on processing the CLOSED replica's report
     ContainerReportsProto closedContainerReport = getContainerReports(closedReplica);
     containerReportHandler
         .onMessage(new ContainerReportFromDatanode(dnWithClosedReplica, closedContainerReport), publisher);
     assertEquals(LifeCycleState.CLOSED, containerStateManager.getContainer(container.containerID()).getState());
+
+    // verify that no delete command is issued for non-empty replica, regardless of container state
+    verify(publisher, times(0))
+        .fireEvent(eq(SCMEvents.DATANODE_COMMAND), any(CommandForDatanode.class));
   }
 
   /**
@@ -1096,12 +1160,10 @@ public class TestContainerReportHandler {
         .getNumberOfKeys());
   }
 
-  @Test
-  public void testStaleReplicaOfDeletedContainer() throws NodeNotFoundException,
-      IOException, TimeoutException {
-
-    final ContainerReportHandler reportHandler = new ContainerReportHandler(
-        nodeManager, containerManager);
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testStaleReplicaOfDeletedContainer(boolean isEmpty) throws NodeNotFoundException, IOException {
+    final ContainerReportHandler reportHandler = new ContainerReportHandler(nodeManager, containerManager);
 
     final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
         NodeStatus.inServiceHealthy()).iterator();
@@ -1115,18 +1177,22 @@ public class TestContainerReportHandler {
     nodeManager.setContainers(datanodeOne, containerIDSet);
     containerStateManager.addContainer(containerOne.getProtobuf());
 
-    // Expects the replica will be deleted.
     final ContainerReportsProto containerReport = getContainerReportsProto(
         containerOne.containerID(), ContainerReplicaProto.State.CLOSED,
-        datanodeOne.getUuidString(), 0);
+        datanodeOne.getUuidString(), 0, isEmpty);
     final ContainerReportFromDatanode containerReportFromDatanode =
         new ContainerReportFromDatanode(datanodeOne, containerReport);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
 
-    verify(publisher, times(1)).fireEvent(any(), any(CommandForDatanode.class));
-
-    assertEquals(0, containerManager.getContainerReplicas(
-        containerOne.containerID()).size());
+    if (isEmpty) {
+      // Expect the replica to be deleted when it is empty
+      verify(publisher, times(1)).fireEvent(any(), any(CommandForDatanode.class));
+      assertEquals(0, containerManager.getContainerReplicas(containerOne.containerID()).size());
+    } else {
+      // Expect the replica to stay when it is NOT empty
+      verify(publisher, times(0)).fireEvent(any(), any(CommandForDatanode.class));
+      assertEquals(1, containerManager.getContainerReplicas(containerOne.containerID()).size());
+    }
   }
 
   private ContainerReportFromDatanode getContainerReportFromDatanode(
@@ -1164,7 +1230,14 @@ public class TestContainerReportHandler {
       final ContainerID containerId, final ContainerReplicaProto.State state,
       final String originNodeId, int replicaIndex) {
     return getContainerReportsProto(containerId, state, originNodeId,
-        2000000000L, 100000000L, 10000L, replicaIndex);
+        2000000000L, 100000000L, 10000L, replicaIndex, false);
+  }
+
+  protected static ContainerReportsProto getContainerReportsProto(
+      final ContainerID containerId, final ContainerReplicaProto.State state,
+      final String originNodeId, int replicaIndex, boolean isEmpty) {
+    return getContainerReportsProto(containerId, state, originNodeId,
+        2000000000L, 100000000L, 10000L, replicaIndex, isEmpty);
   }
 
   protected static ContainerReportsProto getContainerReportsProto(
@@ -1174,10 +1247,20 @@ public class TestContainerReportHandler {
         2000000000L, 100000000L, bcsId, replicaIndex);
   }
 
+
   protected static ContainerReportsProto getContainerReportsProto(
       final ContainerID containerId, final ContainerReplicaProto.State state,
       final String originNodeId, final long usedBytes, final long keyCount,
       final long bcsId, final int replicaIndex) {
+    return getContainerReportsProto(containerId, state, originNodeId, usedBytes,
+        keyCount, bcsId, replicaIndex, false);
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  protected static ContainerReportsProto getContainerReportsProto(
+      final ContainerID containerId, final ContainerReplicaProto.State state,
+      final String originNodeId, final long usedBytes, final long keyCount,
+      final long bcsId, final int replicaIndex, final boolean isEmpty) {
     final ContainerReportsProto.Builder crBuilder =
         ContainerReportsProto.newBuilder();
     final ContainerReplicaProto replicaProto =
@@ -1196,6 +1279,7 @@ public class TestContainerReportHandler {
             .setBlockCommitSequenceId(bcsId)
             .setDeleteTransactionId(0)
             .setReplicaIndex(replicaIndex)
+            .setIsEmpty(isEmpty)
             .build();
     return crBuilder.addReports(replicaProto).build();
   }
