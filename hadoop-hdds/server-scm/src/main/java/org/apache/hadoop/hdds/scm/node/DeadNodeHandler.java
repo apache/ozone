@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerException;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -51,23 +52,34 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
   private final ContainerManager containerManager;
   @Nullable
   private final DeletedBlockLog deletedBlockLog;
+  @Nullable
+  private final ReplicationManager replicationManager;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DeadNodeHandler.class);
 
   public DeadNodeHandler(final NodeManager nodeManager,
-                         final PipelineManager pipelineManager,
-                         final ContainerManager containerManager) {
-    this(nodeManager, pipelineManager, containerManager, null);
+      final PipelineManager pipelineManager,
+      final ContainerManager containerManager) {
+    this(nodeManager, pipelineManager, containerManager, null, null);
   }
 
   public DeadNodeHandler(final NodeManager nodeManager,
                          final PipelineManager pipelineManager,
                          final ContainerManager containerManager,
+                         final ReplicationManager replicationManager) {
+    this(nodeManager, pipelineManager, containerManager, replicationManager, null);
+  }
+
+  public DeadNodeHandler(final NodeManager nodeManager,
+                         final PipelineManager pipelineManager,
+                         final ContainerManager containerManager,
+                         @Nullable final ReplicationManager replicationManager,
                          @Nullable final DeletedBlockLog deletedBlockLog) {
     this.nodeManager = nodeManager;
     this.pipelineManager = pipelineManager;
     this.containerManager = containerManager;
+    this.replicationManager = replicationManager;
     this.deletedBlockLog = deletedBlockLog;
   }
 
@@ -95,6 +107,13 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
       // is IN_MAINTENANCE
       if (!nodeManager.getNodeStatus(datanodeDetails).isInMaintenance()) {
         removeContainerReplicas(datanodeDetails);
+      }
+      
+      // Wake up ReplicationManager
+      if (replicationManager != null) {
+        LOG.info("Notifying ReplicationManager about dead node: {}", 
+            datanodeDetails);
+        replicationManager.notifyNodeStateChange();
       }
       
       // remove commands in command queue for the DN
