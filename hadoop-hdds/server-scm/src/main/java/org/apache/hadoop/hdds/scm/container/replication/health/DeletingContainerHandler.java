@@ -74,7 +74,7 @@ public class DeletingContainerHandler extends AbstractCheck {
       return true;
     }
 
-    if (request.getContainerReplicas().size() == 0) {
+    if (request.getContainerReplicas().isEmpty()) {
       LOG.debug("Deleting Container {} has no replicas so marking for cleanup" +
           " and returning true", containerInfo);
       replicationManager.updateContainerState(

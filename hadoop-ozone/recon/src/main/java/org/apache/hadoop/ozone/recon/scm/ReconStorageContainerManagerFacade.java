@@ -552,7 +552,7 @@ public class ReconStorageContainerManagerFacade
                 getListOfContainers(startContainerId,
                     Long.valueOf(containerCountPerCall).intValue(),
                     HddsProtos.LifeCycleState.CLOSED);
-            if (null != listOfContainers && listOfContainers.size() > 0) {
+            if (null != listOfContainers && !listOfContainers.isEmpty()) {
               LOG.info("Got list of containers from SCM : " +
                   listOfContainers.size());
               listOfContainers.forEach(containerInfo -> {

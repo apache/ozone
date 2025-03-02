@@ -61,7 +61,7 @@ public class OMVolumeDeleteResponse extends OMClientResponse {
 
     String dbUserKey = omMetadataManager.getUserKey(owner);
     PersistedUserVolumeInfo volumeList = updatedVolumeList;
-    if (updatedVolumeList.getVolumeNamesList().size() == 0) {
+    if (updatedVolumeList.getVolumeNamesList().isEmpty()) {
       omMetadataManager.getUserTable().deleteWithBatch(batchOperation,
           dbUserKey);
     } else {

@@ -1705,7 +1705,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
             if (Objects.equals(Optional.ofNullable(newPreviousSnapshotInfo).map(SnapshotInfo::getSnapshotId),
                 Optional.ofNullable(previousSnapshotInfo).map(SnapshotInfo::getSnapshotId))) {
               // If all the versions are not reclaimable, then do nothing.
-              if (notReclaimableKeyInfoList.size() > 0 &&
+              if (!notReclaimableKeyInfoList.isEmpty() &&
                   notReclaimableKeyInfoList.size() !=
                       infoList.getOmKeyInfoList().size()) {
                 keysToModify.put(kv.getKey(), notReclaimableKeyInfo);

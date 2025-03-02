@@ -1259,7 +1259,7 @@ public class SCMNodeManager implements NodeManager {
   }
 
   private void nodeUsageStatistics(Map<String, String> nodeStatics) {
-    if (nodeStateManager.getAllNodes().size() < 1) {
+    if (nodeStateManager.getAllNodes().isEmpty()) {
       return;
     }
     float[] usages = new float[nodeStateManager.getAllNodes().size()];
@@ -1310,7 +1310,7 @@ public class SCMNodeManager implements NodeManager {
   }
 
   private void nodeSpaceStatistics(Map<String, String> nodeStatics) {
-    if (nodeStateManager.getAllNodes().size() < 1) {
+    if (nodeStateManager.getAllNodes().isEmpty()) {
       return;
     }
     long capacityByte = 0;

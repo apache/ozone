@@ -366,7 +366,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
     int len = strategy.getTargetLength();
     while (len > 0) {
       // if we are at the last chunk and have read the entire chunk, return
-      if (chunkStreams.size() == 0 ||
+      if (chunkStreams.isEmpty() ||
           (chunkStreams.size() - 1 <= chunkIndex &&
               chunkStreams.get(chunkIndex)
                   .getRemaining() == 0)) {

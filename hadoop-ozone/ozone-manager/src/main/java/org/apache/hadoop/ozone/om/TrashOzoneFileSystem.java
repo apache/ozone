@@ -399,7 +399,7 @@ public class TrashOzoneFileSystem extends FileSystem {
             }
           }
         }
-        if (keyPathList.size() > 0) {
+        if (!keyPathList.isEmpty()) {
           if (!processKeyPath(keyPathList)) {
             return false;
           }

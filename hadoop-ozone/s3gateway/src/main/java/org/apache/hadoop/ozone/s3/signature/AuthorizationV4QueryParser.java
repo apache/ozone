@@ -126,8 +126,8 @@ public class AuthorizationV4QueryParser implements SignatureParser {
     final String expiresString = queryParameters.get("X-Amz-Expires");
     if (dateString == null ||
         expiresString == null ||
-        dateString.length() == 0 ||
-        expiresString.length() == 0) {
+        dateString.isEmpty() ||
+        expiresString.isEmpty()) {
       throw new MalformedResourceException(
           "dateString or expiresString are missing or empty.");
     }

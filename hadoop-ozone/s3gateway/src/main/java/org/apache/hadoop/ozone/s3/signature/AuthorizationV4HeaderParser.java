@@ -104,7 +104,7 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
           signedHeadersStr.substring(SIGNEDHEADERS.length());
       Collection<String> signedHeaders =
           StringUtils.getStringCollection(parsedSignedHeaders, ";");
-      if (signedHeaders.size() == 0) {
+      if (signedHeaders.isEmpty()) {
         throw new MalformedResourceException("No signed headers found.",
             authHeader);
       }

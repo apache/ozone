@@ -1384,7 +1384,7 @@ public class SCMClientProtocolServer implements
     Set<DatanodeDetails> returnSet = new TreeSet<>();
     List<DatanodeDetails> tmp = scm.getScmNodeManager()
         .getNodes(opState, nodeState);
-    if ((tmp != null) && (tmp.size() > 0)) {
+    if ((tmp != null) && (!tmp.isEmpty())) {
       returnSet.addAll(tmp);
     }
     return returnSet;
