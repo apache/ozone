@@ -1772,7 +1772,6 @@ public class TestReplicationManager {
     assertNotEquals(commandDeadline, sentCommand.getRight().getDeadline());
   }
 
-
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   public void testNotifyNodeStateChangeWakesUpThread(boolean queueIsEmpty) 

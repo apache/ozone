@@ -76,7 +76,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
     EventHandler<CommandForDatanode>, NodeManagerMXBean, Closeable {
 
   /**
-   * TODO: remove cyclic dependency between NodeManager and ReplicationManager
+   * TODO: remove cyclic dependency between NodeManager and ReplicationManager.
    * Set the ReplicationManager
    * @param rm ReplicationManager instance
    */
