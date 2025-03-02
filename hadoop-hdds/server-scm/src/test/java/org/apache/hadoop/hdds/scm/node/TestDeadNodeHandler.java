@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLU
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -108,6 +109,8 @@ public class TestDeadNodeHandler {
         .setSCM(scm).build();
     pipelineManager =
         (PipelineManagerImpl)scm.getPipelineManager();
+    replicationManager = scm.getReplicationManager();
+    replicationManager.setScmContext(scmContext);
     pipelineManager.setScmContext(scmContext);
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
@@ -233,7 +236,8 @@ public class TestDeadNodeHandler {
     assertFalse(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
 
-    verify(replicationManager, times(1)).notifyNodeStateChange();
+    verify(replicationManager).notifyNodeStateChange();
+    clearInvocations(replicationManager);
 
     verify(deletedBlockLog, times(0))
         .onDatanodeDead(datanode1.getUuid());

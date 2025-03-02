@@ -114,7 +114,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   /**
    * SCMContext from StorageContainerManager.
    */
-  private final SCMContext scmContext;
+  private SCMContext scmContext;
 
 
   /**
@@ -1390,6 +1390,11 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     } finally {
       serviceLock.unlock();
     }
+  }
+
+  @VisibleForTesting
+  public void setScmContext(SCMContext context) {
+    scmContext = context;
   }
 
   @Override
