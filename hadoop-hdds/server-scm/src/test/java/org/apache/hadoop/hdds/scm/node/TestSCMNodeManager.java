@@ -2071,30 +2071,17 @@ public class TestSCMNodeManager {
       HddsProtos.NodeOperationalState newState, 
       boolean shouldNotify)
       throws IOException, NodeNotFoundException, AuthenticationException {
-    // Create a configuration
     OzoneConfiguration conf = getConf();
-    
-    // Create a mocked ReplicationManager
     ReplicationManager replicationManager = mock(ReplicationManager.class);
-    
-    // Create the SCMNodeManager
+
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {    
       nodeManager.setReplicationManager(replicationManager);
-      
-      // Create a test datanode and register it
+
       DatanodeDetails datanode = HddsTestUtils.createRandomDatanodeAndRegister(
           nodeManager);
-      
-      // Set the initial operational state
-      nodeManager.setNodeOperationalState(datanode, oldState, 0);
-      
-      // Reset the mock to clear any previous calls
-      org.mockito.Mockito.reset(replicationManager);
-      
-      // Call setNodeOperationalState to simulate a node state change
+      nodeManager.getNodeStateManager().setNodeOperationalState(datanode, oldState);
+
       nodeManager.setNodeOperationalState(datanode, newState, 0);
-      
-      // Verify the notification was sent to ReplicationManager based on shouldNotify flag
       verify(replicationManager, times(shouldNotify ? 1 : 0)).notifyNodeStateChange();
     }
   }
