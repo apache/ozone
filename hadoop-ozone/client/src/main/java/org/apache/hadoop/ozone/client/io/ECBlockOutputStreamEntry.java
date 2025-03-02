@@ -416,6 +416,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
    * Builder class for ChunkGroupOutputStreamEntry.
    * */
   public static class Builder extends BlockOutputStreamEntry.Builder {
+    @Override
     public ECBlockOutputStreamEntry build() {
       return new ECBlockOutputStreamEntry(this);
     }

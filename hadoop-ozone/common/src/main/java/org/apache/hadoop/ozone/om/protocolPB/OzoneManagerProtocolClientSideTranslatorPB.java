@@ -719,11 +719,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       keyArgs.setDataSize(args.getDataSize());
     }
 
-    if (args.getMetadata() != null && args.getMetadata().size() > 0) {
+    if (args.getMetadata() != null && !args.getMetadata().isEmpty()) {
       keyArgs.addAllMetadata(KeyValueUtil.toProtobuf(args.getMetadata()));
     }
 
-    if (args.getTags() != null && args.getTags().size() > 0) {
+    if (args.getTags() != null && !args.getTags().isEmpty()) {
       keyArgs.addAllTags(KeyValueUtil.toProtobuf(args.getTags()));
     }
 
@@ -1808,12 +1808,17 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @Override
   public OmMultipartUploadList listMultipartUploads(String volumeName,
       String bucketName,
-      String prefix) throws IOException {
+      String prefix,
+      String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination) throws IOException {
     ListMultipartUploadsRequest request = ListMultipartUploadsRequest
         .newBuilder()
         .setVolume(volumeName)
         .setBucket(bucketName)
         .setPrefix(prefix == null ? "" : prefix)
+        .setKeyMarker(keyMarker == null ? "" : keyMarker)
+        .setUploadIdMarker(uploadIdMarker == null ? "" : uploadIdMarker)
+        .setMaxUploads(maxUploads)
+        .setWithPagination(withPagination)
         .build();
 
     OMRequest omRequest = createOMRequest(Type.ListMultipartUploads)
@@ -1837,7 +1842,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             ))
             .collect(Collectors.toList());
 
-    OmMultipartUploadList response = new OmMultipartUploadList(uploadList);
+    OmMultipartUploadList response = OmMultipartUploadList.newBuilder()
+        .setUploads(uploadList)
+        .setNextKeyMarker(listMultipartUploadsResponse.getNextKeyMarker())
+        .setNextUploadIdMarker(listMultipartUploadsResponse.getNextUploadIdMarker())
+        .setIsTruncated(listMultipartUploadsResponse.getIsTruncated())
+        .build();
 
     return response;
   }

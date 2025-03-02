@@ -51,7 +51,6 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
 
   private final Text delegationTokenService;
   private Map<String, OMProxyInfo> omProxyInfos;
-  private List<String> retryExceptions = new ArrayList<>();
 
   // HadoopRpcOMFailoverProxyProvider, on encountering certain exception,
   // tries each OM once in a round robin fashion. After that it waits
@@ -67,6 +66,7 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
     this.delegationTokenService = computeDelegationTokenService();
   }
 
+  @Override
   protected void loadOMClientConfigs(ConfigurationSource config, String omSvcId)
       throws IOException {
     Map<String, ProxyInfo<T>> omProxies = new HashMap<>();

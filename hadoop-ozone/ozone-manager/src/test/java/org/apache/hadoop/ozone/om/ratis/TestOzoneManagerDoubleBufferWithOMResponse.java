@@ -61,8 +61,6 @@ import org.apache.hadoop.ozone.om.response.bucket.OMBucketDeleteResponse;
 import org.apache.hadoop.ozone.om.response.volume.OMVolumeCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteBucketResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Daemon;
 import org.apache.ozone.test.GenericTestUtils;
@@ -486,19 +484,6 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     OMClientResponse omClientResponse = omBucketCreateRequest.validateAndUpdateCache(ozoneManager, context);
     doubleBuffer.add(omClientResponse, termIndex);
     return (OMBucketCreateResponse) omClientResponse;
-  }
-
-  /**
-   * Create OMBucketDeleteResponse for specified volume and bucket.
-   * @return OMBucketDeleteResponse
-   */
-  private OMBucketDeleteResponse deleteBucket(String volumeName,
-      String bucketName) {
-    return new OMBucketDeleteResponse(OMResponse.newBuilder()
-        .setCmdType(OzoneManagerProtocolProtos.Type.DeleteBucket)
-        .setStatus(OzoneManagerProtocolProtos.Status.OK)
-        .setDeleteBucketResponse(DeleteBucketResponse.newBuilder().build())
-        .build(), volumeName, bucketName);
   }
 }
 

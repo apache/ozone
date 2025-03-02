@@ -65,16 +65,6 @@ public class TestOzoneTokenIdentifier {
 
   private static final Logger LOG = LoggerFactory
       .getLogger(TestOzoneTokenIdentifier.class);
-  private static String sslConfsDir;
-  private static final String EXCLUDE_CIPHERS =
-      "TLS_ECDHE_RSA_WITH_RC4_128_SHA,"
-          + "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA,  \n"
-          + "SSL_RSA_WITH_DES_CBC_SHA,"
-          + "SSL_DHE_RSA_WITH_DES_CBC_SHA,  "
-          + "SSL_RSA_EXPORT_WITH_RC4_40_MD5,\t \n"
-          + "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA,"
-          + "SSL_RSA_WITH_RC4_128_MD5";
-
 
   @Test
   public void testSignToken(@TempDir Path baseDir) throws GeneralSecurityException, IOException {
@@ -208,7 +198,6 @@ public class TestOzoneTokenIdentifier {
   public void testSymmetricTokenPerfHelper(String hmacAlgorithm, int keyLen) {
     final int testTokenCount = 1000;
     List<OzoneTokenIdentifier> tokenIds = new ArrayList<>();
-    List<byte[]> tokenPasswordSym = new ArrayList<>();
     for (int i = 0; i < testTokenCount; i++) {
       tokenIds.add(generateTestToken());
     }
@@ -234,8 +223,7 @@ public class TestOzoneTokenIdentifier {
 
     long startTime = Time.monotonicNowNanos();
     for (int i = 0; i < testTokenCount; i++) {
-      tokenPasswordSym.add(
-          signTokenSymmetric(tokenIds.get(i), mac, secretKey));
+      signTokenSymmetric(tokenIds.get(i), mac, secretKey);
     }
     long duration = Time.monotonicNowNanos() - startTime;
     LOG.info("Average token sign time with {}({} symmetric key) is {} ns",

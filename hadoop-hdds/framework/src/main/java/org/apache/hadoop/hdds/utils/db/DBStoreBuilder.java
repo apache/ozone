@@ -444,7 +444,7 @@ public final class DBStoreBuilder {
         columnFamilyDescriptors.add(tc.getDescriptor());
       }
 
-      if (columnFamilyDescriptors.size() > 0) {
+      if (!columnFamilyDescriptors.isEmpty()) {
         try {
           option = DBConfigFromFile.readFromFile(dbname,
               columnFamilyDescriptors);

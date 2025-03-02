@@ -115,7 +115,7 @@ public class DeletedBlockLogImpl
     this.metrics = metrics;
     this.transactionStatusManager =
         new SCMDeletedBlockTransactionStatusManager(deletedBlockLogStateManager,
-            containerManager, this.scmContext, metrics, scmCommandTimeoutMs);
+            containerManager, metrics, scmCommandTimeoutMs);
   }
 
   @Override

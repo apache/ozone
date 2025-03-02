@@ -45,7 +45,7 @@ public class RoundRobinVolumeChoosingPolicy implements VolumeChoosingPolicy {
       long maxContainerSize) throws IOException {
 
     // No volumes available to choose from
-    if (volumes.size() < 1) {
+    if (volumes.isEmpty()) {
       throw new DiskOutOfSpaceException("No more available volumes");
     }
 

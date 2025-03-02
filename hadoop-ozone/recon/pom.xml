@@ -351,7 +351,7 @@
         <configuration>
           <executable>java</executable>
           <classpathScope>compile</classpathScope>
-          <mainClass>org.hadoop.ozone.recon.codegen.JooqCodeGenerator</mainClass>
+          <mainClass>org.apache.ozone.recon.codegen.JooqCodeGenerator</mainClass>
           <cleanupDaemonThreads>false</cleanupDaemonThreads>
           <arguments>
             <argument>${project.build.directory}/generated-sources/java</argument>
@@ -505,13 +505,6 @@
             </configuration>
           </execution>
         </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-checkstyle-plugin</artifactId>
-        <configuration>
-          <suppressionsLocation>${basedir}/../../hadoop-hdds/dev-support/checkstyle/suppressions-skip-imports.xml</suppressionsLocation>
-        </configuration>
       </plugin>
     </plugins>
   </build>

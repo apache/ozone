@@ -135,7 +135,7 @@ public class TestUpgradeManager {
     containerSet = new ContainerSet(1000);
 
     blockManager = new BlockManagerImpl(CONF);
-    chunkManager = new FilePerBlockStrategy(true, blockManager, null);
+    chunkManager = new FilePerBlockStrategy(true, blockManager);
   }
 
   @BeforeAll

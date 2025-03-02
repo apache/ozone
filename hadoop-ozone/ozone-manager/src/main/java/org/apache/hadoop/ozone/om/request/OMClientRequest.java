@@ -551,7 +551,7 @@ public abstract class OMClientRequest implements RequestAuditor {
     boolean isValid = true;
 
     // If keyName is empty string throw error.
-    if (path.length() == 0) {
+    if (path.isEmpty()) {
       throw new OMException("Invalid KeyPath, empty keyName" + path,
           INVALID_KEY_NAME);
     } else if (path.startsWith("/")) {

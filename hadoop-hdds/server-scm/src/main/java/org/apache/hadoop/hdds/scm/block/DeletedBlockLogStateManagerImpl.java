@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.block;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -28,12 +27,10 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
-import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -64,12 +61,11 @@ public class DeletedBlockLogStateManagerImpl
     this.deletedTable = deletedTable;
     this.containerManager = containerManager;
     this.transactionBuffer = txBuffer;
-    final boolean isRatisEnabled = SCMHAUtils.isSCMHAEnabled(conf);
-    this.deletingTxIDs = isRatisEnabled ? ConcurrentHashMap.newKeySet() : null;
-    this.skippingRetryTxIDs =
-        isRatisEnabled ? ConcurrentHashMap.newKeySet() : null;
+    this.deletingTxIDs = ConcurrentHashMap.newKeySet();
+    this.skippingRetryTxIDs = ConcurrentHashMap.newKeySet();
   }
 
+  @Override
   public TableIterator<Long, TypedTable.KeyValue<Long,
       DeletedBlocksTransaction>> getReadOnlyIterator() throws IOException {
     return new TableIterator<Long, TypedTable.KeyValue<Long,
@@ -238,6 +234,7 @@ public class DeletedBlockLogStateManagerImpl
     return resetCount;
   }
 
+  @Override
   public void onFlush() {
     // onFlush() can be invoked only when ratis is enabled.
     Preconditions.checkNotNull(deletingTxIDs);
@@ -303,18 +300,11 @@ public class DeletedBlockLogStateManagerImpl
       Preconditions.checkNotNull(conf);
       Preconditions.checkNotNull(table);
 
-      final DeletedBlockLogStateManager impl =
-          new DeletedBlockLogStateManagerImpl(conf, table, containerManager,
-              transactionBuffer);
+      final DeletedBlockLogStateManager impl = new DeletedBlockLogStateManagerImpl(
+          conf, table, containerManager, transactionBuffer);
 
-      final SCMHAInvocationHandler invocationHandler =
-          new SCMHAInvocationHandler(SCMRatisProtocol.RequestType.BLOCK,
-              impl, scmRatisServer);
-
-      return (DeletedBlockLogStateManager) Proxy.newProxyInstance(
-          SCMHAInvocationHandler.class.getClassLoader(),
-          new Class<?>[]{DeletedBlockLogStateManager.class},
-          invocationHandler);
+      return scmRatisServer.getProxyHandler(RequestType.BLOCK,
+          DeletedBlockLogStateManager.class, impl);
     }
   }
 }

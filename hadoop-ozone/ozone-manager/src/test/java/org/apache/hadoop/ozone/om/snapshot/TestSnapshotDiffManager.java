@@ -49,6 +49,7 @@ import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.RE
 import static org.apache.ratis.util.JavaUtils.attempt;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -680,12 +681,13 @@ public class TestSnapshotDiffManager {
 
       SnapshotDiffManager spy = spy(snapshotDiffManager);
 
-      doAnswer(invocation -> {
+      Boolean isKeyInBucket = doAnswer(invocation -> {
             String[] split = invocation.getArgument(0, String.class).split("/");
             String keyName = split[split.length - 1];
             return Integer.parseInt(keyName.substring(3)) % 2 == 0;
           }
       ).when(spy).isKeyInBucket(anyString(), anyMap(), anyString());
+      assertFalse(isKeyInBucket);
 
       PersistentMap<byte[], byte[]> oldObjectIdKeyMap =
           new StubbedPersistentMap<>();
@@ -1585,6 +1587,7 @@ public class TestSnapshotDiffManager {
    * short-circuited based on previous one.
    */
   @Test
+  @Flaky("HDDS-12361")
   public void testGetSnapshotDiffReportJob() throws Exception {
     for (int i = 0; i < jobStatuses.size(); i++) {
       uploadSnapshotDiffJobToDb(snapshotInfo, snapshotInfoList.get(i),

@@ -133,7 +133,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
         toKeyName = renameKey.getToKeyName();
         RenameKeysMap.Builder unRenameKey = RenameKeysMap.newBuilder();
 
-        if (toKeyName.length() == 0 || fromKeyName.length() == 0) {
+        if (toKeyName.isEmpty() || fromKeyName.isEmpty()) {
           renameStatus = false;
           unRenamedKeys.add(
               unRenameKey.setFromKeyName(fromKeyName).setToKeyName(toKeyName)

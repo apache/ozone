@@ -65,6 +65,7 @@ public class MetadataVolume extends StorageVolume {
       return this;
     }
 
+    @Override
     public MetadataVolume build() throws IOException {
       return new MetadataVolume(this);
     }

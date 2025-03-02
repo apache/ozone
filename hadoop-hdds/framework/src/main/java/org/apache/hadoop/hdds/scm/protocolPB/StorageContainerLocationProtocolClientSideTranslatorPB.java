@@ -1162,6 +1162,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         status.getMessagesList());
   }
 
+  @Override
   public Token<?> getContainerToken(
       ContainerID containerID) throws IOException {
     GetContainerTokenRequestProto request =

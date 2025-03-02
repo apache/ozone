@@ -221,10 +221,6 @@ public final class StorageVolumeUtil {
     } else if (rootFiles.length == 1) {
       // The one file is the version file.
       // DN started for first time or this is a newly added volume.
-      // Either the SCM ID or cluster ID will be used in naming the
-      // volume's working directory, depending on the datanode's layout version.
-      workingDirName = VersionedDatanodeFeatures.ScmHA
-          .chooseContainerPathID(conf, scmId, clusterId);
       try {
         volume.createWorkingDir(workingDirName, dbVolumeSet);
       } catch (IOException e) {

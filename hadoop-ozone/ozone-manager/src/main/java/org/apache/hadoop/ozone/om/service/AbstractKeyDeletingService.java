@@ -37,8 +37,6 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.BackgroundService;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.BlockGroup;
@@ -133,38 +131,6 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   }
 
   /**
-   * Deletes all the keys that SCM has acknowledged and queued for delete.
-   *
-   * @param results DeleteBlockGroups returned by SCM.
-   * @throws IOException      on Error
-   */
-  private int deleteAllKeys(List<DeleteBlockGroupResult> results,
-      KeyManager manager) throws IOException {
-    Table<String, RepeatedOmKeyInfo> deletedTable =
-        manager.getMetadataManager().getDeletedTable();
-    DBStore store = manager.getMetadataManager().getStore();
-
-    // Put all keys to delete in a single transaction and call for delete.
-    int deletedCount = 0;
-    try (BatchOperation writeBatch = store.initBatchOperation()) {
-      for (DeleteBlockGroupResult result : results) {
-        if (result.isSuccess()) {
-          // Purge key from OM DB.
-          deletedTable.deleteWithBatch(writeBatch,
-              result.getObjectKey());
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Key {} deleted from OM DB", result.getObjectKey());
-          }
-          deletedCount++;
-        }
-      }
-      // Write a single transaction for delete.
-      store.commitBatchOperation(writeBatch);
-    }
-    return deletedCount;
-  }
-
-  /**
    * Submits PurgeKeys request for the keys whose blocks have been deleted
    * by SCM.
    * @param results DeleteBlockGroups returned by SCM.
@@ -237,7 +203,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         keysToUpdateList.add(keyToUpdate.build());
       }
 
-      if (keysToUpdateList.size() > 0) {
+      if (!keysToUpdateList.isEmpty()) {
         purgeKeysRequest.addAllKeysToUpdate(keysToUpdateList);
       }
     }
@@ -673,6 +639,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     return movedFilesCount.get();
   }
 
+  @Override
   public BootstrapStateHandler.Lock getBootstrapStateLock() {
     return lock;
   }

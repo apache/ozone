@@ -265,7 +265,7 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
         getPlacementStatus(replicas, requiredNodes, Collections.emptyList());
     ContainerPlacementStatus placementStatusWithPending = placementStatus;
     if (!placementStatus.isPolicySatisfied()) {
-      if (replicaPendingOps.size() > 0) {
+      if (!replicaPendingOps.isEmpty()) {
         placementStatusWithPending =
             getPlacementStatus(replicas, requiredNodes, replicaPendingOps);
       }

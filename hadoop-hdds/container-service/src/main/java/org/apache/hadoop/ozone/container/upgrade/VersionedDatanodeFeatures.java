@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.upgrade;
 import java.io.File;
 import java.io.IOException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -107,20 +106,6 @@ public final class VersionedDatanodeFeatures {
               " has more than one directory before SCM HA finalization.");
         }
         return subdirs[0].getName();
-      }
-    }
-
-    /**
-     * Choose whether to use SCM ID or cluster ID based on SCM HA
-     * finalization status and SCM HA configuration.
-     */
-    public static String chooseContainerPathID(ConfigurationSource conf,
-        String scmID, String clusterID) {
-      boolean scmHAEnabled = SCMHAUtils.isSCMHAEnabled(conf);
-      if (isFinalized(HDDSLayoutFeature.SCM_HA) || scmHAEnabled) {
-        return clusterID;
-      } else {
-        return scmID;
       }
     }
 
