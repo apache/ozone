@@ -297,6 +297,7 @@ public class SCMNodeManager implements NodeManager {
     return nodeStateManager.getNodeStatus(datanodeDetails);
   }
 
+  @Override
   public void setReplicationManager(ReplicationManager rm) {
     replicationManager = rm;
   }
