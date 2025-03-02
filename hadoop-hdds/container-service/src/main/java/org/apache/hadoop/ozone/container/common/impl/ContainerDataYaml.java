@@ -23,22 +23,22 @@ import static org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData.K
 import com.google.common.base.Preconditions;
 import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.slf4j.Logger;
@@ -81,7 +81,7 @@ public final class ContainerDataYaml {
   public static void createContainerFile(ContainerType containerType,
       ContainerData containerData, File containerFile) throws IOException {
     Writer writer = null;
-    FileOutputStream out = null;
+    OutputStream out = null;
     try {
       boolean withReplicaIndex =
           containerData instanceof KeyValueContainerData &&
@@ -93,8 +93,7 @@ public final class ContainerDataYaml {
       containerData.computeAndSetChecksum(yaml);
 
       // Write the ContainerData with checksum to Yaml file.
-      out = new FileOutputStream(
-          containerFile);
+      out = Files.newOutputStream(containerFile.toPath());
       writer = new OutputStreamWriter(out, StandardCharsets.UTF_8);
       yaml.dump(containerData, writer);
     } finally {
@@ -102,7 +101,7 @@ public final class ContainerDataYaml {
         if (writer != null) {
           writer.flush();
           // make sure the container metadata is synced to disk.
-          out.getFD().sync();
+          IOUtils.syncFD(out);
           writer.close();
         }
       } catch (IOException ex) {
@@ -121,7 +120,7 @@ public final class ContainerDataYaml {
   public static ContainerData readContainerFile(File containerFile)
       throws IOException {
     Preconditions.checkNotNull(containerFile, "containerFile cannot be null");
-    try (FileInputStream inputFileStream = new FileInputStream(containerFile)) {
+    try (InputStream inputFileStream = Files.newInputStream(containerFile.toPath())) {
       return readContainer(inputFileStream);
     }
 

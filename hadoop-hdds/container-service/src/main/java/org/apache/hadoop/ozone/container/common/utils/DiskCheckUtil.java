@@ -19,14 +19,17 @@ package org.apache.hadoop.ozone.container.common.utils;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.SyncFailedException;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.util.Arrays;
 import java.util.Random;
 import java.util.UUID;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -132,10 +135,10 @@ public final class DiskCheckUtil {
       File testFile = new File(testFileDir, "disk-check-" + UUID.randomUUID());
       byte[] writtenBytes = new byte[numBytesToWrite];
       RANDOM.nextBytes(writtenBytes);
-      try (FileOutputStream fos = new FileOutputStream(testFile)) {
+      try (OutputStream fos = Files.newOutputStream(testFile.toPath())) {
         fos.write(writtenBytes);
-        fos.getFD().sync();
-      } catch (FileNotFoundException notFoundEx) {
+        IOUtils.syncFD(fos);
+      } catch (FileNotFoundException | NoSuchFileException notFoundEx) {
         logError(storageDir, String.format("Could not find file %s for " +
             "volume check.", testFile.getAbsolutePath()), notFoundEx);
         return false;
@@ -151,7 +154,7 @@ public final class DiskCheckUtil {
 
       // Read data back from the test file.
       byte[] readBytes = new byte[numBytesToWrite];
-      try (FileInputStream fis = new FileInputStream(testFile)) {
+      try (InputStream fis = Files.newInputStream(testFile.toPath())) {
         int numBytesRead = fis.read(readBytes);
         if (numBytesRead != numBytesToWrite) {
           logError(storageDir, String.format("%d bytes written to file %s " +
@@ -159,7 +162,7 @@ public final class DiskCheckUtil {
               testFile.getAbsolutePath(), numBytesRead));
           return false;
         }
-      } catch (FileNotFoundException notFoundEx) {
+      } catch (FileNotFoundException | NoSuchFileException notFoundEx) {
         logError(storageDir, String.format("Could not find file %s " +
             "for volume check.", testFile.getAbsolutePath()), notFoundEx);
         return false;

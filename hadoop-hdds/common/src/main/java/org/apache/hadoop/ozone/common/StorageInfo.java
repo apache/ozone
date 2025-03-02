@@ -21,14 +21,12 @@ import static org.apache.hadoop.ozone.common.Storage.STORAGE_FILE_VERSION;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.util.Properties;
 import java.util.UUID;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -192,34 +190,11 @@ public class StorageInfo {
 
   public void writeTo(File to)
       throws IOException {
-    try (RandomAccessFile file = new RandomAccessFile(to, "rws");
-         FileOutputStream out = new FileOutputStream(file.getFD())) {
-      file.seek(0);
-    /*
-     * If server is interrupted before this line,
-     * the version file will remain unchanged.
-     */
-      properties.store(out, null);
-    /*
-     * Now the new fields are flushed to the head of the file, but file
-     * length can still be larger then required and therefore the file can
-     * contain whole or corrupted fields from its old contents in the end.
-     * If server is interrupted here and restarted later these extra fields
-     * either should not effect server behavior or should be handled
-     * by the server correctly.
-     */
-      file.setLength(out.getChannel().position());
-    }
+    IOUtils.writePropertiesToFile(to.toPath(), properties);
   }
 
   private Properties readFrom(File from) throws IOException {
-    try (RandomAccessFile file = new RandomAccessFile(from, "rws");
-        FileInputStream in = new FileInputStream(file.getFD())) {
-      Properties props = new Properties();
-      file.seek(0);
-      props.load(in);
-      return props;
-    }
+    return IOUtils.readPropertiesFromFile(from.toPath());
   }
 
   /**

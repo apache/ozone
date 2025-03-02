@@ -21,10 +21,10 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
@@ -59,6 +59,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.Cache;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.ResourceCache;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -327,7 +328,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   public void buildMissingContainerSet(File snapshotFile) throws IOException {
     // initialize the dispatcher with snapshot so that it build the missing
     // container list
-    try (FileInputStream fin = new FileInputStream(snapshotFile)) {
+    try (InputStream fin = Files.newInputStream(snapshotFile.toPath())) {
       ContainerProtos.Container2BCSIDMapProto proto =
               ContainerProtos.Container2BCSIDMapProto
                       .parseFrom(fin);
@@ -374,11 +375,11 @@ public class ContainerStateMachine extends BaseStateMachine {
       final File snapshotFile =
           storage.getSnapshotFile(ti.getTerm(), ti.getIndex());
       LOG.info("{}: Taking a snapshot at:{} file {}", getGroupId(), ti, snapshotFile);
-      try (FileOutputStream fos = new FileOutputStream(snapshotFile)) {
+      try (OutputStream fos = Files.newOutputStream(snapshotFile.toPath())) {
         persistContainerSet(fos);
         fos.flush();
         // make sure the snapshot file is synced
-        fos.getFD().sync();
+        IOUtils.syncFD(fos);
       } catch (IOException ioe) {
         LOG.error("{}: Failed to write snapshot at:{} file {}", getGroupId(), ti,
             snapshotFile);

@@ -32,5 +32,7 @@
   <rule ref="category/java/bestpractices.xml/UnusedPrivateField"/>
   <rule ref="category/java/bestpractices.xml/UseCollectionIsEmpty" />
 
+  <rule ref="category/java/performance.xml/AvoidFileStream"/>
+
   <exclude-pattern>.*/generated-sources/.*</exclude-pattern>
 </ruleset>

@@ -18,13 +18,13 @@
 package org.apache.hadoop.ozone.container.common.helpers;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -72,7 +72,7 @@ public final class DatanodeIdYaml {
     Yaml yaml = new Yaml(options);
 
     try (Writer writer = new OutputStreamWriter(
-        new FileOutputStream(path), StandardCharsets.UTF_8)) {
+        Files.newOutputStream(path.toPath()), StandardCharsets.UTF_8)) {
       yaml.dump(getDatanodeDetailsYaml(datanodeDetails, conf), writer);
     }
   }
@@ -83,7 +83,7 @@ public final class DatanodeIdYaml {
   public static DatanodeDetails readDatanodeIdFile(File path)
       throws IOException {
     DatanodeDetails datanodeDetails;
-    try (FileInputStream inputFileStream = new FileInputStream(path)) {
+    try (InputStream inputFileStream = Files.newInputStream(path.toPath())) {
       DatanodeDetailsYaml datanodeDetailsYaml;
       try {
         datanodeDetailsYaml =
