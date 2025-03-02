@@ -896,6 +896,10 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     return containerReport;
   }
 
+  public boolean isThreadWaiting() {
+    return replicationMonitor.getState() == Thread.State.TIMED_WAITING;
+  }
+
   /**
    * ReplicationMonitor thread runnable. This wakes up at configured
    * interval and processes all the containers in the system.
@@ -1468,6 +1472,28 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
           .getPipeline(container.getPipelineID()) != null;
     } catch (PipelineNotFoundException e) {
       return false;
+    }
+  }
+
+  /**
+   * Notify the ReplicationManager that a node state has changed, which might
+   * require container replication. This will wake up the replication monitor
+   * thread if it's sleeping and there's no active replication work in progress.
+   */
+  public synchronized void notifyNodeStateChange() {
+    if (!running || serviceStatus == ServiceStatus.PAUSING) {
+      return;
+    }
+
+    // Only wake up the thread if there's no active replication work
+    // This prevents creating a new replication queue over and over
+    // when multiple nodes change state in quick succession
+    if (getQueue().isEmpty()) {
+      LOG.info("Waking up replication monitor due to node state change");
+      // Notify the replication monitor thread to wake up
+      notify();
+    } else {
+      LOG.info("Replication queue is not empty, not waking up replication monitor");
     }
   }
 }
