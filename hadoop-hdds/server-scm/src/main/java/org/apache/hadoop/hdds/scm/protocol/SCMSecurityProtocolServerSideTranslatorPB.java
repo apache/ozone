@@ -61,7 +61,7 @@ public class SCMSecurityProtocolServerSideTranslatorPB
 
   private final SCMSecurityProtocol impl;
   private final StorageContainerManager scm;
-  private final static String roleType = "SCM";
+  private static final String ROLE_TYPE = "SCM";
 
   private OzoneProtocolMessageDispatcher<SCMSecurityRequest,
       SCMSecurityResponse, ProtocolMessageEnum>
@@ -83,7 +83,7 @@ public class SCMSecurityProtocolServerSideTranslatorPB
     if (!scm.checkLeader()) {
       RatisUtil.checkRatisException(
           scm.getScmHAManager().getRatisServer().triggerNotLeaderException(),
-          scm.getSecurityProtocolRpcPort(), scm.getScmId(), scm.getHostname(), roleType);
+          scm.getSecurityProtocolRpcPort(), scm.getScmId(), scm.getHostname(), ROLE_TYPE);
     }
     return dispatcher.processRequest(request, this::processRequest,
         request.getCmdType(), request.getTraceID());
@@ -151,7 +151,7 @@ public class SCMSecurityProtocolServerSideTranslatorPB
       }
     } catch (IOException e) {
       RatisUtil.checkRatisException(e, scm.getSecurityProtocolRpcPort(),
-          scm.getScmId(), scm.getHostname(), roleType);
+          scm.getScmId(), scm.getHostname(), ROLE_TYPE);
       scmSecurityResponse.setSuccess(false);
       scmSecurityResponse.setStatus(exceptionToResponseStatus(e));
       // If actual cause is set in SCMSecurityException, set message with
