@@ -4133,7 +4133,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     List<OzoneAcl> expectedAcls = getAclList(new OzoneConfiguration());
 
     // Case:1 Add new acl permission to existing acl.
-    if (expectedAcls.size() > 0) {
+    if (!expectedAcls.isEmpty()) {
       OzoneAcl oldAcl = expectedAcls.get(0);
       OzoneAcl newAcl = new OzoneAcl(oldAcl.getType(), oldAcl.getName(),
           oldAcl.getAclScope(), ACLType.READ_ACL);

@@ -303,7 +303,7 @@ public class TestStorageContainerManager {
       try {
         cluster.getStorageContainerManager().getScmHAManager()
             .asSCMHADBTransactionBuffer().flush();
-        return delLog.getFailedTransactions(-1, 0).size() == 0;
+        return delLog.getFailedTransactions(-1, 0).isEmpty();
       } catch (IOException e) {
         return false;
       }

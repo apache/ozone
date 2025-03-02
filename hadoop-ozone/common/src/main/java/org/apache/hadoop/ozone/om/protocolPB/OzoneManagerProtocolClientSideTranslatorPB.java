@@ -719,11 +719,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       keyArgs.setDataSize(args.getDataSize());
     }
 
-    if (args.getMetadata() != null && args.getMetadata().size() > 0) {
+    if (args.getMetadata() != null && !args.getMetadata().isEmpty()) {
       keyArgs.addAllMetadata(KeyValueUtil.toProtobuf(args.getMetadata()));
     }
 
-    if (args.getTags() != null && args.getTags().size() > 0) {
+    if (args.getTags() != null && !args.getTags().isEmpty()) {
       keyArgs.addAllTags(KeyValueUtil.toProtobuf(args.getTags()));
     }
 

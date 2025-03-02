@@ -54,7 +54,7 @@ public class TestOzoneAclUtil {
   @Test
   public void testAddAcl() throws IOException {
     List<OzoneAcl> currentAcls = getDefaultAcls();
-    assertTrue(currentAcls.size() > 0);
+    assertTrue(!currentAcls.isEmpty());
 
     // Add new permission to existing acl entry.
     OzoneAcl oldAcl = currentAcls.get(0);
@@ -86,7 +86,7 @@ public class TestOzoneAclUtil {
     removeAndVerifyAcl(currentAcls, USER1, false, 0);
 
     currentAcls = getDefaultAcls();
-    assertTrue(currentAcls.size() > 0);
+    assertTrue(!currentAcls.isEmpty());
 
     // Add new permission to existing acl entru.
     OzoneAcl oldAcl = currentAcls.get(0);

@@ -636,7 +636,7 @@ public class TestPipelineManagerImpl {
     // Simulate safemode check exiting.
     scmContext.updateSafeModeStatus(
         new SCMSafeModeManager.SafeModeStatus(true, true));
-    GenericTestUtils.waitFor(() -> pipelineManager.getPipelines().size() != 0,
+    GenericTestUtils.waitFor(() -> !pipelineManager.getPipelines().isEmpty(),
         100, 10000);
     pipelineManager.close();
   }
