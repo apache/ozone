@@ -69,6 +69,7 @@ import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -134,6 +135,7 @@ public class SCMNodeManager implements NodeManager {
   private final SCMContext scmContext;
   private final Map<SCMCommandProto.Type,
       BiConsumer<DatanodeDetails, SCMCommand<?>>> sendCommandNotifyMap;
+  private volatile ReplicationManager replicationManager;
 
   /**
    * Lock used to synchronize some operation in Node manager to ensure a
@@ -295,6 +297,10 @@ public class SCMNodeManager implements NodeManager {
     return nodeStateManager.getNodeStatus(datanodeDetails);
   }
 
+  public void setReplicationManager(ReplicationManager rm) {
+    replicationManager = rm;
+  }
+
   /**
    * Set the operation state of a node.
    * @param datanodeDetails The datanode to set the new state for
@@ -318,8 +324,21 @@ public class SCMNodeManager implements NodeManager {
   public void setNodeOperationalState(DatanodeDetails datanodeDetails,
       NodeOperationalState newState, long opStateExpiryEpocSec)
       throws NodeNotFoundException {
+    NodeOperationalState oldState = getNodeStatus(datanodeDetails).getOperationalState();
+
     nodeStateManager.setNodeOperationalState(
         datanodeDetails, newState, opStateExpiryEpocSec);
+
+    if (replicationManager != null && oldState != newState) {
+      // Notify when a node is entering maintenance, decommissioning or back to service
+      if (newState == NodeOperationalState.ENTERING_MAINTENANCE
+          || newState == NodeOperationalState.DECOMMISSIONING
+          || newState == NodeOperationalState.IN_SERVICE) {
+        LOG.info("Notifying ReplicationManager of node state change for {}: {} -> {}",
+            datanodeDetails, oldState, newState);
+        replicationManager.notifyNodeStateChange();
+      }
+    }
   }
 
   /**

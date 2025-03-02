@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -74,6 +75,12 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 public interface NodeManager extends StorageContainerNodeProtocol,
     EventHandler<CommandForDatanode>, NodeManagerMXBean, Closeable {
 
+  /**
+   * TODO: remove cyclic dependency between NodeManager and ReplicationManager
+   * Set the ReplicationManager
+   * @param rm ReplicationManager instance
+   */
+  void setReplicationManager(ReplicationManager rm);
 
   /**
    * Register API without a layout version info object passed in. Useful for
