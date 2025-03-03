@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.util.DiskChecker;
 import org.apache.ratis.grpc.util.ZeroCopyMessageMarshaller;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
@@ -50,7 +51,7 @@ class SendContainerRequestHandler
   private long containerId = -1;
   private long nextOffset;
   private OutputStream output;
-  private HddsVolume volume;
+  private HddsVolume volume = null;
   private Path path;
   private CopyContainerCompression compression;
   private final ZeroCopyMessageMarshaller<SendContainerRequest> marshaller;
@@ -85,6 +86,14 @@ class SendContainerRequestHandler
       if (containerId == -1) {
         containerId = req.getContainerID();
         volume = importer.chooseNextVolume();
+        volume.incImportContainerCommitBytes(importer.getDefaultContainerSize() * 2);
+        if (volume.getCurrentUsage().getAvailable() - volume.getCommittedBytes()
+            - volume.getContainerImportCommittedBytes() <= 0) {
+          volume.incImportContainerCommitBytes(-importer.getDefaultContainerSize() * 2);
+          volume = null;
+          throw new DiskChecker.DiskOutOfSpaceException("No more available volumes");
+        }
+
         Path dir = ContainerImporter.getUntarDirectory(volume);
         Files.createDirectories(dir);
         path = dir.resolve(ContainerUtils.getContainerTarName(containerId));
@@ -110,32 +119,44 @@ class SendContainerRequestHandler
 
   @Override
   public void onError(Throwable t) {
-    LOG.warn("Error receiving container {} at {}", containerId, nextOffset, t);
-    closeOutput();
-    deleteTarball();
-    responseObserver.onError(t);
+    try {
+      LOG.warn("Error receiving container {} at {}", containerId, nextOffset, t);
+      closeOutput();
+      deleteTarball();
+      responseObserver.onError(t);
+    } finally {
+      if (volume != null) {
+        volume.incImportContainerCommitBytes(-importer.getDefaultContainerSize() * 2);
+      }
+    }
   }
 
   @Override
   public void onCompleted() {
-    if (output == null) {
-      LOG.warn("Received container without any parts");
-      return;
-    }
-
-    LOG.info("Container {} is downloaded with size {}, starting to import.",
-        containerId, nextOffset);
-    closeOutput();
-
     try {
-      importer.importContainer(containerId, path, volume, compression);
-      LOG.info("Container {} is replicated successfully", containerId);
-      responseObserver.onNext(SendContainerResponse.newBuilder().build());
-      responseObserver.onCompleted();
-    } catch (Throwable t) {
-      LOG.warn("Failed to import container {}", containerId, t);
-      deleteTarball();
-      responseObserver.onError(t);
+      if (output == null) {
+        LOG.warn("Received container without any parts");
+        return;
+      }
+
+      LOG.info("Container {} is downloaded with size {}, starting to import.",
+          containerId, nextOffset);
+      closeOutput();
+
+      try {
+        importer.importContainer(containerId, path, volume, compression);
+        LOG.info("Container {} is replicated successfully", containerId);
+        responseObserver.onNext(SendContainerResponse.newBuilder().build());
+        responseObserver.onCompleted();
+      } catch (Throwable t) {
+        LOG.warn("Failed to import container {}", containerId, t);
+        deleteTarball();
+        responseObserver.onError(t);
+      }
+    } finally {
+      if (volume != null) {
+        volume.incImportContainerCommitBytes(-importer.getDefaultContainerSize() * 2);
+      }
     }
   }
 
