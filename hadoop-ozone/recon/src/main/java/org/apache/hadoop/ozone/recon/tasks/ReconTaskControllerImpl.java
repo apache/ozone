@@ -158,18 +158,20 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   }
 
   @Override
-  public synchronized void reInitializeTasks(ReconOMMetadataManager omMetadataManager) {
+  public synchronized void reInitializeTasks(ReconOMMetadataManager omMetadataManager,
+                                             Map<String, ReconOmTask> reconOmTaskMap) {
     Collection<NamedCallableTask<ReconOmTask.TaskResult>> tasks = new ArrayList<>();
-    ReconConstants.resetTableTruncatedFlags();
-    for (Map.Entry<String, ReconOmTask> taskEntry :
-        reconOmTasks.entrySet()) {
-      ReconOmTask task = taskEntry.getValue();
-      ReconTaskStatusUpdater taskStatusUpdater =
-          taskStatusUpdaterManager.getTaskStatusUpdater(task.getTaskName());
-      taskStatusUpdater.recordRunStart();
-      tasks.add(new NamedCallableTask<>(task.getTaskName(),
-          () -> task.reprocess(omMetadataManager)));
+    Map<String, ReconOmTask> localReconOmTaskMap = reconOmTaskMap;
+    if (null == reconOmTaskMap) {
+      localReconOmTaskMap = reconOmTasks;
     }
+    ReconConstants.resetTableTruncatedFlags();
+
+    localReconOmTaskMap.values().forEach(task -> {
+      ReconTaskStatusUpdater taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(task.getTaskName());
+      taskStatusUpdater.recordRunStart();
+      tasks.add(new NamedCallableTask<>(task.getTaskName(), () -> task.reprocess(omMetadataManager)));
+    });
 
     try {
       CompletableFuture.allOf(tasks.stream()

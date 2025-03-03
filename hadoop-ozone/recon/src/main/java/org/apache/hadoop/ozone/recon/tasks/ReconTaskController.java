@@ -41,9 +41,11 @@ public interface ReconTaskController {
 
   /**
    * Pass on the handle to a new OM DB instance to the registered tasks.
+   *
    * @param omMetadataManager OM Metadata Manager instance
+   * @param reconOmTaskMap
    */
-  void reInitializeTasks(ReconOMMetadataManager omMetadataManager);
+  void reInitializeTasks(ReconOMMetadataManager omMetadataManager, Map<String, ReconOmTask> reconOmTaskMap);
 
   /**
    * Get set of registered tasks.
