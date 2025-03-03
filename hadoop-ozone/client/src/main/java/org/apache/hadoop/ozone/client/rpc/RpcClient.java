@@ -1021,6 +1021,30 @@ public class RpcClient implements ClientProtocol {
   }
 
   /**
+   * {@inheritDoc}
+   */
+  @Override
+  public OzoneSnapshot getSnapshotInfo(String volumeName,
+                                       String bucketName,
+                                       String snapshotName,
+                                       String omNodeId) throws IOException {
+    Preconditions.checkArgument(StringUtils.isNotBlank(volumeName),
+        "volume can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(bucketName),
+        "bucket can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(snapshotName),
+        "snapshot name can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(omNodeId),
+        "OM node ID can't be null or empty.");
+    if (omVersion.compareTo(OzoneManagerVersion.SNAPSHOT_READ_FROM_NON_LEADER) < 0) {
+      throw new IOException("OzoneManager does not support snapshot read from non-leader OM.");
+    }
+    SnapshotInfo snapshotInfo = ozoneManagerClient.getSnapshotInfo(volumeName,
+        bucketName, snapshotName, omNodeId);
+    return OzoneSnapshot.fromSnapshotInfo(snapshotInfo);
+  }
+
+  /**
    * Create an image of the current compaction log DAG in the OM.
    * @param fileNamePrefix  file name prefix of the image file.
    * @param graphType       type of node name to use in the graph image.
@@ -1053,6 +1077,31 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public SnapshotDiffResponse snapshotDiff(String volumeName,
+                                           String bucketName,
+                                           String fromSnapshot,
+                                           String toSnapshot,
+                                           String token,
+                                           int pageSize,
+                                           boolean forceFullDiff,
+                                           boolean disableNativeDiff,
+                                           String omNodeId)
+      throws IOException {
+    Preconditions.checkArgument(StringUtils.isNotBlank(volumeName),
+        "volume can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(bucketName),
+        "bucket can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(omNodeId),
+        "OM node ID can't be null or empty.");
+    if (omVersion.compareTo(OzoneManagerVersion.SNAPSHOT_READ_FROM_NON_LEADER) < 0) {
+      throw new IOException("OzoneManager does not support snapshot diff from non-leader OM.");
+    }
+    return ozoneManagerClient.snapshotDiff(volumeName, bucketName,
+        fromSnapshot, toSnapshot, token, pageSize, forceFullDiff,
+        disableNativeDiff, omNodeId);
+  }
+
+  @Override
   public CancelSnapshotDiffResponse cancelSnapshotDiff(String volumeName,
                                                        String bucketName,
                                                        String fromSnapshot,
@@ -1071,6 +1120,30 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public CancelSnapshotDiffResponse cancelSnapshotDiff(String volumeName,
+                                                       String bucketName,
+                                                       String fromSnapshot,
+                                                       String toSnapshot,
+                                                       String omNodeId)
+      throws IOException {
+    Preconditions.checkArgument(StringUtils.isNotBlank(volumeName),
+        "volume can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(bucketName),
+        "bucket can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(fromSnapshot),
+        "fromSnapshot can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(toSnapshot),
+        "toSnapshot can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(omNodeId),
+        "OM node ID can't be null or empty.");
+    if (omVersion.compareTo(OzoneManagerVersion.SNAPSHOT_READ_FROM_NON_LEADER) < 0) {
+      throw new IOException("OzoneManager does not support cancel snapshot diff from non-leader OM.");
+    }
+    return ozoneManagerClient.cancelSnapshotDiff(volumeName, bucketName,
+        fromSnapshot, toSnapshot, omNodeId);
+  }
+
+  @Override
   public List<OzoneSnapshotDiff> listSnapshotDiffJobs(String volumeName,
                                                     String bucketName,
                                                     String jobStatus,
@@ -1083,6 +1156,24 @@ public class RpcClient implements ClientProtocol {
 
     return ozoneManagerClient.listSnapshotDiffJobs(
         volumeName, bucketName, jobStatus, listAll).stream()
+        .map(OzoneSnapshotDiff::fromSnapshotDiffJob)
+        .collect(Collectors.toList());
+  }
+
+  @Override
+  public List<OzoneSnapshotDiff> listSnapshotDiffJobs(String volumeName, String bucketName, String jobStatus,
+      boolean listAll, String omNodeId) throws IOException {
+    Preconditions.checkArgument(StringUtils.isNotBlank(volumeName),
+        "volume can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(bucketName),
+        "bucket can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(omNodeId),
+        "OM node ID can't be null or empty.");
+    if (omVersion.compareTo(OzoneManagerVersion.SNAPSHOT_READ_FROM_NON_LEADER) < 0) {
+      throw new IOException("OzoneManager does not support cancel snapshot diff from non-leader OM.");
+    }
+    return ozoneManagerClient.listSnapshotDiffJobs(
+            volumeName, bucketName, jobStatus, listAll, omNodeId).stream()
         .map(OzoneSnapshotDiff::fromSnapshotDiffJob)
         .collect(Collectors.toList());
   }
@@ -1106,6 +1197,34 @@ public class RpcClient implements ClientProtocol {
     Preconditions.checkArgument(StringUtils.isNotBlank(bucketName),
         "bucket can't be null or empty.");
     return ozoneManagerClient.listSnapshot(volumeName, bucketName, snapshotPrefix, prevSnapshot, maxListResult);
+  }
+
+  /**
+   * List snapshots in a volume/bucket.
+   * @param volumeName     volume name
+   * @param bucketName     bucket name
+   * @param snapshotPrefix snapshot prefix to match
+   * @param prevSnapshot   snapshots will be listed after this snapshot name
+   * @param maxListResult  max number of snapshots to return
+   * @param omNodeId       OM node ID to get the list of snapshots from
+   * @return list of snapshots for volume/bucket path.
+   * @throws IOException
+   */
+  @Override
+  public ListSnapshotResponse listSnapshot(
+      String volumeName, String bucketName, String snapshotPrefix,
+      String prevSnapshot, int maxListResult, String omNodeId) throws IOException {
+    Preconditions.checkArgument(StringUtils.isNotBlank(volumeName),
+        "volume can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(bucketName),
+        "bucket can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(omNodeId),
+        "OM node ID can't be null or empty.");
+    if (omVersion.compareTo(OzoneManagerVersion.SNAPSHOT_READ_FROM_NON_LEADER) < 0) {
+      throw new IOException("OzoneManager does not support list snapshots from non-leader OM.");
+    }
+    return ozoneManagerClient.listSnapshot(volumeName, bucketName, snapshotPrefix,
+        prevSnapshot, maxListResult, omNodeId);
   }
 
   /**
