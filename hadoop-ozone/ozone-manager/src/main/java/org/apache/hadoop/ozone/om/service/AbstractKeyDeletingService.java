@@ -130,7 +130,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms. Limit per task is {}.",
           delCount, blockDeletionResults.size(), Time.monotonicNow() - purgeStartTime, limit);
     }
-    perfMetrics.setLatencyKeyDeletingService(Time.monotonicNow() - startTime);
+    perfMetrics.setKeyDeletingServiceLatencyMs(Time.monotonicNow() - startTime);
     return delCount;
   }
 
@@ -420,7 +420,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
           dirNum, subdirDelNum, subFileNum, (subDirNum - subdirDelNum),
           timeTakenInIteration, rnCnt);
       metrics.incrementDirectoryDeletionTotalMetrics(dirNum + subdirDelNum, subDirNum, subFileNum);
-      perfMetrics.setLatencyDirectoryDeletingService(timeTakenInIteration);
+      perfMetrics.setDirectoryDeletingServiceLatencyMs(timeTakenInIteration);
     }
   }
 

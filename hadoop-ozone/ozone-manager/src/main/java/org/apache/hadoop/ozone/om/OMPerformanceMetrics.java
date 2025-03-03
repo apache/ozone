@@ -153,13 +153,13 @@ public class OMPerformanceMetrics {
   private MutableRate getObjectTaggingAclCheckLatencyNs;
 
   @Metric(about = "Latency of DirectoryDeletingService in ms")
-  private MutableGaugeLong latencyDirectoryDeletingService;
+  private MutableGaugeLong directoryDeletingServiceLatencyMs;
 
   @Metric(about = "Latency of KeyDeletingService in ms")
-  private MutableGaugeLong latencyKeyDeletingService;
+  private MutableGaugeLong keyDeletingServiceLatencyMs;
 
   @Metric(about = "Latency of OpenKeyCleanupService in ms")
-  private MutableGaugeLong latencyOpenKeyCleanupService;
+  private MutableGaugeLong openKeyCleanupServiceLatencyMs;
 
   public void addLookupLatency(long latencyInNs) {
     lookupLatencyNs.add(latencyInNs);
@@ -310,15 +310,15 @@ public class OMPerformanceMetrics {
     getObjectTaggingAclCheckLatencyNs.add(latencyInNs);
   }
 
-  public void setLatencyDirectoryDeletingService(long latencyInNs) {
-    latencyDirectoryDeletingService.set(latencyInNs);
+  public void setDirectoryDeletingServiceLatencyMs(long latencyInMs) {
+    directoryDeletingServiceLatencyMs.set(latencyInMs);
   }
 
-  public void setLatencyKeyDeletingService(long latencyInNs) {
-    latencyKeyDeletingService.set(latencyInNs);
+  public void setKeyDeletingServiceLatencyMs(long latencyInMs) {
+    keyDeletingServiceLatencyMs.set(latencyInMs);
   }
 
-  public void setLatencyOpenKeyCleanupService(long latencyInNs) {
-    latencyOpenKeyCleanupService.set(latencyInNs);
+  public void setOpenKeyCleanupServiceLatencyMs(long latencyInMs) {
+    openKeyCleanupServiceLatencyMs.set(latencyInMs);
   }
 }

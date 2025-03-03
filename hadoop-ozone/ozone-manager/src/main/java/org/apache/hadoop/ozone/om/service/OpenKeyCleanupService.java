@@ -241,7 +241,7 @@ public class OpenKeyCleanupService extends BackgroundService {
       LOG.info("Number of expired open keys submitted for deletion: {},"
               + " for commit: {}, cleanupLimit: {}, elapsed time: {}ms",
           numOpenKeys, numHsyncKeys, cleanupLimitPerTask, timeTaken);
-      ozoneManager.getPerfMetrics().setLatencyOpenKeyCleanupService(timeTaken);
+      ozoneManager.getPerfMetrics().setOpenKeyCleanupServiceLatencyMs(timeTaken);
       final int numKeys = numOpenKeys + numHsyncKeys;
       submittedOpenKeyCount.addAndGet(numKeys);
       return () -> numKeys;
