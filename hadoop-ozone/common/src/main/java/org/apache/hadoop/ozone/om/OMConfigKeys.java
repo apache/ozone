@@ -172,6 +172,10 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_METRICS_SAVE_INTERVAL =
       "ozone.om.save.metrics.interval";
   public static final String OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT = "5m";
+  public static final String OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED =
+      "ozone.om.snapshot.rocksdb.metrics.enabled";
+  public static final boolean
+      OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT = true;
 
   /**
    * OM Ratis related configurations.

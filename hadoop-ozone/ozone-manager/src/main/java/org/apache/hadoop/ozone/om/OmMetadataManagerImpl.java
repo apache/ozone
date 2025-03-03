@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_SNAPSHOT_ROCKSDB_METRICS_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -29,6 +27,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_L
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
@@ -433,8 +433,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       }
       setStore(loadDB(conf, metaDir, dbName, false,
           java.util.Optional.of(Boolean.TRUE), maxOpenFiles, false, false,
-          conf.getBoolean(OZONE_METADATA_SNAPSHOT_ROCKSDB_METRICS_ENABLED,
-              OZONE_METADATA_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT)));
+          conf.getBoolean(OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED,
+              OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT)));
       initializeOmTables(CacheType.PARTIAL_CACHE, false);
     } catch (IOException e) {
       stop();

@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om;
 
 import static org.apache.commons.io.file.PathUtils.copyDirectory;
 import static org.apache.hadoop.hdds.utils.HAUtils.getExistingSstFiles;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.*;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -113,7 +112,7 @@ class TestOmSnapshotManager {
     configuration.setInt(
         OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE, 1);
     configuration.setBoolean(
-        OZONE_METADATA_SNAPSHOT_ROCKSDB_METRICS_ENABLED, false);
+        OMConfigKeys.OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED, false);
 
     OmTestManagers omTestManagers = new OmTestManagers(configuration);
     om = omTestManagers.getOzoneManager();
