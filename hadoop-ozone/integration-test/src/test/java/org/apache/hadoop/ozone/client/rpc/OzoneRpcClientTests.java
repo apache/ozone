@@ -68,6 +68,7 @@ import java.io.RandomAccessFile;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -1092,18 +1093,18 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     // create a three replica file
     String keyName1 = "key1";
-    TestDataUtil.createKey(bucket, keyName1, THREE, RATIS, value);
+    TestDataUtil.createKey(bucket, keyName1, THREE, RATIS, value.getBytes(UTF_8));
 
     // create a EC replica file
     String keyName2 = "key2";
     ReplicationConfig replicationConfig = new ECReplicationConfig("rs-3-2-1024k");
-    TestDataUtil.createKey(bucket, keyName2, replicationConfig, value);
+    TestDataUtil.createKey(bucket, keyName2, replicationConfig, value.getBytes(UTF_8));
 
     // create a directory and a file
     String dirName = "dir1";
     bucket.createDirectory(dirName);
     String keyName3 = "key3";
-    TestDataUtil.createKey(bucket, keyName3, THREE, RATIS, value);
+    TestDataUtil.createKey(bucket, keyName3, THREE, RATIS, value.getBytes(UTF_8));
 
     // delete files and directory
     output.reset();
@@ -1113,10 +1114,10 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     // create keys for deleteKeys case
     String keyName4 = "key4";
-    TestDataUtil.createKey(bucket, dirName + "/" + keyName4, THREE, RATIS, value);
+    TestDataUtil.createKey(bucket, dirName + "/" + keyName4, THREE, RATIS, value.getBytes(UTF_8));
 
     String keyName5 = "key5";
-    TestDataUtil.createKey(bucket, dirName + "/" + keyName5, replicationConfig, value);
+    TestDataUtil.createKey(bucket, dirName + "/" + keyName5, replicationConfig, value.getBytes(UTF_8));
 
     List<String> keysToDelete = new ArrayList<>();
     keysToDelete.add(dirName + "/" + keyName4);

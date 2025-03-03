@@ -374,7 +374,7 @@ abstract class AbstractOzoneFileSystemTest {
     String fakeGrandpaKey = "dir1";
     String fakeParentKey = fakeGrandpaKey + "/dir2";
     String fullKeyName = fakeParentKey + "/key1";
-    TestDataUtil.createKey(ozoneBucket, fullKeyName, "");
+    TestDataUtil.createKey(ozoneBucket, fullKeyName, "".getBytes(UTF_8));
 
     // /dir1/dir2 should not exist
     assertFalse(fs.exists(new Path(fakeParentKey)));
@@ -888,7 +888,7 @@ abstract class AbstractOzoneFileSystemTest {
     * the "/dir1", "/dir1/dir2/" are fake directory
     * */
     String keyName = "dir1/dir2/key1";
-    TestDataUtil.createKey(ozoneBucket, keyName, "");
+    TestDataUtil.createKey(ozoneBucket, keyName, "".getBytes(UTF_8));
     FileStatus[] fileStatuses;
 
     fileStatuses = fs.listStatus(ROOT, EXCLUDE_TRASH);
@@ -1396,7 +1396,7 @@ abstract class AbstractOzoneFileSystemTest {
     String fakeParentKey = fakeGrandpaKey + "/dir2";
     String sourceKeyName = fakeParentKey + "/key1";
     String targetKeyName = fakeParentKey +  "/key2";
-    TestDataUtil.createKey(ozoneBucket, sourceKeyName, "");
+    TestDataUtil.createKey(ozoneBucket, sourceKeyName, "".getBytes(UTF_8));
 
     Path sourcePath = new Path(fs.getUri().toString() + "/" + sourceKeyName);
     Path targetPath = new Path(fs.getUri().toString() + "/" + targetKeyName);
@@ -1894,8 +1894,7 @@ abstract class AbstractOzoneFileSystemTest {
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(log);
     int keySize = 1024;
-    TestDataUtil.createKey(ozoneBucket, "key1", new String(new byte[keySize],
-        UTF_8));
+    TestDataUtil.createKey(ozoneBucket, "key1", new byte[keySize]);
     logCapturer.stopCapturing();
     String logContent = logCapturer.getOutput();
 

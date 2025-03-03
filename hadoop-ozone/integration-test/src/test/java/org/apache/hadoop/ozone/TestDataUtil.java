@@ -105,11 +105,11 @@ public final class TestDataUtil {
 
   }
 
-  public static void createKey(OzoneBucket bucket, String keyName,
-                               String content) throws IOException {
-    createKey(bucket, keyName, ReplicationFactor.ONE,
-        ReplicationType.RATIS, content.getBytes(UTF_8));
-  }
+//  public static void createKey(OzoneBucket bucket, String keyName,
+//                               String content) throws IOException {
+//    createKey(bucket, keyName, ReplicationFactor.ONE,
+//        ReplicationType.RATIS, content.getBytes(UTF_8));
+//  }
 
   public static void createKey(OzoneBucket bucket, String keyName,
                                byte[] content) throws IOException {
@@ -140,19 +140,19 @@ public final class TestDataUtil {
     }
   }
 
-  public static void createKey(OzoneBucket bucket, String keyName,
-      ReplicationFactor repFactor, ReplicationType repType, String content)
-      throws IOException {
-    ReplicationConfig repConfig = ReplicationConfig
-        .fromTypeAndFactor(repType, repFactor);
-    createKey(bucket, keyName, repConfig, content.getBytes(UTF_8));
-  }
+//  public static void createKey(OzoneBucket bucket, String keyName,
+//      ReplicationFactor repFactor, ReplicationType repType, String content)
+//      throws IOException {
+//    ReplicationConfig repConfig = ReplicationConfig
+//        .fromTypeAndFactor(repType, repFactor);
+//    createKey(bucket, keyName, repConfig, content.getBytes(UTF_8));
+//  }
 
-  public static void createKey(OzoneBucket bucket, String keyName,
-      ReplicationConfig repConfig, String content)
-      throws IOException {
-    createKey(bucket, keyName, repConfig, content.getBytes(UTF_8));
-  }
+//  public static void createKey(OzoneBucket bucket, String keyName,
+//      ReplicationConfig repConfig, String content)
+//      throws IOException {
+//    createKey(bucket, keyName, repConfig, content.getBytes(UTF_8));
+//  }
 
   public static void createKey(OzoneBucket bucket, String keyName,
       ReplicationFactor repFactor, ReplicationType repType,
@@ -258,7 +258,7 @@ public final class TestDataUtil {
       OzoneBucket bucket = createVolumeAndBucket(client);
       for (int i = 0; i < numOfKeys; i++) {
         String keyName = RandomStringUtils.randomAlphabetic(5) + i;
-        createKey(bucket, keyName, RandomStringUtils.randomAlphabetic(5));
+        createKey(bucket, keyName, RandomStringUtils.randomAlphabetic(5).getBytes(UTF_8));
         keyLocationMap.put(keyName, lookupOmKeyInfo(cluster, bucket, keyName));
       }
     }

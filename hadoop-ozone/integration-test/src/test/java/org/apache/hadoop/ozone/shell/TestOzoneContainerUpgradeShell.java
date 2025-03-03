@@ -34,6 +34,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -181,7 +182,7 @@ public class TestOzoneContainerUpgradeShell {
       TestDataUtil.createVolumeAndBucket(client, VOLUME_NAME, BUCKET_NAME);
       TestDataUtil.createKey(
           client.getObjectStore().getVolume(VOLUME_NAME).getBucket(BUCKET_NAME),
-          keyName, ReplicationFactor.THREE, ReplicationType.RATIS, "test");
+          keyName, ReplicationFactor.THREE, ReplicationType.RATIS, "test".getBytes(StandardCharsets.UTF_8));
     }
   }
 
