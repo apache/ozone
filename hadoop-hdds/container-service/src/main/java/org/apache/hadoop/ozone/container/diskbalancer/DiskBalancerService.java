@@ -451,15 +451,10 @@ public class DiskBalancerService extends BackgroundService {
 
         // Stop timing
         long endTime = System.currentTimeMillis();
-        metrics.addMoveSuccessTime(endTime - startTime);
-        LOG.info("Max success time spent on container move in (s) : {} ", metrics.getMoveSuccessTime() / 1000.0);
+        metrics.getMoveSuccessTime().add(endTime - startTime);
         metrics.incrSuccessCount(1);
         metrics.incrSuccessBytes(containerSize);
       } catch (IOException e) {
-        // Stop timing
-        long endTime = System.currentTimeMillis();
-        metrics.addMoveFailureTime(endTime - startTime);
-        LOG.info("Max failure time spent on container move in (s) : {} ", metrics.getMoveFailureTime() / 1000.0);
         if (diskBalancerTmpDir != null) {
           try {
             Files.deleteIfExists(diskBalancerTmpDir);
@@ -481,6 +476,9 @@ public class DiskBalancerService extends BackgroundService {
         if (destVolumeIncreased) {
           destVolume.decrementUsedSpace(containerSize);
         }
+        // Stop timing
+        long endTime = System.currentTimeMillis();
+        metrics.getMoveFailureTime().add(endTime - startTime);
         metrics.incrFailureCount();
       } finally {
         postCall();
