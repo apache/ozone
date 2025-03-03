@@ -44,6 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -831,7 +832,7 @@ public class TestDecommissionAndMaintenance {
       ReplicationConfig replicationConfig) throws IOException {
     for (int i = 0; i < keyCount; i++) {
       TestDataUtil.createKey(bucket, keyPrefix + i, replicationConfig,
-          "this is the content");
+          "this is the content".getBytes(StandardCharsets.UTF_8));
     }
   }
 

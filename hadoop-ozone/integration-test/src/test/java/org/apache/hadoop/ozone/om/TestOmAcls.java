@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -172,7 +173,7 @@ public class TestOmAcls {
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
 
     OMException exception = assertThrows(OMException.class,
-            () -> TestDataUtil.createKey(bucket, "testKey", "testcontent"));
+            () -> TestDataUtil.createKey(bucket, "testKey", "testcontent".getBytes(StandardCharsets.UTF_8)));
     assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
     assertThat(logCapturer.getOutput()).contains("doesn't have CREATE " +
             "permission to access key");
@@ -181,7 +182,7 @@ public class TestOmAcls {
   @Test
   public void testReadKeyPermissionDenied() throws Exception {
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
-    TestDataUtil.createKey(bucket, "testKey", "testcontent");
+    TestDataUtil.createKey(bucket, "testKey", "testcontent".getBytes(StandardCharsets.UTF_8));
 
     TestOmAcls.keyAclAllow = false;
     OMException exception = assertThrows(OMException.class,
