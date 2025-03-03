@@ -17,12 +17,9 @@
 
 package org.apache.hadoop.ozone.om.multitenant;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_SERVICE;
 import static org.apache.hadoop.ozone.om.OMMultiTenantManager.OZONE_TENANT_RANGER_ROLE_DESCRIPTION;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assumptions.assumeThatCode;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -36,25 +33,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Acl;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Policy;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Role;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
-import org.apache.hadoop.security.authentication.util.KerberosName;
-import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ranger.RangerClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.slf4j.LoggerFactory;
-import org.slf4j.event.Level;
 
 /**
  * To test MultiTenantAccessController with Ranger Client.
  */
-public class TestMultiTenantAccessController {
+public abstract class MultiTenantAccessControllerTests {
   private MultiTenantAccessController controller;
   private List<String> users;
+
+  protected abstract MultiTenantAccessController createSubject();
 
   @BeforeEach
   public void setupUsers() {
@@ -64,64 +57,10 @@ public class TestMultiTenantAccessController {
     users.add("hdfs");
   }
 
-  /**
-   * Use this setup to test against a simulated Ranger instance.
-   */
   @BeforeEach
   public void setupUnitTest() {
-    controller = new InMemoryMultiTenantAccessController();
-  }
-
-  /**
-   * Use this setup to test against a live Ranger instance.
-   */
-//  @BeforeEach
-  public void setupClusterTest() throws Exception {
-
-    // Set up truststore
-    System.setProperty("javax.net.ssl.trustStore",
-        "/path/to/cm-auto-global_truststore.jks");
-
-    // Specify Kerberos client config (krb5.conf) path
-    System.setProperty("java.security.krb5.conf", "/etc/krb5.conf");
-
-    // Enable Kerberos debugging
-    System.setProperty("sun.security.krb5.debug", "true");
-
-    // DEFAULT rule uses the default realm configured in krb5.conf
-    KerberosName.setRules("DEFAULT");
-
-    final OzoneConfiguration conf = new OzoneConfiguration();
-
-    // These config keys must be properly set when the test is run:
-    //
-    // OZONE_RANGER_HTTPS_ADDRESS_KEY
-    // OZONE_RANGER_SERVICE
-    // OZONE_OM_KERBEROS_PRINCIPAL_KEY
-    // OZONE_OM_KERBEROS_KEYTAB_FILE_KEY
-
-    // Same as OM ranger-ozone-security.xml ranger.plugin.ozone.policy.rest.url
-    conf.set(OZONE_RANGER_HTTPS_ADDRESS_KEY,
-        "https://RANGER_HOST:6182/");
-
-    // Same as OM ranger-ozone-security.xml ranger.plugin.ozone.service.name
-    conf.set(OZONE_RANGER_SERVICE, "cm_ozone");
-
-    conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY,
-        "om/instance@REALM");
-
-    conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY,
-        "/path/to/ozone.keytab");
-
-    // TODO: Test with clear text username and password as well.
-//    conf.set(OZONE_OM_RANGER_HTTPS_ADMIN_API_USER, "rangeruser");
-//    conf.set(OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD, "passwd");
-
-    // (Optional) Enable RangerClient debug log
-    GenericTestUtils.setLogLevel(
-        LoggerFactory.getLogger(RangerClient.class), Level.DEBUG);
-
-    controller = new RangerClientMultiTenantAccessController(conf);
+    controller = createSubject();
+    assumeThatCode(() -> controller.getRangerServicePolicyVersion()).doesNotThrowAnyException();
   }
 
   @Test

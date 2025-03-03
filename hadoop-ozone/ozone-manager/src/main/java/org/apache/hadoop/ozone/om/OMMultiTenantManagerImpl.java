@@ -55,12 +55,10 @@ import org.apache.hadoop.ozone.om.multitenant.AuthorizerLockImpl;
 import org.apache.hadoop.ozone.om.multitenant.BucketNameSpace;
 import org.apache.hadoop.ozone.om.multitenant.CachedTenantState;
 import org.apache.hadoop.ozone.om.multitenant.CachedTenantState.CachedAccessIdInfo;
-import org.apache.hadoop.ozone.om.multitenant.InMemoryMultiTenantAccessController;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Policy;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Role;
 import org.apache.hadoop.ozone.om.multitenant.OzoneTenant;
-import org.apache.hadoop.ozone.om.multitenant.RangerClientMultiTenantAccessController;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserAccessIdInfo;
@@ -112,14 +110,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
     loadTenantCacheFromDB();
 
-    boolean devSkipRanger = conf.getBoolean(
-        OZONE_OM_TENANT_DEV_SKIP_RANGER, false);
-
-    if (devSkipRanger) {
-      this.accessController = new InMemoryMultiTenantAccessController();
-    } else {
-      this.accessController = new RangerClientMultiTenantAccessController(conf);
-    }
+    accessController = MultiTenantAccessController.create(conf);
 
     cacheOp = new CacheOp(tenantCache, tenantCacheLock);
     authorizerOp = new AuthorizerOp(accessController,
