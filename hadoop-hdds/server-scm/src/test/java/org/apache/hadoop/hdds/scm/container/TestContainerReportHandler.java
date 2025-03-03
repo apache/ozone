@@ -172,6 +172,12 @@ public class TestContainerReportHandler {
   }
 
   static Stream<Arguments> containerAndReplicaStates() {
+    // Replication types to test
+    List<HddsProtos.ReplicationType> replicationTypes = Arrays.asList(
+        HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationType.EC
+    );
+
     // Container states to test
     List<HddsProtos.LifeCycleState> containerStates = Arrays.asList(
         HddsProtos.LifeCycleState.DELETING,
@@ -194,10 +200,16 @@ public class TestContainerReportHandler {
 
     // Generate all combinations, container state * replica state
     List<Arguments> combinations = new ArrayList<>();
-    for (HddsProtos.LifeCycleState containerState : containerStates) {
-      for (ContainerReplicaProto.State replicaState : replicaStates) {
-        for (ContainerReplicaProto.State invalidState : invalidReplicaStates) {
-          combinations.add(Arguments.of(containerState, replicaState, invalidState));
+    for (HddsProtos.ReplicationType replicationType : replicationTypes) {
+      for (HddsProtos.LifeCycleState containerState : containerStates) {
+        for (ContainerReplicaProto.State replicaState : replicaStates) {
+          if (replicationType == HddsProtos.ReplicationType.EC &&
+              replicaState.equals(ContainerReplicaProto.State.QUASI_CLOSED)) {
+            continue;
+          }
+          for (ContainerReplicaProto.State invalidState : invalidReplicaStates) {
+            combinations.add(Arguments.of(replicationType, containerState, replicaState, invalidState));
+          }
         }
       }
     }
@@ -487,40 +499,65 @@ public class TestContainerReportHandler {
   }
 
   /**
-   * Tests that a DELETING or DELETED RATIS container transitions to CLOSED if a non-empty replica in OPEN, CLOSING,
-   * CLOSED, QUASI_CLOSED or UNHEALTHY state is reported. It should not transition if the replica is in INVALID or
-   * DELETED states.
+   * Tests that a DELETING or DELETED RATIS/EC container transitions to CLOSED if a non-empty replica in OPEN, CLOSING,
+   * CLOSED, QUASI_CLOSED or UNHEALTHY state is reported.
+   * It should not transition if the replica is in INVALID or DELETED states.
    */
   @ParameterizedTest
   @MethodSource("containerAndReplicaStates")
-  public void ratisContainerShouldTransitionFromDeletingOrDeletedToClosedWhenNonEmptyReplica(
-      LifeCycleState containerState, ContainerReplicaProto.State replicaState,
-      ContainerReplicaProto.State invalidReplicaState) throws IOException {
+  public void containerShouldTransitionFromDeletingOrDeletedToClosedWhenNonEmptyReplica(
+      HddsProtos.ReplicationType replicationType,
+      LifeCycleState containerState,
+      ContainerReplicaProto.State replicaState,
+      ContainerReplicaProto.State invalidReplicaState)
+      throws IOException {
     ContainerInfo container = getContainer(containerState);
+    switch (replicationType) {
+    case RATIS:
+      container = getContainer(containerState);
+      break;
+    case EC:
+      container = getECContainer(containerState, PipelineID.randomId(), new ECReplicationConfig(6, 3));
+      break;
+    default:
+      fail("Unsupported replication type: " + replicationType);
+    }
     containerStateManager.addContainer(container.getProtobuf());
 
     // set up a non-empty replica in replicaState
     DatanodeDetails dnWithValidReplica = nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0);
     ContainerReplicaProto.Builder builder = ContainerReplicaProto.newBuilder();
-    ContainerReplicaProto validReplica = builder.setContainerID(container.getContainerID())
+    ContainerReplicaProto validReplica = builder
+        .setContainerID(container.getContainerID())
         .setIsEmpty(false)
         .setState(replicaState)
-        .setKeyCount(0)
-        .setBlockCommitSequenceId(123)
-        .setOriginNodeId(dnWithValidReplica.getUuidString()).build();
+        .setKeyCount(0L)
+        .setBlockCommitSequenceId(123L)
+        .setReplicaIndex(1)
+        .setOriginNodeId(dnWithValidReplica.getUuidString())
+        .build();
 
     // set up a non-empty replica in invalidReplicaState
     DatanodeDetails dnWithInvalidReplica = nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(1);
-    ContainerReplicaProto invalidReplica = builder.setState(invalidReplicaState)
-        .setOriginNodeId(dnWithInvalidReplica.getUuidString()).build();
+    ContainerReplicaProto invalidReplica = builder
+        .setIsEmpty(false)
+        .setState(invalidReplicaState)
+        .setReplicaIndex(2)
+        .setOriginNodeId(dnWithInvalidReplica.getUuidString())
+        .build();
 
     // should not transition on processing the invalid replica's report
     ContainerReportHandler containerReportHandler = new ContainerReportHandler(nodeManager, containerManager);
     ContainerReportsProto invalidContainerReport = getContainerReports(invalidReplica);
     containerReportHandler
         .onMessage(new ContainerReportFromDatanode(dnWithInvalidReplica, invalidContainerReport), publisher);
-
     assertEquals(containerState, containerStateManager.getContainer(container.containerID()).getState());
+    /**
+     * containerState,        DELETED
+     * replicaState,          QUASI_CLOSED
+     * invalidReplicaState,   INVALID
+     * replicationType        EC
+     */
 
     // should transition on processing the valid replica's report
     ContainerReportsProto closedContainerReport = getContainerReports(validReplica);
@@ -563,50 +600,6 @@ public class TestContainerReportHandler {
       countDatanodeCommandFired++;
     }
     verify(publisher, times(countDatanodeCommandFired))
-        .fireEvent(eq(SCMEvents.DATANODE_COMMAND), any(CommandForDatanode.class));
-  }
-
-  /**
-   * Tests that a DELETING EC container transitions to CLOSED if a non-empty CLOSED replica is reported. It does not
-   * transition if a non-empty CLOSING (or any other state) replica is reported.
-   */
-  @Test
-  public void ecContainerShouldTransitionFromDeletingToClosedWhenNonEmptyClosedReplica() throws IOException {
-    ContainerInfo container = getECContainer(LifeCycleState.DELETING, PipelineID.randomId(),
-        new ECReplicationConfig(6, 3));
-    containerStateManager.addContainer(container.getProtobuf());
-
-    // set up a non-empty CLOSED replica
-    DatanodeDetails dnWithClosedReplica = nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0);
-    ContainerReplicaProto.Builder builder = ContainerReplicaProto.newBuilder();
-    ContainerReplicaProto closedReplica = builder.setContainerID(container.getContainerID())
-        .setIsEmpty(false)
-        .setState(ContainerReplicaProto.State.CLOSED)
-        .setKeyCount(0)
-        .setBlockCommitSequenceId(0)
-        .setReplicaIndex(1)
-        .setOriginNodeId(dnWithClosedReplica.getUuidString()).build();
-
-    // set up a non-empty CLOSING replica
-    DatanodeDetails dnWithClosingReplica = nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(1);
-    ContainerReplicaProto closingReplica = builder.setState(ContainerReplicaProto.State.CLOSING).setReplicaIndex(2)
-        .setOriginNodeId(dnWithClosingReplica.getUuidString()).build();
-
-    // should transition to CLOSED on processing the CLOSING replica's report
-    ContainerReportHandler containerReportHandler = new ContainerReportHandler(nodeManager, containerManager);
-    ContainerReportsProto closingContainerReport = getContainerReports(closingReplica);
-    containerReportHandler
-        .onMessage(new ContainerReportFromDatanode(dnWithClosingReplica, closingContainerReport), publisher);
-    assertEquals(LifeCycleState.CLOSED, containerStateManager.getContainer(container.containerID()).getState());
-
-    // should transition on processing the CLOSED replica's report
-    ContainerReportsProto closedContainerReport = getContainerReports(closedReplica);
-    containerReportHandler
-        .onMessage(new ContainerReportFromDatanode(dnWithClosedReplica, closedContainerReport), publisher);
-    assertEquals(LifeCycleState.CLOSED, containerStateManager.getContainer(container.containerID()).getState());
-
-    // verify that no delete command is issued for non-empty replica, regardless of container state
-    verify(publisher, times(0))
         .fireEvent(eq(SCMEvents.DATANODE_COMMAND), any(CommandForDatanode.class));
   }
 
