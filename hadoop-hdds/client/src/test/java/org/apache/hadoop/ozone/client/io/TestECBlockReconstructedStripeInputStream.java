@@ -793,8 +793,8 @@ public class TestECBlockReconstructedStripeInputStream {
 
       // Read full stripe
       int read = ecb.read(bufs);
-      for (int j = 0; j < bufs.length; j++) {
-        ECStreamTestUtil.assertBufferMatches(bufs[j], dataGen);
+      for (ByteBuffer buffer : bufs) {
+        ECStreamTestUtil.assertBufferMatches(buffer, dataGen);
       }
       assertEquals(stripeSize(), read);
 

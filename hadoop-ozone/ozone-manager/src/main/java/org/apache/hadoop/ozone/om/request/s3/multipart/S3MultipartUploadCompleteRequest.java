@@ -268,7 +268,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
             OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
       }
 
-      if (partsList.size() > 0) {
+      if (!partsList.isEmpty()) {
         final OmMultipartKeyInfo.PartKeyInfoMap partKeyInfoMap
             = multipartKeyInfo.getPartKeyInfoMap();
         if (partKeyInfoMap.size() == 0) {

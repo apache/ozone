@@ -200,7 +200,7 @@ public final class OmUtils {
    */
   public static boolean isServiceIdsDefined(ConfigurationSource conf) {
     String val = conf.get(OZONE_OM_SERVICE_IDS_KEY);
-    return val != null && val.length() > 0;
+    return val != null && !val.isEmpty();
   }
 
   /**

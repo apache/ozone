@@ -45,6 +45,15 @@ if [[ "${CHECK:-unit}" == "integration" ]]; then
   cat ${leaks} >> "${tempfile}"
 fi
 
+cluster=${REPORT_DIR}/cluster-startup-errors.txt
+if [[ "${CHECK:-unit}" == "integration" ]]; then
+  find hadoop-ozone/integration-test -not -path '*/iteration*' -name '*-output.txt' -print0 \
+      | xargs -n1 -0 "grep" -l -E "Unable to build MiniOzoneCluster" \
+      | awk -F/ '{sub("-output.txt",""); print $NF}' \
+      > "${cluster}"
+  cat ${cluster} >> "${tempfile}"
+fi
+
 #Copy heap dump and dump leftovers
 find "." -not -path '*/iteration*' \
     \( -name "*.hprof" \
@@ -113,6 +122,12 @@ if [[ -s "${leaks}" ]]; then
   cat "${leaks}" | sed 's/^/ * /' >> "$SUMMARY_FILE"
 fi
 rm -f "${leaks}"
+
+if [[ -s "${cluster}" ]]; then
+  printf "# Cluster Startup Errors\n\n" >> "$SUMMARY_FILE"
+  cat "${cluster}" | sed 's/^/ * /' >> "$SUMMARY_FILE"
+fi
+rm -f "${cluster}"
 
 if [[ -s "${crashes}" ]]; then
   printf "# Crashed Tests\n\n" >> "$SUMMARY_FILE"

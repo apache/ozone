@@ -70,7 +70,7 @@ public class OMTenantDeleteResponse extends OMClientResponse {
     omMetadataManager.getTenantStateTable().deleteWithBatch(
         batchOperation, tenantId);
 
-    if (volumeName.length() > 0) {
+    if (!volumeName.isEmpty()) {
       Preconditions.checkNotNull(omVolumeArgs);
       Preconditions.checkState(omVolumeArgs.getVolume().equals(volumeName));
 

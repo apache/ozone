@@ -305,6 +305,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   /**
    * Stops Replication Monitor thread.
    */
+  @Override
   public synchronized void stop() {
     if (running) {
       LOG.info("Stopping Replication Monitor Thread.");
@@ -994,20 +995,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   public NodeStatus getNodeStatus(DatanodeDetails datanode)
       throws NodeNotFoundException {
     return nodeManager.getNodeStatus(datanode);
-  }
-
-  /**
-   * An open container is healthy if all its replicas are in the same state as
-   * the container.
-   * @param container The container to check
-   * @param replicas The replicas belonging to the container
-   * @return True if the container is healthy, false otherwise
-   */
-  private boolean isOpenContainerHealthy(
-      ContainerInfo container, Set<ContainerReplica> replicas) {
-    HddsProtos.LifeCycleState state = container.getState();
-    return replicas.stream()
-        .allMatch(r -> compareState(state, r.getState()));
   }
 
   /**

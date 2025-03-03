@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.File;
@@ -31,6 +32,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileSystemTestHelper;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -63,7 +65,7 @@ public class TestContainerCache {
   @Test
   public void testContainerCacheEviction() throws Exception {
     File root = new File(testRoot);
-    root.mkdirs();
+    assertTrue(root.mkdirs());
 
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE, 2);
@@ -139,13 +141,14 @@ public class TestContainerCache {
       db4.close();
       db5.close();
     });
+
+    FileUtils.deleteDirectory(root);
   }
 
   @Test
   void testConcurrentDBGet() throws Exception {
     File root = new File(testRoot);
-    root.mkdirs();
-    root.deleteOnExit();
+    assertTrue(root.mkdirs());
 
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE, 2);
@@ -180,12 +183,13 @@ public class TestContainerCache {
     db.close();
     assertEquals(1, cache.size());
     db.cleanup();
+    FileUtils.deleteDirectory(root);
   }
 
   @Test
   public void testUnderlyingDBzIsClosed() throws Exception {
     File root = new File(testRoot);
-    root.mkdirs();
+    assertTrue(root.mkdirs());
 
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE, 2);
@@ -217,5 +221,6 @@ public class TestContainerCache {
     db3.close();
     db4.close();
     cache.clear();
+    FileUtils.deleteDirectory(root);
   }
 }

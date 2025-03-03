@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -21,6 +20,7 @@ package org.apache.hadoop.ozone.recon.tasks;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 
+import com.google.inject.Inject;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -34,11 +34,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -48,12 +47,8 @@ import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.inject.Inject;
 
 /**
  * Class to iterate over the OM DB and populate the Recon container DB with
@@ -85,7 +80,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
    * (container, key) -&gt; count to Recon Container DB.
    */
   @Override
-  public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
+  public TaskResult reprocess(OMMetadataManager omMetadataManager) {
     long omKeyCount = 0;
 
     // In-memory maps for fast look up and batch write
@@ -121,7 +116,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
                 containerKeyCountMap);
             if (!checkAndCallFlushToDB(containerKeyMap)) {
               LOG.error("Unable to flush containerKey information to the DB");
-              return new ImmutablePair<>(getTaskName(), false);
+              return buildTaskResult(false);
             }
             omKeyCount++;
           }
@@ -134,7 +129,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
           containerKeyCountMap)) {
         LOG.error("Unable to flush Container Key Count and " +
             "remaining Container Key information to the DB");
-        return new ImmutablePair<>(getTaskName(), false);
+        return buildTaskResult(false);
       }
 
       LOG.debug("Completed 'reprocess' of ContainerKeyMapperTask.");
@@ -145,9 +140,9 @@ public class ContainerKeyMapperTask implements ReconOmTask {
     } catch (IOException ioEx) {
       LOG.error("Unable to populate Container Key data in Recon DB. ",
           ioEx);
-      return new ImmutablePair<>(getTaskName(), false);
+      return buildTaskResult(false);
     }
-    return new ImmutablePair<>(getTaskName(), true);
+    return buildTaskResult(true);
   }
 
   private boolean flushAndCommitContainerKeyInfoToDB(
@@ -192,7 +187,8 @@ public class ContainerKeyMapperTask implements ReconOmTask {
   }
 
   @Override
-  public Pair<String, Boolean> process(OMUpdateEventBatch events) {
+  public TaskResult process(OMUpdateEventBatch events,
+                            Map<String, Integer> subTaskSeekPosMap) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     int eventCount = 0;
     final Collection<String> taskTables = getTaskTables();
@@ -249,18 +245,18 @@ public class ContainerKeyMapperTask implements ReconOmTask {
       } catch (IOException e) {
         LOG.error("Unexpected exception while updating key data : {} ",
             updatedKey, e);
-        return new ImmutablePair<>(getTaskName(), false);
+        return buildTaskResult(false);
       }
     }
     try {
       writeToTheDB(containerKeyMap, containerKeyCountMap, deletedKeyCountList);
     } catch (IOException e) {
       LOG.error("Unable to write Container Key Prefix data in Recon DB.", e);
-      return new ImmutablePair<>(getTaskName(), false);
+      return buildTaskResult(false);
     }
     LOG.debug("{} successfully processed {} OM DB update event(s) in {} milliseconds.",
         getTaskName(), eventCount, (System.currentTimeMillis() - startTime));
-    return new ImmutablePair<>(getTaskName(), true);
+    return buildTaskResult(true);
   }
 
   private void writeToTheDB(Map<ContainerKeyPrefix, Integer> containerKeyMap,

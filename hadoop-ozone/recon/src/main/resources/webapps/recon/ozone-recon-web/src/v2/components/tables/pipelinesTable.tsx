@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React from 'react';
+import React, { HTMLAttributes } from 'react';
 
 import Table, {
   ColumnsType,
@@ -203,7 +203,11 @@ const PipelinesTable: React.FC<PipelinesTableProps> = ({
         rowKey='pipelineId'
         pagination={paginationConfig}
         scroll={{ x: 'max-content', scrollToFirstRowOnChange: true }}
-        locale={{ filterTitle: '' }} />
+        locale={{ filterTitle: '' }}
+        onRow={(record: Pipeline) => ({
+          'data-testid': `pipelinetable-${record.pipelineId}`
+        } as HTMLAttributes<HTMLElement>)}
+        data-testid='pipelines-table'/>
     </div>
   )
 }

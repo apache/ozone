@@ -216,17 +216,11 @@ public class ThrottledAsyncChecker<K, V> implements AsyncChecker<K, V> {
     private final V result;
 
     /**
-     * Exception thrown by the check. null if it returned a result.
-     */
-    private final Throwable exception; // null on success.
-
-    /**
      * Initialize with a result.
      * @param result
      */
     private LastCheckResult(V result, long completedAt) {
       this.result = result;
-      this.exception = null;
       this.completedAt = completedAt;
     }
 
@@ -237,7 +231,6 @@ public class ThrottledAsyncChecker<K, V> implements AsyncChecker<K, V> {
      */
     private LastCheckResult(Throwable t, long completedAt) {
       this.result = null;
-      this.exception = t;
       this.completedAt = completedAt;
     }
   }

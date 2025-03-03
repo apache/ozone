@@ -106,6 +106,7 @@ public class SCMUpgradeFinalizer extends
         context.getStorage());
   }
 
+  @Override
   public void postFinalizeUpgrade(SCMUpgradeFinalizationContext context)
       throws IOException {
     // If we reached this phase of finalization, all layout features should
