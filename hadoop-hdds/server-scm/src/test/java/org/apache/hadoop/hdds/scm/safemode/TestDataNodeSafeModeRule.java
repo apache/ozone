@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.safemode;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -80,6 +81,7 @@ public class TestDataNodeSafeModeRule {
             null, nodeManager, eventQueue, serviceManager, scmContext);
 
     rule = scmSafeModeManager.getDataNodeSafeModeRule();
+    assertNotNull(rule);
     
     rule.setValidateBasedOnReportProcessing(true);
   }
