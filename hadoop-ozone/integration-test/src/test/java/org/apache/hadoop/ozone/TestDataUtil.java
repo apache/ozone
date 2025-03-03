@@ -105,12 +105,6 @@ public final class TestDataUtil {
 
   }
 
-//  public static void createKey(OzoneBucket bucket, String keyName,
-//                               String content) throws IOException {
-//    createKey(bucket, keyName, ReplicationFactor.ONE,
-//        ReplicationType.RATIS, content.getBytes(UTF_8));
-//  }
-
   public static void createKey(OzoneBucket bucket, String keyName,
                                byte[] content) throws IOException {
     createKey(bucket, keyName, ReplicationFactor.ONE,
@@ -139,20 +133,6 @@ public final class TestDataUtil {
       stream.write(content);
     }
   }
-
-//  public static void createKey(OzoneBucket bucket, String keyName,
-//      ReplicationFactor repFactor, ReplicationType repType, String content)
-//      throws IOException {
-//    ReplicationConfig repConfig = ReplicationConfig
-//        .fromTypeAndFactor(repType, repFactor);
-//    createKey(bucket, keyName, repConfig, content.getBytes(UTF_8));
-//  }
-
-//  public static void createKey(OzoneBucket bucket, String keyName,
-//      ReplicationConfig repConfig, String content)
-//      throws IOException {
-//    createKey(bucket, keyName, repConfig, content.getBytes(UTF_8));
-//  }
 
   public static void createKey(OzoneBucket bucket, String keyName,
       ReplicationFactor repFactor, ReplicationType repType,
