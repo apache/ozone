@@ -130,7 +130,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms. Limit per task is {}.",
           delCount, blockDeletionResults.size(), Time.monotonicNow() - purgeStartTime, limit);
     }
-    perfMetrics.setLatencyKeyDeletingService(Time.monotonicNowNanos() - startTime);
+    perfMetrics.setLatencyKeyDeletingService(Time.monotonicNow() - startTime);
     return delCount;
   }
 
