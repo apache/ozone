@@ -61,7 +61,7 @@ public interface RequestHandler {
       OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer) throws IOException {
     final OMClientResponse response = handleWriteRequestImpl(omRequest, context);
     if (omRequest.getCmdType() != Type.Prepare) {
-      ozoneManagerDoubleBuffer.add(response, context.getTermIndex());
+      ozoneManagerDoubleBuffer.add(response, context.getTermIndex(), context.getIndex());
     }
     return response;
   }

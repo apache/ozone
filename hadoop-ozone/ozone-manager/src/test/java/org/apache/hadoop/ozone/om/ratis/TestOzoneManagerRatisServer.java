@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.security.OMCertificateClient;
@@ -118,6 +119,8 @@ public class TestOzoneManagerRatisServer {
     when(ozoneManager.getConfiguration()).thenReturn(conf);
     final OmConfig omConfig = conf.getObject(OmConfig.class);
     when(ozoneManager.getConfig()).thenReturn(omConfig);
+    OMLayoutVersionManager versionManger = mock(OMLayoutVersionManager.class);
+    when(ozoneManager.getVersionManager()).thenReturn(versionManger);
     secConfig = new SecurityConfig(conf);
     HddsProtos.OzoneManagerDetailsProto omInfo =
         OzoneManager.getOmDetailsProto(conf, omID);
