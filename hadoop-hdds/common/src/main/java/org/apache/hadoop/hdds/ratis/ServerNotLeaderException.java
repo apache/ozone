@@ -30,20 +30,21 @@ import org.apache.ratis.protocol.exceptions.NotLeaderException;
 public class ServerNotLeaderException extends IOException {
   private final String leader;
   private static final Pattern CURRENT_PEER_ID_PATTERN =
-      Pattern.compile("Server:(.*) is not the leader[.]+.*", Pattern.DOTALL);
+      Pattern.compile(".* Server:(.*?) is not the leader[.]+.*", Pattern.DOTALL);
   private static final Pattern SUGGESTED_LEADER_PATTERN =
       Pattern.compile(".*Suggested leader is Server:([^:]*)(:[0-9]+).*",
           Pattern.DOTALL);
 
-  public ServerNotLeaderException(RaftPeerId currentPeerId) {
-    super("Server:" + currentPeerId + " is not the leader. Could not " +
+  public ServerNotLeaderException(RaftPeerId currentPeerId, String hostname,
+                                  String roleType) {
+    super(roleType + " Server:" + currentPeerId + "(" + hostname + ") is not the leader. Could not " +
         "determine the leader node.");
     this.leader = null;
   }
 
   public ServerNotLeaderException(RaftPeerId currentPeerId,
-      String suggestedLeader) {
-    super("Server:" + currentPeerId + " is not the leader. Suggested leader is"
+      String suggestedLeader, String hostname, String roleType) {
+    super(roleType + " Server:" + currentPeerId + "(" + hostname + ") is not the leader. Suggested leader is"
         + " Server:" + suggestedLeader + ".");
     this.leader = suggestedLeader;
   }
@@ -90,7 +91,7 @@ public class ServerNotLeaderException extends IOException {
    */
   public static ServerNotLeaderException convertToNotLeaderException(
       NotLeaderException notLeaderException,
-      RaftPeerId currentPeer, String port) {
+      RaftPeerId currentPeer, String port, String hostname, String roleType) {
     String suggestedLeader = notLeaderException.getSuggestedLeader() != null ?
         HddsUtils
             .getHostName(notLeaderException.getSuggestedLeader().getAddress())
@@ -100,9 +101,9 @@ public class ServerNotLeaderException extends IOException {
     if (suggestedLeader != null) {
       String suggestedLeaderHostPort = suggestedLeader + ":" + port;
       serverNotLeaderException =
-          new ServerNotLeaderException(currentPeer, suggestedLeaderHostPort);
+          new ServerNotLeaderException(currentPeer, suggestedLeaderHostPort, hostname, roleType);
     } else {
-      serverNotLeaderException = new ServerNotLeaderException(currentPeer);
+      serverNotLeaderException = new ServerNotLeaderException(currentPeer, hostname, roleType);
     }
     return serverNotLeaderException;
   }
