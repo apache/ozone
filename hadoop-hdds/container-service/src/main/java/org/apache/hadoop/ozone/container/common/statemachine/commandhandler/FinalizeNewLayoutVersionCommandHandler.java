@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.FINALIZATION_REQUIRED;
 
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FinalizeNewLayoutVersionCommandProto;

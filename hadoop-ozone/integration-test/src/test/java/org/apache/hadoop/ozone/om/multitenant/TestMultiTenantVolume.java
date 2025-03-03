@@ -48,7 +48,7 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils.VoidCallable;
 import org.junit.jupiter.api.AfterAll;
@@ -147,7 +147,7 @@ public class TestMultiTenantVolume {
     final OzoneManagerProtocol omClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
     final String upgradeClientID = "Test-Upgrade-Client-" + UUID.randomUUID();
-    UpgradeFinalizer.StatusAndMessages finalizationResponse =
+    UpgradeFinalization.StatusAndMessages finalizationResponse =
         omClient.finalizeUpgrade(upgradeClientID);
 
     // The status should transition as soon as the client call above returns
@@ -157,7 +157,7 @@ public class TestMultiTenantVolume {
     // 10s timeout should be plenty.
     GenericTestUtils.waitFor(() -> {
       try {
-        final UpgradeFinalizer.StatusAndMessages progress =
+        final UpgradeFinalization.StatusAndMessages progress =
             omClient.queryUpgradeFinalizationProgress(
                 upgradeClientID, false, false);
         return isDone(progress.status());
