@@ -15,12 +15,8 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.repair.om.quota;
+package org.apache.hadoop.ozone.repair.om;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.repair.RepairTool;
@@ -28,18 +24,20 @@ import org.apache.hadoop.ozone.utils.OmClientFactory;
 import picocli.CommandLine;
 
 /**
- * Tool to trigger quota repair.
+ * Tool to perform compaction on a column family of a rocksDB.
  */
 @CommandLine.Command(
-    name = "start",
-    description = "CLI to trigger quota repair.",
+    name = "compact",
+    description = "CLI to compact a column family in the DB.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
-public class QuotaTrigger extends RepairTool {
+public class RocksDBManualCompaction extends RepairTool {
 
-  @CommandLine.ParentCommand
-  private QuotaRepair parent;
+  @CommandLine.Option(names = {"--column_family", "--column-family", "--cf"},
+      required = true,
+      description = "Column family name")
+  private String columnFamilyName;
 
   @CommandLine.Option(
       names = {"--service-id", "--om-service-id"},
@@ -56,28 +54,33 @@ public class QuotaTrigger extends RepairTool {
   )
   private String omHost;
 
-  @CommandLine.Option(names = {"--buckets"},
-      required = false,
-      description = "start quota repair for specific buckets. Input will be list of uri separated by comma as" +
-          " /<volume>/<bucket>[,...]")
-  private String buckets;
-
   @Override
   public void execute() throws Exception {
-    List<String> bucketList = Collections.emptyList();
-    if (StringUtils.isNotEmpty(buckets)) {
-      bucketList = Arrays.asList(buckets.split(","));
-    }
 
-    try (OzoneManagerProtocol omClient = OmClientFactory.createOmClient(omServiceId, omHost, false)) {
-      info("Triggering quota repair for %s",
-          bucketList.isEmpty()
-              ? "all buckets"
-              : ("buckets " + buckets));
-      if (!isDryRun()) {
-        omClient.startQuotaRepair(bucketList);
-        info(omClient.getQuotaRepairStatus());
+    OzoneManagerProtocol omClient = OmClientFactory.createOmClient(omServiceId, omHost, false);
+    omClient.compactOMDB(columnFamilyName);
+    info("Compaction request issued for om.db of host: %s, column-family: %s.", omHost, columnFamilyName);
+    /*List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
+    List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(
+        dbPath);
+    try (ManagedRocksDB db = ManagedRocksDB.open(dbPath, cfDescList, cfHandleList)) {
+      ColumnFamilyHandle cfh = RocksDBUtils.getColumnFamilyHandle(columnFamilyName, cfHandleList);
+      if (cfh == null) {
+        throw new IllegalArgumentException(columnFamilyName + " is not in a column family in DB for the given path.");
       }
-    }
+
+      info("Running compaction on " + columnFamilyName);
+
+      if (!isDryRun()) {
+        db.get().compactRange(cfh);
+        info("Compaction completed.");
+      }
+    } catch (RocksDBException exception) {
+      error("Failed to compact the RocksDB for the given path: %s, column-family:%s", dbPath, columnFamilyName);
+      error("Exception: " + exception);
+      throw new IOException("Failed to compact RocksDB.", exception);
+    } finally {
+      IOUtils.closeQuietly(cfHandleList);
+    }*/
   }
 }

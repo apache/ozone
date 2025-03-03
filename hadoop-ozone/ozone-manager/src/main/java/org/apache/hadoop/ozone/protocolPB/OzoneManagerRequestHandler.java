@@ -392,6 +392,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             getObjectTagging(request.getGetObjectTaggingRequest());
         responseBuilder.setGetObjectTaggingResponse(getObjectTaggingResponse);
         break;
+      case CompactDB:
+        OzoneManagerProtocolProtos.CompactResponse compactResponse = compactDB(request.getCompactRequest());
+        responseBuilder
+            .setCompactResponse(compactResponse);
       default:
         responseBuilder.setSuccess(false);
         responseBuilder.setMessage("Unrecognized Command Type: " + cmdType);
@@ -1536,6 +1540,13 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
     resp.addAllTags(KeyValueUtil.toProtobuf(result));
     return resp.build();
+  }
+
+  private OzoneManagerProtocolProtos.CompactResponse compactDB(
+      OzoneManagerProtocolProtos.CompactRequest compactRequest)
+      throws IOException {
+    impl.compactOMDB(compactRequest.getColumnFamily());
+    return OzoneManagerProtocolProtos.CompactResponse.newBuilder().build();
   }
 
   private SafeModeAction toSafeModeAction(
