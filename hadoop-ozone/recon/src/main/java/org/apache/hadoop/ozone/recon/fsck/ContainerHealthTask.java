@@ -668,8 +668,8 @@ public class ContainerHealthTask extends ReconScmTask {
     private static boolean keepReplicaMismatchRecord(
             ContainerHealthStatus container, UnhealthyContainersRecord rec) {
       if (container.isDataChecksumMismatched()) {
-        updateExpectedReplicaCount(rec, container.expectedPlacementCount());
-        updateActualReplicaCount(rec, container.actualPlacementCount());
+        updateExpectedReplicaCount(rec, container.getReplicationFactor());
+        updateActualReplicaCount(rec, container.getReplicaCount());
         updateReplicaDelta(rec, container.replicaDelta());
         return true;
       }
