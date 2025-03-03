@@ -4549,10 +4549,10 @@
     <value>default</value>
     <tag>OZONE, DATANODE</tag>
     <description>
-      The name of the Network Interface from which a data node should
+      The name of the Network Interface from which a Datanode should
       report its IP address. e.g. eth2. This setting may be required for some
-      multi-homed nodes where the DataNodes are assigned multiple hostnames
-      and it is desirable for the DataNodes to use a non-default hostname.
+      multi-homed nodes where the Datanodes are assigned multiple hostnames
+      and it is desirable for the Datanodes to use a non-default hostname.
     </description>
   </property>
   <property>
@@ -4560,13 +4560,13 @@
     <value>default</value>
     <tag>OZONE, DATANODE</tag>
     <description>
-      The host name or IP address of the name server (DNS) which a DataNode
+      The host name or IP address of the name server (DNS) which a Datanode
       should use to determine its own host name.
     </description>
   </property>
   <property>
     <name>hdds.datanode.hostname</name>
-    <value></value>
+    <value/>
     <tag>OZONE, DATANODE</tag>
     <description>
       Optional. The hostname for the Datanode containing this
@@ -4575,27 +4575,12 @@
     </description>
   </property>
   <property>
-    <name>hdds.datanode.data.dir</name>
-    <value>file://${hadoop.tmp.dir}/hdds/data</value>
-    <tag>OZONE, DATANODE</tag>
-    <description>
-      Determines where on the local filesystem a HDDS data node
-      should store its blocks. If this is a comma-delimited
-      list of directories, then data will be stored in all named
-      directories, typically on different devices. The directories should be tagged
-      with corresponding storage types ([SSD]/[DISK]/[ARCHIVE]/[RAM_DISK]/[NVDIMM]) for OZONE
-      storage policies. The default storage type will be DISK if the directory does
-      not have a storage type tagged explicitly. Directories that do not exist will
-      be created if local filesystem permission allows.
-    </description>
-  </property>
-  <property>
     <name>hdds.datanode.use.datanode.hostname</name>
     <value>false</value>
     <tag>OZONE, DATANODE</tag>
     <description>
-      Whether datanodes should use datanode hostnames when
-      connecting to other datanodes for data transfer.
+      Whether Datanodes should use Datanode hostnames when
+      connecting to other Datanodes for data transfer.
     </description>
   </property>
   <property>
@@ -4618,12 +4603,12 @@
       This configration value allows user to specify the value for the
       X-FRAME-OPTIONS. The possible values for this field are
       DENY, SAMEORIGIN and ALLOW-FROM. Any other value will throw an
-      exception when datanodes are starting up.
+      exception when Datanodes are starting up.
     </description>
   </property>
   <property>
     <name>hdds.metrics.session-id</name>
-    <value></value>
+    <value/>
     <tag>OZONE, HDDS</tag>
     <description>
       Get the user-specified session identifier. The default is the empty string.
@@ -4639,21 +4624,21 @@
   </property>
   <property>
     <name>hdds.datanode.kerberos.principal</name>
-    <value></value>
+    <value/>
     <tag>OZONE, DATANODE</tag>
     <description>
-      The DataNode service principal. This is typically set to
-      dn/_HOST@REALM.TLD. Each DataNode will substitute _HOST with its
+      The Datanode service principal. This is typically set to
+      dn/_HOST@REALM.TLD. Each Datanode will substitute _HOST with its
       own fully qualified hostname at startup. The _HOST placeholder
-      allows using the same configuration setting on all DataNodes.
+      allows using the same configuration setting on all Datanodes.
     </description>
   </property>
   <property>
     <name>hdds.datanode.kerberos.keytab.file</name>
-    <value></value>
+    <value/>
     <tag>OZONE, DATANODE</tag>
     <description>
-      The keytab file used by each DataNode daemon to login as its
+      The keytab file used by each Datanode daemon to login as its
       service principal. The principal name is configured with
       hdds.datanode.kerberos.principal.
     </description>
