@@ -209,7 +209,7 @@ public class TestReconContainerManager
         .setUuid(uuid1).setHostName("host1").setIpAddress("127.0.0.1").build();
     ContainerReplica containerReplica1 = ContainerReplica.newBuilder()
         .setContainerID(containerID1).setContainerState(State.OPEN)
-        .setDatanodeDetails(datanodeDetails1).setSequenceId(1001L).build();
+        .setDatanodeDetails(datanodeDetails1).setSequenceId(1001L).setDataChecksum(1234L).build();
 
     final ReconContainerManager containerManager = getContainerManager();
     final Map<Long, Map<UUID, ContainerReplicaHistory>> repHistMap =
@@ -237,6 +237,7 @@ public class TestReconContainerManager
     assertEquals(repHist1.getLastSeenTime(), repHist1.getFirstSeenTime());
     assertEquals(containerReplica1.getSequenceId().longValue(),
         repHist1.getBcsId());
+    assertEquals(containerReplica1.getDataChecksum(), repHist1.getDataChecksum());
 
     // Let's update the entry again
     containerReplica1 = ContainerReplica.newBuilder()
@@ -255,7 +256,7 @@ public class TestReconContainerManager
         .setUuid(uuid2).setHostName("host2").setIpAddress("127.0.0.2").build();
     final ContainerReplica containerReplica2 = ContainerReplica.newBuilder()
         .setContainerID(containerID1).setContainerState(State.OPEN)
-        .setDatanodeDetails(datanodeDetails2).setSequenceId(1051L).build();
+        .setDatanodeDetails(datanodeDetails2).setSequenceId(1051L).setDataChecksum(1234L).build();
 
     // Add replica to DN02
     containerManager.updateContainerReplica(containerID1, containerReplica2);
@@ -269,6 +270,7 @@ public class TestReconContainerManager
     // Because this is a new entry, first seen time equals last seen time
     assertEquals(repHist2.getLastSeenTime(), repHist2.getFirstSeenTime());
     assertEquals(1051L, repHist2.getBcsId());
+    assertEquals(containerReplica2.getDataChecksum(), repHist2.getDataChecksum());
 
     // Remove replica from DN01
     containerManager.removeContainerReplica(containerID1, containerReplica1);

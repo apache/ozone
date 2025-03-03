@@ -114,7 +114,7 @@ public class ContainerHealthTask extends ReconScmTask {
         Thread.sleep(interval);
       }
     } catch (Throwable t) {
-      LOG.error("Exception in Missing Container task Thread.", t);
+      LOG.error("Exception in Container Health task thread.", t);
       if (t instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
@@ -231,6 +231,8 @@ public class ContainerHealthTask extends ReconScmTask {
         UnHealthyContainerStates.MIS_REPLICATED, new HashMap<>());
     unhealthyContainerStateStatsMap.put(
         UnHealthyContainerStates.NEGATIVE_SIZE, new HashMap<>());
+    unhealthyContainerStateStatsMap.put(
+            UnHealthyContainerStates.REPLICA_MISMATCH, new HashMap<>());
   }
 
   private ContainerHealthStatus setCurrentContainer(long recordId)
@@ -349,7 +351,7 @@ public class ContainerHealthTask extends ReconScmTask {
           containerReplicas, placementPolicy,
           reconContainerMetadataManager, conf);
 
-      if (h.isHealthilyReplicated() || h.isDeleted()) {
+      if ((h.isHealthilyReplicated() && !h.isDataChecksumMismatched()) || h.isDeleted()) {
         return;
       }
       // For containers deleted in SCM, we sync the container state here.
@@ -483,7 +485,7 @@ public class ContainerHealthTask extends ReconScmTask {
      */
     public static boolean retainOrUpdateRecord(
         ContainerHealthStatus container, UnhealthyContainersRecord rec) {
-      boolean returnValue = false;
+      boolean returnValue;
       switch (UnHealthyContainerStates.valueOf(rec.getContainerState())) {
       case MISSING:
         returnValue = container.isMissing() && !container.isEmpty();
@@ -496,6 +498,9 @@ public class ContainerHealthTask extends ReconScmTask {
         break;
       case OVER_REPLICATED:
         returnValue = keepOverReplicatedRecord(container, rec);
+        break;
+      case REPLICA_MISMATCH:
+        returnValue = keepReplicaMismatchRecord(container, rec);
         break;
       default:
         returnValue = false;
@@ -525,7 +530,7 @@ public class ContainerHealthTask extends ReconScmTask {
         Map<UnHealthyContainerStates, Map<String, Long>>
             unhealthyContainerStateStatsMap) {
       List<UnhealthyContainers> records = new ArrayList<>();
-      if (container.isHealthilyReplicated() || container.isDeleted()) {
+      if ((container.isHealthilyReplicated() && !container.isDataChecksumMismatched()) || container.isDeleted()) {
         return records;
       }
 
@@ -590,6 +595,16 @@ public class ContainerHealthTask extends ReconScmTask {
             unhealthyContainerStateStatsMap);
       }
 
+      if (container.isDataChecksumMismatched()
+              && !recordForStateExists.contains(
+              UnHealthyContainerStates.REPLICA_MISMATCH.toString())) {
+        records.add(recordForState(
+                container, UnHealthyContainerStates.REPLICA_MISMATCH, time));
+        populateContainerStats(container,
+                UnHealthyContainerStates.REPLICA_MISMATCH,
+                unhealthyContainerStateStatsMap);
+      }
+
       return records;
     }
 
@@ -642,6 +657,17 @@ public class ContainerHealthTask extends ReconScmTask {
         updateActualReplicaCount(rec, container.actualPlacementCount());
         updateReplicaDelta(rec, container.misReplicatedDelta());
         updateReason(rec, container.misReplicatedReason());
+        return true;
+      }
+      return false;
+    }
+
+    private static boolean keepReplicaMismatchRecord(
+            ContainerHealthStatus container, UnhealthyContainersRecord rec) {
+      if (container.isDataChecksumMismatched()) {
+        updateExpectedReplicaCount(rec, container.getReplicationFactor());
+        updateActualReplicaCount(rec, container.getReplicaCount());
+        updateReplicaDelta(rec, container.replicaDelta());
         return true;
       }
       return false;
