@@ -21,6 +21,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
@@ -28,6 +33,8 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+
+import static org.apache.hadoop.hdds.scm.cli.container.upgrade.UpgradeManager.LOG;
 
 /**
  * Handler to get disk balancer status.
@@ -55,6 +62,24 @@ public class DiskBalancerStatusSubcommand extends ScmSubcommand {
             state == null ? Optional.empty() : Optional.of(state));
 
     System.out.println(generateStatus(resultProto));
+//    String metricsJson = scmClient.getMetrics("Hadoop:service=HddsDatanode,name=UgiMetrics");
+//    System.out.println("metricsJson : {}"+ metricsJson);
+//    int successMoveCount = -1;
+//    int failureMoveCount = -1;
+//    JsonNode jsonNode = null;
+//    if (metricsJson != null) {
+//      ObjectMapper objectMapper = new ObjectMapper();
+//      JsonFactory factory = objectMapper.getFactory();
+//      JsonParser parser = factory.createParser(metricsJson);
+//      jsonNode = (JsonNode) objectMapper.readTree(parser).get("beans").get(0);
+//      JsonNode successCount = jsonNode.get("SuccessCount");
+//      JsonNode failureCount = jsonNode.get("FailureCount");
+//      successMoveCount = (successCount == null ? -1 : Integer.parseInt(successCount.toString()));
+//      failureMoveCount = (failureCount == null ? -1 : Integer.parseInt(failureCount.toString()));
+//    }
+//    LOG.info("SuccessMoveCount : {} , failuremovecount : {} .",successMoveCount , failureMoveCount);
+//    System.out.println("SuccessMoveCount : "+ successMoveCount);
+//    System.out.println("FailureMoveCount : "+ failureMoveCount);
   }
 
   private String generateStatus(
