@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.repair.om;
 
 import org.apache.hadoop.hdds.cli.RepairSubcommand;
-import org.apache.hadoop.ozone.repair.RocksDBManualCompaction;
 import org.apache.hadoop.ozone.repair.TransactionInfoRepair;
 import org.apache.hadoop.ozone.repair.om.quota.QuotaRepair;
 import org.kohsuke.MetaInfServices;

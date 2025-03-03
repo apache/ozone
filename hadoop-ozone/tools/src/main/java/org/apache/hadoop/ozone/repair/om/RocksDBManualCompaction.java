@@ -14,57 +14,61 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.ozone.repair.om;
 
-package org.apache.hadoop.ozone.repair;
-
-import jakarta.annotation.Nonnull;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
-import org.apache.hadoop.ozone.debug.RocksDBUtils;
-import org.rocksdb.ColumnFamilyDescriptor;
-import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDBException;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.repair.RepairTool;
+import org.apache.hadoop.ozone.utils.OmClientFactory;
 import picocli.CommandLine;
 
 /**
- * Tool to perform compaction on a table.
+ * Tool to perform compaction on a column family of a rocksDB.
  */
 @CommandLine.Command(
     name = "compact",
-    description = "CLI to compact a table in the DB.",
+    description = "CLI to compact a column family in the DB.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
 public class RocksDBManualCompaction extends RepairTool {
 
-  @CommandLine.Option(names = {"--db"},
-      required = true,
-      description = "Database File Path")
-  private String dbPath;
-
   @CommandLine.Option(names = {"--column_family", "--column-family", "--cf"},
       required = true,
-      description = "Table name")
+      description = "Column family name")
   private String columnFamilyName;
+
+  @CommandLine.Option(
+      names = {"--service-id", "--om-service-id"},
+      description = "Ozone Manager Service ID",
+      required = false
+  )
+  private String omServiceId;
+
+  @CommandLine.Option(
+      names = {"--service-host"},
+      description = "Ozone Manager Host. If OM HA is enabled, use --service-id instead. "
+          + "If you must use --service-host with OM HA, this must point directly to the leader OM. "
+          + "This option is required when --service-id is not provided or when HA is not enabled."
+  )
+  private String omHost;
 
   @Override
   public void execute() throws Exception {
-    List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
+
+    OzoneManagerProtocol omClient = OmClientFactory.createOmClient(omServiceId, omHost, false);
+    omClient.compactOMDB(columnFamilyName);
+    info("Compaction request issued for om.db of host: %s, column-family: %s.", omHost, columnFamilyName);
+    /*List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
     List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(
         dbPath);
-
     try (ManagedRocksDB db = ManagedRocksDB.open(dbPath, cfDescList, cfHandleList)) {
       ColumnFamilyHandle cfh = RocksDBUtils.getColumnFamilyHandle(columnFamilyName, cfHandleList);
       if (cfh == null) {
-        throw new IllegalArgumentException(columnFamilyName +
-            " is not in a column family in DB for the given path.");
+        throw new IllegalArgumentException(columnFamilyName + " is not in a column family in DB for the given path.");
       }
 
-      info("Running compaction on " + (columnFamilyName == null ? "entire DB" : columnFamilyName));
+      info("Running compaction on " + columnFamilyName);
 
       if (!isDryRun()) {
         db.get().compactRange(cfh);
@@ -76,20 +80,6 @@ public class RocksDBManualCompaction extends RepairTool {
       throw new IOException("Failed to compact RocksDB.", exception);
     } finally {
       IOUtils.closeQuietly(cfHandleList);
-    }
-  }
-
-  @Override
-  @Nonnull
-  protected Component serviceToBeOffline() {
-    final String parent = spec().parent().name();
-    switch (parent) {
-    case "om":
-      return Component.OM;
-    case "scm":
-      return Component.SCM;
-    default:
-      throw new IllegalStateException("Unknown component: " + parent);
-    }
+    }*/
   }
 }

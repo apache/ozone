@@ -1190,4 +1190,10 @@ public interface OzoneManagerProtocol
    * @throws IOException
    */
   void startQuotaRepair(List<String> buckets) throws IOException;
+
+  /**
+   * Requests compaction of a column family of om.db.
+   * @param columnFamily
+   */
+  void compactOMDB(String columnFamily) throws IOException;
 }

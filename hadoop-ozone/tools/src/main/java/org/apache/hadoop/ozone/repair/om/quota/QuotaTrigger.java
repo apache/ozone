@@ -24,6 +24,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.repair.RepairTool;
+import org.apache.hadoop.ozone.utils.OmClientFactory;
 import picocli.CommandLine;
 
 /**
@@ -68,7 +69,7 @@ public class QuotaTrigger extends RepairTool {
       bucketList = Arrays.asList(buckets.split(","));
     }
 
-    try (OzoneManagerProtocol omClient = parent.createOmClient(omServiceId, omHost, false)) {
+    try (OzoneManagerProtocol omClient = OmClientFactory.createOmClient(omServiceId, omHost, false)) {
       info("Triggering quota repair for %s",
           bucketList.isEmpty()
               ? "all buckets"
