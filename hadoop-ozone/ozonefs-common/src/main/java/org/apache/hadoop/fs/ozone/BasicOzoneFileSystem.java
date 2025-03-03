@@ -1239,7 +1239,7 @@ public class BasicOzoneFileSystem extends FileSystem {
             }
           }
         }
-        if (keyList.size() > 0) {
+        if (!keyList.isEmpty()) {
           if (!processKey(keyList)) {
             return false;
           }

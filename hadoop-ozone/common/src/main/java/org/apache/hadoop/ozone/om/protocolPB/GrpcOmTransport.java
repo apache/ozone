@@ -75,11 +75,9 @@ public class GrpcOmTransport implements OmTransport {
   // gRPC specific
   private static List<X509Certificate> caCerts = null;
 
-  private OzoneManagerServiceGrpc.OzoneManagerServiceBlockingStub client;
   private Map<String,
       OzoneManagerServiceGrpc.OzoneManagerServiceBlockingStub> clients;
   private Map<String, ManagedChannel> channels;
-  private int lastVisited = -1;
   private ConfigurationSource conf;
 
   private AtomicReference<String> host;
@@ -91,7 +89,6 @@ public class GrpcOmTransport implements OmTransport {
     caCerts = x509Certificates;
   }
 
-  private List<String> oms;
   private RetryPolicy retryPolicy;
   private int failoverCount = 0;
   private GrpcOMFailoverProxyProvider<OzoneManagerProtocolPB>

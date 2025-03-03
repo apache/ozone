@@ -26,7 +26,6 @@ import java.nio.file.Path;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.junit.jupiter.api.AfterEach;
@@ -43,7 +42,6 @@ public class TestOMDelegationTokenRequest {
   private Path folder;
 
   protected OzoneManager ozoneManager;
-  protected OMMetrics omMetrics;
   protected OMMetadataManager omMetadataManager;
   protected ConfigurationSource conf;
 

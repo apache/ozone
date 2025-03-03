@@ -332,7 +332,7 @@ class RDBTable implements Table<byte[], byte[]> {
                           currentKey, null))) {
             result.add(currentEntry);
           } else {
-            if (result.size() > 0 && sequential) {
+            if (!result.isEmpty() && sequential) {
               // if the caller asks for a sequential range of results,
               // and we met a dis-match, abort iteration from here.
               // if result is empty, we continue to look for the first match.

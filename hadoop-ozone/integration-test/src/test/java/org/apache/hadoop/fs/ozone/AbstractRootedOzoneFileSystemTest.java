@@ -1968,12 +1968,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
   }
 
-  private Path getTrashKeyPath(Path keyPath, Path userTrash) {
-    Path userTrashCurrent = new Path(userTrash, "Current");
-    String key = keyPath.toString().substring(1);
-    return new Path(userTrashCurrent, key);
-  }
-
   @Test
   void testCreateWithInvalidPaths() {
     assumeFalse(isBucketFSOptimized);

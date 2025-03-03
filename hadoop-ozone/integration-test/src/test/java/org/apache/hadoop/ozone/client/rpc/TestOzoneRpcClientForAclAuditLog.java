@@ -285,7 +285,7 @@ public class TestOzoneRpcClientForAclAuditLog {
       }
     } catch (AssertionError ex) {
       LOG.error("Error occurred in log verification", ex);
-      if (lines.size() != 0) {
+      if (!lines.isEmpty()) {
         LOG.error("Actual line ::: " + lines.get(0));
         LOG.error("Expected tokens ::: " + Arrays.toString(expected));
       }

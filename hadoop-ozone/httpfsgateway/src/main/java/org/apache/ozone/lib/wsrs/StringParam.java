@@ -43,7 +43,7 @@ public abstract class StringParam extends Param<String> {
     try {
       if (str != null) {
         str = str.trim();
-        if (str.length() > 0) {
+        if (!str.isEmpty()) {
           value = parse(str);
         }
       }

@@ -98,12 +98,14 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
     return addKeyToOpenKeyTable(locationList, omKeyInfoFSO);
   }
 
+  @Override
   @Nonnull
   protected OMKeyCommitRequest getOmKeyCommitRequest(OMRequest omRequest) {
     return new OMKeyCommitRequestWithFSO(omRequest,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
+  @Override
   public BucketLayout getBucketLayout() {
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }

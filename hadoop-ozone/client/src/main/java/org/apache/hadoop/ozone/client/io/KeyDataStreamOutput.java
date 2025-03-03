@@ -128,7 +128,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
         new BlockDataStreamOutputEntryPool(
             config,
             omClient,
-            requestId, replicationConfig,
+            replicationConfig,
             uploadID, partNumber,
             isMultipart, info,
             unsafeByteBufferConversion,

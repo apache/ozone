@@ -126,7 +126,7 @@ public final class SCMContainerPlacementRackScatter
         skippedRacks.clear();
       }
 
-      if (mutableFavoredNodes.size() > 0) {
+      if (!mutableFavoredNodes.isEmpty()) {
         List<DatanodeDetails> chosenFavoredNodesInForLoop = new ArrayList<>();
         for (DatanodeDetails favoredNode : mutableFavoredNodes) {
           Node curRack = getRackOfDatanodeDetails(favoredNode);

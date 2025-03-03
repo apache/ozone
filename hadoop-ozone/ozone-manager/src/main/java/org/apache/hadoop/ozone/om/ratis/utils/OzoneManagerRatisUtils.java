@@ -24,7 +24,6 @@ import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.File;
 import java.io.IOException;
@@ -117,7 +116,6 @@ import org.slf4j.LoggerFactory;
 public final class OzoneManagerRatisUtils {
   private static final Logger LOG = LoggerFactory
       .getLogger(OzoneManagerRatisUtils.class);
-  private static final RpcController NULL_RPC_CONTROLLER = null;
 
   private OzoneManagerRatisUtils() {
   }

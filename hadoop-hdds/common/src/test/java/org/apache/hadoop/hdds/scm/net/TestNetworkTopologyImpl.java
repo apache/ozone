@@ -93,8 +93,8 @@ class TestNetworkTopologyImpl {
     cluster = new NetworkTopologyImpl(NodeSchemaManager.getInstance(),
         mockedShuffleOperation);
     dataNodes = nodeArray.clone();
-    for (int i = 0; i < dataNodes.length; i++) {
-      cluster.add(dataNodes[i]);
+    for (Node dataNode : dataNodes) {
+      cluster.add(dataNode);
     }
   }
 
@@ -195,8 +195,8 @@ class TestNetworkTopologyImpl {
   void testContains(NodeSchema[] schemas, Node[] nodeArray) {
     initNetworkTopology(schemas, nodeArray);
     Node nodeNotInMap = createDatanode("8.8.8.8", "/d2/r4");
-    for (int i = 0; i < dataNodes.length; i++) {
-      assertTrue(cluster.contains(dataNodes[i]));
+    for (Node dataNode : dataNodes) {
+      assertTrue(cluster.contains(dataNode));
     }
     assertFalse(cluster.contains(nodeNotInMap));
   }
@@ -293,18 +293,20 @@ class TestNetworkTopologyImpl {
   @MethodSource("topologies")
   void testAddRemove(NodeSchema[] schemas, Node[] nodeArray) {
     initNetworkTopology(schemas, nodeArray);
-    for (int i = 0; i < dataNodes.length; i++) {
-      cluster.remove(dataNodes[i]);
+    for (Node dataNode : dataNodes) {
+      cluster.remove(dataNode);
     }
-    for (int i = 0; i < dataNodes.length; i++) {
-      assertFalse(cluster.contains(dataNodes[i]));
+
+    for (Node dataNode : dataNodes) {
+      assertFalse(cluster.contains(dataNode));
     }
     // no leaf nodes
     assertEquals(0, cluster.getNumOfLeafNode(null));
     // no inner nodes
     assertEquals(0, cluster.getNumOfNodes(2));
-    for (int i = 0; i < dataNodes.length; i++) {
-      cluster.add(dataNodes[i]);
+
+    for (Node dataNode : dataNodes) {
+      cluster.add(dataNode);
     }
     // Inner nodes are created automatically
     assertThat(cluster.getNumOfNodes(2)).isPositive();
@@ -485,7 +487,7 @@ class TestNetworkTopologyImpl {
             excludedList, ancestorGen);
         for (Node key : dataNodes) {
           if (excludedList.contains(key) ||
-              (ancestorList.size() > 0 &&
+              (!ancestorList.isEmpty() &&
                   ancestorList.stream()
                       .map(a -> (InnerNode) a)
                       .anyMatch(a -> a.isAncestor(key)))) {
@@ -556,7 +558,7 @@ class TestNetworkTopologyImpl {
                 excludedList, ancestorGen);
             for (Node key : dataNodes) {
               if (excludedList.contains(key) || key.isDescendant(path) ||
-                  (ancestorList.size() > 0 &&
+                  (!ancestorList.isEmpty() &&
                       ancestorList.stream()
                           .map(a -> (InnerNode) a)
                           .anyMatch(a -> a.isAncestor(key)))) {

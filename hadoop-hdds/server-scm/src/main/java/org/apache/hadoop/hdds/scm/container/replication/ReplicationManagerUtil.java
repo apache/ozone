@@ -273,14 +273,14 @@ public final class ReplicationManagerUtil {
     deleteCandidates.sort(
         Comparator.comparingLong(ContainerReplica::getSequenceId));
     if (containerInfo.getState() == HddsProtos.LifeCycleState.CLOSED) {
-      return deleteCandidates.size() > 0 ? deleteCandidates : null;
+      return !deleteCandidates.isEmpty() ? deleteCandidates : null;
     }
 
     if (containerInfo.getState() == HddsProtos.LifeCycleState.QUASI_CLOSED) {
       List<ContainerReplica> nonUniqueOrigins =
           findNonUniqueDeleteCandidates(replicas, deleteCandidates,
               nodeStatusFn);
-      return nonUniqueOrigins.size() > 0 ? nonUniqueOrigins : null;
+      return !nonUniqueOrigins.isEmpty() ? nonUniqueOrigins : null;
     }
     return null;
   }

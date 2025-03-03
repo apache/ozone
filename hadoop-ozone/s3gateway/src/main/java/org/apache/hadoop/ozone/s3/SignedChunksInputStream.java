@@ -118,7 +118,7 @@ public class SignedChunksInputStream extends InputStream {
       curr = next;
     }
     String signatureLine = buf.toString().trim();
-    if (signatureLine.length() == 0) {
+    if (signatureLine.isEmpty()) {
       return -1;
     }
 

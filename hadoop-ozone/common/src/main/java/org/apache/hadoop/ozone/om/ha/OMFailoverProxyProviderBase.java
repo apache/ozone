@@ -66,7 +66,6 @@ public abstract class OMFailoverProxyProviderBase<T> implements
       LoggerFactory.getLogger(OMFailoverProxyProviderBase.class);
 
   private final ConfigurationSource conf;
-  private final String omServiceId;
   private final Class<T> protocolClass;
 
   // Map of OMNodeID to its proxy
@@ -100,7 +99,6 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     this.conf = configuration;
     this.protocolClass = protocol;
     this.performFailoverDone = true;
-    this.omServiceId = omServiceId;
     this.ugi = ugi;
 
     waitBetweenRetries = conf.getLong(

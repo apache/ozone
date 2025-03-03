@@ -213,9 +213,9 @@ public class TestRocksDbPersistentMap {
           String.class
       );
 
-      for (int i = 0; i < keys.size(); i++) {
-        String key = keys.get(i).getKey();
-        String value = keys.get(i).getValue();
+      for (Pair<String, String> stringStringPair : keys) {
+        String key = stringStringPair.getKey();
+        String value = stringStringPair.getValue();
         persistentMap.put(key, value);
       }
       ClosableIterator<Map.Entry<String, String>> iterator =

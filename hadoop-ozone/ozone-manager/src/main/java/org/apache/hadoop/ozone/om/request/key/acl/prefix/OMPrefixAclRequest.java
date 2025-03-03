@@ -115,7 +115,7 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
       // the existing acl list, if list size becomes zero, delete the
       // prefix from prefix table.
       if (getOmRequest().hasRemoveAclRequest() &&
-          omPrefixInfo.getAcls().size() == 0) {
+          omPrefixInfo.getAcls().isEmpty()) {
         omMetadataManager.getPrefixTable().addCacheEntry(
             new CacheKey<>(prefixPath),
             CacheValue.get(trxnLogIndex));

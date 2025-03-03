@@ -412,7 +412,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                   }
                 }
 
-                if (newRepeatedOmKeyInfo.getOmKeyInfoList().size() > 0 &&
+                if (!newRepeatedOmKeyInfo.getOmKeyInfoList().isEmpty() &&
                     newRepeatedOmKeyInfo.getOmKeyInfoList().size() !=
                         repeatedOmKeyInfo.getOmKeyInfoList().size()) {
                   keysToModify.put(deletedKey, newRepeatedOmKeyInfo);

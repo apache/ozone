@@ -251,6 +251,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
    */
   void shutdown();
 
+  @Override
   default void close() {
     shutdown();
   }

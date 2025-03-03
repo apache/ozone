@@ -390,12 +390,13 @@ public final class NodeSchemaLoader {
             throw new IllegalArgumentException("Topology path depth doesn't "
                 + "match layer element numbers");
           }
-          for (int j = 0; j < layerIDs.length; j++) {
-            if (schemas.get(layerIDs[j]) == null) {
-              throw new IllegalArgumentException("No layer found for id " +
-                  layerIDs[j]);
+
+          for (String layerID : layerIDs) {
+            if (schemas.get(layerID) == null) {
+              throw new IllegalArgumentException("No layer found for id " + layerID);
             }
           }
+
           if (schemas.get(layerIDs[0]).getType() != LayerType.ROOT) {
             throw new IllegalArgumentException("Topology path doesn't start "
                 + "with ROOT layer");
@@ -405,8 +406,9 @@ public final class NodeSchemaLoader {
             throw new IllegalArgumentException("Topology path doesn't end "
                 + "with LEAF layer");
           }
-          for (int j = 0; j < layerIDs.length; j++) {
-            schemaList.add(schemas.get(layerIDs[j]));
+
+          for (String layerID : layerIDs) {
+            schemaList.add(schemas.get(layerID));
           }
         } else if (TOPOLOGY_ENFORCE_PREFIX.equalsIgnoreCase(tagName)) {
           enforcePrefix = Boolean.parseBoolean(value);

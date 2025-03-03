@@ -116,12 +116,12 @@ public class ChecksumData {
       throws OzoneChecksumException {
 
     // pre checks
-    if (this.checksums.size() == 0) {
+    if (this.checksums.isEmpty()) {
       throw new OzoneChecksumException("Original checksumData has no " +
           "checksums");
     }
 
-    if (that.checksums.size() == 0) {
+    if (that.checksums.isEmpty()) {
       throw new OzoneChecksumException("Computed checksumData has no " +
           "checksums");
     }

@@ -146,7 +146,7 @@ public class SimpleMockNodeManager implements NodeManager {
   @Override
   public Set<PipelineID> getPipelines(DatanodeDetails datanodeDetails) {
     Set<PipelineID> p = pipelineMap.get(datanodeDetails.getUuid());
-    if (p == null || p.size() == 0) {
+    if (p == null || p.isEmpty()) {
       return null;
     } else {
       return p;

@@ -430,7 +430,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     ContainerInfo container = replicaCount.getContainer();
     Set<Integer> decomIndexes = replicaCount.decommissioningOnlyIndexes(true);
     int commandsSent = 0;
-    if (decomIndexes.size() > 0) {
+    if (!decomIndexes.isEmpty()) {
       LOG.debug("Processing decommissioning indexes {} for container {}.",
           decomIndexes, container.containerID());
       final List<DatanodeDetails> selectedDatanodes = getTargetDatanodes(

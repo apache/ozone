@@ -21,15 +21,12 @@ import com.google.protobuf.RpcController;
 import io.grpc.Status;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerServiceGrpc.OzoneManagerServiceImplBase;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
-import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
 import org.apache.hadoop.ozone.util.UUIDUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,16 +42,10 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
    */
   private static final RpcController NULL_RPC_CONTROLLER = null;
   private final OzoneManagerProtocolServerSideTranslatorPB omTranslator;
-  private final OzoneDelegationTokenSecretManager delegationTokenMgr;
-  private final SecurityConfig secConfig;
 
   OzoneManagerServiceGrpc(
-      OzoneManagerProtocolServerSideTranslatorPB omTranslator,
-      OzoneDelegationTokenSecretManager delegationTokenMgr,
-      OzoneConfiguration configuration) {
+      OzoneManagerProtocolServerSideTranslatorPB omTranslator) {
     this.omTranslator = omTranslator;
-    this.delegationTokenMgr = delegationTokenMgr;
-    this.secConfig = new SecurityConfig(configuration);
   }
 
   @Override

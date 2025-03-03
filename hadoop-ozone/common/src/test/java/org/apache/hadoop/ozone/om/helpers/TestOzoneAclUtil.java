@@ -48,16 +48,13 @@ public class TestOzoneAclUtil {
   private static final OzoneAcl USER1 = new OzoneAcl(USER, "user1",
       ACCESS, ACLType.READ_ACL);
 
-  private static final OzoneAcl USER2 = new OzoneAcl(USER, "user2",
-      ACCESS, ACLType.WRITE);
-
   private static final OzoneAcl GROUP1 = new OzoneAcl(GROUP, "group1",
       ACCESS, ACLType.ALL);
 
   @Test
   public void testAddAcl() throws IOException {
     List<OzoneAcl> currentAcls = getDefaultAcls();
-    assertTrue(currentAcls.size() > 0);
+    assertTrue(!currentAcls.isEmpty());
 
     // Add new permission to existing acl entry.
     OzoneAcl oldAcl = currentAcls.get(0);
@@ -89,7 +86,7 @@ public class TestOzoneAclUtil {
     removeAndVerifyAcl(currentAcls, USER1, false, 0);
 
     currentAcls = getDefaultAcls();
-    assertTrue(currentAcls.size() > 0);
+    assertTrue(!currentAcls.isEmpty());
 
     // Add new permission to existing acl entru.
     OzoneAcl oldAcl = currentAcls.get(0);

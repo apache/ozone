@@ -26,8 +26,9 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeData
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDeletedDirToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDeletedKeysToOm;
 import static org.apache.hadoop.ozone.recon.spi.impl.PrometheusServiceProviderImpl.PROMETHEUS_INSTANT_QUERY_API;
+import static org.apache.ozone.recon.schema.generated.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
+import static org.apache.ozone.recon.schema.generated.tables.GlobalStatsTable.GLOBAL_STATS;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hadoop.ozone.recon.schema.tables.GlobalStatsTable.GLOBAL_STATS;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -65,7 +66,6 @@ import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -131,18 +131,21 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
-import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
+import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTaskFSO;
+import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTaskOBS;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
+import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
+import org.apache.ozone.recon.schema.generated.tables.daos.ContainerCountBySizeDao;
+import org.apache.ozone.recon.schema.generated.tables.daos.FileCountBySizeDao;
+import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
+import org.apache.ozone.recon.schema.generated.tables.pojos.ContainerCountBySize;
+import org.apache.ozone.recon.schema.generated.tables.pojos.FileCountBySize;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
-import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
-import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
-import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.ContainerCountBySize;
-import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
 import org.jooq.Configuration;
 import org.jooq.DSLContext;
+import org.jooq.Record3;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -162,7 +165,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private VolumeEndpoint volumeEndpoint;
   private BucketEndpoint bucketEndpoint;
   private ReconOMMetadataManager reconOMMetadataManager;
-  private FileSizeCountTask fileSizeCountTask;
+  private FileSizeCountTaskFSO fileSizeCountTaskFSO;
+  private FileSizeCountTaskOBS fileSizeCountTaskOBS;
   private ContainerSizeCountTask containerSizeCountTask;
   private OmTableInsightTask omTableInsightTask;
   private ReconStorageContainerManagerFacade reconScm;
@@ -305,8 +309,10 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         fileCountBySizeDao,
         containerCountBySizeDao,
         utilizationSchemaDefinition);
-    fileSizeCountTask =
-        new FileSizeCountTask(fileCountBySizeDao, utilizationSchemaDefinition);
+    fileSizeCountTaskFSO =
+        new FileSizeCountTaskFSO(fileCountBySizeDao, utilizationSchemaDefinition);
+    fileSizeCountTaskOBS =
+        new FileSizeCountTaskOBS(fileCountBySizeDao, utilizationSchemaDefinition);
     omTableInsightTask =
         new OmTableInsightTask(globalStatsDao, sqlConfiguration,
             reconOMMetadataManager);
@@ -783,9 +789,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     });
     omTableInsightTask.init();
     // check volume, bucket and key count after running table count task
-    Pair<String, Boolean> result =
+    ReconOmTask.TaskResult result =
         omTableInsightTask.reprocess(reconOMMetadataManager);
-    assertTrue(result.getRight());
+    assertTrue(result.isTaskSuccess());
     response = clusterStateEndpoint.getClusterState();
     clusterStateResponse = (ClusterStateResponse) response.getEntity();
     assertEquals(2, clusterStateResponse.getVolumes());
@@ -835,7 +841,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     when(keyTableLegacy.iterator()).thenReturn(mockKeyIterLegacy);
     when(keyTableFso.iterator()).thenReturn(mockKeyIterFso);
 
-    when(omMetadataManager.getKeyTable(BucketLayout.LEGACY)).thenReturn(
+    when(omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE)).thenReturn(
         keyTableLegacy);
     when(omMetadataManager.getKeyTable(
         BucketLayout.FILE_SYSTEM_OPTIMIZED)).thenReturn(keyTableFso);
@@ -862,11 +868,37 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         .thenReturn(omKeyInfo2)
         .thenReturn(omKeyInfo3);
 
-    Pair<String, Boolean> result =
-        fileSizeCountTask.reprocess(omMetadataManager);
-    assertTrue(result.getRight());
+    // Call reprocess on both endpoints.
+    ReconOmTask.TaskResult resultOBS = fileSizeCountTaskOBS.reprocess(omMetadataManager);
+    ReconOmTask.TaskResult resultFSO = fileSizeCountTaskFSO.reprocess(omMetadataManager);
+    assertTrue(resultOBS.isTaskSuccess());
+    assertTrue(resultFSO.isTaskSuccess());
 
+    // The two tasks should result in 3 rows.
     assertEquals(3, fileCountBySizeDao.count());
+
+    // Verify counts:
+    // For vol1/bucket1 with fileSize 1000L, the upper bound is 1024L and expected count is 2.
+    Record3<String, String, Long> recordToFind = dslContext.newRecord(
+            FILE_COUNT_BY_SIZE.VOLUME,
+            FILE_COUNT_BY_SIZE.BUCKET,
+            FILE_COUNT_BY_SIZE.FILE_SIZE)
+        .value1("vol1")
+        .value2("bucket1")
+        .value3(1024L);
+    assertEquals(2L, fileCountBySizeDao.findById(recordToFind).getCount().longValue());
+
+    // For vol1/bucket1 with fileSize 100000L, the upper bound is 131072L and expected count is 2.
+    recordToFind.value3(131072L);
+    assertEquals(2L, fileCountBySizeDao.findById(recordToFind).getCount().longValue());
+
+    // For vol2/bucket1 with fileSize 1000L, the upper bound is 1024L and expected count is 2.
+    recordToFind.value1("vol2");
+    recordToFind.value2("bucket1");
+    recordToFind.value3(1024L);
+    assertEquals(2L, fileCountBySizeDao.findById(recordToFind).getCount().longValue());
+
+    // --- Now test the query endpoints of the utilization service ---
     Response response = utilizationEndpoint.getFileCounts(null, null, 0);
     List<FileCountBySize> resultSet =
         (List<FileCountBySize>) response.getEntity();
@@ -881,38 +913,38 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         o.getBucket().equals("bucket1") && o.getFileSize() == 1024L &&
         o.getCount() == 2L));
 
-    // Test for "volume" query param
+    // Test for "volume" query param.
     response = utilizationEndpoint.getFileCounts("vol1", null, 0);
     resultSet = (List<FileCountBySize>) response.getEntity();
     assertEquals(2, resultSet.size());
     assertTrue(resultSet.stream().allMatch(o -> o.getVolume().equals("vol1")));
 
-    // Test for non-existent volume
+    // Test for non-existent volume.
     response = utilizationEndpoint.getFileCounts("vol", null, 0);
     resultSet = (List<FileCountBySize>) response.getEntity();
     assertEquals(0, resultSet.size());
 
-    // Test for "volume" + "bucket" query param
+    // Test for "volume" + "bucket" query param.
     response = utilizationEndpoint.getFileCounts("vol1", "bucket1", 0);
     resultSet = (List<FileCountBySize>) response.getEntity();
     assertEquals(2, resultSet.size());
     assertTrue(resultSet.stream().allMatch(o -> o.getVolume().equals("vol1") &&
         o.getBucket().equals("bucket1")));
 
-    // Test for non-existent bucket
+    // Test for non-existent bucket.
     response = utilizationEndpoint.getFileCounts("vol1", "bucket", 0);
     resultSet = (List<FileCountBySize>) response.getEntity();
     assertEquals(0, resultSet.size());
 
-    // Test for "volume" + "bucket" + "fileSize" query params
+    // Test for "volume" + "bucket" + "fileSize" query params.
     response = utilizationEndpoint.getFileCounts("vol1", "bucket1", 131072);
     resultSet = (List<FileCountBySize>) response.getEntity();
     assertEquals(1, resultSet.size());
     FileCountBySize o = resultSet.get(0);
-    assertTrue(o.getVolume().equals("vol1") && o.getBucket().equals(
-        "bucket1") && o.getFileSize() == 131072);
+    assertTrue(o.getVolume().equals("vol1") && o.getBucket().equals("bucket1") &&
+        o.getFileSize() == 131072);
 
-    // Test for non-existent fileSize
+    // Test for non-existent fileSize.
     response = utilizationEndpoint.getFileCounts("vol1", "bucket1", 1310725);
     resultSet = (List<FileCountBySize>) response.getEntity();
     assertEquals(0, resultSet.size());
@@ -1234,10 +1266,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .build();
     reconScm.getDatanodeProtocolServer().sendHeartbeat(heartbeatRequestProto);
     LambdaTestUtils.await(30000, 1000, check);
-  }
-
-  private BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
   }
 
   @Test

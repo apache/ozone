@@ -505,7 +505,7 @@ public class TestHSync {
           // Verify hsync openKey gets committed eventually
           // Key without hsync is deleted
           GenericTestUtils.waitFor(() ->
-              0 == getOpenKeyInfo(BUCKET_LAYOUT).size(), 1000, 12000);
+              getOpenKeyInfo(BUCKET_LAYOUT).isEmpty(), 1000, 12000);
           // Verify only one key is still present in fileTable
           assertThat(1 == getKeyInfo(BUCKET_LAYOUT).size());
 
@@ -590,7 +590,7 @@ public class TestHSync {
         // Verify if DELETED_HSYNC_KEY metadata is added to openKey
         GenericTestUtils.waitFor(() -> {
           List<OmKeyInfo> omKeyInfo = getOpenKeyInfo(BUCKET_LAYOUT);
-          return omKeyInfo.size() > 0 && omKeyInfo.get(0).getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY);
+          return !omKeyInfo.isEmpty() && omKeyInfo.get(0).getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY);
         }, 1000, 12000);
 
         // Resume openKeyCleanupService
@@ -598,7 +598,7 @@ public class TestHSync {
 
         // Verify entry from openKey gets deleted eventually
         GenericTestUtils.waitFor(() ->
-            0 == getOpenKeyInfo(BUCKET_LAYOUT).size(), 1000, 12000);
+            getOpenKeyInfo(BUCKET_LAYOUT).isEmpty(), 1000, 12000);
       } catch (OMException ex) {
         assertEquals(OMException.ResultCodes.DIRECTORY_NOT_FOUND, ex.getResult());
       } finally {
@@ -1378,7 +1378,7 @@ public class TestHSync {
       // Verify entry from openKey gets deleted eventually
       GenericTestUtils.waitFor(() -> {
         try {
-          return getAllOpenKeys(openKeyTable).size() == 0 && getAllDeletedKeys(deletedTable).size() == 2;
+          return getAllOpenKeys(openKeyTable).isEmpty() && getAllDeletedKeys(deletedTable).size() == 2;
         } catch (IOException e) {
           throw new RuntimeException(e);
         }

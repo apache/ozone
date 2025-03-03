@@ -554,26 +554,6 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   /**
-   * Helper method to do deleteRange on a table, including endKey.
-   * TODO: Do remove this method, it is not used anywhere. Need to check if
-   *       deleteRange causes RocksDB corruption.
-   * TODO: Move this into {@link Table} ?
-   * @param table Table
-   * @param beginKey begin key
-   * @param endKey end key
-   */
-  private static void deleteRangeInclusive(
-      Table<String, ?> table, String beginKey, String endKey)
-      throws IOException {
-
-    if (endKey != null) {
-      table.deleteRange(beginKey, endKey);
-      // Remove range end key itself
-      table.delete(endKey);
-    }
-  }
-
-  /**
    * Helper method to delete DB keys in the snapshot scope (bucket)
    * from active DB's deletedTable.
    * @param omMetadataManager OMMetadataManager instance

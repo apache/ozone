@@ -134,7 +134,7 @@ public class OzoneAcl {
     if (type == ACLIdentityType.WORLD || type == ACLIdentityType.ANONYMOUS) {
       if (!name.equals(ACLIdentityType.WORLD.name()) &&
           !name.equals(ACLIdentityType.ANONYMOUS.name()) &&
-          name.length() != 0) {
+          !name.isEmpty()) {
         throw new IllegalArgumentException("Expected name " + type.name() + ", but was: " + name);
       }
       // For type WORLD and ANONYMOUS we allow only one acl to be set.
@@ -142,7 +142,7 @@ public class OzoneAcl {
     }
 
     if (((type == ACLIdentityType.USER) || (type == ACLIdentityType.GROUP))
-        && (name.length() == 0)) {
+        && (name.isEmpty())) {
       throw new IllegalArgumentException(type + " name is required");
     }
 

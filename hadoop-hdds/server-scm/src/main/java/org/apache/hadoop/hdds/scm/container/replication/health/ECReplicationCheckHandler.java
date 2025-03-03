@@ -132,7 +132,7 @@ public class ECReplicationCheckHandler extends AbstractCheck {
       List<Integer> missingIndexes = replicaCount.unavailableIndexes(false);
       int remainingRedundancy = repConfig.getParity();
       boolean dueToOutOfService = true;
-      if (missingIndexes.size() > 0) {
+      if (!missingIndexes.isEmpty()) {
         // The container has reduced redundancy and will need reconstructed
         // via an EC reconstruction command. Note that it may also have some
         // replicas in decommission / maintenance states, but as the under

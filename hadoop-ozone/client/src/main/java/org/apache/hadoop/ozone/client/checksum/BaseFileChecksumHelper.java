@@ -384,7 +384,7 @@ public abstract class BaseFileChecksumHelper {
 
   FileChecksum makeCompositeCrcResult() throws IOException {
     long blockSizeHint = 0;
-    if (keyLocationInfos.size() > 0) {
+    if (!keyLocationInfos.isEmpty()) {
       blockSizeHint = keyLocationInfos.get(0).getLength();
     }
     CrcComposer crcComposer =

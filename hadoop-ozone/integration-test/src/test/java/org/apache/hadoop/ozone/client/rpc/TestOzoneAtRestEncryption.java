@@ -786,9 +786,9 @@ class TestOzoneAtRestEncryption {
     List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
         = omMetadataManager.getDeletedTable().getRangeKVs(
         null, 100, "/");
-    for (int i = 0; i < rangeKVs.size(); ++i) {
-      if (rangeKVs.get(i).getKey().contains(keyName)) {
-        return rangeKVs.get(i).getValue();
+    for (Table.KeyValue<String, RepeatedOmKeyInfo> rangeKV : rangeKVs) {
+      if (rangeKV.getKey().contains(keyName)) {
+        return rangeKV.getValue();
       }
     }
     return null;

@@ -84,7 +84,7 @@ public class OMVolumeSetOwnerResponse extends OMClientResponse {
     String oldOwnerKey = omMetadataManager.getUserKey(oldOwner);
     String newOwnerKey =
         omMetadataManager.getUserKey(newOwnerVolumeArgs.getOwnerName());
-    if (oldOwnerVolumeList.getVolumeNamesList().size() == 0) {
+    if (oldOwnerVolumeList.getVolumeNamesList().isEmpty()) {
       omMetadataManager.getUserTable().deleteWithBatch(batchOperation,
           oldOwnerKey);
     } else {

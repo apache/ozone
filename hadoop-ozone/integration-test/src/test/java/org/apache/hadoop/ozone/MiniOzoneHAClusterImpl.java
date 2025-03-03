@@ -258,6 +258,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         .getClientProtocolServer().getScmInfo().getClusterId();
   }
 
+  @Override
   public StorageContainerManager getActiveSCM() {
     for (StorageContainerManager scm : scmhaService.getServices()) {
       if (scm.checkLeader()) {
@@ -267,6 +268,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     return null;
   }
 
+  @Override
   public void waitForSCMToBeReady()
       throws TimeoutException, InterruptedException  {
     GenericTestUtils.waitFor(() -> {
@@ -1018,6 +1020,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     return new ArrayList<>(this.scmhaService.getServices());
   }
 
+  @Override
   public StorageContainerManager getStorageContainerManager() {
     return getStorageContainerManagers().get(0);
   }

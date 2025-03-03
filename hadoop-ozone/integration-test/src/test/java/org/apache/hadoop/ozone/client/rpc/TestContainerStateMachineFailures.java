@@ -46,7 +46,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -124,7 +123,6 @@ public class TestContainerStateMachineFailures {
   private static String volumeName;
   private static String bucketName;
   private static XceiverClientManager xceiverClientManager;
-  private static Random random;
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -184,7 +182,6 @@ public class TestContainerStateMachineFailures {
     bucketName = volumeName;
     objectStore.createVolume(volumeName);
     objectStore.getVolume(volumeName).createBucket(bucketName);
-    random = new Random();
   }
 
   /**

@@ -570,6 +570,7 @@ public class TestECBlockInputStream {
       return blockStreams;
     }
 
+    @Override
     public synchronized BlockExtendedInputStream create(
         ReplicationConfig repConfig, BlockLocationInfo blockInfo,
         Pipeline pipeline, Token<OzoneBlockTokenIdentifier> token,

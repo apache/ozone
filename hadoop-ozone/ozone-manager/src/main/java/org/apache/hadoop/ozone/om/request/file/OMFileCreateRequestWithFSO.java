@@ -106,7 +106,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
     Exception exception = null;
     Result result = null;
     try {
-      if (keyName.length() == 0) {
+      if (keyName.isEmpty()) {
         // Check if this is the root of the filesystem.
         throw new OMException("Can not write to directory: " + keyName,
                 OMException.ResultCodes.NOT_A_FILE);

@@ -292,11 +292,6 @@ public class TestParentAcl {
     return OzoneNativeAclTestUtil.getBucketAcls(metadataManager, vol, buck);
   }
 
-  private List<OzoneAcl> getKeyAcls(String vol, String buck, String key)
-      throws IOException {
-    return OzoneNativeAclTestUtil.getKeyAcls(metadataManager, vol, buck, getBucketLayout(), key);
-  }
-
   private void setBucketAcl(String vol, String buck,
       List<OzoneAcl> ozoneAcls) throws IOException {
     OzoneNativeAclTestUtil.setBucketAcl(metadataManager, vol, buck, ozoneAcls);

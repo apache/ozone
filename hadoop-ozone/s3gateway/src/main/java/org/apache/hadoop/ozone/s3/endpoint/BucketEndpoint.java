@@ -505,7 +505,7 @@ public class BucketEndpoint extends EndpointBase {
 
     Map<String, String> auditMap = getAuditParameters();
     auditMap.put("failedDeletes", deleteKeys.toString());
-    if (result.getErrors().size() != 0) {
+    if (!result.getErrors().isEmpty()) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(s3GAction,
           auditMap, new Exception("MultiDelete Exception")));
     } else {
@@ -633,7 +633,7 @@ public class BucketEndpoint extends EndpointBase {
       List<OzoneAcl> aclsToRemoveOnVolume = new ArrayList<>();
       List<OzoneAcl> currentAclsOnVolume = volume.getAcls();
       // Remove input user/group's permission from Volume first
-      if (currentAclsOnVolume.size() > 0) {
+      if (!currentAclsOnVolume.isEmpty()) {
         for (OzoneAcl acl : acls) {
           if (acl.getAclScope() == ACCESS) {
             aclsToRemoveOnVolume.addAll(OzoneAclUtil.filterAclList(

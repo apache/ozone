@@ -223,7 +223,7 @@ public class TestDeleteWithInAdequateDN {
     List<Pipeline> pipelineList =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipelines(RatisReplicationConfig.getInstance(THREE));
-    Assumptions.assumeTrue(pipelineList.size() >= FACTOR_THREE_PIPELINE_COUNT);
+    Assumptions.assumeTrue(!pipelineList.isEmpty());
     Pipeline pipeline = pipelineList.get(0);
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
       if (RatisTestHelper.isRatisFollower(dn, pipeline)) {

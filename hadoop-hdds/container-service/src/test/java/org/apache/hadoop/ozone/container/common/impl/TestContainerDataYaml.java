@@ -70,7 +70,7 @@ public class TestContainerDataYaml {
    */
   private File createContainerFile(long containerID, int replicaIndex)
       throws IOException {
-    new File(testRoot).mkdirs();
+    assertTrue(new File(testRoot).mkdirs());
 
     String containerPath = containerID + ".container";
 
@@ -167,6 +167,8 @@ public class TestContainerDataYaml {
         kvData.lastDataScanTime().get().toEpochMilli());
     assertEquals(SCAN_TIME.toEpochMilli(),
         kvData.getDataScanTimestamp().longValue());
+
+    cleanup();
   }
 
   @ContainerLayoutTestInfo.ContainerTest

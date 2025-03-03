@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
  */
 public class TestOMKeyAclRequestWithFSO extends TestOMKeyAclRequest {
 
+  @Override
   protected String addKeyToTable() throws Exception {
     String parentDir = "c/d/e";
     String fileName = "file1";

@@ -115,7 +115,8 @@ public class MultiNodePipelineBlockAllocator implements MockBlockAllocator {
     int clusterSize = clusterDns.size();
     int counter = nodesNeeded;
     int j = 0;
-    for (int i = 0; i < clusterDns.size(); i++) {
+
+    for (int i = 0; i < clusterSize; i++) {
       HddsProtos.DatanodeDetailsProto datanodeDetailsProto =
           clusterDns.get(start % clusterSize);
       start++;

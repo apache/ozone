@@ -335,13 +335,13 @@ public class OzoneAddress {
   }
 
   public void ensureBucketAddress() throws OzoneClientException {
-    if (keyName.length() > 0) {
+    if (!keyName.isEmpty()) {
       throw new OzoneClientException(
           "Invalid bucket name. Delimiters (/) not allowed in bucket name");
-    } else if (volumeName.length() == 0) {
+    } else if (volumeName.isEmpty()) {
       throw new OzoneClientException(
           "Volume name is required.");
-    } else if (bucketName.length() == 0) {
+    } else if (bucketName.isEmpty()) {
       throw new OzoneClientException(
           "Bucket name is required.");
     }
@@ -350,13 +350,13 @@ public class OzoneAddress {
   // Ensure prefix address with a prefix flag
   // Allow CLI to differentiate key and prefix address
   public void ensurePrefixAddress() throws OzoneClientException {
-    if (keyName.length() == 0) {
+    if (keyName.isEmpty()) {
       throw new OzoneClientException(
           "prefix name is missing.");
-    } else if (volumeName.length() == 0) {
+    } else if (volumeName.isEmpty()) {
       throw new OzoneClientException(
           "Volume name is missing");
-    } else if (bucketName.length() == 0) {
+    } else if (bucketName.isEmpty()) {
       throw new OzoneClientException(
           "Bucket name is missing");
     }
@@ -364,13 +364,13 @@ public class OzoneAddress {
   }
 
   public void ensureKeyAddress() throws OzoneClientException {
-    if (keyName.length() == 0) {
+    if (keyName.isEmpty()) {
       throw new OzoneClientException(
           "Key name is missing.");
-    } else if (volumeName.length() == 0) {
+    } else if (volumeName.isEmpty()) {
       throw new OzoneClientException(
           "Volume name is missing");
-    } else if (bucketName.length() == 0) {
+    } else if (bucketName.isEmpty()) {
       throw new OzoneClientException(
           "Bucket name is missing");
     }
@@ -387,7 +387,7 @@ public class OzoneAddress {
    */
   public void ensureSnapshotAddress()
       throws OzoneClientException {
-    if (keyName.length() > 0) {
+    if (!keyName.isEmpty()) {
       if (OmUtils.isBucketSnapshotIndicator(keyName)) {
         snapshotNameWithIndicator = keyName;
       } else {
@@ -396,31 +396,31 @@ public class OzoneAddress {
                 "a bucket name. Only a snapshot name with " +
                 "a snapshot indicator is accepted");
       }
-    } else if (volumeName.length() == 0) {
+    } else if (volumeName.isEmpty()) {
       throw new OzoneClientException(
           "Volume name is missing.");
-    } else if (bucketName.length() == 0) {
+    } else if (bucketName.isEmpty()) {
       throw new OzoneClientException(
           "Bucket name is missing.");
     }
   }
 
   public void ensureVolumeAddress() throws OzoneClientException {
-    if (keyName.length() != 0) {
+    if (!keyName.isEmpty()) {
       throw new OzoneClientException(
           "Invalid volume name. Delimiters (/) not allowed in volume name");
-    } else if (volumeName.length() == 0) {
+    } else if (volumeName.isEmpty()) {
       throw new OzoneClientException(
           "Volume name is required");
-    } else if (bucketName.length() != 0) {
+    } else if (!bucketName.isEmpty()) {
       throw new OzoneClientException(
           "Invalid volume name. Delimiters (/) not allowed in volume name");
     }
   }
 
   public void ensureRootAddress() throws  OzoneClientException {
-    if (keyName.length() != 0 || bucketName.length() != 0
-        || volumeName.length() != 0) {
+    if (!keyName.isEmpty() || !bucketName.isEmpty()
+        || !volumeName.isEmpty()) {
       throw new OzoneClientException(
           "Invalid URI. Volume/bucket/key elements should not been used");
     }
@@ -463,7 +463,7 @@ public class OzoneAddress {
   }
 
   public void ensureVolumeOrBucketAddress() throws OzoneClientException {
-    if (keyName.length() > 0) {
+    if (!keyName.isEmpty()) {
       if (OmUtils.isBucketSnapshotIndicator(keyName)) {
         // If snapshot, ensure snapshot URI
         ensureSnapshotAddress();
@@ -471,7 +471,7 @@ public class OzoneAddress {
       }
       throw new OzoneClientException(
           "Key address is not supported.");
-    } else if (volumeName.length() == 0) {
+    } else if (volumeName.isEmpty()) {
       // Volume must be present
       // Bucket may or may not be present
       // Depending on operation is on volume or bucket

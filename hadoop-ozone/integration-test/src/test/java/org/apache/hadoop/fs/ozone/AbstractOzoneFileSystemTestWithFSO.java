@@ -241,6 +241,7 @@ abstract class AbstractOzoneFileSystemTestWithFSO extends AbstractOzoneFileSyste
   /**
    * Case-2) Cannot rename a directory to its own subdirectory.
    */
+  @Override
   @Test
   public void testRenameDirToItsOwnSubDir() throws Exception {
     final String root = "/root";
@@ -262,6 +263,7 @@ abstract class AbstractOzoneFileSystemTestWithFSO extends AbstractOzoneFileSyste
    * is not yet supported.
    * Fails if the (a) parent of dst does not exist or (b) parent is a file.
    */
+  @Override
   @Test
   public void testRenameDestinationParentDoesntExist() throws Exception {
     final String root = "/root_dir";

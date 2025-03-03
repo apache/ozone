@@ -1444,28 +1444,6 @@ public class SnapshotDiffManager implements AutoCloseable {
     return fromObject.getAcls().equals(toObject.getAcls());
   }
 
-  private boolean isBlockLocationSame(
-      String fromObjectName,
-      String toObjectName,
-      final Table<String, ? extends WithObjectID> fromSnapshotTable,
-      final Table<String, ? extends WithObjectID> toSnapshotTable
-  ) throws IOException {
-    Objects.requireNonNull(fromObjectName, "fromObjectName is null.");
-    Objects.requireNonNull(toObjectName, "toObjectName is null.");
-
-    final WithObjectID fromObject = fromSnapshotTable.get(fromObjectName);
-    final WithObjectID toObject = toSnapshotTable.get(toObjectName);
-
-    if (!(fromObject instanceof OmKeyInfo) ||
-        !(toObject instanceof OmKeyInfo)) {
-      throw new IllegalStateException("fromObject or toObject is not of " +
-          "OmKeyInfo");
-    }
-
-    return SnapshotDeletingService.isBlockLocationInfoSame(
-        (OmKeyInfo) fromObject, (OmKeyInfo) toObject);
-  }
-
   private PersistentList<byte[]> createDiffReportPersistentList(
       ColumnFamilyHandle columnFamilyHandle
   ) {

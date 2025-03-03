@@ -81,18 +81,22 @@ public class TestCodecRegistry {
   @Test
   public void testUpdateCoders() {
     class RSUserDefinedIncorrectFactory implements RawErasureCoderFactory {
+      @Override
       public RawErasureEncoder createEncoder(ECReplicationConfig coderOptions) {
         return null;
       }
 
+      @Override
       public RawErasureDecoder createDecoder(ECReplicationConfig coderOptions) {
         return null;
       }
 
+      @Override
       public String getCoderName() {
         return "rs_java";
       }
 
+      @Override
       public String getCodecName() {
         return ECReplicationConfig.EcCodec.RS.name().toLowerCase();
       }

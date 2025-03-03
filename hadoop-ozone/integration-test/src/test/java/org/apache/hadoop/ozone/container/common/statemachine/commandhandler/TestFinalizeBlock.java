@@ -209,8 +209,8 @@ public class TestFinalizeBlock {
 
     // Finalize Block should be cleared from container data.
     GenericTestUtils.waitFor(() -> (
-        (KeyValueContainerData) getContainerfromDN(cluster.getHddsDatanodes().get(0),
-            containerId.getId()).getContainerData()).getFinalizedBlockSet().size() == 0,
+            (KeyValueContainerData)getContainerfromDN(cluster.getHddsDatanodes().get(0),
+                containerId.getId()).getContainerData()).getFinalizedBlockSet().isEmpty(),
         100, 10 * 1000);
     try {
       // Restart DataNode
@@ -223,7 +223,7 @@ public class TestFinalizeBlock {
     assertTrue(((KeyValueContainerData)getContainerfromDN(
         cluster.getHddsDatanodes().get(0),
         containerId.getId()).getContainerData())
-        .getFinalizedBlockSet().size() == 0);
+        .getFinalizedBlockSet().isEmpty());
   }
 
   private void testRejectPutAndWriteChunkAfterFinalizeBlock(ContainerID containerId, Pipeline pipeline,

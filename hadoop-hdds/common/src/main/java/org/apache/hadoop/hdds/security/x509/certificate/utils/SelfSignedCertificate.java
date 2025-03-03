@@ -144,7 +144,7 @@ public final class SelfSignedCertificate {
       int keyUsageFlag = KeyUsage.keyCertSign | KeyUsage.cRLSign;
       KeyUsage keyUsage = new KeyUsage(keyUsageFlag);
       builder.addExtension(Extension.keyUsage, true, keyUsage);
-      if (altNames != null && altNames.size() >= 1) {
+      if (altNames != null && !altNames.isEmpty()) {
         builder.addExtension(new Extension(Extension.subjectAlternativeName,
             false, new GeneralNames(altNames.toArray(
                 new GeneralName[altNames.size()])).getEncoded()));

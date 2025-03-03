@@ -237,7 +237,7 @@ public class OFSPath {
   }
 
   public boolean isMount() {
-    return mountName.length() > 0;
+    return !mountName.isEmpty();
   }
 
   private static boolean isInSameBucketAsInternal(

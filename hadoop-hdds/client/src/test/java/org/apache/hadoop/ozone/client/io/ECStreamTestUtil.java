@@ -255,6 +255,7 @@ public final class ECStreamTestUtil {
       failIndexes.addAll(Arrays.asList(fail));
     }
 
+    @Override
     public synchronized BlockExtendedInputStream create(
         ReplicationConfig repConfig,
         BlockLocationInfo blockInfo, Pipeline pipeline,

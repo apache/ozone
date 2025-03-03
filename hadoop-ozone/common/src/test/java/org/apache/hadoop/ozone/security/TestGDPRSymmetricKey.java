@@ -38,7 +38,7 @@ public class TestGDPRSymmetricKey {
         .equalsIgnoreCase(OzoneConsts.GDPR_ALGORITHM_NAME));
 
     gkey.acceptKeyDetails(
-        (k, v) -> assertTrue(v.length() > 0));
+        (k, v) -> assertTrue(!v.isEmpty()));
   }
 
   @Test
@@ -51,7 +51,7 @@ public class TestGDPRSymmetricKey {
         .equalsIgnoreCase(OzoneConsts.GDPR_ALGORITHM_NAME));
 
     gkey.acceptKeyDetails(
-        (k, v) -> assertTrue(v.length() > 0));
+        (k, v) -> assertTrue(!v.isEmpty()));
   }
 
   @Test

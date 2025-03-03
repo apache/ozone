@@ -77,8 +77,6 @@ import picocli.CommandLine;
  */
 public class TestOzoneDebugShell {
 
-  private static String omServiceId;
-
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient client;
   private static OzoneDebug ozoneDebugShell;
@@ -87,7 +85,6 @@ public class TestOzoneDebugShell {
 
   protected static void startCluster() throws Exception {
     // Init HA cluster
-    omServiceId = "om-service-test1";
     final int numDNs = 5;
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(numDNs)

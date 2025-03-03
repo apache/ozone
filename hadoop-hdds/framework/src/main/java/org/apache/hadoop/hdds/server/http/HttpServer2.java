@@ -894,19 +894,18 @@ public final class HttpServer2 implements FilterContainer {
     // Jetty doesn't like the same path spec mapping to different servlets, so
     // if there's already a mapping for this pathSpec, remove it and assume that
     // the newest one is the one we want
-    final ServletMapping[] servletMappings =
-        webAppContext.getServletHandler().getServletMappings();
-    for (int i = 0; i < servletMappings.length; i++) {
-      if (servletMappings[i].containsPathSpec(pathSpec)) {
+    final ServletMapping[] servletMappings = webAppContext.getServletHandler().getServletMappings();
+
+    for (ServletMapping servletMapping : servletMappings) {
+      if (servletMapping.containsPathSpec(pathSpec)) {
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Found existing " + servletMappings[i].getServletName() +
+          LOG.debug("Found existing " + servletMapping.getServletName() +
               " servlet at path " + pathSpec + "; will replace mapping" +
               " with " + holder.getName() + " servlet");
         }
-        ServletMapping[] newServletMappings =
-            ArrayUtil.removeFromArray(servletMappings, servletMappings[i]);
-        webAppContext.getServletHandler()
-            .setServletMappings(newServletMappings);
+
+        ServletMapping[] newServletMappings = ArrayUtil.removeFromArray(servletMappings, servletMapping);
+        webAppContext.getServletHandler().setServletMappings(newServletMappings);
         break;
       }
     }
@@ -916,20 +915,23 @@ public final class HttpServer2 implements FilterContainer {
     // Kerberos replay error.
     FilterMapping[] filterMappings = webAppContext.getServletHandler().
         getFilterMappings();
-    for (int i = 0; i < filterMappings.length; i++) {
-      if (filterMappings[i].getPathSpecs() == null) {
-        LOG.debug("Skip checking {} filterMappings {} without a path spec.",
-            filterMappings[i].getFilterName(), filterMappings[i]);
+    for (FilterMapping filterMapping : filterMappings) {
+      if (filterMapping.getPathSpecs() == null) {
+        LOG.debug(
+            "Skip checking {} filterMappings {} without a path spec.",
+            filterMapping.getFilterName(),
+            filterMapping
+        );
         continue;
       }
-      int oldPathSpecsLen = filterMappings[i].getPathSpecs().length;
-      String[] newPathSpecs =
-          ArrayUtil.removeFromArray(filterMappings[i].getPathSpecs(), pathSpec);
+
+      int oldPathSpecsLen = filterMapping.getPathSpecs().length;
+      String[] newPathSpecs = ArrayUtil.removeFromArray(filterMapping.getPathSpecs(), pathSpec);
+
       if (newPathSpecs.length == 0) {
-        webAppContext.getServletHandler().setFilterMappings(
-            ArrayUtil.removeFromArray(filterMappings, filterMappings[i]));
+        webAppContext.getServletHandler().setFilterMappings(ArrayUtil.removeFromArray(filterMappings, filterMapping));
       } else if (newPathSpecs.length != oldPathSpecsLen) {
-        filterMappings[i].setPathSpecs(newPathSpecs);
+        filterMapping.setPathSpecs(newPathSpecs);
       }
     }
 
@@ -966,15 +968,15 @@ public final class HttpServer2 implements FilterContainer {
     sh.setInitParameters(params);
     final ServletMapping[] servletMappings =
         webAppContext.getServletHandler().getServletMappings();
-    for (int i = 0; i < servletMappings.length; i++) {
-      if (servletMappings[i].containsPathSpec(pathSpec)) {
+    for (ServletMapping servletMapping : servletMappings) {
+      if (servletMapping.containsPathSpec(pathSpec)) {
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Found existing " + servletMappings[i].getServletName() +
+          LOG.debug("Found existing " + servletMapping.getServletName() +
               " servlet at path " + pathSpec + "; will replace mapping" +
               " with " + sh.getName() + " servlet");
         }
-        ServletMapping[] newServletMappings =
-            ArrayUtil.removeFromArray(servletMappings, servletMappings[i]);
+
+        ServletMapping[] newServletMappings = ArrayUtil.removeFromArray(servletMappings, servletMapping);
         webAppContext.getServletHandler()
             .setServletMappings(newServletMappings);
         break;

@@ -98,7 +98,7 @@ public abstract class BackgroundService {
   @VisibleForTesting
   public void runPeriodicalTaskNow() throws Exception {
     BackgroundTaskQueue tasks = getTasks();
-    while (tasks.size() > 0) {
+    while (!tasks.isEmpty()) {
       tasks.poll().call();
     }
   }
@@ -131,7 +131,7 @@ public abstract class BackgroundService {
         LOG.debug("Number of background tasks to execute : {}", tasks.size());
       }
 
-      while (tasks.size() > 0) {
+      while (!tasks.isEmpty()) {
         BackgroundTask task = tasks.poll();
         CompletableFuture.runAsync(() -> {
           long startTime = System.nanoTime();

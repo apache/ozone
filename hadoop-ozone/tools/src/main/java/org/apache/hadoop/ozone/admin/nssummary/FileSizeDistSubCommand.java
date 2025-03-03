@@ -56,7 +56,7 @@ public class FileSizeDistSubCommand implements Callable {
 
   @Override
   public Void call() throws Exception {
-    if (path == null || path.length() == 0) {
+    if (path == null || path.isEmpty()) {
       printEmptyPathRequest();
       return null;
     }

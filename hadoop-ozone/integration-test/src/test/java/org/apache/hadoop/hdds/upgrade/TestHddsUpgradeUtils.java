@@ -123,7 +123,7 @@ public final class TestHddsUpgradeUtils {
     PipelineManager scmPipelineManager = scm.getPipelineManager();
     try {
       GenericTestUtils.waitFor(
-          () -> scmPipelineManager.getPipelines(RATIS_THREE, OPEN).size() >= 1,
+          () -> !scmPipelineManager.getPipelines(RATIS_THREE, OPEN).isEmpty(),
           500, 60000);
     } catch (TimeoutException | InterruptedException e) {
       fail("Timeout waiting for Upgrade to complete on SCM.");

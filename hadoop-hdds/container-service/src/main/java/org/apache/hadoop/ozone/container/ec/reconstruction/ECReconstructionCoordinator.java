@@ -289,7 +289,7 @@ public class ECReconstructionCoordinator implements Closeable {
           emptyBlockStreams[i] = getECBlockOutputStream(blockLocationInfo, datanodeDetails, repConfig, replicaIndex);
         }
 
-        if (toReconstructIndexes.size() > 0) {
+        if (!toReconstructIndexes.isEmpty()) {
           sis.setRecoveryIndexes(toReconstructIndexes.stream().map(i -> (i - 1))
               .collect(Collectors.toSet()));
           long length = safeBlockGroupLength;

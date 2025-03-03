@@ -122,7 +122,7 @@ public class WritableECContainerProvider
         PipelineRequestInformation.Builder.getBuilder()
             .setSize(size)
             .build();
-    while (existingPipelines.size() > 0) {
+    while (!existingPipelines.isEmpty()) {
       int pipelineIndex =
           pipelineChoosePolicy.choosePipelineIndex(existingPipelines, pri);
       if (pipelineIndex < 0) {
@@ -197,7 +197,7 @@ public class WritableECContainerProvider
       throws IOException {
 
     List<DatanodeDetails> excludedNodes = Collections.emptyList();
-    if (excludeList.getDatanodes().size() > 0) {
+    if (!excludeList.getDatanodes().isEmpty()) {
       excludedNodes = new ArrayList<>(excludeList.getDatanodes());
     }
 
@@ -248,7 +248,7 @@ public class WritableECContainerProvider
     NavigableSet<ContainerID> containers =
         pipelineManager.getContainersInPipeline(pipeline.getId());
     // Assume 1 container per pipeline for EC
-    if (containers.size() == 0) {
+    if (containers.isEmpty()) {
       return null;
     }
     ContainerID containerID = containers.first();

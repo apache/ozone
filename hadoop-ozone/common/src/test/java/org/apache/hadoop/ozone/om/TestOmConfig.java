@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -49,6 +50,34 @@ class TestOmConfig {
 
     assertThat(subject.getMaxListSize())
         .isEqualTo(OmConfig.Defaults.SERVER_LIST_MAX_SIZE);
+  }
+
+  @Test
+  void testCopy() {
+    MutableConfigurationSource conf = new OzoneConfiguration();
+    OmConfig original = conf.getObject(OmConfig.class);
+
+    OmConfig subject = original.copy();
+
+    assertConfigEquals(original, subject);
+  }
+
+  @Test
+  void testSetFrom() {
+    MutableConfigurationSource conf = new OzoneConfiguration();
+    OmConfig subject = conf.getObject(OmConfig.class);
+    OmConfig updated = conf.getObject(OmConfig.class);
+    updated.setFileSystemPathEnabled(!updated.isFileSystemPathEnabled());
+    updated.setMaxListSize(updated.getMaxListSize() + 1);
+
+    subject.setFrom(updated);
+
+    assertConfigEquals(updated, subject);
+  }
+
+  private static void assertConfigEquals(OmConfig expected, OmConfig actual) {
+    assertEquals(expected.getMaxListSize(), actual.getMaxListSize());
+    assertEquals(expected.isFileSystemPathEnabled(), actual.isFileSystemPathEnabled());
   }
 
 }

@@ -18,12 +18,18 @@
 <FindBugsFilter>
   <!-- Generated Code -->
   <Match>
-    <Package name="org.hadoop.ozone.recon.schema"/>
+    <Package name="org.apache.ozone.recon.schema.generated"/>
   </Match>
   <Match>
-    <Package name="org.hadoop.ozone.recon.schema.tables"/>
+    <Package name="org.apache.ozone.recon.schema.generated.tables"/>
   </Match>
   <Match>
-    <Package name="org.hadoop.ozone.recon.schema.tables.pojos"/>
+    <Package name="org.apache.ozone.recon.schema.generated.tables.daos"/>
+  </Match>
+  <Match>
+    <Package name="org.apache.ozone.recon.schema.generated.tables.pojos"/>
+  </Match>
+  <Match>
+    <Package name="org.apache.ozone.recon.schema.generated.tables.records"/>
   </Match>
 </FindBugsFilter>

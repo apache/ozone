@@ -122,7 +122,7 @@ public class PartialTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
   @Override
   public void evictCache(List<Long> epochs) {
     Set<CacheKey<KEY>> currentCacheKeys;
-    CacheKey<KEY> cachekey;
+
     long lastEpoch = epochs.get(epochs.size() - 1);
     for (long currentEpoch : epochEntries.keySet()) {
       currentCacheKeys = epochEntries.get(currentEpoch);
@@ -135,10 +135,8 @@ public class PartialTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
       // As ConcurrentHashMap computeIfPresent is atomic, there is no race
       // condition between cache cleanup and requests updating same cache entry.
       if (epochs.contains(currentEpoch)) {
-        for (Iterator<CacheKey<KEY>> iterator = currentCacheKeys.iterator();
-             iterator.hasNext();) {
-          cachekey = iterator.next();
-          cache.computeIfPresent(cachekey, ((k, v) -> {
+        for (CacheKey<KEY> currentCacheKey : currentCacheKeys) {
+          cache.computeIfPresent(currentCacheKey, ((k, v) -> {
             // If cache epoch entry matches with current Epoch, remove entry
             // from cache.
             if (v.getEpoch() == currentEpoch) {

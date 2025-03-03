@@ -264,8 +264,8 @@ public class TrashPolicyOzone extends OzoneTrashPolicy {
     }
 
     long now = Time.now();
-    for (int i = 0; i < dirs.length; i++) {
-      Path path = dirs[i].getPath();
+    for (FileStatus fileStatus : dirs) {
+      Path path = fileStatus.getPath();
       String dir = path.toUri().getPath();
       String name = path.getName();
       if (name.equals(CURRENT.getName())) {         // skip current

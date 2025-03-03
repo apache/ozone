@@ -95,7 +95,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
     validateKey(ozoneManager, validateArgs);
 
     UserInfo userInfo = getUserInfo();
-    if (keyArgs.getKeyName().length() == 0) {
+    if (keyArgs.getKeyName().isEmpty()) {
       // Check if this is the root of the filesystem.
       // Not throwing exception here, as need to throw exception after
       // checking volume/bucket exists.
@@ -207,7 +207,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
-      if (keyName.length() == 0) {
+      if (keyName.isEmpty()) {
         // Check if this is the root of the filesystem.
         throw new OMException("Can not write to directory: " + keyName,
             OMException.ResultCodes.NOT_A_FILE);

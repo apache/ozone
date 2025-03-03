@@ -40,17 +40,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveDeletedKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Handles OMSnapshotMoveDeletedKeys Request.
  * This is an OM internal request. Does not need @RequireSnapshotFeatureState.
  */
 public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OMSnapshotMoveDeletedKeysRequest.class);
 
   public OMSnapshotMoveDeletedKeysRequest(OMRequest omRequest) {
     super(omRequest);

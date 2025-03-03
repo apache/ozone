@@ -17,6 +17,7 @@
 
 package org.apache.ozone.fs.http.server.metrics;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METRICS_SESSION_ID_KEY;
 import static org.apache.hadoop.metrics2.impl.MsInfo.SessionId;
 
 import java.util.concurrent.ThreadLocalRandom;
@@ -46,8 +47,6 @@ import org.apache.hadoop.metrics2.source.JvmMetrics;
 @Metrics(about = "HttpFSServer metrics", context = "httpfs")
 public class HttpFSServerMetrics {
 
-  private static final String DFS_METRICS_SESSION_ID_KEY
-      = "hdds.metrics.session-id";
   private @Metric MutableCounterLong bytesWritten;
   private @Metric MutableCounterLong bytesRead;
 
@@ -78,7 +77,7 @@ public class HttpFSServerMetrics {
 
   public static HttpFSServerMetrics create(Configuration conf,
       String serverName) {
-    String sessionId = conf.get(DFS_METRICS_SESSION_ID_KEY);
+    String sessionId = conf.get(HDDS_METRICS_SESSION_ID_KEY);
     MetricsSystem ms = DefaultMetricsSystem.instance();
     JvmMetrics jm = JvmMetrics.create("HttpFSServer", sessionId, ms);
     String name = "ServerActivity-" + (serverName.isEmpty()

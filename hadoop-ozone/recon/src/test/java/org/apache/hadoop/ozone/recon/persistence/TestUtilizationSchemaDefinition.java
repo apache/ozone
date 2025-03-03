@@ -17,11 +17,11 @@
 
 package org.apache.hadoop.ozone.recon.persistence;
 
-import static org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition.CLUSTER_GROWTH_DAILY_TABLE_NAME;
-import static org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition.CONTAINER_COUNT_BY_SIZE_TABLE_NAME;
-import static org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition.FILE_COUNT_BY_SIZE_TABLE_NAME;
-import static org.hadoop.ozone.recon.schema.tables.ClusterGrowthDailyTable.CLUSTER_GROWTH_DAILY;
-import static org.hadoop.ozone.recon.schema.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
+import static org.apache.ozone.recon.schema.UtilizationSchemaDefinition.CLUSTER_GROWTH_DAILY_TABLE_NAME;
+import static org.apache.ozone.recon.schema.UtilizationSchemaDefinition.CONTAINER_COUNT_BY_SIZE_TABLE_NAME;
+import static org.apache.ozone.recon.schema.UtilizationSchemaDefinition.FILE_COUNT_BY_SIZE_TABLE_NAME;
+import static org.apache.ozone.recon.schema.generated.tables.ClusterGrowthDailyTable.CLUSTER_GROWTH_DAILY;
+import static org.apache.ozone.recon.schema.generated.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
@@ -35,12 +35,12 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
-import org.hadoop.ozone.recon.schema.tables.daos.ClusterGrowthDailyDao;
-import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.ClusterGrowthDaily;
-import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
-import org.hadoop.ozone.recon.schema.tables.records.FileCountBySizeRecord;
+import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
+import org.apache.ozone.recon.schema.generated.tables.daos.ClusterGrowthDailyDao;
+import org.apache.ozone.recon.schema.generated.tables.daos.FileCountBySizeDao;
+import org.apache.ozone.recon.schema.generated.tables.pojos.ClusterGrowthDaily;
+import org.apache.ozone.recon.schema.generated.tables.pojos.FileCountBySize;
+import org.apache.ozone.recon.schema.generated.tables.records.FileCountBySizeRecord;
 import org.jooq.Record3;
 import org.jooq.Table;
 import org.jooq.UniqueKey;

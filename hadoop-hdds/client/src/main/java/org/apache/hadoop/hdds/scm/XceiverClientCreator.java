@@ -32,10 +32,6 @@ import org.apache.hadoop.ozone.OzoneSecurityUtil;
 public class XceiverClientCreator implements XceiverClientFactory {
   private static ErrorInjector errorInjector;
 
-  public static void enableErrorInjection(ErrorInjector injector) {
-    errorInjector = injector;
-  }
-
   private final ConfigurationSource conf;
   private final boolean topologyAwareRead;
   private final ClientTrustManager trustManager;
@@ -55,6 +51,10 @@ public class XceiverClientCreator implements XceiverClientFactory {
     if (securityEnabled) {
       Preconditions.checkNotNull(trustManager);
     }
+  }
+
+  public static void enableErrorInjection(ErrorInjector injector) {
+    errorInjector = injector;
   }
 
   public boolean isSecurityEnabled() {

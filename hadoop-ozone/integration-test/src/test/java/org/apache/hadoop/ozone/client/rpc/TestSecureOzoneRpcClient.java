@@ -434,6 +434,7 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
   public void testZReadKeyWithUnhealthyContainerReplica() {
   }
 
+  @Override
   @Test
   public void testGetServerDefaults() throws IOException {
     assertNotNull(getClient().getProxy().getServerDefaults());

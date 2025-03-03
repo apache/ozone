@@ -411,10 +411,10 @@ public final class Pipeline {
     // To save the message size on wire, only transfer the node order based on
     // network topology
     if (!nodesInOrder.isEmpty()) {
-      for (int i = 0; i < nodesInOrder.size(); i++) {
+      for (DatanodeDetails datanodeDetails : nodesInOrder) {
         Iterator<DatanodeDetails> it = nodeStatus.keySet().iterator();
-        for (int j = 0; j < nodeStatus.keySet().size(); j++) {
-          if (it.next().equals(nodesInOrder.get(i))) {
+        for (int j = 0; j < nodeStatus.size(); j++) {
+          if (it.next().equals(datanodeDetails)) {
             builder.addMemberOrders(j);
             break;
           }
@@ -655,8 +655,7 @@ public final class Pipeline {
 
       if (nodeOrder != null && !nodeOrder.isEmpty()) {
         List<DatanodeDetails> nodesWithOrder = new ArrayList<>();
-        for (int i = 0; i < nodeOrder.size(); i++) {
-          int nodeIndex = nodeOrder.get(i);
+        for (int nodeIndex : nodeOrder) {
           Iterator<DatanodeDetails> it = nodeStatus.keySet().iterator();
           while (it.hasNext() && nodeIndex >= 0) {
             DatanodeDetails node = it.next();

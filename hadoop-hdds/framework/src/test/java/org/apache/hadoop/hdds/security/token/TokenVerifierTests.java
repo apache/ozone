@@ -42,16 +42,11 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Common test cases for {@link ShortLivedTokenVerifier} implementations.
  */
 public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TokenVerifierTests.class);
 
   protected static final UUID SECRET_KEY_ID = UUID.randomUUID();
 

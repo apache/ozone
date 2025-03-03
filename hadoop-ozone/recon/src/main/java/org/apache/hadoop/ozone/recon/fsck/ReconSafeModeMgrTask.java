@@ -50,7 +50,6 @@ public class ReconSafeModeMgrTask {
   private ReconSafeModeManager safeModeManager;
   private List<DatanodeDetails> allNodes;
   private List<ContainerInfo> containers;
-  private OzoneConfiguration ozoneConfiguration;
   private final long interval;
   private final long dnHBInterval;
 
@@ -65,7 +64,6 @@ public class ReconSafeModeMgrTask {
     this.nodeManager = nodeManager;
     this.allNodes = nodeManager.getAllNodes();
     this.containers = containerManager.getContainers();
-    this.ozoneConfiguration = ozoneConfiguration;
     interval = reconTaskConfig.getSafeModeWaitThreshold().toMillis();
     dnHBInterval = ozoneConfiguration.getTimeDuration(HDDS_HEARTBEAT_INTERVAL,
         HDDS_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
@@ -97,10 +95,10 @@ public class ReconSafeModeMgrTask {
   private void tryReconExitSafeMode()
       throws InterruptedException {
       // Recon starting first time
-    if (null == allNodes || allNodes.size() == 0) {
+    if (null == allNodes || allNodes.isEmpty()) {
       return;
     }
-    if (null == containers || containers.size() == 0) {
+    if (null == containers || containers.isEmpty()) {
       return;
     }
     final Set<ContainerID> currentContainersInAllDatanodes =

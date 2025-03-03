@@ -658,7 +658,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   }
 
   private ResourceType getResourceType(OmKeyArgs args) {
-    if (args.getKeyName() == null || args.getKeyName().length() == 0) {
+    if (args.getKeyName() == null || args.getKeyName().isEmpty()) {
       return ResourceType.BUCKET;
     }
     return ResourceType.KEY;

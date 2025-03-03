@@ -56,10 +56,7 @@ public interface ConfigurationTarget {
   }
 
   default <T> void setFromObject(T object) {
-    ConfigGroup configGroup =
-        object.getClass().getAnnotation(ConfigGroup.class);
-    String prefix = configGroup.prefix();
-    ConfigurationReflectionUtil.updateConfiguration(this, object, prefix);
+    ConfigurationReflectionUtil.updateConfiguration(this, object);
   }
 
 }

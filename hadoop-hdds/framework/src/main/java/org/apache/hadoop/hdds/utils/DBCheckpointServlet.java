@@ -106,6 +106,14 @@ public class DBCheckpointServlet extends HttpServlet
     }
     bootstrapTempData = Paths.get(tempData,
         "temp-bootstrap-data").toFile();
+    if (bootstrapTempData.exists()) {
+      try {
+        FileUtils.cleanDirectory(bootstrapTempData);
+      } catch (IOException e) {
+        LOG.error("Failed to clean-up: {} dir.", bootstrapTempData);
+        throw new ServletException("Failed to clean-up: " + bootstrapTempData);
+      }
+    }
     if (!bootstrapTempData.exists() &&
         !bootstrapTempData.mkdirs()) {
       throw new ServletException("Failed to make:" + bootstrapTempData);

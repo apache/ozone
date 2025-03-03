@@ -393,7 +393,7 @@ public class TestNodeStateManager {
     }
 
     public Event getLastEvent() {
-      if (events.size() == 0) {
+      if (events.isEmpty()) {
         return null;
       } else {
         return events.get(events.size() - 1);

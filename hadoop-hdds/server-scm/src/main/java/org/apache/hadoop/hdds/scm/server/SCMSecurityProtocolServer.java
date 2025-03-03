@@ -256,7 +256,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
       throws IOException {
     List<String> pemEncodedList = new ArrayList<>();
     Set<X509Certificate> certList =
-        scmCertificateClient.getAllRootCaCerts().size() == 0 ?
+        scmCertificateClient.getAllRootCaCerts().isEmpty() ?
             scmCertificateClient.getAllCaCerts() :
             scmCertificateClient.getAllRootCaCerts();
     for (X509Certificate cert : certList) {

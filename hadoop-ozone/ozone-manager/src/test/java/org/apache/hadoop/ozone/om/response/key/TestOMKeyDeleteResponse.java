@@ -176,6 +176,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
     return omBucketInfo;
   }
 
+  @Override
   public BucketLayout getBucketLayout() {
     return BucketLayout.OBJECT_STORE;
   }

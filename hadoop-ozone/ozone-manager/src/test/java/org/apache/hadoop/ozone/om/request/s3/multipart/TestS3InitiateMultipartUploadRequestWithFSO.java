@@ -47,6 +47,7 @@ import org.junit.jupiter.api.Test;
 public class TestS3InitiateMultipartUploadRequestWithFSO
     extends TestS3InitiateMultipartUploadRequest {
 
+  @Override
   @Test
   public void testValidateAndUpdateCache() throws Exception {
     String volumeName = UUID.randomUUID().toString();
@@ -145,14 +146,11 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
       throws IOException {
     // bucketID is the parent
     long parentID = bucketId;
-    for (int indx = 0; indx < dirs.size(); indx++) {
-      String dirName = dirs.get(indx);
+    for (String dirName : dirs) {
       String dbKey;
       // for index=0, parentID is bucketID
-      dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
-              parentID, dirName);
-      OmDirectoryInfo omDirInfo =
-              omMetadataManager.getDirectoryTable().get(dbKey);
+      dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId, parentID, dirName);
+      OmDirectoryInfo omDirInfo = omMetadataManager.getDirectoryTable().get(dbKey);
       assertNotNull(omDirInfo, "Invalid directory!");
       assertEquals(dirName, omDirInfo.getName(),
           "Invalid directory!");
@@ -172,6 +170,7 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
     return request;
   }
 
+  @Override
   @Test
   public void testMultipartUploadInheritParentDefaultAcls()
       throws Exception {

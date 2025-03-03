@@ -83,7 +83,7 @@ public class CommandQueue {
     List<SCMCommand> cmdList = null;
     if (cmds != null) {
       cmdList = cmds.getCommands();
-      commandsInQueue -= cmdList.size() > 0 ? cmdList.size() : 0;
+      commandsInQueue -= !cmdList.isEmpty() ? cmdList.size() : 0;
       // A post condition really.
       Preconditions.checkState(commandsInQueue >= 0);
     }

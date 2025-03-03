@@ -1170,7 +1170,7 @@ public class TestECUnderReplicationHandler {
     int replicateCommand = 0;
     int reconstructCommand = 0;
     boolean shouldReconstructCommandExist =
-        missingIndexes.size() > 0 && missingIndexes.size() <= repConfig
+        !missingIndexes.isEmpty() && missingIndexes.size() <= repConfig
             .getParity();
     for (Map.Entry<DatanodeDetails, SCMCommand<?>> dnCommand : commandsSent) {
       if (dnCommand.getValue() instanceof ReplicateContainerCommand) {

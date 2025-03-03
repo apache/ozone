@@ -174,7 +174,7 @@ public class ProgressBar {
     StringBuilder sb = new StringBuilder();
     String realTimeMessage = supplier.get();
     int shrinkTimes = 1;
-    if (realTimeMessage.length() != 0) {
+    if (!realTimeMessage.isEmpty()) {
       shrinkTimes = 3;
     }
     sb.append(" ").append(String.format("%.2f", percent)).append("% |");

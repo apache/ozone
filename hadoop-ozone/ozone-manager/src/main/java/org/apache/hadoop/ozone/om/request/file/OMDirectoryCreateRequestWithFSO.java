@@ -99,7 +99,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
 
     try {
       // Check if this is the root of the filesystem.
-      if (keyName.length() == 0) {
+      if (keyName.isEmpty()) {
         throw new OMException("Directory create failed. Cannot create " +
             "directory at root of the filesystem",
             OMException.ResultCodes.CANNOT_CREATE_DIRECTORY_AT_ROOT);

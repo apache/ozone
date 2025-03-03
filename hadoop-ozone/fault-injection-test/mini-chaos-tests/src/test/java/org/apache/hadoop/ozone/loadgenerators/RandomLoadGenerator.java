@@ -19,16 +19,12 @@ package org.apache.hadoop.ozone.loadgenerators;
 
 import java.nio.ByteBuffer;
 import org.apache.commons.lang3.RandomUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Random load generator which writes, read and deletes keys from
  * the bucket.
  */
 public class RandomLoadGenerator extends LoadGenerator {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(RandomLoadGenerator.class);
 
   private final LoadBucket ozoneBucket;
   private final DataBuffer dataBuffer;

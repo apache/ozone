@@ -98,7 +98,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
     this.failoverProxyProvider = proxyProvider;
     this.rpcProxy = (ScmBlockLocationProtocolPB) RetryProxy.create(
         ScmBlockLocationProtocolPB.class, failoverProxyProvider,
-        failoverProxyProvider.getSCMBlockLocationRetryPolicy());
+        failoverProxyProvider.getRetryPolicy());
   }
 
   /**

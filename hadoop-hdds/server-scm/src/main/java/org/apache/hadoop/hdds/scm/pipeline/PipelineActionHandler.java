@@ -18,8 +18,6 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
@@ -47,13 +45,11 @@ public class PipelineActionHandler
 
   private final PipelineManager pipelineManager;
   private final SCMContext scmContext;
-  private final ConfigurationSource ozoneConf;
 
   public PipelineActionHandler(PipelineManager pipelineManager,
-      SCMContext scmContext, OzoneConfiguration conf) {
+      SCMContext scmContext) {
     this.pipelineManager = pipelineManager;
     this.scmContext = scmContext;
-    this.ozoneConf = conf;
   }
 
   @Override

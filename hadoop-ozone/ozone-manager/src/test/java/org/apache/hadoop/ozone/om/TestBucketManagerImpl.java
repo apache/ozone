@@ -455,8 +455,4 @@ class TestBucketManagerImpl extends OzoneTestBase {
         bucketInfo.getIsVersionEnabled(),
         storedLinkBucket.getIsVersionEnabled());
   }
-
-  private BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
-  }
 }

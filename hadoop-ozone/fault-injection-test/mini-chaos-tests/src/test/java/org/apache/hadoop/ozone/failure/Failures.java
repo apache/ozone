@@ -133,6 +133,7 @@ public abstract class Failures {
    */
   public static class StorageContainerManagerStartStopFailure
       extends ScmFailures {
+    @Override
     public void fail(MiniOzoneChaosCluster cluster) {
       // Get the number of OzoneManager to fail in the cluster.
       boolean shouldStop = cluster.shouldStopScm();

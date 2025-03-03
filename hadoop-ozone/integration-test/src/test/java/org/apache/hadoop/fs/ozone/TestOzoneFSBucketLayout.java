@@ -34,7 +34,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -43,6 +42,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
@@ -52,12 +52,10 @@ import org.junit.jupiter.params.provider.MethodSource;
 /**
  * Ozone file system tests to validate default bucket layout configuration
  * and behaviour.
- * TODO: merge with some other test
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class TestOzoneFSBucketLayout {
+public abstract class TestOzoneFSBucketLayout implements NonHATests.TestCase {
 
-  private MiniOzoneCluster cluster;
   private ObjectStore objectStore;
   private OzoneClient client;
   private String rootPath;
@@ -95,25 +93,17 @@ class TestOzoneFSBucketLayout {
   }
 
   @BeforeAll
-  void initCluster() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
-        .build();
-    cluster.waitForClusterToBeReady();
-    client = cluster.newClient();
+  void setUp() throws Exception {
+    client = cluster().newClient();
     objectStore = client.getObjectStore();
     rootPath = String.format("%s://%s/",
-        OzoneConsts.OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
+        OzoneConsts.OZONE_OFS_URI_SCHEME, cluster().getConf().get(OZONE_OM_ADDRESS_KEY));
     volumeName = TestDataUtil.createVolumeAndBucket(client).getVolumeName();
   }
 
   @AfterAll
-  void teardown() throws IOException {
+  void tearDown() {
     IOUtils.closeQuietly(client);
-    if (cluster != null) {
-      cluster.shutdown();
-    }
   }
 
   @ParameterizedTest
@@ -134,6 +124,7 @@ class TestOzoneFSBucketLayout {
     assertThat(e.getMessage())
         .contains(ERROR_MAP.get(layout));
   }
+
   @ParameterizedTest
   @MethodSource("validDefaultBucketLayouts")
   void fileSystemWithValidBucketLayout(String layout) throws IOException {

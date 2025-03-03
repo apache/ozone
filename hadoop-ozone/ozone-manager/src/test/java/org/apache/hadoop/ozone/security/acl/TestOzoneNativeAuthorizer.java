@@ -243,7 +243,7 @@ public class TestOzoneNativeAuthorizer {
     createAll(keyName, prefixName, userRight, groupRight, expectedResult);
     OzoneAcl userAcl = new OzoneAcl(USER, testUgi.getUserName(),
         ACCESS, parentDirUserAcl);
-    OzoneAcl groupAcl = new OzoneAcl(GROUP, testUgi.getGroups().size() > 0 ?
+    OzoneAcl groupAcl = new OzoneAcl(GROUP, !testUgi.getGroups().isEmpty() ?
         testUgi.getGroups().get(0) : "", ACCESS, parentDirGroupAcl);
     // Set access for volume.
     // We should directly add to table because old API's update to DB.
@@ -265,7 +265,7 @@ public class TestOzoneNativeAuthorizer {
     createAll(keyName, prefixName, userRight, groupRight, expectedResult);
     OzoneAcl userAcl = new OzoneAcl(USER, testUgi.getUserName(),
         ACCESS, parentDirUserAcl);
-    OzoneAcl groupAcl = new OzoneAcl(GROUP, testUgi.getGroups().size() > 0 ?
+    OzoneAcl groupAcl = new OzoneAcl(GROUP, !testUgi.getGroups().isEmpty() ?
         testUgi.getGroups().get(0) : "", ACCESS, parentDirGroupAcl);
     // Set access for volume & bucket. We should directly add to table
     // because old API's update to DB.
@@ -295,7 +295,7 @@ public class TestOzoneNativeAuthorizer {
 
     OzoneAcl userAcl = new OzoneAcl(USER, testUgi.getUserName(),
         ACCESS, parentDirUserAcl);
-    OzoneAcl groupAcl = new OzoneAcl(GROUP, testUgi.getGroups().size() > 0 ?
+    OzoneAcl groupAcl = new OzoneAcl(GROUP, !testUgi.getGroups().isEmpty() ?
         testUgi.getGroups().get(0) : "", ACCESS, parentDirGroupAcl);
     // Set access for volume & bucket. We should directly add to table
     // because old API's update to DB.
@@ -333,7 +333,7 @@ public class TestOzoneNativeAuthorizer {
       throws IOException {
     List<OzoneAcl> acls;
     String user = testUgi.getUserName();
-    String group = (testUgi.getGroups().size() > 0) ?
+    String group = (!testUgi.getGroups().isEmpty()) ?
         testUgi.getGroups().get(0) : "";
 
     RequestContext.Builder builder = new RequestContext.Builder()
@@ -486,7 +486,7 @@ public class TestOzoneNativeAuthorizer {
     case USER:
       return testUgi.getUserName();
     case GROUP:
-      if (testUgi.getGroups().size() > 0) {
+      if (!testUgi.getGroups().isEmpty()) {
         return testUgi.getGroups().get(0);
       }
     default:

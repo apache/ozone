@@ -76,7 +76,6 @@ public class TestOzoneManagerRatisServer {
   private OMMetadataManager omMetadataManager;
   private OzoneManager ozoneManager;
   private OMNodeDetails omNodeDetails;
-  private TermIndex initialTermIndex;
   private SecurityConfig secConfig;
   private OMCertificateClient certClient;
 
@@ -115,7 +114,6 @@ public class TestOzoneManagerRatisServer {
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
-    initialTermIndex = TermIndex.valueOf(0, 0);
     when(ozoneManager.getTransactionInfo()).thenReturn(TransactionInfo.DEFAULT_VALUE);
     when(ozoneManager.getConfiguration()).thenReturn(conf);
     final OmConfig omConfig = conf.getObject(OmConfig.class);

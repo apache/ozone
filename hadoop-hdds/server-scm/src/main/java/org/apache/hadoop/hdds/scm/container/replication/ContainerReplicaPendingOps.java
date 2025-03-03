@@ -233,7 +233,7 @@ public class ContainerReplicaPendingOps {
             updateTimeoutMetrics(op);
           }
         }
-        if (ops.size() == 0) {
+        if (ops.isEmpty()) {
           pendingOps.remove(containerID);
         }
       } finally {
@@ -304,7 +304,7 @@ public class ContainerReplicaPendingOps {
             decrementCounter(op.getOpType(), replicaIndex);
           }
         }
-        if (ops.size() == 0) {
+        if (ops.isEmpty()) {
           pendingOps.remove(containerID);
         }
       }

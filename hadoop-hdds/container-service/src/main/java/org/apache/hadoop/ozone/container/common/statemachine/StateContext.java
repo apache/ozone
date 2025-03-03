@@ -590,7 +590,7 @@ public class StateContext {
     }
 
     ThreadPoolExecutor ex = (ThreadPoolExecutor) executor;
-    if (ex.getQueue().size() == 0) {
+    if (ex.getQueue().isEmpty()) {
       return true;
     }
 

@@ -102,7 +102,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
 
   private static final int QUANTILES = 10;
 
-  private static final int CHECK_INTERVAL_MILLIS = 5000;
+  private static final int CHECK_INTERVAL_MILLIS = 100;
 
   private byte[] keyValueBuffer = null;
 

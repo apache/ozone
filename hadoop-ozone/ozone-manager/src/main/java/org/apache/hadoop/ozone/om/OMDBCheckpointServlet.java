@@ -93,7 +93,6 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   private static final long serialVersionUID = 1L;
   private transient BootstrapStateHandler.Lock lock;
   private long maxTotalSstSize = 0;
-  private static final AtomicLong PAUSE_COUNTER = new AtomicLong(0);
 
   @Override
   public void init() throws ServletException {

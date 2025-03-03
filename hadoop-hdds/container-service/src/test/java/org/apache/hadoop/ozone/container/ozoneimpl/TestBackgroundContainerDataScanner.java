@@ -56,6 +56,7 @@ public class TestBackgroundContainerDataScanner extends
 
   private BackgroundContainerDataScanner scanner;
 
+  @Override
   @BeforeEach
   public void setup() {
     super.setup();
@@ -105,12 +106,11 @@ public class TestBackgroundContainerDataScanner extends
   @Override
   public void testScannerMetricsUnregisters() {
     String name = scanner.getMetrics().getName();
-
     assertNotNull(DefaultMetricsSystem.instance().getSource(name));
 
     scanner.shutdown();
     scanner.run();
-
+    
     assertNull(DefaultMetricsSystem.instance().getSource(name));
   }
 
@@ -203,7 +203,8 @@ public class TestBackgroundContainerDataScanner extends
     GenericTestUtils.waitFor(() -> !scanner.isAlive(), 1000, 5000);
 
     // Volume health should have been checked.
-    verify(vol, atLeastOnce()).isFailed();
+    // TODO: remove the mock return value asseration after we upgrade to spotbugs 4.8 up
+    assertFalse(verify(vol, atLeastOnce()).isFailed());
     // No iterations should have been run.
     assertEquals(0, metrics.getNumScanIterations());
     assertEquals(0, metrics.getNumContainersScanned());

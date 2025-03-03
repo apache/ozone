@@ -146,7 +146,7 @@ public final class SCMContainerPlacementRackAware
     }
     DatanodeDetails favoredNode;
     int favorIndex = 0;
-    if (mutableUsedNodes.size() == 0) {
+    if (mutableUsedNodes.isEmpty()) {
       // choose all nodes for a new pipeline case
       // choose first datanode from scope ROOT or from favoredNodes if not null
       favoredNode = favoredNodeNum > favorIndex ?

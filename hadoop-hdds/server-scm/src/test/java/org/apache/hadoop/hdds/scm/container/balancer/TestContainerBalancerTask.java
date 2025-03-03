@@ -590,16 +590,4 @@ public class TestContainerBalancerTask {
   private void stopBalancer() {
     // do nothing as testcase is not threaded
   }
-
-  private CompletableFuture<MoveManager.MoveResult>
-      genCompletableFuture(int sleepMilSec) {
-    return CompletableFuture.supplyAsync(() -> {
-      try {
-        Thread.sleep(sleepMilSec);
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      }
-      return MoveManager.MoveResult.COMPLETED;
-    });
-  }
 }

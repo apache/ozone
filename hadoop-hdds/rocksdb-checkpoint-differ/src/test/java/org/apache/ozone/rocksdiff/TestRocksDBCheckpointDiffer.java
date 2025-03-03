@@ -925,7 +925,7 @@ public class TestRocksDBCheckpointDiffer {
       // fist go through fwdGraph to find nodes that don't have successors.
       // These nodes will be the top level nodes in reverse graph
       Set<CompactionNode> successors = fwdMutableGraph.successors(infileNode);
-      if (successors.size() == 0) {
+      if (successors.isEmpty()) {
         LOG.debug("No successors. Cumulative keys: {}, total keys: {}",
             infileNode.getCumulativeKeysReverseTraversal(),
             infileNode.getTotalNumberOfKeys());
@@ -1050,9 +1050,9 @@ public class TestRocksDBCheckpointDiffer {
       List<CompactionNode> currentLevel = COMPACTION_NODES_BY_LEVEL.get(level);
       List<CompactionNode> nextLevel = COMPACTION_NODES_BY_LEVEL.get(level + 1);
 
-      for (int i = 0; i < currentLevel.size(); i++) {
+      for (CompactionNode compactionNode : currentLevel) {
         for (int j = 0; j < nextLevel.size(); j++) {
-          dag.addNode(currentLevel.get(i));
+          dag.addNode(compactionNode);
           dag.addNode(nextLevel.get(j));
 
           int child = nextLevel.size();
@@ -1061,7 +1061,7 @@ public class TestRocksDBCheckpointDiffer {
           }
 
           if (j < child) {
-            dag.putEdge(currentLevel.get(i), nextLevel.get(j));
+            dag.putEdge(compactionNode, nextLevel.get(j));
           }
         }
       }
@@ -1094,9 +1094,9 @@ public class TestRocksDBCheckpointDiffer {
       List<CompactionNode> nextLevel = COMPACTION_NODES_BY_LEVEL.get(level - 1);
 
       for (int i = 0; i < currentLevel.size(); i++) {
-        for (int j = 0; j < nextLevel.size(); j++) {
+        for (CompactionNode compactionNode : nextLevel) {
           dag.addNode(currentLevel.get(i));
-          dag.addNode(nextLevel.get(j));
+          dag.addNode(compactionNode);
 
           int parent = currentLevel.size();
           if (level < COMPACTION_NODES_BY_LEVEL.size() - 1) {
@@ -1104,7 +1104,7 @@ public class TestRocksDBCheckpointDiffer {
           }
 
           if (i < parent) {
-            dag.putEdge(currentLevel.get(i), nextLevel.get(j));
+            dag.putEdge(currentLevel.get(i), compactionNode);
           }
         }
       }

@@ -38,7 +38,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -568,8 +567,8 @@ public class TestContainerPersistence {
     List<ContainerData> results = new LinkedList<>();
     while (counter < count) {
       containerSet.listContainer(prevKey, step, results);
-      for (int y = 0; y < results.size(); y++) {
-        testMap.remove(results.get(y).getContainerID());
+      for (ContainerData result : results) {
+        testMap.remove(result.getContainerID());
       }
       counter += step;
       long nextKey = results.get(results.size() - 1).getContainerID();
@@ -660,7 +659,6 @@ public class TestContainerPersistence {
     KeyValueContainerData cNewData =
         (KeyValueContainerData) container.getContainerData();
     assertNotNull(cNewData);
-    Path dataDir = Paths.get(cNewData.getChunksPath());
 
     // Read chunk via file system and verify.
     Checksum checksum = new Checksum(ChecksumType.CRC32, 1024 * 1024);

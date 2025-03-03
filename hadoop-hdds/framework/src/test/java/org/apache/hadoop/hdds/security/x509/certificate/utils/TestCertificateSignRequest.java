@@ -29,7 +29,6 @@ import static org.junit.jupiter.api.Assertions.fail;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.security.KeyPair;
-import java.util.Iterator;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -265,18 +264,17 @@ public class TestCertificateSignRequest {
         GeneralNames.fromExtensions(
             extensions, Extension.subjectAlternativeName);
     GeneralName[] names = gns.getNames();
-    for (int i = 0; i < names.length; i++) {
-      if (names[i].getTagNo() == GeneralName.otherName) {
-        ASN1Encodable asn1Encodable = names[i].getName();
-        Iterator iterator = ((DLSequence) asn1Encodable).iterator();
-        while (iterator.hasNext()) {
-          Object o = iterator.next();
-          if (o instanceof ASN1ObjectIdentifier) {
-            String oid = o.toString();
+    for (GeneralName name : names) {
+      if (name.getTagNo() == GeneralName.otherName) {
+        ASN1Encodable asn1Encodable = name.getName();
+
+        for (Object sequence : (DLSequence) asn1Encodable) {
+          if (sequence instanceof ASN1ObjectIdentifier) {
+            String oid = sequence.toString();
             assertEquals("2.16.840.1.113730.3.1.34", oid);
           }
-          if (o instanceof DERTaggedObject) {
-            String serviceName = ((DERTaggedObject)o).toASN1Primitive().toString();
+          if (sequence instanceof DERTaggedObject) {
+            String serviceName = ((DERTaggedObject) sequence).toASN1Primitive().toString();
             assertEquals("OzoneMarketingCluster003", serviceName);
           }
         }

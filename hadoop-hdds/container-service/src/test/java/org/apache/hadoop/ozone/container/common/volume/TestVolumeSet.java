@@ -34,7 +34,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -77,7 +76,7 @@ public class TestVolumeSet {
     String dataDirKey = volume1 + "," + volume2;
     volumes.add(volume1);
     volumes.add(volume2);
-    conf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY, dataDirKey);
+    conf.set(HddsConfigKeys.HDDS_DATANODE_DATA_DIR_KEY, dataDirKey);
     conf.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
         dataDirKey);
     initializeVolumeSet();
@@ -185,10 +184,10 @@ public class TestVolumeSet {
     // Create the root volume dir and create a sub-directory within it.
     File newVolume = new File(volume3, HDDS_VOLUME_DIR);
     System.out.println("new volume root: " + newVolume);
-    newVolume.mkdirs();
+    assertTrue(newVolume.mkdirs());
     assertTrue(newVolume.exists(), "Failed to create new volume root");
     File dataDir = new File(newVolume, "chunks");
-    dataDir.mkdirs();
+    assertTrue(dataDir.mkdirs());
     assertTrue(dataDir.exists());
 
     // The new volume is in an inconsistent state as the root dir is

@@ -42,7 +42,6 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
@@ -67,10 +66,8 @@ public class FilePerChunkStrategy implements ChunkManager {
   private final MappedBufferManager mappedBufferManager;
 
   private final boolean readNettyChunkedNioFile;
-  private final VolumeSet volumeSet;
 
-  public FilePerChunkStrategy(boolean sync, BlockManager manager,
-                              VolumeSet volSet) {
+  public FilePerChunkStrategy(boolean sync, BlockManager manager) {
     doSyncWrite = sync;
     blockManager = manager;
     this.defaultReadBufferCapacity = manager == null ? 0 :
@@ -80,7 +77,6 @@ public class FilePerChunkStrategy implements ChunkManager {
     this.readMappedBufferMaxCount = manager == null ? 0
         : manager.getReadMappedBufferMaxCount();
     LOG.info("ozone.chunk.read.mapped.buffer.max.count is load with {}", readMappedBufferMaxCount);
-    this.volumeSet = volSet;
     if (this.readMappedBufferMaxCount > 0) {
       mappedBufferManager = new MappedBufferManager(this.readMappedBufferMaxCount);
     } else {

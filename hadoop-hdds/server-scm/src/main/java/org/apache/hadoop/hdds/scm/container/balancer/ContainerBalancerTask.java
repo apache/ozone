@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.container.balancer;
 
 import static java.time.OffsetDateTime.now;
-import static java.util.Collections.emptyMap;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DEFAULT;
 import static org.apache.hadoop.util.StringUtils.byteDesc;
@@ -408,53 +407,6 @@ public class ContainerBalancerTask implements Runnable {
     } else {
       return null;
     }
-  }
-
-  private static ContainerBalancerTaskIterationStatusInfo getEmptyCurrentIterationStatistic(
-      long iterationDuration) {
-    ContainerMoveInfo containerMoveInfo = new ContainerMoveInfo(0, 0, 0, 0);
-    DataMoveInfo dataMoveInfo = new DataMoveInfo(
-        0,
-        0,
-        emptyMap(),
-        emptyMap()
-    );
-    IterationInfo iterationInfo = new IterationInfo(
-        0,
-        null,
-        iterationDuration
-    );
-    return new ContainerBalancerTaskIterationStatusInfo(
-        iterationInfo,
-        containerMoveInfo,
-        dataMoveInfo
-    );
-  }
-
-  private ContainerBalancerTaskIterationStatusInfo getFilledCurrentIterationStatistic(int lastIterationNumber,
-                                                                                      long iterationDuration) {
-    Map<UUID, Long> sizeEnteringDataToNodes =
-        convertToNodeIdToTrafficMap(findTargetStrategy.getSizeEnteringNodes());
-    Map<UUID, Long> sizeLeavingDataFromNodes =
-        convertToNodeIdToTrafficMap(findSourceStrategy.getSizeLeavingNodes());
-
-    ContainerMoveInfo containerMoveInfo = new ContainerMoveInfo(metrics);
-    DataMoveInfo dataMoveInfo = new DataMoveInfo(
-        getSizeScheduledForMoveInLatestIteration(),
-        sizeActuallyMovedInLatestIteration,
-        sizeEnteringDataToNodes,
-        sizeLeavingDataFromNodes
-    );
-    IterationInfo iterationInfo = new IterationInfo(
-        lastIterationNumber + 1,
-        null,
-        iterationDuration
-    );
-    return new ContainerBalancerTaskIterationStatusInfo(
-        iterationInfo,
-        containerMoveInfo,
-        dataMoveInfo
-    );
   }
 
   private long getCurrentIterationDuration() {
