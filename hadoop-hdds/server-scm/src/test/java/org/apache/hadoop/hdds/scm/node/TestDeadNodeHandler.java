@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLU
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -52,6 +53,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -81,6 +83,7 @@ public class TestDeadNodeHandler {
   private ContainerManager containerManager;
   private PipelineManagerImpl pipelineManager;
   private DeadNodeHandler deadNodeHandler;
+  private ReplicationManager replicationManager;
   private HealthyReadOnlyNodeHandler healthyReadOnlyNodeHandler;
   private EventPublisher publisher;
   private EventQueue eventQueue;
@@ -106,6 +109,8 @@ public class TestDeadNodeHandler {
         .setSCM(scm).build();
     pipelineManager =
         (PipelineManagerImpl)scm.getPipelineManager();
+    replicationManager = scm.getReplicationManager();
+    replicationManager.setScmContext(scmContext);
     pipelineManager.setScmContext(scmContext);
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
@@ -113,9 +118,10 @@ public class TestDeadNodeHandler {
     pipelineManager.setPipelineProvider(RATIS,
         mockRatisProvider);
     containerManager = scm.getContainerManager();
+    replicationManager = mock(ReplicationManager.class);
     deletedBlockLog = mock(DeletedBlockLog.class);
     deadNodeHandler = new DeadNodeHandler(nodeManager,
-        mock(PipelineManager.class), containerManager, deletedBlockLog);
+        mock(PipelineManager.class), containerManager, replicationManager, deletedBlockLog);
     healthyReadOnlyNodeHandler =
         new HealthyReadOnlyNodeHandler(nodeManager,
             pipelineManager);
@@ -230,6 +236,9 @@ public class TestDeadNodeHandler {
     assertFalse(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
 
+    verify(replicationManager).notifyNodeStateChange();
+    clearInvocations(replicationManager);
+
     verify(deletedBlockLog, times(0))
         .onDatanodeDead(datanode1.getUuid());
 
@@ -259,8 +268,9 @@ public class TestDeadNodeHandler {
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
     assertEquals(0, nodeManager.getCommandQueueCount(datanode1.getUuid(), cmd.getType()));
 
-    verify(deletedBlockLog, times(1))
-        .onDatanodeDead(datanode1.getUuid());
+    verify(replicationManager).notifyNodeStateChange();
+
+    verify(deletedBlockLog).onDatanodeDead(datanode1.getUuid());
 
     container1Replicas = containerManager
         .getContainerReplicas(ContainerID.valueOf(container1.getContainerID()));

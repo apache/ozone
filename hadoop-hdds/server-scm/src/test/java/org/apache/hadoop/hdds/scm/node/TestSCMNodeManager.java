@@ -86,6 +86,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -2036,6 +2037,52 @@ public class TestSCMNodeManager {
 
       assertEquals(emptyList(), nodeManager.getNodesByAddress(hostName));
       assertEquals(emptyList(), nodeManager.getNodesByAddress(ipAddress));
+    }
+  }
+
+  private static Stream<Arguments> nodeStateTransitions() {
+    return Stream.of(
+        // start decommissioning or entering maintenance
+        Arguments.of(HddsProtos.NodeOperationalState.IN_SERVICE, 
+                    HddsProtos.NodeOperationalState.DECOMMISSIONING, true),
+        Arguments.of(HddsProtos.NodeOperationalState.IN_SERVICE, 
+                    HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE, true),
+        // back to service (DataNodeAdminMonitor abort workflow, maintenance end time expired or node is dead)
+        Arguments.of(HddsProtos.NodeOperationalState.DECOMMISSIONING, 
+                    HddsProtos.NodeOperationalState.IN_SERVICE, true),
+        Arguments.of(HddsProtos.NodeOperationalState.DECOMMISSIONED, 
+                    HddsProtos.NodeOperationalState.IN_SERVICE, true),
+        Arguments.of(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE, 
+                    HddsProtos.NodeOperationalState.IN_SERVICE, true),
+        Arguments.of(HddsProtos.NodeOperationalState.IN_MAINTENANCE, 
+                    HddsProtos.NodeOperationalState.IN_SERVICE, true),
+        // there is no under/over replicated containers on the node, completed the admin workflow
+        Arguments.of(HddsProtos.NodeOperationalState.DECOMMISSIONING, 
+                    HddsProtos.NodeOperationalState.DECOMMISSIONED, false),
+        Arguments.of(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE, 
+                    HddsProtos.NodeOperationalState.IN_MAINTENANCE, false)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("nodeStateTransitions")
+  public void testNodeOperationalStateChangeNotifiesReplicationManager(
+      HddsProtos.NodeOperationalState oldState, 
+      HddsProtos.NodeOperationalState newState, 
+      boolean shouldNotify)
+      throws IOException, NodeNotFoundException, AuthenticationException {
+    OzoneConfiguration conf = getConf();
+    ReplicationManager replicationManager = mock(ReplicationManager.class);
+
+    try (SCMNodeManager nodeManager = createNodeManager(conf)) {    
+      nodeManager.setReplicationManager(replicationManager);
+
+      DatanodeDetails datanode = HddsTestUtils.createRandomDatanodeAndRegister(
+          nodeManager);
+      nodeManager.getNodeStateManager().setNodeOperationalState(datanode, oldState);
+
+      nodeManager.setNodeOperationalState(datanode, newState, 0);
+      verify(replicationManager, times(shouldNotify ? 1 : 0)).notifyNodeStateChange();
     }
   }
 }
