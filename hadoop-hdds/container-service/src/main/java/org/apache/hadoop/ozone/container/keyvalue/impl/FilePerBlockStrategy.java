@@ -179,15 +179,15 @@ public class FilePerBlockStrategy implements ChunkManager {
     try {
       fileLengthBeforeWrite = channel.size();
     } catch (IOException e) {
-      throw new StorageContainerException("IO error encountered while " +
-          "getting the file size for " + chunkFile.getName(), CHUNK_FILE_INCONSISTENCY);
+      throw new StorageContainerException("Encountered an error while getting the file size for "
+          + chunkFile.getName(), CHUNK_FILE_INCONSISTENCY);
     }
 
     ChunkUtils.writeData(channel, chunkFile.getName(), data, offset, len, volume);
 
     // When overwriting, update the bytes used if the new length is greater than the old length
     // This is to ensure that the bytes used is updated correctly when overwriting a smaller chunk
-    // with a larger chunk.
+    // with a larger chunk at the end of the block.
     if (overwrite) {
       long fileLengthAfterWrite = offset + len;
       if (fileLengthAfterWrite > fileLengthBeforeWrite) {

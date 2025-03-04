@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContain
 import static org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl.FULL_CHUNK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -53,7 +54,6 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -208,34 +208,38 @@ public class TestBlockManagerImpl {
     assertEquals(0, containerData.getBlockCount());
     keyValueContainer.close();
     assertEquals(CLOSED, keyValueContainer.getContainerState());
-    // 1. Put Block with bcsId = 2, Overwrite = true
-    blockManager.putBlockForClosedContainer(keyValueContainer, blockData1, true);
 
     try (DBHandle db = BlockUtils.getDB(containerData, config)) {
+      // 1. Put Block with bcsId = 1, Overwrite BCS ID = true
+      blockData1 = createBlockData(1L, 2L, 1, 0, 2048, 1);
+      blockManager.putBlockForClosedContainer(keyValueContainer, blockData1, true);
+
       BlockData fromGetBlockData;
       //Check Container's bcsId
-      fromGetBlockData = blockManager.getBlock(keyValueContainer, blockData1.getBlockID());
+      fromGetBlockData = blockManager.getBlock(keyValueContainer, blockData.getBlockID());
       assertEquals(1, containerData.getBlockCount());
       assertEquals(1, containerData.getBlockCommitSequenceId());
       assertEquals(1, fromGetBlockData.getBlockCommitSequenceId());
       assertEquals(1, db.getStore().getMetadataTable().get(containerData.getBcsIdKey()));
       assertEquals(1, db.getStore().getMetadataTable().get(containerData.getBlockCountKey()));
 
-      // 2. Put Block with bcsId = 2, Overwrite = false
+      // 2. Put Block with bcsId = 2, Overwrite BCS ID = false
       BlockData blockData2 = createBlockData(1L, 3L, 1, 0, 2048, 2);
       blockManager.putBlockForClosedContainer(keyValueContainer, blockData2, false);
 
-      // The block should be written, but we won't be able to read it, As BcsId < container's BcsId
+      // The block should be written, but we won't be able to read it, As expected BcsId < container's BcsId
       // fails during block read.
-      Assertions.assertThrows(StorageContainerException.class, () -> blockManager
+      assertThrows(StorageContainerException.class, () -> blockManager
           .getBlock(keyValueContainer, blockData2.getBlockID()));
+      fromGetBlockData = db.getStore().getBlockDataTable().get(containerData.getBlockKey(blockData2.getLocalID()));
       assertEquals(2, containerData.getBlockCount());
       // BcsId should still be 1, as the BcsId is not overwritten
       assertEquals(1, containerData.getBlockCommitSequenceId());
+      assertEquals(2, fromGetBlockData.getBlockCommitSequenceId());
       assertEquals(2, db.getStore().getMetadataTable().get(containerData.getBlockCountKey()));
       assertEquals(1, db.getStore().getMetadataTable().get(containerData.getBcsIdKey()));
 
-      // 3. Put Block with bcsId = 2, Overwrite = true
+      // 3. Put Block with bcsId = 2, Overwrite BCS ID = true
       // This should succeed as we are overwriting the BcsId, The container BcsId should be updated to 2
       // The block count should not change.
       blockManager.putBlockForClosedContainer(keyValueContainer, blockData2, true);
@@ -246,8 +250,8 @@ public class TestBlockManagerImpl {
       assertEquals(2, db.getStore().getMetadataTable().get(containerData.getBlockCountKey()));
       assertEquals(2, db.getStore().getMetadataTable().get(containerData.getBcsIdKey()));
 
-      // 4. Put Block with bcsId = 1 < container bcsId, Overwrite = true
-      // Container bcsId should not change
+      // 4. Put Block with bcsId = 1 < container bcsId, Overwrite BCS ID = true
+      // We are overwriting an existing block with lower bcsId than container bcdId. Container bcsId should not change
       BlockData blockData3 = createBlockData(1L, 1L, 1, 0, 2048, 1);
       blockManager.putBlockForClosedContainer(keyValueContainer, blockData3, true);
       fromGetBlockData = blockManager.getBlock(keyValueContainer, blockData3.getBlockID());
@@ -256,6 +260,9 @@ public class TestBlockManagerImpl {
       assertEquals(1, fromGetBlockData.getBlockCommitSequenceId());
       assertEquals(3, db.getStore().getMetadataTable().get(containerData.getBlockCountKey()));
       assertEquals(2, db.getStore().getMetadataTable().get(containerData.getBcsIdKey()));
+
+      // Used Bytes is only update by writeChunk, so it should be 0 here.
+      assertEquals(0, db.getStore().getMetadataTable().get(containerData.getBytesUsedKey()));
     }
   }
 

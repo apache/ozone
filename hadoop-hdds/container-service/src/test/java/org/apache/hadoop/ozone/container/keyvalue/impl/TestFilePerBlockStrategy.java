@@ -236,14 +236,13 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 1L, true);
     assertEquals(1L, containerData.getBlockCommitSequenceId());
     assertEquals(1L, containerData.getBlockCount());
+    assertEquals(20L, containerData.getBytesUsed());
 
     try (DBHandle dbHandle = BlockUtils.getDB(containerData, new OzoneConfiguration())) {
       long localID = putBlockData.getLocalID();
       BlockData getBlockData = dbHandle.getStore().getBlockDataTable()
           .get(containerData.getBlockKey(localID));
       Assertions.assertTrue(blockDataEquals(putBlockData, getBlockData));
-      // Overwriting the same
-      assertEquals(20L, containerData.getBytesUsed());
       assertEquals(20L, dbHandle.getStore().getMetadataTable().get(containerData.getBytesUsedKey()));
     }
 
@@ -257,16 +256,18 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 2L, true);
     assertEquals(2L, containerData.getBlockCommitSequenceId());
     assertEquals(1L, containerData.getBlockCount());
+    assertEquals(40L, containerData.getBytesUsed());
 
     try (DBHandle dbHandle = BlockUtils.getDB(containerData, new OzoneConfiguration())) {
       long localID = putBlockData.getLocalID();
       BlockData getBlockData = dbHandle.getStore().getBlockDataTable()
           .get(containerData.getBlockKey(localID));
       Assertions.assertTrue(blockDataEquals(putBlockData, getBlockData));
-      assertEquals(40L, containerData.getBytesUsed());
       assertEquals(40L, dbHandle.getStore().getMetadataTable().get(containerData.getBytesUsedKey()));
     }
 
+    // Replace the last chunk with a chunk of greater size, This should only update the bytesUsed with
+    // difference in length between the old last chunk and new last chunk
     newChunkInfo = new ChunkInfo(String.format("%d.data.%d", getBlockID().getLocalID(), 1L), 20L, 30L);
     chunkInfoList.remove(chunkInfoList.size() - 1);
     chunkInfoList.add(newChunkInfo.getProtoBufMessage());
@@ -277,13 +278,14 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 2L, true);
     assertEquals(2L, containerData.getBlockCommitSequenceId());
     assertEquals(1L, containerData.getBlockCount());
+    // Old chunk size 20, new chunk size 30, difference 10. So bytesUsed should be 40 + 10 = 50
+    assertEquals(50L, containerData.getBytesUsed());
 
     try (DBHandle dbHandle = BlockUtils.getDB(containerData, new OzoneConfiguration())) {
       long localID = putBlockData.getLocalID();
       BlockData getBlockData = dbHandle.getStore().getBlockDataTable()
           .get(containerData.getBlockKey(localID));
       Assertions.assertTrue(blockDataEquals(putBlockData, getBlockData));
-      assertEquals(50L, containerData.getBytesUsed());
       assertEquals(50L, dbHandle.getStore().getMetadataTable().get(containerData.getBytesUsedKey()));
     }
 

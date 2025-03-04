@@ -18,10 +18,13 @@
 package org.apache.hadoop.ozone.container.keyvalue.interfaces;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.List;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 
 /**
  * BlockManager is for performing key related operations on the container.
@@ -50,12 +53,13 @@ public interface BlockManager {
       throws IOException;
 
   /**
-   * Puts or overwrites a block to a closed container.
+   * Persists the block data for a closed container. The block data should have all the chunks and bcsId.
+   * Overwrites the block if it already exists, The container's used bytes should be updated by the caller with
+   * {@link ChunkManager#writeChunk(Container, BlockID, ChunkInfo, ByteBuffer, DispatcherContext)}.
    *
-   * @param container - Container for which block need to be added.
-   * @param data - Block Data.
-   * @param overwriteBcsId - To overwrite bcsId in the block data.
-   * @return length of the Block.
+   * @param container      - Container for which block data need to be persisted.
+   * @param data           - Block Data to be persisted (BlockData should have the chunks).
+   * @param overwriteBcsId - To overwrite bcsId of the block and container.
    */
   long putBlockForClosedContainer(Container container, BlockData data, boolean overwriteBcsId)
           throws IOException;
