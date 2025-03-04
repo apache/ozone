@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,24 +18,6 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
-import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
-import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.slf4j.Logger;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,6 +25,21 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.slf4j.Logger;
 
 /**
  * Base class for all the container report handlers.
@@ -291,9 +287,6 @@ public class AbstractContainerReportHandler {
       }
 
       if (replica.getState() == State.CLOSED) {
-        Preconditions.checkArgument(replica.getBlockCommitSequenceId()
-            == container.getSequenceId());
-
         /*
         For an EC container, only the first index and the parity indexes are
         guaranteed to have block data. So, update the container's state in SCM
@@ -309,8 +302,14 @@ public class AbstractContainerReportHandler {
           }
         }
 
-        logger.info("Moving container {} to CLOSED state, datanode {} " +
-            "reported CLOSED replica with index {}.", containerId, datanode,
+        if (!verifyBcsId(replica.getBlockCommitSequenceId(), container.getSequenceId(), datanode, containerId)) {
+          logger.warn("Ignored moving container {} from CLOSING to CLOSED state because replica bcsId ({}) " +
+                  "reported by datanode {} does not match sequenceId ({}).",
+              containerId, replica.getBlockCommitSequenceId(), datanode, container.getSequenceId());
+          return true;
+        }
+        logger.info("Moving container {} from CLOSING to CLOSED state, datanode {} " +
+                "reported CLOSED replica with index {}.", containerId, datanode,
             replica.getReplicaIndex());
         containerManager.updateContainerState(containerId,
             LifeCycleEvent.CLOSE);
@@ -334,10 +333,15 @@ public class AbstractContainerReportHandler {
        *
        */
       if (replica.getState() == State.CLOSED) {
-        logger.info("Moving container {} to CLOSED state, datanode {} " +
-            "reported CLOSED replica.", containerId, datanode);
-        Preconditions.checkArgument(replica.getBlockCommitSequenceId()
-            == container.getSequenceId());
+        if (!verifyBcsId(replica.getBlockCommitSequenceId(), container.getSequenceId(), datanode, containerId)) {
+          logger.warn("Ignored moving container {} from QUASI_CLOSED to CLOSED state because replica bcsId ({}) " +
+                  "reported by datanode {} does not match sequenceId ({}).",
+              containerId, replica.getBlockCommitSequenceId(), datanode, container.getSequenceId());
+          return true;
+        }
+        logger.info("Moving container {} from QUASI_CLOSED to CLOSED state, datanode {} " +
+                "reported CLOSED replica with index {}.", containerId, datanode,
+            replica.getReplicaIndex());
         containerManager.updateContainerState(containerId,
             LifeCycleEvent.FORCE_CLOSE);
       }
@@ -374,6 +378,32 @@ public class AbstractContainerReportHandler {
     }
 
     return ignored;
+  }
+
+  /**
+   * Helper method to verify that the replica's bcsId matches the container's in SCM.
+   * Throws IOException if the bcsIds do not match.
+   * <p>
+   * @param replicaBcsId Replica bcsId
+   * @param containerBcsId Container bcsId in SCM
+   * @param datanode DatanodeDetails for logging
+   * @param containerId ContainerID for logging
+   * @return true if verification has passed, false otherwise
+   */
+  private boolean verifyBcsId(long replicaBcsId, long containerBcsId,
+      DatanodeDetails datanode, ContainerID containerId) {
+
+    if (replicaBcsId != containerBcsId) {
+      final String errMsg = "Unexpected bcsId for container " + containerId +
+          " from datanode " + datanode + ". replica's: " + replicaBcsId +
+          ", SCM's: " + containerBcsId +
+          ". Ignoring container report for " + containerId;
+
+      logger.error(errMsg);
+      return false;
+    } else {
+      return true;
+    }
   }
 
   private void updateContainerReplica(final DatanodeDetails datanodeDetails,

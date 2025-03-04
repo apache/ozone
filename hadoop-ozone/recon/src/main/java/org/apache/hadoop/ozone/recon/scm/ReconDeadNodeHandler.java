@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -20,7 +19,6 @@ package org.apache.hadoop.ozone.recon.scm;
 
 import java.util.List;
 import java.util.Optional;
-
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.Node;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -30,7 +28,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
-import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,22 +42,17 @@ public class ReconDeadNodeHandler extends DeadNodeHandler {
   private StorageContainerServiceProvider scmClient;
   private ContainerHealthTask containerHealthTask;
   private PipelineSyncTask pipelineSyncTask;
-  private ContainerSizeCountTask containerSizeCountTask;
-  private ContainerManager containerManager;
 
   public ReconDeadNodeHandler(NodeManager nodeManager,
                               PipelineManager pipelineManager,
                               ContainerManager containerManager,
                               StorageContainerServiceProvider scmClient,
                               ContainerHealthTask containerHealthTask,
-                              PipelineSyncTask pipelineSyncTask,
-                              ContainerSizeCountTask containerSizeCountTask) {
+                              PipelineSyncTask pipelineSyncTask) {
     super(nodeManager, pipelineManager, containerManager);
     this.scmClient = scmClient;
-    this.containerManager = containerManager;
     this.containerHealthTask = containerHealthTask;
     this.pipelineSyncTask = pipelineSyncTask;
-    this.containerSizeCountTask = containerSizeCountTask;
   }
 
   @Override
@@ -83,8 +75,8 @@ public class ReconDeadNodeHandler extends DeadNodeHandler {
         LOG.warn("Node {} has reached DEAD state, but SCM does not have " +
             "information about it.", datanodeDetails);
       }
-      containerHealthTask.triggerContainerHealthCheck();
-      pipelineSyncTask.triggerPipelineSyncTask();
+      containerHealthTask.initializeAndRunTask();
+      pipelineSyncTask.initializeAndRunTask();
     } catch (Exception ioEx) {
       LOG.error("Error trying to verify Node operational state from SCM.",
           ioEx);

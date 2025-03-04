@@ -1,29 +1,43 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.repair.om;
 
-import org.apache.commons.io.IOUtils;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.ozone.test.IntLambda.withTextFromSystemIn;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -36,367 +50,318 @@ import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.repair.OzoneRepair;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
-
+import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.PrintStream;
-import java.nio.charset.StandardCharsets;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
 /**
  * FSORepairTool test cases.
  */
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class TestFSORepairTool {
+
   public static final Logger LOG = LoggerFactory.getLogger(TestFSORepairTool.class);
-  private final ByteArrayOutputStream out = new ByteArrayOutputStream();
-  private final ByteArrayOutputStream err = new ByteArrayOutputStream();
-  private static final PrintStream OLD_OUT = System.out;
-  private static final PrintStream OLD_ERR = System.err;
-  private static final String DEFAULT_ENCODING = UTF_8.name();
-  private MiniOzoneCluster cluster;
-  private FileSystem fs;
-  private OzoneClient client;
-  private OzoneConfiguration conf = null;
+  private static final int ORDER_DRY_RUN = 1;
+  //private static final int ORDER_REPAIR_SOME = 2; // TODO add test case
+  private static final int ORDER_REPAIR_ALL = 3;
+  private static final int ORDER_REPAIR_ALL_AGAIN = 4;
+  private static final int ORDER_RESTART_OM = 5;
 
-  @BeforeEach
-  public void init() throws Exception {
-    // Set configs.
-    conf = new OzoneConfiguration();
+  private static MiniOzoneCluster cluster;
+  private static FileSystem fs;
+  private static OzoneClient client;
+  private static CommandLine cmd;
+  private static String dbPath;
+  private static FSORepairTool.Report vol1Report;
+  private static FSORepairTool.Report vol2Report;
+  private static FSORepairTool.Report fullReport;
+  private static FSORepairTool.Report emptyReport;
 
-    // Build cluster.
-    cluster =  MiniOzoneCluster.newBuilder(conf).build();
+  private static GenericTestUtils.PrintStreamCapturer out;
+  private static GenericTestUtils.PrintStreamCapturer err;
+
+  @BeforeAll
+  public static void setup() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
 
     // Init ofs.
     final String rootPath = String.format("%s://%s/", OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     fs = FileSystem.get(conf);
+
+    out = GenericTestUtils.captureOut();
+    err = GenericTestUtils.captureErr();
+    cmd = new OzoneRepair().getCmd();
+    dbPath = new File(OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME).getPath();
+
+    // Build multiple connected and disconnected trees
+    FSORepairTool.Report report1 = buildConnectedTree("vol1", "bucket1", 10);
+    FSORepairTool.Report report2 = buildDisconnectedTree("vol2", "bucket1", 10);
+    FSORepairTool.Report report3 = buildConnectedTree("vol2", "bucket2", 10);
+    FSORepairTool.Report report4 = buildEmptyTree();
+
+    vol1Report = new FSORepairTool.Report(report1);
+    vol2Report = new FSORepairTool.Report(report2, report3);
+    fullReport = new FSORepairTool.Report(report1, report2, report3, report4);
+    emptyReport = new FSORepairTool.Report(report4);
+
     client = OzoneClientFactory.getRpcClient(conf);
-
-    System.setOut(new PrintStream(out, false, DEFAULT_ENCODING));
-    System.setErr(new PrintStream(err, false, DEFAULT_ENCODING));
-  }
-
-  @AfterEach
-  public void reset() throws IOException {
-    // reset stream after each unit test
-    out.reset();
-    err.reset();
-
-    // restore system streams
-    System.setOut(OLD_OUT);
-    System.setErr(OLD_ERR);
-
-    if (cluster != null) {
-      cluster.shutdown();
-    }
-    if (client != null) {
-      client.close();
-    }
-    IOUtils.closeQuietly(fs);
-  }
-
-  @Test
-  public void testConnectedTreeOneBucket() throws Exception {
-    CommandLine cmd = new OzoneRepair().getCmd();
-    String dbPath = new File(OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME).getPath();
-
-    FSORepairTool.Report expectedReport = buildConnectedTree("vol1", "bucket1");
-    String expectedOutput = serializeReport(expectedReport);
-
-    // Test the connected tree in debug mode.
-    cluster.getOzoneManager().stop();
-
-    String[] args = new String[] {"om", "fso-tree", "--db", dbPath};
-    int exitCode = cmd.execute(args);
-    assertEquals(0, exitCode);
-
-    String cliOutput = out.toString(DEFAULT_ENCODING);
-    String reportOutput = extractRelevantSection(cliOutput);
-    Assertions.assertEquals(expectedOutput, reportOutput);
-
-    out.reset();
-    err.reset();
-
-    // Running again in repair mode should give same results since the tree is connected.
-    String[] args1 = new String[] {"om", "fso-tree", "--db", dbPath, "--repair"};
-    int exitCode1 = cmd.execute(args1);
-    assertEquals(0, exitCode1);
-
-    String cliOutput1 = out.toString(DEFAULT_ENCODING);
-    String reportOutput1 = extractRelevantSection(cliOutput1);
-    Assertions.assertEquals(expectedOutput, reportOutput1);
-
-    cluster.getOzoneManager().restart();
-  }
-
-  @Test
-  public void testReportedDataSize() throws Exception {
-    CommandLine cmd = new OzoneRepair().getCmd();
-    String dbPath = new File(OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME).getPath();
-
-    FSORepairTool.Report report1 = buildDisconnectedTree("vol1", "bucket1", 10);
-    FSORepairTool.Report report2 = buildConnectedTree("vol1", "bucket2", 10);
-    FSORepairTool.Report expectedReport = new FSORepairTool.Report(report1, report2);
-    String expectedOutput = serializeReport(expectedReport);
-
-    cluster.getOzoneManager().stop();
-
-    String[] args = new String[] {"om", "fso-tree", "--db", dbPath, "--repair"};
-    int exitCode = cmd.execute(args);
-    assertEquals(0, exitCode);
-
-    String cliOutput = out.toString(DEFAULT_ENCODING);
-    String reportOutput = extractRelevantSection(cliOutput);
-
-    Assertions.assertEquals(expectedOutput, reportOutput);
-    cluster.getOzoneManager().restart();
-  }
-
-  /**
-   * Test to verify how the tool processes the volume and bucket
-   * filters.
-   */
-  @Test
-  public void testVolumeAndBucketFilter() throws Exception {
-    CommandLine cmd = new OzoneRepair().getCmd();
-    String dbPath = new File(OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME).getPath();
-
-    FSORepairTool.Report report1 = buildDisconnectedTree("vol1", "bucket1", 10);
-    FSORepairTool.Report report2 = buildConnectedTree("vol2", "bucket2", 10);
-    FSORepairTool.Report expectedReport1 = new FSORepairTool.Report(report1);
-    FSORepairTool.Report expectedReport2 = new FSORepairTool.Report(report2);
-
-    cluster.getOzoneManager().stop();
-
-    // When volume filter is passed
-    String[] args1 = new String[]{"om", "fso-tree", "--db", dbPath, "--volume", "/vol1"};
-    int exitCode1 = cmd.execute(args1);
-    assertEquals(0, exitCode1);
-
-    String cliOutput1 = out.toString(DEFAULT_ENCODING);
-    String reportOutput1 = extractRelevantSection(cliOutput1);
-    String expectedOutput1 = serializeReport(expectedReport1);
-    Assertions.assertEquals(expectedOutput1, reportOutput1);
-
-    out.reset();
-    err.reset();
-
-    // When both volume and bucket filters are passed
-    String[] args2 = new String[]{"om", "fso-tree", "--db", dbPath, "--volume", "/vol2",
-        "--bucket", "bucket2"};
-    int exitCode2 = cmd.execute(args2);
-    assertEquals(0, exitCode2);
-
-    String cliOutput2 = out.toString(DEFAULT_ENCODING);
-    String reportOutput2 = extractRelevantSection(cliOutput2);
-    String expectedOutput2 = serializeReport(expectedReport2);
-    Assertions.assertEquals(expectedOutput2, reportOutput2);
-
-    out.reset();
-    err.reset();
-
-    // When a non-existent bucket filter is passed
-    String[] args3 = new String[]{"om", "fso-tree", "--db", dbPath, "--volume", "/vol1",
-        "--bucket", "bucket2"};
-    int exitCode3 = cmd.execute(args3);
-    assertEquals(0, exitCode3);
-    String cliOutput3 = out.toString(DEFAULT_ENCODING);
-    Assertions.assertTrue(cliOutput3.contains("Bucket 'bucket2' does not exist in volume '/vol1'."));
-
-    out.reset();
-    err.reset();
-
-    // When a non-existent volume filter is passed
-    String[] args4 = new String[]{"om", "fso-tree", "--db", dbPath, "--volume", "/vol3"};
-    int exitCode4 = cmd.execute(args4);
-    assertEquals(0, exitCode4);
-    String cliOutput4 = out.toString(DEFAULT_ENCODING);
-    Assertions.assertTrue(cliOutput4.contains("Volume '/vol3' does not exist."));
-
-    out.reset();
-    err.reset();
-
-    // When bucket filter is passed without the volume filter.
-    String[] args5 = new String[]{"om", "fso-tree", "--db", dbPath, "--bucket", "bucket1"};
-    int exitCode5 = cmd.execute(args5);
-    assertEquals(0, exitCode5);
-    String cliOutput5 = out.toString(DEFAULT_ENCODING);
-    Assertions.assertTrue(cliOutput5.contains("--bucket flag cannot be used without specifying --volume."));
-
-    cluster.getOzoneManager().restart();
-  }
-
-  @Test
-  public void testMultipleBucketsAndVolumes() throws Exception {
-    CommandLine cmd = new OzoneRepair().getCmd();
-    String dbPath = new File(OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME).getPath();
-
-    FSORepairTool.Report report1 = buildConnectedTree("vol1", "bucket1");
-    FSORepairTool.Report report2 = buildDisconnectedTree("vol2", "bucket2");
-    FSORepairTool.Report expectedAggregateReport = new FSORepairTool.Report(report1, report2);
-    String expectedOutput = serializeReport(expectedAggregateReport);
-
-    cluster.getOzoneManager().stop();
-
-    String[] args = new String[] {"om", "fso-tree", "--db", dbPath, "--repair"};
-    int exitCode = cmd.execute(args);
-    assertEquals(0, exitCode);
-
-    String cliOutput = out.toString(DEFAULT_ENCODING);
-    String reportOutput = extractRelevantSection(cliOutput);
-    Assertions.assertEquals(expectedOutput, reportOutput);
-
-    cluster.getOzoneManager().restart();
-  }
-
-  /**
-   * Tests having multiple entries in the deleted file and directory tables
-   * for the same objects.
-   */
-  @Test
-  public void testDeleteOverwrite() throws Exception {
-    CommandLine cmd = new OzoneRepair().getCmd();
-    String dbPath = new File(OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME).getPath();
-
-    // Create files and dirs under dir1. To make sure they are added to the
-    // delete table, the keys must have data.
-    buildConnectedTree("vol1", "bucket1", 10);
-    // Move soon to be disconnected objects to the deleted table.
-    fs.delete(new Path("/vol1/bucket1/dir1/dir2/file3"), true);
-    fs.delete(new Path("/vol1/bucket1/dir1/dir2"), true);
-    fs.delete(new Path("/vol1/bucket1/dir1/file1"), true);
-    fs.delete(new Path("/vol1/bucket1/dir1/file2"), true);
-
-    // Recreate deleted objects, then disconnect dir1.
-    // This means after the repair runs, these objects will be
-    // the deleted tables multiple times. Some will have the same dir1 parent ID
-    // in their key name too.
-    ContractTestUtils.touch(fs, new Path("/vol1/bucket1/dir1/dir2/file3"));
-    ContractTestUtils.touch(fs, new Path("/vol1/bucket1/dir1/file1"));
-    ContractTestUtils.touch(fs, new Path("/vol1/bucket1/dir1/file2"));
-    disconnectDirectory("dir1");
-
-    cluster.getOzoneManager().stop();
-
-    String[] args = new String[]{"om", "fso-tree", "--db", dbPath, "--repair"};
-    int exitCode = cmd.execute(args);
-    assertEquals(0, exitCode);
-
-    String cliOutput = out.toString(DEFAULT_ENCODING);
-    Assertions.assertTrue(cliOutput.contains("Unreferenced:\n\tDirectories: 1\n\tFiles: 3"));
-
-    cluster.getOzoneManager().restart();
-  }
-
-  @Test
-  public void testEmptyFileTrees() throws Exception {
-    CommandLine cmd = new OzoneRepair().getCmd();
-    String dbPath = new File(OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME).getPath();
-
-    FSORepairTool.Report emptyReport = buildEmptyTree();
-    String expectedOutput = serializeReport(emptyReport);
-
-    cluster.getOzoneManager().stop();
-
-    // Run when there are no file trees.
-    String[] args = new String[] {"om", "fso-tree", "--db", dbPath, "--repair"};
-    int exitCode = cmd.execute(args);
-    assertEquals(0, exitCode);
-
-    String cliOutput = out.toString(DEFAULT_ENCODING);
-    String reportOutput = extractRelevantSection(cliOutput);
-    Assertions.assertEquals(expectedOutput, reportOutput);
-
-    out.reset();
-    err.reset();
-    cluster.getOzoneManager().restart();
-
-    // Create an empty volume and bucket.
-    fs.mkdirs(new Path("/vol1"));
-    fs.mkdirs(new Path("/vol2/bucket1"));
-
-    cluster.getOzoneManager().stop();
-
-    // Run on an empty volume and bucket.
-    String[] args1 = new String[] {"om", "fso-tree", "--db", dbPath, "--repair"};
-    int exitCode1 = cmd.execute(args1);
-    assertEquals(0, exitCode1);
-
-    String cliOutput2 = out.toString(DEFAULT_ENCODING);
-    String reportOutput2 = extractRelevantSection(cliOutput2);
-    Assertions.assertEquals(expectedOutput, reportOutput2);
-
-    cluster.getOzoneManager().restart();
-  }
-
-  @Test
-  public void testNonFSOBucketsSkipped() throws Exception {
     ObjectStore store = client.getObjectStore();
 
     // Create legacy and OBS buckets.
-    store.createVolume("vol1");
     store.getVolume("vol1").createBucket("obs-bucket",
-        BucketArgs.newBuilder().setBucketLayout(BucketLayout.OBJECT_STORE)
-            .build());
+            BucketArgs.newBuilder().setBucketLayout(BucketLayout.OBJECT_STORE)
+                    .build());
     store.getVolume("vol1").createBucket("legacy-bucket",
-        BucketArgs.newBuilder().setBucketLayout(BucketLayout.LEGACY)
-            .build());
+            BucketArgs.newBuilder().setBucketLayout(BucketLayout.LEGACY)
+                    .build());
 
     // Put a key in the legacy and OBS buckets.
     OzoneOutputStream obsStream = store.getVolume("vol1")
-        .getBucket("obs-bucket")
-        .createKey("prefix/test-key", 3);
+            .getBucket("obs-bucket")
+            .createKey("prefix/test-key", 3);
     obsStream.write(new byte[]{1, 1, 1});
     obsStream.close();
 
     OzoneOutputStream legacyStream = store.getVolume("vol1")
-        .getBucket("legacy-bucket")
-        .createKey("prefix/test-key", 3);
+            .getBucket("legacy-bucket")
+            .createKey("prefix/test-key", 3);
     legacyStream.write(new byte[]{1, 1, 1});
     legacyStream.close();
 
-    CommandLine cmd = new OzoneRepair().getCmd();
-    String dbPath = new File(OMStorage.getOmDbDir(conf) + "/" + OM_DB_NAME).getPath();
-
-    // Add an FSO bucket with data.
-    FSORepairTool.Report connectReport = buildConnectedTree("vol1", "fso-bucket");
-
+    // Stop the OM before running the tool
     cluster.getOzoneManager().stop();
-
-    // Even in repair mode there should be no action. legacy and obs buckets
-    // will be skipped and FSO tree is connected.
-    String[] args = new String[] {"om", "fso-tree", "--db", dbPath, "--repair"};
-    int exitCode = cmd.execute(args);
-    assertEquals(0, exitCode);
-
-    String cliOutput = out.toString(DEFAULT_ENCODING);
-    String reportOutput = extractRelevantSection(cliOutput);
-    String expectedOutput = serializeReport(connectReport);
-
-    Assertions.assertEquals(expectedOutput, reportOutput);
-    Assertions.assertTrue(cliOutput.contains("Skipping non-FSO bucket /vol1/obs-bucket"));
-    Assertions.assertTrue(cliOutput.contains("Skipping non-FSO bucket /vol1/legacy-bucket"));
-
-    cluster.getOzoneManager().restart();
   }
 
-  private FSORepairTool.Report buildConnectedTree(String volume, String bucket) throws Exception {
-    return buildConnectedTree(volume, bucket, 0);
+  @BeforeEach
+  public void init() throws Exception {
+    out.reset();
+    err.reset();
+  }
+
+  @AfterAll
+  public static void reset() throws IOException {
+    IOUtils.closeQuietly(fs, client, cluster, out, err);
+  }
+
+  /**
+   * Test to check a connected tree with one bucket.
+   * The output remains the same in debug and repair mode as the tree is connected.
+   */
+  @Order(ORDER_DRY_RUN)
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testConnectedTreeOneBucket(boolean dryRun) {
+    String expectedOutput = serializeReport(vol1Report);
+
+    int exitCode = execute(dryRun, "-v", "/vol1", "-b", "bucket1");
+    assertEquals(0, exitCode, err.getOutput());
+
+    String cliOutput = out.getOutput();
+    String reportOutput = extractRelevantSection(cliOutput);
+    assertEquals(expectedOutput, reportOutput);
+  }
+
+  /**
+   * Test to verify the file size of the tree.
+   */
+  @Order(ORDER_DRY_RUN)
+  @Test
+  public void testReportedDataSize() {
+    String expectedOutput = serializeReport(vol2Report);
+
+    int exitCode = dryRun("-v", "/vol2");
+    assertEquals(0, exitCode);
+
+    String cliOutput = out.getOutput();
+    String reportOutput = extractRelevantSection(cliOutput);
+
+    assertEquals(expectedOutput, reportOutput);
+  }
+
+  /**
+   * Test to verify how the tool processes the volume and bucket filters.
+   * - Volume filter only.
+   * - Both volume and bucket filters.
+   * - Non-existent bucket.
+   * - Non-existent volume.
+   * - Using a bucket filter without specifying a volume.
+   */
+  @Order(ORDER_DRY_RUN)
+  @Test
+  public void testVolumeFilter() {
+    String expectedOutput1 = serializeReport(vol1Report);
+
+    // When volume filter is passed
+    int exitCode1 = dryRun("--volume", "/vol1");
+    assertEquals(0, exitCode1);
+
+    String cliOutput1 = out.getOutput();
+    String reportOutput1 = extractRelevantSection(cliOutput1);
+    assertEquals(expectedOutput1, reportOutput1);
+  }
+
+  @Order(ORDER_DRY_RUN)
+  @Test
+  public void testVolumeAndBucketFilter() {
+    String expectedOutput2 = serializeReport(vol1Report);
+
+    // When both volume and bucket filters are passed
+    int exitCode2 = dryRun("--volume", "/vol1", "--bucket", "bucket1");
+    assertEquals(0, exitCode2);
+
+    String cliOutput2 = out.getOutput();
+    String reportOutput2 = extractRelevantSection(cliOutput2);
+    assertEquals(expectedOutput2, reportOutput2);
+  }
+
+  @Order(ORDER_DRY_RUN)
+  @Test
+  public void testNonExistentBucket() {
+    // When a non-existent bucket filter is passed
+    int exitCode = dryRun("--volume", "/vol1", "--bucket", "bucket3");
+    assertEquals(0, exitCode);
+    String cliOutput = err.getOutput();
+    assertThat(cliOutput).contains("Bucket 'bucket3' does not exist in volume '/vol1'.");
+  }
+
+  @Order(ORDER_DRY_RUN)
+  @Test
+  public void testNonExistentVolume() {
+    // When a non-existent volume filter is passed
+    int exitCode = dryRun("--volume", "/vol5");
+    assertEquals(0, exitCode);
+    String cliOutput = err.getOutput();
+    assertThat(cliOutput).contains("Volume '/vol5' does not exist.");
+  }
+
+  @Order(ORDER_DRY_RUN)
+  @Test
+  public void testBucketFilterWithoutVolume() {
+    // When bucket filter is passed without the volume filter.
+    int exitCode = dryRun("--bucket", "bucket1");
+    assertEquals(0, exitCode);
+    String cliOutput = err.getOutput();
+    assertThat(cliOutput).contains("--bucket flag cannot be used without specifying --volume.");
+  }
+
+  /**
+   * Test to verify that non-fso buckets, such as legacy and obs, are skipped during the process.
+   */
+  @Order(ORDER_DRY_RUN)
+  @Test
+  public void testNonFSOBucketsSkipped() {
+    int exitCode = dryRun();
+    assertEquals(0, exitCode);
+
+    String cliOutput = out.getOutput();
+    assertThat(cliOutput).contains("Skipping non-FSO bucket /vol1/obs-bucket");
+    assertThat(cliOutput).contains("Skipping non-FSO bucket /vol1/legacy-bucket");
+  }
+
+  /**
+   * If no file is present inside a vol/bucket, the report statistics should be zero.
+   */
+  @Order(ORDER_DRY_RUN)
+  @Test
+  public void testEmptyFileTrees() {
+    String expectedOutput = serializeReport(emptyReport);
+
+    // Run on an empty volume and bucket
+    int exitCode = dryRun("-v", "/vol-empty", "-b", "bucket-empty");
+    assertEquals(0, exitCode);
+
+    String cliOutput = out.getOutput();
+    String reportOutput = extractRelevantSection(cliOutput);
+    assertEquals(expectedOutput, reportOutput);
+  }
+
+  /**
+   * Test in repair mode. This test ensures that:
+   * - The initial repair correctly resolves unreferenced objects.
+   * - Subsequent repair runs do not find any unreferenced objects to process.
+   */
+  @Order(ORDER_REPAIR_ALL)
+  @Test
+  public void testMultipleBucketsAndVolumes() {
+    String expectedOutput = serializeReport(fullReport);
+
+    int exitCode = repair();
+    assertEquals(0, exitCode);
+
+    String cliOutput = out.getOutput();
+    String reportOutput = extractRelevantSection(cliOutput);
+    assertEquals(expectedOutput, reportOutput);
+    assertThat(cliOutput).contains("Unreferenced:\n\tDirectories: 1\n\tFiles: 3\n\tBytes: 30");
+  }
+
+  @Order(ORDER_REPAIR_ALL_AGAIN)
+  @Test
+  public void repairAllAgain() {
+    int exitCode = repair();
+    assertEquals(0, exitCode);
+    String cliOutput = out.getOutput();
+    assertThat(cliOutput).contains("Unreferenced:\n\tDirectories: 0\n\tFiles: 0\n\tBytes: 0");
+  }
+
+  /**
+   * Validate cluster state after OM restart by checking the tables.
+   */
+  @Order(ORDER_RESTART_OM)
+  @Test
+  public void validateClusterAfterRestart() throws Exception {
+    cluster.getOzoneManager().restart();
+
+    // 4 volumes (/s3v, /vol1, /vol2, /vol-empty)
+    assertEquals(4, countTableEntries(cluster.getOzoneManager().getMetadataManager().getVolumeTable()));
+    // 6 buckets (vol1/bucket1, vol2/bucket1, vol2/bucket2, vol-empty/bucket-empty, vol/legacy-bucket, vol1/obs-bucket)
+    assertEquals(6, countTableEntries(cluster.getOzoneManager().getMetadataManager().getBucketTable()));
+    // 1 directory is unreferenced and moved to the deletedDirTable during repair mode.
+    assertEquals(1, countTableEntries(cluster.getOzoneManager().getMetadataManager().getDeletedDirTable()));
+    // 3 files are unreferenced and moved to the deletedTable during repair mode.
+    assertEquals(3, countTableEntries(cluster.getOzoneManager().getMetadataManager().getDeletedTable()));
+  }
+
+  private int repair(String... args) {
+    return execute(false, args);
+  }
+
+  private int dryRun(String... args) {
+    return execute(true, args);
+  }
+
+  private int execute(boolean dryRun, String... args) {
+    List<String> argList = new ArrayList<>(Arrays.asList("om", "fso-tree", "--db", dbPath));
+    if (dryRun) {
+      argList.add("--dry-run");
+    }
+    argList.addAll(Arrays.asList(args));
+
+    return withTextFromSystemIn("y")
+        .execute(() -> cmd.execute(argList.toArray(new String[0])));
+  }
+
+  private <K, V> int countTableEntries(Table<K, V> table) throws Exception {
+    int count = 0;
+    try (TableIterator<K, ? extends Table.KeyValue<K, V>> iterator = table.iterator()) {
+      while (iterator.hasNext()) {
+        iterator.next();
+        count++;
+      }
+    }
+    return count;
   }
 
   private String extractRelevantSection(String cliOutput) {
@@ -427,7 +392,7 @@ public class TestFSORepairTool {
   /**
    * Creates a tree with 3 reachable directories and 4 reachable files.
    */
-  private FSORepairTool.Report buildConnectedTree(String volume, String bucket, int fileSize) throws Exception {
+  private static FSORepairTool.Report buildConnectedTree(String volume, String bucket, int fileSize) throws Exception {
     Path bucketPath = new Path("/" + volume + "/" + bucket);
     Path dir1 = new Path(bucketPath, "dir1");
     Path file1 = new Path(dir1, "file1");
@@ -468,7 +433,8 @@ public class TestFSORepairTool {
         .build();
   }
 
-  private FSORepairTool.Report buildEmptyTree() {
+  private static FSORepairTool.Report buildEmptyTree() throws IOException {
+    fs.mkdirs(new Path("/vol-empty/bucket-empty"));
     FSORepairTool.ReportStatistics reachableCount =
             new FSORepairTool.ReportStatistics(0, 0, 0);
     FSORepairTool.ReportStatistics unreachableCount =
@@ -482,7 +448,7 @@ public class TestFSORepairTool {
         .build();
   }
 
-  private void assertConnectedTreeReadable(String volume, String bucket) throws IOException {
+  private static void assertConnectedTreeReadable(String volume, String bucket) throws IOException {
     Path bucketPath = new Path("/" + volume + "/" + bucket);
     Path dir1 = new Path(bucketPath, "dir1");
     Path file1 = new Path(dir1, "file1");
@@ -494,24 +460,21 @@ public class TestFSORepairTool {
     Path dir3 = new Path(bucketPath, "dir3");
     Path file4 = new Path(bucketPath, "file4");
 
-    Assertions.assertTrue(fs.exists(dir1));
-    Assertions.assertTrue(fs.exists(dir2));
-    Assertions.assertTrue(fs.exists(dir3));
-    Assertions.assertTrue(fs.exists(file1));
-    Assertions.assertTrue(fs.exists(file2));
-    Assertions.assertTrue(fs.exists(file3));
-    Assertions.assertTrue(fs.exists(file4));
-  }
-
-  private FSORepairTool.Report buildDisconnectedTree(String volume, String bucket) throws Exception {
-    return buildDisconnectedTree(volume, bucket, 0);
+    assertTrue(fs.exists(dir1));
+    assertTrue(fs.exists(dir2));
+    assertTrue(fs.exists(dir3));
+    assertTrue(fs.exists(file1));
+    assertTrue(fs.exists(file2));
+    assertTrue(fs.exists(file3));
+    assertTrue(fs.exists(file4));
   }
 
   /**
    * Creates a tree with 1 reachable directory, 1 reachable file, 1
    * unreachable directory, and 3 unreachable files.
    */
-  private FSORepairTool.Report buildDisconnectedTree(String volume, String bucket, int fileSize) throws Exception {
+  private static FSORepairTool.Report buildDisconnectedTree(String volume, String bucket, int fileSize)
+        throws Exception {
     buildConnectedTree(volume, bucket, fileSize);
 
     // Manually remove dir1. This should disconnect 3 of the files and 1 of
@@ -532,7 +495,7 @@ public class TestFSORepairTool {
         .build();
   }
 
-  private void disconnectDirectory(String dirName) throws Exception {
+  private static void disconnectDirectory(String dirName) throws Exception {
     Table<String, OmDirectoryInfo> dirTable = cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
     try (TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>> iterator = dirTable.iterator()) {
       while (iterator.hasNext()) {
@@ -546,7 +509,7 @@ public class TestFSORepairTool {
     }
   }
 
-  private void assertDisconnectedTreePartiallyReadable(String volume, String bucket) throws Exception {
+  private static void assertDisconnectedTreePartiallyReadable(String volume, String bucket) throws Exception {
     Path bucketPath = new Path("/" + volume + "/" + bucket);
     Path dir1 = new Path(bucketPath, "dir1");
     Path file1 = new Path(dir1, "file1");
@@ -558,12 +521,12 @@ public class TestFSORepairTool {
     Path dir3 = new Path(bucketPath, "dir3");
     Path file4 = new Path(bucketPath, "file4");
 
-    Assertions.assertFalse(fs.exists(dir1));
-    Assertions.assertFalse(fs.exists(dir2));
-    Assertions.assertTrue(fs.exists(dir3));
-    Assertions.assertFalse(fs.exists(file1));
-    Assertions.assertFalse(fs.exists(file2));
-    Assertions.assertFalse(fs.exists(file3));
-    Assertions.assertTrue(fs.exists(file4));
+    assertFalse(fs.exists(dir1));
+    assertFalse(fs.exists(dir2));
+    assertTrue(fs.exists(dir3));
+    assertFalse(fs.exists(file1));
+    assertFalse(fs.exists(file2));
+    assertFalse(fs.exists(file3));
+    assertTrue(fs.exists(file4));
   }
 }

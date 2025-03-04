@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,18 +14,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.upgrade;
 
+import java.io.File;
+import java.io.IOException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-
-import java.io.File;
-import java.io.IOException;
 
 /**
  * Utility class to retrieve the version of a feature that corresponds to the
@@ -108,22 +106,6 @@ public final class VersionedDatanodeFeatures {
               " has more than one directory before SCM HA finalization.");
         }
         return subdirs[0].getName();
-      }
-    }
-
-    /**
-     * Choose whether to use SCM ID or cluster ID based on SCM HA
-     * finalization status and SCM HA configuration.
-     */
-    public static String chooseContainerPathID(ConfigurationSource conf,
-        String scmID, String clusterID) {
-      boolean scmHAEnabled =
-          conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
-          ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT);
-      if (isFinalized(HDDSLayoutFeature.SCM_HA) || scmHAEnabled) {
-        return clusterID;
-      } else {
-        return scmID;
       }
     }
 

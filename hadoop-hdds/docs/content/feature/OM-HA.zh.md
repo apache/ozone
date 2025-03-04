@@ -42,15 +42,6 @@ Ozone Manager 和 Storage Container Manager 都支持 HA。在这种模式下，
 
 ## 配置
 
-可以在 `ozone-site.xml` 中配置以下设置来启用 Ozone Manager 的高可用模式：
-
-```XML
-<property>
-   <name>ozone.om.ratis.enable</name>
-   <value>true</value>
-</property>
-```
-
 一个 Ozone 的配置（`ozone-site.xml`）支持多个 Ozone 高可用集群。为了支持在多个高可用集群之间进行选择，每个集群都需要一个逻辑名称，该逻辑名称可以解析为 Ozone Manager 的 IP 地址（和域名）。
 
 该逻辑名称叫做 `serviceId`，可以在 `ozone-site.xml` 中进行配置：

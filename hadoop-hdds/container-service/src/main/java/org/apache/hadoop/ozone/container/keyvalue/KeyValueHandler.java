@@ -1,97 +1,21 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.keyvalue;
-
-import java.io.File;
-import java.io.FilenameFilter;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.ByteBuffer;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.locks.Lock;
-import java.util.function.Function;
-
-import com.google.common.util.concurrent.Striped;
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFileRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
-import org.apache.hadoop.hdds.scm.ByteStringConversion;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
-import org.apache.hadoop.hdds.utils.FaultInjector;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.common.Checksum;
-import org.apache.hadoop.ozone.common.ChunkBuffer;
-import org.apache.hadoop.ozone.common.OzoneChecksumException;
-import org.apache.hadoop.ozone.common.utils.BufferUtils;
-import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
-import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
-import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
-import org.apache.hadoop.ozone.container.common.interfaces.Handler;
-import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
-import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
-import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
-import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
-import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
-import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
-import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
-import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
-import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CLOSED_CONTAINER_IO;
@@ -123,8 +47,84 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.DEFAULT_LAYOUT;
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.Striped;
+import java.io.File;
+import java.io.FilenameFilter;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Clock;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.locks.Lock;
+import java.util.function.Function;
+import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFileRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
+import org.apache.hadoop.hdds.scm.ByteStringConversion;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.utils.FaultInjector;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.common.Checksum;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
+import org.apache.hadoop.ozone.common.OzoneChecksumException;
+import org.apache.hadoop.ozone.common.utils.BufferUtils;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
+import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
+import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
+import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -143,11 +143,13 @@ public class KeyValueHandler extends Handler {
   private final ChunkManager chunkManager;
   private final VolumeChoosingPolicy volumeChoosingPolicy;
   private final long maxContainerSize;
+  private final long maxDeleteLockWaitMs;
   private final Function<ByteBuffer, ByteString> byteBufferToByteString;
   private final boolean validateChunkChecksumData;
   // A striped lock that is held during container creation.
   private final Striped<Lock> containerCreationLocks;
   private static FaultInjector injector;
+  private final Clock clock;
 
   public KeyValueHandler(ConfigurationSource config,
                          String datanodeId,
@@ -155,7 +157,18 @@ public class KeyValueHandler extends Handler {
                          VolumeSet volSet,
                          ContainerMetrics metrics,
                          IncrementalReportSender<Container> icrSender) {
+    this(config, datanodeId, contSet, volSet, metrics, icrSender, Clock.systemUTC());
+  }
+
+  public KeyValueHandler(ConfigurationSource config,
+                         String datanodeId,
+                         ContainerSet contSet,
+                         VolumeSet volSet,
+                         ContainerMetrics metrics,
+                         IncrementalReportSender<Container> icrSender,
+                         Clock clock) {
     super(config, datanodeId, contSet, volSet, metrics, icrSender);
+    this.clock = clock;
     blockManager = new BlockManagerImpl(config);
     validateChunkChecksumData = conf.getObject(
         DatanodeConfiguration.class).isChunkDataValidationCheck();
@@ -170,6 +183,9 @@ public class KeyValueHandler extends Handler {
     maxContainerSize = (long) config.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    maxDeleteLockWaitMs = dnConf.getDeleteContainerTimeoutMs();
     // this striped handler lock is used for synchronizing createContainer
     // Requests.
     final int threadCountPerDisk = conf.getInt(
@@ -190,6 +206,14 @@ public class KeyValueHandler extends Handler {
     byteBufferToByteString =
         ByteStringConversion
             .createByteBufferConversion(isUnsafeByteBufferConversionEnabled);
+
+    if (ContainerLayoutVersion.getConfiguredVersion(conf) ==
+        ContainerLayoutVersion.FILE_PER_CHUNK) {
+      LOG.warn("FILE_PER_CHUNK layout is not supported. Falling back to default : {}.",
+          DEFAULT_LAYOUT.name());
+      OzoneConfiguration.of(conf).set(ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY,
+          DEFAULT_LAYOUT.name());
+    }
   }
 
   @VisibleForTesting
@@ -799,7 +823,8 @@ public class KeyValueHandler extends Handler {
       }
       return malformedRequest(request);
     }
-    ChunkBuffer data;
+
+    final ChunkBufferToByteString data;
     try {
       BlockID blockID = BlockID.getFromProtobuf(
           request.getReadChunk().getBlockID());
@@ -861,11 +886,16 @@ public class KeyValueHandler extends Handler {
         "using BlockDeletingService");
   }
 
-  private void validateChunkChecksumData(ChunkBuffer data, ChunkInfo info)
+  private void validateChunkChecksumData(ChunkBufferToByteString data, ChunkInfo info)
       throws StorageContainerException {
     if (validateChunkChecksumData) {
       try {
-        Checksum.verifyChecksum(data.duplicate(data.position(), data.limit()), info.getChecksumData(), 0);
+        if (data instanceof ChunkBuffer) {
+          final ChunkBuffer b = (ChunkBuffer)data;
+          Checksum.verifyChecksum(b.duplicate(b.position(), b.limit()), info.getChecksumData(), 0);
+        } else {
+          Checksum.verifyChecksum(data.toByteString(byteBufferToByteString), info.getChecksumData(), 0);
+        }
       } catch (OzoneChecksumException ex) {
         throw ChunkUtils.wrapInStorageContainerException(ex);
       }
@@ -1058,8 +1088,8 @@ public class KeyValueHandler extends Handler {
           // of ByteStrings.
           chunkInfo.setReadDataIntoSingleBuffer(true);
         }
-        ChunkBuffer data = chunkManager.readChunk(kvContainer, blockID,
-            chunkInfo, dispatcherContext);
+        final ChunkBufferToByteString data = chunkManager.readChunk(
+            kvContainer, blockID, chunkInfo, dispatcherContext);
         dataBuffers.addAll(data.toByteStringList(byteBufferToByteString));
         chunkInfoProto = chunk;
       }
@@ -1348,11 +1378,13 @@ public class KeyValueHandler extends Handler {
     }
   }
 
+  @Override
   public void addFinalizedBlock(Container container, long localID) {
     KeyValueContainer keyValueContainer = (KeyValueContainer)container;
     keyValueContainer.getContainerData().addToFinalizedBlockSet(localID);
   }
 
+  @Override
   public boolean isFinalizedBlockExist(Container container, long localID) {
     KeyValueContainer keyValueContainer = (KeyValueContainer)container;
     return keyValueContainer.getContainerData().isFinalizedBlockExist(localID);
@@ -1419,6 +1451,7 @@ public class KeyValueHandler extends Handler {
 
   private void deleteInternal(Container container, boolean force)
       throws StorageContainerException {
+    long startTime = clock.millis();
     container.writeLock();
     try {
       if (container.getContainerData().getVolume().isFailed()) {
@@ -1473,6 +1506,13 @@ public class KeyValueHandler extends Handler {
         // 4. container moved to tmp folder
         // 5. container content deleted from tmp folder
         try {
+          long waitTime = clock.millis() - startTime;
+          if (waitTime > maxDeleteLockWaitMs) {
+            LOG.warn("An attempt to delete container {} took {} ms acquiring locks and pre-checks. " +
+                    "The delete has been skipped and should be retried automatically by SCM.",
+                container.getContainerData().getContainerID(), waitTime);
+            return;
+          }
           container.markContainerForDelete();
           long containerId = container.getContainerData().getContainerID();
           containerSet.removeContainer(containerId);
@@ -1504,8 +1544,8 @@ public class KeyValueHandler extends Handler {
       container.writeUnlock();
     }
     // Avoid holding write locks for disk operations
-    container.delete();
     sendICR(container);
+    container.delete();
   }
 
   private void triggerVolumeScanAndThrowException(Container container,

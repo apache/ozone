@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,24 +19,23 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Pipeline placement policy that choose datanodes based on load balancing
@@ -55,7 +53,6 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       LoggerFactory.getLogger(PipelinePlacementPolicy.class);
   private final NodeManager nodeManager;
   private final PipelineStateManager stateManager;
-  private final ConfigurationSource conf;
   private final int heavyNodeCriteria;
   private static final int REQUIRED_RACKS = 2;
 
@@ -77,7 +74,6 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
                                  final ConfigurationSource conf) {
     super(nodeManager, conf);
     this.nodeManager = nodeManager;
-    this.conf = conf;
     this.stateManager = stateManager;
     String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
     this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
@@ -138,7 +134,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     List<DatanodeDetails> healthyNodes =
         nodeManager.getNodes(NodeStatus.inServiceHealthy());
     String msg;
-    if (healthyNodes.size() == 0) {
+    if (healthyNodes.isEmpty()) {
       msg = "No healthy node found to allocate container.";
       LOG.error(msg);
       throw new SCMException(msg, SCMException.ResultCodes
@@ -311,7 +307,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     List<DatanodeDetails> mutableExclude = new ArrayList<>();
     boolean rackAwareness = getAnchorAndNextNode(healthyNodes,
         usedNodes, results, mutableLstNodes, mutableExclude);
-    if (mutableLstNodes.size() == 0) {
+    if (mutableLstNodes.isEmpty()) {
       LOG.warn("Unable to find healthy node for anchor(first) node.");
       throw new SCMException("Unable to find anchor node.",
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
@@ -405,7 +401,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     DatanodeDetails anchor;
     DatanodeDetails nextNode = null;
     // First choose an anchor node.
-    if (usedNodes.size() == 0) {
+    if (usedNodes.isEmpty()) {
       // No usedNode, choose anchor based on healthyNodes
       anchor = chooseFirstNode(healthyNodes);
       if (anchor != null) {

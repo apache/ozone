@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +17,20 @@
 
 package org.apache.hadoop.ozone.security;
 
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -30,8 +43,6 @@ import java.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-
-import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
@@ -58,28 +69,13 @@ import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
-
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-import org.slf4j.event.Level;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.event.Level;
 
 /**
  * Test class for {@link OzoneDelegationTokenSecretManager}.
@@ -132,14 +128,6 @@ public class TestOzoneDelegationTokenSecretManager {
 
   private OzoneConfiguration createNewTestPath() throws IOException {
     OzoneConfiguration config = new OzoneConfiguration();
-    // When ratis is enabled, tokens are not updated to the store directly by
-    // OzoneDelegationTokenSecretManager. Tokens are updated via Ratis
-    // through the DoubleBuffer. Hence, to test
-    // OzoneDelegationTokenSecretManager, we should disable OM Ratis.
-    // TODO: Once HA and non-HA code paths are merged in
-    //  OzoneDelegationTokenSecretManager, this test should be updated to
-    //  test both ratis enabled and disabled case.
-    config.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
     File newFolder = folder.toFile();
     if (!newFolder.exists()) {
       assertTrue(newFolder.mkdirs());
@@ -257,6 +245,7 @@ public class TestOzoneDelegationTokenSecretManager {
     Token<OzoneTokenIdentifier> token = secretManager.createToken(TEST_USER,
         TEST_USER,
         TEST_USER);
+    addToTokenStore(token);
     Thread.sleep(10 * 5);
 
     if (restartSecretManager) {
@@ -264,6 +253,7 @@ public class TestOzoneDelegationTokenSecretManager {
     }
 
     long renewalTime = secretManager.renewToken(token, TEST_USER.toString());
+    addToTokenStore(token);
     assertThat(renewalTime).isGreaterThan(0);
   }
 
@@ -287,6 +277,7 @@ public class TestOzoneDelegationTokenSecretManager {
     secretManager.start(certificateClient);
     Token<OzoneTokenIdentifier> token = secretManager.createToken(TEST_USER,
         TEST_USER, TEST_USER);
+    addToTokenStore(token);
     AccessControlException exception =
         assertThrows(AccessControlException.class,
             () -> secretManager.renewToken(token, "rougeUser"));
@@ -354,6 +345,7 @@ public class TestOzoneDelegationTokenSecretManager {
     secretManager.start(certificateClient);
     Token<OzoneTokenIdentifier> token = secretManager.createToken(TEST_USER,
         TEST_USER, TEST_USER);
+    addToTokenStore(token);
     secretManager.cancelToken(token, TEST_USER.toString());
   }
 
@@ -511,5 +503,12 @@ public class TestOzoneDelegationTokenSecretManager {
         .setOmServiceId(OzoneConsts.OM_SERVICE_ID_DEFAULT)
         .setSecretKeyClient(secretKeyClient)
         .build();
+  }
+
+  private void addToTokenStore(Token<OzoneTokenIdentifier> token) throws IOException {
+    OzoneTokenIdentifier ozoneTokenIdentifier = OzoneTokenIdentifier.
+        readProtoBuf(token.getIdentifier());
+    long renewDate = secretManager.updateToken(token, ozoneTokenIdentifier, expiryTime);
+    om.getMetadataManager().getDelegationTokenTable().put(ozoneTokenIdentifier, renewDate);
   }
 }

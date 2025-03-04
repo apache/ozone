@@ -45,6 +45,15 @@ if [[ "${CHECK:-unit}" == "integration" ]]; then
   cat ${leaks} >> "${tempfile}"
 fi
 
+cluster=${REPORT_DIR}/cluster-startup-errors.txt
+if [[ "${CHECK:-unit}" == "integration" ]]; then
+  find hadoop-ozone/integration-test -not -path '*/iteration*' -name '*-output.txt' -print0 \
+      | xargs -n1 -0 "grep" -l -E "Unable to build MiniOzoneCluster" \
+      | awk -F/ '{sub("-output.txt",""); print $NF}' \
+      > "${cluster}"
+  cat ${cluster} >> "${tempfile}"
+fi
+
 #Copy heap dump and dump leftovers
 find "." -not -path '*/iteration*' \
     \( -name "*.hprof" \
@@ -63,6 +72,7 @@ grep -A1 'Crashed tests' "${REPORT_DIR}/output.log" \
 cat "${crashes}" >> "${tempfile}"
 
 # Check for tests that started but were not finished
+timeouts=${REPORT_DIR}/timeouts.txt
 if grep -q 'There was a timeout.*in the fork' "${REPORT_DIR}/output.log"; then
   diff -uw \
     <(grep -e 'Running org' "${REPORT_DIR}/output.log" \
@@ -75,7 +85,8 @@ if grep -q 'There was a timeout.*in the fork' "${REPORT_DIR}/output.log"; then
       | sort -u -k2) \
     | grep '^- ' \
     | awk '{ print $3 }' \
-    >> "${tempfile}"
+    > "${timeouts}"
+  cat "${timeouts}" >> "${tempfile}"
 fi
 
 sort -u "${tempfile}" | tee "${REPORT_DIR}/summary.txt"
@@ -112,11 +123,23 @@ if [[ -s "${leaks}" ]]; then
 fi
 rm -f "${leaks}"
 
+if [[ -s "${cluster}" ]]; then
+  printf "# Cluster Startup Errors\n\n" >> "$SUMMARY_FILE"
+  cat "${cluster}" | sed 's/^/ * /' >> "$SUMMARY_FILE"
+fi
+rm -f "${cluster}"
+
 if [[ -s "${crashes}" ]]; then
   printf "# Crashed Tests\n\n" >> "$SUMMARY_FILE"
   cat "${crashes}" | sed 's/^/ * /' >> "$SUMMARY_FILE"
 fi
 rm -f "${crashes}"
+
+if [[ -s "${timeouts}" ]]; then
+  printf "# Fork Timeout\n\n" >> "$SUMMARY_FILE"
+  cat "${timeouts}" | sed 's/^/ * /' >> "$SUMMARY_FILE"
+fi
+rm -f "${timeouts}"
 
 ## generate counter
 wc -l "$REPORT_DIR/summary.txt" | awk '{print $1}'> "$REPORT_DIR/failures"

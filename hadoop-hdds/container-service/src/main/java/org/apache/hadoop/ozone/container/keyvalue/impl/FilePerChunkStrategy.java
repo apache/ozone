@@ -1,59 +1,54 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
-import com.google.common.base.Preconditions;
-
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.common.ChunkBuffer;
-import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
-import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
-import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
-
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IO_EXCEPTION;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_CHUNK;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.limitReadSize;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
-
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
-import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
-import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.limitReadSize;
+import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
+import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
+import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class is for performing chunk related operations.
@@ -69,10 +64,10 @@ public class FilePerChunkStrategy implements ChunkManager {
   private final int readMappedBufferThreshold;
   private final int readMappedBufferMaxCount;
   private final MappedBufferManager mappedBufferManager;
-  private final VolumeSet volumeSet;
 
-  public FilePerChunkStrategy(boolean sync, BlockManager manager,
-                              VolumeSet volSet) {
+  private final boolean readNettyChunkedNioFile;
+
+  public FilePerChunkStrategy(boolean sync, BlockManager manager) {
     doSyncWrite = sync;
     blockManager = manager;
     this.defaultReadBufferCapacity = manager == null ? 0 :
@@ -82,12 +77,13 @@ public class FilePerChunkStrategy implements ChunkManager {
     this.readMappedBufferMaxCount = manager == null ? 0
         : manager.getReadMappedBufferMaxCount();
     LOG.info("ozone.chunk.read.mapped.buffer.max.count is load with {}", readMappedBufferMaxCount);
-    this.volumeSet = volSet;
     if (this.readMappedBufferMaxCount > 0) {
       mappedBufferManager = new MappedBufferManager(this.readMappedBufferMaxCount);
     } else {
       mappedBufferManager = null;
     }
+
+    this.readNettyChunkedNioFile = manager != null && manager.isReadNettyChunkedNioFile();
   }
 
   private static void checkLayoutVersion(Container container) {
@@ -214,7 +210,7 @@ public class FilePerChunkStrategy implements ChunkManager {
    * TODO: Explore if we need to do that for ozone.
    */
   @Override
-  public ChunkBuffer readChunk(Container container, BlockID blockID,
+  public ChunkBufferToByteString readChunk(Container container, BlockID blockID,
       ChunkInfo info, DispatcherContext dispatcherContext)
       throws StorageContainerException {
 
@@ -274,6 +270,9 @@ public class FilePerChunkStrategy implements ChunkManager {
         if (file.exists()) {
           long offset = info.getOffset() - chunkFileOffset;
           Preconditions.checkState(offset >= 0);
+          if (readNettyChunkedNioFile && dispatcherContext != null && dispatcherContext.isReleaseSupported()) {
+            return ChunkUtils.readData(file, bufferCapacity, offset, len, volume, dispatcherContext);
+          }
           return ChunkUtils.readData(len, bufferCapacity, file, offset, volume,
               readMappedBufferThreshold, readMappedBufferMaxCount > 0, mappedBufferManager);
         }

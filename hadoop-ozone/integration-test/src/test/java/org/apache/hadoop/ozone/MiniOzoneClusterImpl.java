@@ -1,36 +1,39 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
-import java.util.Iterator;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import static java.util.Collections.singletonList;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD;
+import static org.apache.hadoop.hdds.server.http.HttpConfig.getHttpPolicy;
+import static org.apache.hadoop.hdds.server.http.HttpServer2.HTTPS_SCHEME;
+import static org.apache.hadoop.hdds.server.http.HttpServer2.HTTP_SCHEME;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_ADDRESS_KEY;
+import static org.apache.ozone.test.GenericTestUtils.PortAllocator.anyHostWithFreePort;
+import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
+import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
 
 import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentialsProvider;
@@ -40,18 +43,30 @@ import com.amazonaws.client.builder.AwsClientBuilder;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.DatanodeVersion;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
-import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -87,31 +102,8 @@ import org.apache.hadoop.ozone.s3.OzoneClientCache;
 import org.apache.hadoop.ozone.s3.OzoneConfigurationHolder;
 import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.ozone.recon.schema.ReconSqlDbConfig;
 import org.apache.ozone.test.GenericTestUtils;
-
-import org.apache.commons.io.FileUtils;
-
-import static java.util.Collections.singletonList;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD;
-import static org.apache.hadoop.hdds.server.http.HttpConfig.getHttpPolicy;
-import static org.apache.hadoop.hdds.server.http.HttpServer2.HTTPS_SCHEME;
-import static org.apache.hadoop.hdds.server.http.HttpServer2.HTTP_SCHEME;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTPS_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_ADDRESS_KEY;
-import static org.apache.ozone.test.GenericTestUtils.PortAllocator.anyHostWithFreePort;
-import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
-import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
-
-import org.hadoop.ozone.recon.codegen.ReconSqlDbConfig;
-import org.mockito.MockedStatic;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -145,7 +137,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   private CertificateClient caClient;
   private final Set<AutoCloseable> clients = ConcurrentHashMap.newKeySet();
   private SecretKeyClient secretKeyClient;
-  private static MockedStatic mockDNStatic = Mockito.mockStatic(HddsDatanodeService.class);
 
   /**
    * Creates a new MiniOzoneCluster with Recon.
@@ -195,10 +186,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
   public void waitForSCMToBeReady() throws TimeoutException,
       InterruptedException {
-    if (SCMHAUtils.isSCMHAEnabled(conf)) {
-      GenericTestUtils.waitFor(scm::checkLeader,
-          1000, waitForClusterToBeReadyTimeout);
-    }
+    GenericTestUtils.waitFor(scm::checkLeader,
+        1000, waitForClusterToBeReadyTimeout);
   }
 
   public StorageContainerManager getActiveSCM() {
@@ -427,16 +416,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     }, 1000, waitForClusterToBeReadyTimeout);
   }
 
-  private static void overrideDatanodeVersions(int dnInitialVersion, int dnCurrentVersion) {
-    // FUTURE_VERSION (-1) is not a valid version for a datanode, using it as a marker when version is not overridden
-    if (dnInitialVersion != DatanodeVersion.FUTURE_VERSION.toProtoValue()) {
-      mockDNStatic.when(HddsDatanodeService::getDefaultInitialVersion).thenReturn(dnInitialVersion);
-    }
-    if (dnCurrentVersion != DatanodeVersion.FUTURE_VERSION.toProtoValue()) {
-      mockDNStatic.when(HddsDatanodeService::getDefaultCurrentVersion).thenReturn(dnCurrentVersion);
-    }
-  }
-
   @Override
   public void restartHddsDatanode(int i, boolean waitForDatanode)
       throws InterruptedException, TimeoutException {
@@ -474,6 +453,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     shutdownHddsDatanode(getHddsDatanodeIndex(dn));
   }
 
+  @Override
   public String getClusterId() {
     return scm.getClientProtocolServer().getScmInfo().getClusterId();
   }
@@ -683,6 +663,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         stopSCM(scm);
         removeConfiguration();
 
+        LOG.warn("Unable to build MiniOzoneCluster", ex);
+
         if (ex instanceof IOException) {
           throw (IOException) ex;
         }
@@ -709,7 +691,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       Path metaDir = Paths.get(path, "ozone-meta");
       Files.createDirectories(metaDir);
       conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.toString());
-      // conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
 
       conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
           DEFAULT_RATIS_RPC_TIMEOUT_SEC, TimeUnit.SECONDS);
@@ -766,18 +747,12 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       scmStore.setClusterId(clusterId);
       scmStore.setScmId(scmId);
       scmStore.initialize();
-      //TODO: HDDS-6897
-      //Disabling Ratis for only of MiniOzoneClusterImpl.
-      //MiniOzoneClusterImpl doesn't work with Ratis enabled SCM
-      if (StringUtils.isNotEmpty(
-          conf.get(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY))
-              && SCMHAUtils.isSCMHAEnabled(conf)) {
-        scmStore.setSCMHAFlag(true);
-        scmStore.persistCurrentState();
-        SCMRatisServerImpl.initialize(clusterId, scmId,
-                SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
-                        .getLocalNodeDetails(), conf);
-      }
+      scmStore.setSCMHAFlag(true);
+      scmStore.persistCurrentState();
+      SCMRatisServerImpl.initialize(clusterId, scmId,
+          SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
+              .getLocalNodeDetails(), conf);
+
     }
 
     void initializeOmStorage(OMStorage omStorage) throws IOException {
@@ -869,9 +844,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         throws IOException {
       List<HddsDatanodeService> hddsDatanodes = new ArrayList<>();
 
-      // Override default datanode initial and current version if necessary
-      overrideDatanodeVersions(dnInitialVersion, dnCurrentVersion);
-
       for (int i = 0; i < numOfDatanodes; i++) {
         OzoneConfiguration dnConf = dnFactory.apply(conf);
 
@@ -893,6 +865,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           localhostWithFreePort());
       conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
           "3s");
+      conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY, getFreePort());
+      conf.setInt(ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY, getFreePort());
     }
 
     private void configureOM() {

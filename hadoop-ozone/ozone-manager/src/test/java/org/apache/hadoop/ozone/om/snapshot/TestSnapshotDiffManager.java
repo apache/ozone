@@ -1,26 +1,109 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.snapshot;
+
+import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.SNAP_DIFF_JOB_TABLE_NAME;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.SNAP_DIFF_REPORT_TABLE_NAME;
+import static org.apache.hadoop.ozone.om.helpers.BucketLayout.LEGACY;
+import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.getTableKey;
+import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_ALREADY_CANCELLED_JOB;
+import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_ALREADY_DONE_JOB;
+import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_ALREADY_FAILED_JOB;
+import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_JOB_NOT_EXIST;
+import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_NON_CANCELLABLE;
+import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_SUCCEEDED;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone.getDiffReportEntryCodec;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.FAILED;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.QUEUED;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.REJECTED;
+import static org.apache.ratis.util.JavaUtils.attempt;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyList;
+import static org.mockito.Mockito.anyMap;
+import static org.mockito.Mockito.anySet;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.google.common.cache.CacheLoader;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import jakarta.annotation.Nonnull;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.function.BiFunction;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.LongStream;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -56,19 +139,19 @@ import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.ozone.util.ClosableIterator;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ExitUtil;
-import org.apache.ozone.rocksdb.util.SstFileSetReader;
 import org.apache.ozone.rocksdb.util.RdbUtil;
+import org.apache.ozone.rocksdb.util.SstFileSetReader;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.TimeDuration;
-import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -82,6 +165,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -90,89 +174,6 @@ import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
-
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.function.BiFunction;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import java.util.stream.LongStream;
-import java.util.stream.Stream;
-
-import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.SNAP_DIFF_JOB_TABLE_NAME;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.SNAP_DIFF_REPORT_TABLE_NAME;
-import static org.apache.hadoop.ozone.om.helpers.BucketLayout.LEGACY;
-import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.getTableKey;
-import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_ALREADY_CANCELLED_JOB;
-import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_ALREADY_DONE_JOB;
-import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_ALREADY_FAILED_JOB;
-import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_JOB_NOT_EXIST;
-import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_NON_CANCELLABLE;
-import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_SUCCEEDED;
-import static org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone.getDiffReportEntryCodec;
-import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
-import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.FAILED;
-import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
-import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.QUEUED;
-import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.REJECTED;
-import static org.apache.ratis.util.JavaUtils.attempt;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyBoolean;
-import static org.mockito.Mockito.anyInt;
-import static org.mockito.Mockito.atLeast;
-import static org.mockito.Mockito.anyList;
-import static org.mockito.Mockito.anyMap;
-import static org.mockito.Mockito.anySet;
-import static org.mockito.Mockito.anyString;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockConstruction;
-import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 /**
  * Tests for SnapshotDiffManager.
@@ -411,7 +412,7 @@ public class TestSnapshotDiffManager {
   }
 
   @ParameterizedTest
-  @ValueSource(ints = {1, 2, 5, 10, 100, 1000, 10000})
+  @ValueSource(ints = {0, 1, 2, 5, 10, 100, 1000, 10000})
   public void testGetDeltaFilesWithDag(int numberOfFiles) throws IOException {
     UUID snap1 = UUID.randomUUID();
     UUID snap2 = UUID.randomUUID();
@@ -429,7 +430,7 @@ public class TestSnapshotDiffManager {
         any(DifferSnapshotInfo.class),
         any(DifferSnapshotInfo.class),
         eq(diffDir))
-    ).thenReturn(Lists.newArrayList(randomStrings));
+    ).thenReturn(Optional.of(Lists.newArrayList(randomStrings)));
 
     ReferenceCounted<OmSnapshot> rcFromSnapshot =
         omSnapshotManager.getActiveSnapshot(VOLUME_NAME, BUCKET_NAME, snap1.toString());
@@ -441,14 +442,20 @@ public class TestSnapshotDiffManager {
     SnapshotInfo fromSnapshotInfo = getMockedSnapshotInfo(snap1);
     SnapshotInfo toSnapshotInfo = getMockedSnapshotInfo(snap2);
     when(jobTableIterator.isValid()).thenReturn(false);
-    Set<String> deltaFiles = snapshotDiffManager.getDeltaFiles(
-        fromSnapshot,
-        toSnapshot,
-        Arrays.asList("cf1", "cf2"), fromSnapshotInfo,
-        toSnapshotInfo, false,
-        Collections.emptyMap(), diffDir);
-    assertEquals(randomStrings, deltaFiles);
-
+    try (MockedStatic<RdbUtil> mockedRdbUtil = Mockito.mockStatic(RdbUtil.class, Mockito.CALLS_REAL_METHODS);
+         MockedStatic<RocksDiffUtils> mockedRocksDiffUtils = Mockito.mockStatic(RocksDiffUtils.class,
+             Mockito.CALLS_REAL_METHODS)) {
+      mockedRdbUtil.when(() -> RdbUtil.getSSTFilesForComparison(any(), any()))
+          .thenReturn(Collections.singleton(RandomStringUtils.randomAlphabetic(10)));
+      mockedRocksDiffUtils.when(() -> RocksDiffUtils.filterRelevantSstFiles(any(), any())).thenAnswer(i -> null);
+      Set<String> deltaFiles = snapshotDiffManager.getDeltaFiles(
+          fromSnapshot,
+          toSnapshot,
+          Arrays.asList("cf1", "cf2"), fromSnapshotInfo,
+          toSnapshotInfo, false,
+          Collections.emptyMap(), diffDir);
+      assertEquals(randomStrings, deltaFiles);
+    }
     rcFromSnapshot.close();
     rcToSnapshot.close();
   }
@@ -476,7 +483,8 @@ public class TestSnapshotDiffManager {
           });
 
       mockedRocksDiffUtils.when(() ->
-              RocksDiffUtils.filterRelevantSstFiles(anySet(), anyMap()))
+              RocksDiffUtils.filterRelevantSstFiles(anySet(), anyMap(), anyMap(), any(ManagedRocksDB.class),
+                  any(ManagedRocksDB.class)))
           .thenAnswer((Answer<Void>) invocationOnMock -> {
             invocationOnMock.getArgument(0, Set.class).stream()
                 .findAny().ifPresent(val -> {
@@ -497,7 +505,7 @@ public class TestSnapshotDiffManager {
             any(DifferSnapshotInfo.class),
             any(DifferSnapshotInfo.class),
             anyString()))
-            .thenReturn(Collections.emptyList());
+            .thenReturn(Optional.ofNullable(Collections.emptyList()));
       }
 
       ReferenceCounted<OmSnapshot> rcFromSnapshot =
@@ -543,7 +551,8 @@ public class TestSnapshotDiffManager {
           });
 
       mockedRocksDiffUtils.when(() ->
-              RocksDiffUtils.filterRelevantSstFiles(anySet(), anyMap()))
+              RocksDiffUtils.filterRelevantSstFiles(anySet(), anyMap(), anyMap(), any(ManagedRocksDB.class),
+                  any(ManagedRocksDB.class)))
           .thenAnswer((Answer<Void>) invocationOnMock -> {
             invocationOnMock.getArgument(0, Set.class).stream()
                 .findAny().ifPresent(val -> {
@@ -560,7 +569,7 @@ public class TestSnapshotDiffManager {
       when(snapshotInfoTable.get(SnapshotInfo.getTableKey(VOLUME_NAME, BUCKET_NAME, snap2.toString())))
           .thenReturn(getSnapshotInfoInstance(VOLUME_NAME, BUCKET_NAME, snap2.toString(), snap2));
 
-      doThrow(new FileNotFoundException("File not found exception."))
+      doThrow(new RuntimeException("File not found exception."))
           .when(differ)
           .getSSTDiffListWithFullPath(
               any(DifferSnapshotInfo.class),
@@ -672,12 +681,13 @@ public class TestSnapshotDiffManager {
 
       SnapshotDiffManager spy = spy(snapshotDiffManager);
 
-      doAnswer(invocation -> {
+      Boolean isKeyInBucket = doAnswer(invocation -> {
             String[] split = invocation.getArgument(0, String.class).split("/");
             String keyName = split[split.length - 1];
             return Integer.parseInt(keyName.substring(3)) % 2 == 0;
           }
       ).when(spy).isKeyInBucket(anyString(), anyMap(), anyString());
+      assertFalse(isKeyInBucket);
 
       PersistentMap<byte[], byte[]> oldObjectIdKeyMap =
           new StubbedPersistentMap<>();
@@ -1512,6 +1522,27 @@ public class TestSnapshotDiffManager {
   }
 
   @Test
+  public void testGetDeltaFilesWithFullDiff() throws IOException {
+    SnapshotDiffManager spy = spy(snapshotDiffManager);
+    OmSnapshot fromSnapshot = getMockedOmSnapshot(UUID.randomUUID());
+    OmSnapshot toSnapshot = getMockedOmSnapshot(UUID.randomUUID());
+    Mockito.doAnswer(invocation -> {
+      OmSnapshot snapshot = invocation.getArgument(0);
+      if (snapshot == fromSnapshot) {
+        return Sets.newHashSet("1", "2", "3");
+      }
+      if (snapshot == toSnapshot) {
+        return Sets.newHashSet("3", "4", "5");
+      }
+      return Sets.newHashSet("6", "7", "8");
+    }).when(spy).getSSTFileListForSnapshot(Mockito.any(OmSnapshot.class),
+        Mockito.anyList());
+    Set<String> deltaFiles = spy.getDeltaFiles(fromSnapshot, toSnapshot, Collections.emptyList(), snapshotInfo,
+        snapshotInfo, true, Collections.emptyMap(), null);
+    Assertions.assertEquals(Sets.newHashSet("1", "2", "3", "4", "5"), deltaFiles);
+  }
+
+  @Test
   public void testGetSnapshotDiffReportHappyCase() throws Exception {
     SnapshotInfo fromSnapInfo = snapshotInfo;
     SnapshotInfo toSnapInfo = snapshotInfoList.get(0);
@@ -1556,6 +1587,7 @@ public class TestSnapshotDiffManager {
    * short-circuited based on previous one.
    */
   @Test
+  @Flaky("HDDS-12361")
   public void testGetSnapshotDiffReportJob() throws Exception {
     for (int i = 0; i < jobStatuses.size(); i++) {
       uploadSnapshotDiffJobToDb(snapshotInfo, snapshotInfoList.get(i),

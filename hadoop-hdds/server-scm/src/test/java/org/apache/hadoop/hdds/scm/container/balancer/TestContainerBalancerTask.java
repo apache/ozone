@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,7 +17,32 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import com.google.protobuf.ByteString;
+import java.io.IOException;
+import java.time.Clock;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -56,33 +80,6 @@ import org.junit.jupiter.api.TestInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
-
-import java.io.IOException;
-import java.time.Clock;
-import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
-import static org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyString;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Tests for {@link ContainerBalancer}.
@@ -137,12 +134,7 @@ public class TestContainerBalancerTask {
         .thenReturn(CompletableFuture.completedFuture(
             MoveManager.MoveResult.COMPLETED));
 
-    /*
-    Disable LegacyReplicationManager. This means balancer should select RATIS
-     as well as EC containers for balancing. Also, MoveManager will be used.
-     */
     when(replicationManager.getConfig()).thenReturn(rmConf);
-    rmConf.setEnableLegacy(false);
     // these configs will usually be specified in each test
     balancerConfiguration =
         conf.getObject(ContainerBalancerConfiguration.class);
@@ -175,12 +167,6 @@ public class TestContainerBalancerTask {
     when(replicationManager
         .isContainerReplicatingOrDeleting(any(ContainerID.class)))
         .thenReturn(false);
-
-    when(replicationManager.move(any(ContainerID.class),
-        any(DatanodeDetails.class),
-        any(DatanodeDetails.class)))
-        .thenReturn(CompletableFuture.
-            completedFuture(MoveManager.MoveResult.COMPLETED));
 
     when(replicationManager.getClock())
         .thenReturn(Clock.system(ZoneId.systemDefault()));
@@ -366,40 +352,6 @@ public class TestContainerBalancerTask {
     // ensure the thread dies
     GenericTestUtils.waitFor(() -> !balancingThread.isAlive(), 1, 20);
     assertFalse(balancingThread.isAlive());
-  }
-
-  /**
-   * The expectation is that only RATIS containers should be selected for
-   * balancing when LegacyReplicationManager is enabled. This is because
-   * LegacyReplicationManager does not support moving EC containers.
-   */
-  @Test
-  public void balancerShouldExcludeECContainersWhenLegacyRmIsEnabled()
-      throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
-    // Enable LegacyReplicationManager
-    rmConf.setEnableLegacy(true);
-    balancerConfiguration.setThreshold(10);
-    balancerConfiguration.setIterations(1);
-    balancerConfiguration.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
-    balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
-    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-
-    startBalancer(balancerConfiguration);
-
-    /*
-     Get all containers that were selected by balancer and assert none of
-     them is an EC container.
-     */
-    Map<ContainerID, DatanodeDetails> containerToSource =
-        containerBalancerTask.getContainerToSourceMap();
-    assertFalse(containerToSource.isEmpty());
-    for (Map.Entry<ContainerID, DatanodeDetails> entry :
-        containerToSource.entrySet()) {
-      ContainerInfo containerInfo = cidToInfoMap.get(entry.getKey());
-      assertNotSame(HddsProtos.ReplicationType.EC,
-          containerInfo.getReplicationType());
-    }
   }
 
   /**
@@ -637,17 +589,5 @@ public class TestContainerBalancerTask {
 
   private void stopBalancer() {
     // do nothing as testcase is not threaded
-  }
-
-  private CompletableFuture<MoveManager.MoveResult>
-      genCompletableFuture(int sleepMilSec) {
-    return CompletableFuture.supplyAsync(() -> {
-      try {
-        Thread.sleep(sleepMilSec);
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      }
-      return MoveManager.MoveResult.COMPLETED;
-    });
   }
 }
