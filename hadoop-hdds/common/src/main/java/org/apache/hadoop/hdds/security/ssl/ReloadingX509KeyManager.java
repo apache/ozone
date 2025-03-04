@@ -221,7 +221,7 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager implements C
 
   private boolean isAlreadyUsing(PrivateKey privateKey, List<X509Certificate> newTrustChain) {
     return currentPrivateKey != null && currentPrivateKey.equals(privateKey) &&
-        currentTrustChain.size() > 0 &&
+        !currentTrustChain.isEmpty() &&
         newTrustChain.size() == currentTrustChain.size() &&
         newTrustChain.stream()
             .allMatch(

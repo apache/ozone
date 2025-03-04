@@ -57,7 +57,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.management.ObjectName;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -469,18 +468,18 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         new CommandStatusReportHandler();
 
     NewNodeHandler newNodeHandler = new NewNodeHandler(pipelineManager,
-        scmDecommissionManager, configuration, serviceManager);
+        scmDecommissionManager, serviceManager);
     NodeAddressUpdateHandler nodeAddressUpdateHandler =
             new NodeAddressUpdateHandler(pipelineManager,
                     scmDecommissionManager, serviceManager);
     StaleNodeHandler staleNodeHandler =
-        new StaleNodeHandler(scmNodeManager, pipelineManager, configuration);
+        new StaleNodeHandler(scmNodeManager, pipelineManager);
     DeadNodeHandler deadNodeHandler = new DeadNodeHandler(scmNodeManager,
         pipelineManager, containerManager);
     StartDatanodeAdminHandler datanodeStartAdminHandler =
         new StartDatanodeAdminHandler(scmNodeManager, pipelineManager);
     ReadOnlyHealthyToHealthyNodeHandler readOnlyHealthyToHealthyNodeHandler =
-        new ReadOnlyHealthyToHealthyNodeHandler(configuration, serviceManager);
+        new ReadOnlyHealthyToHealthyNodeHandler(serviceManager);
     HealthyReadOnlyNodeHandler
         healthyReadOnlyNodeHandler =
         new HealthyReadOnlyNodeHandler(scmNodeManager,
@@ -495,7 +494,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         new IncrementalContainerReportHandler(
             scmNodeManager, containerManager, scmContext);
     PipelineActionHandler pipelineActionHandler =
-        new PipelineActionHandler(pipelineManager, scmContext, configuration);
+        new PipelineActionHandler(pipelineManager, scmContext);
 
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.RETRIABLE_DATANODE_COMMAND, scmNodeManager);
@@ -709,7 +708,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
         conf.getClass(
-            DFSConfigKeysLegacy.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+            ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
             TableMapping.class, DNSToSwitchMapping.class);
     DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
         dnsToSwitchMappingClass, conf);

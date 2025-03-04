@@ -536,7 +536,7 @@ public class BasicRootedOzoneClientAdapterImpl
       // given in pathStr, so getBucket above should handle the creation
       // of volume and bucket. We won't feed empty keyStr to
       // bucket.createDirectory as that would be a NPE.
-      if (keyStr != null && keyStr.length() > 0) {
+      if (keyStr != null && !keyStr.isEmpty()) {
         bucket.createDirectory(keyStr);
       }
     } catch (OMException e) {
@@ -563,7 +563,7 @@ public class BasicRootedOzoneClientAdapterImpl
     incrementCounter(Statistic.OBJECTS_DELETED, 1);
     OFSPath ofsPath = new OFSPath(path, config);
     String keyName = ofsPath.getKeyName();
-    if (keyName.length() == 0) {
+    if (keyName.isEmpty()) {
       return false;
     }
     try {
@@ -619,7 +619,7 @@ public class BasicRootedOzoneClientAdapterImpl
    */
   @Override
   public boolean deleteObjects(List<String> keyNameList) {
-    if (keyNameList.size() == 0) {
+    if (keyNameList.isEmpty()) {
       return true;
     }
     // Sanity check. Support only deleting a list of keys in the same bucket

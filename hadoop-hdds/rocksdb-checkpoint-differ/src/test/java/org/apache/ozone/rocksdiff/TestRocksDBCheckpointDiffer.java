@@ -925,7 +925,7 @@ public class TestRocksDBCheckpointDiffer {
       // fist go through fwdGraph to find nodes that don't have successors.
       // These nodes will be the top level nodes in reverse graph
       Set<CompactionNode> successors = fwdMutableGraph.successors(infileNode);
-      if (successors.size() == 0) {
+      if (successors.isEmpty()) {
         LOG.debug("No successors. Cumulative keys: {}, total keys: {}",
             infileNode.getCumulativeKeysReverseTraversal(),
             infileNode.getTotalNumberOfKeys());

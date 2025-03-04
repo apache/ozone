@@ -29,7 +29,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
-import javax.management.ObjectName;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -52,8 +51,6 @@ public class SCMNodeStorageStatMap implements SCMNodeStorageStatMXBean {
   private final double criticalUtilizationThreshold;
 
   private final Map<UUID, Set<StorageLocationReport>> scmNodeStorageReportMap;
-  // NodeStorageInfo MXBean
-  private ObjectName scmNodeStorageInfoBean;
   /**
    * constructs the scmNodeStorageReportMap object.
    */
@@ -112,7 +109,7 @@ public class SCMNodeStorageStatMap implements SCMNodeStorageStatMXBean {
   public void insertNewDatanode(UUID datanodeID,
       Set<StorageLocationReport> report) throws SCMException {
     Preconditions.checkNotNull(report);
-    Preconditions.checkState(report.size() != 0);
+    Preconditions.checkState(!report.isEmpty());
     Preconditions.checkNotNull(datanodeID);
     synchronized (scmNodeStorageReportMap) {
       if (isKnownDatanode(datanodeID)) {
@@ -135,7 +132,7 @@ public class SCMNodeStorageStatMap implements SCMNodeStorageStatMXBean {
       Set<StorageLocationReport> report) throws SCMException {
     Preconditions.checkNotNull(datanodeID);
     Preconditions.checkNotNull(report);
-    Preconditions.checkState(report.size() != 0);
+    Preconditions.checkState(!report.isEmpty());
     synchronized (scmNodeStorageReportMap) {
       if (!scmNodeStorageReportMap.containsKey(datanodeID)) {
         throw new SCMException("No such datanode", NO_SUCH_DATANODE);

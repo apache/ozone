@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.protocolPB;
 
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
 
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.ipc.ProtocolInfo;
 import org.apache.hadoop.security.KerberosInfo;
 
@@ -32,7 +32,7 @@ import org.apache.hadoop.security.KerberosInfo;
     protocolVersion = 1)
 @KerberosInfo(
     serverPrincipal = OZONE_RECON_KERBEROS_PRINCIPAL_KEY,
-    clientPrincipal = DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY)
+    clientPrincipal = HddsConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY)
 public interface ReconDatanodeProtocolPB extends
     StorageContainerDatanodeProtocolPB {
 }

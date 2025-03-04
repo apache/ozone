@@ -132,7 +132,7 @@ public class VersionEndpointTask implements
           volumeSet.failVolume(volume.getStorageDir().getPath());
         }
       }
-      if (volumeSet.getVolumesList().size() == 0) {
+      if (volumeSet.getVolumesList().isEmpty()) {
         // All volumes are in inconsistent state
         throw new DiskOutOfSpaceException(
             "All configured Volumes are in Inconsistent State");

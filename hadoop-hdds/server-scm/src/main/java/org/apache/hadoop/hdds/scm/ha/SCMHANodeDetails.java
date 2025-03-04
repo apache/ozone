@@ -183,7 +183,7 @@ public class SCMHANodeDetails {
 
       // TODO: need to fall back to ozone.scm.names in case scm node ids are
       // not defined.
-      if (scmNodeIds.size() == 0) {
+      if (scmNodeIds.isEmpty()) {
         throw new IllegalArgumentException(
             String.format("Configuration does not have any value set for %s " +
                 "for the service %s. List of SCM Node ID's should be " +
