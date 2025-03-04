@@ -133,7 +133,7 @@ public class TestNSSummaryTaskWithOBS {
         OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
     nSSummaryTaskWithOBS = new NSSummaryTaskWithOBS(
         reconNamespaceSummaryManager,
-        reconOMMetadataManager, omConfiguration,
+        reconOMMetadataManager,
         nsSummaryFlushToDBMaxThreshold);
   }
 

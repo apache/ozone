@@ -449,7 +449,7 @@ public class RDBStore implements DBStore {
           sequenceNumber, e);
       dbUpdatesWrapper.setDBUpdateSuccess(false);
     } finally {
-      if (dbUpdatesWrapper.getData().size() > 0) {
+      if (!dbUpdatesWrapper.getData().isEmpty()) {
         rdbMetrics.incWalUpdateDataSize(cumulativeDBUpdateLogBatchSize);
         rdbMetrics.incWalUpdateSequenceCount(
             dbUpdatesWrapper.getCurrentSequenceNumber() - sequenceNumber);

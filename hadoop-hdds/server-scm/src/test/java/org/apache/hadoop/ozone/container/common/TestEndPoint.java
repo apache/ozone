@@ -424,7 +424,7 @@ public class TestEndPoint {
     when(versionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
     RegisterEndpointTask endpointTask =
-        new RegisterEndpointTask(rpcEndPoint, conf, ozoneContainer,
+        new RegisterEndpointTask(rpcEndPoint, ozoneContainer,
             mock(StateContext.class), versionManager);
     if (!clearDatanodeDetails) {
       DatanodeDetails datanodeDetails = randomDatanodeDetails();

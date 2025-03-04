@@ -50,7 +50,6 @@ public class PipelineReportHandler implements
   private static final Logger LOGGER = LoggerFactory.getLogger(
       PipelineReportHandler.class);
   private final PipelineManager pipelineManager;
-  private final ConfigurationSource conf;
   private final SafeModeManager scmSafeModeManager;
   private final SCMContext scmContext;
   private final boolean pipelineAvailabilityCheck;
@@ -64,7 +63,6 @@ public class PipelineReportHandler implements
     this.scmSafeModeManager = scmSafeModeManager;
     this.pipelineManager = pipelineManager;
     this.scmContext = scmContext;
-    this.conf = conf;
     this.metrics = SCMPipelineMetrics.create();
     this.pipelineAvailabilityCheck = conf.getBoolean(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,

@@ -207,7 +207,7 @@ public final class HddsUtils {
       return Optional.empty();
     }
     String hostname = value.replaceAll("\\:[0-9]+$", "");
-    if (hostname.length() == 0) {
+    if (hostname.isEmpty()) {
       return Optional.empty();
     } else {
       return Optional.of(hostname);

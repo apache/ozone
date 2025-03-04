@@ -129,7 +129,7 @@ public class TestSchemaTwoBackwardsCompatibility {
         StorageVolume.VolumeType.DATA_VOLUME, null);
 
     blockManager = new BlockManagerImpl(conf);
-    chunkManager = new FilePerBlockStrategy(true, blockManager, volumeSet);
+    chunkManager = new FilePerBlockStrategy(true, blockManager);
 
     containerSet = new ContainerSet(1000);
     keyValueHandler = new KeyValueHandler(conf, datanodeUuid,

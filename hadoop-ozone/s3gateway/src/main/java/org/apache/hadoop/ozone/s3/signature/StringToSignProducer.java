@@ -109,7 +109,7 @@ public final class StringToSignProducer {
 
     // If the absolute path is empty, use a forward slash (/)
     String uri = signatureInfo.getUnfilteredURI();
-    uri = (uri.trim().length() > 0) ? uri : "/";
+    uri = (!uri.trim().isEmpty()) ? uri : "/";
     // Encode URI and preserve forward slashes
     strToSign.append(signatureInfo.getAlgorithm() + NEWLINE);
     if (signatureInfo.getDateTime() == null) {

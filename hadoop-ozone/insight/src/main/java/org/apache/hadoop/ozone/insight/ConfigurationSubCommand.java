@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.insight;
 
+import static org.apache.hadoop.hdds.conf.ConfigurationReflectionUtil.getFullKey;
+
 import java.lang.reflect.Field;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -78,12 +80,10 @@ public class ConfigurationSubCommand extends BaseInsightSubCommand
 
   private void printConfig(ConfigGroup configGroup, Class clazz,
       OzoneConfiguration conf) {
-    String prefix = configGroup.prefix();
-
     for (Field field : clazz.getDeclaredFields()) {
       if (field.isAnnotationPresent(Config.class)) {
         Config config = field.getAnnotation(Config.class);
-        String key = prefix + "." + config.key();
+        String key = getFullKey(configGroup, config);
         System.out.println(">>> " + key);
         System.out.println("       default: " + config.defaultValue());
         System.out.println("       current: " + conf.get(key));

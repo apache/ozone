@@ -993,7 +993,7 @@ public class OMDBInsightEndpoint {
 
 
     // This API supports startPrefix from bucket level.
-    if (startPrefix == null || startPrefix.length() == 0) {
+    if (startPrefix == null || startPrefix.isEmpty()) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
     String[] names = startPrefix.split(OM_KEY_PREFIX);

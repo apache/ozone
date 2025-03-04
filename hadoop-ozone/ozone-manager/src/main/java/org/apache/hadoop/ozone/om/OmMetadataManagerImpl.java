@@ -313,7 +313,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table snapshotRenamedTable;
   private Table compactionLogTable;
 
-  private boolean ignorePipelineinKey;
   private Table deletedDirTable;
 
   private OzoneManager ozoneManager;
@@ -351,9 +350,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
     this.lock = new OzoneManagerLock(conf);
     this.omEpoch = OmUtils.getOMEpoch();
-    // For test purpose only
-    ignorePipelineinKey = conf.getBoolean(
-        "ozone.om.ignore.pipeline", Boolean.TRUE);
     start(conf);
   }
 
@@ -1717,7 +1713,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
             if (Objects.equals(Optional.ofNullable(newPreviousSnapshotInfo).map(SnapshotInfo::getSnapshotId),
                 Optional.ofNullable(previousSnapshotInfo).map(SnapshotInfo::getSnapshotId))) {
               // If all the versions are not reclaimable, then do nothing.
-              if (notReclaimableKeyInfoList.size() > 0 &&
+              if (!notReclaimableKeyInfoList.isEmpty() &&
                   notReclaimableKeyInfoList.size() !=
                       infoList.getOmKeyInfoList().size()) {
                 keysToModify.put(kv.getKey(), notReclaimableKeyInfo);
