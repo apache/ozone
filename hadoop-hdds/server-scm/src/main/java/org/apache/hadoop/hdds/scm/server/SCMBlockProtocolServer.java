@@ -230,7 +230,7 @@ public class SCMBlockProtocolServer implements
       String blockIDs = blocks.stream().limit(10)
           .map(block -> block.getBlockID().toString())
           .collect(Collectors.joining(", ", "[", "]"));
-      auditMap.put("sample blocks", blockIDs);
+      auditMap.put("sampleBlocks", blockIDs);
 
       if (blocks.size() < num) {
         AUDIT.logWriteFailure(buildAuditMessageForFailure(
