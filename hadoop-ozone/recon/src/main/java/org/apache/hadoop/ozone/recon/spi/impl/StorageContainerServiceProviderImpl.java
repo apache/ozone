@@ -17,9 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
-import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_SNAPSHOT_DB;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONNECTION_REQUEST_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
@@ -49,10 +47,8 @@ import org.apache.hadoop.hdds.scm.ha.SCMSnapshotDownloader;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
-import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconUtils;
@@ -74,9 +70,7 @@ public class StorageContainerServiceProviderImpl
       LoggerFactory.getLogger(StorageContainerServiceProviderImpl.class);
   private StorageContainerLocationProtocol scmClient;
   private final OzoneConfiguration configuration;
-  private String scmDBSnapshotUrl;
   private File scmSnapshotDBParentDir;
-  private URLConnectionFactory connectionFactory;
   private ReconUtils reconUtils;
   private ReconStorageConfig reconStorage;
   private ReconContext reconContext;
@@ -96,27 +90,8 @@ public class StorageContainerServiceProviderImpl
         OZONE_RECON_SCM_CONNECTION_REQUEST_TIMEOUT,
         OZONE_RECON_SCM_CONNECTION_REQUEST_TIMEOUT_DEFAULT,
         TimeUnit.MILLISECONDS);
-    connectionFactory =
-        URLConnectionFactory.newDefaultURLConnectionFactory(connectionTimeout,
-                connectionRequestTimeout, configuration);
-
-    String scmHttpAddress = configuration.get(ScmConfigKeys
-        .OZONE_SCM_HTTP_ADDRESS_KEY);
-
-    String scmHttpsAddress = configuration.get(ScmConfigKeys
-        .OZONE_SCM_HTTPS_ADDRESS_KEY);
-
-    HttpConfig.Policy policy = HttpConfig.getHttpPolicy(configuration);
 
     scmSnapshotDBParentDir = ReconUtils.getReconScmDbDir(configuration);
-
-    scmDBSnapshotUrl = "http://" + scmHttpAddress +
-        OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
-
-    if (policy.isHttpsEnabled()) {
-      scmDBSnapshotUrl = "https://" + scmHttpsAddress +
-          OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
-    }
 
     this.reconUtils = reconUtils;
     this.scmClient = scmClient;
@@ -163,15 +138,6 @@ public class StorageContainerServiceProviderImpl
   public long getContainerCount(HddsProtos.LifeCycleState state)
       throws IOException {
     return scmClient.getContainerCount(state);
-  }
-
-  public String getScmDBSnapshotUrl() {
-    return scmDBSnapshotUrl;
-  }
-
-  private boolean isOmSpnegoEnabled() {
-    return configuration.get(HDDS_SCM_HTTP_AUTH_TYPE, "simple")
-        .equals("kerberos");
   }
 
   @Override
