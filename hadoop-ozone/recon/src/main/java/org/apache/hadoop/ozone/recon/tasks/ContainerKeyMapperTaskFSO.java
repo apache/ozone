@@ -18,15 +18,12 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import com.google.inject.Inject;
-import org.apache.commons.lang3.tuple.Pair;
+import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import java.util.Map;
 
 /**
  * Task for processing ContainerKey mapping specifically for FSO buckets.
@@ -61,7 +58,8 @@ public class ContainerKeyMapperTaskFSO implements ReconOmTask {
 
   @Override
   public TaskResult process(OMUpdateEventBatch events, Map<String, Integer> subTaskSeekPosMap) {
-    boolean result =  ContainerKeyMapperHelper.process(events, "fileTable", reconContainerMetadataManager, getTaskName());
+    boolean result =
+        ContainerKeyMapperHelper.process(events, "fileTable", reconContainerMetadataManager, getTaskName());
     return buildTaskResult(result);
   }
 }

@@ -18,15 +18,12 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import com.google.inject.Inject;
-import org.apache.commons.lang3.tuple.Pair;
+import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import java.util.Map;
 
 /**
  * Task for processing ContainerKey mapping specifically for OBS buckets.
