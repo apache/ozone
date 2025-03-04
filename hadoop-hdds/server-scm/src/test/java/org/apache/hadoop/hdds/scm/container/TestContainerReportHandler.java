@@ -499,6 +499,27 @@ public class TestContainerReportHandler {
   }
 
   /**
+   * Helper method to get a container with specified replication type and state for testing.
+   * @param replicationType HddsProtos.ReplicationType
+   * @param state HddsProtos.LifeCycleState
+   * @return ContainerInfo
+   */
+  private ContainerInfo getContainerHelper(
+      HddsProtos.ReplicationType replicationType,
+      final HddsProtos.LifeCycleState containerState) {
+    switch (replicationType) {
+    case RATIS:
+      return getContainer(containerState);
+    case EC:
+      return getECContainer(containerState, PipelineID.randomId(), new ECReplicationConfig(6, 3));
+    default:
+      fail("Unsupported replication type: " + replicationType);
+    }
+    // make the compiler happy
+    return null;
+  }
+
+  /**
    * Tests that a DELETING or DELETED RATIS/EC container transitions to CLOSED if a non-empty replica in OPEN, CLOSING,
    * CLOSED, QUASI_CLOSED or UNHEALTHY state is reported.
    * It should not transition if the replica is in INVALID or DELETED states.
@@ -511,17 +532,8 @@ public class TestContainerReportHandler {
       ContainerReplicaProto.State replicaState,
       ContainerReplicaProto.State invalidReplicaState)
       throws IOException {
-    ContainerInfo container = getContainer(containerState);
-    switch (replicationType) {
-    case RATIS:
-      container = getContainer(containerState);
-      break;
-    case EC:
-      container = getECContainer(containerState, PipelineID.randomId(), new ECReplicationConfig(6, 3));
-      break;
-    default:
-      fail("Unsupported replication type: " + replicationType);
-    }
+
+    ContainerInfo container = getContainerHelper(replicationType, containerState);
     containerStateManager.addContainer(container.getProtobuf());
 
     // set up a non-empty replica in replicaState
@@ -572,20 +584,26 @@ public class TestContainerReportHandler {
 
   @ParameterizedTest
   @MethodSource("containerAndReplicaStates")
-  public void ratisContainerShouldNotTransitionFromDeletingOrDeletedToClosedWhenEmptyReplica(
-      LifeCycleState containerState, ContainerReplicaProto.State replicaState) throws IOException {
-    ContainerInfo container = getContainer(containerState);
+  public void containerShouldNotTransitionFromDeletingOrDeletedToClosedWhenEmptyReplica(
+      HddsProtos.ReplicationType replicationType,
+      LifeCycleState containerState,
+      ContainerReplicaProto.State replicaState) throws IOException {
+
+    ContainerInfo container = getContainerHelper(replicationType, containerState);
     containerStateManager.addContainer(container.getProtobuf());
 
     // set up an empty replica
     DatanodeDetails dnWithEmptyReplica = nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0);
     ContainerReplicaProto.Builder builder = ContainerReplicaProto.newBuilder();
-    ContainerReplicaProto emptyReplica = builder.setContainerID(container.getContainerID())
+    ContainerReplicaProto emptyReplica = builder
+        .setContainerID(container.getContainerID())
         .setIsEmpty(true)
         .setState(replicaState)
-        .setKeyCount(0)
-        .setBlockCommitSequenceId(123)
-        .setOriginNodeId(dnWithEmptyReplica.getUuidString()).build();
+        .setKeyCount(0L)
+        .setBlockCommitSequenceId(123L)
+        .setReplicaIndex(1)
+        .setOriginNodeId(dnWithEmptyReplica.getUuidString())
+        .build();
 
     ContainerReportHandler containerReportHandler = new ContainerReportHandler(nodeManager, containerManager);
     ContainerReportsProto emptyContainerReport = getContainerReports(emptyReplica);
