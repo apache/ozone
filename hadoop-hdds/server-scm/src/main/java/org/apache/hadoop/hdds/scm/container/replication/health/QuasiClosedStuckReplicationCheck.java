@@ -39,17 +39,24 @@ import org.slf4j.LoggerFactory;
 public class QuasiClosedStuckReplicationCheck  extends AbstractCheck {
   public static final Logger LOG = LoggerFactory.getLogger(QuasiClosedStuckReplicationCheck.class);
 
-  @Override
-  public boolean handle(ContainerCheckRequest request) {
-    if (request.getContainerInfo().getState() != QUASI_CLOSED) {
+  public static boolean shouldHandleAsQuasiClosedStuck(ContainerInfo containerInfo, Set<ContainerReplica> replicas) {
+    if (containerInfo.getState() != QUASI_CLOSED) {
       return false;
     }
-    if (!QuasiClosedContainerHandler.isQuasiClosedStuck(request.getContainerInfo(), request.getContainerReplicas())) {
+    if (!QuasiClosedContainerHandler.isQuasiClosedStuck(containerInfo, replicas)) {
       return false;
     }
-    if (hasEnoughOriginsWithOpen(request.getContainerInfo(), request.getContainerReplicas())) {
+    if (hasEnoughOriginsWithOpen(containerInfo, replicas)) {
       // If we have all origins with open replicas, and not unhealthy then the container should close after the close
       // goes through, so this handler should not run.
+      return false;
+    }
+    return true;
+  }
+
+  @Override
+  public boolean handle(ContainerCheckRequest request) {
+    if (!shouldHandleAsQuasiClosedStuck(request.getContainerInfo(), request.getContainerReplicas())) {
       return false;
     }
 
