@@ -668,6 +668,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
       // Then wait for the double buffer to be flushed.
       om.awaitDoubleBufferFlush();
+
+      // Flush all the pending transactions to get DB to a consistent state.
+      om.getOmSnapshotManager().flushLog();
       return this;
     }
 

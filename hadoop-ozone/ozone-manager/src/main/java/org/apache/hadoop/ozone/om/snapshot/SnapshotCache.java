@@ -116,6 +116,20 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
     }
   }
 
+  /**
+   * Immediately flush the outstanding I/O operations of the DB.
+   */
+  public void flushLog() {
+    for (ReferenceCounted<OmSnapshot> snapshot : dbMap.values()) {
+      try {
+        snapshot.get().getMetadataManager().getStore().flushLog(true);
+      } catch (IOException e) {
+        LOG.error("Failed to flush log for snapshot cache", e);
+        throw new IllegalStateException(e);
+      }
+    }
+  }
+
   @Override
   public void close() {
     invalidateAll();
