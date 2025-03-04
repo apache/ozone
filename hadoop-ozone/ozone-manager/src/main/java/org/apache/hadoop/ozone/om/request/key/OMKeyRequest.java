@@ -308,7 +308,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       long requestedSize, long scmBlockSize, int preallocateBlocksMax,
       boolean grpcBlockTokenEnabled, String serviceID, OMMetrics omMetrics,
       boolean shouldSortDatanodes, UserInfo userInfo, NetworkTopology clusterMap,
-      OMBlockPrefetchClient prefetchClient, int blockPrefetchFactor, OMPerformanceMetrics perfMetrics)
+      OMBlockPrefetchClient prefetchClient, OMPerformanceMetrics perfMetrics)
       throws IOException {
     long allocateBlockStartTime = Time.monotonicNowNanos();
     int dataGroupSize = replicationConfig instanceof ECReplicationConfig

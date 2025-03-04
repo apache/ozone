@@ -453,7 +453,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final long scmBlockSize;
   private final int preallocateBlocksMax;
   private final boolean grpcBlockTokenEnabled;
-  private final int blockPrefetchFactor;
   private final BucketLayout defaultBucketLayout;
   private final ReplicationConfig defaultReplicationConfig;
 
@@ -582,7 +581,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT);
     this.grpcBlockTokenEnabled = conf.getBoolean(HDDS_BLOCK_TOKEN_ENABLED,
         HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
-    this.blockPrefetchFactor = conf.getInt(OZONE_OM_PREFETCH_BLOCKS_FACTOR, OZONE_OM_PREFETCH_BLOCKS_FACTOR_DEFAULT);
     this.isStrictS3 = conf.getBoolean(
         OZONE_OM_NAMESPACE_STRICT_S3,
         OZONE_OM_NAMESPACE_STRICT_S3_DEFAULT);
@@ -950,14 +948,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public boolean isGrpcBlockTokenEnabled() {
     return grpcBlockTokenEnabled;
-  }
-
-  /**
-   * Return config value of
-   * {@link OzoneConfigKeys#OZONE_OM_PREFETCH_BLOCKS_FACTOR}.
-   */
-  public int getBlockPrefetchFactor() {
-    return blockPrefetchFactor;
   }
 
   /**

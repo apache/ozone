@@ -150,7 +150,6 @@ public class OMKeyCreateRequest extends OMKeyRequest {
               userInfo,
               ozoneManager.getClusterMap(),
               ozoneManager.getOmBlockPrefetchClient(),
-              ozoneManager.getBlockPrefetchFactor(),
               ozoneManager.getPerfMetrics());
 
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now())

@@ -137,7 +137,6 @@ public class OMFileCreateRequest extends OMKeyRequest {
               userInfo,
               ozoneManager.getClusterMap(),
               ozoneManager.getOmBlockPrefetchClient(),
-              ozoneManager.getBlockPrefetchFactor(),
               ozoneManager.getPerfMetrics());
 
     KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
