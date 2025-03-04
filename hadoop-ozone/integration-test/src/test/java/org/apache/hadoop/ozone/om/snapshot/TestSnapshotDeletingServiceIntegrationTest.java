@@ -288,8 +288,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
         client.getProxy().createDirectory(VOLUME_NAME,
             BUCKET_NAME_FSO, parent + childDir);
         TestDataUtil.createKey(bucket2, parent + childFile, ReplicationConfig.
-                fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.THREE)
-            , CONTENT.array());
+                fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.THREE), CONTENT.array());
       }
     }
 
