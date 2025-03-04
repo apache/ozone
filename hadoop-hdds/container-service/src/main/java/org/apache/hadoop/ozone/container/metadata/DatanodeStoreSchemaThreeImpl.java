@@ -33,8 +33,6 @@ import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
-import org.apache.hadoop.hdds.utils.db.LongCodec;
-import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
@@ -141,17 +139,26 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
 
   public void loadKVContainerData(File dumpDir)
       throws IOException, RocksDBException {
+
     try (BatchOperation batch = getBatchHandler().initBatchOperation()) {
       processTable(batch, getTableDumpFile(getMetadataTable(), dumpDir),
-          FixedLengthStringCodec.get(), LongCodec.get(), getMetadataTable());
+          getDbDef().getMetadataColumnFamily().getKeyCodec(),
+          getDbDef().getMetadataColumnFamily().getValueCodec(),
+          getMetadataTable());
       processTable(batch, getTableDumpFile(getBlockDataTable(), dumpDir),
-          FixedLengthStringCodec.get(), BlockData.getCodec(), getBlockDataTable());
+          getDbDef().getBlockDataColumnFamily().getKeyCodec(),
+          getDbDef().getBlockDataColumnFamily().getValueCodec(),
+          getBlockDataTable());
       if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.HBASE_SUPPORT)) {
         processTable(batch, getTableDumpFile(getLastChunkInfoTable(), dumpDir),
-            FixedLengthStringCodec.get(), BlockData.getCodec(), getLastChunkInfoTable());
+            getDbDef().getLastChunkInfoColumnFamily().getKeyCodec(),
+            getDbDef().getLastChunkInfoColumnFamily().getValueCodec(),
+            getLastChunkInfoTable());
       }
-      processTable(batch, getTableDumpFile(getDeleteTransactionTable(), dumpDir), FixedLengthStringCodec.get(),
-          Proto2Codec.get(DeletedBlocksTransaction.getDefaultInstance()), getDeleteTransactionTable());
+      processTable(batch, getTableDumpFile(getDeleteTransactionTable(), dumpDir),
+          ((DatanodeSchemaThreeDBDefinition)getDbDef()).getDeleteTransactionsColumnFamily().getKeyCodec(),
+          ((DatanodeSchemaThreeDBDefinition)getDbDef()).getDeleteTransactionsColumnFamily().getValueCodec(),
+          getDeleteTransactionTable());
 
       getStore().commitBatchOperation(batch);
     }
@@ -160,7 +167,7 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
   private <K, V> void processTable(BatchOperation batch, File tableDumpFile,
       Codec<K> keyCodec, Codec<V> valueCodec, Table<K, V> table) throws IOException, RocksDBException {
     if (isFileEmpty(tableDumpFile)) {
-      LOG.warn("SST File {} is empty. Skipping processing.", tableDumpFile.getAbsolutePath());
+      LOG.debug("SST File {} is empty. Skipping processing.", tableDumpFile.getAbsolutePath());
       return;
     }
 
