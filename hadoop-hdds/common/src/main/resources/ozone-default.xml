@@ -1521,7 +1521,7 @@
 
   <property>
     <name>ozone.om.snapshot.rocksdb.metrics.enabled</name>
-    <value>true</value>
+    <value>false</value>
     <tag>OZONE, OM</tag>
     <description>
       Skip collecting RocksDBStore metrics for Snapshotted DB.

@@ -175,7 +175,7 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED =
       "ozone.om.snapshot.rocksdb.metrics.enabled";
   public static final boolean
-      OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT = true;
+      OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT = false;
 
   /**
    * OM Ratis related configurations.
