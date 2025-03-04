@@ -35,6 +35,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -108,8 +109,9 @@ public class TestCloseContainer {
       throws Exception {
     // Create some keys to write data into the open containers
     for (int i = 0; i < 10; i++) {
-      TestDataUtil.createKey(bucket, "key" + i, ReplicationFactor.THREE,
-          ReplicationType.RATIS, "this is the content".getBytes(StandardCharsets.UTF_8));
+      TestDataUtil.createKey(bucket, "key" + i, ReplicationConfig
+          .fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.THREE),
+          "this is the content".getBytes(StandardCharsets.UTF_8));
     }
     StorageContainerManager scm = cluster.getStorageContainerManager();
 
@@ -153,8 +155,9 @@ public class TestCloseContainer {
       throws Exception {
     // Create some keys to write data into the open containers
     for (int i = 0; i < 10; i++) {
-      TestDataUtil.createKey(bucket, "key" + i, ReplicationFactor.THREE,
-          ReplicationType.RATIS, "this is the content".getBytes(StandardCharsets.UTF_8));
+      TestDataUtil.createKey(bucket, "key" + i, ReplicationConfig
+          .fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.THREE),
+          "this is the content".getBytes(StandardCharsets.UTF_8));
     }
     StorageContainerManager scm = cluster.getStorageContainerManager();
     // Pick any container on the cluster and close it via client
