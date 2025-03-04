@@ -460,7 +460,7 @@ public class TestContainerKeyMapperTask {
         }, 0L);
 
     // Process DELETE event for key2
-    containerKeyMapperTaskFSO.process(omUpdateEventBatch, Collections.emptyMap());
+    containerKeyMapperTaskFSO.process(omUpdateEventBatch2, Collections.emptyMap());
 
     keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(1);
