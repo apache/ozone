@@ -99,7 +99,8 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
-import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
+import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskFSO;
+import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskOBS;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
@@ -297,10 +298,13 @@ public class TestContainerEndpoint {
   }
 
   private void reprocessContainerKeyMapper() {
-    ContainerKeyMapperTask containerKeyMapperTask =
-        new ContainerKeyMapperTask(reconContainerMetadataManager,
-            omConfiguration);
-    containerKeyMapperTask.reprocess(reconOMMetadataManager);
+    ContainerKeyMapperTaskOBS containerKeyMapperTaskOBS =
+        new ContainerKeyMapperTaskOBS(reconContainerMetadataManager, omConfiguration);
+    containerKeyMapperTaskOBS.reprocess(reconOMMetadataManager);
+
+    ContainerKeyMapperTaskFSO containerKeyMapperTaskFSO =
+        new ContainerKeyMapperTaskFSO(reconContainerMetadataManager, omConfiguration);
+    containerKeyMapperTaskFSO.reprocess(reconOMMetadataManager);
   }
 
   private void setUpFSOData() throws IOException {
