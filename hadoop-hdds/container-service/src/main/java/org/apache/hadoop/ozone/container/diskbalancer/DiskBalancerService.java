@@ -294,11 +294,6 @@ public class DiskBalancerService extends BackgroundService {
     this.version = version;
   }
 
-  public DiskBalancerInfo getDiskBalancerInfo() {
-    return new DiskBalancerInfo(shouldRun, threshold, bandwidthInMB,
-        parallelThread, version);
-  }
-
   public DiskBalancerReportProto getDiskBalancerReportProto() {
     LOG.info("Hitting getDiskBalancerReportProto on datanode side");
     DiskBalancerReportProto.Builder builder =
@@ -494,6 +489,11 @@ public class DiskBalancerService extends BackgroundService {
       deltaSizes.put(destVolume, deltaSizes.get(destVolume)
           - containerData.getBytesUsed());
     }
+  }
+
+  public DiskBalancerInfo getDiskBalancerInfo() {
+    return new DiskBalancerInfo(shouldRun, threshold, bandwidthInMB,
+        parallelThread, version, metrics.getSuccessCount(), metrics.getFailureCount());
   }
 
   private Path getDiskBalancerTmpDir(HddsVolume hddsVolume) {

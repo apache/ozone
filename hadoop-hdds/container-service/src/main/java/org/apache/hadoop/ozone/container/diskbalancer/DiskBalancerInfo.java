@@ -32,6 +32,8 @@ public class DiskBalancerInfo {
   private long bandwidthInMB;
   private int parallelThread;
   private DiskBalancerVersion version;
+  private long SuccessCount;
+  private long FailureCount;
 
   public DiskBalancerInfo(boolean shouldRun, double threshold,
       long bandwidthInMB, int parallelThread) {
@@ -46,6 +48,16 @@ public class DiskBalancerInfo {
     this.bandwidthInMB = bandwidthInMB;
     this.parallelThread = parallelThread;
     this.version = version;
+  }
+  public DiskBalancerInfo(boolean shouldRun, double threshold,
+                          long bandwidthInMB, int parallelThread, DiskBalancerVersion version, long SuccessCount, long FailureCount) {
+    this.shouldRun = shouldRun;
+    this.threshold = threshold;
+    this.bandwidthInMB = bandwidthInMB;
+    this.parallelThread = parallelThread;
+    this.version = version;
+    this.SuccessCount = SuccessCount;
+    this.FailureCount = FailureCount;
   }
 
   public DiskBalancerInfo(boolean shouldRun,
@@ -78,6 +90,8 @@ public class DiskBalancerInfo {
         StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto.newBuilder();
     builder.setIsRunning(shouldRun);
     builder.setDiskBalancerConf(confProto);
+    builder.setSuccessCount(SuccessCount);
+    builder.setFailureCount(FailureCount);
     return builder.build();
   }
 
