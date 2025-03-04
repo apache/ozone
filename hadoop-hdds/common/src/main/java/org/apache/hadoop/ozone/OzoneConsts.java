@@ -243,6 +243,9 @@ public final class OzoneConsts {
   // V3: Column families definitions are close to V2,
   // but have containerID as key prefixes.
   public static final String SCHEMA_V3 = "3";
+  // V4: Column families is same as V3,
+  // removed chunkPath and metadataPath in .container file
+  public static final String SCHEMA_V4 = "4";
 
   // Supported store types.
   public static final String OZONE = "ozone";

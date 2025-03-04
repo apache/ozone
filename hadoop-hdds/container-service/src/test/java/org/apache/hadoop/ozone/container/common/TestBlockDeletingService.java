@@ -22,13 +22,13 @@ import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
-import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSharedDBVersion;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -189,7 +189,7 @@ public class TestBlockDeletingService {
       createPendingDeleteBlocksSchema1(numOfBlocksPerContainer, data,
           containerID, numOfChunksPerBlock, buffer, chunkManager, container);
     } else if (isSameSchemaVersion(schemaVersion, SCHEMA_V2)
-        || isSameSchemaVersion(schemaVersion, SCHEMA_V3)) {
+        || isSharedDBVersion(schemaVersion)) {
       createPendingDeleteBlocksViaTxn(numOfBlocksPerContainer, txnID,
           containerID, numOfChunksPerBlock, buffer, chunkManager,
           container, data);
@@ -274,7 +274,7 @@ public class TestBlockDeletingService {
           .initBatchOperation()) {
         DatanodeStore ds = metadata.getStore();
 
-        if (isSameSchemaVersion(schemaVersion, SCHEMA_V3)) {
+        if (isSharedDBVersion(schemaVersion)) {
           DatanodeStoreSchemaThreeImpl dnStoreThreeImpl =
               (DatanodeStoreSchemaThreeImpl) ds;
           dnStoreThreeImpl.getDeleteTransactionTable()
@@ -381,7 +381,7 @@ public class TestBlockDeletingService {
         }
       }
       return pendingBlocks;
-    } else if (data.hasSchema(SCHEMA_V3)) {
+    } else if (data.sharedDB()) {
       int pendingBlocks = 0;
       DatanodeStore ds = meta.getStore();
       DatanodeStoreSchemaThreeImpl dnStoreThreeImpl =
@@ -983,7 +983,7 @@ public class TestBlockDeletingService {
               (containerData.get(0).getBytesUsed() == 0),
           100, 3000);
       if (schemaVersion != null && (
-          schemaVersion.equals(SCHEMA_V2) || schemaVersion.equals(SCHEMA_V3))) {
+          schemaVersion.equals(SCHEMA_V2) || isSharedDBVersion(schemaVersion))) {
 
         // Since MaxLockHoldingTime is -1, every "deletion transaction" triggers
         // a timeout except the last one, where a "deletion transaction"
