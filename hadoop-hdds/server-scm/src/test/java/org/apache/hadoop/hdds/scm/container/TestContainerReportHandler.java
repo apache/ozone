@@ -501,7 +501,7 @@ public class TestContainerReportHandler {
   /**
    * Helper method to get a container with specified replication type and state for testing.
    * @param replicationType HddsProtos.ReplicationType
-   * @param state HddsProtos.LifeCycleState
+   * @param containerState HddsProtos.LifeCycleState
    * @return ContainerInfo
    */
   private ContainerInfo getContainerHelper(
