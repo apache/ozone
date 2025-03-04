@@ -157,12 +157,23 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     }
   }
 
+  /**
+   * Reinitializes the registered Recon OM tasks with a new OM Metadata Manager instance.
+   *
+   * @param omMetadataManager the OM Metadata Manager instance to be used for reinitialization.
+   * @param reconOmTaskMap a map of Recon OM tasks whose lastUpdatedSeqNumber does not match
+   *                       the lastUpdatedSeqNumber from the previous run of the 'OmDeltaRequest' task.
+   *                       These tasks will be reinitialized to process the delta OM DB updates
+   *                       received in the last run of 'OmDeltaRequest'.
+   *                       If {@code reconOmTaskMap} is null, all registered Recon OM tasks
+   *                       will be reinitialized.
+   */
   @Override
   public synchronized void reInitializeTasks(ReconOMMetadataManager omMetadataManager,
                                              Map<String, ReconOmTask> reconOmTaskMap) {
     Collection<NamedCallableTask<ReconOmTask.TaskResult>> tasks = new ArrayList<>();
     Map<String, ReconOmTask> localReconOmTaskMap = reconOmTaskMap;
-    if (null == reconOmTaskMap) {
+    if (reconOmTaskMap == null) {
       localReconOmTaskMap = reconOmTasks;
     }
     ReconConstants.resetTableTruncatedFlags();

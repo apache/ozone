@@ -279,7 +279,6 @@ public class OzoneManagerServiceProviderImpl
         .stream()
         .filter(entry -> {
           String taskName = entry.getKey();
-          ReconOmTask task = entry.getValue();
           ReconTaskStatusUpdater taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
 
           return !taskName.equals(OmSnapshotTaskName.OmDeltaRequest.name()) &&  // Condition 1
@@ -287,14 +286,17 @@ public class OzoneManagerServiceProviderImpl
                   .equals(deltaTaskStatusUpdater.getLastUpdatedSeqNumber());  // Condition 2
         })
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));  // Collect into desired Map
-    LOG.info("Task details of such tasks whose lastUpdatedSeqNumber number not matching with " +
-        "lastUpdatedSeqNumber of 'OmDeltaRequest' task::\n");
-    LOG.info(deltaTaskStatusUpdater.getTaskName() + "->" + deltaTaskStatusUpdater.getLastUpdatedSeqNumber());
-    reconOmTaskMap.keySet()
-        .forEach(taskName -> {
-          LOG.info(taskName + "->" + taskStatusUpdaterManager.getTaskStatusUpdater(taskName).getLastUpdatedSeqNumber());
+    if (!reconOmTaskMap.isEmpty()) {
+      LOG.info("Task details of such tasks whose lastUpdatedSeqNumber number not matching with " +
+          "lastUpdatedSeqNumber of 'OmDeltaRequest' task::\n");
+      LOG.info("{}->{}", deltaTaskStatusUpdater.getTaskName(), deltaTaskStatusUpdater.getLastUpdatedSeqNumber());
+      reconOmTaskMap.keySet()
+          .forEach(taskName -> {
+            LOG.info("{}->{}", taskName,
+                taskStatusUpdaterManager.getTaskStatusUpdater(taskName).getLastUpdatedSeqNumber());
 
-        });
+          });
+    }
     reconTaskController.reInitializeTasks(omMetadataManager, reconOmTaskMap);
     startSyncDataFromOM(initialDelay);
   }
