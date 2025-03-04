@@ -125,6 +125,9 @@ public final class HddsConfigKeys {
   // metadata locations must be configured explicitly.
   public static final String OZONE_METADATA_DIRS = "ozone.metadata.dirs";
 
+  public static final String ROCKS_DB_CONFIG_PATH = "rocks.db.config.path";
+  public static final String ROCKS_DB_CONFIG_PATH_DEFAULT = "";
+
   public static final String HDDS_PROMETHEUS_ENABLED =
       "hdds.prometheus.endpoint.enabled";
 

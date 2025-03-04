@@ -22,6 +22,8 @@ import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PRO
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.nio.file.Paths;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
@@ -60,7 +62,8 @@ public abstract class AbstractRDBStore<DEF extends DBDefinition> implements DBSt
   public void start(ConfigurationSource config)
       throws IOException {
     if (this.store == null) {
-      ManagedDBOptions options = dbProfile.getDBOptions();
+      String dbPath = config.get(HddsConfigKeys.ROCKS_DB_CONFIG_PATH, HddsConfigKeys.ROCKS_DB_CONFIG_PATH_DEFAULT);
+      ManagedDBOptions options = dbProfile.getDBOptions(Paths.get(dbPath));
       options.setCreateIfMissing(true);
       options.setCreateMissingColumnFamilies(true);
 

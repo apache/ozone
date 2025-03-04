@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import java.nio.file.Path;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.StringUtils;
@@ -27,9 +28,8 @@ import org.rocksdb.ColumnFamilyDescriptor;
  * Class that maintains Table Configuration.
  */
 public class TableConfig implements AutoCloseable {
-  static TableConfig newTableConfig(String name) {
-    return new TableConfig(name,
-        DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE.getColumnFamilyOptions());
+  static TableConfig newTableConfig(Path dbPath, String cfName) {
+    return new TableConfig(cfName, DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE.getColumnFamilyOptions(dbPath, cfName));
   }
 
   private final String name;
@@ -41,11 +41,11 @@ public class TableConfig implements AutoCloseable {
 
   /**
    * Constructs a Table Config.
-   * @param name - Name of the Table.
+   *
+   * @param name                - Name of the Table.
    * @param columnFamilyOptions - Column Family options.
    */
-  public TableConfig(String name,
-                     ManagedColumnFamilyOptions columnFamilyOptions) {
+  public TableConfig(String name, ManagedColumnFamilyOptions columnFamilyOptions) {
     this.name = name;
     this.columnFamilyOptions = columnFamilyOptions;
   }

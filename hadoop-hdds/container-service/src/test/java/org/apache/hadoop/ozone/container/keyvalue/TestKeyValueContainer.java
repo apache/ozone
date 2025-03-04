@@ -704,10 +704,11 @@ public class TestKeyValueContainer {
     for (Supplier<DatanodeDBProfile> dbProfileSupplier : new Supplier[] {
         DatanodeDBProfile.Disk::new, DatanodeDBProfile.SSD::new }) {
       // ColumnFamilyOptions should be same across configurations
+      OzoneConfiguration config = new OzoneConfiguration();
       ColumnFamilyOptions columnFamilyOptions1 = dbProfileSupplier.get()
-          .getColumnFamilyOptions(new OzoneConfiguration());
+          .getColumnFamilyOptions(config);
       ColumnFamilyOptions columnFamilyOptions2 = dbProfileSupplier.get()
-          .getColumnFamilyOptions(new OzoneConfiguration());
+          .getColumnFamilyOptions(config);
       assertEquals(columnFamilyOptions1, columnFamilyOptions2);
 
       // ColumnFamilyOptions should be same when queried multiple times
@@ -768,12 +769,12 @@ public class TestKeyValueContainer {
     // DBOtions should be different, except SCHEMA-V3
     if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
       assertEquals(
-          outProfile1.getDBOptions().compactionReadaheadSize(),
-          outProfile2.getDBOptions().compactionReadaheadSize());
+          outProfile1.getDBOptions(null).compactionReadaheadSize(),
+          outProfile2.getDBOptions(null).compactionReadaheadSize());
     } else {
       assertNotEquals(
-          outProfile1.getDBOptions().compactionReadaheadSize(),
-          outProfile2.getDBOptions().compactionReadaheadSize());
+          outProfile1.getDBOptions(null).compactionReadaheadSize(),
+          outProfile2.getDBOptions(null).compactionReadaheadSize());
     }
   }
 

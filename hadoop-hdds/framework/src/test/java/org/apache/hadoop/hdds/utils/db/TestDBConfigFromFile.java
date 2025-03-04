@@ -32,12 +32,14 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyOptions;
+import org.rocksdb.CompactionStyle;
 import org.rocksdb.DBOptions;
 import org.rocksdb.RocksDB;
 
@@ -77,8 +79,7 @@ public class TestDBConfigFromFile {
               new ColumnFamilyOptions()));
     }
 
-    final DBOptions options = DBConfigFromFile.readFromFile(DB_FILE,
-        columnFamilyDescriptors);
+    final DBOptions options = DBConfigFromFile.readDBOptionsFromFile(Paths.get(DB_FILE));
 
     // Some Random Values Defined in the test.db.ini, we verify that we are
     // able to get values that are defined in the test.db.ini.
@@ -103,10 +104,23 @@ public class TestDBConfigFromFile {
               new ColumnFamilyOptions()));
     }
 
-    final DBOptions options = DBConfigFromFile.readFromFile("badfile.db.ini",
-        columnFamilyDescriptors);
+    final DBOptions options = DBConfigFromFile.readDBOptionsFromFile(Paths.get("badfile.db.ini")
+    );
 
     // This has to return a Null, since we have config defined for badfile.db
     assertNull(options);
+  }
+
+  @Test
+  public void readColumnFamilyOptionsFromFile() throws IOException {
+    ManagedColumnFamilyOptions managedColumnFamily = DBConfigFromFile.readCFOptionsFromFile(
+        Paths.get(DB_FILE), "default");
+    assertNotNull(managedColumnFamily);
+    assertEquals(134217728, managedColumnFamily.writeBufferSize());
+    assertEquals(6, managedColumnFamily.numLevels());
+    assertEquals(268435456, managedColumnFamily.blobFileSize());
+    assertEquals("SkipListFactory", managedColumnFamily.memTableFactoryName());
+    assertEquals(CompactionStyle.LEVEL, managedColumnFamily.compactionStyle());
+    assertEquals(16777216, managedColumnFamily.arenaBlockSize());
   }
 }
