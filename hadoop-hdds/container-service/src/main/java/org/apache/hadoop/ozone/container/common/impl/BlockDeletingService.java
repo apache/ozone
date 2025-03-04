@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDeletionChoosingPolicy;
@@ -64,6 +65,8 @@ public class BlockDeletingService extends BackgroundService {
   private static final int TASK_PRIORITY_DEFAULT = 1;
 
   private final Duration blockDeletingMaxLockHoldingTime;
+  private String blockDeletingServiceInterval;
+  private String blockDeletingServiceTimeout;
 
   @VisibleForTesting
   public BlockDeletingService(
@@ -99,6 +102,12 @@ public class BlockDeletingService extends BackgroundService {
     this.blockDeletingMaxLockHoldingTime =
         dnConf.getBlockDeletingMaxLockHoldingTime();
     metrics = BlockDeletingServiceMetrics.create();
+    this.blockDeletingServiceInterval = conf.get(
+        OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
+        OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT);
+    this.blockDeletingServiceTimeout = conf.get(
+        OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
+        OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT);
   }
 
   /**
@@ -270,6 +279,20 @@ public class BlockDeletingService extends BackgroundService {
 
   public int getBlockLimitPerInterval() {
     return dnConf.getBlockDeletionLimit();
+  }
+
+  public String getBlockDeletingServiceInterval() {
+    return blockDeletingServiceInterval;
+  }
+  public void setBlockDeletingServiceInterval(String blockDeletingServiceInterval) {
+    this.blockDeletingServiceInterval = blockDeletingServiceInterval;
+  }
+
+  public String getBlockDeletingServiceTimeout() {
+    return blockDeletingServiceTimeout;
+  }
+  public void setBlockDeletingServiceTimeout(String blockDeletingServiceTimeout) {
+    this.blockDeletingServiceTimeout = blockDeletingServiceTimeout;
   }
 
   private static class BlockDeletingTaskBuilder {

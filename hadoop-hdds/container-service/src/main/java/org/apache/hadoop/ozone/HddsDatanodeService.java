@@ -22,6 +22,8 @@ import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
@@ -291,6 +293,10 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
                   this::reconfigBlockDeleteThreadMax)
               .register(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
                   this::reconfigDeletingServiceWorkers)
+              .register(OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
+                  this::reconfigBlockDeletingServiceInterval)
+              .register(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
+                  this::reconfigBlockDeletingServiceTimeout)
               .register(REPLICATION_STREAMS_LIMIT_KEY,
                   this::reconfigReplicationStreamsLimit);
 
@@ -673,6 +679,22 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
 
     getDatanodeStateMachine().getContainer().getReplicationServer()
         .setPoolSize(Integer.parseInt(value));
+    return value;
+  }
+
+  private String reconfigBlockDeletingServiceInterval(String value) {
+    getConf().set(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, value);
+
+    getDatanodeStateMachine().getContainer().getBlockDeletingService()
+        .setBlockDeletingServiceInterval(value);
+    return value;
+  }
+
+  private String reconfigBlockDeletingServiceTimeout(String value) {
+    getConf().set(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT, value);
+
+    getDatanodeStateMachine().getContainer().getBlockDeletingService()
+        .setBlockDeletingServiceTimeout(value);
     return value;
   }
 
