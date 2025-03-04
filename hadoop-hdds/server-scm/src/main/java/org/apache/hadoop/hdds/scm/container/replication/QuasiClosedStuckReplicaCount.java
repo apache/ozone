@@ -17,9 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
-
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -68,38 +70,57 @@ public class QuasiClosedStuckReplicaCount {
   }
 
   public boolean isUnderReplicated() {
-    // If there is only a single origin, we expect 3 copies, otherwise we expect 2 copies of each origin
+    return !getUnderReplicatedReplicas().isEmpty();
+  }
+
+  public List<UnderReplicatedOrigin> getUnderReplicatedReplicas() {
+    List<UnderReplicatedOrigin> underReplicatedOrigins = new ArrayList<>();
+
     if (replicasByOrigin.size() == 1) {
       UUID origin = replicasByOrigin.keySet().iterator().next();
       Set<ContainerReplica> inService = inServiceReplicasByOrigin.get(origin);
       if (inService == null) {
-        return true;
+        inService = Collections.emptySet();
       }
-      if (inService.size() >= 3) {
-        return false;
-      }
-      // If it is less than 3, we need to check for maintenance copies.
       Set<ContainerReplica> maintenance = maintenanceReplicasByOrigin.get(origin);
       int maintenanceCount = maintenance == null ? 0 : maintenance.size();
 
-      return inService.size() < minHealthyForMaintenance || inService.size() + maintenanceCount < 3;
+      if (maintenanceCount > 0) {
+        if (inService.size() < minHealthyForMaintenance) {
+          int additionalReplicas = minHealthyForMaintenance - inService.size();
+          underReplicatedOrigins.add(new UnderReplicatedOrigin(replicasByOrigin.get(origin), additionalReplicas));
+        }
+      } else {
+        if (inService.size() < 3) {
+          int additionalReplicas = 3 - inService.size();
+          underReplicatedOrigins.add(new UnderReplicatedOrigin(replicasByOrigin.get(origin), additionalReplicas));
+        }
+      }
+      return underReplicatedOrigins;
     }
 
     // If there are multiple origins, we expect 2 copies of each origin
     // For maintenance, we expect 1 copy of each origin and ignore the minHealthyForMaintenance parameter
     for (UUID origin : replicasByOrigin.keySet()) {
-      Set<ContainerReplica> replicas = inServiceReplicasByOrigin.get(origin);
-      if (replicas == null) {
-        return true;
+      Set<ContainerReplica> inService = inServiceReplicasByOrigin.get(origin);
+      if (inService == null) {
+        inService = Collections.emptySet();
       }
       Set<ContainerReplica> maintenance = maintenanceReplicasByOrigin.get(origin);
       int maintenanceCount = maintenance == null ? 0 : maintenance.size();
-      if (replicas.size() + maintenanceCount < 2) {
-        return true;
+
+      if (inService.size() < 2) {
+        if (maintenanceCount > 0) {
+          if (inService.isEmpty()) {
+            // We need 1 copy online for maintenance
+            underReplicatedOrigins.add(new UnderReplicatedOrigin(replicasByOrigin.get(origin), 1));
+          }
+        } else {
+          underReplicatedOrigins.add(new UnderReplicatedOrigin(replicasByOrigin.get(origin), 2 - inService.size()));
+        }
       }
     }
-    // If we have 2 copies of each origin, we are not under-replicated
-    return false;
+    return underReplicatedOrigins;
   }
 
   /**
@@ -127,6 +148,29 @@ public class QuasiClosedStuckReplicaCount {
     }
     // If we have 2 copies or less of each origin, we are not over-replicated
     return false;
+  }
+
+  /**
+   * Class to represent the origin of under replicated replicas and the number of additional replicas required.
+   */
+  public static class UnderReplicatedOrigin {
+
+    private final Set<ContainerReplica> sources;
+    private final int additionalRequired;
+
+    public UnderReplicatedOrigin(Set<ContainerReplica> sources, int additionalRequired) {
+      this.sources = sources;
+      this.additionalRequired = additionalRequired;
+    }
+
+    public Set<ContainerReplica> getSources() {
+      return sources;
+    }
+
+    public int getAdditionalRequired() {
+      return additionalRequired;
+    }
+
   }
 
 }
