@@ -258,6 +258,7 @@ public class DiskBalancerManager {
 
   private HddsProtos.DatanodeDiskBalancerInfoProto getInfoProto(
       DatanodeInfo dn, int clientVersion) {
+    LOG.info("Hitting getInfoProto");
     double volumeDensitySum =
         getVolumeDataDensitySumForDatanodeDetails(dn);
     HddsProtos.DiskBalancerRunningStatus runningStatus =
@@ -326,6 +327,7 @@ public class DiskBalancerManager {
 
   public void processDiskBalancerReport(DiskBalancerReportProto reportProto,
       DatanodeDetails dn) {
+    LOG.info("Hitting processDiskBalancerReport");
     boolean isRunning = reportProto.getIsRunning();
     DiskBalancerConfiguration diskBalancerConfiguration =
         reportProto.hasDiskBalancerConf() ?
@@ -339,6 +341,8 @@ public class DiskBalancerManager {
     }
     SuccessMoveCount = reportProto.getSuccessCount();
     FailureMoveCount = reportProto.getFailureCount();
+    LOG.info("SuccessMoveCount in processDiskBalancerReport: {}",SuccessMoveCount);
+    LOG.info("FailureMoveCount in processDiskBalancerReport: {}",FailureMoveCount);
   }
 
   private DiskBalancerConfiguration attachDiskBalancerConf(
