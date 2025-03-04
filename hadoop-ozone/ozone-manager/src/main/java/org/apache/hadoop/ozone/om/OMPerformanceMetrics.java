@@ -152,13 +152,13 @@ public class OMPerformanceMetrics {
   @Metric(about = "ACLs check in getObjectTagging")
   private MutableRate getObjectTaggingAclCheckLatencyNs;
 
-  @Metric(about = "Latency of DirectoryDeletingService in ms")
+  @Metric(about = "Latency of each iteration of DirectoryDeletingService in ms")
   private MutableGaugeLong directoryDeletingServiceLatencyMs;
 
-  @Metric(about = "Latency of KeyDeletingService in ms")
+  @Metric(about = "Latency of each iteration of KeyDeletingService in ms")
   private MutableGaugeLong keyDeletingServiceLatencyMs;
 
-  @Metric(about = "Latency of OpenKeyCleanupService in ms")
+  @Metric(about = "Latency of each iteration of OpenKeyCleanupService in ms")
   private MutableGaugeLong openKeyCleanupServiceLatencyMs;
 
   public void addLookupLatency(long latencyInNs) {
