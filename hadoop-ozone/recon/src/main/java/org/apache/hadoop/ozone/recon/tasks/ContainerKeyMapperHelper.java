@@ -66,14 +66,14 @@ public abstract class ContainerKeyMapperHelper {
           // Perform table truncation
           reconContainerMetadataManager.reinitWithNewContainerDataFromOm(new HashMap<>());
           LOG.info("Successfully truncated container key tables.");
-        } catch (IOException e) {
+        } catch (Exception e) {
           // Reset the flag so truncation can be retried
           ReconConstants.CONTAINER_KEY_TABLES_TRUNCATED.set(false);
           LOG.error("Error while truncating container key tables. Resetting flag.", e);
           throw new RuntimeException("Table truncation failed", e);
         }
       } else {
-        LOG.info("Container key tables already truncated by another task, waiting for truncation to complete.");
+        LOG.info("Container key tables already truncated by another task.");
       }
     }
   }
@@ -114,16 +114,17 @@ public abstract class ContainerKeyMapperHelper {
         }
       }
 
-      // Flush and commit changes
+      // Final flush and commit
       if (!flushAndCommitContainerKeyInfoToDB(containerKeyMap, containerKeyCountMap, reconContainerMetadataManager)) {
         LOG.error("Failed to flush Container Key data to DB for {}", taskName);
         return false;
       }
 
-      LOG.info("Completed 'reprocess' for {}. Processed {} keys.", taskName, omKeyCount);
       Instant end = Instant.now();
-      long duration = Duration.between(start, end).toMillis();
-      LOG.info("Total time: {} seconds.", (double) duration / 1000.0);
+      long durationMillis = Duration.between(start, end).toMillis();
+      double durationSeconds = (double) durationMillis / 1000.0;
+      LOG.info("Completed 'reprocess' for {}. Processed {} keys in {} ms ({} seconds).",
+          taskName, omKeyCount, durationMillis, durationSeconds);
 
     } catch (IOException ioEx) {
       LOG.error("Error populating Container Key data for {} in Recon DB.", taskName, ioEx);
