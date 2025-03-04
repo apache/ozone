@@ -19,10 +19,6 @@ package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_SNAPSHOT_DB;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONNECTION_REQUEST_TIMEOUT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONNECTION_TIMEOUT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONNECTION_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 
 import java.io.File;
@@ -31,7 +27,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.inject.Inject;
 import javax.validation.constraints.NotNull;
@@ -82,14 +77,6 @@ public class StorageContainerServiceProviderImpl
       OzoneConfiguration configuration,
       ReconStorageConfig reconStorage,
       ReconContext reconContext) {
-
-    int connectionTimeout = (int) configuration.getTimeDuration(
-        OZONE_RECON_SCM_CONNECTION_TIMEOUT,
-        OZONE_RECON_SCM_CONNECTION_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
-    int connectionRequestTimeout = (int) configuration.getTimeDuration(
-        OZONE_RECON_SCM_CONNECTION_REQUEST_TIMEOUT,
-        OZONE_RECON_SCM_CONNECTION_REQUEST_TIMEOUT_DEFAULT,
-        TimeUnit.MILLISECONDS);
 
     scmSnapshotDBParentDir = ReconUtils.getReconScmDbDir(configuration);
 
