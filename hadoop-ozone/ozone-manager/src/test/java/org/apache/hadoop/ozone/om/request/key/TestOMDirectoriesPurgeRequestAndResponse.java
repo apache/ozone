@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -42,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.key.OMDirectoriesPurgeResponseWithFSO;
 import org.apache.hadoop.ozone.om.response.key.OMKeyPurgeResponse;
+import org.apache.hadoop.ozone.om.service.CompactionService;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -52,7 +54,6 @@ import org.junit.jupiter.api.Test;
  * Tests {@link OMKeyPurgeRequest} and {@link OMKeyPurgeResponse}.
  */
 public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
-
   private int numKeys = 10;
 
   /**
@@ -185,6 +186,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
 
   @Test
   public void testValidateAndUpdateCacheCheckQuota() throws Exception {
+    keyManager.start(getOzoneConfiguration());
     // Create and Delete keys. The keys should be moved to DeletedKeys table
     List<OmKeyInfo> deletedKeyInfos = createAndDeleteKeys(1, null);
     // The keys should be present in the DeletedKeys table before purging
@@ -216,6 +218,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
 
   @Test
   public void testValidateAndUpdateCacheSnapshotLastTransactionInfoUpdated() throws Exception {
+    keyManager.start(getOzoneConfiguration());
     // Create and Delete keys. The keys should be moved to DeletedKeys table
     List<OmKeyInfo> deletedKeyInfos = createAndDeleteKeys(1, null);
     // The keys should be present in the DeletedKeys table before purging
@@ -269,6 +272,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
   @Test
   public void testValidateAndUpdateCacheQuotaBucketRecreated()
       throws Exception {
+    keyManager.start(getOzoneConfiguration());
     // Create and Delete keys. The keys should be moved to DeletedKeys table
     List<OmKeyInfo> deletedKeyInfos = createAndDeleteKeys(1, null);
     // The keys should be present in the DeletedKeys table before purging
@@ -347,5 +351,9 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
       assertTrue(omMetadataManager.getDeletedTable().isExist(
           deletedKey));
     }
+    CompactionService compactionService = ((OmMetadataManagerImpl) this.omMetadataManager)
+        .getOzoneManager().getKeyManager().getCompactionService();
+    assertEquals(deletedKeyNames.size(),
+        compactionService.getUncompactedFileDeletes().get());
   }
 }

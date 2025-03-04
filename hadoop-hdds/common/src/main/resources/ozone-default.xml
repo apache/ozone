@@ -1518,6 +1518,36 @@
       to the OM.
     </description>
   </property>
+
+  <property>
+    <name>ozone.compaction.service.enabled</name>
+    <value>true</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      Enable or disable a background job that periodically compacts rocksdb tables flagged for compaction.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.compaction.service.run.interval</name>
+    <value>5m</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      A background job that periodically compacts rocksdb tables flagged for compaction.
+      Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.compaction.service.timeout</name>
+    <value>10m</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>A timeout value of compaction service. If this is set
+      greater than 0, the service will stop waiting for compaction
+      completion after this time.
+      Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+
   <property>
     <name>hdds.rest.http-address</name>
     <value>0.0.0.0:9880</value>

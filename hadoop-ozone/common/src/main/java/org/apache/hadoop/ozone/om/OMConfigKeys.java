@@ -624,4 +624,18 @@ public final class OMConfigKeys {
    */
   public static final String OZONE_OM_SERVER_LIST_MAX_SIZE = "ozone.om.server.list.max.size";
   public static final int OZONE_OM_SERVER_LIST_MAX_SIZE_DEFAULT = 1000;
+  /**
+   * Configuration properties for Compaction Service.
+   */
+  public static final String OZONE_COMPACTION_SERVICE_ENABLED = "ozone.compaction.service.enabled";
+  public static final boolean OZONE_COMPACTION_SERVICE_ENABLED_DEFAULT = true;
+  public static final String OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL =
+      "ozone.om.compaction.service.run.interval";
+  public static final long
+      OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL_DEFAULT
+      = TimeUnit.MINUTES.toMillis(5);
+
+  public static final String OZONE_OM_COMPACTION_SERVICE_TIMEOUT
+      = "ozone.om.compaction.service.timeout";
+  public static final String OZONE_COMPACTION_SERVICE_TIMEOUT_DEFAULT = "10m";
 }

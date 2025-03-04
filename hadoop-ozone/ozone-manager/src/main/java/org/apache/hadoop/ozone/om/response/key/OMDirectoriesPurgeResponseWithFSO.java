@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
+import org.apache.hadoop.ozone.om.service.CompactionService;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -83,6 +84,8 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
   @Override
   public void addToDBBatch(OMMetadataManager metadataManager,
       BatchOperation batchOp) throws IOException {
+    CompactionService compactionService = ((OmMetadataManagerImpl) metadataManager)
+        .getOzoneManager().getKeyManager().getCompactionService();
     if (fromSnapshotInfo != null) {
       OmSnapshotManager omSnapshotManager =
           ((OmMetadataManagerImpl) metadataManager)
@@ -96,13 +99,13 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
         // Init Batch Operation for snapshot db.
         try (BatchOperation writeBatch =
             fromSnapshotStore.initBatchOperation()) {
-          processPaths(fromSnapshot.getMetadataManager(), writeBatch);
+          processPaths(fromSnapshot.getMetadataManager(), writeBatch, compactionService);
           fromSnapshotStore.commitBatchOperation(writeBatch);
         }
       }
       metadataManager.getSnapshotInfoTable().putWithBatch(batchOp, fromSnapshotInfo.getTableKey(), fromSnapshotInfo);
     } else {
-      processPaths(metadataManager, batchOp);
+      processPaths(metadataManager, batchOp, compactionService);
     }
 
     // update bucket quota in active db
@@ -114,7 +117,7 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
   }
 
   public void processPaths(OMMetadataManager omMetadataManager,
-      BatchOperation batchOperation) throws IOException {
+      BatchOperation batchOperation, CompactionService compactionService) throws IOException {
     for (OzoneManagerProtocolProtos.PurgePathRequest path : paths) {
       final long volumeId = path.getVolumeId();
       final long bucketId = path.getBucketId();
@@ -143,6 +146,8 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
         }
       }
 
+      compactionService.compactDirectoryTableIfNeeded(markDeletedSubDirsList.size());
+
       for (OzoneManagerProtocolProtos.KeyInfo key : deletedSubFilesList) {
         OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key);
         String ozoneDbKey = omMetadataManager.getOzonePathKey(volumeId,
@@ -167,6 +172,7 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
         omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
             deletedKey, repeatedOmKeyInfo);
       }
+      compactionService.compactFileTableIfNeeded(deletedSubFilesList.size());
 
       if (!openKeyInfoMap.isEmpty()) {
         for (Map.Entry<String, OmKeyInfo> entry : openKeyInfoMap.entrySet()) {

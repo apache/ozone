@@ -22,11 +22,12 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.service.CompactionService;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.junit.jupiter.api.Test;
 
@@ -125,6 +126,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {
+    keyManager.start(getOzoneConfiguration());
     // Create and Delete keys. The keys should be moved to DeletedKeys table
     List<String> deletedKeyNames = createAndDeleteKeys(1, null);
 
@@ -168,6 +170,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
 
   @Test
   public void testKeyPurgeInSnapshot() throws Exception {
+    keyManager.start(getOzoneConfiguration());
     // Create and Delete keys. The keys should be moved to DeletedKeys table
     List<String> deletedKeyNames = createAndDeleteKeys(1, null);
 
@@ -214,8 +217,12 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
     try (BatchOperation batchOperation =
         omMetadataManager.getStore().initBatchOperation()) {
 
-      OMKeyPurgeResponse omKeyPurgeResponse = new OMKeyPurgeResponse(omResponse, deletedKeyNames, snapInfo, null);
+      OMKeyPurgeResponse omKeyPurgeResponse = new OMKeyPurgeResponse(
+          omResponse, deletedKeyNames, snapInfo, null);
       omKeyPurgeResponse.addToDBBatch(omMetadataManager, batchOperation);
+      CompactionService compactionService = ((OmMetadataManagerImpl) omMetadataManager)
+          .getOzoneManager().getKeyManager().getCompactionService();
+      assertEquals(deletedKeyNames.size(), compactionService.getUncompactedDeletes().get());
 
       // Do manual commit and see whether addToBatch is successful or not.
       omMetadataManager.getStore().commitBatchOperation(batchOperation);
