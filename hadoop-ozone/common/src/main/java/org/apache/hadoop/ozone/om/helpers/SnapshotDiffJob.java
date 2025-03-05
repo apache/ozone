@@ -21,6 +21,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.util.List;
 import java.util.Objects;
 
 import org.apache.commons.lang3.StringUtils;
@@ -55,6 +56,9 @@ public class SnapshotDiffJob {
   // is FAILED.
   private String reason;
 
+  // Represents current status of the job if the job is in IN_PROGRESS state.
+  private List<String> activities;
+
   // Default constructor for Jackson Serializer.
   public SnapshotDiffJob() {
 
@@ -70,7 +74,8 @@ public class SnapshotDiffJob {
                          String toSnapshot,
                          boolean forceFullDiff,
                          boolean disableNativeDiff,
-                         long totalDiffEntries) {
+                         long totalDiffEntries,
+                         List<String> activities) {
     this.creationTime = creationTime;
     this.jobId = jobId;
     this.status = jobStatus;
@@ -82,6 +87,7 @@ public class SnapshotDiffJob {
     this.disableNativeDiff = disableNativeDiff;
     this.totalDiffEntries = totalDiffEntries;
     this.reason = StringUtils.EMPTY;
+    this.activities = activities;
   }
 
   public String getJobId() {
@@ -172,6 +178,18 @@ public class SnapshotDiffJob {
     this.disableNativeDiff = disableNativeDiffVal;
   }
 
+  public List<String> getActivities() {
+    return activities;
+  }
+
+  public void setActivities(List<String> activities) {
+    this.activities = activities;
+  }
+
+  public void addActivity(String activity){
+    this.activities.add(activity);
+  }
+
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder("creationTime : ").append(creationTime)
@@ -209,7 +227,8 @@ public class SnapshotDiffJob {
           Objects.equals(this.forceFullDiff, otherJob.forceFullDiff) &&
           Objects.equals(this.totalDiffEntries, otherJob.totalDiffEntries) &&
           Objects.equals(this.disableNativeDiff, otherJob.disableNativeDiff)
-          && Objects.equals(this.reason, otherJob.reason);
+          && Objects.equals(this.reason, otherJob.reason) &&
+          Objects.equals(this.activities, otherJob.activities);
     }
     return false;
   }
@@ -218,7 +237,7 @@ public class SnapshotDiffJob {
   public int hashCode() {
     return Objects.hash(creationTime, jobId, status, volume, bucket,
         fromSnapshot, toSnapshot, forceFullDiff, disableNativeDiff,
-        totalDiffEntries, reason);
+        totalDiffEntries, reason, activities);
   }
 
   public SnapshotDiffJobProto toProtoBuf() {
@@ -233,6 +252,7 @@ public class SnapshotDiffJob {
         .setForceFullDiff(forceFullDiff)
         .setDisableNativeDiff(disableNativeDiff)
         .setTotalDiffEntries(totalDiffEntries)
+        .addAllActivities(activities)
         .build();
   }
 
@@ -248,7 +268,8 @@ public class SnapshotDiffJob {
         diffJobProto.getToSnapshot(),
         diffJobProto.getForceFullDiff(),
         diffJobProto.getDisableNativeDiff(),
-        diffJobProto.getTotalDiffEntries());
+        diffJobProto.getTotalDiffEntries(),
+        diffJobProto.getActivitiesList());
   }
 
   /**

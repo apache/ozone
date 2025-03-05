@@ -88,6 +88,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.Date;
 import java.util.function.BiFunction;
 import java.util.stream.Stream;
 
@@ -491,11 +493,12 @@ public class SnapshotDiffManager implements AutoCloseable {
           fromSnapshotName, toSnapshotName, index, pageSize, forceFullDiff,
           disableNativeDiff);
     case IN_PROGRESS:
-      return new SnapshotDiffResponse(
+      SnapshotDiffResponse response = new SnapshotDiffResponse(
           new SnapshotDiffReportOzone(snapshotRoot.toString(), volumeName,
               bucketName, fromSnapshotName, toSnapshotName, new ArrayList<>(),
-              null),
-          IN_PROGRESS, defaultWaitTime);
+              null), IN_PROGRESS, defaultWaitTime);
+      response.setActivities(snapDiffJob.getActivities());
+      return response;
     case FAILED:
       return new SnapshotDiffResponse(
           new SnapshotDiffReportOzone(snapshotRoot.toString(), volumeName,
@@ -753,7 +756,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       String jobId = UUID.randomUUID().toString();
       snapDiffJob = new SnapshotDiffJob(System.currentTimeMillis(), jobId,
           QUEUED, volumeName, bucketName, fromSnapshotName, toSnapshotName,
-          forceFullDiff, disableNativeDiff, 0L);
+          forceFullDiff, disableNativeDiff, 0L, Collections.EMPTY_LIST);
       snapDiffJobTable.put(jobKey, snapDiffJob);
     }
 
@@ -907,22 +910,26 @@ public class SnapshotDiffManager implements AutoCloseable {
       // repetition while constantly checking if the job is cancelled.
       Callable<Void>[] methodCalls = new Callable[]{
           () -> {
+            recordActivity(jobKey, "Candidate Key Generation :" +
+                " Generating the ObjectId-Key Map");
             getDeltaFilesAndDiffKeysToObjectIdToKeyMap(fsKeyTable, tsKeyTable,
                 fromSnapshot, toSnapshot, fsInfo, tsInfo, useFullDiff,
                 performNonNativeDiff, tablePrefixes,
                 objectIdToKeyNameMapForFromSnapshot,
                 objectIdToKeyNameMapForToSnapshot, objectIdToIsDirMap,
-                oldParentIds, newParentIds, path.toString());
+                oldParentIds, newParentIds, path.toString(), jobKey);
             return null;
           },
           () -> {
             if (bucketLayout.isFileSystemOptimized()) {
+              recordActivity(jobKey, "Candidate Key Generation : " +
+                  "Generating the ObjectId-Key Map for Directory Keys");
               getDeltaFilesAndDiffKeysToObjectIdToKeyMap(fsDirTable, tsDirTable,
                   fromSnapshot, toSnapshot, fsInfo, tsInfo, useFullDiff,
                   performNonNativeDiff, tablePrefixes,
                   objectIdToKeyNameMapForFromSnapshot,
                   objectIdToKeyNameMapForToSnapshot, objectIdToIsDirMap,
-                  oldParentIds, newParentIds, path.toString());
+                  oldParentIds, newParentIds, path.toString(), jobKey);
             }
             return null;
           },
@@ -945,6 +952,8 @@ public class SnapshotDiffManager implements AutoCloseable {
             return null;
           },
           () -> {
+            recordActivity(jobKey, "Final Stage : " +
+                "Generating and storing the Diff Report");
             long totalDiffEntries = generateDiffReport(jobId,
                 fsKeyTable,
                 tsKeyTable,
@@ -1021,10 +1030,10 @@ public class SnapshotDiffManager implements AutoCloseable {
       final PersistentMap<byte[], Boolean> objectIdToIsDirMap,
       final Optional<Set<Long>> oldParentIds,
       final Optional<Set<Long>> newParentIds,
-      final String diffDir) throws IOException, RocksDBException {
+      final String diffDir, final String jobKey) throws IOException, RocksDBException {
 
     List<String> tablesToLookUp = Collections.singletonList(fsTable.getName());
-
+    recordActivity(jobKey, "Computing Delta SST File Set");
     Set<String> deltaFiles = getDeltaFiles(fromSnapshot, toSnapshot,
         tablesToLookUp, fsInfo, tsInfo, useFullDiff, tablePrefixes, diffDir);
 
@@ -1037,10 +1046,12 @@ public class SnapshotDiffManager implements AutoCloseable {
       RocksDiffUtils.filterRelevantSstFiles(inputFiles, tablePrefixes, fromDB);
       deltaFiles.addAll(inputFiles);
     }
+    recordActivity(jobKey, "Computed Delta SST File Set, Total count = " +
+        deltaFiles.size());
     addToObjectIdMap(fsTable, tsTable, deltaFiles,
         !skipNativeDiff && isNativeLibsLoaded,
         oldObjIdToKeyMap, newObjIdToKeyMap, objectIdToIsDirMap, oldParentIds,
-        newParentIds, tablePrefixes);
+        newParentIds, tablePrefixes, jobKey);
   }
 
   @VisibleForTesting
@@ -1053,7 +1064,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       PersistentMap<byte[], Boolean> objectIdToIsDirMap,
       Optional<Set<Long>> oldParentIds,
       Optional<Set<Long>> newParentIds,
-      Map<String, String> tablePrefixes) throws IOException, RocksDBException {
+      Map<String, String> tablePrefixes, String jobKey) throws IOException, RocksDBException {
     if (deltaFiles.isEmpty()) {
       return;
     }
@@ -1064,6 +1075,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     validateEstimatedKeyChangesAreInLimits(sstFileReader);
     String sstFileReaderLowerBound = tablePrefix;
     String sstFileReaderUpperBound = null;
+    int stepIncrease = 100;
     if (Strings.isNotEmpty(tablePrefix)) {
       char[] upperBoundCharArray = tablePrefix.toCharArray();
       upperBoundCharArray[upperBoundCharArray.length - 1] += 1;
@@ -1072,13 +1084,19 @@ public class SnapshotDiffManager implements AutoCloseable {
     try (Stream<String> keysToCheck = nativeRocksToolsLoaded ?
         sstFileReader.getKeyStreamWithTombstone(sstFileReaderLowerBound, sstFileReaderUpperBound)
         : sstFileReader.getKeyStream(sstFileReaderLowerBound, sstFileReaderUpperBound)) {
+      AtomicLong keysProcessed = new AtomicLong(0);
       keysToCheck.forEach(key -> {
+        if (keysProcessed.get() % stepIncrease == 0) {
+          String status = "Completed processing " + keysProcessed + " number of keys";
+          recordActivity(jobKey, status);
+        }
+
         try {
           final WithParentObjectId fromObjectId = fsTable.get(key);
           final WithParentObjectId toObjectId = tsTable.get(key);
           if (areKeysEqual(fromObjectId, toObjectId) || !isKeyInBucket(key,
               tablePrefixes, fsTable.getName())) {
-            // We don't have to do anything.
+            keysProcessed.getAndIncrement();
             return;
           }
           if (fromObjectId != null) {
@@ -1104,6 +1122,7 @@ public class SnapshotDiffManager implements AutoCloseable {
             newParentIds.ifPresent(set -> set.add(toObjectId
                 .getParentObjectID()));
           }
+          keysProcessed.getAndIncrement();
         } catch (IOException e) {
           throw new RuntimeException(e);
         }
@@ -1522,6 +1541,19 @@ public class SnapshotDiffManager implements AutoCloseable {
     }
     snapshotDiffJob.setStatus(newStatus);
     snapDiffJobTable.put(jobKey, snapshotDiffJob);
+  }
+
+  private synchronized void recordActivity(String jobKey,
+      String statusText) {
+    SnapshotDiffJob snapshotDiffJob = snapDiffJobTable.get(jobKey);
+    String timestamp = getTimeStampString() + "";
+    snapshotDiffJob.addActivity(timestamp + " : " + statusText);
+    snapDiffJobTable.put(jobKey, snapshotDiffJob);
+  }
+
+  private static String getTimeStampString() {
+    Date date = new Date(System.currentTimeMillis());
+    return date.toString();
   }
 
   private synchronized void updateJobStatusToFailed(String jobKey,

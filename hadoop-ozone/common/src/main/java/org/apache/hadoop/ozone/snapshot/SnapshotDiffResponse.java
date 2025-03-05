@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.snapshot;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffResponse.JobStatusProto;
+import java.util.List;
 
 /**
  * POJO for Snapshot Diff Response.
@@ -49,6 +50,7 @@ public class SnapshotDiffResponse {
   private final JobStatus jobStatus;
   private final long waitTimeInMs;
   private final String reason;
+  private List<String> activities;
 
   public SnapshotDiffResponse(final SnapshotDiffReportOzone snapshotDiffReport,
                               final JobStatus jobStatus,
@@ -85,6 +87,10 @@ public class SnapshotDiffResponse {
     return reason;
   }
 
+  public void setActivities(List<String> activities) {
+    this.activities = activities;
+  }
+
   @Override
   public String toString() {
     StringBuilder str = new StringBuilder();
@@ -112,6 +118,19 @@ public class SnapshotDiffResponse {
           .append(". Please retry after ")
           .append(waitTimeInMs)
           .append(" ms.\n");
+      if (activities != null && !activities.isEmpty()) {
+        str.append("Activities: [");
+        for (int i = 0; i < activities.size(); i++) {
+          String activity = activities.get(i);
+          str.append("{")
+              .append(", op : ").append(activity)
+              .append("}");
+          if (i < activities.size() - 1) {
+            str.append(", "); // Add comma except for the last element
+          }
+        }
+        str.append("]");
+      }
     }
     return str.toString();
   }

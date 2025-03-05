@@ -303,7 +303,8 @@ public class TestSnapshotDiffManager {
 
       SnapshotDiffJob diffJob = new SnapshotDiffJob(System.currentTimeMillis(),
           UUID.randomUUID().toString(), jobStatus, VOLUME_NAME, BUCKET_NAME,
-          baseSnapshotName, targetSnapshotName, false, false, 0);
+          baseSnapshotName, targetSnapshotName, false, false, 0,
+          new ArrayList<>());
 
       snapshotNames.add(targetSnapshotName);
       snapshotInfoList.add(targetSnapshot);
@@ -705,7 +706,7 @@ public class TestSnapshotDiffManager {
           Optional.of(newParentIds),
           ImmutableMap.of(OmMetadataManagerImpl.DIRECTORY_TABLE, "",
               OmMetadataManagerImpl.KEY_TABLE, "",
-              OmMetadataManagerImpl.FILE_TABLE, ""));
+              OmMetadataManagerImpl.FILE_TABLE, ""),"");
 
       try (ClosableIterator<Map.Entry<byte[], byte[]>> oldObjectIdIter =
                oldObjectIdKeyMap.iterator()) {
@@ -856,7 +857,7 @@ public class TestSnapshotDiffManager {
       assertEquals(100, totalDiffEntries);
       SnapshotDiffJob snapshotDiffJob = new SnapshotDiffJob(0, "jobId",
           JobStatus.DONE, "vol", "buck", "fs", "ts", false,
-          true, diffMap.size());
+          true, diffMap.size(), new ArrayList<>());
       SnapshotDiffReportOzone snapshotDiffReportOzone =
           snapshotDiffManager.createPageResponse(snapshotDiffJob, "vol",
               "buck", "fs", "ts",
@@ -917,11 +918,11 @@ public class TestSnapshotDiffManager {
 
     SnapshotDiffJob snapshotDiffJob = new SnapshotDiffJob(0, testJobId,
         JobStatus.DONE, "vol", "buck", "fs", "ts", false,
-        true, totalNumberOfRecords);
+        true, totalNumberOfRecords, new ArrayList<>());
 
     SnapshotDiffJob snapshotDiffJob2 = new SnapshotDiffJob(0, testJobId2,
         JobStatus.DONE, "vol", "buck", "fs", "ts", false,
-        true, totalNumberOfRecords);
+        true, totalNumberOfRecords, new ArrayList<>());
 
     db.get().put(snapDiffJobTable,
         codecRegistry.asRawData(testJobId),
@@ -1066,7 +1067,7 @@ public class TestSnapshotDiffManager {
     String jobId = UUID.randomUUID().toString();
     SnapshotDiffJob snapshotDiffJob = new SnapshotDiffJob(0L,
         jobId, jobStatus, volumeName, bucketName,
-        fromSnapshotName, toSnapshotName, true, false, 10);
+        fromSnapshotName, toSnapshotName, true, false, 10, new ArrayList<>());
 
     snapDiffJobMap.put(diffJobKey, snapshotDiffJob);
 
@@ -1558,7 +1559,7 @@ public class TestSnapshotDiffManager {
         .getSSTFileListForSnapshot(any(OmSnapshot.class), anyList());
 
     doNothing().when(spy).addToObjectIdMap(eq(keyInfoTable), eq(keyInfoTable),
-        any(), anyBoolean(), any(), any(), any(), any(), any(), anyMap());
+        any(), anyBoolean(), any(), any(), any(), any(), any(), anyMap(),anyString());
     doNothing().when(spy).checkReportsIntegrity(any(), anyInt(), anyInt());
 
     doReturn(10L).when(spy).generateDiffReport(anyString(),

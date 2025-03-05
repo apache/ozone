@@ -912,6 +912,7 @@ message SnapshotDiffJobProto {
   optional uint64 totalDiffEntries = 9;
   optional string message = 10;
   optional bool disableNativeDiff = 11;
+  repeated string activities = 12;
 }
 
 message OzoneObj {
