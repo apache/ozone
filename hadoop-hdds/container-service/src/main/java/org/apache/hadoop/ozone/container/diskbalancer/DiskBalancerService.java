@@ -295,11 +295,8 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   public DiskBalancerReportProto getDiskBalancerReportProto() {
-    LOG.info("Hitting getDiskBalancerReportProto on datanode side");
     DiskBalancerReportProto.Builder builder =
         DiskBalancerReportProto.newBuilder();
-    LOG.info("SuccessMoveCount in getDiskBalancerReportProto on datanode side: {}",metrics.getSuccessCount());
-    LOG.info("FailureMoveCount in getDiskBalancerReportProto on datanode side: {}",metrics.getFailureCount());
     return builder.setIsRunning(shouldRun)
         .setBalancedBytes(totalBalancedBytes.get())
         .setSuccessCount(metrics.getSuccessCount())

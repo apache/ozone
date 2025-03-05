@@ -59,8 +59,8 @@ public class DiskBalancerManager {
   private final NodeManager nodeManager;
   private Map<DatanodeDetails, DiskBalancerStatus> statusMap;
   private Map<DatanodeDetails, Long> balancedBytesMap;
-  private long SuccessMoveCount;
-  private long FailureMoveCount;
+  private long successMoveCount;
+  private long failureMoveCount;
   private boolean useHostnames;
 
   /**
@@ -267,8 +267,8 @@ public class DiskBalancerManager {
             .setNode(dn.toProto(clientVersion))
             .setCurrentVolumeDensitySum(volumeDensitySum)
             .setRunningStatus(getRunningStatus(dn))
-            .setSuccessMoveCount(SuccessMoveCount)
-            .setFailureMoveCount(FailureMoveCount);
+            .setSuccessMoveCount(successMoveCount)
+            .setFailureMoveCount(failureMoveCount);
     if (runningStatus != HddsProtos.DiskBalancerRunningStatus.UNKNOWN) {
       builder.setDiskBalancerConf(statusMap.get(dn)
           .getDiskBalancerConfiguration().toProtobufBuilder());
@@ -337,8 +337,8 @@ public class DiskBalancerManager {
     if (reportProto.hasBalancedBytes()) {
       balancedBytesMap.put(dn, reportProto.getBalancedBytes());
     }
-    SuccessMoveCount = reportProto.getSuccessCount();
-    FailureMoveCount = reportProto.getFailureCount();
+    successMoveCount = reportProto.getSuccessCount();
+    failureMoveCount = reportProto.getFailureCount();
   }
 
   private DiskBalancerConfiguration attachDiskBalancerConf(
