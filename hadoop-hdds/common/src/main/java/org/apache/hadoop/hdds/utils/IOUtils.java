@@ -18,8 +18,6 @@
 package org.apache.hadoop.hdds.utils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.nio.file.StandardOpenOption.CREATE;
-import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
 
 import jakarta.annotation.Nonnull;
 import java.io.FileOutputStream;
@@ -120,7 +118,7 @@ public final class IOUtils {
   public static void writePropertiesToFile(Path path, Properties properties) throws IOException {
     StringWriter out = new StringWriter();
     properties.store(out, null);
-    Files.write(path, out.toString().getBytes(UTF_8), CREATE, TRUNCATE_EXISTING);
+    Files.write(path, out.toString().getBytes(UTF_8));
   }
 
   /** Read {@link Properties} from the file at {@code path}. */

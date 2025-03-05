@@ -18,8 +18,6 @@
 package org.apache.hadoop.ozone.audit;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.nio.file.StandardOpenOption.CREATE;
-import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
 
 import java.io.File;
@@ -73,7 +71,7 @@ public final class AuditLogTestUtils {
   }
 
   public static void truncateAuditLogFile() throws IOException {
-    Files.write(Paths.get(AUDITLOG_FILENAME), new byte[0], CREATE, TRUNCATE_EXISTING);
+    Files.write(Paths.get(AUDITLOG_FILENAME), new byte[0]);
   }
 
   public static void deleteAuditLogFile() {
