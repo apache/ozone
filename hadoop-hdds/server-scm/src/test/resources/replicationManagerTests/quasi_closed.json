@@ -133,5 +133,19 @@
       { "type": "replicateContainerCommand", "datanode": "d4" },
       { "type": "replicateContainerCommand", "datanode": "d4" }
     ]
+  },
+  { "description": "Quasi-Closed 3 on one origin 2 unhealthy with 1 decommissioning", "containerState": "QUASI_CLOSED", "replicationConfig": "RATIS:THREE", "sequenceId": 11,
+    "replicas": [
+      { "state": "QUASI_CLOSED", "index": 0,   "datanode": "d1", "sequenceId": 10, "isEmpty": false, "origin": "o1"},
+      { "state": "QUASI_CLOSED", "index": 0,   "datanode": "d2", "sequenceId": 10, "isEmpty": false, "origin": "o1"},
+      { "state": "QUASI_CLOSED", "index": 0,   "datanode": "d3", "sequenceId": 10, "isEmpty": false, "origin": "o1"},
+      { "state": "UNHEALTHY",    "index": 0,   "datanode": "d4", "sequenceId": 11, "isEmpty": false, "origin": "o3", "operationalState": "DECOMMISSIONING"},
+      { "state": "UNHEALTHY",    "index": 0,   "datanode": "d5", "sequenceId": 11, "isEmpty": false, "origin": "o3"}
+    ],
+    "expectation": { "underReplicated": 1, "underReplicatedQueue": 1, "overReplicated": 0, "overReplicatedQueue":  0, "quasiClosedStuck": 1, "unhealthy": 0 },
+    "checkCommands": [],
+    "commands": [
+      { "type": "replicateContainerCommand"}
+    ]
   }
 ]
