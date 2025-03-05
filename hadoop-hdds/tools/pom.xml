@@ -98,7 +98,6 @@
     <dependency>
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-tools</artifactId>
-      <version>${ratis.version}</version>
       <exclusions>
         <exclusion>
           <groupId>org.apache.ratis</groupId>
@@ -117,7 +116,6 @@
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-reload4j</artifactId>
-      <version>${slf4j.version}</version>
     </dependency>
     <dependency>
       <groupId>org.xerial</groupId>
@@ -144,12 +142,8 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-hadoop-dependency-test</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-test-utils</artifactId>
+      <type>test-jar</type>
       <scope>test</scope>
     </dependency>
   </dependencies>

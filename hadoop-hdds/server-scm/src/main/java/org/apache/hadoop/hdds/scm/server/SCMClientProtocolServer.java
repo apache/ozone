@@ -1,31 +1,54 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license
- * agreements. See the NOTICE file distributed with this work for additional
- * information regarding
- * copyright ownership. The ASF licenses this file to you under the Apache
- * License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the
- * License. You may obtain a
- * copy of the License at
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * <p>http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * <p>Unless required by applicable law or agreed to in writing, software
- * distributed under the
- * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
- * CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.server;
+
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageContainerLocationProtocolService.newReflectiveBlockingService;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_READ_THREADPOOL_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_READ_THREADPOOL_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmUtils.checkIfCertSignRequestAllowed;
+import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.createSCMRatisTLSConfig;
+import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
+import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
+import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -46,9 +69,9 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.FetchMetrics;
 import org.apache.hadoop.hdds.scm.ScmInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
@@ -62,7 +85,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.DeletedBlocksTransact
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
-import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
@@ -99,35 +121,6 @@ import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.TreeSet;
-import java.util.UUID;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageContainerLocationProtocolService.newReflectiveBlockingService;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_HANDLER_COUNT_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_READ_THREADPOOL_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_READ_THREADPOOL_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmUtils.checkIfCertSignRequestAllowed;
-import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.createSCMRatisTLSConfig;
-import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
-import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
-import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 
 /**
  * The RPC server that listens to requests from clients.
@@ -818,20 +811,8 @@ public class SCMClientProtocolServer implements
       ScmInfo.Builder builder =
           new ScmInfo.Builder()
               .setClusterId(scm.getScmStorageConfig().getClusterID())
-              .setScmId(scm.getScmStorageConfig().getScmId());
-      if (scm.getScmHAManager().getRatisServer() != null) {
-        builder.setRatisPeerRoles(
-            scm.getScmHAManager().getRatisServer().getRatisRoles());
-        builder.setScmRatisEnabled(true);
-      } else {
-        // In case, there is no ratis, there is no ratis role.
-        // This will just print the hostname with ratis port as the default
-        // behaviour.
-        String address = scm.getSCMHANodeDetails().getLocalNodeDetails()
-            .getRatisHostPortStr();
-        builder.setRatisPeerRoles(Arrays.asList(address));
-        builder.setScmRatisEnabled(false);
-      }
+              .setScmId(scm.getScmStorageConfig().getScmId())
+              .setPeerRoles(scm.getScmHAManager().getRatisServer().getRatisRoles());
       return builder.build();
     } catch (Exception ex) {
       auditSuccess = false;
@@ -852,10 +833,6 @@ public class SCMClientProtocolServer implements
   public void transferLeadership(String newLeaderId)
       throws IOException {
     getScm().checkAdminAccess(getRemoteUser(), false);
-    if (!SCMHAUtils.isSCMHAEnabled(getScm().getConfiguration())) {
-      throw new SCMException("SCM HA not enabled.", ResultCodes.INTERNAL_ERROR);
-    }
-
     checkIfCertSignRequestAllowed(scm.getRootCARotationManager(),
         false, config, "transferLeadership");
 
@@ -897,6 +874,7 @@ public class SCMClientProtocolServer implements
     }
   }
 
+  @Override
   public List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
       long startTxId) throws IOException {
     List<DeletedBlocksTransactionInfo> result;
@@ -1393,7 +1371,7 @@ public class SCMClientProtocolServer implements
     Set<DatanodeDetails> returnSet = new TreeSet<>();
     List<DatanodeDetails> tmp = scm.getScmNodeManager()
         .getNodes(opState, nodeState);
-    if ((tmp != null) && (tmp.size() > 0)) {
+    if ((tmp != null) && (!tmp.isEmpty())) {
       returnSet.addAll(tmp);
     }
     return returnSet;

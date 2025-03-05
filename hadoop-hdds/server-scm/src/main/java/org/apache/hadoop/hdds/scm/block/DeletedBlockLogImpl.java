@@ -1,45 +1,49 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.block;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT;
+import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus;
+import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.DEL_TXN_ID;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Duration;
-import java.util.HashSet;
-import java.util.List;
-import java.util.UUID;
-import java.util.Set;
-import java.util.Map;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
-
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.command.CommandStatusReportHandler.DeleteBlockStatus;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
@@ -52,13 +56,6 @@ import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-
-import com.google.common.collect.Lists;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT;
-import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus;
-import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.DEL_TXN_ID;
-
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -118,7 +115,7 @@ public class DeletedBlockLogImpl
     this.metrics = metrics;
     this.transactionStatusManager =
         new SCMDeletedBlockTransactionStatusManager(deletedBlockLogStateManager,
-            containerManager, this.scmContext, metrics, scmCommandTimeoutMs);
+            containerManager, metrics, scmCommandTimeoutMs);
   }
 
   @Override
@@ -176,19 +173,48 @@ public class DeletedBlockLogImpl
    */
   @Override
   public int resetCount(List<Long> txIDs) throws IOException {
+    final int batchSize = 1000;
+    int totalProcessed = 0;
+
+    try {
+      if (txIDs != null && !txIDs.isEmpty()) {
+        return resetRetryCount(txIDs);
+      }
+
+      // If txIDs are null or empty, fetch all failed transactions in batches
+      long startTxId = 0;
+      List<DeletedBlocksTransaction> batch;
+
+      do {
+        // Fetch the batch of failed transactions
+        batch = getFailedTransactions(batchSize, startTxId);
+        if (batch.isEmpty()) {
+          break;
+        }
+
+        List<Long> batchTxIDs = batch.stream().map(DeletedBlocksTransaction::getTxID).collect(Collectors.toList());
+        totalProcessed += resetRetryCount(new ArrayList<>(batchTxIDs));
+        // Update startTxId to continue from the last processed transaction
+        startTxId = batch.get(batch.size() - 1).getTxID() + 1;
+      } while (!batch.isEmpty());
+
+    } catch (Exception e) {
+      throw new IOException("Error during transaction reset", e);
+    }
+    return totalProcessed;
+  }
+
+  private int resetRetryCount(List<Long> txIDs) throws IOException {
+    int totalProcessed;
     lock.lock();
     try {
-      if (txIDs == null || txIDs.isEmpty()) {
-        txIDs = getFailedTransactions(LIST_ALL_FAILED_TRANSACTIONS, 0).stream()
-            .map(DeletedBlocksTransaction::getTxID)
-            .collect(Collectors.toList());
-      }
       transactionStatusManager.resetRetryCount(txIDs);
-      return deletedBlockLogStateManager.resetRetryCountOfTransactionInDB(
-          new ArrayList<>(new HashSet<>(txIDs)));
+      totalProcessed = deletedBlockLogStateManager.resetRetryCountOfTransactionInDB(new ArrayList<>(
+          txIDs));
     } finally {
       lock.unlock();
     }
+    return totalProcessed;
   }
 
   private DeletedBlocksTransaction constructNewTransaction(

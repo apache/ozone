@@ -1,20 +1,20 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.helpers;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
@@ -35,6 +35,12 @@ public abstract class WithObjectID extends WithMetadata {
     super(b);
     objectID = b.objectID;
     updateID = b.updateID;
+  }
+
+  protected WithObjectID(WithObjectID other) {
+    super(other);
+    objectID = other.objectID;
+    updateID = other.updateID;
   }
 
   /**
@@ -73,10 +79,8 @@ public abstract class WithObjectID extends WithMetadata {
   /**
    * Sets the update ID. For each modification of this object, we will set
    * this to a value greater than the current value.
-   * @param updateId  long
-   * @param isRatisEnabled boolean
    */
-  public final void setUpdateID(long updateId, boolean isRatisEnabled) {
+  public final void setUpdateID(long newValue) {
 
     // Because in non-HA, we have multiple rpc handler threads and
     // transactionID is generated in OzoneManagerServerSideTranslatorPB.
@@ -103,23 +107,20 @@ public abstract class WithObjectID extends WithMetadata {
     // Main reason, in non-HA transaction Index after restart starts from 0.
     // And also because of this same reason we don't do replay checks in non-HA.
 
-    if (isRatisEnabled && updateId < this.getUpdateID()) {
+    final long currentValue = getUpdateID();
+    if (newValue < currentValue) {
       throw new IllegalArgumentException(String.format(
           "Trying to set updateID to %d which is not greater than the " +
-              "current value of %d for %s", updateId, this.getUpdateID(),
+              "current value of %d for %s", newValue, currentValue,
           getObjectInfo()));
     }
 
-    this.setUpdateID(updateId);
+    updateID = newValue;
   }
 
   /** Hook method, customized in subclasses. */
   public String getObjectInfo() {
     return this.toString();
-  }
-
-  public final void setUpdateID(long updateID) {
-    this.updateID = updateID;
   }
 
   /** Builder for {@link WithObjectID}. */

@@ -65,8 +65,20 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-client</artifactId>
+        <version>${hdds.version}</version>
+        <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-common</artifactId>
         <version>${hdds.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-common</artifactId>
+        <version>${hdds.version}</version>
+        <type>test-jar</type>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
@@ -142,6 +154,12 @@
       <dependency>
         <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-server-scm</artifactId>
+        <version>${hdds.version}</version>
+        <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-test-utils</artifactId>
         <version>${hdds.version}</version>
         <type>test-jar</type>
       </dependency>
@@ -255,6 +273,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
+        <artifactId>ozone-reconcodegen</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
         <artifactId>ozone-s3-secret-store</artifactId>
         <version>${hdds.version}</version>
       </dependency>
@@ -273,32 +296,6 @@
         <artifactId>rocksdb-checkpoint-differ</artifactId>
         <version>${hdds.version}</version>
       </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-client</artifactId>
-        <version>${hdds.version}</version>
-        <type>test-jar</type>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-common</artifactId>
-        <version>${hdds.version}</version>
-        <type>test-jar</type>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-hadoop-dependency-test</artifactId>
-        <version>${hdds.version}</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-test-utils</artifactId>
-        <version>${hdds.version}</version>
-        <scope>test</scope>
-      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -306,26 +303,6 @@
 
   <build>
     <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>depcheck</id>
-            <goals>
-              <goal>enforce</goal>
-            </goals>
-            <phase>validate</phase>
-            <configuration>
-              <rules>
-                <DependencyConvergence>
-                  <uniqueVersions>true</uniqueVersions>
-                </DependencyConvergence>
-              </rules>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>

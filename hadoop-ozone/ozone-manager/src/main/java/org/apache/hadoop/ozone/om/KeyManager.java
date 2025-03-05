@@ -1,45 +1,45 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
-package org.apache.hadoop.ozone.om;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.common.BlockGroup;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
-import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
-import org.apache.hadoop.ozone.om.fs.OzoneManagerFS;
-import org.apache.hadoop.hdds.utils.BackgroundService;
-import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
-import org.apache.hadoop.ozone.om.service.KeyDeletingService;
-import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
-import org.apache.hadoop.ozone.om.service.SnapshotDirectoryCleaningService;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
+package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.BackgroundService;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.fs.OzoneManagerFS;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
+import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
+import org.apache.hadoop.ozone.om.service.KeyDeletingService;
+import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
+import org.apache.hadoop.ozone.om.service.SnapshotDirectoryCleaningService;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
 
 /**
  * Handles key level commands.
@@ -203,7 +203,8 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
 
 
   OmMultipartUploadList listMultipartUploads(String volumeName,
-      String bucketName, String prefix) throws OMException;
+          String bucketName, String prefix,
+          String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination) throws OMException;
 
   /**
    * Returns list of parts of a multipart upload key.
@@ -224,34 +225,6 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @param key
    */
   void refresh(OmKeyInfo key) throws IOException;
-
-  /**
-   * Assume OM has FS namespace like below, deleteDirTable stores absolute
-   * path name as existing KeyDeletionService expects full key name.
-   * For example, if user deletes directory 'd1' then the entry in OM DB looks
-   * like, DBKey = 1030/d3 and DBValue = KeyInfo with keyName "a/b2/d3"
-   *
-   *                   vol1
-   *                    |
-   *                  buck-1
-   *                    |
-   *                    a
-   *                    |
-   *      -----------------------------------
-   *     |             |                     |
-   *     b1            b2                    b3
-   *   -----       ---------               ----------
-   *   |    |      |    |   |             |    |     |
-   *  c1   c2     d1   d2  d3             e1   e2   e3
-   *                   |                  |
-   *               --------               |
-   *              |        |              |
-   *           d21.txt   d22.txt        e11.txt
-   *
-   * @return OmKeyInfo
-   * @throws IOException
-   */
-  Table.KeyValue<String, OmKeyInfo> getPendingDeletionDir() throws IOException;
 
   /**
    * Returns an iterator for pending deleted directories.
@@ -277,23 +250,21 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * Returns all sub directories under the given parent directory.
    *
    * @param parentInfo
-   * @param numEntries
    * @return list of dirs
    * @throws IOException
    */
-  List<OmKeyInfo> getPendingDeletionSubDirs(long volumeId, long bucketId,
-      OmKeyInfo parentInfo, long numEntries) throws IOException;
+  DeleteKeysResult getPendingDeletionSubDirs(long volumeId, long bucketId,
+      OmKeyInfo parentInfo, long remainingBufLimit) throws IOException;
 
   /**
    * Returns all sub files under the given parent directory.
    *
    * @param parentInfo
-   * @param numEntries
    * @return list of files
    * @throws IOException
    */
-  List<OmKeyInfo> getPendingDeletionSubFiles(long volumeId,
-      long bucketId, OmKeyInfo parentInfo, long numEntries)
+  DeleteKeysResult getPendingDeletionSubFiles(long volumeId,
+      long bucketId, OmKeyInfo parentInfo, long remainingBufLimit)
           throws IOException;
 
   /**
