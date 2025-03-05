@@ -77,23 +77,23 @@ public class QuasiClosedStuckReplicaCount {
     List<UnderReplicatedOrigin> underReplicatedOrigins = new ArrayList<>();
 
     if (replicasByOrigin.size() == 1) {
-      UUID origin = replicasByOrigin.keySet().iterator().next();
-      Set<ContainerReplica> inService = inServiceReplicasByOrigin.get(origin);
+      Map.Entry<UUID, Set<ContainerReplica>> entry = replicasByOrigin.entrySet().iterator().next();
+      Set<ContainerReplica> inService = inServiceReplicasByOrigin.get(entry.getKey());
       if (inService == null) {
         inService = Collections.emptySet();
       }
-      Set<ContainerReplica> maintenance = maintenanceReplicasByOrigin.get(origin);
+      Set<ContainerReplica> maintenance = maintenanceReplicasByOrigin.get(entry.getKey());
       int maintenanceCount = maintenance == null ? 0 : maintenance.size();
 
       if (maintenanceCount > 0) {
         if (inService.size() < minHealthyForMaintenance) {
           int additionalReplicas = minHealthyForMaintenance - inService.size();
-          underReplicatedOrigins.add(new UnderReplicatedOrigin(replicasByOrigin.get(origin), additionalReplicas));
+          underReplicatedOrigins.add(new UnderReplicatedOrigin(entry.getValue(), additionalReplicas));
         }
       } else {
         if (inService.size() < 3) {
           int additionalReplicas = 3 - inService.size();
-          underReplicatedOrigins.add(new UnderReplicatedOrigin(replicasByOrigin.get(origin), additionalReplicas));
+          underReplicatedOrigins.add(new UnderReplicatedOrigin(entry.getValue(), additionalReplicas));
         }
       }
       return underReplicatedOrigins;
@@ -101,22 +101,22 @@ public class QuasiClosedStuckReplicaCount {
 
     // If there are multiple origins, we expect 2 copies of each origin
     // For maintenance, we expect 1 copy of each origin and ignore the minHealthyForMaintenance parameter
-    for (UUID origin : replicasByOrigin.keySet()) {
-      Set<ContainerReplica> inService = inServiceReplicasByOrigin.get(origin);
+    for (Map.Entry<UUID, Set<ContainerReplica>> entry : replicasByOrigin.entrySet()) {
+      Set<ContainerReplica> inService = inServiceReplicasByOrigin.get(entry.getKey());
       if (inService == null) {
         inService = Collections.emptySet();
       }
-      Set<ContainerReplica> maintenance = maintenanceReplicasByOrigin.get(origin);
+      Set<ContainerReplica> maintenance = maintenanceReplicasByOrigin.get(entry.getKey());
       int maintenanceCount = maintenance == null ? 0 : maintenance.size();
 
       if (inService.size() < 2) {
         if (maintenanceCount > 0) {
           if (inService.isEmpty()) {
             // We need 1 copy online for maintenance
-            underReplicatedOrigins.add(new UnderReplicatedOrigin(replicasByOrigin.get(origin), 1));
+            underReplicatedOrigins.add(new UnderReplicatedOrigin(entry.getValue(), 1));
           }
         } else {
-          underReplicatedOrigins.add(new UnderReplicatedOrigin(replicasByOrigin.get(origin), 2 - inService.size()));
+          underReplicatedOrigins.add(new UnderReplicatedOrigin(entry.getValue(), 2 - inService.size()));
         }
       }
     }
