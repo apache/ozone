@@ -142,7 +142,6 @@
                     <exclude>org.apache.ozone.**</exclude>
                     <exclude>org.apache.ratis.**</exclude>
                     <exclude>org.bouncycastle.**</exclude>
-                    <exclude>org.hadoop.ozone.**</exclude>
                     <exclude>org.ietf.jgss.*</exclude>
                     <exclude>org.junit.**</exclude>
                     <exclude>org.omg.**</exclude>
