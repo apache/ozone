@@ -59,7 +59,7 @@ public interface BlockManager {
    *
    * @param container      - Container for which block data need to be persisted.
    * @param data           - Block Data to be persisted (BlockData should have the chunks).
-   * @param overwriteBcsId - To overwrite bcsId of the block and container.
+   * @param overwriteBcsId - To overwrite bcsId of the container.
    */
   long putBlockForClosedContainer(Container container, BlockData data, boolean overwriteBcsId)
           throws IOException;
