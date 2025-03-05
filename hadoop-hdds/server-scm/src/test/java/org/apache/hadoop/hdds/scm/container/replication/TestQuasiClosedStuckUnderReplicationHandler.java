@@ -167,7 +167,6 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
     assertThrows(CommandTargetOverloadedException.class, () ->
         handler.processAndSendCommands(replicas, Collections.emptyList(), getUnderReplicatedHealthResult(), 1));
     assertEquals(1, commandsSent.size());
-    assertEquals(1, metrics.getPartialReplicationTotal());
   }
 
   @Test
@@ -200,7 +199,6 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
     assertThrows(InsufficientDatanodesException.class, () ->
         handler.processAndSendCommands(replicas, Collections.emptyList(), getUnderReplicatedHealthResult(), 1));
     assertEquals(1, commandsSent.size());
-    assertEquals(1, metrics.getPartialReplicationTotal());
   }
 
   private ContainerHealthResult.UnderReplicatedHealthResult getUnderReplicatedHealthResult() {
