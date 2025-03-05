@@ -283,7 +283,7 @@ public class OMDBReader {
 //    omdbReader.flush(omMetadataManager);
     try (Stream<String> lines  = Files.lines(Paths.get(args[0] + "/containers.out"));
          PrintWriter outFile =
-             new PrintWriter(new BufferedWriter(new FileWriter(args[1] +
+             new PrintWriter(new BufferedWriter(new FileWriter(args[1] + "/" +
                  omMetadataManager.getFileTable().getName() + "_missing_containers.txt")))) {
       AtomicLong totalSize = new AtomicLong(0);
       AtomicLong cnt = new AtomicLong(0);
