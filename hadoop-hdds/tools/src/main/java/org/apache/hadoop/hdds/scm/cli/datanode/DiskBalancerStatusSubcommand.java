@@ -72,7 +72,6 @@ public class DiskBalancerStatusSubcommand extends ScmSubcommand {
     contentList.add("SuccessMoveCount");
     contentList.add("FailureMoveCount");
 
-
     for (HddsProtos.DatanodeDiskBalancerInfoProto proto: protos) {
       formatBuilder.append("%-40s %-20s %-10s %-10s %-15s %-15s %-15s %-15s%n");
       contentList.add(proto.getNode().getHostName());
@@ -86,7 +85,6 @@ public class DiskBalancerStatusSubcommand extends ScmSubcommand {
           String.valueOf(proto.getDiskBalancerConf().getParallelThread()));
       contentList.add(String.valueOf(proto.getSuccessMoveCount()));
       contentList.add(String.valueOf(proto.getFailureMoveCount()));
-
     }
 
     return String.format(formatBuilder.toString(),
