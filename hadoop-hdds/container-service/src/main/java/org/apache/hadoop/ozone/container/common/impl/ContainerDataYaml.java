@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.container.common.impl;
 
+import static java.nio.file.StandardOpenOption.CREATE;
+import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
+import static java.nio.file.StandardOpenOption.WRITE;
 import static org.apache.hadoop.ozone.OzoneConsts.REPLICA_INDEX;
 import static org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData.KEYVALUE_YAML_TAG;
 
@@ -41,6 +44,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.ratis.util.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.DumperOptions;
@@ -93,15 +97,13 @@ public final class ContainerDataYaml {
       containerData.computeAndSetChecksum(yaml);
 
       // Write the ContainerData with checksum to Yaml file.
-      out = Files.newOutputStream(containerFile.toPath());
+      out = FileUtils.newOutputStreamForceAtClose(containerFile, CREATE, TRUNCATE_EXISTING, WRITE);
       writer = new OutputStreamWriter(out, StandardCharsets.UTF_8);
       yaml.dump(containerData, writer);
     } finally {
       try {
         if (writer != null) {
           writer.flush();
-          // make sure the container metadata is synced to disk.
-          IOUtils.syncFD(out);
           writer.close();
         }
       } catch (IOException ex) {

@@ -17,6 +17,10 @@
 
 package org.apache.hadoop.ozone.container.common.utils;
 
+import static java.nio.file.StandardOpenOption.CREATE;
+import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
+import static java.nio.file.StandardOpenOption.WRITE;
+
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -29,7 +33,7 @@ import java.nio.file.NoSuchFileException;
 import java.util.Arrays;
 import java.util.Random;
 import java.util.UUID;
-import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.ratis.util.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -135,9 +139,8 @@ public final class DiskCheckUtil {
       File testFile = new File(testFileDir, "disk-check-" + UUID.randomUUID());
       byte[] writtenBytes = new byte[numBytesToWrite];
       RANDOM.nextBytes(writtenBytes);
-      try (OutputStream fos = Files.newOutputStream(testFile.toPath())) {
+      try (OutputStream fos = FileUtils.newOutputStreamForceAtClose(testFile, CREATE, TRUNCATE_EXISTING, WRITE)) {
         fos.write(writtenBytes);
-        IOUtils.syncFD(fos);
       } catch (FileNotFoundException | NoSuchFileException notFoundEx) {
         logError(storageDir, String.format("Could not find file %s for " +
             "volume check.", testFile.getAbsolutePath()), notFoundEx);

@@ -20,10 +20,8 @@ package org.apache.hadoop.hdds.utils;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import jakarta.annotation.Nonnull;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -105,13 +103,6 @@ public final class IOUtils {
    */
   public static void closeQuietly(Collection<? extends AutoCloseable> closeables) {
     close(null, closeables);
-  }
-
-  /** Sync the file descriptor, if {@code out} is a {@code FileOutputStream}. */
-  public static void syncFD(OutputStream out) throws IOException {
-    if (out instanceof FileOutputStream) {
-      ((FileOutputStream) out).getFD().sync();
-    }
   }
 
   /** Write {@code properties} to the file at {@code path}, truncating any existing content. */

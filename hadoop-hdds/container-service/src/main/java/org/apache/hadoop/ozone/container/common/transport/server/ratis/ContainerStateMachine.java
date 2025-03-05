@@ -17,6 +17,10 @@
 
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
+import static java.nio.file.StandardOpenOption.CREATE;
+import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
+import static java.nio.file.StandardOpenOption.WRITE;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -59,7 +63,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.Cache;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.ResourceCache;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -97,6 +100,7 @@ import org.apache.ratis.statemachine.impl.SingleFileSnapshotInfo;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
+import org.apache.ratis.util.FileUtils;
 import org.apache.ratis.util.JavaUtils;
 import org.apache.ratis.util.LifeCycle;
 import org.apache.ratis.util.TaskQueue;
@@ -375,11 +379,9 @@ public class ContainerStateMachine extends BaseStateMachine {
       final File snapshotFile =
           storage.getSnapshotFile(ti.getTerm(), ti.getIndex());
       LOG.info("{}: Taking a snapshot at:{} file {}", getGroupId(), ti, snapshotFile);
-      try (OutputStream fos = Files.newOutputStream(snapshotFile.toPath())) {
+      try (OutputStream fos = FileUtils.newOutputStreamForceAtClose(snapshotFile, CREATE, TRUNCATE_EXISTING, WRITE)) {
         persistContainerSet(fos);
         fos.flush();
-        // make sure the snapshot file is synced
-        IOUtils.syncFD(fos);
       } catch (IOException ioe) {
         LOG.error("{}: Failed to write snapshot at:{} file {}", getGroupId(), ti,
             snapshotFile);
