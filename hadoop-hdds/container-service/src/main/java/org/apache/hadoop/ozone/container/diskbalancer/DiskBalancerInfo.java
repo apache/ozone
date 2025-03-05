@@ -49,6 +49,7 @@ public class DiskBalancerInfo {
     this.parallelThread = parallelThread;
     this.version = version;
   }
+
   public DiskBalancerInfo(boolean shouldRun, double threshold,
       long bandwidthInMB, int parallelThread, DiskBalancerVersion version,
           long successCount, long failureCount) {
