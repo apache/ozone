@@ -423,15 +423,6 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   /**
-   * Immediately flush the outstanding I/O operations of the DB.
-   */
-  public void flushLog() {
-    if (snapshotCache != null) {
-      snapshotCache.flushLog();
-    }
-  }
-
-  /**
    * Immediately invalidate all entries and close their DB instances in cache.
    */
   public void invalidateCache() {
