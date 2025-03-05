@@ -43,10 +43,7 @@ public interface ReconTaskController {
    * Reinitializes the registered Recon OM tasks with a new OM Metadata Manager instance.
    *
    * @param omMetadataManager the OM Metadata Manager instance to be used for reinitialization.
-   * @param reconOmTaskMap a map of Recon OM tasks whose lastUpdatedSeqNumber does not match
-   *                       the lastUpdatedSeqNumber from the previous run of the 'OmDeltaRequest' task.
-   *                       These tasks will be reinitialized to process the delta OM DB updates
-   *                       received in the last run of 'OmDeltaRequest'.
+   * @param reconOmTaskMap a map of Recon OM tasks, which we would like to reinitialize.
    *                       If {@code reconOmTaskMap} is null, all registered Recon OM tasks
    *                       will be reinitialized.
    */

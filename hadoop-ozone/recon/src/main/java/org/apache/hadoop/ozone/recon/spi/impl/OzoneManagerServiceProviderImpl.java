@@ -287,12 +287,12 @@ public class OzoneManagerServiceProviderImpl
         })
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));  // Collect into desired Map
     if (!reconOmTaskMap.isEmpty()) {
-      LOG.info("Task details of such tasks whose lastUpdatedSeqNumber number not matching with " +
-          "lastUpdatedSeqNumber of 'OmDeltaRequest' task::\n");
-      LOG.info("{}->{}", deltaTaskStatusUpdater.getTaskName(), deltaTaskStatusUpdater.getLastUpdatedSeqNumber());
+      LOG.info("Task name and last updated sequence number of tasks, that are not matching with " +
+          "the last updated sequence number of OmDeltaRequest task:\n");
+      LOG.info("{} -> {}", deltaTaskStatusUpdater.getTaskName(), deltaTaskStatusUpdater.getLastUpdatedSeqNumber());
       reconOmTaskMap.keySet()
           .forEach(taskName -> {
-            LOG.info("{}->{}", taskName,
+            LOG.info("{} -> {}", taskName,
                 taskStatusUpdaterManager.getTaskStatusUpdater(taskName).getLastUpdatedSeqNumber());
 
           });
