@@ -59,21 +59,22 @@ public abstract class ContainerKeyMapperHelper {
    *
    * @param reconContainerMetadataManager The metadata manager instance responsible for DB operations.
    */
-  public static void truncateTablesIfNeeded(ReconContainerMetadataManager reconContainerMetadataManager) {
+  public static void truncateTablesIfNeeded(ReconContainerMetadataManager reconContainerMetadataManager,
+                                            String taskName) {
     synchronized (TRUNCATE_LOCK) {
       if (ReconConstants.CONTAINER_KEY_TABLES_TRUNCATED.compareAndSet(false, true)) {
         try {
           // Perform table truncation
-          reconContainerMetadataManager.reinitWithNewContainerDataFromOm(new HashMap<>());
-          LOG.info("Successfully truncated container key tables.");
+          reconContainerMetadataManager.reinitWithNewContainerDataFromOm(Collections.emptyMap());
+          LOG.debug("Successfully truncated container key tables.");
         } catch (Exception e) {
           // Reset the flag so truncation can be retried
           ReconConstants.CONTAINER_KEY_TABLES_TRUNCATED.set(false);
-          LOG.error("Error while truncating container key tables. Resetting flag.", e);
+          LOG.error("Error while truncating container key tables for task {}. Resetting flag.", taskName, e);
           throw new RuntimeException("Table truncation failed", e);
         }
       } else {
-        LOG.info("Container key tables already truncated by another task.");
+        LOG.debug("Container key tables already truncated by another task.");
       }
     }
   }
@@ -88,11 +89,11 @@ public abstract class ContainerKeyMapperHelper {
     Map<Long, Long> containerKeyCountMap = new HashMap<>();
 
     try {
-      LOG.info("Starting a 'reprocess' run for {}.", taskName);
+      LOG.debug("Starting a 'reprocess' run for {}.", taskName);
       Instant start = Instant.now();
 
       // Ensure the tables are truncated only once
-      truncateTablesIfNeeded(reconContainerMetadataManager);
+      truncateTablesIfNeeded(reconContainerMetadataManager, taskName);
 
       // Get the appropriate table based on BucketLayout
       Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable(bucketLayout);
@@ -123,7 +124,7 @@ public abstract class ContainerKeyMapperHelper {
       Instant end = Instant.now();
       long durationMillis = Duration.between(start, end).toMillis();
       double durationSeconds = (double) durationMillis / 1000.0;
-      LOG.info("Completed 'reprocess' for {}. Processed {} keys in {} ms ({} seconds).",
+      LOG.debug("Completed 'reprocess' for {}. Processed {} keys in {} ms ({} seconds).",
           taskName, omKeyCount, durationMillis, durationSeconds);
 
     } catch (IOException ioEx) {
@@ -209,7 +210,7 @@ public abstract class ContainerKeyMapperHelper {
       LOG.error("Unable to write Container Key Prefix data in Recon DB.", e);
       return false;
     }
-    LOG.info("{} successfully processed {} OM DB update event(s) in {} milliseconds.",
+    LOG.debug("{} successfully processed {} OM DB update event(s) in {} milliseconds.",
         taskName, eventCount, (System.currentTimeMillis() - startTime));
     return true;
   }
