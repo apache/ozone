@@ -34,5 +34,6 @@ github:
     - RATIS
   enabled_merge_buttons:
     squash:  true
+    squash_commit_message: PR_TITLE
     merge:   false
     rebase:  false
