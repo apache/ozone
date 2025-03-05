@@ -1518,6 +1518,16 @@
       to the OM.
     </description>
   </property>
+
+  <property>
+    <name>ozone.om.snapshot.rocksdb.metrics.enabled</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Skip collecting RocksDBStore metrics for Snapshotted DB.
+    </description>
+  </property>
+
   <property>
     <name>hdds.rest.http-address</name>
     <value>0.0.0.0:9880</value>
