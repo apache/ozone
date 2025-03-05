@@ -25,7 +25,6 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -106,28 +105,11 @@ public final class TestDataUtil {
   }
 
   public static void createKey(OzoneBucket bucket, String keyName,
-                               String content) throws IOException {
-    createKey(bucket, keyName, ReplicationFactor.ONE,
-        ReplicationType.RATIS, content.getBytes(UTF_8));
-  }
-
-  public static void createKey(OzoneBucket bucket, String keyName,
                                byte[] content) throws IOException {
-    createKey(bucket, keyName, ReplicationFactor.ONE,
-        ReplicationType.RATIS, content);
+    ReplicationConfig replicationConfig = ReplicationConfig.
+        fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE);
+    createKey(bucket, keyName, replicationConfig, content);
 
-  }
-
-  public static void createKey(OzoneBucket bucket, String keyName,
-                               ReplicationFactor repFactor, ReplicationType repType, byte[] content)
-      throws IOException {
-    ReplicationConfig repConfig = ReplicationConfig
-        .fromTypeAndFactor(repType, repFactor);
-    try (OutputStream stream = bucket
-        .createKey(keyName, content.length, repConfig,
-            new HashMap<>())) {
-      stream.write(content);
-    }
   }
 
   public static void createKey(OzoneBucket bucket, String keyName,
@@ -137,32 +119,6 @@ public final class TestDataUtil {
         .createKey(keyName, content.length, repConfig,
             new HashMap<>())) {
       stream.write(content);
-    }
-  }
-
-  public static void createKey(OzoneBucket bucket, String keyName,
-      ReplicationFactor repFactor, ReplicationType repType, String content)
-      throws IOException {
-    ReplicationConfig repConfig = ReplicationConfig
-        .fromTypeAndFactor(repType, repFactor);
-    createKey(bucket, keyName, repConfig, content.getBytes(UTF_8));
-  }
-
-  public static void createKey(OzoneBucket bucket, String keyName,
-      ReplicationConfig repConfig, String content)
-      throws IOException {
-    createKey(bucket, keyName, repConfig, content.getBytes(UTF_8));
-  }
-
-  public static void createKey(OzoneBucket bucket, String keyName,
-      ReplicationFactor repFactor, ReplicationType repType,
-      ByteBuffer data) throws IOException {
-    ReplicationConfig repConfig = ReplicationConfig
-        .fromTypeAndFactor(repType, repFactor);
-    try (OutputStream stream = bucket
-        .createKey(keyName, data.capacity(), repConfig,
-            new HashMap<>())) {
-      stream.write(data.array());
     }
   }
 
@@ -258,7 +214,7 @@ public final class TestDataUtil {
       OzoneBucket bucket = createVolumeAndBucket(client);
       for (int i = 0; i < numOfKeys; i++) {
         String keyName = RandomStringUtils.randomAlphabetic(5) + i;
-        createKey(bucket, keyName, RandomStringUtils.randomAlphabetic(5));
+        createKey(bucket, keyName, RandomStringUtils.randomAlphabetic(5).getBytes(UTF_8));
         keyLocationMap.put(keyName, lookupOmKeyInfo(cluster, bucket, keyName));
       }
     }

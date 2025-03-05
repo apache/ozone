@@ -649,8 +649,8 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     byte[] input = new byte[length];
     Arrays.fill(input, (byte) 96);
     for (String key : keys) {
-      createKey(ozoneBucket, key, ReplicationFactor.THREE,
-          ReplicationType.RATIS, input);
+      createKey(ozoneBucket, key, ReplicationConfig
+          .fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.THREE), input);
       // Read the key with given key name.
       readkey(ozoneBucket, key, length, input);
     }

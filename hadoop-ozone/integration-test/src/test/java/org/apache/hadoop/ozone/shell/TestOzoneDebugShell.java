@@ -35,6 +35,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.Set;
@@ -191,7 +192,7 @@ public class TestOzoneDebugShell {
           BucketLayout.LEGACY);
       TestDataUtil.createKey(
           client.getObjectStore().getVolume(volumeName).getBucket(bucketName),
-          keyName, repConfig, "test");
+          keyName, repConfig, "test".getBytes(StandardCharsets.UTF_8));
     }
   }
 
