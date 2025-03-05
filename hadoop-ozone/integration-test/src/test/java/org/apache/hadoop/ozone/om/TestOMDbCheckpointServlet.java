@@ -676,9 +676,9 @@ public class TestOMDbCheckpointServlet {
 
     // Create dummy keys for snapshotting.
     TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
-        "content");
+        "content".getBytes(StandardCharsets.UTF_8));
     TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
-        "content");
+        "content".getBytes(StandardCharsets.UTF_8));
 
     snapshotDirName =
         createSnapshot(bucket.getVolumeName(), bucket.getName());

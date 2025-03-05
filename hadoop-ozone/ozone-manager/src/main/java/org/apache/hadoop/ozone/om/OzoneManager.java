@@ -23,7 +23,6 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERV
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
-import static org.apache.hadoop.hdds.HddsUtils.preserveThreadName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 import static org.apache.hadoop.hdds.utils.HAUtils.getScmInfo;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
@@ -450,7 +449,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final int preallocateBlocksMax;
   private final boolean grpcBlockTokenEnabled;
   private final BucketLayout defaultBucketLayout;
-  private final ReplicationConfig defaultReplicationConfig;
+  private ReplicationConfig defaultReplicationConfig;
 
   private final boolean isS3MultiTenancyEnabled;
   private final boolean isStrictS3;
@@ -606,7 +605,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     // Validates the default server-side replication configs.
-    this.defaultReplicationConfig = getDefaultReplicationConfig();
+    setReplicationFromConfig();
     InetSocketAddress omNodeRpcAddr = omNodeDetails.getRpcAddress();
     // Honor property 'hadoop.security.token.service.use_ip'
     omRpcAddressTxt = new Text(SecurityUtil.buildTokenService(omNodeRpcAddr));
@@ -1310,7 +1309,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     final int readThreads = conf.getInt(OZONE_OM_READ_THREADPOOL_KEY,
         OZONE_OM_READ_THREADPOOL_DEFAULT);
 
-    RPC.Server rpcServer = preserveThreadName(() -> new RPC.Builder(conf)
+    RPC.Server rpcServer = new RPC.Builder(conf)
         .setProtocol(OzoneManagerProtocolPB.class)
         .setInstance(clientProtocolService)
         .setBindAddress(addr.getHostString())
@@ -1319,7 +1318,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setNumReaders(readThreads)
         .setVerbose(false)
         .setSecretManager(delegationTokenMgr)
-        .build());
+        .build();
 
     HddsServerUtil.addPBProtocol(conf, OMInterServiceProtocolPB.class,
         interOMProtocolService, rpcServer);
@@ -4478,18 +4477,22 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public ReplicationConfig getDefaultReplicationConfig() {
-    if (this.defaultReplicationConfig != null) {
-      return this.defaultReplicationConfig;
+    if (defaultReplicationConfig == null) {
+      setReplicationFromConfig();
     }
+    return defaultReplicationConfig;
+  }
 
+  public void setReplicationFromConfig() {
     final String replication = configuration.getTrimmed(
         OZONE_SERVER_DEFAULT_REPLICATION_KEY,
         OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT);
     final String type = configuration.getTrimmed(
         OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY,
         OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT);
-    return ReplicationConfig.parse(ReplicationType.valueOf(type),
+    defaultReplicationConfig = ReplicationConfig.parse(ReplicationType.valueOf(type),
         replication, configuration);
+    LOG.info("Set default replication in OM: {}/{} -> {}", type, replication, defaultReplicationConfig);
   }
 
   public BucketLayout getOMDefaultBucketLayout() {

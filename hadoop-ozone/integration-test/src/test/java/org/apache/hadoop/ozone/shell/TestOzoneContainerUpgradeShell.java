@@ -34,6 +34,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,6 +42,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -181,7 +183,8 @@ public class TestOzoneContainerUpgradeShell {
       TestDataUtil.createVolumeAndBucket(client, VOLUME_NAME, BUCKET_NAME);
       TestDataUtil.createKey(
           client.getObjectStore().getVolume(VOLUME_NAME).getBucket(BUCKET_NAME),
-          keyName, ReplicationFactor.THREE, ReplicationType.RATIS, "test");
+          keyName, ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.THREE),
+          "test".getBytes(StandardCharsets.UTF_8));
     }
   }
 
