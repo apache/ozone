@@ -386,6 +386,8 @@ public class OzoneConfiguration extends Configuration
             HddsConfigKeys.HDDS_DATANODE_DNS_NAMESERVER_KEY),
         new DeprecationDelta("dfs.datanode.hostname",
             HddsConfigKeys.HDDS_DATANODE_HOST_NAME_KEY),
+        new DeprecationDelta("dfs.datanode.data.dir",
+            ScmConfigKeys.HDDS_DATANODE_DIR_KEY),
         new DeprecationDelta("dfs.datanode.use.datanode.hostname",
             HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME),
         new DeprecationDelta("dfs.xframe.enabled",
