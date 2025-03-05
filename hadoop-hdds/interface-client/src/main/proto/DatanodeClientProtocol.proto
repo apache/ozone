@@ -284,43 +284,43 @@ enum ContainerType {
 
 
 // Container Messages.
-message  CreateContainerRequestProto {
+message CreateContainerRequestProto {
   repeated KeyValue metadata = 2;
   optional ContainerType containerType = 3 [default = KeyValueContainer];
   optional int32 replicaIndex = 4;
   optional ContainerDataProto.State state = 5;
 }
 
-message  CreateContainerResponseProto {
+message CreateContainerResponseProto {
 }
 
-message  ReadContainerRequestProto {
+message ReadContainerRequestProto {
 }
 
-message  ReadContainerResponseProto {
+message ReadContainerResponseProto {
   optional ContainerDataProto containerData = 1;
 }
 
-message  UpdateContainerRequestProto {
+message UpdateContainerRequestProto {
   repeated KeyValue metadata = 2;
   optional bool forceUpdate = 3 [default = false];
 }
 
-message  UpdateContainerResponseProto {
+message UpdateContainerResponseProto {
 }
 
-message  DeleteContainerRequestProto {
+message DeleteContainerRequestProto {
   optional bool forceDelete = 2 [default = false];
 }
 
-message  DeleteContainerResponseProto {
+message DeleteContainerResponseProto {
 }
 
-message  ListContainerRequestProto {
+message ListContainerRequestProto {
   optional uint32 count = 2; // Max Results to return
 }
 
-message  ListContainerResponseProto {
+message ListContainerResponseProto {
   repeated ContainerDataProto containerData = 1;
 }
 
@@ -341,66 +341,66 @@ message BlockData {
 }
 
 // Block Messages.
-message  PutBlockRequestProto {
+message PutBlockRequestProto {
   required BlockData blockData = 1;
   optional bool eof = 2;
 }
 
-message  PutBlockResponseProto {
+message PutBlockResponseProto {
   required GetCommittedBlockLengthResponseProto committedBlockLength = 1;
 }
 
-message  FinalizeBlockRequestProto  {
+message FinalizeBlockRequestProto  {
   required DatanodeBlockID blockID = 1;
 }
 
-message  FinalizeBlockResponseProto  {
+message FinalizeBlockResponseProto  {
   required BlockData blockData = 1;
 }
 
-message  GetBlockRequestProto  {
+message GetBlockRequestProto  {
   required DatanodeBlockID blockID = 1;
 }
 
-message  GetBlockResponseProto  {
+message GetBlockResponseProto  {
   required BlockData blockData = 1;
 }
 
 
-message  DeleteBlockRequestProto {
+message DeleteBlockRequestProto {
   required DatanodeBlockID blockID = 1;
 }
 
-message  GetCommittedBlockLengthRequestProto {
+message GetCommittedBlockLengthRequestProto {
   required DatanodeBlockID blockID = 1;
 }
 
-message  GetCommittedBlockLengthResponseProto {
+message GetCommittedBlockLengthResponseProto {
   required DatanodeBlockID blockID = 1;
   required int64 blockLength = 2;
 }
 
-message   DeleteBlockResponseProto {
+message DeleteBlockResponseProto {
 }
 
-message  ListBlockRequestProto {
+message ListBlockRequestProto {
   optional int64 startLocalID = 2;
   required uint32 count = 3;
 
 }
 
-message  ListBlockResponseProto {
+message ListBlockResponseProto {
   repeated BlockData blockData = 1;
 }
 
-message  EchoRequestProto {
+message EchoRequestProto {
   optional bytes payload = 1;
   optional int32 payloadSizeResp = 2;
   optional int32 sleepTimeMs = 3;
   optional bool readOnly = 4;
 }
 
-message  EchoResponseProto {
+message EchoResponseProto {
   optional bytes payload = 1;
 }
 
@@ -433,14 +433,14 @@ enum ChecksumType {
     MD5 = 5;
 }
 
-message  WriteChunkRequestProto  {
+message WriteChunkRequestProto  {
   required DatanodeBlockID blockID = 1;
   optional ChunkInfo chunkData = 2;
   optional bytes data = 3;
   optional PutBlockRequestProto block = 4;
 }
 
-message  WriteChunkResponseProto {
+message WriteChunkResponseProto {
   optional GetCommittedBlockLengthResponseProto committedBlockLength = 1;
 }
 
@@ -449,13 +449,13 @@ enum ReadChunkVersion {
   V1 = 1; // Response data is split into multiple buffers
 }
 
-message  ReadChunkRequestProto  {
+message ReadChunkRequestProto  {
   required DatanodeBlockID blockID = 1;
   required ChunkInfo chunkData = 2;
   optional ReadChunkVersion readChunkVersion = 3;
 }
 
-message  ReadChunkResponseProto {
+message ReadChunkResponseProto {
   required DatanodeBlockID blockID = 1;
   required ChunkInfo chunkData = 2;
   // Chunk data should be returned in one of the two for
@@ -469,21 +469,21 @@ message DataBuffers {
   repeated bytes buffers = 1;
 }
 
-message  DeleteChunkRequestProto {
+message DeleteChunkRequestProto {
   required DatanodeBlockID blockID = 1;
   required ChunkInfo chunkData = 2;
 }
 
-message  DeleteChunkResponseProto {
+message DeleteChunkResponseProto {
 }
 
-message  ListChunkRequestProto {
+message ListChunkRequestProto {
   required DatanodeBlockID blockID = 1;
   required string prevChunkName = 2;
   required uint32 count = 3;
 }
 
-message  ListChunkResponseProto {
+message ListChunkResponseProto {
   repeated ChunkInfo chunkData = 1;
 }
 
