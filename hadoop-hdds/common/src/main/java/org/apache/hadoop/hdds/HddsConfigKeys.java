@@ -412,8 +412,6 @@ public final class HddsConfigKeys {
       "hdds.datanode.dns.nameserver";
   public static final String HDDS_DATANODE_HOST_NAME_KEY =
       "hdds.datanode.hostname";
-  public static final String HDDS_DATANODE_DATA_DIR_KEY =
-      "hdds.datanode.data.dir";
   public static final String HDDS_DATANODE_USE_DN_HOSTNAME =
       "hdds.datanode.use.datanode.hostname";
   public static final boolean HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT = false;
