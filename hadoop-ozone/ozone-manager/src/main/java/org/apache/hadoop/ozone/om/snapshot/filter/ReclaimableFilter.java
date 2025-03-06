@@ -131,12 +131,11 @@ public abstract class ReclaimableFilter<V> implements CheckedExceptionOperation<
     // If existing snapshotIds don't match then close all snapshots and reopen the previous N snapshots.
     close();
     try {
-      // Acquire lock only on last N-1 snapshot & current snapshot(AOS if it is null).
+      // Acquire lock on last N snapshot & current snapshot(AOS if it is null).
       List<SnapshotInfo> expectedLastNSnapshotsInChain = getLastNSnapshotInChain(volume, bucket);
-      List<UUID> expectedSnapshotIds = expectedLastNSnapshotsInChain.stream()
+      List<UUID> lockIds = expectedLastNSnapshotsInChain.stream()
           .map(snapshotInfo -> snapshotInfo == null ? null : snapshotInfo.getSnapshotId())
           .collect(Collectors.toList());
-      List<UUID> lockIds = new ArrayList<>(expectedSnapshotIds.subList(1, expectedSnapshotIds.size()));
       lockIds.add(currentSnapshotInfo == null ? null : currentSnapshotInfo.getSnapshotId());
 
       if (snapshotIdLocks.acquireLock(lockIds).isLockAcquired()) {

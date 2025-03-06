@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.ratis.util.MemoizedCheckedSupplier;
+import org.apache.ratis.util.function.CheckedSupplier;
 
 /**
  * Filter to return deleted keys which are reclaimable based on their presence in previous snapshot in
@@ -87,7 +88,7 @@ public class ReclaimableKeyFilter extends ReclaimableFilter<OmKeyInfo> {
     }
 
     // Getting keyInfo from prev snapshot's keyTable/fileTable
-    MemoizedCheckedSupplier<Optional<OmKeyInfo>, IOException> previousKeyInfo =
+    CheckedSupplier<Optional<OmKeyInfo>, IOException> previousKeyInfo =
         MemoizedCheckedSupplier.valueOf(() -> getPreviousSnapshotKey(deletedKeyInfo.getValue(), getBucketInfo(),
             getVolumeId(), renamedTable, previousKeyTable.get()));
     // If file not present in previous snapshot then it won't be present in previous to previous snapshot either.
@@ -101,11 +102,11 @@ public class ReclaimableKeyFilter extends ReclaimableFilter<OmKeyInfo> {
           .getKeyTable(getBucketInfo().getBucketLayout()));
     }
     // Getting keyInfo from prev to prev snapshot's keyTable/fileTable based on keyInfo of prev keyTable
-    MemoizedCheckedSupplier<Optional<OmKeyInfo>, IOException> previousPrevKeyInfo =
+    CheckedSupplier<Optional<OmKeyInfo>, IOException> previousPrevKeyInfo =
         MemoizedCheckedSupplier.valueOf(() -> getPreviousSnapshotKey(previousKeyInfo.get().orElse(null),
             getBucketInfo(), getVolumeId(), prevRenamedTable.get(), previousPrevKeyTable.get()));
-    SnapshotInfo prevToPrevSnapshotInfo = getPreviousSnapshotInfo(0);
-    calculateExclusiveSize(prevToPrevSnapshotInfo, previousPrevKeyInfo.get().orElse(null),
+    SnapshotInfo previousSnapshotInfo = getPreviousSnapshotInfo(1);
+    calculateExclusiveSize(previousSnapshotInfo, previousKeyInfo, previousPrevKeyInfo,
         exclusiveSizeMap, exclusiveReplicatedSizeMap);
     return false;
   }
@@ -134,15 +135,19 @@ public class ReclaimableKeyFilter extends ReclaimableFilter<OmKeyInfo> {
    * previousToPrevSnapshot - Snapshot which is used to check
    *                 if key is exclusive to previousSnapshot.
    */
-  private void calculateExclusiveSize(SnapshotInfo prevToPrevSnapKey, OmKeyInfo keyInfoPrevToPrevSnapshot,
-                                      Map<UUID, Long> exclusiveSizes, Map<UUID, Long> exclusiveReplicatedSizes) {
-    if (keyInfoPrevToPrevSnapshot == null) {
-      return;
+  private void calculateExclusiveSize(SnapshotInfo previousSnapshotInfo,
+                                      CheckedSupplier<Optional<OmKeyInfo>, IOException> keyInfoPrevSnapshot,
+                                      CheckedSupplier<Optional<OmKeyInfo>, IOException> keyInfoPrevToPrevSnapshot,
+                                      Map<UUID, Long> exclusiveSizes, Map<UUID, Long> exclusiveReplicatedSizes)
+      throws IOException {
+    if (keyInfoPrevSnapshot.get().isPresent() && !keyInfoPrevToPrevSnapshot.get().isPresent()) {
+      OmKeyInfo keyInfo = keyInfoPrevSnapshot.get().get();
+      exclusiveSizes.compute(previousSnapshotInfo.getSnapshotId(),
+          (k, v) -> (v == null ? 0 : v) + keyInfo.getDataSize());
+      exclusiveReplicatedSizes.compute(previousSnapshotInfo.getSnapshotId(),
+          (k, v) -> (v == null ? 0 : v) + keyInfo.getReplicatedSize());
     }
-    exclusiveSizes.compute(prevToPrevSnapKey.getSnapshotId(),
-        (k, v) -> (v == null ? 0 : v) + keyInfoPrevToPrevSnapshot.getDataSize());
-    exclusiveReplicatedSizes.compute(prevToPrevSnapKey.getSnapshotId(),
-        (k, v) -> (v == null ? 0 : v) + keyInfoPrevToPrevSnapshot.getReplicatedSize());
+
   }
 
   private Optional<OmKeyInfo> getPreviousSnapshotKey(OmKeyInfo keyInfo, OmBucketInfo bucketInfo, long volumeId,
