@@ -32,6 +32,8 @@ import java.util.Map;
 import java.util.Scanner;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -217,7 +219,9 @@ public final class TestDataUtil {
       OzoneBucket bucket = createVolumeAndBucket(client);
       for (int i = 0; i < numOfKeys; i++) {
         String keyName = RandomStringUtils.randomAlphabetic(5) + i;
-        createKey(bucket, keyName, RandomStringUtils.randomAlphabetic(5).getBytes(UTF_8));
+        createKey(bucket, keyName,ReplicationConfig
+            .fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
+            RandomStringUtils.randomAlphabetic(5).getBytes(UTF_8));
         keyLocationMap.put(keyName, lookupOmKeyInfo(cluster, bucket, keyName));
       }
     }

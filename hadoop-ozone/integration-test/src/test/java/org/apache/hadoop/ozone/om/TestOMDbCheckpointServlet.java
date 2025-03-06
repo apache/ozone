@@ -98,6 +98,9 @@ import javax.servlet.WriteListener;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -676,9 +679,11 @@ public class TestOMDbCheckpointServlet {
         .createVolumeAndBucket(client);
 
     // Create dummy keys for snapshotting.
-    TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
-        "content".getBytes(StandardCharsets.UTF_8));
-    TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
+    TestDataUtil.createKey(bucket, UUID.randomUUID().toString(), ReplicationConfig
+            .fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE)
+        , "content".getBytes(StandardCharsets.UTF_8));
+    TestDataUtil.createKey(bucket, UUID.randomUUID().toString(), ReplicationConfig
+            .fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
         "content".getBytes(StandardCharsets.UTF_8));
 
     snapshotDirName =
