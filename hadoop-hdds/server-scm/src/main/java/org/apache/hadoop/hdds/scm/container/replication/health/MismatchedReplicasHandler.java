@@ -92,7 +92,7 @@ public class MismatchedReplicasHandler extends AbstractCheck {
   /**
    * Returns the final expected closed state type based on the scm container state and the replica state.
    * @param replica replica to check for mismatch and if it should be closed
-   * @return non null closed state if the replica should be closed, else CLOSED/QUASI_CLOSED based on the replica's
+   * @return null if the replica should not be closed, else CLOSED/QUASI_CLOSED based on the replica's
    * state.
    */
   private ContainerReplicaProto.State getTransitionState(ContainerInfo container,
