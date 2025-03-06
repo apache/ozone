@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -72,43 +73,34 @@ public class ReclaimableDirFilter extends ReclaimableFilter<OmKeyInfo> {
     ReferenceCounted<OmSnapshot> previousSnapshot = getPreviousOmSnapshot(0);
     Table<String, OmDirectoryInfo> prevDirTable = previousSnapshot == null ? null :
         previousSnapshot.get().getMetadataManager().getDirectoryTable();
-    return isDirReclaimable(deletedDirInfo, prevDirTable,
+    return isDirReclaimable(deletedDirInfo.getValue(), getVolumeId(), getBucketInfo(), prevDirTable,
         getMetadataManager().getSnapshotRenamedTable());
   }
 
-  private boolean isDirReclaimable(Table.KeyValue<String, OmKeyInfo> deletedDir,
+  private boolean isDirReclaimable(OmKeyInfo dirInfo,
+                                   long volumeId, OmBucketInfo bucketInfo,
                                    Table<String, OmDirectoryInfo> previousDirTable,
                                    Table<String, String> renamedTable) throws IOException {
     if (previousDirTable == null) {
       return true;
     }
-
-    String deletedDirDbKey = deletedDir.getKey();
-    OmKeyInfo deletedDirInfo = deletedDir.getValue();
     String dbRenameKey = ozoneManager.getMetadataManager().getRenameKey(
-        deletedDirInfo.getVolumeName(), deletedDirInfo.getBucketName(),
-        deletedDirInfo.getObjectID());
+        dirInfo.getVolumeName(), dirInfo.getBucketName(), dirInfo.getObjectID());
 
       /*
       snapshotRenamedTable: /volumeName/bucketName/objectID ->
           /volumeId/bucketId/parentId/dirName
        */
     String dbKeyBeforeRename = renamedTable.getIfExist(dbRenameKey);
-    String prevDbKey = null;
-
+    String prevDbKey;
     if (dbKeyBeforeRename != null) {
       prevDbKey = dbKeyBeforeRename;
     } else {
-      // In OMKeyDeleteResponseWithFSO OzonePathKey is converted to
-      // OzoneDeletePathKey. Changing it back to check the previous DirTable.
-      prevDbKey = ozoneManager.getMetadataManager()
-          .getOzoneDeletePathDirKey(deletedDirDbKey);
+      prevDbKey = ozoneManager.getMetadataManager().getOzonePathKey(
+          volumeId, bucketInfo.getObjectID(), dirInfo.getParentObjectID(), dirInfo.getFileName());
     }
 
     OmDirectoryInfo prevDirectoryInfo = previousDirTable.get(prevDbKey);
-    if (prevDirectoryInfo == null) {
-      return true;
-    }
-    return prevDirectoryInfo.getObjectID() != deletedDirInfo.getObjectID();
+    return prevDirectoryInfo == null || prevDirectoryInfo.getObjectID() != dirInfo.getObjectID();
   }
 }

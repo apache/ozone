@@ -15,14 +15,17 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.lock;
+package org.apache.hadoop.ozone.om.snapshot.filter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -30,7 +33,12 @@ import static org.mockito.Mockito.when;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
+import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
+import org.apache.hadoop.ozone.om.snapshot.MultiSnapshotLocks;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,87 +50,88 @@ import org.mockito.junit.jupiter.MockitoExtension;
  * Class to test class MultiLocks.
  */
 @ExtendWith(MockitoExtension.class)
-public class TestMultiLocks {
+public class TestMultiSnapshotLocks {
   @Mock
   private IOzoneManagerLock mockLock;
 
   @Mock
   private OzoneManagerLock.Resource mockResource;
 
-  private MultiLocks<String> multiLocks;
+  private MultiSnapshotLocks multiSnapshotLocks;
+  private UUID obj1 = UUID.randomUUID();
+  private UUID obj2 = UUID.randomUUID();
 
   @BeforeEach
   void setUp() {
     // Initialize MultiLocks with mock dependencies
-    multiLocks = new MultiLocks<>(mockLock, mockResource, true);
+    multiSnapshotLocks = new MultiSnapshotLocks(mockLock, mockResource, true);
   }
 
   @Test
   void testAcquireLockSuccess() throws Exception {
-    List<String> objects = Arrays.asList("obj1", "obj2");
+    List<UUID> objects = Arrays.asList(obj1, obj2);
     OMLockDetails mockLockDetails = mock(OMLockDetails.class);
     when(mockLockDetails.isLockAcquired()).thenReturn(true);
 
     // Simulate successful lock acquisition for each object
-    when(mockLock.acquireWriteLock(any(), anyString())).thenReturn(mockLockDetails);
+    when(mockLock.acquireWriteLocks(eq(mockResource), anyList())).thenReturn(mockLockDetails);
 
-    OMLockDetails result = multiLocks.acquireLock(objects);
+    OMLockDetails result = multiSnapshotLocks.acquireLock(objects);
 
     assertEquals(mockLockDetails, result);
-    verify(mockLock, times(2)).acquireWriteLock(ArgumentMatchers.eq(mockResource), anyString());
+    verify(mockLock, times(1)).acquireWriteLocks(ArgumentMatchers.eq(mockResource), any());
   }
 
   @Test
   void testAcquireLockFailureReleasesAll() throws Exception {
-    List<String> objects = Arrays.asList("obj1", "obj2");
+
+    List<UUID> objects = Arrays.asList(obj1, obj2);
     OMLockDetails failedLockDetails = mock(OMLockDetails.class);
     when(failedLockDetails.isLockAcquired()).thenReturn(false);
 
     // Simulate failure during lock acquisition
-    when(mockLock.acquireWriteLock(mockResource, "obj1")).thenReturn(failedLockDetails);
+    when(mockLock.acquireWriteLocks(eq(mockResource), anyCollection())).thenReturn(failedLockDetails);
 
-    OMLockDetails result = multiLocks.acquireLock(objects);
+    OMLockDetails result = multiSnapshotLocks.acquireLock(objects);
 
     assertEquals(failedLockDetails, result);
-    verify(mockLock).acquireWriteLock(mockResource, "obj1");
-    verify(mockLock, never()).acquireWriteLock(mockResource, "obj2"); // No further lock attempt
-
-    // Verify releaseLock() behavior
-    verify(mockLock).releaseWriteLock(mockResource, "obj1");
+    assertTrue(multiSnapshotLocks.getObjectLocks().isEmpty());
   }
 
   @Test
   void testReleaseLock() throws Exception {
-    List<String> objects = Arrays.asList("obj1", "obj2");
+    List<UUID> objects = Arrays.asList(obj1, obj2);
     OMLockDetails mockLockDetails = mock(OMLockDetails.class);
     when(mockLockDetails.isLockAcquired()).thenReturn(true);
 
     // Acquire locks first
-    when(mockLock.acquireWriteLock(any(), anyString())).thenReturn(mockLockDetails);
-    multiLocks.acquireLock(objects);
+    when(mockLock.acquireWriteLocks(eq(mockResource), anyCollection())).thenReturn(mockLockDetails);
+    multiSnapshotLocks.acquireLock(objects);
+    assertFalse(multiSnapshotLocks.getObjectLocks().isEmpty());
 
     // Now release locks
-    multiLocks.releaseLock();
+    multiSnapshotLocks.releaseLock();
 
     // Verify that locks are released in order
-    verify(mockLock).releaseWriteLock(mockResource, "obj1");
-    verify(mockLock).releaseWriteLock(mockResource, "obj2");
+    verify(mockLock).releaseWriteLocks(eq(mockResource), any());
+    assertTrue(multiSnapshotLocks.getObjectLocks().isEmpty());
   }
 
   @Test
   void testAcquireLockWhenAlreadyAcquiredThrowsException() throws Exception {
-    List<String> objects = Collections.singletonList("obj1");
+    List<UUID> objects = Collections.singletonList(obj1);
     OMLockDetails mockLockDetails = mock(OMLockDetails.class);
     when(mockLockDetails.isLockAcquired()).thenReturn(true);
 
     // Acquire a lock first
-    when(mockLock.acquireWriteLock(any(), anyString())).thenReturn(mockLockDetails);
-    multiLocks.acquireLock(objects);
+    when(mockLock.acquireWriteLocks(any(), anyList())).thenReturn(mockLockDetails);
+    multiSnapshotLocks.acquireLock(objects);
 
     // Try acquiring locks again without releasing
-    OMException exception = assertThrows(OMException.class, () -> multiLocks.acquireLock(objects));
+    OMException exception = assertThrows(OMException.class, () -> multiSnapshotLocks.acquireLock(objects));
 
-    assertEquals("More locks cannot be acquired when locks have been already acquired. Locks acquired : [obj1]",
-        exception.getMessage());
+    assertEquals(
+        String.format("More locks cannot be acquired when locks have been already acquired. Locks acquired : [[%s]]",
+            obj1.toString()), exception.getMessage());
   }
 }

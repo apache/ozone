@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.om.lock;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Collection;
+import java.util.List;
 
 /**
  * Interface for OM Metadata locks.
@@ -27,8 +29,14 @@ public interface IOzoneManagerLock {
   OMLockDetails acquireReadLock(OzoneManagerLock.Resource resource,
                                 String... resources);
 
+  OMLockDetails acquireReadLocks(OzoneManagerLock.Resource resource, Collection<String[]> resources);
+
+
   OMLockDetails acquireWriteLock(OzoneManagerLock.Resource resource,
                                  String... resources);
+
+  OMLockDetails acquireWriteLocks(OzoneManagerLock.Resource resource,
+                                 Collection<String[]> resources);
 
   boolean acquireMultiUserLock(String firstUser, String secondUser);
 
@@ -37,8 +45,14 @@ public interface IOzoneManagerLock {
   OMLockDetails releaseWriteLock(OzoneManagerLock.Resource resource,
                         String... resources);
 
+  OMLockDetails releaseWriteLocks(OzoneManagerLock.Resource resource,
+                                 Collection<String[]> resources);
+
   OMLockDetails releaseReadLock(OzoneManagerLock.Resource resource,
                                 String... resources);
+
+  OMLockDetails releaseReadLocks(OzoneManagerLock.Resource resource,
+                                Collection<String[]> resources);
 
   @VisibleForTesting
   int getReadHoldCount(OzoneManagerLock.Resource resource,

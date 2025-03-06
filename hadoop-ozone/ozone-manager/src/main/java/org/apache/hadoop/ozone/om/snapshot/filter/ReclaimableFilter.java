@@ -34,8 +34,8 @@ import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
-import org.apache.hadoop.ozone.om.lock.MultiLocks;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
+import org.apache.hadoop.ozone.om.snapshot.MultiSnapshotLocks;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.util.CheckedExceptionOperation;
@@ -53,7 +53,7 @@ public abstract class ReclaimableFilter<V> implements CheckedExceptionOperation<
 
   private final List<SnapshotInfo> previousSnapshotInfos;
   private final List<ReferenceCounted<OmSnapshot>> previousOmSnapshots;
-  private final MultiLocks<UUID> snapshotIdLocks;
+  private final MultiSnapshotLocks snapshotIdLocks;
   private Long volumeId;
   private OmBucketInfo bucketInfo;
   private final OMMetadataManager metadataManager;
@@ -79,7 +79,7 @@ public abstract class ReclaimableFilter<V> implements CheckedExceptionOperation<
     this.omSnapshotManager = omSnapshotManager;
     this.currentSnapshotInfo = currentSnapshotInfo;
     this.snapshotChainManager = snapshotChainManager;
-    this.snapshotIdLocks = new MultiLocks<>(lock, OzoneManagerLock.Resource.SNAPSHOT_GC_LOCK, false);
+    this.snapshotIdLocks = new MultiSnapshotLocks(lock, OzoneManagerLock.Resource.SNAPSHOT_GC_LOCK, false);
     this.metadataManager = metadataManager;
     this.numberOfPreviousSnapshotsFromChain = numberOfPreviousSnapshotsFromChain;
     this.previousOmSnapshots = new ArrayList<>(numberOfPreviousSnapshotsFromChain);
@@ -217,4 +217,5 @@ public abstract class ReclaimableFilter<V> implements CheckedExceptionOperation<
   public SnapshotInfo getPreviousSnapshotInfo(int index) {
     return previousSnapshotInfos.get(index);
   }
+
 }
