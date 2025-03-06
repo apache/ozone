@@ -288,48 +288,6 @@ public class ReplicationManager extends StatefulService implements ContainerRepl
     }
   }
 
-  public void saveConfiguration(boolean isRunning)
-      throws IOException {
-    saveConfiguration(
-        ReplicationManagerConfigurationProto.newBuilder()
-            .setIsRunning(isRunning)
-            .build());
-  }
-
-  public boolean isRunning() {
-    try {
-      ReplicationManagerConfigurationProto proto =
-          readConfiguration(ReplicationManagerConfigurationProto.class);
-      if (proto == null) {
-        LOG.warn("Could not find persisted configuration for {} when checking" +
-            " if ReplicationManager is running. ReplicationManager should not " +
-            "run now.", this.getServiceName());
-        return false;
-      }
-      return proto.getIsRunning();
-    } catch (IOException e) {
-      LOG.warn("Could not read persisted configuration for checking if " +
-          "ReplicationManager is running. ReplicationManager should not run" +
-          " now.", e);
-      return false;
-    }
-  }
-
-  /**
-   * Returns true if the Replication Monitor Thread is running.
-   *
-   * @return true if running, false otherwise
-   */
-  public boolean canRun() {
-    if (!isRunning()) {
-      synchronized (this) {
-        return replicationMonitor != null
-            && replicationMonitor.isAlive();
-      }
-    }
-    return true;
-  }
-
   /**
    * Stops Replication Monitor thread.
    */
@@ -374,6 +332,48 @@ public class ReplicationManager extends StatefulService implements ContainerRepl
     overReplicatedProcessorThread.setName(prefix + "OverReplicatedProcessor");
     overReplicatedProcessorThread.setDaemon(true);
     overReplicatedProcessorThread.start();
+  }
+
+  public void saveConfiguration(boolean isRunning)
+      throws IOException {
+    saveConfiguration(
+        ReplicationManagerConfigurationProto.newBuilder()
+            .setIsRunning(isRunning)
+            .build());
+  }
+
+  public boolean isRunning() {
+    try {
+      ReplicationManagerConfigurationProto proto =
+          readConfiguration(ReplicationManagerConfigurationProto.class);
+      if (proto == null) {
+        LOG.warn("Could not find persisted configuration for {} when checking" +
+            " if ReplicationManager is running. ReplicationManager should not " +
+            "run now.", this.getServiceName());
+        return false;
+      }
+      return proto.getIsRunning();
+    } catch (IOException e) {
+      LOG.warn("Could not read persisted configuration for checking if " +
+          "ReplicationManager is running. ReplicationManager should not run" +
+          " now.", e);
+      return false;
+    }
+  }
+
+  /**
+   * Returns true if the Replication Monitor Thread is running.
+   *
+   * @return true if running, false otherwise
+   */
+  public boolean canRun() {
+    if (!isRunning()) {
+      synchronized (this) {
+        return replicationMonitor != null
+            && replicationMonitor.isAlive();
+      }
+    }
+    return true;
   }
 
   /**
