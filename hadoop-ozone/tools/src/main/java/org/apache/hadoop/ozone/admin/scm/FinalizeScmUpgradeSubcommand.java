@@ -39,8 +39,8 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import picocli.CommandLine;
 
 /**
@@ -132,7 +132,7 @@ public class FinalizeScmUpgradeSubcommand extends ScmSubcommand {
         Thread.sleep(500);
         // do not check for exceptions, if one happens during monitoring we
         // should report it and exit.
-        UpgradeFinalizer.StatusAndMessages progress =
+        UpgradeFinalization.StatusAndMessages progress =
             client.queryUpgradeFinalizationProgress(upgradeClientID, force,
                 false);
         // this can happen after trying to takeover the request after the fact

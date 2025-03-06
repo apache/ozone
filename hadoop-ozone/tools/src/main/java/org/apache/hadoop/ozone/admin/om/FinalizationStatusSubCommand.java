@@ -21,7 +21,7 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import picocli.CommandLine;
 
 /**
@@ -55,7 +55,7 @@ public class FinalizationStatusSubCommand implements Callable<Void> {
     OzoneManagerProtocol client =
         parent.createOmClient(omServiceId, omHost, false);
     String upgradeClientID = "Upgrade-Client-" + UUID.randomUUID().toString();
-    UpgradeFinalizer.StatusAndMessages progress =
+    UpgradeFinalization.StatusAndMessages progress =
         client.queryUpgradeFinalizationProgress(upgradeClientID, false, true);
     System.out.println(progress.status());
     return null;
