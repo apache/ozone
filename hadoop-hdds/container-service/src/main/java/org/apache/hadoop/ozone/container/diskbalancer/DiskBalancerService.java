@@ -480,7 +480,7 @@ public class DiskBalancerService extends BackgroundService {
         metrics.incrFailureCount();
       } finally {
         // Stop timing for successful move
-        if(moveSucceeded){
+        if (moveSucceeded) {
           long endTime = Time.monotonicNow();
           metrics.getMoveSuccessTime().add(endTime - startTime);
         }
