@@ -267,7 +267,8 @@ public class DiskBalancerManager {
             .setCurrentVolumeDensitySum(volumeDensitySum)
             .setRunningStatus(status.getRunningStatus())
             .setSuccessMoveCount(status.getSuccessMoveCount())
-            .setFailureMoveCount(status.getFailureMoveCount());
+            .setFailureMoveCount(status.getFailureMoveCount())
+            .setEstimatedTotalSizePendingToMove(status.getEstimatedTotalSizePendingToMove());
     if (status.getRunningStatus() != DiskBalancerRunningStatus.UNKNOWN) {
       builder.setDiskBalancerConf(statusMap.get(dn)
           .getDiskBalancerConfiguration().toProtobufBuilder());
@@ -306,13 +307,14 @@ public class DiskBalancerManager {
 
   private DiskBalancerStatus getStatus(DatanodeDetails datanodeDetails) {
     return statusMap.computeIfAbsent(datanodeDetails,
-        dn -> new DiskBalancerStatus(DiskBalancerRunningStatus.UNKNOWN, new DiskBalancerConfiguration(), 0, 0));
+        dn -> new DiskBalancerStatus(DiskBalancerRunningStatus.UNKNOWN,
+            new DiskBalancerConfiguration(), 0, 0, 0));
   }
 
   @VisibleForTesting
   public void addRunningDatanode(DatanodeDetails datanodeDetails) {
     statusMap.put(datanodeDetails, new DiskBalancerStatus(DiskBalancerRunningStatus.RUNNING,
-        new DiskBalancerConfiguration(), 0, 0));
+        new DiskBalancerConfiguration(), 0, 0, 0));
   }
 
   public void processDiskBalancerReport(DiskBalancerReportProto reportProto,
@@ -325,9 +327,10 @@ public class DiskBalancerManager {
             new DiskBalancerConfiguration();
     long successMoveCount = reportProto.getSuccessMoveCount();
     long failureMoveCount = reportProto.getFailureMoveCount();
+    long estimatedTotalSizePendingToMove = reportProto.getEstimatedTotalSizePendingToMove();
     statusMap.put(dn, new DiskBalancerStatus(
         isRunning ? DiskBalancerRunningStatus.RUNNING : DiskBalancerRunningStatus.STOPPED,
-        diskBalancerConfiguration, successMoveCount, failureMoveCount));
+        diskBalancerConfiguration, successMoveCount, failureMoveCount, estimatedTotalSizePendingToMove));
     if (reportProto.hasBalancedBytes()) {
       balancedBytesMap.put(dn, reportProto.getBalancedBytes());
     }

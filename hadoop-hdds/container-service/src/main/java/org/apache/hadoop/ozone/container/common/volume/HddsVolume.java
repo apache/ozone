@@ -157,6 +157,16 @@ public class HddsVolume extends StorageVolume {
     }
   }
 
+  public long getTotalCapacity() {
+    File volumeDir = getStorageDir();
+    return volumeDir.getTotalSpace();
+  }
+
+  public long getFreeSpace() {
+    File volumeDir = getStorageDir();
+    return volumeDir.getFreeSpace();
+  }
+
   @Override
   public void createTmpDirs(String workDirName) throws IOException {
     super.createTmpDirs(workDirName);
@@ -496,3 +506,4 @@ public class HddsVolume extends StorageVolume {
     }
   }
 }
+

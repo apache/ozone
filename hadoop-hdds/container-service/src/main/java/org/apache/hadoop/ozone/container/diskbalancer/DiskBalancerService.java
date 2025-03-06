@@ -505,8 +505,46 @@ public class DiskBalancerService extends BackgroundService {
 
   public DiskBalancerInfo getDiskBalancerInfo() {
     return new DiskBalancerInfo(shouldRun, threshold, bandwidthInMB,
-        parallelThread, version, metrics.getSuccessCount(), metrics.getFailureCount());
+        parallelThread, version, metrics.getSuccessCount(), metrics.getFailureCount(), estimatedTotalSizePendingToMove());
   }
+
+  private long estimatedTotalSizePendingToMove() {
+    long totalUsedSpace = 0;
+    int numVolumes = 0;
+
+    // Collect total used space across all data volumes
+    for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())) {
+        totalUsedSpace += (volume.getTotalCapacity() - volume.getFreeSpace());
+        numVolumes++;
+    }
+
+    if (numVolumes == 0) {
+      return 0; // Avoid division by zero
+    }
+    LOG.info("Number of data volumes {}.",
+        numVolumes);
+    LOG.info("Total used space across all data volumes {}.",
+        totalUsedSpace);
+    // Compute target usage per volume
+    long targetUsagePerVolume = totalUsedSpace / numVolumes;
+    LOG.info("Target usage per data volumes {}.",
+        targetUsagePerVolume);
+    long totalDataPendingToMove = 0;
+
+    // Calculate excess data in overused volumes
+    for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())) {
+        long usedSpace = (volume.getTotalCapacity() - volume.getFreeSpace());
+        long deviation = usedSpace - targetUsagePerVolume;
+        if (deviation > 0) {
+          totalDataPendingToMove += deviation;
+        }
+    }
+    LOG.info("Total data pending to move before disk" +
+        " usage becomes even {}.", totalDataPendingToMove);
+
+    return totalDataPendingToMove;
+  }
+
 
   private Path getDiskBalancerTmpDir(HddsVolume hddsVolume) {
     return Paths.get(hddsVolume.getVolumeRootDir())

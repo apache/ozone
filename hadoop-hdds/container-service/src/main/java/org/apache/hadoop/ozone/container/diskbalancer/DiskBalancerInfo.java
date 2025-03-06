@@ -34,6 +34,7 @@ public class DiskBalancerInfo {
   private DiskBalancerVersion version;
   private long successCount;
   private long failureCount;
+  private long totalDataPendingToMove;
 
   public DiskBalancerInfo(boolean shouldRun, double threshold,
       long bandwidthInMB, int parallelThread) {
@@ -52,7 +53,7 @@ public class DiskBalancerInfo {
 
   public DiskBalancerInfo(boolean shouldRun, double threshold,
       long bandwidthInMB, int parallelThread, DiskBalancerVersion version,
-      long successCount, long failureCount) {
+      long successCount, long failureCount, long totalDataPendingToMove) {
     this.shouldRun = shouldRun;
     this.threshold = threshold;
     this.bandwidthInMB = bandwidthInMB;
@@ -60,6 +61,7 @@ public class DiskBalancerInfo {
     this.version = version;
     this.successCount = successCount;
     this.failureCount = failureCount;
+    this.totalDataPendingToMove = totalDataPendingToMove;
   }
 
   public DiskBalancerInfo(boolean shouldRun,
@@ -94,6 +96,7 @@ public class DiskBalancerInfo {
     builder.setDiskBalancerConf(confProto);
     builder.setSuccessMoveCount(successCount);
     builder.setFailureMoveCount(failureCount);
+    builder.setEstimatedTotalSizePendingToMove(totalDataPendingToMove);
     return builder.build();
   }
 

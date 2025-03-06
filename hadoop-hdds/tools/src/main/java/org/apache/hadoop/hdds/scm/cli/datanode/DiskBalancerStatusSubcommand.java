@@ -60,7 +60,7 @@ public class DiskBalancerStatusSubcommand extends ScmSubcommand {
   private String generateStatus(
       List<HddsProtos.DatanodeDiskBalancerInfoProto> protos) {
     StringBuilder formatBuilder = new StringBuilder("Status result:%n" +
-        "%-40s %-20s %-10s %-10s %-15s %-15s %-15s %-15s%n");
+        "%-40s %-20s %-10s %-10s %-15s %-15s %-15s %-15s %-15s%n");
 
     List<String> contentList = new ArrayList<>();
     contentList.add("Datanode");
@@ -71,9 +71,12 @@ public class DiskBalancerStatusSubcommand extends ScmSubcommand {
     contentList.add("Threads");
     contentList.add("SuccessMove");
     contentList.add("FailureMove");
+    contentList.add("EstTimeLeft(min)");
 
     for (HddsProtos.DatanodeDiskBalancerInfoProto proto: protos) {
-      formatBuilder.append("%-40s %-20s %-10s %-10s %-15s %-15s %-15s %-15s%n");
+      formatBuilder.append("%-40s %-20s %-10s %-10s %-15s %-15s %-15s %-15s %-15s%n");
+      double estimatedTimeLeft = calculateEstimatedTimeLeft(proto);
+
       contentList.add(proto.getNode().getHostName());
       contentList.add(String.valueOf(proto.getCurrentVolumeDensitySum()));
       contentList.add(proto.getRunningStatus().name());
@@ -85,9 +88,20 @@ public class DiskBalancerStatusSubcommand extends ScmSubcommand {
           String.valueOf(proto.getDiskBalancerConf().getParallelThread()));
       contentList.add(String.valueOf(proto.getSuccessMoveCount()));
       contentList.add(String.valueOf(proto.getFailureMoveCount()));
+      contentList.add(estimatedTimeLeft >= 0 ? String.format("%.2f", estimatedTimeLeft) : "N/A");
     }
 
     return String.format(formatBuilder.toString(),
         contentList.toArray(new String[0]));
+  }
+
+  private double calculateEstimatedTimeLeft(HddsProtos.DatanodeDiskBalancerInfoProto proto) {
+    long estimatedDataPendingToMove = proto.getEstimatedTotalSizePendingToMove();
+    double bandwidth = proto.getDiskBalancerConf().getDiskBandwidthInMB();
+
+    // Convert estimated data from bytes to MB
+    double estimatedDataPendingMB = estimatedDataPendingToMove / (1024.0 * 1024.0);
+    double estimatedTimeLeft = (bandwidth > 0) ? (estimatedDataPendingMB / bandwidth) / 60 : -1;
+    return estimatedTimeLeft;
   }
 }
