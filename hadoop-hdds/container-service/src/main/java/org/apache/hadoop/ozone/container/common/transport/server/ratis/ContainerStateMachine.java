@@ -363,10 +363,14 @@ public class ContainerStateMachine extends BaseStateMachine {
     return stateMachineHealthy.get();
   }
 
-  private void checkContainerHealthy(long containerId, boolean skipContainerUnhealthyCheck) throws StorageContainerException {
-    if (!isStateMachineHealthy() && (skipContainerUnhealthyCheck || unhealthyContainers.contains(containerId))) {
+  private void checkContainerHealthy(long containerId, boolean skipContainerUnhealthyCheck)
+      throws StorageContainerException {
+    if (!isStateMachineHealthy() && unhealthyContainers.contains(containerId)) {
       throw new StorageContainerException(String.format("Prev writes to container %d failed, stopping all writes to " +
               "container", containerId), ContainerProtos.Result.CONTAINER_UNHEALTHY);
+    } else if (!isStateMachineHealthy() && skipContainerUnhealthyCheck) {
+      throw new StorageContainerException(String.format("Prev writes to containers %s failed, stopping all writes to " +
+          "container", unhealthyContainers.toString()), ContainerProtos.Result.CONTAINER_UNHEALTHY);
     }
   }
 
