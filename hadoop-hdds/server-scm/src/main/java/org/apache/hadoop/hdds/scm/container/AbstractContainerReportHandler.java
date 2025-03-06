@@ -245,7 +245,7 @@ public class AbstractContainerReportHandler {
 
     final ContainerID containerId = container.containerID();
     boolean ignored = false;
-
+    boolean replicaIsEmpty = replica.hasIsEmpty() && replica.getIsEmpty();
     switch (container.getState()) {
     case OPEN:
       /*
@@ -351,8 +351,14 @@ public class AbstractContainerReportHandler {
        * The container is already in closed state. do nothing.
        */
       break;
-    case DELETING:
     case DELETED:
+      // If container is in DELETED state and the reported replica is empty, delete the empty replica.
+      // We should also do this for DELETING containers and currently DeletingContainerHandler does that
+      if (replicaIsEmpty) {
+        deleteReplica(containerId, datanode, publisher, "DELETED", false);
+        break;
+      }
+    case DELETING:
       /*
        * HDDS-11136: If a DELETING container has a non-empty CLOSED replica, the container should be moved back to
        * CLOSED state.
@@ -360,15 +366,6 @@ public class AbstractContainerReportHandler {
        * HDDS-12421: If a DELETING or DELETED container has a non-empty replica, the container should also be moved
        * back to CLOSED state.
        */
-      boolean replicaIsEmpty = replica.hasIsEmpty() && replica.getIsEmpty();
-      // If container is in DELETED state and the reported replica is empty, delete the empty replica.
-      // We should also do this for DELETING containers and currently DeletingContainerHandler does that
-      if (container.getState() == HddsProtos.LifeCycleState.DELETED && replicaIsEmpty) {
-        deleteReplica(containerId, datanode, publisher, "DELETED", false);
-        ignored = true;
-        break;
-      }
-
       boolean replicaStateAllowed = (replica.getState() != State.INVALID && replica.getState() != State.DELETED);
       if (!replicaIsEmpty && replicaStateAllowed) {
         logger.info("Moving container {} from {} to CLOSED state, datanode {} reported replica with state={}, " +
