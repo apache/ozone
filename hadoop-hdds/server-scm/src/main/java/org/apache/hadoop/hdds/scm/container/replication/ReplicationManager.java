@@ -361,11 +361,6 @@ public class ReplicationManager extends StatefulService implements ContainerRepl
     }
   }
 
-  /**
-   * Returns true if the Replication Monitor Thread is running.
-   *
-   * @return true if running, false otherwise
-   */
   public boolean canRun() {
     if (!isRunning()) {
       synchronized (this) {
