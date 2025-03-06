@@ -62,7 +62,7 @@ public class DatanodeVersionFile {
    */
   public void createVersionFile(File path) throws
       IOException {
-    IOUtils.writePropertiesToFile(path.toPath(), createProperties());
+    IOUtils.writePropertiesToFile(path, createProperties());
   }
 
   /**
@@ -72,6 +72,6 @@ public class DatanodeVersionFile {
    * @throws IOException
    */
   public static Properties readFrom(File versionFile) throws IOException {
-    return IOUtils.readPropertiesFromFile(versionFile.toPath());
+    return IOUtils.readPropertiesFromFile(versionFile);
   }
 }

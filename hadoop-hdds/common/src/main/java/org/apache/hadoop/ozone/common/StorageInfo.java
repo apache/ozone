@@ -190,11 +190,11 @@ public class StorageInfo {
 
   public void writeTo(File to)
       throws IOException {
-    IOUtils.writePropertiesToFile(to.toPath(), properties);
+    IOUtils.writePropertiesToFile(to, properties);
   }
 
   private Properties readFrom(File from) throws IOException {
-    return IOUtils.readPropertiesFromFile(from.toPath());
+    return IOUtils.readPropertiesFromFile(from);
   }
 
   /**

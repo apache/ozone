@@ -17,17 +17,16 @@
 
 package org.apache.hadoop.hdds.utils;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-
 import jakarta.annotation.Nonnull;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.StringWriter;
+import java.io.OutputStream;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Properties;
+import org.apache.ratis.util.AtomicFileOutputStream;
 import org.slf4j.Logger;
 
 /**
@@ -106,16 +105,16 @@ public final class IOUtils {
   }
 
   /** Write {@code properties} to the file at {@code path}, truncating any existing content. */
-  public static void writePropertiesToFile(Path path, Properties properties) throws IOException {
-    StringWriter out = new StringWriter();
-    properties.store(out, null);
-    Files.write(path, out.toString().getBytes(UTF_8));
+  public static void writePropertiesToFile(File file, Properties properties) throws IOException {
+    try (OutputStream out = new AtomicFileOutputStream(file)) {
+      properties.store(out, null);
+    }
   }
 
   /** Read {@link Properties} from the file at {@code path}. */
-  public static @Nonnull Properties readPropertiesFromFile(Path path) throws IOException {
+  public static @Nonnull Properties readPropertiesFromFile(File file) throws IOException {
     Properties props = new Properties();
-    try (InputStream in = Files.newInputStream(path)) {
+    try (InputStream in = Files.newInputStream(file.toPath())) {
       props.load(in);
     }
     return props;
