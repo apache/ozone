@@ -34,8 +34,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -377,8 +375,7 @@ public abstract class TestListKeys implements NonHATests.TestCase {
     byte[] input = new byte[length];
     Arrays.fill(input, (byte) 96);
     for (String key : keys) {
-      createKey(ozoneBucket, key,
-          ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.THREE), input);
+      createKey(ozoneBucket, key, null, input);
       // Read the key with given key name.
       readkey(ozoneBucket, key, length, input);
     }

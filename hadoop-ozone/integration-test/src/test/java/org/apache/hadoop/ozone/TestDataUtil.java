@@ -32,8 +32,6 @@ import java.util.Map;
 import java.util.Scanner;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -106,18 +104,23 @@ public final class TestDataUtil {
 
   public static void createKey(OzoneBucket bucket, String keyName,
                                byte[] content) throws IOException {
-    ReplicationConfig replicationConfig = ReplicationConfig.
-        fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE);
-    createKey(bucket, keyName, replicationConfig, content);
+    createKey(bucket, keyName, null, content);
 
+  }
+
+  public static OutputStream createOutputStream(OzoneBucket bucket, String keyName,
+                                                ReplicationConfig repConfig, byte[] content)
+      throws IOException {
+    return repConfig == null
+        ? bucket.createKey(keyName, content.length)
+        : bucket.createKey(keyName, content.length, repConfig, new HashMap<>());
   }
 
   public static void createKey(OzoneBucket bucket, String keyName,
                                ReplicationConfig repConfig, byte[] content)
       throws IOException {
-    try (OutputStream stream = bucket
-        .createKey(keyName, content.length, repConfig,
-            new HashMap<>())) {
+    try (OutputStream stream = createOutputStream(bucket, keyName,
+        repConfig, content)) {
       stream.write(content);
     }
   }
