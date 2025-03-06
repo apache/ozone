@@ -71,7 +71,7 @@ import org.junit.jupiter.api.Timeout;
 public class TestContainerStateMachine {
 
   private MiniOzoneCluster cluster;
-  private OzoneConfiguration conf = new OzoneConfiguration();
+  private final OzoneConfiguration conf = new OzoneConfiguration();
   private OzoneClient client;
   private ObjectStore objectStore;
   private String volumeName;
@@ -84,7 +84,6 @@ public class TestContainerStateMachine {
    */
   @BeforeEach
   public void setup() throws Exception {
-
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 200, TimeUnit.MILLISECONDS);
     conf.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);

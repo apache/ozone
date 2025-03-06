@@ -1,3 +1,20 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -67,16 +84,14 @@ import org.junit.jupiter.params.provider.ValueSource;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 abstract class TestContainerStateMachine {
   private ContainerDispatcher dispatcher;
-  private static XceiverServerRatis ratisServer;
-  private static ContainerController controller;
-  private OzoneConfiguration conf = new OzoneConfiguration();
+  private final OzoneConfiguration conf = new OzoneConfiguration();
   private ContainerStateMachine stateMachine;
-  private List<ThreadPoolExecutor> executor = IntStream.range(0, 2).mapToObj(i -> new ThreadPoolExecutor(1, 1,
+  private final List<ThreadPoolExecutor> executor = IntStream.range(0, 2).mapToObj(i -> new ThreadPoolExecutor(1, 1,
       0, TimeUnit.SECONDS, new LinkedBlockingQueue<>(), new ThreadFactoryBuilder()
       .setDaemon(true)
       .setNameFormat("ChunkWriter-" + i + "-%d")
       .build())).collect(Collectors.toList());
-  private boolean isLeader;
+  private final boolean isLeader;
 
   TestContainerStateMachine(boolean isLeader) {
     this.isLeader = isLeader;
@@ -85,8 +100,8 @@ abstract class TestContainerStateMachine {
   @BeforeEach
   public void setup() throws IOException {
     dispatcher = mock(ContainerDispatcher.class);
-    controller = mock(ContainerController.class);
-    ratisServer = mock(XceiverServerRatis.class);
+    ContainerController controller = mock(ContainerController.class);
+    XceiverServerRatis ratisServer = mock(XceiverServerRatis.class);
     RaftServer raftServer = mock(RaftServer.class);
     RaftServer.Division division = mock(RaftServer.Division.class);
     RaftGroup raftGroup = mock(RaftGroup.class);
