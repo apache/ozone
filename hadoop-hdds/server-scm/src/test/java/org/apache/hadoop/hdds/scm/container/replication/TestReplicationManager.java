@@ -130,6 +130,7 @@ public class TestReplicationManager {
   private ReplicationManagerReport repReport;
   private ReplicationQueue repQueue;
   private Set<Pair<UUID, SCMCommand<?>>> commandsSent;
+  private Map<String, ByteString> serviceToConfigMap = new HashMap<>();
 
   @BeforeEach
   public void setup() throws IOException {
@@ -186,8 +187,19 @@ public class TestReplicationManager {
     StorageContainerManager scm = mock(StorageContainerManager.class);
     when(scm.getPipelineManager()).thenReturn(pipelineManager);
     when(scm.getContainerTokenGenerator()).thenReturn(ContainerTokenGenerator.DISABLED);
-
+    when(scm.getStatefulServiceStateManager()).thenReturn(serviceStateManager);
     when(scmContext.getScm()).thenReturn(scm);
+    doAnswer(i -> {
+      serviceToConfigMap.put(i.getArgument(0, String.class), i.getArgument(1,
+          ByteString.class));
+      return null;
+    }).when(serviceStateManager).saveConfiguration(
+        any(String.class),
+        any(ByteString.class));
+    
+    when(serviceStateManager.readConfiguration(anyString())).thenAnswer(
+        i -> serviceToConfigMap.get(i.getArgument(0, String.class)));
+
   }
 
   @AfterEach
@@ -195,6 +207,19 @@ public class TestReplicationManager {
     if (replicationManager.getMetrics() != null) {
       replicationManager.getMetrics().unRegister();
     }
+  }
+
+  private ReplicationManager createDefaultReplicationManager() throws IOException {
+    return new ReplicationManager(
+        configuration,
+        containerManager,
+        ratisPlacementPolicy,
+        ecPlacementPolicy,
+        eventPublisher,
+        scmContext,
+        nodeManager,
+        clock,
+        containerReplicaPendingOps);
   }
 
   private ReplicationManager createReplicationManager() throws IOException {
@@ -219,6 +244,39 @@ public class TestReplicationManager {
     SCMServiceManager serviceManager = new SCMServiceManager();
     serviceManager.register(replicationManager);
     serviceManager.notifyStatusChanged();
+  }
+
+  @Test
+  public void testIsRunning() {
+    // replicationManager has started in the constructor
+    assertTrue(replicationManager.isRunning());
+
+    try {
+      replicationManager.saveConfiguration(false);
+    } catch (IOException e) {
+      fail("Should not throw IOException");
+    }
+    assertFalse(replicationManager.isRunning());
+
+    try {
+      replicationManager.saveConfiguration(true);
+    } catch (IOException e) {
+      fail("Should not throw IOException");
+    }
+    assertTrue(replicationManager.isRunning());
+  }
+
+  @Test
+  public void testStartStop() throws IOException {
+    serviceToConfigMap.clear();
+    ReplicationManager replicationManager = createDefaultReplicationManager();
+    assertTrue(replicationManager.isRunning());
+
+    replicationManager.stop();
+    assertFalse(replicationManager.isRunning());
+
+    replicationManager.start();
+    assertTrue(replicationManager.isRunning());
   }
 
   @Test
