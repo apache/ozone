@@ -143,8 +143,8 @@ public final class DiskBalancerServiceMetrics {
     buffer.append("successCount = " + successCount.value()).append("\t")
         .append("successBytes = " + successBytes.value()).append("\t")
         .append("failureCount = " + failureCount.value()).append("\t")
-        .append("moveSuccessTime = ").append(moveSuccessTime.lastStat().mean()).append("\t")
-        .append("moveFailureTime = ").append(moveFailureTime.lastStat().mean()).append("\t")
+        .append("moveSuccessTime = " + moveSuccessTime.lastStat().mean()).append("\t")
+        .append("moveFailureTime = " + moveFailureTime.lastStat().mean()).append("\t")
         .append("idleLoopNoAvailableVolumePairCount = " +
             idleLoopNoAvailableVolumePairCount.value()).append("\t")
         .append("idleLoopExceedsBandwidthCount = " +
