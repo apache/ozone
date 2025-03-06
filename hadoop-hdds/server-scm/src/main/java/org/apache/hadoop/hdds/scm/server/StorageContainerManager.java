@@ -803,6 +803,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     } else {
       scmBlockManager = new BlockManagerImpl(conf, scmConfig, this);
     }
+
+    statefulServiceStateManager = StatefulServiceStateManagerImpl.newBuilder()
+        .setStatefulServiceConfig(
+            scmMetadataStore.getStatefulServiceConfigTable())
+        .setSCMDBTransactionBuffer(scmHAManager.getDBTransactionBuffer())
+        .setRatisServer(scmHAManager.getRatisServer())
+        .build();
+
     if (configurator.getReplicationManager() != null) {
       replicationManager = configurator.getReplicationManager();
     }  else {
@@ -832,13 +840,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager, containerManager,
         scmContext, eventQueue, replicationManager);
-
-    statefulServiceStateManager = StatefulServiceStateManagerImpl.newBuilder()
-        .setStatefulServiceConfig(
-            scmMetadataStore.getStatefulServiceConfigTable())
-        .setSCMDBTransactionBuffer(scmHAManager.getDBTransactionBuffer())
-        .setRatisServer(scmHAManager.getRatisServer())
-        .build();
   }
 
   /**
