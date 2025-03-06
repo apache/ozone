@@ -34,12 +34,12 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.NotImplementedException;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -219,8 +219,7 @@ public class TestECKeyOutputStream {
       List<OmKeyLocationInfo> locationInfoList = groupOutputStream.getLocationInfoList();
       while (locationInfoList.isEmpty()) {
         locationInfoList = groupOutputStream.getLocationInfoList();
-        Random random = new Random();
-        random.nextBytes(b);
+        b = RandomUtils.secure().randomBytes(b.length);
         assertInstanceOf(ECKeyOutputStream.class, key.getOutputStream());
         key.write(b);
         key.flush();
@@ -247,8 +246,7 @@ public class TestECKeyOutputStream {
       locationInfoList = groupOutputStream.getLocationInfoList();
       while (locationInfoList.size() == 1) {
         locationInfoList = groupOutputStream.getLocationInfoList();
-        Random random = new Random();
-        random.nextBytes(b);
+        b = RandomUtils.secure().randomBytes(b.length);
         assertInstanceOf(ECKeyOutputStream.class, key.getOutputStream());
         key.write(b);
         key.flush();

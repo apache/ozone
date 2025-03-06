@@ -107,6 +107,7 @@ public abstract class AbstractContractDistCpTest
    * are allowed to take time, especially to remote stores.
    * @return the current test timeout
    */
+  @Override
   protected int getTestTimeoutMillis() {
     return 15  * 60 * 1000;
   }
@@ -148,8 +149,6 @@ public abstract class AbstractContractDistCpTest
   private Path outputFile3;
 
   private Path outputFile4;
-
-  private Path outputFile5;
 
   private Path inputDirUnderOutputDir;
 
@@ -217,7 +216,6 @@ public abstract class AbstractContractDistCpTest
     outputFile3 = new Path(outputSubDir2, "file3");
     outputSubDir4 = new Path(inputDirUnderOutputDir, "subDir4/subDir4");
     outputFile4 = new Path(outputSubDir4, "file4");
-    outputFile5 = new Path(outputSubDir4, "file5");
   }
 
   /**

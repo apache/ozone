@@ -142,7 +142,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
 
       LOG.debug("Tenant '{}' has volume '{}'", tenantId, volumeName);
       // decVolumeRefCount is true if volumeName is not empty string
-      decVolumeRefCount = volumeName.length() > 0;
+      decVolumeRefCount = !volumeName.isEmpty();
 
       // Acquire the volume lock
       mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(

@@ -304,18 +304,10 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
       ROOT_PATH + VOL + ROOT_PATH + BUCKET_ONE + ROOT_PATH + KEY_ONE;
   private static final String KEY_TWO_PATH =
       ROOT_PATH + VOL + ROOT_PATH + BUCKET_ONE + ROOT_PATH + KEY_TWO;
-  private static final String KEY_THREE_PATH =
-      ROOT_PATH + VOL + ROOT_PATH + BUCKET_ONE + ROOT_PATH + KEY_THREE;
-  private static final String KEY_FOUR_PATH =
-      ROOT_PATH + VOL + ROOT_PATH + BUCKET_TWO + ROOT_PATH + KEY_FOUR;
   private static final String KEY_FIVE_PATH =
       ROOT_PATH + VOL + ROOT_PATH + BUCKET_TWO + ROOT_PATH + KEY_FIVE;
   private static final String KEY_EIGHT_PATH =
       ROOT_PATH + VOL_TWO + ROOT_PATH + BUCKET_THREE + ROOT_PATH + KEY_EIGHT;
-  private static final String KEY_NINE_PATH =
-      ROOT_PATH + VOL_TWO + ROOT_PATH + BUCKET_THREE + ROOT_PATH + KEY_NINE;
-  private static final String KEY_TEN_PATH =
-      ROOT_PATH + VOL_TWO + ROOT_PATH + BUCKET_THREE + ROOT_PATH + KEY_TEN;
   private static final String KEY_ELEVEN_PATH =
       ROOT_PATH + VOL_TWO + ROOT_PATH + BUCKET_FOUR + ROOT_PATH + KEY_ELEVEN;
   private static final String KEY4_PATH =
@@ -382,11 +374,11 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
     populateOMDB();
     NSSummaryTaskWithOBS nsSummaryTaskWithOBS =
         new NSSummaryTaskWithOBS(reconNamespaceSummaryManager,
-            reconOMMetadataManager, conf);
+            reconOMMetadataManager, 10);
     nsSummaryTaskWithOBS.reprocessWithOBS(reconOMMetadataManager);
     NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy =
         new NSSummaryTaskWithLegacy(reconNamespaceSummaryManager,
-            reconOMMetadataManager, conf);
+            reconOMMetadataManager, conf, 10);
     nsSummaryTaskWithLegacy.reprocessWithLegacy(reconOMMetadataManager);
     commonUtils = new CommonUtils();
   }

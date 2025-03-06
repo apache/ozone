@@ -30,7 +30,7 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Random;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -96,9 +96,8 @@ class TestKeyInputStream extends TestInputStreamBase {
   private void randomPositionSeek(TestBucket bucket, int dataLength,
       KeyInputStream keyInputStream,
       byte[] inputData, int readSize) throws Exception {
-    Random rand = new Random();
     for (int i = 0; i < 100; i++) {
-      int position = rand.nextInt(dataLength - readSize);
+      int position = RandomUtils.secure().randomInt(0, dataLength - readSize);
       validate(bucket, keyInputStream, inputData, position, readSize);
     }
   }

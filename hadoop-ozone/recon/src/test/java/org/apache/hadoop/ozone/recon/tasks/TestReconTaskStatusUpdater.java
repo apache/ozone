@@ -31,8 +31,8 @@ import static org.mockito.Mockito.when;
 
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
-import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
+import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
+import org.apache.ozone.recon.schema.generated.tables.pojos.ReconTaskStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

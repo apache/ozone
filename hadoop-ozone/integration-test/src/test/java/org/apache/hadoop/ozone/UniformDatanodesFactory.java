@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone;
 
-import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
@@ -96,7 +95,6 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
     }
     String reservedSpaceString = String.join(",", reservedSpaceList);
     String listOfDirs = String.join(",", dataDirs);
-    dnConf.set(DFS_DATANODE_DATA_DIR_KEY, listOfDirs);
     dnConf.set(HDDS_DATANODE_DIR_KEY, listOfDirs);
     dnConf.set(HDDS_DATANODE_DIR_DU_RESERVED, reservedSpaceString);
 

@@ -469,6 +469,7 @@ public class ContainerOperationClient implements ScmClient {
     return storageContainerLocationClient.getSafeModeRuleStatuses();
   }
 
+  @Override
   public boolean forceExitSafeMode() throws IOException {
     return storageContainerLocationClient.forceExitSafeMode();
   }
@@ -531,13 +532,8 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public List<String> getScmRatisRoles() throws IOException {
-    return storageContainerLocationClient.getScmInfo().getRatisPeerRoles();
-  }
-
-  @Override
-  public boolean isScmRatisEnable() throws IOException {
-    return storageContainerLocationClient.getScmInfo().getScmRatisEnabled();
+  public List<String> getScmRoles() throws IOException {
+    return storageContainerLocationClient.getScmInfo().getPeerRoles();
   }
 
   @Override

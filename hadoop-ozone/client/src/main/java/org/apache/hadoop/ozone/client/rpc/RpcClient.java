@@ -520,6 +520,7 @@ public class RpcClient implements ClientProtocol {
     }
   }
 
+  @Override
   public OzoneVolume buildOzoneVolume(OmVolumeArgs volume) {
     return OzoneVolume.newBuilder(conf, this)
         .setName(volume.getVolume())
@@ -826,6 +827,7 @@ public class RpcClient implements ClientProtocol {
   /**
    * {@inheritDoc}
    */
+  @Override
   public S3SecretValue setS3Secret(String accessId, String secretKey)
           throws IOException {
     Preconditions.checkArgument(StringUtils.isNotBlank(accessId),
@@ -1003,6 +1005,7 @@ public class RpcClient implements ClientProtocol {
    * @return snapshot info for volume/bucket snapshot path.
    * @throws IOException
    */
+  @Override
   public OzoneSnapshot getSnapshotInfo(String volumeName,
                                        String bucketName,
                                        String snapshotName) throws IOException {
@@ -2124,10 +2127,16 @@ public class RpcClient implements ClientProtocol {
 
   @Override
   public OzoneMultipartUploadList listMultipartUploads(String volumeName,
-      String bucketName, String prefix) throws IOException {
+      String bucketName, String prefix, String keyMarker, String uploadIdMarker, int maxUploads) throws IOException {
 
-    OmMultipartUploadList omMultipartUploadList =
-        ozoneManagerClient.listMultipartUploads(volumeName, bucketName, prefix);
+    OmMultipartUploadList omMultipartUploadList;
+    if (omVersion.compareTo(OzoneManagerVersion.S3_LIST_MULTIPART_UPLOADS_PAGINATION) >= 0) {
+      omMultipartUploadList = ozoneManagerClient.listMultipartUploads(volumeName, bucketName, prefix, keyMarker,
+          uploadIdMarker, maxUploads, true);
+    } else {
+      omMultipartUploadList = ozoneManagerClient.listMultipartUploads(volumeName, bucketName, prefix, keyMarker,
+          uploadIdMarker, maxUploads, false);
+    }
     List<OzoneMultipartUpload> uploads = omMultipartUploadList.getUploads()
         .stream()
         .map(upload -> new OzoneMultipartUpload(upload.getVolumeName(),
@@ -2137,7 +2146,10 @@ public class RpcClient implements ClientProtocol {
             upload.getCreationTime(),
             upload.getReplicationConfig()))
         .collect(Collectors.toList());
-    OzoneMultipartUploadList result = new OzoneMultipartUploadList(uploads);
+    OzoneMultipartUploadList result = new OzoneMultipartUploadList(uploads,
+        omMultipartUploadList.getNextKeyMarker(),
+        omMultipartUploadList.getNextUploadIdMarker(),
+        omMultipartUploadList.isTruncated());
     return result;
   }
 

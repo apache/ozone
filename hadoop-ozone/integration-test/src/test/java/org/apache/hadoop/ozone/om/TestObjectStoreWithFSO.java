@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
+import static org.apache.hadoop.ozone.TestDataUtil.createKey;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -397,7 +398,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
     byte[] input = new byte[length];
     Arrays.fill(input, (byte)96);
 
-    createKeys(ozoneBucket, keys);
+    createAndAssertKeys(ozoneBucket, keys);
 
     // Root level listing keys
     Iterator<? extends OzoneKey> ozoneKeyIterator =
@@ -511,16 +512,9 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
     keys.add(OmUtils.normalizeKey(key2, false));
     keys.add(OmUtils.normalizeKey(key3, false));
 
-    int length = 10;
-    byte[] input = new byte[length];
-    Arrays.fill(input, (byte)96);
-
-    createKey(ozoneBucket, key1, 10, input);
-    createKey(ozoneBucket, key2, 10, input);
-    createKey(ozoneBucket, key3, 10, input);
+    createAndAssertKeys(ozoneBucket, Arrays.asList(key1, key2, key3));
 
     // Iterator with key name as prefix.
-
     Iterator<? extends OzoneKey> ozoneKeyIterator =
             ozoneBucket.listKeys("/dir1//", null);
 
@@ -562,27 +556,23 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
     assertEquals(keys, outputKeys);
   }
 
-  private void createKeys(OzoneBucket ozoneBucket, List<String> keys)
+  private void createAndAssertKeys(OzoneBucket ozoneBucket, List<String> keys)
       throws Exception {
+
     int length = 10;
     byte[] input = new byte[length];
     Arrays.fill(input, (byte) 96);
+
     for (String key : keys) {
-      createKey(ozoneBucket, key, 10, input);
+      createKey(ozoneBucket, key, input);
+      // Read the key with given key name.
+      readKey(ozoneBucket, key, length, input);
     }
   }
 
-  private void createKey(OzoneBucket ozoneBucket, String key, int length,
-      byte[] input) throws Exception {
+  private void readKey(OzoneBucket ozoneBucket, String key, int length, byte[] input)
+      throws Exception {
 
-    OzoneOutputStream ozoneOutputStream =
-            ozoneBucket.createKey(key, length);
-
-    ozoneOutputStream.write(input);
-    ozoneOutputStream.write(input, 0, 10);
-    ozoneOutputStream.close();
-
-    // Read the key with given key name.
     OzoneInputStream ozoneInputStream = ozoneBucket.readKey(key);
     byte[] read = new byte[length];
     ozoneInputStream.read(read, 0, length);
@@ -593,9 +583,9 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
 
     // Read using filesystem.
     String rootPath = String.format("%s://%s.%s/", OZONE_URI_SCHEME,
-            bucketName, volumeName, StandardCharsets.UTF_8);
+        bucketName, volumeName, StandardCharsets.UTF_8);
     OzoneFileSystem o3fs = (OzoneFileSystem) FileSystem.get(new URI(rootPath),
-            conf);
+        conf);
     FSDataInputStream fsDataInputStream = o3fs.open(new Path(key));
     read = new byte[length];
     fsDataInputStream.read(read, 0, length);
@@ -757,10 +747,9 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
     String[] pathComponents = StringUtils.split(parentKey, '/');
     long parentId = bucketId;
     OmDirectoryInfo dirInfo = null;
-    for (int indx = 0; indx < pathComponents.length; indx++) {
-      String pathElement = pathComponents[indx];
-      String dbKey = omMetadataManager.getOzonePathKey(volumeId,
-              bucketId, parentId, pathElement);
+
+    for (String pathElement : pathComponents) {
+      String dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId, parentId, pathElement);
       dirInfo = omMetadataManager.getDirectoryTable().get(dbKey);
       parentId = dirInfo.getObjectID();
     }

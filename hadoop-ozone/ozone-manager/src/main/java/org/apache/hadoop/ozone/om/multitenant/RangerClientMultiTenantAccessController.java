@@ -35,7 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -70,7 +70,7 @@ public class RangerClientMultiTenantAccessController implements
   // execUser for Ranger
   private final String shortName;
 
-  public RangerClientMultiTenantAccessController(OzoneConfiguration conf)
+  public RangerClientMultiTenantAccessController(ConfigurationSource conf)
       throws IOException {
 
     aclToString = MultiTenantAccessController.getRangerAclStrings();

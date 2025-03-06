@@ -102,6 +102,7 @@ public final class DBStoreBuilder {
   private final DBProfile defaultCfProfile;
   private boolean enableCompactionDag;
   private boolean createCheckpointDirs = true;
+  private boolean enableRocksDbMetrics = true;
   // this is to track the total size of dbUpdates data since sequence
   // number in request to avoid increase in heap memory.
   private long maxDbUpdatesSizeThreshold;
@@ -232,7 +233,7 @@ public final class DBStoreBuilder {
       return new RDBStore(dbFile, rocksDBOption, statistics, writeOptions, tableConfigs,
           registry.build(), openReadOnly, maxFSSnapshots, dbJmxBeanNameName,
           enableCompactionDag, maxDbUpdatesSizeThreshold, createCheckpointDirs,
-          configuration, threadNamePrefix);
+          configuration, threadNamePrefix, enableRocksDbMetrics);
     } finally {
       tableConfigs.forEach(TableConfig::close);
     }
@@ -300,6 +301,11 @@ public final class DBStoreBuilder {
 
   public DBStoreBuilder setCreateCheckpointDirs(boolean createCheckpointDirs) {
     this.createCheckpointDirs = createCheckpointDirs;
+    return this;
+  }
+
+  public DBStoreBuilder setEnableRocksDbMetrics(boolean enableRocksDbMetrics) {
+    this.enableRocksDbMetrics = enableRocksDbMetrics;
     return this;
   }
   /**
@@ -444,7 +450,7 @@ public final class DBStoreBuilder {
         columnFamilyDescriptors.add(tc.getDescriptor());
       }
 
-      if (columnFamilyDescriptors.size() > 0) {
+      if (!columnFamilyDescriptors.isEmpty()) {
         try {
           option = DBConfigFromFile.readFromFile(dbname,
               columnFamilyDescriptors);

@@ -52,13 +52,13 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.slf4j.Logger;
@@ -145,23 +145,6 @@ public class SCMHANodeDetails {
     return new SCMHANodeDetails(scmNodeDetails, Collections.emptyList());
   }
 
-  /** Validates SCM HA Config.
-   For Non Initialized SCM the value is true.
-   For Previously Initialized SCM the values are taken from the version file
-   <br>
-   Ratis SCM -> Non Ratis SCM is not supported.
-   This value is validated with the config provided.
-  **/
-  private static void validateSCMHAConfig(SCMStorageConfig scmStorageConfig,
-                                          OzoneConfiguration conf) {
-    Storage.StorageState state = scmStorageConfig.getState();
-    boolean scmHAEnableDefault = state == Storage.StorageState.INITIALIZED
-        ? scmStorageConfig.isSCMHAEnabled()
-        : SCMHAUtils.isSCMHAEnabled(conf);
-    // If we have an initialized cluster, use the value from VERSION file.
-    SCMHAUtils.setRatisEnabled(scmHAEnableDefault);
-  }
-
   public static SCMHANodeDetails loadSCMHAConfig(OzoneConfiguration conf,
                                                  SCMStorageConfig storageConfig)
       throws IOException {
@@ -177,7 +160,6 @@ public class SCMHANodeDetails {
         ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID);
 
     LOG.info("ServiceID for StorageContainerManager is {}", localScmServiceId);
-    validateSCMHAConfig(storageConfig, conf);
     if (localScmServiceId == null) {
       // There is no internal scm service id is being set, fall back to ozone
       // .scm.service.ids.
@@ -197,11 +179,11 @@ public class SCMHANodeDetails {
     boolean isSCMddressSet = false;
 
     for (String serviceId : scmServiceIds) {
-      Collection<String> scmNodeIds = SCMHAUtils.getSCMNodeIds(conf, serviceId);
+      Collection<String> scmNodeIds = HddsUtils.getSCMNodeIds(conf, serviceId);
 
       // TODO: need to fall back to ozone.scm.names in case scm node ids are
       // not defined.
-      if (scmNodeIds.size() == 0) {
+      if (scmNodeIds.isEmpty()) {
         throw new IllegalArgumentException(
             String.format("Configuration does not have any value set for %s " +
                 "for the service %s. List of SCM Node ID's should be " +

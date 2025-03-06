@@ -72,8 +72,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Tests the EC recovery and over replication processing.
@@ -92,8 +90,6 @@ public class TestECContainerRecovery {
   private static int dataBlocks = 3;
   private static byte[][] inputChunks = new byte[dataBlocks][chunkSize];
 
-  private static final Logger LOG =
-          LoggerFactory.getLogger(TestECContainerRecovery.class);
   /**
    * Create a MiniDFSCluster for testing.
    */
@@ -373,7 +369,7 @@ public class TestECContainerRecovery {
             .filter(r -> !ReplicationManager
                 .compareState(container.getState(), r.getState()))
             .collect(Collectors.toList());
-        return unhealthyReplicas.size() == 0;
+        return unhealthyReplicas.isEmpty();
       } catch (ContainerNotFoundException e) {
         return false;
       }

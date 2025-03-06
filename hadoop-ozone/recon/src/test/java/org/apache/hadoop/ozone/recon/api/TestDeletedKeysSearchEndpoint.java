@@ -80,7 +80,6 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
   private ReconOMMetadataManager reconOMMetadataManager;
   private OMDBInsightEndpoint omdbInsightEndpoint;
   private OzoneConfiguration ozoneConfiguration;
-  private static final String ROOT_PATH = "/";
   private OMMetadataManager omMetadataManager;
 
   @BeforeEach

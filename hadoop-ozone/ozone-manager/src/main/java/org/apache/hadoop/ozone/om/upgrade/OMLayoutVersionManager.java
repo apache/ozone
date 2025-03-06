@@ -142,13 +142,6 @@ public final class OMLayoutVersionManager
     return validRequests;
   }
 
-  private void registerRequestType(String type, int version,
-                                   Class<? extends OMClientRequest> reqClass) {
-    VersionFactoryKey key = new VersionFactoryKey.Builder()
-        .key(type).version(version).build();
-    requestFactory.register(this, key, reqClass);
-  }
-
   /**
    * Given a type and version, get the corresponding request class type.
    * @param type type string

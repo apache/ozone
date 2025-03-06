@@ -39,7 +39,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -86,7 +85,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.DeletedBlocksTransact
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
-import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
@@ -813,20 +811,8 @@ public class SCMClientProtocolServer implements
       ScmInfo.Builder builder =
           new ScmInfo.Builder()
               .setClusterId(scm.getScmStorageConfig().getClusterID())
-              .setScmId(scm.getScmStorageConfig().getScmId());
-      if (scm.getScmHAManager().getRatisServer() != null) {
-        builder.setRatisPeerRoles(
-            scm.getScmHAManager().getRatisServer().getRatisRoles());
-        builder.setScmRatisEnabled(true);
-      } else {
-        // In case, there is no ratis, there is no ratis role.
-        // This will just print the hostname with ratis port as the default
-        // behaviour.
-        String address = scm.getSCMHANodeDetails().getLocalNodeDetails()
-            .getRatisHostPortStr();
-        builder.setRatisPeerRoles(Arrays.asList(address));
-        builder.setScmRatisEnabled(false);
-      }
+              .setScmId(scm.getScmStorageConfig().getScmId())
+              .setPeerRoles(scm.getScmHAManager().getRatisServer().getRatisRoles());
       return builder.build();
     } catch (Exception ex) {
       auditSuccess = false;
@@ -847,10 +833,6 @@ public class SCMClientProtocolServer implements
   public void transferLeadership(String newLeaderId)
       throws IOException {
     getScm().checkAdminAccess(getRemoteUser(), false);
-    if (!SCMHAUtils.isSCMHAEnabled(getScm().getConfiguration())) {
-      throw new SCMException("SCM HA not enabled.", ResultCodes.INTERNAL_ERROR);
-    }
-
     checkIfCertSignRequestAllowed(scm.getRootCARotationManager(),
         false, config, "transferLeadership");
 
@@ -892,6 +874,7 @@ public class SCMClientProtocolServer implements
     }
   }
 
+  @Override
   public List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
       long startTxId) throws IOException {
     List<DeletedBlocksTransactionInfo> result;
@@ -1388,7 +1371,7 @@ public class SCMClientProtocolServer implements
     Set<DatanodeDetails> returnSet = new TreeSet<>();
     List<DatanodeDetails> tmp = scm.getScmNodeManager()
         .getNodes(opState, nodeState);
-    if ((tmp != null) && (tmp.size() > 0)) {
+    if ((tmp != null) && (!tmp.isEmpty())) {
       returnSet.addAll(tmp);
     }
     return returnSet;

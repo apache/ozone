@@ -102,8 +102,8 @@ import org.apache.hadoop.ozone.s3.OzoneClientCache;
 import org.apache.hadoop.ozone.s3.OzoneConfigurationHolder;
 import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.ozone.recon.schema.ReconSqlDbConfig;
 import org.apache.ozone.test.GenericTestUtils;
-import org.hadoop.ozone.recon.codegen.ReconSqlDbConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -453,6 +453,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     shutdownHddsDatanode(getHddsDatanodeIndex(dn));
   }
 
+  @Override
   public String getClusterId() {
     return scm.getClientProtocolServer().getScmInfo().getClusterId();
   }
@@ -661,6 +662,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         }
         stopSCM(scm);
         removeConfiguration();
+
+        LOG.warn("Unable to build MiniOzoneCluster", ex);
 
         if (ex instanceof IOException) {
           throw (IOException) ex;
