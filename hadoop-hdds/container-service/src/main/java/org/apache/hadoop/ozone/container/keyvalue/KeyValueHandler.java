@@ -1099,11 +1099,17 @@ public class KeyValueHandler extends Handler {
 
   /**
    * Handle Put Block operation for closed container. Calls BlockManager to process the request.
-   *
+   * This is primarily used by container reconciliation process to persist the block data for closed container.
+   * @param kvContainer           - Container for which block data need to be persisted.
+   * @param blockData             - Block Data to be persisted (BlockData should have the chunks).
+   * @param blockCommitSequenceId - Block Commit Sequence ID for the block.
+   * @param overwriteBscId        - To overwrite bcsId in the block data and container. In case of chunk failure
+   *                              during reconciliation, we do not want to overwrite the bcsId as this block/container
+   *                              is incomplete in its current state.
    */
-  public void putBlockForClosedContainer(List<ContainerProtos.ChunkInfo> chunkInfos, KeyValueContainer kvContainer,
-                                          BlockData blockData, long blockCommitSequenceId)
-      throws IOException {
+  public void putBlockForClosedContainer(KeyValueContainer kvContainer, BlockData blockData,
+                                         long blockCommitSequenceId, boolean overwriteBscId)
+          throws IOException {
     Preconditions.checkNotNull(kvContainer);
     Preconditions.checkNotNull(blockData);
     long startTime = Time.monotonicNowNanos();
@@ -1112,11 +1118,12 @@ public class KeyValueHandler extends Handler {
       throw new IOException("Container #" + kvContainer.getContainerData().getContainerID() +
           " is not in closed state, Container state is " + kvContainer.getContainerState());
     }
-    blockData.setChunks(chunkInfos);
     // To be set from the Replica's BCSId
-    blockData.setBlockCommitSequenceId(blockCommitSequenceId);
+    if (overwriteBscId) {
+      blockData.setBlockCommitSequenceId(blockCommitSequenceId);
+    }
 
-    blockManager.putBlock(kvContainer, blockData, false);
+    blockManager.putBlockForClosedContainer(kvContainer, blockData, overwriteBscId);
     ContainerProtos.BlockData blockDataProto = blockData.getProtoBufMessage();
     final long numBytes = blockDataProto.getSerializedSize();
     // Increment write stats for PutBlock after write.
