@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -51,7 +52,8 @@ public class MultiSnapshotLocks {
           + objectLocks.stream().map(Arrays::toString).collect(Collectors.toList()),
           OMException.ResultCodes.INTERNAL_ERROR);
     }
-    List<String[]> keys = ids.stream().map(id -> new String[] {id.toString()}).collect(Collectors.toList());
+    List<String[]> keys =
+        ids.stream().filter(Objects::nonNull).map(id -> new String[] {id.toString()}).collect(Collectors.toList());
     OMLockDetails omLockDetails = this.writeLock ? lock.acquireWriteLocks(resource, keys) :
         lock.acquireReadLocks(resource, keys);
     if (omLockDetails.isLockAcquired()) {

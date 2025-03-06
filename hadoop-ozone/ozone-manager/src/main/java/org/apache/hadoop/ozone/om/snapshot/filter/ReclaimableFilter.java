@@ -41,7 +41,8 @@ import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.util.CheckedExceptionOperation;
 
 /**
- * This class is responsible for opening last N snapshot given snapshot or AOS metadata manager by acquiring a lock.
+ * This class is responsible for opening last N snapshot given a snapshot metadata manager or AOS metadata manager by
+ * acquiring a lock.
  */
 public abstract class ReclaimableFilter<V> implements CheckedExceptionOperation<Table.KeyValue<String, V>,
     Boolean, IOException>, Closeable {
@@ -63,8 +64,6 @@ public abstract class ReclaimableFilter<V> implements CheckedExceptionOperation<
    * Filter to return deleted keys/directories which are reclaimable based on their presence in previous snapshot in
    * the snapshot chain.
    *
-   * @param omSnapshotManager
-   * @param snapshotChainManager
    * @param currentSnapshotInfo  : If null the deleted keys in AOS needs to be processed, hence the latest snapshot
    *                             in the snapshot chain corresponding to bucket key needs to be processed.
    * @param metadataManager      : MetadataManager corresponding to snapshot or AOS.
@@ -198,24 +197,27 @@ public abstract class ReclaimableFilter<V> implements CheckedExceptionOperation<
     previousSnapshotInfos.clear();
   }
 
-  public ReferenceCounted<OmSnapshot> getPreviousOmSnapshot(int index) {
+  protected ReferenceCounted<OmSnapshot> getPreviousOmSnapshot(int index) {
     return previousOmSnapshots.get(index);
   }
 
-  public OMMetadataManager getMetadataManager() {
+  protected OMMetadataManager getMetadataManager() {
     return metadataManager;
   }
 
-  public Long getVolumeId() {
+  protected Long getVolumeId() {
     return volumeId;
   }
 
-  public OmBucketInfo getBucketInfo() {
+  protected OmBucketInfo getBucketInfo() {
     return bucketInfo;
   }
 
-  public SnapshotInfo getPreviousSnapshotInfo(int index) {
+  protected SnapshotInfo getPreviousSnapshotInfo(int index) {
     return previousSnapshotInfos.get(index);
   }
 
+  protected OzoneManager getOzoneManager() {
+    return ozoneManager;
+  }
 }

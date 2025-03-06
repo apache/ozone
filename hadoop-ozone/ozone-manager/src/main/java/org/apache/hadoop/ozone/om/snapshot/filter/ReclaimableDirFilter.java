@@ -37,14 +37,10 @@ import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
  */
 public class ReclaimableDirFilter extends ReclaimableFilter<OmKeyInfo> {
 
-  private final OzoneManager ozoneManager;
-
   /**
    * Filter to return deleted directories which are reclaimable based on their presence in previous snapshot in
    * the snapshot chain.
    *
-   * @param omSnapshotManager
-   * @param snapshotChainManager
    * @param currentSnapshotInfo  : If null the deleted keys in AOS needs to be processed, hence the latest snapshot
    *                             in the snapshot chain corresponding to bucket key needs to be processed.
    * @param metadataManager      : MetadataManager corresponding to snapshot or AOS.
@@ -55,7 +51,6 @@ public class ReclaimableDirFilter extends ReclaimableFilter<OmKeyInfo> {
                               SnapshotInfo currentSnapshotInfo, OMMetadataManager metadataManager,
                               IOzoneManagerLock lock) {
     super(ozoneManager, omSnapshotManager, snapshotChainManager, currentSnapshotInfo, metadataManager, lock, 1);
-    this.ozoneManager = ozoneManager;
   }
 
   @Override
@@ -84,19 +79,16 @@ public class ReclaimableDirFilter extends ReclaimableFilter<OmKeyInfo> {
     if (previousDirTable == null) {
       return true;
     }
-    String dbRenameKey = ozoneManager.getMetadataManager().getRenameKey(
+    String dbRenameKey = getOzoneManager().getMetadataManager().getRenameKey(
         dirInfo.getVolumeName(), dirInfo.getBucketName(), dirInfo.getObjectID());
 
-      /*
-      snapshotRenamedTable: /volumeName/bucketName/objectID ->
-          /volumeId/bucketId/parentId/dirName
-       */
+    // snapshotRenamedTable: /volumeName/bucketName/objectID -> /volumeId/bucketId/parentId/dirName
     String dbKeyBeforeRename = renamedTable.getIfExist(dbRenameKey);
     String prevDbKey;
     if (dbKeyBeforeRename != null) {
       prevDbKey = dbKeyBeforeRename;
     } else {
-      prevDbKey = ozoneManager.getMetadataManager().getOzonePathKey(
+      prevDbKey = getOzoneManager().getMetadataManager().getOzonePathKey(
           volumeId, bucketInfo.getObjectID(), dirInfo.getParentObjectID(), dirInfo.getFileName());
     }
 

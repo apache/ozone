@@ -43,13 +43,10 @@ import org.apache.ratis.util.MemoizedCheckedSupplier;
  * the snapshot chain.
  */
 public class ReclaimableKeyFilter extends ReclaimableFilter<OmKeyInfo> {
-  private final OzoneManager ozoneManager;
   private final Map<UUID, Long> exclusiveSizeMap;
   private final Map<UUID, Long> exclusiveReplicatedSizeMap;
 
   /**
-   * @param omSnapshotManager
-   * @param snapshotChainManager
    * @param currentSnapshotInfo  : If null the deleted keys in AOS needs to be processed, hence the latest snapshot
    *                             in the snapshot chain corresponding to bucket key needs to be processed.
    * @param metadataManager      : MetadataManager corresponding to snapshot or AOS.
@@ -60,7 +57,6 @@ public class ReclaimableKeyFilter extends ReclaimableFilter<OmKeyInfo> {
                               SnapshotInfo currentSnapshotInfo, OMMetadataManager metadataManager,
                               IOzoneManagerLock lock) {
     super(ozoneManager, omSnapshotManager, snapshotChainManager, currentSnapshotInfo, metadataManager, lock, 2);
-    this.ozoneManager = ozoneManager;
     this.exclusiveSizeMap = new HashMap<>();
     this.exclusiveReplicatedSizeMap = new HashMap<>();
   }
@@ -156,7 +152,7 @@ public class ReclaimableKeyFilter extends ReclaimableFilter<OmKeyInfo> {
     if (keyInfo == null || previousKeyTable == null) {
       return Optional.empty();
     }
-    String dbRenameKey = ozoneManager.getMetadataManager().getRenameKey(
+    String dbRenameKey = getOzoneManager().getMetadataManager().getRenameKey(
         keyInfo.getVolumeName(),
         keyInfo.getBucketName(),
         keyInfo.getObjectID());
@@ -167,13 +163,13 @@ public class ReclaimableKeyFilter extends ReclaimableFilter<OmKeyInfo> {
     if (renamedKey == null) {
       String dbKeyPrevSnap;
       if (bucketInfo.getBucketLayout().isFileSystemOptimized()) {
-        dbKeyPrevSnap = ozoneManager.getMetadataManager().getOzonePathKey(
+        dbKeyPrevSnap = getOzoneManager().getMetadataManager().getOzonePathKey(
             volumeId,
             bucketInfo.getObjectID(),
             keyInfo.getParentObjectID(),
             keyInfo.getFileName());
       } else {
-        dbKeyPrevSnap = ozoneManager.getMetadataManager().getOzoneKey(
+        dbKeyPrevSnap = getOzoneManager().getMetadataManager().getOzoneKey(
             keyInfo.getVolumeName(),
             keyInfo.getBucketName(),
             keyInfo.getKeyName());

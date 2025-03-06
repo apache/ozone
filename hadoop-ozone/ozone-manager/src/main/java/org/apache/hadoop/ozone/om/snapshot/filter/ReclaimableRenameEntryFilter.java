@@ -37,10 +37,6 @@ import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 public class ReclaimableRenameEntryFilter extends ReclaimableFilter<String> {
 
   /**
-   *
-   *
-   * @param omSnapshotManager
-   * @param snapshotChainManager
    * @param currentSnapshotInfo  : If null the deleted keys in AOS needs to be processed, hence the latest snapshot
    *                             in the snapshot chain corresponding to bucket key needs to be processed.
    * @param metadataManager      : MetadataManager corresponding to snapshot or AOS.
