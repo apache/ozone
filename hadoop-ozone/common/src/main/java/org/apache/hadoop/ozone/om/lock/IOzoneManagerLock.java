@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.lock;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Collection;
-import java.util.List;
 
 /**
  * Interface for OM Metadata locks.
