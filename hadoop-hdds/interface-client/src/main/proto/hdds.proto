@@ -485,6 +485,10 @@ message ContainerBalancerConfigurationProto {
     optional int64 moveReplicationTimeout = 20;
 }
 
+message ReplicationManagerConfigurationProto {
+    required bool isRunning = 1;
+}
+
 message TransferLeadershipRequestProto {
     required string newLeaderId = 1;
 }
