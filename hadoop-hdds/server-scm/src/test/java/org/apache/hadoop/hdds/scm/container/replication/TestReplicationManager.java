@@ -277,7 +277,7 @@ public class TestReplicationManager {
   @Test
   public void testStartStop() throws IOException {
     serviceToConfigMap.clear();
-    ReplicationManager replicationManager = createDefaultReplicationManager();
+    replicationManager = createDefaultReplicationManager();
     assertTrue(replicationManager.isRunning());
 
     replicationManager.stop();
