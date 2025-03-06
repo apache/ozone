@@ -150,7 +150,7 @@ public class FilePerBlockStrategy implements ChunkManager {
         .getContainerData();
 
     final File chunkFile = getChunkFile(container, blockID);
-    long len = info.getLen();
+    long chunkLength = info.getLen();
     long offset = info.getOffset();
 
     HddsVolume volume = containerData.getVolume();
@@ -183,19 +183,19 @@ public class FilePerBlockStrategy implements ChunkManager {
           + chunkFile.getName(), CHUNK_FILE_INCONSISTENCY);
     }
 
-    ChunkUtils.writeData(channel, chunkFile.getName(), data, offset, len, volume);
+    ChunkUtils.writeData(channel, chunkFile.getName(), data, offset, chunkLength, volume);
 
     // When overwriting, update the bytes used if the new length is greater than the old length
     // This is to ensure that the bytes used is updated correctly when overwriting a smaller chunk
     // with a larger chunk at the end of the block.
     if (overwrite) {
-      long fileLengthAfterWrite = offset + len;
+      long fileLengthAfterWrite = offset + chunkLength;
       if (fileLengthAfterWrite > fileLengthBeforeWrite) {
         containerData.incrBytesUsed(fileLengthAfterWrite - fileLengthBeforeWrite);
       }
     }
 
-    containerData.updateWriteStats(len, overwrite);
+    containerData.updateWriteStats(chunkLength, overwrite);
   }
 
   @Override

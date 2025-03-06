@@ -251,7 +251,7 @@ public class TestBlockManagerImpl {
       assertEquals(2, db.getStore().getMetadataTable().get(containerData.getBcsIdKey()));
 
       // 4. Put Block with bcsId = 1 < container bcsId, Overwrite BCS ID = true
-      // We are overwriting an existing block with lower bcsId than container bcdId. Container bcsId should not change
+      // We are overwriting an existing block with lower bcsId than container bcsId. Container bcsId should not change
       BlockData blockData3 = createBlockData(1L, 1L, 1, 0, 2048, 1);
       blockManager.putBlockForClosedContainer(keyValueContainer, blockData3, true);
       fromGetBlockData = blockManager.getBlock(keyValueContainer, blockData3.getBlockID());
@@ -261,7 +261,8 @@ public class TestBlockManagerImpl {
       assertEquals(3, db.getStore().getMetadataTable().get(containerData.getBlockCountKey()));
       assertEquals(2, db.getStore().getMetadataTable().get(containerData.getBcsIdKey()));
 
-      // Used Bytes is only update by writeChunk, so it should be 0 here.
+      // writeChunk updates the in-memory state of the used bytes, putBlock persists the in-memory state to the DB.
+      // We are only doing putBlock without writeChunk, the used bytes should be 0.
       assertEquals(0, db.getStore().getMetadataTable().get(containerData.getBytesUsedKey()));
     }
   }
