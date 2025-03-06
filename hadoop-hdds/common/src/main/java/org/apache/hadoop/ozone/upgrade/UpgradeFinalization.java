@@ -115,7 +115,7 @@ public final class UpgradeFinalization {
 
   public static void handleInvalidRequestAfterInitiatingFinalization(
       boolean force, UpgradeException e) throws IOException {
-    if (e.getResult().equals(INVALID_REQUEST)) {
+    if (INVALID_REQUEST.equals(e.getResult())) {
       if (force) {
         return;
       }
@@ -138,19 +138,19 @@ public final class UpgradeFinalization {
   }
 
   public static boolean isFinalized(Status status) {
-    return status.equals(Status.ALREADY_FINALIZED);
+    return Status.ALREADY_FINALIZED.equals(status);
   }
 
   public static boolean isDone(Status status) {
-    return status.equals(Status.FINALIZATION_DONE);
+    return Status.FINALIZATION_DONE.equals(status);
   }
 
   public static boolean isInprogress(Status status) {
-    return status.equals(Status.FINALIZATION_IN_PROGRESS);
+    return Status.FINALIZATION_IN_PROGRESS.equals(status);
   }
 
   public static boolean isStarting(Status status) {
-    return status.equals(Status.STARTING_FINALIZATION);
+    return Status.STARTING_FINALIZATION.equals(status);
   }
 
   public static void emitGeneralErrorMsg() {
