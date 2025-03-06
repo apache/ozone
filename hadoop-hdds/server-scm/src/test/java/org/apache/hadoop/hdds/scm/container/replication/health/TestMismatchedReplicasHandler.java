@@ -223,12 +223,12 @@ public class TestMismatchedReplicasHandler {
     assertFalse(handler.handle(readRequest));
 
     verify(replicationManager, times(1)).sendCloseContainerReplicaCommand(
-        containerInfo, mismatch1.getDatanodeDetails(), true);
+        containerInfo, mismatch1.getDatanodeDetails(), false);
     verify(replicationManager, times(1)).sendCloseContainerReplicaCommand(
-        containerInfo, mismatch2.getDatanodeDetails(), true);
+        containerInfo, mismatch2.getDatanodeDetails(), false);
     // close command should not be sent for unhealthy replica
     verify(replicationManager, times(0)).sendCloseContainerReplicaCommand(
-        containerInfo, mismatch3.getDatanodeDetails(), true);
+        containerInfo, mismatch3.getDatanodeDetails(), false);
   }
 
   /**
@@ -343,10 +343,15 @@ public class TestMismatchedReplicasHandler {
         containerInfo.containerID(), 0,
         HddsProtos.NodeOperationalState.IN_SERVICE,
         ContainerReplicaProto.State.QUASI_CLOSED, 1000);
+    ContainerReplica mismatch4 = ReplicationTestUtil.createContainerReplica(
+        containerInfo.containerID(), 0,
+        HddsProtos.NodeOperationalState.IN_SERVICE,
+        ContainerReplicaProto.State.CLOSING, 1000);
     Set<ContainerReplica> containerReplicas = new HashSet<>();
     containerReplicas.add(mismatch1);
     containerReplicas.add(mismatch2);
     containerReplicas.add(mismatch3);
+    containerReplicas.add(mismatch4);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
         .setReport(new ReplicationManagerReport())
@@ -373,5 +378,7 @@ public class TestMismatchedReplicasHandler {
     // close command should not be sent for unhealthy replica
     verify(replicationManager, times(1)).sendCloseContainerReplicaCommand(
         containerInfo, mismatch3.getDatanodeDetails(), true);
+    verify(replicationManager, times(1)).sendCloseContainerReplicaCommand(
+        containerInfo, mismatch4.getDatanodeDetails(), false);
   }
 }

@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.container.replication.health;
 
 import java.util.Set;
-import java.util.function.Predicate;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -70,16 +69,18 @@ public class MismatchedReplicasHandler extends AbstractCheck {
       // Handler is only relevant for CLOSED or QUASI-CLOSED containers.
       return false;
     }
-
-    LOG.debug("Checking container {} in MismatchedReplicasHandler", containerInfo);
-
-    final Predicate<ContainerReplica> shouldSendClose = (r) -> shouldSendClose(containerInfo, r);
-
-    replicas.stream().filter(shouldSendClose).forEach(r -> {
-      LOG.debug("Sending close command for mismatched replica {} of container {}.", r, containerInfo);
-      replicationManager.sendCloseContainerReplicaCommand(
-          containerInfo, r.getDatanodeDetails(), shouldForceClose(containerInfo, r));
-    });
+    LOG.debug("Checking container {} in MismatchedReplicasHandler",
+        containerInfo);
+    // close replica if needed
+    for (ContainerReplica replica : replicas) {
+      ContainerReplicaProto.State replicaState = getTransitionState(containerInfo, replica);
+      if (replicaState != null) {
+        LOG.debug("Sending close command for mismatched replica {} of " +
+            "container {}.", replica, containerInfo);
+        replicationManager.sendCloseContainerReplicaCommand(
+            containerInfo, replica.getDatanodeDetails(), ContainerReplicaProto.State.CLOSED.equals(replicaState));
+      }
+    }
 
     /*
      This handler is unique because it always returns false. This allows
@@ -89,23 +90,24 @@ public class MismatchedReplicasHandler extends AbstractCheck {
   }
 
   /**
-   * Returns true if the replica state doesn't match the container state and the replica can be 
-   * QUASI_CLOSED/CLOSED.
-   *
-   * This method only works for QUASI_CLOSED/CLOSED Containers.
+   * Returns the final expected closed state type based on the scm container state and the replica state.
+   * @param replica replica to check for mismatch and if it should be closed
+   * @return non null closed state if the replica should be closed, else CLOSED/QUASI_CLOSED based on the replica's
+   * state.
    */
-  private boolean shouldSendClose(final ContainerInfo container, final ContainerReplica replica) {
-    return replica.getState() == ContainerReplicaProto.State.OPEN ||
-        replica.getState() == ContainerReplicaProto.State.CLOSING ||
-        (replica.getState() == ContainerReplicaProto.State.QUASI_CLOSED &&
-        shouldForceClose(container, replica));
-  }
+  private ContainerReplicaProto.State getTransitionState(ContainerInfo container,
+                                                         ContainerReplica replica) {
+    if (replica.getState() == ContainerReplicaProto.State.OPEN ||
+        replica.getState() == ContainerReplicaProto.State.CLOSING) {
+      return HddsProtos.ReplicationType.RATIS == container.getReplicationType() ?
+          ContainerReplicaProto.State.QUASI_CLOSED : ContainerReplicaProto.State.CLOSED;
+    }
 
-  /**
-   * Retruns true if the Container is CLOSED but the Replica is not, and the Sequence Id matches.
-   */
-  private boolean shouldForceClose(final ContainerInfo container, final ContainerReplica replica) {
+    // a quasi closed replica of a closed container should be closed if their
+    // sequence IDs match
     return container.getState() == HddsProtos.LifeCycleState.CLOSED &&
-        container.getSequenceId() == replica.getSequenceId();
+        replica.getState() == ContainerReplicaProto.State.QUASI_CLOSED &&
+        container.getSequenceId() == replica.getSequenceId() ? ContainerReplicaProto.State.CLOSED
+        : null;
   }
 }
