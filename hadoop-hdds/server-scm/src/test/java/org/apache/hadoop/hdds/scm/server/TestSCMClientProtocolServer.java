@@ -38,8 +38,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
-import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
@@ -65,11 +63,8 @@ public class TestSCMClientProtocolServer {
   @BeforeEach
   void setUp(@TempDir File testDir) throws Exception {
     config = SCMTestUtils.getConf(testDir);
-    SCMConfigurator configurator = new SCMConfigurator();
-    configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
-    configurator.setScmContext(SCMContext.emptyContext());
     config.set(OZONE_READONLY_ADMINISTRATORS, "testUser");
-    scm = HddsTestUtils.getScm(config, configurator);
+    scm = HddsTestUtils.getScm(config);
     scm.start();
     scm.exitSafeMode();
 

@@ -33,11 +33,8 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
-import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.net.StaticMapping;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -94,10 +91,7 @@ public class TestOMSortDatanodes {
     config.set(StaticMapping.KEY_HADOOP_CONFIGURED_NODE_MAPPING,
         String.join(",", nodeMapping));
 
-    SCMConfigurator configurator = new SCMConfigurator();
-    configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
-    configurator.setScmContext(SCMContext.emptyContext());
-    scm = HddsTestUtils.getScm(config, configurator);
+    scm = HddsTestUtils.getScm(config);
     scm.start();
     scm.exitSafeMode();
     nodeManager = scm.getScmNodeManager();
