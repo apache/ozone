@@ -17,7 +17,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 14,
+  "id": 13,
   "links": [],
   "panels": [
     {
@@ -419,6 +419,288 @@
                 "axisBorderShow": false,
                 "axisCenteredZero": false,
                 "axisColorMode": "text",
+                "axisLabel": "Time (ms)",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 8,
+            "x": 0,
+            "y": 8
+          },
+          "id": 59,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "disableTextWrap": false,
+              "editorMode": "builder",
+              "expr": "om_performance_metrics_key_deleting_service_latency_ms",
+              "fullMetaSearch": false,
+              "includeNullMetadata": true,
+              "legendFormat": "{{hostname}}",
+              "range": true,
+              "refId": "A",
+              "useBackend": false
+            }
+          ],
+          "title": "KeyDeletingService Latency",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "Time (ms)",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 8,
+            "x": 8,
+            "y": 8
+          },
+          "id": 60,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "disableTextWrap": false,
+              "editorMode": "builder",
+              "expr": "om_performance_metrics_directory_deleting_service_latency_ms",
+              "fullMetaSearch": false,
+              "includeNullMetadata": true,
+              "legendFormat": "{{hostname}}",
+              "range": true,
+              "refId": "A",
+              "useBackend": false
+            }
+          ],
+          "title": "DirectoryDeletingService Latency",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "Time (ms)",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 8,
+            "x": 16,
+            "y": 8
+          },
+          "id": 61,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "disableTextWrap": false,
+              "editorMode": "builder",
+              "expr": "om_performance_metrics_open_key_cleanup_service_latency_ms",
+              "fullMetaSearch": false,
+              "includeNullMetadata": true,
+              "legendFormat": "{{hostname}}",
+              "range": true,
+              "refId": "A",
+              "useBackend": false
+            }
+          ],
+          "title": "OpenKeyCleanupService Latency",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
                 "axisLabel": "Time (ns)",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
@@ -469,7 +751,7 @@
             "h": 7,
             "w": 6,
             "x": 0,
-            "y": 624
+            "y": 15
           },
           "id": 27,
           "options": {
@@ -563,7 +845,7 @@
             "h": 7,
             "w": 6,
             "x": 6,
-            "y": 624
+            "y": 15
           },
           "id": 28,
           "options": {
@@ -657,7 +939,7 @@
             "h": 7,
             "w": 6,
             "x": 12,
-            "y": 624
+            "y": 15
           },
           "id": 29,
           "options": {
@@ -765,7 +1047,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 2
+            "y": 198
           },
           "id": 15,
           "options": {
@@ -861,7 +1143,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 2
+            "y": 198
           },
           "id": 30,
           "options": {
@@ -955,7 +1237,7 @@
             "h": 7,
             "w": 8,
             "x": 0,
-            "y": 9
+            "y": 247
           },
           "id": 31,
           "options": {
@@ -1049,7 +1331,7 @@
             "h": 7,
             "w": 8,
             "x": 8,
-            "y": 9
+            "y": 247
           },
           "id": 17,
           "options": {
@@ -1145,7 +1427,7 @@
             "h": 7,
             "w": 8,
             "x": 16,
-            "y": 9
+            "y": 247
           },
           "id": 32,
           "options": {
@@ -1239,7 +1521,7 @@
             "h": 7,
             "w": 6,
             "x": 0,
-            "y": 16
+            "y": 254
           },
           "id": 16,
           "options": {
@@ -1333,7 +1615,7 @@
             "h": 7,
             "w": 6,
             "x": 6,
-            "y": 16
+            "y": 254
           },
           "id": 33,
           "options": {
@@ -1427,7 +1709,7 @@
             "h": 7,
             "w": 6,
             "x": 12,
-            "y": 16
+            "y": 254
           },
           "id": 18,
           "options": {
@@ -1523,7 +1805,7 @@
             "h": 7,
             "w": 6,
             "x": 18,
-            "y": 16
+            "y": 254
           },
           "id": 34,
           "options": {
@@ -1617,7 +1899,7 @@
             "h": 7,
             "w": 8,
             "x": 0,
-            "y": 23
+            "y": 261
           },
           "id": 35,
           "options": {
@@ -1711,7 +1993,7 @@
             "h": 7,
             "w": 8,
             "x": 8,
-            "y": 23
+            "y": 261
           },
           "id": 36,
           "options": {
@@ -1805,7 +2087,7 @@
             "h": 7,
             "w": 8,
             "x": 16,
-            "y": 23
+            "y": 261
           },
           "id": 37,
           "options": {
@@ -1899,7 +2181,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 30
+            "y": 268
           },
           "id": 39,
           "options": {
@@ -1993,7 +2275,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 30
+            "y": 268
           },
           "id": 21,
           "options": {
@@ -2103,7 +2385,7 @@
             "h": 7,
             "w": 6,
             "x": 0,
-            "y": 276
+            "y": 66
           },
           "id": 49,
           "options": {
@@ -2197,7 +2479,7 @@
             "h": 7,
             "w": 6,
             "x": 6,
-            "y": 276
+            "y": 66
           },
           "id": 51,
           "options": {
@@ -2291,7 +2573,7 @@
             "h": 7,
             "w": 6,
             "x": 12,
-            "y": 276
+            "y": 66
           },
           "id": 48,
           "options": {
@@ -2385,7 +2667,7 @@
             "h": 7,
             "w": 6,
             "x": 18,
-            "y": 276
+            "y": 66
           },
           "id": 50,
           "options": {
@@ -2479,7 +2761,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 283
+            "y": 73
           },
           "id": 57,
           "options": {
@@ -2583,7 +2865,7 @@
             "h": 7,
             "w": 8,
             "x": 0,
-            "y": 305
+            "y": 1208
           },
           "id": 40,
           "options": {
@@ -2677,7 +2959,7 @@
             "h": 7,
             "w": 8,
             "x": 8,
-            "y": 305
+            "y": 1208
           },
           "id": 42,
           "options": {
@@ -2771,7 +3053,7 @@
             "h": 7,
             "w": 8,
             "x": 16,
-            "y": 305
+            "y": 1208
           },
           "id": 41,
           "options": {
@@ -2865,7 +3147,7 @@
             "h": 7,
             "w": 8,
             "x": 0,
-            "y": 396
+            "y": 1299
           },
           "id": 10,
           "options": {
@@ -2961,7 +3243,7 @@
             "h": 7,
             "w": 8,
             "x": 8,
-            "y": 396
+            "y": 1299
           },
           "id": 43,
           "options": {
@@ -3055,7 +3337,7 @@
             "h": 7,
             "w": 8,
             "x": 16,
-            "y": 396
+            "y": 1299
           },
           "id": 46,
           "options": {
@@ -3149,7 +3431,7 @@
             "h": 7,
             "w": 8,
             "x": 0,
-            "y": 403
+            "y": 1306
           },
           "id": 44,
           "options": {
@@ -3243,7 +3525,7 @@
             "h": 7,
             "w": 8,
             "x": 8,
-            "y": 403
+            "y": 1306
           },
           "id": 1,
           "options": {
@@ -3339,7 +3621,7 @@
             "h": 7,
             "w": 8,
             "x": 16,
-            "y": 403
+            "y": 1306
           },
           "id": 45,
           "options": {
@@ -3447,7 +3729,7 @@
             "h": 7,
             "w": 8,
             "x": 0,
-            "y": 292
+            "y": 201
           },
           "id": 13,
           "options": {
@@ -3541,7 +3823,7 @@
             "h": 7,
             "w": 8,
             "x": 8,
-            "y": 292
+            "y": 201
           },
           "id": 12,
           "options": {
@@ -3637,7 +3919,7 @@
             "h": 7,
             "w": 8,
             "x": 16,
-            "y": 292
+            "y": 201
           },
           "id": 8,
           "options": {
@@ -3731,7 +4013,7 @@
             "h": 7,
             "w": 6,
             "x": 0,
-            "y": 299
+            "y": 215
           },
           "id": 5,
           "options": {
@@ -3825,7 +4107,7 @@
             "h": 7,
             "w": 6,
             "x": 6,
-            "y": 299
+            "y": 215
           },
           "id": 7,
           "options": {
@@ -3919,7 +4201,7 @@
             "h": 7,
             "w": 6,
             "x": 12,
-            "y": 299
+            "y": 215
           },
           "id": 6,
           "options": {
@@ -4013,7 +4295,7 @@
             "h": 7,
             "w": 6,
             "x": 18,
-            "y": 299
+            "y": 215
           },
           "id": 9,
           "options": {
@@ -4107,7 +4389,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 306
+            "y": 222
           },
           "id": 58,
           "options": {
@@ -4211,7 +4493,7 @@
             "h": 7,
             "w": 6,
             "x": 0,
-            "y": 293
+            "y": 202
           },
           "id": 54,
           "options": {
@@ -4305,7 +4587,7 @@
             "h": 7,
             "w": 6,
             "x": 6,
-            "y": 293
+            "y": 202
           },
           "id": 56,
           "options": {
@@ -4399,7 +4681,7 @@
             "h": 7,
             "w": 6,
             "x": 12,
-            "y": 293
+            "y": 202
           },
           "id": 53,
           "options": {
@@ -4493,7 +4775,7 @@
             "h": 7,
             "w": 6,
             "x": 18,
-            "y": 293
+            "y": 202
           },
           "id": 55,
           "options": {
