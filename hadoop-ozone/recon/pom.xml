@@ -293,12 +293,8 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-hadoop-dependency-test</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-test-utils</artifactId>
+      <type>test-jar</type>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -356,7 +352,7 @@
         <configuration>
           <executable>java</executable>
           <classpathScope>compile</classpathScope>
-          <mainClass>org.hadoop.ozone.recon.codegen.JooqCodeGenerator</mainClass>
+          <mainClass>org.apache.ozone.recon.codegen.JooqCodeGenerator</mainClass>
           <cleanupDaemonThreads>false</cleanupDaemonThreads>
           <arguments>
             <argument>${project.build.directory}/generated-sources/java</argument>

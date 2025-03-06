@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,14 +17,28 @@
 
 package org.apache.hadoop.ozone;
 
+import static java.util.Collections.singletonList;
+import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
+import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import java.io.IOException;
+import java.net.BindException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.hdds.conf.ConfigurationTarget;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.safemode.HealthyPipelineSafeModeRule;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -43,21 +56,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.net.BindException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.function.Function;
-
-import static java.util.Collections.singletonList;
-import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
-import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
 
 /**
  * MiniOzoneHAClusterImpl creates a complete in-process Ozone cluster
@@ -260,6 +258,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         .getClientProtocolServer().getScmInfo().getClusterId();
   }
 
+  @Override
   public StorageContainerManager getActiveSCM() {
     for (StorageContainerManager scm : scmhaService.getServices()) {
       if (scm.checkLeader()) {
@@ -269,6 +268,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     return null;
   }
 
+  @Override
   public void waitForSCMToBeReady()
       throws TimeoutException, InterruptedException  {
     GenericTestUtils.waitFor(() -> {
@@ -538,7 +538,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     }
 
     /**
-     * Start OM service with multiple OMs.
+     * Start SCM service with multiple SCMs.
      */
     protected SCMHAService createSCMService()
         throws IOException, AuthenticationException {
@@ -616,10 +616,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
      * Initialize HA related configurations.
      */
     private void initSCMHAConfig() {
-      // Set configurations required for starting OM HA service, because that
+      // Set configurations required for starting SCM HA service, because that
       // is the serviceID being passed to start Ozone HA cluster.
-      // Here setting internal service and OZONE_OM_SERVICE_IDS_KEY, in this
-      // way in OM start it uses internal service id to find it's service id.
+      // Here setting internal service and OZONE_SCM_SERVICE_IDS_KEY, in this
+      // way in SCM start it uses internal service id to find it's service id.
       conf.set(ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY, scmServiceId);
       conf.set(ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID, scmServiceId);
       String scmNodesKey = ConfUtils.addKeySuffixes(
@@ -629,6 +629,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
       for (int i = 1; i <= numOfSCMs; i++) {
         String scmNodeId = SCM_NODE_ID_PREFIX + i;
+
+        if (i == 1) {
+          conf.set(ScmConfigKeys.OZONE_SCM_PRIMORDIAL_NODE_ID_KEY, scmNodeId);
+        }
         scmNodesKeyValue.append(",").append(scmNodeId);
 
         String scmAddrKey = ConfUtils.addKeySuffixes(
@@ -1016,6 +1020,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     return new ArrayList<>(this.scmhaService.getServices());
   }
 
+  @Override
   public StorageContainerManager getStorageContainerManager() {
     return getStorageContainerManagers().get(0);
   }

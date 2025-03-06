@@ -418,6 +418,26 @@ function check_needs_findbugs() {
     start_end::group_end
 }
 
+function check_needs_pmd() {
+    start_end::group_start "Check if pmd is needed"
+    local pattern_array=(
+        "^hadoop-ozone/dev-support/checks/pmd.sh"
+        "pom.xml"
+        "src/..../java"
+        "pmd-ruleset.xml"
+    )
+    local ignore_array=(
+        "^hadoop-ozone/dist"
+    )
+    filter_changed_files
+
+    if [[ ${match_count} != "0" ]]; then
+        add_basic_check pmd
+    fi
+
+    start_end::group_end
+}
+
 function check_needs_native() {
     start_end::group_start "Check if native is needed"
     local pattern_array=(
@@ -438,7 +458,6 @@ function check_needs_native() {
             "^hadoop-hdds/common"
             "^hadoop-hdds/config"
             "^hadoop-hdds/hadoop-dependency-client"
-            "^hadoop-hdds/hadoop-dependency-test"
             "^hadoop-hdds/managed-rocksdb"
             "^hadoop-hdds/test-utils"
             "^pom.xml"
@@ -585,6 +604,7 @@ check_needs_bats
 check_needs_checkstyle
 check_needs_docs
 check_needs_findbugs
+check_needs_pmd
 check_needs_native
 calculate_test_types_to_run
 set_outputs

@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,6 +17,15 @@
 
 package org.apache.hadoop.ozone.om.request.file;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import java.io.IOException;
+import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -32,21 +40,12 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
-import java.util.UUID;
-
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.fail;
-
 /**
  * Tests OMFileCreateRequest - prefix layout.
  */
 public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
 
+  @Override
   @Test
   public void testValidateAndUpdateCacheWithNonRecursive() throws Exception {
     testNonRecursivePath(UUID.randomUUID().toString(), false, false, false);
@@ -78,6 +77,7 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     testNonRecursivePath("a/b/e", false, false, false);
   }
 
+  @Override
   @Test
   public void testValidateAndUpdateCacheWithNamespaceQuotaExceeded()
       throws Exception {
@@ -102,6 +102,7 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
         OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
   }
 
+  @Override
   @Test
   public void testValidateAndUpdateCacheWithRecursiveAndOverWrite()
           throws Exception {
@@ -131,6 +132,7 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     testNonRecursivePath(key, false, true, true);
   }
 
+  @Override
   @Test
   public void testValidateAndUpdateCacheWithNonRecursiveAndOverWrite()
           throws Exception {
@@ -161,6 +163,7 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     testNonRecursivePath(key, false, false, true);
   }
 
+  @Override
   @Test
   public void testCreateFileInheritParentDefaultAcls()
       throws Exception {
@@ -224,14 +227,11 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     String[] pathComponents = StringUtils.split(key, '/');
     long parentId = bucketId;
     OmDirectoryInfo dirInfo = null;
-    for (int indx = 0; indx < pathComponents.length; indx++) {
-      String pathElement = pathComponents[indx];
+    for (String pathElement : pathComponents) {
       // Reached last component, which is file name
       // directory
-      String dbKey = omMetadataManager.getOzonePathKey(volumeId,
-              bucketId, parentId, pathElement);
-      dirInfo =
-              omMetadataManager.getDirectoryTable().get(dbKey);
+      String dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId, parentId, pathElement);
+      dirInfo = omMetadataManager.getDirectoryTable().get(dbKey);
       parentId = dirInfo.getObjectID();
     }
     return dirInfo;

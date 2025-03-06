@@ -118,11 +118,6 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-hadoop-dependency-test</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-interface-admin</artifactId>
         <version>${hdds.version}</version>
       </dependency>
@@ -166,6 +161,7 @@
         <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-test-utils</artifactId>
         <version>${hdds.version}</version>
+        <type>test-jar</type>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>

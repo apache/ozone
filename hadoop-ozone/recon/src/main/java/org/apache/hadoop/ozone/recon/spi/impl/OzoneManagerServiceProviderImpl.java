@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,8 +17,31 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DB_DIRS_PERMISSIONS_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_TIMEOUT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LAG_THRESHOLD;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LAG_THRESHOLD_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconUtils.convertNumericToSymbolic;
+import static org.apache.ratis.proto.RaftProtos.RaftPeerRole.LEADER;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Iterators;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -37,24 +59,24 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
-
-import com.google.common.collect.Iterators;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import javax.inject.Inject;
+import javax.inject.Singleton;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
+import org.apache.hadoop.hdds.server.http.HttpConfig;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.server.http.HttpConfig;
-import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
-import org.apache.hadoop.hdds.utils.db.RDBStore;
-import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
@@ -69,37 +91,12 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdatesHandler;
 import org.apache.hadoop.ozone.recon.tasks.OMUpdateEventBatch;
+import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.util.Time;
-
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.commons.io.FileUtils;
-
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DB_DIRS_PERMISSIONS_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_TIMEOUT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LAG_THRESHOLD;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LAG_THRESHOLD_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconUtils.convertNumericToSymbolic;
-import static org.apache.ratis.proto.RaftProtos.RaftPeerRole.LEADER;
-
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -266,6 +263,10 @@ public class OzoneManagerServiceProviderImpl
             ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY,
             OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT),
         TimeUnit.MILLISECONDS);
+    // Initialize recon om tasks for any first time initialization of resources.
+    reconTaskController.getRegisteredTasks()
+        .values()
+        .forEach(ReconOmTask::init);
     startSyncDataFromOM(initialDelay);
   }
 
@@ -454,7 +455,7 @@ public class OzoneManagerServiceProviderImpl
   Long getAndApplyDeltaUpdatesFromOM(
       long fromSequenceNumber, OMDBUpdatesHandler omdbUpdatesHandler)
       throws IOException, RocksDBException {
-    LOG.info("OriginalFromSequenceNumber : {} ", fromSequenceNumber);
+    LOG.debug("OriginalFromSequenceNumber : {} ", fromSequenceNumber);
     ImmutablePair<Boolean, Long> dbUpdatesLatestSeqNumOfOMDB =
         innerGetAndApplyDeltaUpdatesFromOM(fromSequenceNumber, omdbUpdatesHandler);
     if (!dbUpdatesLatestSeqNumOfOMDB.getLeft()) {
@@ -466,7 +467,6 @@ public class OzoneManagerServiceProviderImpl
               fromSequenceNumber);
     }
     omdbUpdatesHandler.setLatestSequenceNumber(getCurrentOMDBSequenceNumber());
-    LOG.info("Delta updates received from OM : {} records", getCurrentOMDBSequenceNumber() - fromSequenceNumber);
     return dbUpdatesLatestSeqNumOfOMDB.getRight();
   }
 
@@ -501,7 +501,9 @@ public class OzoneManagerServiceProviderImpl
       }
       for (byte[] data : dbUpdates.getData()) {
         try (ManagedWriteBatch writeBatch = new ManagedWriteBatch(data)) {
+          // Events gets populated in events list in OMDBUpdatesHandler with call back for put/delete/update
           writeBatch.iterate(omdbUpdatesHandler);
+          // Commit the OM DB transactions in recon rocks DB and sync here.
           try (RDBBatchOperation rdbBatchOperation =
                    new RDBBatchOperation(writeBatch)) {
             try (ManagedWriteOptions wOpts = new ManagedWriteOptions()) {
@@ -514,11 +516,10 @@ public class OzoneManagerServiceProviderImpl
     long lag = latestSequenceNumberOfOM == -1 ? 0 :
         latestSequenceNumberOfOM - getCurrentOMDBSequenceNumber();
     metrics.setSequenceNumberLag(lag);
-    LOG.info("Number of updates received from OM : {}, " +
-            "SequenceNumber diff: {}, SequenceNumber Lag from OM {}, " +
-            "isDBUpdateSuccess: {}", numUpdates, getCurrentOMDBSequenceNumber()
-            - fromSequenceNumber, lag,
-        null != dbUpdates && dbUpdates.isDBUpdateSuccess());
+    LOG.info("From Sequence Number:{}, Recon DB Sequence Number: {}, Number of updates received from OM : {}, " +
+            "SequenceNumber diff: {}, SequenceNumber Lag from OM {}, isDBUpdateSuccess: {}",
+        fromSequenceNumber, getCurrentOMDBSequenceNumber(), numUpdates,
+        getCurrentOMDBSequenceNumber() - fromSequenceNumber, lag, null != dbUpdates && dbUpdates.isDBUpdateSuccess());
     return new ImmutablePair<>(null != dbUpdates && dbUpdates.isDBUpdateSuccess(), lag);
   }
 
@@ -540,9 +541,8 @@ public class OzoneManagerServiceProviderImpl
     ReconTaskStatusUpdater reconTaskUpdater;
     if (isSyncDataFromOMRunning.compareAndSet(false, true)) {
       try {
-        LOG.info("Syncing data from Ozone Manager.");
         long currentSequenceNumber = getCurrentOMDBSequenceNumber();
-        LOG.debug("Seq number of Recon's OM DB : {}", currentSequenceNumber);
+        LOG.info("Seq number of Recon's OM DB : {}", currentSequenceNumber);
         boolean fullSnapshot = false;
 
         if (currentSequenceNumber <= 0) {
@@ -551,29 +551,27 @@ public class OzoneManagerServiceProviderImpl
           reconTaskUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(
               OmSnapshotTaskName.OmDeltaRequest.name());
 
-          try (OMDBUpdatesHandler omdbUpdatesHandler =
-              new OMDBUpdatesHandler(omMetadataManager)) {
-            LOG.info("Obtaining delta updates from Ozone Manager");
+          // Get updates from OM and apply to local Recon OM DB and update task status in table
+          reconTaskUpdater.recordRunStart();
+          int loopCount = 0;
+          long fromSequenceNumber = currentSequenceNumber;
+          long diffBetweenOMDbAndReconDBSeqNumber = deltaUpdateLimit + 1;
+          /**
+           * This loop will continue to fetch and apply OM DB updates and with every
+           * OM DB fetch request, it will fetch {@code deltaUpdateLimit} count of DB updates.
+           * It continues to fetch from OM till the lag, between OM DB WAL sequence number
+           * and Recon OM DB snapshot WAL sequence number, is less than this lag threshold value.
+           * In high OM write TPS cluster, this simulates continuous pull from OM without any delay.
+           */
+          while (diffBetweenOMDbAndReconDBSeqNumber > omDBLagThreshold) {
+            try (OMDBUpdatesHandler omdbUpdatesHandler =
+                     new OMDBUpdatesHandler(omMetadataManager)) {
 
-            // If interrupt was previously signalled,
-            // we should check for it before starting delta update sync.
-            if (Thread.currentThread().isInterrupted()) {
-              throw new InterruptedException("Thread interrupted during delta update.");
-            }
-
-            // Get updates from OM and apply to local Recon OM DB and update task status in table
-            reconTaskUpdater.recordRunStart();
-            int loopCount = 0;
-            long fromSequenceNumber = currentSequenceNumber;
-            long diffBetweenOMDbAndReconDBSeqNumber = deltaUpdateLimit + 1;
-            /**
-            * This loop will continue to fetch and apply OM DB updates and with every
-            * OM DB fetch request, it will fetch {@code deltaUpdateLimit} count of DB updates.
-            * It continues to fetch from OM till the lag, between OM DB WAL sequence number
-            * and Recon OM DB snapshot WAL sequence number, is less than this lag threshold value.
-            * In high OM write TPS cluster, this simulates continuous pull from OM without any delay.
-            */
-            while (diffBetweenOMDbAndReconDBSeqNumber > omDBLagThreshold) {
+              // If interrupt was previously signalled,
+              // we should check for it before starting delta update sync.
+              if (Thread.currentThread().isInterrupted()) {
+                throw new InterruptedException("Thread interrupted during delta update.");
+              }
               diffBetweenOMDbAndReconDBSeqNumber =
                   getAndApplyDeltaUpdatesFromOM(currentSequenceNumber, omdbUpdatesHandler);
               reconTaskUpdater.setLastTaskRunStatus(0);
@@ -585,25 +583,30 @@ public class OzoneManagerServiceProviderImpl
               currentSequenceNumber = getCurrentOMDBSequenceNumber();
               LOG.debug("Updated current sequence number: {}", currentSequenceNumber);
               loopCount++;
+            } catch (InterruptedException intEx) {
+              LOG.error("OM DB Delta update sync thread was interrupted and delta sync failed.");
+              // We are updating the table even if it didn't run i.e. got interrupted beforehand
+              // to indicate that a task was supposed to run, but it didn't.
+              reconTaskUpdater.setLastTaskRunStatus(-1);
+              reconTaskUpdater.recordRunCompletion();
+              Thread.currentThread().interrupt();
+              // Since thread is interrupted, we do not fall back to snapshot sync.
+              // Return with sync failed status.
+              return false;
+            } catch (Exception e) {
+              metrics.incrNumDeltaRequestsFailed();
+              reconTaskUpdater.setLastTaskRunStatus(-1);
+              reconTaskUpdater.recordRunCompletion();
+              LOG.warn("Unable to get and apply delta updates from OM: {}, falling back to full snapshot",
+                  e.getMessage());
+              fullSnapshot = true;
             }
-            LOG.info("Delta updates received from OM : {} loops, {} records", loopCount,
-                getCurrentOMDBSequenceNumber() - fromSequenceNumber);
-          } catch (InterruptedException intEx) {
-            LOG.error("OM DB Delta update sync thread was interrupted.");
-            // We are updating the table even if it didn't run i.e. got interrupted beforehand
-            // to indicate that a task was supposed to run, but it didn't.
-            reconTaskUpdater.setLastTaskRunStatus(-1);
-            reconTaskUpdater.recordRunCompletion();
-            Thread.currentThread().interrupt();
-            // Since thread is interrupted, we do not fall back to snapshot sync. Return with sync failed status.
-            return false;
-          } catch (Exception e) {
-            metrics.incrNumDeltaRequestsFailed();
-            reconTaskUpdater.setLastTaskRunStatus(-1);
-            reconTaskUpdater.recordRunCompletion();
-            LOG.warn("Unable to get and apply delta updates from OM: {}", e.getMessage());
-            fullSnapshot = true;
+            if (fullSnapshot) {
+              break;
+            }
           }
+          LOG.info("Delta updates received from OM : {} loops, {} records", loopCount,
+              getCurrentOMDBSequenceNumber() - fromSequenceNumber);
         }
 
         if (fullSnapshot) {
