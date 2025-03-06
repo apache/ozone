@@ -692,6 +692,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     if (configurator.getScmContext() != null) {
       scmContext = configurator.getScmContext();
+      if (scmContext.getScm() == null) {
+        scmContext.setSCM(this);
+      }
     } else {
       // non-leader of term 0, in safe mode, preCheck not completed.
       scmContext = new SCMContext.Builder()

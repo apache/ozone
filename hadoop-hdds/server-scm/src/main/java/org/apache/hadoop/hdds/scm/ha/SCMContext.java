@@ -68,7 +68,7 @@ public final class SCMContext {
    */
   private SafeModeStatus safeModeStatus;
 
-  private final OzoneStorageContainerManager scm;
+  private OzoneStorageContainerManager scm;
   private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
   /**
@@ -132,6 +132,15 @@ public final class SCMContext {
     lock.writeLock().lock();
     try {
       this.finalizationCheckpoint = checkpoint;
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  public void setSCM(OzoneStorageContainerManager ozoneScm) {
+    lock.writeLock().lock();
+    try {
+      this.scm = ozoneScm;
     } finally {
       lock.writeLock().unlock();
     }
