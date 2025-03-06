@@ -680,8 +680,8 @@ public class TestOMDbCheckpointServlet {
 
     // Create dummy keys for snapshotting.
     TestDataUtil.createKey(bucket, UUID.randomUUID().toString(), ReplicationConfig
-            .fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE)
-        , "content".getBytes(StandardCharsets.UTF_8));
+            .fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
+        "content".getBytes(StandardCharsets.UTF_8));
     TestDataUtil.createKey(bucket, UUID.randomUUID().toString(), ReplicationConfig
             .fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
         "content".getBytes(StandardCharsets.UTF_8));

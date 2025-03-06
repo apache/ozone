@@ -219,7 +219,7 @@ public final class TestDataUtil {
       OzoneBucket bucket = createVolumeAndBucket(client);
       for (int i = 0; i < numOfKeys; i++) {
         String keyName = RandomStringUtils.randomAlphabetic(5) + i;
-        createKey(bucket, keyName,ReplicationConfig
+        createKey(bucket, keyName, ReplicationConfig
             .fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
             RandomStringUtils.randomAlphabetic(5).getBytes(UTF_8));
         keyLocationMap.put(keyName, lookupOmKeyInfo(cluster, bucket, keyName));
