@@ -36,10 +36,12 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
@@ -50,6 +52,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.Proto2Utils;
 import java.io.IOException;
 import java.time.Instant;
@@ -87,6 +90,7 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
+import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -136,29 +140,29 @@ public class TestReplicationManager {
   public void setup() throws IOException {
     configuration = new OzoneConfiguration();
     configuration.set(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "0s");
+
     containerManager = mock(ContainerManager.class);
+    nodeManager = mock(NodeManager.class);
+    eventPublisher = mock(EventPublisher.class);
+
     ratisPlacementPolicy = mock(PlacementPolicy.class);
     when(ratisPlacementPolicy.validateContainerPlacement(anyList(),
         anyInt())).thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
+    
     ecPlacementPolicy = mock(PlacementPolicy.class);
     when(ecPlacementPolicy.validateContainerPlacement(
         anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
+    
+    clock = new TestClock(Instant.now(), ZoneId.systemDefault());
+    containerReplicaPendingOps = new ContainerReplicaPendingOps(clock);
 
-    scmContext = mock(SCMContext.class);
-
-    nodeManager = mock(NodeManager.class);
     commandsSent = new HashSet<>();
-    eventPublisher = mock(EventPublisher.class);
     doAnswer(invocation -> {
       commandsSent.add(Pair.of(invocation.getArgument(0),
           invocation.getArgument(1)));
       return null;
     }).when(nodeManager).addDatanodeCommand(any(), any());
-
-    clock = new TestClock(Instant.now(), ZoneId.systemDefault());
-    containerReplicaPendingOps =
-        new ContainerReplicaPendingOps(clock);
 
     when(containerManager
         .getContainerReplicas(any(ContainerID.class))).thenAnswer(
@@ -166,29 +170,26 @@ public class TestReplicationManager {
             ContainerID cid = invocation.getArgument(0);
             return containerReplicaMap.get(cid);
           });
-
+    
     when(containerManager.getContainers()).thenAnswer(
         invocation -> new ArrayList<>(containerInfoSet));
-    replicationManager = createReplicationManager();
-    containerReplicaMap = new HashMap<>();
-    containerInfoSet = new HashSet<>();
-    repConfig = new ECReplicationConfig(3, 2);
-    repReport = new ReplicationManagerReport();
-    repQueue = new ReplicationQueue();
-
-    // Ensure that RM will run when asked.
-    when(scmContext.isLeaderReady()).thenReturn(true);
-    when(scmContext.isInSafeMode()).thenReturn(false);
 
     PipelineManager pipelineManager = mock(PipelineManager.class);
     when(pipelineManager.getPipeline(any()))
         .thenReturn(HddsTestUtils.getRandomPipeline());
-
+    
+    StatefulServiceStateManager serviceStateManager = mock(StatefulServiceStateManager.class);
+    
     StorageContainerManager scm = mock(StorageContainerManager.class);
     when(scm.getPipelineManager()).thenReturn(pipelineManager);
     when(scm.getContainerTokenGenerator()).thenReturn(ContainerTokenGenerator.DISABLED);
     when(scm.getStatefulServiceStateManager()).thenReturn(serviceStateManager);
+    
+    scmContext = mock(SCMContext.class);
     when(scmContext.getScm()).thenReturn(scm);
+    when(scmContext.isLeaderReady()).thenReturn(true);
+    when(scmContext.isInSafeMode()).thenReturn(false);
+
     doAnswer(i -> {
       serviceToConfigMap.put(i.getArgument(0, String.class), i.getArgument(1,
           ByteString.class));
@@ -200,6 +201,13 @@ public class TestReplicationManager {
     when(serviceStateManager.readConfiguration(anyString())).thenAnswer(
         i -> serviceToConfigMap.get(i.getArgument(0, String.class)));
 
+    containerReplicaMap = new HashMap<>();
+    containerInfoSet = new HashSet<>();
+    repConfig = new ECReplicationConfig(3, 2);
+    repReport = new ReplicationManagerReport();
+    repQueue = new ReplicationQueue();
+
+    replicationManager = createReplicationManager();
   }
 
   @AfterEach
