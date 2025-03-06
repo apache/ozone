@@ -125,53 +125,54 @@ public abstract class ReclaimableFilter<V> implements CheckedExceptionOperation<
 
   // Initialize the last N snapshots in the chain by acquiring locks. Throw IOException if it fails.
   private void initializePreviousSnapshotsFromChain(String volume, String bucket) throws IOException {
+    if (validateExistingLastNSnapshotsInChain(volume, bucket)) {
+      return;
+    }
     // If existing snapshotIds don't match then close all snapshots and reopen the previous N snapshots.
-    if (!validateExistingLastNSnapshotsInChain(volume, bucket)) {
-      close();
-      try {
-        // Acquire lock only on last N-1 snapshot & current snapshot(AOS if it is null).
-        List<SnapshotInfo> expectedLastNSnapshotsInChain = getLastNSnapshotInChain(volume, bucket);
-        List<UUID> expectedSnapshotIds = expectedLastNSnapshotsInChain.stream()
-            .map(snapshotInfo -> snapshotInfo == null ? null : snapshotInfo.getSnapshotId())
-            .collect(Collectors.toList());
-        List<UUID> lockIds = new ArrayList<>(expectedSnapshotIds.subList(1, expectedSnapshotIds.size()));
-        lockIds.add(currentSnapshotInfo == null ? null : currentSnapshotInfo.getSnapshotId());
+    close();
+    try {
+      // Acquire lock only on last N-1 snapshot & current snapshot(AOS if it is null).
+      List<SnapshotInfo> expectedLastNSnapshotsInChain = getLastNSnapshotInChain(volume, bucket);
+      List<UUID> expectedSnapshotIds = expectedLastNSnapshotsInChain.stream()
+          .map(snapshotInfo -> snapshotInfo == null ? null : snapshotInfo.getSnapshotId())
+          .collect(Collectors.toList());
+      List<UUID> lockIds = new ArrayList<>(expectedSnapshotIds.subList(1, expectedSnapshotIds.size()));
+      lockIds.add(currentSnapshotInfo == null ? null : currentSnapshotInfo.getSnapshotId());
 
-        if (snapshotIdLocks.acquireLock(lockIds).isLockAcquired()) {
-          for (SnapshotInfo snapshotInfo : expectedLastNSnapshotsInChain) {
-            if (snapshotInfo != null) {
-              // For AOS fail operation if any of the previous snapshots are not active. currentSnapshotInfo for
-              // AOS will be null.
-              previousOmSnapshots.add(currentSnapshotInfo == null
-                  ? omSnapshotManager.getActiveSnapshot(snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(),
-                  snapshotInfo.getName())
-                  : omSnapshotManager.getSnapshot(snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(),
-                  snapshotInfo.getName()));
-              previousSnapshotInfos.add(snapshotInfo);
-            } else {
-              previousOmSnapshots.add(null);
-              previousSnapshotInfos.add(null);
-            }
-
-            // TODO: Getting volumeId and bucket from active OM. This would be wrong on volume & bucket renames
-            //  support.
-            volumeId = ozoneManager.getMetadataManager().getVolumeId(volume);
-            String dbBucketKey = ozoneManager.getMetadataManager().getBucketKey(volume, bucket);
-            bucketInfo = ozoneManager.getMetadataManager().getBucketTable().get(dbBucketKey);
+      if (snapshotIdLocks.acquireLock(lockIds).isLockAcquired()) {
+        for (SnapshotInfo snapshotInfo : expectedLastNSnapshotsInChain) {
+          if (snapshotInfo != null) {
+            // For AOS fail operation if any of the previous snapshots are not active. currentSnapshotInfo for
+            // AOS will be null.
+            previousOmSnapshots.add(currentSnapshotInfo == null
+                ? omSnapshotManager.getActiveSnapshot(snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(),
+                snapshotInfo.getName())
+                : omSnapshotManager.getSnapshot(snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(),
+                snapshotInfo.getName()));
+            previousSnapshotInfos.add(snapshotInfo);
+          } else {
+            previousOmSnapshots.add(null);
+            previousSnapshotInfos.add(null);
           }
-        } else {
-          throw new IOException("Lock acquisition failed for last N snapshots : " +
-              expectedLastNSnapshotsInChain + " " + currentSnapshotInfo);
+
+          // TODO: Getting volumeId and bucket from active OM. This would be wrong on volume & bucket renames
+          //  support.
+          volumeId = ozoneManager.getMetadataManager().getVolumeId(volume);
+          String dbBucketKey = ozoneManager.getMetadataManager().getBucketKey(volume, bucket);
+          bucketInfo = ozoneManager.getMetadataManager().getBucketTable().get(dbBucketKey);
         }
-      } catch (IOException e) {
-        this.close();
-        throw e;
+      } else {
+        throw new IOException("Lock acquisition failed for last N snapshots : " +
+            expectedLastNSnapshotsInChain + " " + currentSnapshotInfo);
       }
+    } catch (IOException e) {
+      this.close();
+      throw e;
     }
   }
 
   @Override
-  public Boolean apply(Table.KeyValue<String, V> keyValue) throws IOException {
+  public synchronized Boolean apply(Table.KeyValue<String, V> keyValue) throws IOException {
     String volume = getVolumeName(keyValue);
     String bucket = getBucketName(keyValue);
     initializePreviousSnapshotsFromChain(volume, bucket);
