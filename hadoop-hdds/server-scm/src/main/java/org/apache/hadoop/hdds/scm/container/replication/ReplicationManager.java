@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationManagerConfigurationProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
@@ -76,7 +77,7 @@ import org.apache.hadoop.hdds.scm.container.replication.health.RatisUnhealthyRep
 import org.apache.hadoop.hdds.scm.container.replication.health.VulnerableUnhealthyReplicasHandler;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMService;
+import org.apache.hadoop.hdds.scm.ha.StatefulService;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -100,7 +101,7 @@ import org.slf4j.LoggerFactory;
  * that the containers are properly replicated. Replication Manager deals only
  * with Quasi Closed / Closed container.
  */
-public class ReplicationManager implements SCMService, ContainerReplicaPendingOpsSubscriber {
+public class ReplicationManager extends StatefulService implements ContainerReplicaPendingOpsSubscriber {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(ReplicationManager.class);
@@ -132,12 +133,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
    * interval and processes all the containers.
    */
   private Thread replicationMonitor;
-
-  /**
-   * Flag used for checking if the ReplicationMonitor thread is running or
-   * not.
-   */
-  private volatile boolean running;
 
   /**
    * Report object that is refreshed each time replication Manager runs.
@@ -214,12 +209,12 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
              final Clock clock,
              final ContainerReplicaPendingOps replicaPendingOps)
              throws IOException {
+    super(scmContext.getScm().getStatefulServiceStateManager());
     this.containerManager = containerManager;
     this.scmContext = scmContext;
     this.rmConf = conf.getObject(ReplicationManagerConfiguration.class);
     this.replicationServerConf =
         conf.getObject(ReplicationServer.ReplicationConfig.class);
-    this.running = false;
     this.clock = clock;
     this.containerReport = new ReplicationManagerReport();
     this.eventPublisher = eventPublisher;
@@ -276,9 +271,15 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
    */
   @Override
   public synchronized void start() {
-    if (!isRunning()) {
+    if (!canRun()) {
       LOG.info("Starting Replication Monitor Thread.");
-      running = true;
+      try {
+        saveConfiguration(true);
+      } catch (IOException e) {
+        LOG.warn("Could not save configuration for ReplicationManager. " +
+            "ReplicationManager will not start.", e);
+        return;
+      }
       metrics = ReplicationManagerMetrics.create(this);
       containerReplicaPendingOps.setReplicationMetrics(metrics);
       startSubServices();
@@ -287,13 +288,40 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     }
   }
 
+  public void saveConfiguration(boolean isRunning)
+      throws IOException {
+    saveConfiguration(
+        ReplicationManagerConfigurationProto.newBuilder()
+            .setIsRunning(isRunning)
+            .build());
+  }
+
+  public boolean isRunning() {
+    try {
+      ReplicationManagerConfigurationProto proto =
+          readConfiguration(ReplicationManagerConfigurationProto.class);
+      if (proto == null) {
+        LOG.warn("Could not find persisted configuration for {} when checking" +
+            " if ReplicationManager is running. ReplicationManager should not " +
+            "run now.", this.getServiceName());
+        return false;
+      }
+      return proto.getIsRunning();
+    } catch (IOException e) {
+      LOG.warn("Could not read persisted configuration for checking if " +
+          "ReplicationManager is running. ReplicationManager should not run" +
+          " now.", e);
+      return false;
+    }
+  }
+
   /**
    * Returns true if the Replication Monitor Thread is running.
    *
    * @return true if running, false otherwise
    */
-  public boolean isRunning() {
-    if (!running) {
+  public boolean canRun() {
+    if (!isRunning()) {
       synchronized (this) {
         return replicationMonitor != null
             && replicationMonitor.isAlive();
@@ -307,11 +335,17 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
    */
   @Override
   public synchronized void stop() {
-    if (running) {
+    if (isRunning()) {
       LOG.info("Stopping Replication Monitor Thread.");
+      try {
+        saveConfiguration(false);
+      } catch (IOException e) {
+        LOG.warn("Could not save configuration for ReplicationManager. " +
+            "ReplicationManager will not stop.", e);
+        return;
+      }
       underReplicatedProcessorThread.interrupt();
       overReplicatedProcessorThread.interrupt();
-      running = false;
       metrics.unRegister();
       replicationMonitor.interrupt();
     } else {
@@ -902,7 +936,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
    */
   private synchronized void run() {
     try {
-      while (running) {
+      while (isRunning()) {
         processAll();
         wait(rmConf.getInterval().toMillis());
       }
