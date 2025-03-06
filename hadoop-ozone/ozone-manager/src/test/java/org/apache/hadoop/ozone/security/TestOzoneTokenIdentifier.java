@@ -22,10 +22,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
@@ -236,19 +236,20 @@ public class TestOzoneTokenIdentifier {
   @Test
   public void testReadWriteInProtobuf(@TempDir Path baseDir) throws IOException {
     OzoneTokenIdentifier id = getIdentifierInst();
-    File idFile = baseDir.resolve("tokenFile").toFile();
+    Path idFile = baseDir.resolve("tokenFile");
 
-    FileOutputStream fop = new FileOutputStream(idFile);
-    DataOutputStream dataOutputStream = new DataOutputStream(fop);
-    id.write(dataOutputStream);
-    fop.close();
+    try (OutputStream fop = Files.newOutputStream(idFile)) {
+      DataOutputStream dataOutputStream = new DataOutputStream(fop);
+      id.write(dataOutputStream);
+    }
 
-    FileInputStream fis = new FileInputStream(idFile);
-    DataInputStream dis = new DataInputStream(fis);
-    OzoneTokenIdentifier id2 = new OzoneTokenIdentifier();
+    try (InputStream fis = Files.newInputStream(idFile)) {
+      DataInputStream dis = new DataInputStream(fis);
+      OzoneTokenIdentifier id2 = new OzoneTokenIdentifier();
 
-    id2.readFields(dis);
-    assertEquals(id, id2);
+      id2.readFields(dis);
+      assertEquals(id, id2);
+    }
   }
 
 

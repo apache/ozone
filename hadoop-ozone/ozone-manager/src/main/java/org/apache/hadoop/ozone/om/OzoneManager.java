@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
@@ -108,14 +109,12 @@ import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -1013,8 +1012,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         Files.createDirectories(parent.toPath());
       }
       try (BufferedWriter writer = new BufferedWriter(
-          new OutputStreamWriter(new FileOutputStream(
-              getTempMetricsStorageFile()), StandardCharsets.UTF_8))) {
+          new OutputStreamWriter(Files.newOutputStream(getTempMetricsStorageFile().toPath()), UTF_8))) {
         OmMetricsInfo metricsInfo = new OmMetricsInfo();
         metricsInfo.setNumKeys(metrics.getNumKeys());
         WRITER.writeValue(writer, metricsInfo);
