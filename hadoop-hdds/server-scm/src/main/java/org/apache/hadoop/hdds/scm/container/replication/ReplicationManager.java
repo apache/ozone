@@ -278,7 +278,7 @@ public class ReplicationManager extends StatefulService implements ContainerRepl
    * Notice that if persist is true, it may fail with raft purpose exception.
    */
   public synchronized void start(boolean persist) {
-    if (!started()) {
+    if (!isRunning()) {
       LOG.info("Starting Replication Monitor Thread.");
       if (persist) {
         try {
@@ -366,25 +366,21 @@ public class ReplicationManager extends StatefulService implements ContainerRepl
     }
   }
 
+   /**
+   * Returns true if the Replication Monitor Thread is running.
+   *
+   * @return true if running, false otherwise
+   */
   public boolean isRunning() {
     ReplicationManagerConfigurationProto proto = readConfiguration();
     if (proto == null) {
       LOG.warn("No persisted configuration found for {} when checking operational status. " +
           "This may prevent the ReplicationManager from responding to manual start/stop commands. " +
-          "Defaulting to running state.", this.getServiceName());
-      return true;
+          "Use its thread status to check if it is running.", this.getServiceName());
+      return replicationMonitor != null
+          && replicationMonitor.isAlive();
     }
     return proto.getIsRunning();
-  }
-
-  public boolean started() {
-    if (readConfiguration() == null || !isRunning()) {
-      synchronized (this) {
-        return replicationMonitor != null
-            && replicationMonitor.isAlive();
-      }
-    }
-    return true;
   }
 
   /**

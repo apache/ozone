@@ -256,7 +256,9 @@ public class TestReplicationManager {
   }
 
   @Test
-  public void testPersistConfiguration() {
+  public void testPersistConfiguration() throws IOException {
+    serviceToConfigMap.clear();
+    replicationManager = createDefaultReplicationManager();
     // replicationManager has started in the constructor
     assertTrue(replicationManager.isRunning());
 
