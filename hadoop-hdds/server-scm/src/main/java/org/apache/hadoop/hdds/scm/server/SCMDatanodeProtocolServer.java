@@ -44,6 +44,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
+import com.google.protobuf.TextFormat;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -285,7 +286,7 @@ public class SCMDatanodeProtocolServer implements
         auditMap.append(" encodedToken: \"").append(cmd.getEncodedToken()).append("\"");
         auditMap.append(" deadlineMsSinceEpoch: ").append(cmd.getDeadlineMsSinceEpoch());
       } else {
-        auditMap.append(cmd);
+        auditMap.append(TextFormat.shortDebugString(cmd));
       }
       auditMap.append(", ");
     }
@@ -308,7 +309,7 @@ public class SCMDatanodeProtocolServer implements
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("datanodeUUID", heartbeat.getDatanodeDetails().getUuid());
-    auditMap.put("command", flatten(constructCommandAuditMap(cmdResponses)));
+    auditMap.put("command", constructCommandAuditMap(cmdResponses));
     term.ifPresent(t -> auditMap.put("term", String.valueOf(t)));
     try {
       SCMHeartbeatResponseProto.Builder builder =
@@ -478,13 +479,6 @@ public class SCMDatanodeProtocolServer implements
         .withResult(AuditEventStatus.FAILURE)
         .withException(throwable)
         .build();
-  }
-
-  private static String flatten(String input) {
-    return input
-        .replaceAll(System.lineSeparator(), " ")
-        .trim()
-        .replaceAll(" +", " ");
   }
 
   /**
