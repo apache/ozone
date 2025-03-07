@@ -156,6 +156,7 @@
                     <exclude>org.apache.hadoop.**</exclude>
                     <exclude>org.apache.log4j.**</exclude>
                     <exclude>org.apache.ozone.**</exclude>
+                    <exclude>org.apache.ratis.**</exclude>
                     <!-- These packages are the ones that are not shaded in the hadoop release package.
                       To prevent conflicts, we do not include these packages in the ozone client release package.
                       Ozone will use hadoop / JVM to provide these dependencies. -->
@@ -168,6 +169,10 @@
                     <exclude>org.xml.sax.**</exclude>
                     <exclude>org.wildfly.**</exclude>
                   </excludes>
+                </relocation>
+                <relocation>
+                  <pattern>org.apache.ratis</pattern>
+                  <shadedPattern>${shaded.prefix}.org.apache.ratis</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>com</pattern>
