@@ -33,7 +33,7 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
       new HashMap<>();
   private long mostAvailableSpace = Long.MIN_VALUE;
 
-  AvailableSpaceFilter(long requiredSpace) {
+  public AvailableSpaceFilter(long requiredSpace) {
     this.requiredSpace = requiredSpace;
   }
 
@@ -43,8 +43,7 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
     long volumeCapacity = usage.getCapacity();
     long free = usage.getAvailable();
     long committed = vol.getCommittedBytes();
-    long importContainerCommitBytes = vol.getContainerImportCommittedBytes();
-    long available = free - committed - importContainerCommitBytes;
+    long available = free - committed;
     long volumeFreeSpaceToSpare =
         new VolumeUsage.MinFreeSpaceCalculator(vol.getConf()).get(volumeCapacity);
     boolean hasEnoughSpace = VolumeUsage.hasVolumeEnoughSpace(free, committed,

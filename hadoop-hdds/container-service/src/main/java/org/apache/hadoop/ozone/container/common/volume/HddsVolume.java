@@ -307,14 +307,6 @@ public class HddsVolume extends StorageVolume {
     return committedBytes.get();
   }
 
-  public long incImportContainerCommitBytes(long delta) {
-    return containerImportCommittedBytes.addAndGet(delta);
-  }
-
-  public long getContainerImportCommittedBytes() {
-    return containerImportCommittedBytes.get();
-  }
-
   public void setDbVolume(DbVolume dbVolume) {
     this.dbVolume = dbVolume;
   }

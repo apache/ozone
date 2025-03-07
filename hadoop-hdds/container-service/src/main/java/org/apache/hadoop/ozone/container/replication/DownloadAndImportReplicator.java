@@ -20,12 +20,15 @@ package org.apache.hadoop.ozone.container.replication;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.volume.AvailableSpaceFilter;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 import org.slf4j.Logger;
@@ -80,9 +83,18 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
 
     try {
       targetVolume = containerImporter.chooseNextVolume();
-      targetVolume.incImportContainerCommitBytes(containerSize * 2);
-      if (targetVolume.getCurrentUsage().getAvailable() - targetVolume.getCommittedBytes()
-          - targetVolume.getContainerImportCommittedBytes() <= 0) {
+      // Increment committed bytes and verify if it doesn't cross the space left.
+      targetVolume.incCommittedBytes(containerSize * 2);
+      // Already committed bytes increased above, so required space is not required here in AvailableSpaceFilter
+      AvailableSpaceFilter filter = new AvailableSpaceFilter(0);
+      List<HddsVolume> hddsVolumeList = new ArrayList<>();
+      hddsVolumeList.add(targetVolume);
+      List<HddsVolume> volumeWithEnoughSpace = hddsVolumeList.stream()
+          .filter(filter)
+          .collect(Collectors.toList());
+      if (volumeWithEnoughSpace.isEmpty()) {
+        targetVolume.incCommittedBytes(-containerSize * 2);
+        LOG.error("Container {} replication was unsuccessful, due to no space left", containerID);
         task.setStatus(Status.FAILED);
         return;
       }
@@ -110,7 +122,7 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
       task.setStatus(Status.FAILED);
     } finally {
       if (targetVolume != null) {
-        targetVolume.incImportContainerCommitBytes(-containerSize * 2);
+        targetVolume.incCommittedBytes(-containerSize * 2);
       }
     }
   }

@@ -23,12 +23,16 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerResponse;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.volume.AvailableSpaceFilter;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.util.DiskChecker;
 import org.apache.ratis.grpc.util.ZeroCopyMessageMarshaller;
@@ -86,10 +90,18 @@ class SendContainerRequestHandler
       if (containerId == -1) {
         containerId = req.getContainerID();
         volume = importer.chooseNextVolume();
-        volume.incImportContainerCommitBytes(importer.getDefaultContainerSize() * 2);
-        if (volume.getCurrentUsage().getAvailable() - volume.getCommittedBytes()
-            - volume.getContainerImportCommittedBytes() <= 0) {
-          volume.incImportContainerCommitBytes(-importer.getDefaultContainerSize() * 2);
+        // Increment committed bytes and verify if it doesn't cross the space left.
+        volume.incCommittedBytes(importer.getDefaultContainerSize() * 2);
+        // Already committed bytes increased above, so required space is not required here in AvailableSpaceFilter
+        AvailableSpaceFilter filter = new AvailableSpaceFilter(0);
+        List<HddsVolume> hddsVolumeList = new ArrayList<>();
+        hddsVolumeList.add(volume);
+        List<HddsVolume> volumeWithEnoughSpace = hddsVolumeList.stream()
+            .filter(filter)
+            .collect(Collectors.toList());
+        if (volumeWithEnoughSpace.isEmpty()) {
+          volume.incCommittedBytes(-importer.getDefaultContainerSize() * 2);
+          LOG.error("Container {} import was unsuccessful, due to no space left", containerId);
           volume = null;
           throw new DiskChecker.DiskOutOfSpaceException("No more available volumes");
         }
@@ -126,7 +138,7 @@ class SendContainerRequestHandler
       responseObserver.onError(t);
     } finally {
       if (volume != null) {
-        volume.incImportContainerCommitBytes(-importer.getDefaultContainerSize() * 2);
+        volume.incCommittedBytes(-importer.getDefaultContainerSize() * 2);
       }
     }
   }
@@ -155,7 +167,7 @@ class SendContainerRequestHandler
       }
     } finally {
       if (volume != null) {
-        volume.incImportContainerCommitBytes(-importer.getDefaultContainerSize() * 2);
+        volume.incCommittedBytes(-importer.getDefaultContainerSize() * 2);
       }
     }
   }
