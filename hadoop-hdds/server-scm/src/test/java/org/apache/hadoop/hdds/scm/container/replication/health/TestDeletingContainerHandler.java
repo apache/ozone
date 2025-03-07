@@ -229,6 +229,25 @@ public class TestDeletingContainerHandler {
 
   }
 
+  @Test
+  public void testDeleteCommandIsNotSentForNonEmptyReplica() throws NotLeaderException {
+    // Ratis container
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        ratisReplicationConfig, 1, DELETING);
+    Set<ContainerReplica> containerReplicas = ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(),
+            ContainerReplicaProto.State.CLOSED, 0, 0, 0);
+    verifyDeleteCommandCount(containerInfo, containerReplicas, Collections.emptyList(), 0);
+
+    // EC container
+    containerInfo = ReplicationTestUtil.createContainerInfo(
+        ecReplicationConfig, 1, DELETING);
+    containerReplicas = ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(),
+            ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
+    verifyDeleteCommandCount(containerInfo, containerReplicas, Collections.emptyList(), 0);
+  }
+
   private void verifyDeleteCommandCount(ContainerInfo containerInfo,
                                    Set<ContainerReplica> containerReplicas,
                                    List<ContainerReplicaOp> pendingOps,
