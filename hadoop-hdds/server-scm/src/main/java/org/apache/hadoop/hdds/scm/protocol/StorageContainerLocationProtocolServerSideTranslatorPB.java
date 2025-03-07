@@ -147,7 +147,7 @@ import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1000,8 +1000,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     return HddsProtos.GetScmInfoResponseProto.newBuilder()
         .setClusterId(scmInfo.getClusterId())
         .setScmId(scmInfo.getScmId())
-        .addAllPeerRoles(scmInfo.getRatisPeerRoles())
-        .setScmRatisEnabled(scmInfo.getScmRatisEnabled())
+        .addAllPeerRoles(scmInfo.getPeerRoles())
         .build();
   }
 

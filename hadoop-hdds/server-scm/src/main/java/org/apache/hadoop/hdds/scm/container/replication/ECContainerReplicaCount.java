@@ -552,22 +552,22 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     StringBuilder sb = new StringBuilder();
     sb.append("Container State: ").append(containerInfo.getState())
         .append(", Replicas: (Count: ").append(replicas.size());
-    if (healthyIndexes.size() > 0) {
+    if (!healthyIndexes.isEmpty()) {
       sb.append(", Healthy: ").append(healthyIndexes.size());
     }
-    if (unhealthyReplicaDNs.size() > 0) {
+    if (!unhealthyReplicaDNs.isEmpty()) {
       sb.append(", Unhealthy: ").append(unhealthyReplicaDNs.size());
     }
-    if (decommissionIndexes.size() > 0) {
+    if (!decommissionIndexes.isEmpty()) {
       sb.append(", Decommission: ").append(decommissionIndexes.size());
     }
-    if (maintenanceIndexes.size() > 0) {
+    if (!maintenanceIndexes.isEmpty()) {
       sb.append(", Maintenance: ").append(maintenanceIndexes.size());
     }
-    if (pendingAdd.size() > 0) {
+    if (!pendingAdd.isEmpty()) {
       sb.append(", PendingAdd: ").append(pendingAdd.size());
     }
-    if (pendingDelete.size() > 0) {
+    if (!pendingDelete.isEmpty()) {
       sb.append(", PendingDelete: ").append(pendingDelete.size());
     }
     sb.append(")")

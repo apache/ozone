@@ -65,7 +65,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -220,7 +220,7 @@ public class TestHSyncUpgrade {
     final OzoneManagerProtocol omClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
     final String upgradeClientID = "Test-Upgrade-Client-" + UUID.randomUUID();
-    UpgradeFinalizer.StatusAndMessages finalizationResponse =
+    UpgradeFinalization.StatusAndMessages finalizationResponse =
         omClient.finalizeUpgrade(upgradeClientID);
 
     // The status should transition as soon as the client call above returns
@@ -228,7 +228,7 @@ public class TestHSyncUpgrade {
     // Wait for the finalization to be marked as done.
     // 10s timeout should be plenty.
     await(POLL_MAX_WAIT_MILLIS, POLL_INTERVAL_MILLIS, () -> {
-      final UpgradeFinalizer.StatusAndMessages progress =
+      final UpgradeFinalization.StatusAndMessages progress =
           omClient.queryUpgradeFinalizationProgress(
               upgradeClientID, false, false);
       return isDone(progress.status());

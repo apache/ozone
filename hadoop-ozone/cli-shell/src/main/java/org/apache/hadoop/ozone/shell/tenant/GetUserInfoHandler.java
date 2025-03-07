@@ -50,7 +50,7 @@ public class GetUserInfoHandler extends TenantHandler {
         client.getObjectStore().tenantGetUserInfo(userPrincipal);
     final List<ExtendedUserAccessIdInfo> accessIdInfoList =
         tenantUserInfo.getAccessIdInfoList();
-    if (accessIdInfoList.size() == 0) {
+    if (accessIdInfoList.isEmpty()) {
       err().println("User '" + userPrincipal +
           "' is not assigned to any tenant.");
       return;

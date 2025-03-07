@@ -229,7 +229,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
           LOG.error("Exception attempting to create container {} on volume {}" +
               " remaining volumes to try {}", containerData.getContainerID(),
               containerVolume.getHddsRootDir(), volumes.size(), ex);
-          if (volumes.size() == 0) {
+          if (volumes.isEmpty()) {
             throw new StorageContainerException(
                 "Container creation failed. " + ex.getMessage(), ex,
                 CONTAINER_INTERNAL_ERROR);

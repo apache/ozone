@@ -64,7 +64,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
                                  ozoneConfiguration,
                                  long nsSummaryFlushToDBMaxThreshold) {
     super(reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconOMMetadataManager);
     // true if FileSystemPaths enabled
     enableFileSystemPaths = ozoneConfiguration
         .getBoolean(OmConfig.Keys.ENABLE_FILESYSTEM_PATHS,

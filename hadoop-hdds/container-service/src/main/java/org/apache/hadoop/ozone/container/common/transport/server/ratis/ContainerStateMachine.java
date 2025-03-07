@@ -17,14 +17,18 @@
 
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
+import static java.nio.file.StandardOpenOption.CREATE;
+import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
+import static java.nio.file.StandardOpenOption.WRITE;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
@@ -96,6 +100,7 @@ import org.apache.ratis.statemachine.impl.SingleFileSnapshotInfo;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
+import org.apache.ratis.util.FileUtils;
 import org.apache.ratis.util.JavaUtils;
 import org.apache.ratis.util.LifeCycle;
 import org.apache.ratis.util.TaskQueue;
@@ -327,7 +332,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   public void buildMissingContainerSet(File snapshotFile) throws IOException {
     // initialize the dispatcher with snapshot so that it build the missing
     // container list
-    try (FileInputStream fin = new FileInputStream(snapshotFile)) {
+    try (InputStream fin = Files.newInputStream(snapshotFile.toPath())) {
       ContainerProtos.Container2BCSIDMapProto proto =
               ContainerProtos.Container2BCSIDMapProto
                       .parseFrom(fin);
@@ -374,11 +379,9 @@ public class ContainerStateMachine extends BaseStateMachine {
       final File snapshotFile =
           storage.getSnapshotFile(ti.getTerm(), ti.getIndex());
       LOG.info("{}: Taking a snapshot at:{} file {}", getGroupId(), ti, snapshotFile);
-      try (FileOutputStream fos = new FileOutputStream(snapshotFile)) {
+      try (OutputStream fos = FileUtils.newOutputStreamForceAtClose(snapshotFile, CREATE, TRUNCATE_EXISTING, WRITE)) {
         persistContainerSet(fos);
         fos.flush();
-        // make sure the snapshot file is synced
-        fos.getFD().sync();
       } catch (IOException ioe) {
         LOG.error("{}: Failed to write snapshot at:{} file {}", getGroupId(), ti,
             snapshotFile);

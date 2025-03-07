@@ -29,6 +29,10 @@
   <rule ref="category/java/bestpractices.xml/ForLoopCanBeForeach"/>
   <rule ref="category/java/bestpractices.xml/MissingOverride"/>
   <rule ref="category/java/bestpractices.xml/UnusedPrivateMethod"/>
+  <rule ref="category/java/bestpractices.xml/UnusedPrivateField"/>
+  <rule ref="category/java/bestpractices.xml/UseCollectionIsEmpty" />
+
+  <rule ref="category/java/performance.xml/AvoidFileStream"/>
 
   <exclude-pattern>.*/generated-sources/.*</exclude-pattern>
 </ruleset>

@@ -44,8 +44,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.management.ObjectName;
 import org.apache.hadoop.conf.Configurable;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.DatanodeVersion;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -248,16 +248,16 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
             UserGroupInformation.AuthenticationMethod.KERBEROS)) {
           LOG.info("Ozone security is enabled. Attempting login for Hdds " +
                   "Datanode user. Principal: {},keytab: {}", conf.get(
-                  DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY),
+                  HddsConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY),
               conf.get(
-                  DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY));
+                  HddsConfigKeys.HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY));
 
           UserGroupInformation.setConfiguration(conf);
 
           SecurityUtil
               .login(conf,
-                  DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY,
-                  DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY,
+                  HddsConfigKeys.HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY,
+                  HddsConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY,
                   hostname);
         } else {
           throw new AuthenticationException(SecurityUtil.

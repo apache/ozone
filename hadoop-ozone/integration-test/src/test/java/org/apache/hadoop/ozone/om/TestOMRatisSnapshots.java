@@ -31,9 +31,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -1188,7 +1187,7 @@ public class TestOMRatisSnapshots {
 
     private void createEmptyTarball(File dummyTarFile)
         throws IOException {
-      FileOutputStream fileOutputStream = new FileOutputStream(dummyTarFile);
+      OutputStream fileOutputStream = Files.newOutputStream(dummyTarFile.toPath());
       TarArchiveOutputStream archiveOutputStream =
           new TarArchiveOutputStream(fileOutputStream);
       archiveOutputStream.close();
@@ -1199,7 +1198,7 @@ public class TestOMRatisSnapshots {
         throws IOException {
       Set<String> sstFilenames = new HashSet<>();
       try (TarArchiveInputStream tarInput =
-           new TarArchiveInputStream(new FileInputStream(tarball))) {
+           new TarArchiveInputStream(Files.newInputStream(tarball.toPath()))) {
         TarArchiveEntry entry;
         while ((entry = tarInput.getNextTarEntry()) != null) {
           String name = entry.getName();

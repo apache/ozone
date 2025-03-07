@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto.DeleteBlockTransactionResult;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
@@ -301,6 +302,7 @@ public class TestDeleteBlocksCommandHandler {
     // Setting up the test environment
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS, folder.toString());
+    configuration.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, folder.toString());
     DatanodeDetails datanodeDetails = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeConfiguration dnConf =
         configuration.getObject(DatanodeConfiguration.class);

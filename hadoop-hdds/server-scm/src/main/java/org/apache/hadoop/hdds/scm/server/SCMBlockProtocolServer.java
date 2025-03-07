@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -95,7 +96,6 @@ public class SCMBlockProtocolServer implements
       new AuditLogger(AuditLoggerType.SCMLOGGER);
 
   private final StorageContainerManager scm;
-  private final OzoneConfiguration conf;
   private final RPC.Server blockRpcServer;
   private final InetSocketAddress blockRpcAddress;
   private final ProtocolMessageMetrics<ProtocolMessageEnum>
@@ -108,7 +108,6 @@ public class SCMBlockProtocolServer implements
   public SCMBlockProtocolServer(OzoneConfiguration conf,
       StorageContainerManager scm) throws IOException {
     this.scm = scm;
-    this.conf = conf;
     this.perfMetrics = getPerfMetrics();
     final int handlerCount = conf.getInt(OZONE_SCM_BLOCK_HANDLER_COUNT_KEY,
         OZONE_SCM_HANDLER_COUNT_KEY, OZONE_SCM_HANDLER_COUNT_DEFAULT,
@@ -226,6 +225,10 @@ public class SCMBlockProtocolServer implements
       }
 
       auditMap.put("allocated", String.valueOf(blocks.size()));
+      String blockIDs = blocks.stream().limit(10)
+          .map(block -> block.getBlockID().toString())
+          .collect(Collectors.joining(", ", "[", "]"));
+      auditMap.put("sampleBlocks", blockIDs);
 
       if (blocks.size() < num) {
         AUDIT.logWriteFailure(buildAuditMessageForFailure(

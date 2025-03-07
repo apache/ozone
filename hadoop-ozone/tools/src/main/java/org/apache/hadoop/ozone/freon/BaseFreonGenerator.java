@@ -285,7 +285,7 @@ public class BaseFreonGenerator implements FreonSubcommand {
     failureCounter = new AtomicLong(0);
     attemptCounter = new AtomicLong(0);
 
-    if (prefix.length() == 0) {
+    if (prefix.isEmpty()) {
       prefix = !allowEmptyPrefix() ? RandomStringUtils.randomAlphanumeric(10).toLowerCase() : "";
     } else {
       //replace environment variables to support multi-node execution
@@ -456,7 +456,7 @@ public class BaseFreonGenerator implements FreonSubcommand {
       pipelines = pipelines
           .peek(p -> log.debug("Found pipeline {}", p.getId().getId()));
     }
-    if (pipelineId != null && pipelineId.length() > 0) {
+    if (pipelineId != null && !pipelineId.isEmpty()) {
       pipeline = pipelines
           .filter(p -> p.getId().toString().equals(pipelineId))
           .findFirst()

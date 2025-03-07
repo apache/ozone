@@ -20,11 +20,12 @@ package org.apache.hadoop.ozone.audit.parser.common;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import java.io.BufferedReader;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -134,9 +135,9 @@ public final class DatabaseHelper {
   private static ArrayList<AuditEntry> parseAuditLogs(String filePath)
       throws IOException {
     ArrayList<AuditEntry> listResult = new ArrayList<>();
-    try (FileInputStream fis = new FileInputStream(filePath);
-        InputStreamReader isr = new InputStreamReader(fis, UTF_8);
-        BufferedReader bReader = new BufferedReader(isr)) {
+    try (InputStream fis = Files.newInputStream(Paths.get(filePath));
+         InputStreamReader isr = new InputStreamReader(fis, UTF_8);
+         BufferedReader bReader = new BufferedReader(isr)) {
       String currentLine = bReader.readLine();
       String nextLine = bReader.readLine();
       String[] entry;

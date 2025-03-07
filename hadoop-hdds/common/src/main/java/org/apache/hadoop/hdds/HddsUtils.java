@@ -17,14 +17,14 @@
 
 package org.apache.hadoop.hdds;
 
-import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DNS_INTERFACE_KEY;
-import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DNS_NAMESERVER_KEY;
-import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_HOST_NAME_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_BIND_HOST_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_PORT_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DNS_INTERFACE_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DNS_NAMESERVER_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HOST_NAME_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
@@ -44,7 +44,6 @@ import com.google.protobuf.ServiceException;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 import java.io.File;
-import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
@@ -90,7 +89,6 @@ import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.SizeInBytes;
-import org.apache.ratis.util.function.CheckedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -207,7 +205,7 @@ public final class HddsUtils {
       return Optional.empty();
     }
     String hostname = value.replaceAll("\\:[0-9]+$", "");
-    if (hostname.length() == 0) {
+    if (hostname.isEmpty()) {
       return Optional.empty();
     } else {
       return Optional.of(hostname);
@@ -363,7 +361,7 @@ public final class HddsUtils {
    */
   public static String getHostName(ConfigurationSource conf)
       throws UnknownHostException {
-    String name = conf.get(DFS_DATANODE_HOST_NAME_KEY);
+    String name = conf.get(HDDS_DATANODE_HOST_NAME_KEY);
     if (name == null) {
       String dnsInterface = conf.get(
           CommonConfigurationKeysPublic.HADOOP_SECURITY_DNS_INTERFACE_KEY);
@@ -373,9 +371,9 @@ public final class HddsUtils {
 
       if (dnsInterface == null) {
         // Try the legacy configuration keys.
-        dnsInterface = conf.get(DFS_DATANODE_DNS_INTERFACE_KEY);
-        dnsInterface = conf.get(DFS_DATANODE_DNS_INTERFACE_KEY);
-        nameServer = conf.get(DFS_DATANODE_DNS_NAMESERVER_KEY);
+        dnsInterface = conf.get(HDDS_DATANODE_DNS_INTERFACE_KEY);
+        dnsInterface = conf.get(HDDS_DATANODE_DNS_INTERFACE_KEY);
+        nameServer = conf.get(HDDS_DATANODE_DNS_NAMESERVER_KEY);
       } else {
         // If HADOOP_SECURITY_DNS_* is set then also attempt hosts file
         // resolution if DNS fails. We will not use hosts file resolution
@@ -819,25 +817,6 @@ public final class HddsUtils {
     return id != null && !"".equals(id)
         ? id + "-"
         : "";
-  }
-
-  /**
-   * Execute some code and ensure thread name is not changed
-   * (workaround for HADOOP-18433).
-   */
-  public static <T, E extends IOException> T preserveThreadName(
-      CheckedSupplier<T, E> supplier) throws E {
-    final Thread thread = Thread.currentThread();
-    final String threadName = thread.getName();
-
-    try {
-      return supplier.get();
-    } finally {
-      if (!Objects.equals(threadName, thread.getName())) {
-        LOG.info("Restoring thread name: {}", threadName);
-        thread.setName(threadName);
-      }
-    }
   }
 
   /**
