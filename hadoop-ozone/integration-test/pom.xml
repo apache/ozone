@@ -284,7 +284,6 @@
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>s3</artifactId>
-      <version>2.30.34</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
