@@ -187,13 +187,39 @@ public class ContainerStateMachine extends BaseStateMachine {
     }
   }
 
+  static class WriteFutureContext {
+    private final CompletableFuture<ContainerCommandResponseProto> writeChunkFuture;
+    private final CompletableFuture<Message> raftFuture;
+    private final long startTime;
+
+    WriteFutureContext(CompletableFuture<ContainerCommandResponseProto> writeChunkFuture,
+                       CompletableFuture<Message> raftFuture, long startTime) {
+      this.writeChunkFuture = writeChunkFuture;
+      this.raftFuture = raftFuture;
+      this.startTime = startTime;
+    }
+
+    public CompletableFuture<ContainerCommandResponseProto> getWriteChunkFuture() {
+      return writeChunkFuture;
+    }
+
+    public CompletableFuture<Message> getRaftFuture() {
+      return raftFuture;
+    }
+
+    long getStartTime() {
+      return startTime;
+    }
+  }
+
   private final SimpleStateMachineStorage storage =
       new SimpleStateMachineStorage();
   private final ContainerDispatcher dispatcher;
   private final ContainerController containerController;
   private final XceiverServerRatis ratisServer;
-  private final ConcurrentHashMap<Long,
-      CompletableFuture<ContainerCommandResponseProto>> writeChunkFutureMap;
+  private final ConcurrentHashMap<Long, WriteFutureContext> writeChunkFutureMap;
+  private final long writeChunkWaitMaxMs;
+  private long writeFutureMinIndex = 0;
 
   // keeps track of the containers created per pipeline
   private final Map<Long, Long> container2BCSIDMap;
@@ -273,6 +299,8 @@ public class ContainerStateMachine extends BaseStateMachine {
     this.waitOnBothFollowers = conf.getObject(
         DatanodeConfiguration.class).waitOnAllFollowers();
 
+    this.writeChunkWaitMaxMs = conf.getLong(ScmConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL,
+        ScmConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL_DEFAULT);
   }
 
   private void validatePeers() throws IOException {
@@ -542,6 +570,15 @@ public class ContainerStateMachine extends BaseStateMachine {
   private CompletableFuture<Message> writeStateMachineData(
       ContainerCommandRequestProto requestProto, long entryIndex, long term,
       long startTime) {
+    if (writeChunkFutureMap.containsKey(entryIndex)) {
+      // generally state machine will wait forever, for precaution, a check is added if retry happens.
+      return writeChunkFutureMap.get(entryIndex).getRaftFuture();
+    }
+    try {
+      validateLongRunningWrite(entryIndex);
+    } catch (IOException e) {
+      return completeExceptionally(e);
+    }
     final WriteChunkRequestProto write = requestProto.getWriteChunk();
     RaftServer server = ratisServer.getServer();
     Preconditions.checkArgument(!write.getData().isEmpty());
@@ -591,7 +628,7 @@ public class ContainerStateMachine extends BaseStateMachine {
           }
         }, getChunkExecutor(requestProto.getWriteChunk()));
 
-    writeChunkFutureMap.put(entryIndex, writeChunkFuture);
+    writeChunkFutureMap.put(entryIndex, new WriteFutureContext(writeChunkFuture, raftFuture, startTime));
     if (LOG.isDebugEnabled()) {
       LOG.debug("{}: writeChunk writeStateMachineData : blockId" +
               "{} logIndex {} chunkName {}", getGroupId(), write.getBlockID(),
@@ -637,6 +674,37 @@ public class ContainerStateMachine extends BaseStateMachine {
       return r;
     });
     return raftFuture;
+  }
+
+  private void validateLongRunningWrite(long currIndex) throws IOException {
+    // get min valid write chunk operation's future context
+    WriteFutureContext writeFutureContext = null;
+    for (long i = writeFutureMinIndex; i < currIndex; ++i) {
+      if (writeChunkFutureMap.containsKey(i)) {
+        writeFutureContext = writeChunkFutureMap.get(i);
+        writeFutureMinIndex = i;
+        break;
+      }
+    }
+    if (null == writeFutureContext) {
+      return;
+    }
+    // validate for timeout in milli second
+    long waitTime = Time.monotonicNow() - writeFutureContext.getStartTime() / 1000000;
+    IOException ex = new StorageContainerException("Write chunk has taken " + waitTime + " crossing threshold "
+        + writeChunkWaitMaxMs + " for groupId " + getGroupId(), ContainerProtos.Result.CONTAINER_INTERNAL_ERROR);
+    if (waitTime > writeChunkWaitMaxMs) {
+      LOG.error("Write chunk has taken {}ms crossing threshold {}ms for groupId {}", waitTime, writeChunkWaitMaxMs,
+          getGroupId());
+      stateMachineHealthy.set(false);
+      writeChunkFutureMap.forEach((key, value) -> {
+        LOG.error("Cancelling write chunk for transaction {}, groupId {}", key, getGroupId());
+        value.getWriteChunkFuture().cancel(true);
+        value.getRaftFuture().completeExceptionally(ex);
+      });
+      writeFutureContext.getRaftFuture().completeExceptionally(ex);
+      throw ex;
+    }
   }
 
   private StateMachine.DataChannel getStreamDataChannel(
@@ -821,7 +889,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   public CompletableFuture<Void> flush(long index) {
     return CompletableFuture.allOf(
         writeChunkFutureMap.entrySet().stream().filter(x -> x.getKey() <= index)
-            .map(Map.Entry::getValue).toArray(CompletableFuture[]::new));
+            .map(e -> e.getValue().getWriteChunkFuture()).toArray(CompletableFuture[]::new));
   }
 
   /**
