@@ -180,7 +180,7 @@ public class TestOzoneContainerUpgradeShell {
       TestDataUtil.createVolumeAndBucket(client, VOLUME_NAME, BUCKET_NAME);
       TestDataUtil.createKey(
           client.getObjectStore().getVolume(VOLUME_NAME).getBucket(BUCKET_NAME),
-          keyName, null, "test".getBytes(StandardCharsets.UTF_8));
+          keyName, "test".getBytes(StandardCharsets.UTF_8));
     }
   }
 

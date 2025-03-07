@@ -106,7 +106,7 @@ public class TestCloseContainer {
       throws Exception {
     // Create some keys to write data into the open containers
     for (int i = 0; i < 10; i++) {
-      TestDataUtil.createKey(bucket, "key" + i, null,
+      TestDataUtil.createKey(bucket, "key" + i,
           "this is the content".getBytes(StandardCharsets.UTF_8));
     }
     StorageContainerManager scm = cluster.getStorageContainerManager();
@@ -151,7 +151,7 @@ public class TestCloseContainer {
       throws Exception {
     // Create some keys to write data into the open containers
     for (int i = 0; i < 10; i++) {
-      TestDataUtil.createKey(bucket, "key" + i, null,
+      TestDataUtil.createKey(bucket, "key" + i,
           "this is the content".getBytes(StandardCharsets.UTF_8));
     }
     StorageContainerManager scm = cluster.getStorageContainerManager();

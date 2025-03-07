@@ -375,7 +375,7 @@ public abstract class TestListKeys implements NonHATests.TestCase {
     byte[] input = new byte[length];
     Arrays.fill(input, (byte) 96);
     for (String key : keys) {
-      createKey(ozoneBucket, key, null, input);
+      createKey(ozoneBucket, key, input);
       // Read the key with given key name.
       readkey(ozoneBucket, key, length, input);
     }
