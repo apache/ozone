@@ -40,9 +40,9 @@ import static org.mockito.Mockito.when;
 import com.google.protobuf.Proto2Utils;
 import jakarta.annotation.Nonnull;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -435,7 +435,7 @@ public class TestReplicationSupervisor {
         yamlFile);
     File tarFile = new File(tempDir,
         ContainerUtils.getContainerTarName(containerId));
-    try (FileOutputStream output = new FileOutputStream(tarFile)) {
+    try (OutputStream output = Files.newOutputStream(tarFile.toPath())) {
       ArchiveOutputStream<TarArchiveEntry> archive = new TarArchiveOutputStream(output);
       TarArchiveEntry entry = archive.createArchiveEntry(yamlFile,
           "container.yaml");
