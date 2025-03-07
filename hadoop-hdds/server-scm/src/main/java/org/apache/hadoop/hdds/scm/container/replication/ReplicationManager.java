@@ -268,7 +268,7 @@ public class ReplicationManager extends StatefulService implements ContainerRepl
 
   @Override
   public void start() {
-    start(true);
+    start(false);
   }
 
   /**
@@ -277,7 +277,7 @@ public class ReplicationManager extends StatefulService implements ContainerRepl
    * 
    * Notice that if persist is true, it may fail with raft purpose exception.
    */
-  private synchronized void start(boolean persist) {
+  public synchronized void start(boolean persist) {
     if (!started()) {
       LOG.info("Starting Replication Monitor Thread.");
       if (persist) {
@@ -349,7 +349,7 @@ public class ReplicationManager extends StatefulService implements ContainerRepl
     overReplicatedProcessorThread.start();
   }
 
-  public void saveConfiguration(boolean isRunning)
+  protected void saveConfiguration(boolean isRunning)
       throws IOException {
     saveConfiguration(
         ReplicationManagerConfigurationProto.newBuilder()
@@ -357,7 +357,7 @@ public class ReplicationManager extends StatefulService implements ContainerRepl
             .build());
   }
 
-  private ReplicationManagerConfigurationProto readConfiguration() {
+  protected ReplicationManagerConfigurationProto readConfiguration() {
     try {
       return readConfiguration(ReplicationManagerConfigurationProto.class);
     } catch (IOException e) {

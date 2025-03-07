@@ -33,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -275,15 +276,18 @@ public class TestReplicationManager {
   }
 
   @Test
-  public void testManualStartStopAndPersist() throws IOException {
+  public void testPersistedStartStop() throws IOException {
     serviceToConfigMap.clear();
     replicationManager = createDefaultReplicationManager();
+    assertNull(replicationManager.readConfiguration());
     assertTrue(replicationManager.isRunning());
 
     replicationManager.stop(true);
+    assertNotNull(replicationManager.readConfiguration());
     assertFalse(replicationManager.isRunning());
 
-    replicationManager.start();
+    replicationManager.start(true);
+    assertNotNull(replicationManager.readConfiguration());
     assertTrue(replicationManager.isRunning());
   }
 
