@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.cli.container.upgrade;
+package org.apache.hadoop.ozone.repair.datanode.schemaupgrade;
 
 import java.io.File;
 import java.io.IOException;

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.cli.container.upgrade;
+package org.apache.hadoop.ozone.repair.datanode.schemaupgrade;
 
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
 

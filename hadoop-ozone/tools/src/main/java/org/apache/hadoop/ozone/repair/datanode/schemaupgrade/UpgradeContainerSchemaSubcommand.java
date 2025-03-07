@@ -15,9 +15,8 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.cli.container;
+package org.apache.hadoop.ozone.repair.datanode.schemaupgrade;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import java.io.File;
 import java.io.InputStreamReader;
@@ -25,24 +24,16 @@ import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Scanner;
-import java.util.concurrent.Callable;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.cli.container.upgrade.UpgradeChecker;
-import org.apache.hadoop.hdds.scm.cli.container.upgrade.UpgradeManager;
-import org.apache.hadoop.hdds.scm.cli.container.upgrade.UpgradeUtils;
-import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.hadoop.ozone.repair.RepairTool;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
@@ -50,15 +41,12 @@ import picocli.CommandLine.Command;
  * This is the handler that process container upgrade command.
  */
 @Command(
-    name = "upgrade",
+    name = "upgrade-container-schema",
     description = "Offline upgrade all schema V2 containers to schema V3 " +
         "for this datanode.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class UpgradeSubcommand extends AbstractSubcommand implements Callable<Void> {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(UpgradeSubcommand.class);
+public class UpgradeContainerSchemaSubcommand extends RepairTool {
 
   @CommandLine.Option(names = {"--volume"},
       required = false,
@@ -69,27 +57,16 @@ public class UpgradeSubcommand extends AbstractSubcommand implements Callable<Vo
       description = "Continue without interactive user confirmation")
   private boolean yes;
 
-  private static OzoneConfiguration ozoneConfiguration;
-
+  @Override
+  protected Component serviceToBeOffline() {
+    return Component.DATANODE;
+  }
 
   @Override
-  public Void call() throws Exception {
-    OzoneConfiguration configuration = getConfiguration();
-    // Verify admin privilege
-    OzoneAdmins admins = OzoneAdmins.getOzoneAdmins("", configuration);
-    if (!admins.isAdmin(UserGroupInformation.getCurrentUser())) {
-      out().println("It requires ozone administrator privilege. Current user" +
-          " is " + UserGroupInformation.getCurrentUser() + ".");
-      return null;
-    }
+  public void execute() throws Exception {
+    OzoneConfiguration configuration = getOzoneConf();
 
     final UpgradeChecker upgradeChecker = new UpgradeChecker();
-    Pair<Boolean, String> pair = upgradeChecker.checkDatanodeRunning();
-    final boolean isRunning = pair.getKey();
-    if (isRunning) {
-      out().println(pair.getValue());
-      return null;
-    }
 
     DatanodeDetails dnDetail =
         UpgradeUtils.getDatanodeDetails(configuration);
@@ -103,31 +80,28 @@ public class UpgradeSubcommand extends AbstractSubcommand implements Callable<Vo
 
     if (metadataLayoutFeature.layoutVersion() < needLayoutVersion ||
         softwareLayoutFeature.layoutVersion() < needLayoutVersion) {
-      out().println(String.format(
+      error(
           "Please upgrade your software version, no less than %s," +
               " current metadata layout version is %s," +
               " software layout version is %s",
           HDDSLayoutFeature.DATANODE_SCHEMA_V3.name(),
-          metadataLayoutFeature.name(), softwareLayoutFeature.name()));
-      return null;
+          metadataLayoutFeature.name(), softwareLayoutFeature.name());
+      return;
     }
 
     if (!Strings.isNullOrEmpty(volume)) {
       File volumeDir = new File(volume);
       if (!volumeDir.exists() || !volumeDir.isDirectory()) {
-        out().println(
-            String.format("Volume path %s is not a directory or doesn't exist",
-                volume));
-        return null;
+        error("Volume path %s is not a directory or doesn't exist", volume);
+        return;
       }
       File hddsRootDir = new File(volume + "/" + HddsVolume.HDDS_VOLUME_DIR);
       File versionFile = new File(volume + "/" + HddsVolume.HDDS_VOLUME_DIR +
           "/" + Storage.STORAGE_FILE_VERSION);
       if (!hddsRootDir.exists() || !hddsRootDir.isDirectory() ||
           !versionFile.exists() || !versionFile.isFile()) {
-        out().println(
-            String.format("Volume path %s is not a valid data volume", volume));
-        return null;
+        error("Volume path %s is not a valid data volume", volume);
+        return;
       }
       configuration.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, volume);
     }
@@ -136,10 +110,10 @@ public class UpgradeSubcommand extends AbstractSubcommand implements Callable<Vo
         dnDetail.getPersistedOpState();
 
     if (!opState.equals(HddsProtos.NodeOperationalState.IN_MAINTENANCE)) {
-      out().println("This command requires the datanode's " +
+      error("This command requires the datanode's " +
           "NodeOperationalState to be IN_MAINTENANCE, currently is " +
           opState);
-      return null;
+      return;
     }
 
     List<HddsVolume> allVolume =
@@ -149,15 +123,15 @@ public class UpgradeSubcommand extends AbstractSubcommand implements Callable<Vo
     while (volumeIterator.hasNext()) {
       HddsVolume hddsVolume = volumeIterator.next();
       if (UpgradeChecker.isAlreadyUpgraded(hddsVolume)) {
-        out().println("Volume " + hddsVolume.getVolumeRootDir() +
+        info("Volume " + hddsVolume.getVolumeRootDir() +
             " is already upgraded, skip it.");
         volumeIterator.remove();
       }
     }
 
     if (allVolume.isEmpty()) {
-      out().println("There is no more volume to upgrade. Exit.");
-      return null;
+      info("There is no more volume to upgrade. Exit.");
+      return;
     }
 
     if (!yes) {
@@ -169,25 +143,12 @@ public class UpgradeSubcommand extends AbstractSubcommand implements Callable<Vo
       boolean confirm = scanner.next().trim().equals("yes");
       scanner.close();
       if (!confirm) {
-        return null;
+        return;
       }
     }
 
     // do upgrade
     final UpgradeManager upgradeManager = new UpgradeManager();
     upgradeManager.run(configuration, allVolume);
-    return null;
-  }
-
-  @VisibleForTesting
-  public static void setOzoneConfiguration(OzoneConfiguration config) {
-    ozoneConfiguration = config;
-  }
-
-  private OzoneConfiguration getConfiguration() {
-    if (ozoneConfiguration == null) {
-      ozoneConfiguration = new OzoneConfiguration();
-    }
-    return ozoneConfiguration;
   }
 }
