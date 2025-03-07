@@ -107,7 +107,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
@@ -348,9 +347,10 @@ public class TestReplicationSupervisor {
         .contains("Container 1 replication was unsuccessful.");
   }
 
-  @Test
-  public void testReplicationImportReserveSpace()
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testReplicationImportReserveSpace(ContainerLayoutVersion layout)
       throws IOException, InterruptedException, TimeoutException {
+    this.layoutVersion = layout;
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, tempDir.getAbsolutePath());
 
