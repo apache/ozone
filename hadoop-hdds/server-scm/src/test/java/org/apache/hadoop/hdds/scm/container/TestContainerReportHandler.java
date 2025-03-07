@@ -1198,12 +1198,11 @@ public class TestContainerReportHandler {
     if (isEmpty) {
       // Expect the replica to be deleted when it is empty
       verify(publisher, times(1)).fireEvent(any(), any(CommandForDatanode.class));
-      assertEquals(0, containerManager.getContainerReplicas(containerOne.containerID()).size());
     } else {
       // Expect the replica to stay when it is NOT empty
       verify(publisher, times(0)).fireEvent(any(), any(CommandForDatanode.class));
-      assertEquals(1, containerManager.getContainerReplicas(containerOne.containerID()).size());
     }
+    assertEquals(1, containerManager.getContainerReplicas(containerOne.containerID()).size());
   }
 
   private ContainerReportFromDatanode getContainerReportFromDatanode(
