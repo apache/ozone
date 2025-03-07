@@ -638,4 +638,7 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_COMPACTION_SERVICE_TIMEOUT
       = "ozone.om.compaction.service.timeout";
   public static final String OZONE_COMPACTION_SERVICE_TIMEOUT_DEFAULT = "10m";
+  public static final String OZONE_OM_COMPACTION_SERVICE_THRESHOLD
+      = "ozone.om.compaction.service.threshold";
+  public static final String OZONE_COMPACTION_SERVICE_THRESHOLD_DEFAULT = "10000";
 }

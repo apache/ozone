@@ -19,13 +19,13 @@
 package org.apache.hadoop.ozone.om.service;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
+import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -34,11 +34,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 
 /**
  * This is the background service to compact OM rocksdb tables.
@@ -54,14 +60,13 @@ public class CompactionService extends BackgroundService {
   private final OMMetadataManager omMetadataManager;
   private final AtomicLong numCompactions;
   private final AtomicBoolean suspended;
-  private Set<String> tablesToCompact = new HashSet<>();
-  // this counter is used by OMDirectoriesPurgeResponseWithFSO to track the number of directories deleted
-  private final AtomicLong uncompactedDirDeletes = new AtomicLong(0);
-  private final AtomicLong uncompactedFileDeletes = new AtomicLong(0);
-  private final AtomicLong uncompactedDeletes = new AtomicLong(0);
+  private final long compactionThreshold;
+  // list of tables that can be compacted
+  private static final List<String> COMPACTABLE_TABLES =
+      Arrays.asList(DELETED_DIR_TABLE, DELETED_TABLE, DIRECTORY_TABLE, FILE_TABLE, KEY_TABLE);
 
   public CompactionService(OzoneManager ozoneManager, TimeUnit unit, long interval, long timeout,
-      ConfigurationSource conf) {
+      long compactionThreshold) {
     super("CompactionService", interval, unit,
         COMPACTOR_THREAD_POOL_SIZE, timeout,
         ozoneManager.getThreadNamePrefix());
@@ -70,6 +75,7 @@ public class CompactionService extends BackgroundService {
 
     this.numCompactions = new AtomicLong(0);
     this.suspended = new AtomicBoolean(false);
+    this.compactionThreshold = compactionThreshold;
   }
 
   /**
@@ -100,64 +106,56 @@ public class CompactionService extends BackgroundService {
 
 
   public AtomicLong getUncompactedDirDeletes() {
-    return uncompactedDirDeletes;
+    TypedTable table = (TypedTable)omMetadataManager.getTable(DELETED_DIR_TABLE);
+    return table.getUncompactedDeletes();
   }
 
   public AtomicLong getUncompactedDeletes() {
-    return uncompactedDeletes;
+    TypedTable table = (TypedTable)omMetadataManager.getTable(DELETED_TABLE);
+    return table.getUncompactedDeletes();
+  }
+
+  public AtomicLong getUncompactedDeletedDirs() {
+    TypedTable table = (TypedTable)omMetadataManager.getTable(DIRECTORY_TABLE);
+    return table.getUncompactedDeletes();
   }
 
   public AtomicLong getUncompactedFileDeletes() {
-    return uncompactedFileDeletes;
-  }
-
-  public void compactDirectoryTableIfNeeded(long batchSize) throws IOException {
-
-    String columnFamilyName = "directoryTable";
-    long compactionThreshold = 10 * 1000;
-    if (uncompactedDirDeletes.addAndGet(batchSize) < compactionThreshold) {
-      return;
-    }
-    addTask(columnFamilyName);
-    uncompactedDirDeletes.set(0);
-  }
-
-  public void compactFileTableIfNeeded(long batchSize) {
-    String columnFamilyName = "fileTable";
-    long compactionThreshold = 10 * 1000;
-    if (uncompactedFileDeletes.addAndGet(batchSize) < compactionThreshold) {
-      return;
-    }
-    addTask(columnFamilyName);
-    uncompactedFileDeletes.set(0);
-  }
-
-  public void compactDeletedTableIfNeeded(long batchSize) {
-    String columnFamilyName = "deletedTable";
-    long compactionThreshold = 10 * 1000;
-    if (uncompactedDeletes.addAndGet(batchSize) < compactionThreshold) {
-      return;
-    }
-    addTask(columnFamilyName);
-    uncompactedDeletes.set(0);
+    TypedTable table = (TypedTable)omMetadataManager.getTable(FILE_TABLE);
+    return table.getUncompactedDeletes();
   }
 
   @Override
   public synchronized BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
-    for (String table : tablesToCompact) {
-      queue.add(new CompactTask(table));
-    }
-    tablesToCompact.clear();
-    return queue;
-  }
 
-  public synchronized void addTask(String tableName) {
-    tablesToCompact.add(tableName);
+    for (String tableName : COMPACTABLE_TABLES) {
+      TypedTable table = (TypedTable)omMetadataManager.getTable(tableName);
+      if (table.getUncompactedDeletes().get() > compactionThreshold) {
+        queue.add(new CompactTask(tableName));
+        table.resetUncompactedDeletes();
+      }
+    }
+    return queue;
   }
 
   private boolean shouldRun() {
     return !suspended.get();
+  }
+
+  protected void compactFully(String tableName) throws IOException {
+    long startTime = Time.monotonicNow();
+    LOG.info("Compacting column family: {}", tableName);
+    try (ManagedCompactRangeOptions options = new ManagedCompactRangeOptions()) {
+      options.setBottommostLevelCompaction(
+          ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
+      // Find CF Handler
+      RocksDatabase rocksDatabase = ((RDBStore) omMetadataManager.getStore()).getDb();
+      RocksDatabase.ColumnFamily columnFamily = rocksDatabase.getColumnFamily(tableName);
+      rocksDatabase.compactRange(columnFamily, null, null, options);
+      LOG.info("Compaction of column family: {} completed in {} ms",
+          tableName, Time.monotonicNow() - startTime);
+    }
   }
 
   private class CompactTask implements BackgroundTask {
@@ -179,23 +177,11 @@ public class CompactionService extends BackgroundService {
         return BackgroundTaskResult.EmptyTaskResult.newResult();
       }
       LOG.debug("Running CompactTask");
-      long startTime = Time.monotonicNow();
-      LOG.info("Compacting column family: {}", tableName);
-      try (ManagedCompactRangeOptions options = new ManagedCompactRangeOptions()) {
-        options.setBottommostLevelCompaction(
-            ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
-        // Find CF Handler
-        RocksDatabase.ColumnFamily columnFamily =
-            ((RDBStore) omMetadataManager.getStore()).getDb()
-                .getColumnFamily(tableName);
-        ((RDBStore) omMetadataManager.getStore()).getDb().compactRange(
-            columnFamily, null, null, options);
-        LOG.info("Compaction of column family: {} completed in {} ms",
-            tableName, Time.monotonicNow() - startTime);
-        numCompactions.incrementAndGet();
-      }
 
+      compactFully(tableName);
+      numCompactions.incrementAndGet();
       return () -> 1;
     }
   }
+
 }

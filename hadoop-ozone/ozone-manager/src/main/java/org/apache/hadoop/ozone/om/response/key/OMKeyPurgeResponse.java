@@ -27,7 +27,6 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
-import org.apache.hadoop.ozone.om.service.CompactionService;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -37,7 +36,6 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
 import java.util.List;
-
 import jakarta.annotation.Nonnull;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
@@ -75,8 +73,6 @@ public class OMKeyPurgeResponse extends OmKeyResponse {
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
-    CompactionService compactionService = ((OmMetadataManagerImpl) omMetadataManager).getOzoneManager().
-        getKeyManager().getCompactionService();
 
     if (fromSnapshot != null) {
       OmSnapshotManager omSnapshotManager =
@@ -90,14 +86,14 @@ public class OMKeyPurgeResponse extends OmKeyResponse {
         // Init Batch Operation for snapshot db.
         try (BatchOperation writeBatch =
             fromSnapshotStore.initBatchOperation()) {
-          processKeys(writeBatch, fromOmSnapshot.getMetadataManager(), compactionService);
+          processKeys(writeBatch, fromOmSnapshot.getMetadataManager());
           processKeysToUpdate(writeBatch, fromOmSnapshot.getMetadataManager());
           fromSnapshotStore.commitBatchOperation(writeBatch);
         }
       }
       omMetadataManager.getSnapshotInfoTable().putWithBatch(batchOperation, fromSnapshot.getTableKey(), fromSnapshot);
     } else {
-      processKeys(batchOperation, omMetadataManager, compactionService);
+      processKeys(batchOperation, omMetadataManager);
       processKeysToUpdate(batchOperation, omMetadataManager);
     }
   }
@@ -118,12 +114,11 @@ public class OMKeyPurgeResponse extends OmKeyResponse {
   }
 
   private void processKeys(BatchOperation batchOp,
-      OMMetadataManager metadataManager, CompactionService compactionService) throws IOException {
+      OMMetadataManager metadataManager) throws IOException {
     for (String key : purgeKeyList) {
       metadataManager.getDeletedTable().deleteWithBatch(batchOp,
           key);
     }
-    compactionService.compactDeletedTableIfNeeded(purgeKeyList.size());
   }
 
 }

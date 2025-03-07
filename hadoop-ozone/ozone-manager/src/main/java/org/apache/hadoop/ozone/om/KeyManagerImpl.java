@@ -138,10 +138,12 @@ import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_COMPACTION_SERVICE_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_COMPACTION_SERVICE_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_COMPACTION_SERVICE_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_COMPACTION_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_THRESHOLD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_CLEANUP_SERVICE_INTERVAL;
@@ -390,9 +392,12 @@ public class KeyManagerImpl implements KeyManager {
           OZONE_OM_COMPACTION_SERVICE_TIMEOUT,
           OZONE_COMPACTION_SERVICE_TIMEOUT_DEFAULT,
           TimeUnit.MILLISECONDS);
+      long compactionThreshold = configuration.getTimeDuration(
+          OZONE_OM_COMPACTION_SERVICE_THRESHOLD,
+          OZONE_COMPACTION_SERVICE_THRESHOLD_DEFAULT,
+          TimeUnit.MILLISECONDS);
       compactionService = new CompactionService(ozoneManager, TimeUnit.MILLISECONDS,
-          compactionInterval,
-          serviceTimeout, configuration);
+          compactionInterval, serviceTimeout, compactionThreshold);
       compactionService.start();
     }
   }

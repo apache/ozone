@@ -355,5 +355,9 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
         .getOzoneManager().getKeyManager().getCompactionService();
     assertEquals(deletedKeyNames.size(),
         compactionService.getUncompactedFileDeletes().get());
+    assertEquals(0,
+        compactionService.getUncompactedDirDeletes().get());
+    assertEquals(0,
+        compactionService.getUncompactedDeletedDirs().get());
   }
 }

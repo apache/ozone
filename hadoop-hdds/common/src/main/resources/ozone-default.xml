@@ -1536,7 +1536,6 @@
       Unit could be defined with postfix (ns,ms,s,m,h,d)
     </description>
   </property>
-
   <property>
     <name>ozone.om.compaction.service.timeout</name>
     <value>10m</value>
@@ -1545,6 +1544,15 @@
       greater than 0, the service will stop waiting for compaction
       completion after this time.
       Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.compaction.service.threshold</name>
+    <value>10000</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      Compact rocksdb column families when the number of deleted keys
+      exceeds this number.
     </description>
   </property>
 

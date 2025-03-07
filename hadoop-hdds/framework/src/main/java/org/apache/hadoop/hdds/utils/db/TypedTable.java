@@ -26,6 +26,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -68,6 +69,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   private final CodecBuffer.Capacity bufferCapacity
       = new CodecBuffer.Capacity(this, BUFFER_SIZE_DEFAULT);
   private final TableCache<KEY, VALUE> cache;
+  private final AtomicLong uncompactedDeletes = new AtomicLong(0);
 
   /**
    * The same as this(rawTable, codecRegistry, keyType, valueType,
@@ -400,17 +402,28 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     } else {
       rawTable.delete(encodeKey(key));
     }
+    uncompactedDeletes.addAndGet(1);
   }
 
   @Override
   public void deleteWithBatch(BatchOperation batch, KEY key)
       throws IOException {
     rawTable.deleteWithBatch(batch, encodeKey(key));
+    uncompactedDeletes.addAndGet(1);
   }
 
   @Override
   public void deleteRange(KEY beginKey, KEY endKey) throws IOException {
     rawTable.deleteRange(encodeKey(beginKey), encodeKey(endKey));
+  }
+
+  public AtomicLong getUncompactedDeletes() {
+    return uncompactedDeletes;
+  }
+
+
+  public void resetUncompactedDeletes() {
+    uncompactedDeletes.set(0);
   }
 
   @Override

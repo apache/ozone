@@ -22,12 +22,11 @@ package org.apache.hadoop.ozone.om.service;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
-import org.apache.hadoop.ozone.om.KeyManager;
-import org.apache.hadoop.ozone.om.OmTestManagers;
+import org.apache.hadoop.hdds.utils.db.TypedTable;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
 import org.junit.jupiter.api.Test;
@@ -42,20 +41,21 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(OrderAnnotation.class)
 class TestCompactionService {
-  private OzoneManager om;
   private static final Logger LOG =
       LoggerFactory.getLogger(TestCompactionService.class);
 
   private static final int SERVICE_INTERVAL = 1;
   private static final int WAIT_TIME = (int) Duration.ofSeconds(10).toMillis();
-  private KeyManager keyManager;
 
   @BeforeAll
   void setup(@TempDir Path tempDir) throws Exception {
@@ -67,16 +67,6 @@ class TestCompactionService {
     conf.setTimeDuration(OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL,
         SERVICE_INTERVAL, TimeUnit.MILLISECONDS);
     conf.setQuietMode(false);
-    OmTestManagers omTestManagers = new OmTestManagers(conf);
-    keyManager = omTestManagers.getKeyManager();
-    om = omTestManagers.getOzoneManager();
-  }
-
-  @AfterAll
-  void cleanup() {
-    if (om.stop()) {
-      om.join();
-    }
   }
 
   /**
@@ -87,8 +77,25 @@ class TestCompactionService {
   @Timeout(300)
   @Test
   public void testCompact() throws Exception {
+    OzoneManager ozoneManager = mock(OzoneManager.class);
+    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
 
-    CompactionService compactionService = keyManager.getCompactionService();
+    TypedTable table = mock(TypedTable.class);
+    AtomicLong numDeletes = new AtomicLong(2);
+
+    when(ozoneManager.getMetadataManager()).thenReturn(metadataManager);
+    when(metadataManager.getTable(anyString())).thenReturn(table);
+    when(table.getUncompactedDeletes()).thenReturn(numDeletes);
+
+    CompactionService compactionService = new CompactionService(ozoneManager, TimeUnit.MILLISECONDS,
+        TimeUnit.SECONDS.toMillis(SERVICE_INTERVAL), TimeUnit.SECONDS.toMillis(60), 1) {
+
+      @Override
+      public void compactFully(String tableName) throws IOException {
+        LOG.info("Compacting column family: {}", tableName);
+      }
+    };
+    compactionService.start();
 
     compactionService.suspend();
     // wait for submitted tasks to complete
@@ -96,13 +103,12 @@ class TestCompactionService {
     final long oldkeyCount = compactionService.getNumCompactions();
     LOG.info("oldkeyCount={}", oldkeyCount);
 
-    final int keyCount = 1;
-    compactionService.addTask(FILE_TABLE);
+    final int compactionTriggered = 1;
 
     compactionService.resume();
 
     GenericTestUtils.waitFor(
-        () -> compactionService.getNumCompactions() >= oldkeyCount + keyCount,
+        () -> compactionService.getNumCompactions() >= oldkeyCount + compactionTriggered,
         SERVICE_INTERVAL, WAIT_TIME);
   }
 
