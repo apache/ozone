@@ -40,7 +40,7 @@ fi
 if [[ "${FAIL_FAST}" == "true" ]]; then
   MAVEN_OPTIONS="${MAVEN_OPTIONS} --fail-fast -Dsurefire.skipAfterFailureCount=1"
 else
-  MAVEN_OPTIONS="${MAVEN_OPTIONS} --fail-at-end"
+  MAVEN_OPTIONS="${MAVEN_OPTIONS} --fail-never"
 fi
 
 # apply module access args (for Java 9+)
