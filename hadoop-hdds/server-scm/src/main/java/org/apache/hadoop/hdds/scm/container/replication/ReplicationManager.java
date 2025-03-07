@@ -301,15 +301,21 @@ public class ReplicationManager extends StatefulService implements ContainerRepl
    * Stops Replication Monitor thread.
    */
   @Override
-  public synchronized void stop() {
+  public void stop() {
+    stop(false);
+  }
+
+  public synchronized void stop(boolean persist) {
     if (isRunning()) {
       LOG.info("Stopping Replication Monitor Thread.");
-      try {
-        saveConfiguration(false);
-      } catch (IOException e) {
-        LOG.warn("Could not save configuration for ReplicationManager. " +
-            "ReplicationManager will not stop.", e);
-        return;
+      if (persist) {
+        try {
+          saveConfiguration(false);
+        } catch (IOException e) {
+          LOG.warn("Could not save configuration for ReplicationManager. " +
+              "ReplicationManager will not stop.", e);
+          return;
+        }
       }
       underReplicatedProcessorThread.interrupt();
       overReplicatedProcessorThread.interrupt();
@@ -363,9 +369,9 @@ public class ReplicationManager extends StatefulService implements ContainerRepl
   public boolean isRunning() {
     ReplicationManagerConfigurationProto proto = readConfiguration();
     if (proto == null) {
-      LOG.warn("Could not find existing persisted configuration for {} when checking" +
-          " if ReplicationManager is running. ReplicationManager may not receive any manual " +
-          "start/stop commands. So make it running as default.", this.getServiceName());
+      LOG.warn("No persisted configuration found for {} when checking operational status. " +
+          "This may prevent the ReplicationManager from responding to manual start/stop commands. " +
+          "Defaulting to running state.", this.getServiceName());
       return true;
     }
     return proto.getIsRunning();
@@ -1391,11 +1397,6 @@ public class ReplicationManager extends StatefulService implements ContainerRepl
   public void notifyStatusChanged() {
     serviceLock.lock();
     try {
-      // if (scmContext.isLeaderReady() && readConfiguration() == null) {
-      //   // It's the first leader among the HA nodes, we need to start the service.
-      //   LOG.info("It's the first leader among the HA nodes, we need to start the service.");
-      //   CompletableFuture.runAsync(() -> start());
-      // }
 
       // 1) SCMContext#isLeaderReady returns true.
       // 2) not in safe mode.

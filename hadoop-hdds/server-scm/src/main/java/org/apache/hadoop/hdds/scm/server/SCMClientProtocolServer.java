@@ -964,7 +964,7 @@ public class SCMClientProtocolServer implements
     getScm().checkAdminAccess(getRemoteUser(), false);
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.STOP_REPLICATION_MANAGER, null));
-    scm.getReplicationManager().stop();
+    scm.getReplicationManager().stop(true);
   }
 
   @Override

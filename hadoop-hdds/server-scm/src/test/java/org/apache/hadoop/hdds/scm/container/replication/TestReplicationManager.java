@@ -255,7 +255,7 @@ public class TestReplicationManager {
   }
 
   @Test
-  public void testIsRunning() {
+  public void testPersistConfiguration() {
     // replicationManager has started in the constructor
     assertTrue(replicationManager.isRunning());
 
@@ -275,12 +275,12 @@ public class TestReplicationManager {
   }
 
   @Test
-  public void testStartStop() throws IOException {
+  public void testManualStartStopAndPersist() throws IOException {
     serviceToConfigMap.clear();
     replicationManager = createDefaultReplicationManager();
     assertTrue(replicationManager.isRunning());
 
-    replicationManager.stop();
+    replicationManager.stop(true);
     assertFalse(replicationManager.isRunning());
 
     replicationManager.start();
