@@ -225,38 +225,72 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     containerSet.addContainer(kvContainer);
     KeyValueHandler keyValueHandler = createKeyValueHandler(containerSet);
     List<ContainerProtos.ChunkInfo> chunkInfoList = new ArrayList<>();
-    chunkInfoList.add(getChunkInfo().getProtoBufMessage());
+    ChunkInfo info = new ChunkInfo(String.format("%d.data.%d", getBlockID().getLocalID(), 0), 0L, 20L);
+
+    chunkInfoList.add(info.getProtoBufMessage());
     BlockData putBlockData = new BlockData(getBlockID());
     putBlockData.setChunks(chunkInfoList);
+
+    ChunkBuffer chunkData = ContainerTestHelper.getData(20);
+    keyValueHandler.writeChunkForClosedContainer(info, getBlockID(), chunkData, kvContainer);
     keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 1L, true);
-    Assertions.assertEquals(containerData.getBlockCommitSequenceId(), 1L);
-    Assertions.assertEquals(containerData.getBlockCount(), 1L);
+    assertEquals(1L, containerData.getBlockCommitSequenceId());
+    assertEquals(1L, containerData.getBlockCount());
+    assertEquals(20L, containerData.getBytesUsed());
 
     try (DBHandle dbHandle = BlockUtils.getDB(containerData, new OzoneConfiguration())) {
       long localID = putBlockData.getLocalID();
       BlockData getBlockData = dbHandle.getStore().getBlockDataTable()
           .get(containerData.getBlockKey(localID));
       Assertions.assertTrue(blockDataEquals(putBlockData, getBlockData));
+      assertEquals(20L, dbHandle.getStore().getMetadataTable().get(containerData.getBytesUsedKey()));
     }
 
     // Add another chunk and check the put block data
-    ChunkInfo newChunkInfo = new ChunkInfo(String.format("%d.data.%d", getBlockID()
-        .getLocalID(), 1L), 0, 20L);
+    ChunkInfo newChunkInfo = new ChunkInfo(String.format("%d.data.%d", getBlockID().getLocalID(), 1L), 20L, 20L);
     chunkInfoList.add(newChunkInfo.getProtoBufMessage());
     putBlockData.setChunks(chunkInfoList);
+
+    chunkData = ContainerTestHelper.getData(20);
+    keyValueHandler.writeChunkForClosedContainer(newChunkInfo, getBlockID(), chunkData, kvContainer);
     keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 2L, true);
-    Assertions.assertEquals(containerData.getBlockCommitSequenceId(), 2L);
-    Assertions.assertEquals(containerData.getBlockCount(), 1L);
+    assertEquals(2L, containerData.getBlockCommitSequenceId());
+    assertEquals(1L, containerData.getBlockCount());
+    assertEquals(40L, containerData.getBytesUsed());
 
     try (DBHandle dbHandle = BlockUtils.getDB(containerData, new OzoneConfiguration())) {
       long localID = putBlockData.getLocalID();
       BlockData getBlockData = dbHandle.getStore().getBlockDataTable()
           .get(containerData.getBlockKey(localID));
       Assertions.assertTrue(blockDataEquals(putBlockData, getBlockData));
+      assertEquals(40L, dbHandle.getStore().getMetadataTable().get(containerData.getBytesUsedKey()));
+    }
+
+    // Replace the last chunk with a chunk of greater size, This should only update the bytesUsed with
+    // difference in length between the old last chunk and new last chunk
+    newChunkInfo = new ChunkInfo(String.format("%d.data.%d", getBlockID().getLocalID(), 1L), 20L, 30L);
+    chunkInfoList.remove(chunkInfoList.size() - 1);
+    chunkInfoList.add(newChunkInfo.getProtoBufMessage());
+    putBlockData.setChunks(chunkInfoList);
+
+    chunkData = ContainerTestHelper.getData(30);
+    keyValueHandler.writeChunkForClosedContainer(newChunkInfo, getBlockID(), chunkData, kvContainer);
+    keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 2L, true);
+    assertEquals(2L, containerData.getBlockCommitSequenceId());
+    assertEquals(1L, containerData.getBlockCount());
+    // Old chunk size 20, new chunk size 30, difference 10. So bytesUsed should be 40 + 10 = 50
+    assertEquals(50L, containerData.getBytesUsed());
+
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, new OzoneConfiguration())) {
+      long localID = putBlockData.getLocalID();
+      BlockData getBlockData = dbHandle.getStore().getBlockDataTable()
+          .get(containerData.getBlockKey(localID));
+      Assertions.assertTrue(blockDataEquals(putBlockData, getBlockData));
+      assertEquals(50L, dbHandle.getStore().getMetadataTable().get(containerData.getBytesUsedKey()));
     }
 
     keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 2L, true);
-    Assertions.assertEquals(containerData.getBlockCommitSequenceId(), 2L);
+    assertEquals(2L, containerData.getBlockCommitSequenceId());
   }
 
   private boolean blockDataEquals(BlockData putBlockData, BlockData getBlockData) {
