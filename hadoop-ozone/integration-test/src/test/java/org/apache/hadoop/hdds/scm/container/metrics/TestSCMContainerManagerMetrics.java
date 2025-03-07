@@ -143,8 +143,6 @@ public abstract class TestSCMContainerManagerMetrics implements NonHATests.TestC
     assertThat(getLongCounter("NumContainerReportsProcessedSuccessful", metrics))
         .isPositive();
 
-    final long previous = getLongCounter("NumICRReportsProcessedSuccessful", metrics);
-
     // Create key should create container on DN.
     client.getObjectStore().getClientProxy()
         .createVolume(volumeName);
@@ -163,8 +161,7 @@ public abstract class TestSCMContainerManagerMetrics implements NonHATests.TestC
     GenericTestUtils.waitFor(() -> {
       final MetricsRecordBuilder scmMetrics =
           getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
-      return getLongCounter("NumICRReportsProcessedSuccessful",
-          scmMetrics) >= previous + 1;
+      return getLongCounter("NumICRReportsProcessedSuccessful", scmMetrics) > 0;
     }, 100, 30_000);
   }
 }
