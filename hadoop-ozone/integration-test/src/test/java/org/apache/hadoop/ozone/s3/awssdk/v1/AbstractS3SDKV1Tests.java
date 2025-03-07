@@ -70,7 +70,6 @@ import com.amazonaws.services.s3.transfer.model.UploadResult;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
@@ -995,7 +994,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     // Upload the file parts.
     long filePosition = 0;
     long fileLength = file.length();
-    try (FileInputStream fileInputStream = new FileInputStream(file)) {
+    try (InputStream fileInputStream = Files.newInputStream(file.toPath())) {
       for (int i = 1; filePosition < fileLength; i++) {
         // Because the last part could be less than 5 MB, adjust the part size as
         // needed.

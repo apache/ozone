@@ -42,7 +42,7 @@ public class ContinueToken {
     Preconditions.checkNotNull(lastKey,
         "The last key can't be null in the continue token.");
     this.lastKey = lastKey;
-    if (lastDir != null && lastDir.length() > 0) {
+    if (lastDir != null && !lastDir.isEmpty()) {
       this.lastDir = lastDir;
     }
   }

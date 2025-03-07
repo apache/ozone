@@ -48,10 +48,6 @@ import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
 public final class HddsClientUtils {
-
-  private HddsClientUtils() {
-  }
-
   private static final List<Class<? extends Exception>> EXCEPTION_LIST =
       ImmutableList.<Class<? extends Exception>>builder()
           .add(TimeoutException.class)
@@ -63,6 +59,9 @@ public final class HddsClientUtils {
           // does not succeed
           .add(NotReplicatedException.class)
           .build();
+
+  private HddsClientUtils() {
+  }
 
   private static void doNameChecks(String resName, String resType) {
     if (resName == null) {

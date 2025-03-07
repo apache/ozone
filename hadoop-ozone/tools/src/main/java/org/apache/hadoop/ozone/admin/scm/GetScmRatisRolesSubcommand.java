@@ -58,30 +58,21 @@ public class GetScmRatisRolesSubcommand extends ScmSubcommand {
 
   private static final String SCM_ROLES_TITLE = "Storage Container Manager Roles";
 
-  private static final List<String> RATIS_SCM_ROLES_HEADER = Arrays.asList(
+  private static final List<String> SCM_ROLES_HEADER = Arrays.asList(
       "Host Name", "Ratis Port", "Role",  "Node ID", "Host Address");
-
-  private static final List<String> STANDALONE_SCM_ROLES_HEADER = Arrays.asList("Host Name", "Port");
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    List<String> ratisRoles = scmClient.getScmRatisRoles();
-    boolean isRatisEnabled = scmClient.isScmRatisEnable();
+    List<String> peerRoles = scmClient.getScmRoles();
     if (json) {
-      Map<String, Map<String, String>> scmRoles = parseScmRoles(ratisRoles);
+      Map<String, Map<String, String>> scmRoles = parseScmRoles(peerRoles);
       System.out.print(
           JsonUtils.toJsonStringWithDefaultPrettyPrinter(scmRoles));
     } else if (table) {
       FormattingCLIUtils formattingCLIUtils = new FormattingCLIUtils(SCM_ROLES_TITLE);
+      formattingCLIUtils.addHeaders(SCM_ROLES_HEADER);
 
-      // Determine which header to use based on whether Ratis is enabled or not.
-      if (isRatisEnabled) {
-        formattingCLIUtils.addHeaders(RATIS_SCM_ROLES_HEADER);
-      } else {
-        formattingCLIUtils.addHeaders(STANDALONE_SCM_ROLES_HEADER);
-      }
-
-      for (String role : ratisRoles) {
+      for (String role : peerRoles) {
         String[] roleItems = role.split(":");
         if (roleItems.length < 2) {
           err.println("Invalid response received for ScmRatisRoles.");
@@ -90,16 +81,16 @@ public class GetScmRatisRolesSubcommand extends ScmSubcommand {
       }
       System.out.println(formattingCLIUtils.render());
     } else {
-      for (String role: ratisRoles) {
+      for (String role: peerRoles) {
         System.out.println(role);
       }
     }
   }
 
   private Map<String, Map<String, String>> parseScmRoles(
-      List<String> ratisRoles) {
+      List<String> peerRoles) {
     Map<String, Map<String, String>> allRoles = new HashMap<>();
-    for (String role : ratisRoles) {
+    for (String role : peerRoles) {
       Map<String, String> roleDetails = new HashMap<>();
       String[] roles = role.split(":");
       if (roles.length < 2) {

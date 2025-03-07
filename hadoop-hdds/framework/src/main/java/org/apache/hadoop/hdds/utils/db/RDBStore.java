@@ -83,7 +83,8 @@ public class RDBStore implements DBStore {
                   String dbJmxBeanName, boolean enableCompactionDag,
                   long maxDbUpdatesSizeThreshold,
                   boolean createCheckpointDirs,
-                  ConfigurationSource configuration, String threadNamePrefix)
+                  ConfigurationSource configuration, String threadNamePrefix,
+                  boolean enableRocksDBMetrics)
 
       throws IOException {
     this.threadNamePrefix = threadNamePrefix;
@@ -118,13 +119,18 @@ public class RDBStore implements DBStore {
         dbJmxBeanName = dbFile.getName();
       }
       // Use statistics instead of dbOptions.statistics() to avoid repeated init.
-      metrics = RocksDBStoreMetrics.create(statistics, db, dbJmxBeanName);
-      if (metrics == null) {
-        LOG.warn("Metrics registration failed during RocksDB init, " +
+      if (!enableRocksDBMetrics) {
+        LOG.debug("Skipped Metrics registration during RocksDB init, " +
             "db path :{}", dbJmxBeanName);
       } else {
-        LOG.debug("Metrics registration succeed during RocksDB init, " +
-            "db path :{}", dbJmxBeanName);
+        metrics = RocksDBStoreMetrics.create(statistics, db, dbJmxBeanName);
+        if (metrics == null) {
+          LOG.warn("Metrics registration failed during RocksDB init, " +
+              "db path :{}", dbJmxBeanName);
+        } else {
+          LOG.debug("Metrics registration succeed during RocksDB init, " +
+              "db path :{}", dbJmxBeanName);
+        }
       }
 
       // Create checkpoints and snapshot directories if not exists.
@@ -443,7 +449,7 @@ public class RDBStore implements DBStore {
           sequenceNumber, e);
       dbUpdatesWrapper.setDBUpdateSuccess(false);
     } finally {
-      if (dbUpdatesWrapper.getData().size() > 0) {
+      if (!dbUpdatesWrapper.getData().isEmpty()) {
         rdbMetrics.incWalUpdateDataSize(cumulativeDBUpdateLogBatchSize);
         rdbMetrics.incWalUpdateSequenceCount(
             dbUpdatesWrapper.getCurrentSequenceNumber() - sequenceNumber);

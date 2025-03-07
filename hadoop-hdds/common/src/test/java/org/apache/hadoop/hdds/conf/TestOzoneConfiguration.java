@@ -31,11 +31,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
@@ -83,7 +84,7 @@ public class TestOzoneConfiguration {
       throws Exception {
     File coreDefault = new File(tempDir, "core-default-test.xml");
     File coreSite = new File(tempDir, "core-site-test.xml");
-    FileOutputStream coreDefaultStream = new FileOutputStream(coreDefault);
+    OutputStream coreDefaultStream = Files.newOutputStream(coreDefault.toPath());
     try (BufferedWriter out = new BufferedWriter(new OutputStreamWriter(
         coreDefaultStream, StandardCharsets.UTF_8))) {
       startConfig(out);
@@ -102,7 +103,7 @@ public class TestOzoneConfiguration {
           .getProperty("dfs.random.key"));
     }
 
-    FileOutputStream coreSiteStream = new FileOutputStream(coreSite);
+    OutputStream coreSiteStream = Files.newOutputStream(coreSite.toPath());
     try (BufferedWriter out = new BufferedWriter(new OutputStreamWriter(
         coreSiteStream, StandardCharsets.UTF_8))) {
       startConfig(out);
@@ -286,7 +287,7 @@ public class TestOzoneConfiguration {
     Configuration configuration = new Configuration(true);
 
     File ozoneSite = new File(tempDir, "ozone-site.xml");
-    FileOutputStream ozoneSiteStream = new FileOutputStream(ozoneSite);
+    OutputStream ozoneSiteStream = Files.newOutputStream(ozoneSite.toPath());
     try (BufferedWriter out = new BufferedWriter(new OutputStreamWriter(
         ozoneSiteStream, StandardCharsets.UTF_8))) {
       startConfig(out);

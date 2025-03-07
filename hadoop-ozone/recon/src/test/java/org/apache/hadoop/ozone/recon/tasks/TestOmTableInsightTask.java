@@ -34,7 +34,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeOpen
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.DELETE;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.UPDATE;
-import static org.hadoop.ozone.recon.schema.tables.GlobalStatsTable.GLOBAL_STATS;
+import static org.apache.ozone.recon.schema.generated.tables.GlobalStatsTable.GLOBAL_STATS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -49,7 +49,6 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
@@ -65,15 +64,13 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
-import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
+import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * This test class is designed for the OM Table Insight Task. It conducts tests
@@ -89,7 +86,6 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   private boolean isSetupDone = false;
   private static ReconOMMetadataManager reconOMMetadataManager;
   private static NSSummaryTaskWithFSO nSSummaryTaskWithFso;
-  private static OzoneConfiguration ozoneConfiguration;
   private static ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
 
   // Object names in FSO-enabled format
@@ -127,15 +123,11 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   @Mock
   private Table<Long, NSSummary> nsSummaryTable;
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestOmTableInsightTask.class);
-
   public TestOmTableInsightTask() {
     super();
   }
 
   private void initializeInjector() throws IOException {
-    ozoneConfiguration = new OzoneConfiguration();
     reconOMMetadataManager = getTestReconOmMetadataManager(
         initializeNewOmMetadataManager(Files.createDirectory(
             temporaryFolder.resolve("JunitOmDBDir")).toFile()),
@@ -154,8 +146,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     omTableInsightTask = new OmTableInsightTask(
         globalStatsDao, getConfiguration(), reconOMMetadataManager);
     nSSummaryTaskWithFso = new NSSummaryTaskWithFSO(
-        reconNamespaceSummaryManager, reconOMMetadataManager,
-        ozoneConfiguration, 10);
+        reconNamespaceSummaryManager, reconOMMetadataManager, 10);
     dslContext = getDslContext();
 
     omTableInsightTask.setTables(omTableInsightTask.getTaskTables());

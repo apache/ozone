@@ -164,9 +164,9 @@ public class TestBlockDeletingService {
       int numOfBlocksPerContainer, int numOfChunksPerBlock) throws IOException {
     ChunkManager chunkManager;
     if (layout == FILE_PER_BLOCK) {
-      chunkManager = new FilePerBlockStrategy(true, null, null);
+      chunkManager = new FilePerBlockStrategy(true, null);
     } else {
-      chunkManager = new FilePerChunkStrategy(true, null, null);
+      chunkManager = new FilePerChunkStrategy(true, null);
     }
     byte[] arr = randomAlphanumeric(1048576).getBytes(UTF_8);
     ChunkBuffer buffer = ChunkBuffer.wrap(ByteBuffer.wrap(arr));

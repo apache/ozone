@@ -47,9 +47,9 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -925,7 +925,7 @@ public class TestRocksDBCheckpointDiffer {
       // fist go through fwdGraph to find nodes that don't have successors.
       // These nodes will be the top level nodes in reverse graph
       Set<CompactionNode> successors = fwdMutableGraph.successors(infileNode);
-      if (successors.size() == 0) {
+      if (successors.isEmpty()) {
         LOG.debug("No successors. Cumulative keys: {}, total keys: {}",
             infileNode.getCumulativeKeysReverseTraversal(),
             infileNode.getTotalNumberOfKeys());
@@ -1698,7 +1698,7 @@ public class TestRocksDBCheckpointDiffer {
 
   private void createFileWithContext(String fileName, String context)
       throws IOException {
-    try (FileOutputStream fileOutputStream = new FileOutputStream(fileName)) {
+    try (OutputStream fileOutputStream = Files.newOutputStream(Paths.get(fileName))) {
       fileOutputStream.write(context.getBytes(UTF_8));
     }
   }
