@@ -77,10 +77,10 @@ public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplica
     QuasiClosedStuckReplicaCount replicaCount =
         new QuasiClosedStuckReplicaCount(replicas, remainingMaintenanceRedundancy);
 
-    List<QuasiClosedStuckReplicaCount.UnderReplicatedOrigin> underReplicatedOrigins
+    List<QuasiClosedStuckReplicaCount.MisReplicatedOrigin> misReplicatedOrigins
         = replicaCount.getUnderReplicatedReplicas();
 
-    if (underReplicatedOrigins.isEmpty()) {
+    if (misReplicatedOrigins.isEmpty()) {
       LOG.debug("Container {} is not under replicated", containerInfo);
       return 0;
     }
@@ -90,11 +90,11 @@ public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplica
     int totalCommandsSent = 0;
     IOException firstException = null;
     List<ContainerReplicaOp> mutablePendingOps = new ArrayList<>(pendingOps);
-    for (QuasiClosedStuckReplicaCount.UnderReplicatedOrigin origin : underReplicatedOrigins) {
-      totalRequiredReplicas += origin.getAdditionalRequired();
+    for (QuasiClosedStuckReplicaCount.MisReplicatedOrigin origin : misReplicatedOrigins) {
+      totalRequiredReplicas += origin.getReplicaDelta();
       List<DatanodeDetails> targets;
       try {
-        targets = getTargets(containerInfo, replicas, origin.getAdditionalRequired(), mutablePendingOps);
+        targets = getTargets(containerInfo, replicas, origin.getReplicaDelta(), mutablePendingOps);
       } catch (SCMException e) {
         if (firstException == null) {
           firstException = e;

@@ -102,7 +102,7 @@ public class TestQuasiClosedStuckReplicaCount {
     QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 1);
     assertTrue(replicaCount.isUnderReplicated());
     assertFalse(replicaCount.isOverReplicated());
-    validateUnderReplicatedOrigins(replicaCount.getUnderReplicatedReplicas(), 1, 1, 1, origin3);
+    validateMisReplicatedOrigins(replicaCount.getUnderReplicatedReplicas(), 1, 1, 1, origin3);
   }
 
   @Test
@@ -117,12 +117,12 @@ public class TestQuasiClosedStuckReplicaCount {
     assertTrue(replicaCount.isUnderReplicated());
     assertFalse(replicaCount.isOverReplicated());
 
-    List<QuasiClosedStuckReplicaCount.UnderReplicatedOrigin> underReplicatedOrigins =
+    List<QuasiClosedStuckReplicaCount.MisReplicatedOrigin> misReplicatedOrigins =
         replicaCount.getUnderReplicatedReplicas();
-    assertTrue(underReplicatedOrigins.size() == 2);
+    assertTrue(misReplicatedOrigins.size() == 2);
 
-    for (QuasiClosedStuckReplicaCount.UnderReplicatedOrigin underReplicatedOrigin : underReplicatedOrigins) {
-      UUID source = underReplicatedOrigin.getSources().iterator().next().getOriginDatanodeId();
+    for (QuasiClosedStuckReplicaCount.MisReplicatedOrigin misReplicatedOrigin : misReplicatedOrigins) {
+      UUID source = misReplicatedOrigin.getSources().iterator().next().getOriginDatanodeId();
       assertTrue(source.equals(origin1) || source.equals(origin3));
     }
   }
@@ -137,7 +137,7 @@ public class TestQuasiClosedStuckReplicaCount {
     QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 1);
     assertTrue(replicaCount.isUnderReplicated());
     assertFalse(replicaCount.isOverReplicated());
-    validateUnderReplicatedOrigins(replicaCount.getUnderReplicatedReplicas(), 1, 1, 1, origin2);
+    validateMisReplicatedOrigins(replicaCount.getUnderReplicatedReplicas(), 1, 1, 1, origin2);
   }
 
   @Test
@@ -149,7 +149,7 @@ public class TestQuasiClosedStuckReplicaCount {
     QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 1);
     assertTrue(replicaCount.isUnderReplicated());
     assertFalse(replicaCount.isOverReplicated());
-    validateUnderReplicatedOrigins(replicaCount.getUnderReplicatedReplicas(), 1, 1, 2, origin1);
+    validateMisReplicatedOrigins(replicaCount.getUnderReplicatedReplicas(), 1, 1, 2, origin1);
   }
 
   @Test
@@ -163,6 +163,7 @@ public class TestQuasiClosedStuckReplicaCount {
     QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 1);
     assertFalse(replicaCount.isUnderReplicated());
     assertTrue(replicaCount.isOverReplicated());
+    validateMisReplicatedOrigins(replicaCount.getOverReplicatedOrigins(), 1, 3, 1, origin3);
   }
 
   @Test
@@ -175,6 +176,7 @@ public class TestQuasiClosedStuckReplicaCount {
     QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 1);
     assertFalse(replicaCount.isUnderReplicated());
     assertTrue(replicaCount.isOverReplicated());
+    validateMisReplicatedOrigins(replicaCount.getOverReplicatedOrigins(), 1, 3, 1, origin2);
   }
 
   @Test
@@ -187,6 +189,7 @@ public class TestQuasiClosedStuckReplicaCount {
     QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 1);
     assertFalse(replicaCount.isUnderReplicated());
     assertTrue(replicaCount.isOverReplicated());
+    validateMisReplicatedOrigins(replicaCount.getOverReplicatedOrigins(), 1, 4, 1, origin1);
   }
 
   @Test
@@ -200,7 +203,7 @@ public class TestQuasiClosedStuckReplicaCount {
     QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 1);
     assertTrue(replicaCount.isUnderReplicated());
     assertFalse(replicaCount.isOverReplicated());
-    validateUnderReplicatedOrigins(replicaCount.getUnderReplicatedReplicas(), 1, 2, 2, origin1);
+    validateMisReplicatedOrigins(replicaCount.getUnderReplicatedReplicas(), 1, 2, 2, origin1);
   }
 
   @Test
@@ -213,7 +216,7 @@ public class TestQuasiClosedStuckReplicaCount {
     QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 1);
     assertTrue(replicaCount.isUnderReplicated());
     assertFalse(replicaCount.isOverReplicated());
-    validateUnderReplicatedOrigins(replicaCount.getUnderReplicatedReplicas(), 1, 2, 1, origin1);
+    validateMisReplicatedOrigins(replicaCount.getUnderReplicatedReplicas(), 1, 2, 1, origin1);
   }
 
   @Test
@@ -225,7 +228,7 @@ public class TestQuasiClosedStuckReplicaCount {
     QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 1);
     assertTrue(replicaCount.isUnderReplicated());
     assertFalse(replicaCount.isOverReplicated());
-    validateUnderReplicatedOrigins(replicaCount.getUnderReplicatedReplicas(), 1, 3, 2, origin1);
+    validateMisReplicatedOrigins(replicaCount.getUnderReplicatedReplicas(), 1, 3, 2, origin1);
   }
 
   @Test
@@ -282,7 +285,7 @@ public class TestQuasiClosedStuckReplicaCount {
     replicaCount = new QuasiClosedStuckReplicaCount(replicas, 2);
     assertTrue(replicaCount.isUnderReplicated());
     assertFalse(replicaCount.isOverReplicated());
-    validateUnderReplicatedOrigins(replicaCount.getUnderReplicatedReplicas(), 1, 3, 1, origin1);
+    validateMisReplicatedOrigins(replicaCount.getUnderReplicatedReplicas(), 1, 3, 1, origin1);
   }
 
   @Test
@@ -304,7 +307,7 @@ public class TestQuasiClosedStuckReplicaCount {
     replicaCount = new QuasiClosedStuckReplicaCount(replicas, 1);
     assertTrue(replicaCount.isUnderReplicated());
     assertFalse(replicaCount.isOverReplicated());
-    validateUnderReplicatedOrigins(replicaCount.getUnderReplicatedReplicas(), 1, 2, 1, origin1);
+    validateMisReplicatedOrigins(replicaCount.getUnderReplicatedReplicas(), 1, 2, 1, origin1);
   }
 
   @Test
@@ -331,17 +334,17 @@ public class TestQuasiClosedStuckReplicaCount {
     assertFalse(replicaCount.isOverReplicated());
   }
 
-  private void validateUnderReplicatedOrigins(
-      List<QuasiClosedStuckReplicaCount.UnderReplicatedOrigin> underReplicatedOrigins,
-      int expectedUnderRepOrigins, int expectedSources, int expectedAdditionalRequired, UUID expectedOrigin) {
+  private void validateMisReplicatedOrigins(
+      List<QuasiClosedStuckReplicaCount.MisReplicatedOrigin> misReplicatedOrigins,
+      int expectedUnderRepOrigins, int expectedSources, int expectedDelta, UUID expectedOrigin) {
 
-    assertTrue(underReplicatedOrigins.size() == expectedUnderRepOrigins);
-    Set<ContainerReplica> sources = underReplicatedOrigins.get(0).getSources();
+    assertTrue(misReplicatedOrigins.size() == expectedUnderRepOrigins);
+    Set<ContainerReplica> sources = misReplicatedOrigins.get(0).getSources();
     assertEquals(sources.size(), expectedSources);
     for (ContainerReplica source : sources) {
       assertTrue(source.getOriginDatanodeId().equals(expectedOrigin));
     }
-    assertTrue(underReplicatedOrigins.get(0).getAdditionalRequired() == expectedAdditionalRequired);
+    assertTrue(misReplicatedOrigins.get(0).getReplicaDelta() == expectedDelta);
   }
 
 }

@@ -73,8 +73,8 @@ public class QuasiClosedStuckReplicaCount {
     return !getUnderReplicatedReplicas().isEmpty();
   }
 
-  public List<UnderReplicatedOrigin> getUnderReplicatedReplicas() {
-    List<UnderReplicatedOrigin> underReplicatedOrigins = new ArrayList<>();
+  public List<MisReplicatedOrigin> getUnderReplicatedReplicas() {
+    List<MisReplicatedOrigin> misReplicatedOrigins = new ArrayList<>();
 
     if (replicasByOrigin.size() == 1) {
       Map.Entry<UUID, Set<ContainerReplica>> entry = replicasByOrigin.entrySet().iterator().next();
@@ -88,15 +88,15 @@ public class QuasiClosedStuckReplicaCount {
       if (maintenanceCount > 0) {
         if (inService.size() < minHealthyForMaintenance) {
           int additionalReplicas = minHealthyForMaintenance - inService.size();
-          underReplicatedOrigins.add(new UnderReplicatedOrigin(entry.getValue(), additionalReplicas));
+          misReplicatedOrigins.add(new MisReplicatedOrigin(entry.getValue(), additionalReplicas));
         }
       } else {
         if (inService.size() < 3) {
           int additionalReplicas = 3 - inService.size();
-          underReplicatedOrigins.add(new UnderReplicatedOrigin(entry.getValue(), additionalReplicas));
+          misReplicatedOrigins.add(new MisReplicatedOrigin(entry.getValue(), additionalReplicas));
         }
       }
-      return underReplicatedOrigins;
+      return misReplicatedOrigins;
     }
 
     // If there are multiple origins, we expect 2 copies of each origin
@@ -113,14 +113,14 @@ public class QuasiClosedStuckReplicaCount {
         if (maintenanceCount > 0) {
           if (inService.isEmpty()) {
             // We need 1 copy online for maintenance
-            underReplicatedOrigins.add(new UnderReplicatedOrigin(entry.getValue(), 1));
+            misReplicatedOrigins.add(new MisReplicatedOrigin(entry.getValue(), 1));
           }
         } else {
-          underReplicatedOrigins.add(new UnderReplicatedOrigin(entry.getValue(), 2 - inService.size()));
+          misReplicatedOrigins.add(new MisReplicatedOrigin(entry.getValue(), 2 - inService.size()));
         }
       }
     }
-    return underReplicatedOrigins;
+    return misReplicatedOrigins;
   }
 
   /**
@@ -132,45 +132,52 @@ public class QuasiClosedStuckReplicaCount {
    * @return True if the container is over-replicated, otherwise false
    */
   public boolean isOverReplicated() {
+    return !getOverReplicatedOrigins().isEmpty();
+  }
+
+  public List<MisReplicatedOrigin> getOverReplicatedOrigins() {
     // If there is only a single origin, we expect 3 copies, otherwise we expect 2 copies of each origin
     if (replicasByOrigin.size() == 1) {
       UUID origin = replicasByOrigin.keySet().iterator().next();
       Set<ContainerReplica> inService = inServiceReplicasByOrigin.get(origin);
-      return inService != null && inService.size() > 3;
+      if (inService != null && inService.size() > 3) {
+        return Collections.singletonList(new MisReplicatedOrigin(inService, inService.size() - 3));
+      }
+      return Collections.emptyList();
     }
 
     // If there are multiple origins, we expect 2 copies of each origin
+    List<MisReplicatedOrigin> overReplicatedOrigins = new ArrayList<>();
     for (UUID origin : replicasByOrigin.keySet()) {
       Set<ContainerReplica> replicas = inServiceReplicasByOrigin.get(origin);
       if (replicas != null && replicas.size() > 2) {
-        return true;
+        overReplicatedOrigins.add(new MisReplicatedOrigin(replicas, replicas.size() - 2));
       }
     }
     // If we have 2 copies or less of each origin, we are not over-replicated
-    return false;
+    return overReplicatedOrigins;
   }
 
   /**
    * Class to represent the origin of under replicated replicas and the number of additional replicas required.
    */
-  public static class UnderReplicatedOrigin {
+  public static class MisReplicatedOrigin {
 
     private final Set<ContainerReplica> sources;
-    private final int additionalRequired;
+    private final int replicaDelta;
 
-    public UnderReplicatedOrigin(Set<ContainerReplica> sources, int additionalRequired) {
+    public MisReplicatedOrigin(Set<ContainerReplica> sources, int replicaDelta) {
       this.sources = sources;
-      this.additionalRequired = additionalRequired;
+      this.replicaDelta = replicaDelta;
     }
 
     public Set<ContainerReplica> getSources() {
       return sources;
     }
 
-    public int getAdditionalRequired() {
-      return additionalRequired;
+    public int getReplicaDelta() {
+      return replicaDelta;
     }
-
   }
 
 }
