@@ -375,7 +375,7 @@ public class TestReplicationSupervisor {
           semaphore.acquire();
           return container;
         });
-    MutableVolumeSet volumeSet = new MutableVolumeSet("test", conf, null,
+    MutableVolumeSet volumeSet = new MutableVolumeSet(datanode.getUuidString(), conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     File tarFile = containerTarFile(containerId, containerData);
 
