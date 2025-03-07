@@ -104,27 +104,6 @@ public class CompactionService extends BackgroundService {
     return numCompactions.get();
   }
 
-
-  public AtomicLong getUncompactedDirDeletes() {
-    TypedTable table = (TypedTable)omMetadataManager.getTable(DELETED_DIR_TABLE);
-    return table.getUncompactedDeletes();
-  }
-
-  public AtomicLong getUncompactedDeletes() {
-    TypedTable table = (TypedTable)omMetadataManager.getTable(DELETED_TABLE);
-    return table.getUncompactedDeletes();
-  }
-
-  public AtomicLong getUncompactedDeletedDirs() {
-    TypedTable table = (TypedTable)omMetadataManager.getTable(DIRECTORY_TABLE);
-    return table.getUncompactedDeletes();
-  }
-
-  public AtomicLong getUncompactedFileDeletes() {
-    TypedTable table = (TypedTable)omMetadataManager.getTable(FILE_TABLE);
-    return table.getUncompactedDeletes();
-  }
-
   @Override
   public synchronized BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
