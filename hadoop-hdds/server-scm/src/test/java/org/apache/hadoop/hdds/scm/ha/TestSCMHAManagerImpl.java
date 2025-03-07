@@ -80,6 +80,7 @@ class TestSCMHAManagerImpl {
   private static final int LEADER_PORT = 9894;
   private static final String FOLLOWER_SCM_ID = "follower";
 
+  private StorageContainerManager scm;
   private Path storageBaseDir;
   private String clusterID;
   private SCMHAManager primarySCMHAManager;
@@ -90,7 +91,7 @@ class TestSCMHAManagerImpl {
       TimeoutException {
     storageBaseDir = tempDir;
     clusterID = UUID.randomUUID().toString();
-    final StorageContainerManager scm = getMockStorageContainerManager(LEADER_SCM_ID, LEADER_PORT);
+    scm = getMockStorageContainerManager(LEADER_SCM_ID, LEADER_PORT);
     SCMRatisServerImpl.initialize(clusterID, LEADER_SCM_ID, scm.getScmNodeDetails(), scm.getConfiguration());
     primarySCMHAManager = scm.getScmHAManager();
     primarySCMHAManager.start();
@@ -174,7 +175,7 @@ class TestSCMHAManagerImpl {
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageBaseDir.toString());
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
-    configurator.setScmContext(SCMContext.emptyContext());
+    configurator.setScmContext(new SCMContext.Builder().setSCM(scm).build());
     configurator.setSCMHAManager(primarySCMHAManager);
     final StorageContainerManager scm2 = HddsTestUtils
         .getScm(config, configurator);
@@ -207,7 +208,7 @@ class TestSCMHAManagerImpl {
     final Table<String, TransactionInfo> txnInfoTable = mock(Table.class);
     final SCMHANodeDetails scmHANodeDetails = mock(SCMHANodeDetails.class);
     final SCMServiceManager serviceManager = mock(SCMServiceManager.class);
-    final StorageContainerManager scm = mock(StorageContainerManager.class);
+    final StorageContainerManager mockScm = mock(StorageContainerManager.class);
     final DeletedBlockLog deletedBlockLog = mock(DeletedBlockLogImpl.class);
     final SCMSafeModeManager safeModeManager = mock(SCMSafeModeManager.class);
     final CertificateClient certificateClient = mock(CertificateClient.class);
@@ -220,29 +221,32 @@ class TestSCMHAManagerImpl {
         mock(NodeDecommissionManager.class);
     final SCMDatanodeProtocolServer datanodeProtocolServer =
         mock(SCMDatanodeProtocolServer.class);
+    final StatefulServiceStateManager serviceStateManager = mock(StatefulServiceStateManager.class);
 
-    when(scm.getClusterId()).thenReturn(clusterID);
-    when(scm.getConfiguration()).thenReturn(conf);
-    when(scm.getScmId()).thenReturn(scmID);
-    when(scm.getScmMetadataStore()).thenReturn(metadataStore);
-    when(scm.getScmNodeDetails()).thenReturn(nodeDetails);
-    when(scm.getSCMHANodeDetails()).thenReturn(scmHANodeDetails);
-    when(scm.getScmCertificateClient()).thenReturn(certificateClient);
-    when(scm.getScmBlockManager()).thenReturn(blockManager);
-    when(scm.getScmContext()).thenReturn(scmContext);
-    when(scm.getSequenceIdGen()).thenReturn(sequenceIdGenerator);
-    when(scm.getScmDecommissionManager()).thenReturn(decommissionManager);
-    when(scm.getSCMServiceManager()).thenReturn(serviceManager);
-    when(scm.getFinalizationManager()).thenReturn(finalizationManager);
-    when(scm.getScmSafeModeManager()).thenReturn(safeModeManager);
-    when(scm.getDatanodeProtocolServer()).thenReturn(datanodeProtocolServer);
+    when(mockScm.getClusterId()).thenReturn(clusterID);
+    when(mockScm.getConfiguration()).thenReturn(conf);
+    when(mockScm.getScmId()).thenReturn(scmID);
+    when(mockScm.getScmMetadataStore()).thenReturn(metadataStore);
+    when(mockScm.getScmNodeDetails()).thenReturn(nodeDetails);
+    when(mockScm.getSCMHANodeDetails()).thenReturn(scmHANodeDetails);
+    when(mockScm.getScmCertificateClient()).thenReturn(certificateClient);
+    when(mockScm.getScmBlockManager()).thenReturn(blockManager);
+    when(mockScm.getScmContext()).thenReturn(scmContext);
+    when(mockScm.getSequenceIdGen()).thenReturn(sequenceIdGenerator);
+    when(mockScm.getScmDecommissionManager()).thenReturn(decommissionManager);
+    when(mockScm.getSCMServiceManager()).thenReturn(serviceManager);
+    when(mockScm.getFinalizationManager()).thenReturn(finalizationManager);
+    when(mockScm.getScmSafeModeManager()).thenReturn(safeModeManager);
+    when(mockScm.getDatanodeProtocolServer()).thenReturn(datanodeProtocolServer);
+    when(mockScm.getStatefulServiceStateManager()).thenReturn(serviceStateManager);
     when(metadataStore.getStore()).thenReturn(dbStore);
     when(metadataStore.getTransactionInfoTable()).thenReturn(txnInfoTable);
     when(scmHANodeDetails.getLocalNodeDetails()).thenReturn(nodeDetails);
     when(blockManager.getDeletedBlockLog()).thenReturn(deletedBlockLog);
     when(dbStore.initBatchOperation()).thenReturn(batchOperation);
     when(nodeDetails.getRatisHostPortStr()).thenReturn("localhost:" + port);
-    when(scm.getSystemClock()).thenReturn(Clock.system(ZoneOffset.UTC));
+    when(mockScm.getSystemClock()).thenReturn(Clock.system(ZoneOffset.UTC));
+    when(scmContext.getScm()).thenReturn(mockScm);
 
     if (FOLLOWER_SCM_ID.equals(scmID)) {
       final SCMNodeDetails leaderNodeDetails = mock(SCMNodeDetails.class);
@@ -262,13 +266,13 @@ class TestSCMHAManagerImpl {
         .thenReturn(checkpoint);
 
     final SCMHAManager manager = new SCMHAManagerImpl(conf,
-        new SecurityConfig(conf), scm) {
+        new SecurityConfig(conf), mockScm) {
       @Override
       protected SCMSnapshotProvider newScmSnapshotProvider(StorageContainerManager storageContainerManager) {
         return scmSnapshotProvider;
       }
     };
-    when(scm.getScmHAManager()).thenReturn(manager);
-    return scm;
+    when(mockScm.getScmHAManager()).thenReturn(manager);
+    return mockScm;
   }
 }

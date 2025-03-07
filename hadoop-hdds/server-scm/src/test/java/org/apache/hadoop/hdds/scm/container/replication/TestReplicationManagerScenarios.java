@@ -62,9 +62,12 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.security.token.ContainerTokenGenerator;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -168,8 +171,13 @@ public class TestReplicationManagerScenarios {
     configuration.set(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "0s");
     containerManager = mock(ContainerManager.class);
 
+    StorageContainerManager scm = mock(StorageContainerManager.class);
     scmContext = mock(SCMContext.class);
     nodeManager = mock(NodeManager.class);
+
+    ContainerTokenGenerator containerTokenGenerator = mock(ContainerTokenGenerator.class);
+    when(containerTokenGenerator.generateEncodedToken(any(ContainerID.class))).thenReturn("");
+    when(scm.getContainerTokenGenerator()).thenReturn(containerTokenGenerator);
 
     ratisPlacementPolicy = ReplicationTestUtil.getSimpleTestPlacementPolicy(nodeManager, configuration);
     ecPlacementPolicy = ReplicationTestUtil.getSimpleTestPlacementPolicy(nodeManager, configuration);
@@ -209,9 +217,13 @@ public class TestReplicationManagerScenarios {
             any(SCMCommandProto.Type.class), any(SCMCommandProto.Type.class)))
         .thenReturn(countMap);
 
+    StatefulServiceStateManager serviceStateManager = mock(StatefulServiceStateManager.class);
+    when(scm.getStatefulServiceStateManager()).thenReturn(serviceStateManager);
+
     // Ensure that RM will run when asked.
     when(scmContext.isLeaderReady()).thenReturn(true);
     when(scmContext.isInSafeMode()).thenReturn(false);
+    when(scmContext.getScm()).thenReturn(scm);
     containerReplicaMap = new HashMap<>();
     containerInfoSet = new HashSet<>();
     ORIGINS.clear();
