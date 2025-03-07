@@ -377,8 +377,10 @@ public class ReplicationManager extends StatefulService implements ContainerRepl
       LOG.warn("No persisted configuration found for {} when checking operational status. " +
           "This may prevent the ReplicationManager from responding to manual start/stop commands. " +
           "Use its thread status to check if it is running.", this.getServiceName());
-      return replicationMonitor != null
-          && replicationMonitor.isAlive();
+      synchronized (this) {
+        return replicationMonitor != null
+            && replicationMonitor.isAlive();
+      }
     }
     return proto.getIsRunning();
   }
