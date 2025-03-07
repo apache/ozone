@@ -24,8 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
@@ -238,7 +238,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
     ByteBuffer bb = ByteBuffer.allocate(partSize);
     List<CompletedPart> completedParts = new ArrayList<>();
     try (RandomAccessFile file = new RandomAccessFile(inputFile, "r");
-         FileInputStream fileInputStream = new FileInputStream(inputFile)) {
+         InputStream fileInputStream = Files.newInputStream(inputFile.toPath())) {
       long fileSize = file.length();
       long position = 0;
       while (position < fileSize) {
