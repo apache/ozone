@@ -352,6 +352,7 @@ public class TestReplicationSupervisor {
   public void testReplicationImportReserveSpace()
       throws IOException, InterruptedException, TimeoutException {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, tempDir.getAbsolutePath());
 
     long containerSize = (long) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
