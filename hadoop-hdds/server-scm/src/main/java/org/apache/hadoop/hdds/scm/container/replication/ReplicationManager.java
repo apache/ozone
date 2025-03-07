@@ -263,22 +263,31 @@ public class ReplicationManager extends StatefulService implements ContainerRepl
         .addNext(ecMisReplicationCheckHandler)
         .addNext(new RatisUnhealthyReplicationCheckHandler())
         .addNext(new VulnerableUnhealthyReplicasHandler(this));
-    start();
+    start(false);
+  }
+
+  @Override
+  public void start() {
+    start(true);
   }
 
   /**
    * Starts Replication Monitor thread.
+   * @param persist whether to persist the configuration
+   * 
+   * Notice that if persist is true, it may fail with raft purpose exception.
    */
-  @Override
-  public synchronized void start() {
-    if (!canRun()) {
+  private synchronized void start(boolean persist) {
+    if (!started()) {
       LOG.info("Starting Replication Monitor Thread.");
-      try {
-        saveConfiguration(true);
-      } catch (IOException e) {
-        LOG.warn("Could not save configuration for ReplicationManager. " +
-            "ReplicationManager will not start.", e);
-        return;
+      if (persist) {
+        try {
+          saveConfiguration(true);
+        } catch (IOException e) {
+          LOG.warn("Could not save configuration for ReplicationManager. " +
+              "ReplicationManager will not start.", e);
+          return;
+        }
       }
       metrics = ReplicationManagerMetrics.create(this);
       containerReplicaPendingOps.setReplicationMetrics(metrics);
@@ -342,27 +351,28 @@ public class ReplicationManager extends StatefulService implements ContainerRepl
             .build());
   }
 
-  public boolean isRunning() {
+  private ReplicationManagerConfigurationProto readConfiguration() {
     try {
-      ReplicationManagerConfigurationProto proto =
-          readConfiguration(ReplicationManagerConfigurationProto.class);
-      if (proto == null) {
-        LOG.warn("Could not find persisted configuration for {} when checking" +
-            " if ReplicationManager is running. ReplicationManager should not " +
-            "run now.", this.getServiceName());
-        return false;
-      }
-      return proto.getIsRunning();
+      return readConfiguration(ReplicationManagerConfigurationProto.class);
     } catch (IOException e) {
-      LOG.warn("Could not read persisted configuration for checking if " +
-          "ReplicationManager is running. ReplicationManager should not run" +
-          " now.", e);
-      return false;
+      LOG.warn("Could not read persisted configuration of ReplicationManager.", e);
+      return null;
     }
   }
 
-  public boolean canRun() {
-    if (!isRunning()) {
+  public boolean isRunning() {
+    ReplicationManagerConfigurationProto proto = readConfiguration();
+    if (proto == null) {
+      LOG.warn("Could not find existing persisted configuration for {} when checking" +
+          " if ReplicationManager is running. ReplicationManager may not receive any manual " +
+          "start/stop commands. So make it running as default.", this.getServiceName());
+      return true;
+    }
+    return proto.getIsRunning();
+  }
+
+  public boolean started() {
+    if (readConfiguration() == null || !isRunning()) {
       synchronized (this) {
         return replicationMonitor != null
             && replicationMonitor.isAlive();
@@ -1381,6 +1391,12 @@ public class ReplicationManager extends StatefulService implements ContainerRepl
   public void notifyStatusChanged() {
     serviceLock.lock();
     try {
+      // if (scmContext.isLeaderReady() && readConfiguration() == null) {
+      //   // It's the first leader among the HA nodes, we need to start the service.
+      //   LOG.info("It's the first leader among the HA nodes, we need to start the service.");
+      //   CompletableFuture.runAsync(() -> start());
+      // }
+
       // 1) SCMContext#isLeaderReady returns true.
       // 2) not in safe mode.
       if (scmContext.isLeaderReady() && !scmContext.isInSafeMode()) {
