@@ -23,10 +23,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,27 +36,27 @@ public class UpgradeManager {
   public static final Logger LOG =
       LoggerFactory.getLogger(UpgradeManager.class);
 
-  public static List<Result> run(OzoneConfiguration configuration,
+  public static List<VolumeUpgradeResult> run(OzoneConfiguration configuration,
       List<HddsVolume> volumes) throws IOException {
-    List<Result> results = new ArrayList<>();
-    Map<HddsVolume, CompletableFuture<Result>> volumeFutures = new HashMap<>();
+    List<VolumeUpgradeResult> results = new ArrayList<>();
+    Map<HddsVolume, CompletableFuture<VolumeUpgradeResult>> volumeFutures = new HashMap<>();
     long startTime = System.currentTimeMillis();
 
     LOG.info("Start to upgrade {} volume(s)", volumes.size());
     for (HddsVolume hddsVolume : volumes) {
       final UpgradeTask task =
           new UpgradeTask(configuration, hddsVolume);
-      final CompletableFuture<Result> future = task.getUpgradeFuture();
+      final CompletableFuture<VolumeUpgradeResult> future = task.getUpgradeFuture();
       volumeFutures.put(hddsVolume, future);
     }
 
-    for (Map.Entry<HddsVolume, CompletableFuture<Result>> entry :
+    for (Map.Entry<HddsVolume, CompletableFuture<VolumeUpgradeResult>> entry :
         volumeFutures.entrySet()) {
       final HddsVolume hddsVolume = entry.getKey();
-      final CompletableFuture<Result> volumeFuture = entry.getValue();
+      final CompletableFuture<VolumeUpgradeResult> volumeFuture = entry.getValue();
 
       try {
-        final Result result = volumeFuture.get();
+        final VolumeUpgradeResult result = volumeFuture.get();
         results.add(result);
         LOG.info("Finish upgrading containers on volume {}, {}",
             hddsVolume.getVolumeRootDir(), result.toString());
@@ -71,99 +69,6 @@ public class UpgradeManager {
     LOG.info("It took {}ms to finish all volume upgrade.",
         (System.currentTimeMillis() - startTime));
     return results;
-  }
-
-  /**
-   * This class contains v2 to v3 container upgrade result.
-   */
-  public static class Result {
-    private Map<Long, UpgradeTask.UpgradeContainerResult> resultMap;
-    private final HddsVolume hddsVolume;
-    private final long startTimeMs = System.currentTimeMillis();
-    private long endTimeMs = 0L;
-    private Exception e = null;
-    private Status status = Status.FAIL;
-    private DatanodeStoreSchemaThreeImpl store;
-
-    public Result(HddsVolume hddsVolume) {
-      this.hddsVolume = hddsVolume;
-    }
-
-    public HddsVolume getHddsVolume() {
-      return hddsVolume;
-    }
-
-    public long getCost() {
-      return endTimeMs - startTimeMs;
-    }
-
-    DatanodeStoreSchemaThreeImpl getDBStore() {
-      return store;
-    }
-
-    void setDBStore(DatanodeStoreSchemaThreeImpl store) {
-      this.store = store;
-    }
-
-    public void setResultList(
-        List<UpgradeTask.UpgradeContainerResult> resultList) {
-      resultMap = new HashMap<>();
-      resultList.forEach(res -> resultMap
-          .put(res.getOriginContainerData().getContainerID(), res));
-    }
-
-    public Map<Long, UpgradeTask.UpgradeContainerResult> getResultMap() {
-      return resultMap;
-    }
-
-    public boolean isSuccess() {
-      return this.status == Status.SUCCESS;
-    }
-
-    public void success() {
-      this.endTimeMs = System.currentTimeMillis();
-      this.status = Status.SUCCESS;
-    }
-
-    public void fail(Exception exception) {
-      this.endTimeMs = System.currentTimeMillis();
-      this.status = Status.FAIL;
-      this.e = exception;
-    }
-
-    @Override
-    public String toString() {
-      final StringBuilder stringBuilder = new StringBuilder();
-      stringBuilder.append("Result:{");
-      stringBuilder.append("hddsRootDir=");
-      stringBuilder.append(getHddsVolume().getHddsRootDir());
-      stringBuilder.append(", resultList=");
-      AtomicLong total = new AtomicLong(0L);
-      if (resultMap != null) {
-        resultMap.forEach((k, r) -> {
-          stringBuilder.append(r.toString());
-          stringBuilder.append("\n");
-          total.addAndGet(r.getTotalRow());
-        });
-      }
-      stringBuilder.append(", totalRow=");
-      stringBuilder.append(total.get());
-      stringBuilder.append(", costMs=");
-      stringBuilder.append(getCost());
-      stringBuilder.append(", status=");
-      stringBuilder.append(status);
-      if (e != null) {
-        stringBuilder.append(", Exception=");
-        stringBuilder.append(e);
-      }
-      stringBuilder.append('}');
-      return stringBuilder.toString();
-    }
-
-    enum Status {
-      SUCCESS,
-      FAIL
-    }
   }
 
 }

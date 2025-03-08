@@ -82,15 +82,15 @@ public class UpgradeTask {
     this.hddsVolume = hddsVolume;
   }
 
-  public CompletableFuture<UpgradeManager.Result> getUpgradeFuture() {
+  public CompletableFuture<VolumeUpgradeResult> getUpgradeFuture() {
     final File lockFile = UpgradeUtils.getVolumeUpgradeLockFile(hddsVolume);
 
     return CompletableFuture.supplyAsync(() -> {
 
-      final UpgradeManager.Result result =
-          new UpgradeManager.Result(hddsVolume);
+      final VolumeUpgradeResult result =
+          new VolumeUpgradeResult(hddsVolume);
 
-      List<UpgradeContainerResult> resultList = new ArrayList<>();
+      List<ContainerUpgradeResult> resultList = new ArrayList<>();
       final File hddsVolumeRootDir = hddsVolume.getHddsRootDir();
 
       Preconditions.checkNotNull(hddsVolumeRootDir, "hddsVolumeRootDir" +
@@ -169,7 +169,7 @@ public class UpgradeTask {
       if (containerTopDirs != null) {
         for (File containerTopDir : containerTopDirs) {
           try {
-            final List<UpgradeContainerResult> results =
+            final List<ContainerUpgradeResult> results =
                 upgradeSubContainerDir(containerTopDir);
             resultList.addAll(results);
           } catch (IOException e) {
@@ -202,9 +202,9 @@ public class UpgradeTask {
     });
   }
 
-  private List<UpgradeContainerResult> upgradeSubContainerDir(
+  private List<ContainerUpgradeResult> upgradeSubContainerDir(
       File containerTopDir) throws IOException {
-    List<UpgradeContainerResult> resultList = new ArrayList<>();
+    List<ContainerUpgradeResult> resultList = new ArrayList<>();
     if (containerTopDir.isDirectory()) {
       File[] containerDirs = containerTopDir.listFiles();
       if (containerDirs != null) {
@@ -213,8 +213,8 @@ public class UpgradeTask {
           if (containerData != null &&
               ((KeyValueContainerData) containerData)
                   .hasSchema(OzoneConsts.SCHEMA_V2)) {
-            final UpgradeContainerResult result =
-                new UpgradeContainerResult(containerData);
+            final ContainerUpgradeResult result =
+                new ContainerUpgradeResult(containerData);
             upgradeContainer(containerData, result);
             resultList.add(result);
           }
@@ -264,7 +264,7 @@ public class UpgradeTask {
   }
 
   private void upgradeContainer(ContainerData containerData,
-      UpgradeContainerResult result) throws IOException {
+      ContainerUpgradeResult result) throws IOException {
     final DBStore targetDBStore = dataStore.getStore();
 
     // open container schema v2 rocksdb
@@ -314,7 +314,7 @@ public class UpgradeTask {
   }
 
   private void rewriteAndBackupContainerDataFile(ContainerData containerData,
-      UpgradeContainerResult result) throws IOException {
+      ContainerUpgradeResult result) throws IOException {
     if (containerData instanceof KeyValueContainerData) {
       final KeyValueContainerData keyValueContainerData =
           (KeyValueContainerData) containerData;
@@ -372,95 +372,4 @@ public class UpgradeTask {
     }
   }
 
-  /**
-   * This class represents upgrade v2 to v3 container result.
-   */
-  public static class UpgradeContainerResult {
-    private final ContainerData originContainerData;
-    private ContainerData newContainerData;
-    private long totalRow = 0L;
-    private final long startTimeMs = System.currentTimeMillis();
-    private long endTimeMs = 0L;
-    private Status status;
-
-    private String backupContainerFilePath;
-    private String newContainerFilePath;
-
-    public UpgradeContainerResult(
-        ContainerData originContainerData) {
-      this.originContainerData = originContainerData;
-      this.status = Status.FAIL;
-    }
-
-    public long getTotalRow() {
-      return totalRow;
-    }
-
-    public Status getStatus() {
-      return status;
-    }
-
-    public void setNewContainerData(
-        ContainerData newContainerData) {
-      this.newContainerData = newContainerData;
-    }
-
-    public long getCostMs() {
-      return endTimeMs - startTimeMs;
-    }
-
-    public ContainerData getOriginContainerData() {
-      return originContainerData;
-    }
-
-    public void setBackupContainerFilePath(String backupContainerFilePath) {
-      this.backupContainerFilePath = backupContainerFilePath;
-    }
-
-    public void setNewContainerFilePath(String newContainerFilePath) {
-      this.newContainerFilePath = newContainerFilePath;
-    }
-
-    public void success(long rowCount) {
-      this.totalRow = rowCount;
-      this.endTimeMs = System.currentTimeMillis();
-      this.status = Status.SUCCESS;
-    }
-
-    @Override
-    public String toString() {
-      final StringBuilder stringBuilder = new StringBuilder();
-      stringBuilder.append("Result:{");
-      stringBuilder.append("containerID=");
-      stringBuilder.append(originContainerData.getContainerID());
-      stringBuilder.append(", originContainerSchemaVersion=");
-      stringBuilder.append(
-          ((KeyValueContainerData) originContainerData).getSchemaVersion());
-
-      if (newContainerData != null) {
-        stringBuilder.append(", schemaV2ContainerFileBackupPath=");
-        stringBuilder.append(backupContainerFilePath);
-
-        stringBuilder.append(", newContainerSchemaVersion=");
-        stringBuilder.append(
-            ((KeyValueContainerData) newContainerData).getSchemaVersion());
-
-        stringBuilder.append(", schemaV3ContainerFilePath=");
-        stringBuilder.append(newContainerFilePath);
-      }
-      stringBuilder.append(", totalRow=");
-      stringBuilder.append(totalRow);
-      stringBuilder.append(", costMs=");
-      stringBuilder.append(getCostMs());
-      stringBuilder.append(", status=");
-      stringBuilder.append(status);
-      stringBuilder.append("}");
-      return stringBuilder.toString();
-    }
-
-    enum Status {
-      SUCCESS,
-      FAIL
-    }
-  }
 }
