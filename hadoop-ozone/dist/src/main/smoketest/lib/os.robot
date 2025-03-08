@@ -30,6 +30,10 @@ Execute And Ignore Error
 Execute and checkrc
     [arguments]                     ${command}                  ${expected_error_code}
     ${rc}                           ${output} =                 Run And Return Rc And Output           ${command}
+    ${PRINT_ERROR_ON_FAILURE} =     Get Environment Variable    PRINT_ERROR_ON_FAILURE     True
+    ${PRINT_ERROR_ON_FAILURE} =     Convert To Lower Case       ${PRINT_ERROR_ON_FAILURE}
+    Run Keyword If                  ${rc} != 0 and '${PRINT_ERROR_ON_FAILURE}' == 'true'
+    ...                             Log To Console   \n\n[ERROR] Command failed: ${command}\nOutput: ${output}\n\nReturn code: ${rc}\n
     Log                             ${output}
     Should Be Equal As Integers     ${rc}                       ${expected_error_code}
     [return]                        ${output}
