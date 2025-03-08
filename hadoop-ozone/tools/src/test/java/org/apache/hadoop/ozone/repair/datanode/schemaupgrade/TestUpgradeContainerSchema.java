@@ -66,6 +66,7 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerBlockStrategy;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
+import org.apache.hadoop.ozone.repair.OzoneRepair;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -88,6 +89,7 @@ class TestUpgradeContainerSchema {
   private BlockManager blockManager;
   private FilePerBlockStrategy chunkManager;
   private ContainerSet containerSet;
+  private List<HddsVolume> volumes;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -112,7 +114,7 @@ class TestUpgradeContainerSchema {
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
 
     // create rocksdb instance in volume dir
-    final List<HddsVolume> volumes = new ArrayList<>();
+    volumes = new ArrayList<>();
     for (StorageVolume storageVolume : volumeSet.getVolumesList()) {
       HddsVolume hddsVolume = (HddsVolume) storageVolume;
       StorageVolumeUtil.checkVolume(hddsVolume, SCM_ID, SCM_ID, CONF, null,
@@ -158,9 +160,12 @@ class TestUpgradeContainerSchema {
 
     shutdownAllVolume();
 
-    final List<VolumeUpgradeResult> results =
-        new UpgradeContainerSchema().run(CONF,
-            StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()));
+    UpgradeContainerSchema subject = (UpgradeContainerSchema) new OzoneRepair().getCmd()
+        .getSubcommands().get("datanode")
+        .getSubcommands().get("upgrade-container-schema")
+        .getCommandSpec().userObject();
+
+    final List<VolumeUpgradeResult> results = subject.run(CONF, volumes);
 
     checkV3MetaData(keyValueContainerBlockDataMap, results);
   }
