@@ -35,12 +35,14 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
@@ -217,9 +219,8 @@ public class ContainerStateMachine extends BaseStateMachine {
   private final ContainerDispatcher dispatcher;
   private final ContainerController containerController;
   private final XceiverServerRatis ratisServer;
-  private final ConcurrentHashMap<Long, WriteFutureContext> writeChunkFutureMap;
+  private final NavigableMap<Long, WriteFutureContext> writeChunkFutureMap;
   private final long writeChunkWaitMaxMs;
-  private long writeFutureMinIndex = 0;
 
   // keeps track of the containers created per pipeline
   private final Map<Long, Long> container2BCSIDMap;
@@ -255,7 +256,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     this.containerController = containerController;
     this.ratisServer = ratisServer;
     metrics = CSMMetrics.create(gid);
-    this.writeChunkFutureMap = new ConcurrentHashMap<>();
+    this.writeChunkFutureMap = new ConcurrentSkipListMap<>();
     applyTransactionCompletionMap = new ConcurrentHashMap<>();
     this.unhealthyContainers = ConcurrentHashMap.newKeySet();
     long pendingRequestsBytesLimit = (long)conf.getStorageSize(
@@ -678,21 +679,12 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   private void validateLongRunningWrite(long currIndex) throws IOException {
     // get min valid write chunk operation's future context
-    WriteFutureContext writeFutureContext = null;
-    for (long i = writeFutureMinIndex; i < currIndex; ++i) {
-      if (writeChunkFutureMap.containsKey(i)) {
-        writeFutureContext = writeChunkFutureMap.get(i);
-        writeFutureMinIndex = i;
-        break;
-      }
-    }
-    if (null == writeFutureContext) {
+    Map.Entry<Long, WriteFutureContext> longWriteFutureContextEntry = writeChunkFutureMap.firstEntry();
+    if (null == longWriteFutureContextEntry) {
       return;
     }
     // validate for timeout in milli second
-    long waitTime = Time.monotonicNow() - writeFutureContext.getStartTime() / 1000000;
-    IOException ex = new StorageContainerException("Write chunk has taken " + waitTime + " crossing threshold "
-        + writeChunkWaitMaxMs + " for groupId " + getGroupId(), ContainerProtos.Result.CONTAINER_INTERNAL_ERROR);
+    long waitTime = Time.monotonicNow() - longWriteFutureContextEntry.getValue().getStartTime() / 1000000;
     if (waitTime > writeChunkWaitMaxMs) {
       LOG.error("Write chunk has taken {}ms crossing threshold {}ms for groupId {}", waitTime, writeChunkWaitMaxMs,
           getGroupId());
@@ -700,10 +692,9 @@ public class ContainerStateMachine extends BaseStateMachine {
       writeChunkFutureMap.forEach((key, value) -> {
         LOG.error("Cancelling write chunk for transaction {}, groupId {}", key, getGroupId());
         value.getWriteChunkFuture().cancel(true);
-        value.getRaftFuture().completeExceptionally(ex);
       });
-      writeFutureContext.getRaftFuture().completeExceptionally(ex);
-      throw ex;
+      throw new StorageContainerException("Write chunk has taken " + waitTime + " crossing threshold "
+          + writeChunkWaitMaxMs + " for groupId " + getGroupId(), ContainerProtos.Result.CONTAINER_INTERNAL_ERROR);
     }
   }
 
