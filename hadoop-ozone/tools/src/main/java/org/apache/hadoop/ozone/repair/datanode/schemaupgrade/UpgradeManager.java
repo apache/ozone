@@ -26,7 +26,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,8 +45,7 @@ public class UpgradeManager {
     long startTime = System.currentTimeMillis();
 
     LOG.info("Start to upgrade {} volume(s)", volumes.size());
-    for (StorageVolume volume : volumes) {
-      final HddsVolume hddsVolume = (HddsVolume) volume;
+    for (HddsVolume hddsVolume : volumes) {
       final UpgradeTask task =
           new UpgradeTask(configuration, hddsVolume);
       final CompletableFuture<Result> future = task.getUpgradeFuture();
