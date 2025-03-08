@@ -86,7 +86,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
-import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -2066,23 +2066,28 @@ public class TestSCMNodeManager {
 
   @ParameterizedTest
   @MethodSource("nodeStateTransitions")
-  public void testNodeOperationalStateChangeNotifiesReplicationManager(
+  public void testNodeOperationalStateChange(
       HddsProtos.NodeOperationalState oldState, 
       HddsProtos.NodeOperationalState newState, 
       boolean shouldNotify)
       throws IOException, NodeNotFoundException, AuthenticationException {
-    OzoneConfiguration conf = getConf();
-    ReplicationManager replicationManager = mock(ReplicationManager.class);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
+    when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
+    EventPublisher eventPublisher = mock(EventPublisher.class);
+    HDDSLayoutVersionManager lvm  =
+        new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
+    createNodeManager(getConf());
+    SCMNodeManager nodeManager  = new SCMNodeManager(conf,
+        scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
+        scmContext, lvm);
 
-    try (SCMNodeManager nodeManager = createNodeManager(conf)) {    
-      nodeManager.setReplicationManager(replicationManager);
+    DatanodeDetails datanode = MockDatanodeDetails.randomDatanodeDetails();
+    datanode.setPersistedOpState(oldState);
+    nodeManager.register(datanode, null, HddsTestUtils.getRandomPipelineReports());
+    nodeManager.setNodeOperationalState(datanode, newState, 0);
+    verify(eventPublisher, times(shouldNotify ? 1 : 0)).fireEvent(SCMEvents.REPLICATION_MANAGER_NOTIFY, datanode);
 
-      DatanodeDetails datanode = HddsTestUtils.createRandomDatanodeAndRegister(
-          nodeManager);
-      nodeManager.getNodeStateManager().setNodeOperationalState(datanode, oldState);
-
-      nodeManager.setNodeOperationalState(datanode, newState, 0);
-      verify(replicationManager, times(shouldNotify ? 1 : 0)).notifyNodeStateChange();
-    }
+    nodeManager.close();
   }
 }

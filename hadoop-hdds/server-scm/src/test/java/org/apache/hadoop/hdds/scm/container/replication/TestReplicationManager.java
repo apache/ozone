@@ -1815,7 +1815,7 @@ public class TestReplicationManager {
     assertTrue(processAllCalled.get());
     processAllCalled.set(false);
 
-    customRM.notifyNodeStateChange();
+    assertThat(customRM.notifyNodeStateChange()).isEqualTo(queueIsEmpty);
 
     GenericTestUtils.waitFor(
         () -> customRM.isThreadWaiting(),

@@ -330,14 +330,15 @@ public class SCMNodeManager implements NodeManager {
     nodeStateManager.setNodeOperationalState(
         datanodeDetails, newState, opStateExpiryEpocSec);
 
-    if (replicationManager != null && oldState != newState) {
+    if (oldState != newState) {
       // Notify when a node is entering maintenance, decommissioning or back to service
       if (newState == NodeOperationalState.ENTERING_MAINTENANCE
           || newState == NodeOperationalState.DECOMMISSIONING
           || newState == NodeOperationalState.IN_SERVICE) {
         LOG.info("Notifying ReplicationManager of node state change for {}: {} -> {}",
             datanodeDetails, oldState, newState);
-        replicationManager.notifyNodeStateChange();
+        scmNodeEventPublisher.fireEvent(SCMEvents.REPLICATION_MANAGER_NOTIFY, datanodeDetails);
+        
       }
     }
   }

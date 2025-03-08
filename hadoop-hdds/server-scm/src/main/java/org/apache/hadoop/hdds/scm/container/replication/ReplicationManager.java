@@ -1484,10 +1484,12 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
    * Notify the ReplicationManager that a node state has changed, which might
    * require container replication. This will wake up the replication monitor
    * thread if it's sleeping and there's no active replication work in progress.
+   * 
+   * @return true if the replication monitor was woken up, false otherwise
    */
-  public synchronized void notifyNodeStateChange() {
+  public synchronized boolean notifyNodeStateChange() {
     if (!running || serviceStatus == ServiceStatus.PAUSING) {
-      return;
+      return false;
     }
 
     // Only wake up the thread if there's no active replication work
@@ -1497,8 +1499,10 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       LOG.info("Waking up replication monitor due to node state change");
       // Notify the replication monitor thread to wake up
       notify();
+      return true;
     } else {
       LOG.info("Replication queue is not empty, not waking up replication monitor");
+      return false;
     }
   }
 }
