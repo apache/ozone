@@ -26,7 +26,6 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import org.apache.commons.io.FileUtils;
@@ -69,7 +68,6 @@ public class UpgradeTask {
   private final ConfigurationSource config;
   private final HddsVolume hddsVolume;
   private DatanodeStoreSchemaThreeImpl dataStore;
-  private final Map volumeStoreMap;
 
   private static final String BACKUP_CONTAINER_DATA_FILE_SUFFIX = ".backup";
   public static final String UPGRADE_COMPLETE_FILE_NAME = "upgrade.complete";
@@ -79,11 +77,9 @@ public class UpgradeTask {
       (new DatanodeSchemaTwoDBDefinition("", new OzoneConfiguration()))
           .getMap().keySet();
 
-  public UpgradeTask(ConfigurationSource config, HddsVolume hddsVolume,
-      Map storeMap) {
+  public UpgradeTask(ConfigurationSource config, HddsVolume hddsVolume) {
     this.config = config;
     this.hddsVolume = hddsVolume;
-    this.volumeStoreMap = storeMap;
   }
 
   public CompletableFuture<UpgradeManager.Result> getUpgradeFuture() {
@@ -159,8 +155,7 @@ public class UpgradeTask {
         RawDB db = DatanodeStoreCache.getInstance().getDB(
             volumeDBPath.getAbsolutePath(), config);
         dataStore = (DatanodeStoreSchemaThreeImpl) db.getStore();
-        volumeStoreMap.put(
-            hddsVolume.getStorageDir().getAbsolutePath(), dataStore);
+        result.setDBStore(dataStore);
       } catch (IOException e) {
         result.fail(new Exception(
             "Failed to load db for volume " + hddsVolume.getVolumeRootDir() +

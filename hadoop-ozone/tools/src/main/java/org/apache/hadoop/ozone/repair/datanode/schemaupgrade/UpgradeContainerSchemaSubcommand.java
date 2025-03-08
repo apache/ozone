@@ -128,7 +128,6 @@ public class UpgradeContainerSchemaSubcommand extends RepairTool {
     }
 
     // do upgrade
-    final UpgradeManager upgradeManager = new UpgradeManager();
-    upgradeManager.run(configuration, allVolume);
+    UpgradeManager.run(configuration, allVolume);
   }
 }

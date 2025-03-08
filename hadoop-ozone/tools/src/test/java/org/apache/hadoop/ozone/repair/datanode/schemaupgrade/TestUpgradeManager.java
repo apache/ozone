@@ -158,12 +158,11 @@ public class TestUpgradeManager {
 
     shutdownAllVolume();
 
-    final UpgradeManager upgradeManager = new UpgradeManager();
     final List<UpgradeManager.Result> results =
-        upgradeManager.run(CONF,
+        UpgradeManager.run(CONF,
             StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()));
 
-    checkV3MetaData(keyValueContainerBlockDataMap, results, upgradeManager);
+    checkV3MetaData(keyValueContainerBlockDataMap, results);
   }
 
   private Map<String, BlockData> putAnyBlockData(KeyValueContainerData data,
@@ -267,26 +266,21 @@ public class TestUpgradeManager {
   }
 
   private void checkV3MetaData(Map<KeyValueContainerData,
-      Map<String, BlockData>> blockDataMap, List<UpgradeManager.Result> results,
-      UpgradeManager upgradeManager) throws IOException {
-    Map<Long, UpgradeTask.UpgradeContainerResult> resultMap = new HashMap<>();
+      Map<String, BlockData>> blockDataMap, List<UpgradeManager.Result> results) throws IOException {
+    Map<Long, UpgradeManager.Result> volumeResults = new HashMap<>();
 
     for (UpgradeManager.Result result : results) {
-      resultMap.putAll(result.getResultMap());
+      result.getResultMap().forEach((k, v) -> volumeResults.put(k, result));
     }
 
     for (Map.Entry<KeyValueContainerData, Map<String, BlockData>> entry :
         blockDataMap.entrySet()) {
       final KeyValueContainerData containerData = entry.getKey();
       final Map<String, BlockData> blockKeyValue = entry.getValue();
-
-      final UpgradeTask.UpgradeContainerResult result =
-          resultMap.get(containerData.getContainerID());
-      final KeyValueContainerData v3ContainerData =
-          (KeyValueContainerData) result.getNewContainerData();
+      Long containerID = containerData.getContainerID();
 
       final DatanodeStoreSchemaThreeImpl datanodeStoreSchemaThree =
-          upgradeManager.getDBStore(v3ContainerData.getVolume());
+          volumeResults.get(containerID).getDBStore();
       final Table<String, BlockData> blockDataTable =
           datanodeStoreSchemaThree.getBlockDataTable();
 

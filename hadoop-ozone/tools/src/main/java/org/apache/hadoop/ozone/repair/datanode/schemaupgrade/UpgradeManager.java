@@ -17,14 +17,12 @@
 
 package org.apache.hadoop.ozone.repair.datanode.schemaupgrade;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -41,10 +39,7 @@ public class UpgradeManager {
   public static final Logger LOG =
       LoggerFactory.getLogger(UpgradeManager.class);
 
-  private final Map<String, DatanodeStoreSchemaThreeImpl>
-      volumeStoreMap = new ConcurrentHashMap<>();
-
-  public List<Result> run(OzoneConfiguration configuration,
+  public static List<Result> run(OzoneConfiguration configuration,
       List<HddsVolume> volumes) throws IOException {
     List<Result> results = new ArrayList<>();
     Map<HddsVolume, CompletableFuture<Result>> volumeFutures = new HashMap<>();
@@ -54,7 +49,7 @@ public class UpgradeManager {
     for (StorageVolume volume : volumes) {
       final HddsVolume hddsVolume = (HddsVolume) volume;
       final UpgradeTask task =
-          new UpgradeTask(configuration, hddsVolume, volumeStoreMap);
+          new UpgradeTask(configuration, hddsVolume);
       final CompletableFuture<Result> future = task.getUpgradeFuture();
       volumeFutures.put(hddsVolume, future);
     }
@@ -80,11 +75,6 @@ public class UpgradeManager {
     return results;
   }
 
-  @VisibleForTesting
-  public DatanodeStoreSchemaThreeImpl getDBStore(HddsVolume volume) {
-    return volumeStoreMap.get(volume.getStorageDir().getAbsolutePath());
-  }
-
   /**
    * This class contains v2 to v3 container upgrade result.
    */
@@ -95,6 +85,7 @@ public class UpgradeManager {
     private long endTimeMs = 0L;
     private Exception e = null;
     private Status status = Status.FAIL;
+    private DatanodeStoreSchemaThreeImpl store;
 
     public Result(HddsVolume hddsVolume) {
       this.hddsVolume = hddsVolume;
@@ -106,6 +97,14 @@ public class UpgradeManager {
 
     public long getCost() {
       return endTimeMs - startTimeMs;
+    }
+
+    DatanodeStoreSchemaThreeImpl getDBStore() {
+      return store;
+    }
+
+    void setDBStore(DatanodeStoreSchemaThreeImpl store) {
+      this.store = store;
     }
 
     public void setResultList(
