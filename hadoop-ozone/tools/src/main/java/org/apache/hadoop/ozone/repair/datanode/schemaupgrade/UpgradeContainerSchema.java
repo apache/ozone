@@ -65,8 +65,6 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinitio
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.repair.RepairTool;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
@@ -81,9 +79,6 @@ import picocli.CommandLine.Command;
     versionProvider = HddsVersionProvider.class)
 public class UpgradeContainerSchema extends RepairTool {
 
-  public static final Logger LOG =
-      LoggerFactory.getLogger(UpgradeContainerSchema.class);
-
   @CommandLine.Option(names = {"--volume"},
       description = "volume path")
   private String volume;
@@ -93,7 +88,7 @@ public class UpgradeContainerSchema extends RepairTool {
     Map<HddsVolume, CompletableFuture<VolumeUpgradeResult>> volumeFutures = new HashMap<>();
     long startTime = System.currentTimeMillis();
 
-    LOG.info("Start to upgrade {} volume(s)", volumes.size());
+    info("Start to upgrade %s volume(s)", volumes.size());
     for (HddsVolume hddsVolume : volumes) {
       final UpgradeTask task =
           new UpgradeTask(configuration, hddsVolume);
@@ -109,15 +104,15 @@ public class UpgradeContainerSchema extends RepairTool {
       try {
         final VolumeUpgradeResult result = volumeFuture.get();
         results.add(result);
-        LOG.info("Finish upgrading containers on volume {}, {}",
-            hddsVolume.getVolumeRootDir(), result.toString());
+        info("Finish upgrading containers on volume %s, %s",
+            hddsVolume.getVolumeRootDir(), result);
       } catch (Exception e) {
-        LOG.error("Failed to upgrade containers on volume {}",
+        error("Failed to upgrade containers on volume %s",
             hddsVolume.getVolumeRootDir(), e);
       }
     }
 
-    LOG.info("It took {}ms to finish all volume upgrade.",
+    info("It took %sms to finish all volume upgrade.",
         (System.currentTimeMillis() - startTime));
     return results;
   }
@@ -267,7 +262,7 @@ public class UpgradeContainerSchema extends RepairTool {
           result.fail(new Exception("Upgrade complete file already exists " +
               completeFile.getAbsolutePath() + ", skip upgrade."));
           if (!lockFile.delete()) {
-            LOG.warn("Failed to delete upgrade lock file {}.", lockFile);
+            error("Failed to delete upgrade lock file %s.", lockFile);
           }
           return result;
         }
@@ -296,7 +291,7 @@ public class UpgradeContainerSchema extends RepairTool {
           return result;
         }
 
-        LOG.info("Start to upgrade containers on volume {}",
+        info("Start to upgrade containers on volume %s",
             hddsVolume.getVolumeRootDir());
         File[] containerTopDirs = currentDir.listFiles();
         if (containerTopDirs != null) {
@@ -323,13 +318,13 @@ public class UpgradeContainerSchema extends RepairTool {
           try {
             UpgradeUtils.createFile(file);
           } catch (IOException ioe) {
-            LOG.warn("Failed to create upgrade complete file {}.", file, ioe);
+            error("Failed to create upgrade complete file %s.", file, ioe);
           }
         }
         if (lockFile.exists()) {
           boolean deleted = lockFile.delete();
           if (!deleted) {
-            LOG.warn("Failed to delete upgrade lock file {}.", file);
+            error("Failed to delete upgrade lock file %s.", file);
           }
         }
       });
@@ -362,14 +357,14 @@ public class UpgradeContainerSchema extends RepairTool {
         File containerFile = ContainerUtils.getContainerFile(containerDir);
         long containerID = ContainerUtils.getContainerID(containerDir);
         if (!containerFile.exists()) {
-          LOG.error("Missing .container file: {}.", containerDir);
+          error("Missing .container file: %s.", containerDir);
           return null;
         }
         try {
           ContainerData containerData =
               ContainerDataYaml.readContainerFile(containerFile);
           if (containerID != containerData.getContainerID()) {
-            LOG.error("ContainerID in file {} mismatch with expected {}.",
+            error("ContainerID in file %s mismatch with expected %s.",
                 containerFile, containerID);
             return null;
           }
@@ -382,16 +377,16 @@ public class UpgradeContainerSchema extends RepairTool {
             KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
             return kvContainerData;
           } else {
-            LOG.error("Container is not KeyValueContainer type: {}.",
+            error("Container is not KeyValueContainer type: %s.",
                 containerDir);
             return null;
           }
         } catch (IOException ex) {
-          LOG.error("Failed to parse ContainerFile: {}.", containerFile, ex);
+          error("Failed to parse ContainerFile: %s.", containerFile, ex);
           return null;
         }
       } catch (Throwable e) {
-        LOG.error("Failed to load container: {}.", containerDir, e);
+        error("Failed to load container: %s.", containerDir, e);
         return null;
       }
     }
