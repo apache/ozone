@@ -50,10 +50,10 @@ import picocli.CommandLine.Command;
         "for this datanode.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class UpgradeContainerSchemaSubcommand extends RepairTool {
+public class UpgradeContainerSchema extends RepairTool {
 
   public static final Logger LOG =
-      LoggerFactory.getLogger(UpgradeContainerSchemaSubcommand.class);
+      LoggerFactory.getLogger(UpgradeContainerSchema.class);
 
   @CommandLine.Option(names = {"--volume"},
       required = false,

@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.repair.datanode;
 
 import org.apache.hadoop.hdds.cli.RepairSubcommand;
-import org.apache.hadoop.ozone.repair.datanode.schemaupgrade.UpgradeContainerSchemaSubcommand;
+import org.apache.hadoop.ozone.repair.datanode.schemaupgrade.UpgradeContainerSchema;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
@@ -27,7 +27,7 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(name = "datanode",
     subcommands = {
-        UpgradeContainerSchemaSubcommand.class,
+        UpgradeContainerSchema.class,
     },
     description = "Tools to repair Datanode")
 @MetaInfServices(RepairSubcommand.class)

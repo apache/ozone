@@ -73,9 +73,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Tests for {@link UpgradeContainerSchemaSubcommand} class.
+ * Tests for {@link UpgradeContainerSchema} class.
  */
-class TestUpgradeContainerSchemaSubcommand {
+class TestUpgradeContainerSchema {
   private static final String SCM_ID = UUID.randomUUID().toString();
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
 
@@ -159,7 +159,7 @@ class TestUpgradeContainerSchemaSubcommand {
     shutdownAllVolume();
 
     final List<VolumeUpgradeResult> results =
-        UpgradeContainerSchemaSubcommand.run(CONF,
+        UpgradeContainerSchema.run(CONF,
             StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()));
 
     checkV3MetaData(keyValueContainerBlockDataMap, results);
