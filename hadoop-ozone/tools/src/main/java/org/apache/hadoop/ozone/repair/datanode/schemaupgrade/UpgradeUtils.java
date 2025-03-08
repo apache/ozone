@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.repair.datanode.schemaupgrade;
 
-import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
-
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
@@ -58,10 +56,6 @@ public final class UpgradeUtils {
     Preconditions.checkState(idFile.exists(),
         "Datanode id file: " + idFilePath + " not exists");
     return ContainerUtils.readDatanodeDetailsFrom(idFile);
-  }
-
-  public static File getContainerDBPath(HddsVolume volume) {
-    return new File(volume.getDbParentDir(), CONTAINER_DB_NAME);
   }
 
   public static File getVolumeUpgradeCompleteFile(HddsVolume volume) {
