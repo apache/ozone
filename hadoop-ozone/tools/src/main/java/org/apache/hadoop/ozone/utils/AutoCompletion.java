@@ -37,11 +37,13 @@ import org.apache.hadoop.ozone.shell.checknative.CheckNative;
 import org.apache.hadoop.ozone.shell.s3.S3Shell;
 import org.apache.hadoop.ozone.shell.tenant.TenantShell;
 import org.apache.hadoop.util.Classpath;
-
 import picocli.AutoComplete;
 import picocli.CommandLine;
+import picocli.CommandLine.Option;
 
 public class AutoCompletion {
+
+  private AutoCompletion() { }
 
   public static void main(String[] args) {
 
@@ -80,7 +82,7 @@ public class AutoCompletion {
      */
 
     /*
-     * We don't have auto-complete support for the following commands 
+     * We don't have auto-complete support for the following commands
      *   - dtutil
      *   - envvars
      *   - fs
@@ -88,7 +90,7 @@ public class AutoCompletion {
      *   - daemonlog
      */
 
-    System.out.println(AutoComplete.bash("ozone",hierarchy));
+    System.out.println(AutoComplete.bash("ozone", hierarchy));
   }
 
   /**
@@ -97,5 +99,51 @@ public class AutoCompletion {
   @CommandLine.Command(name = "ozone",
           description = "Ozone top level command")
   private static class Ozone {
+    @Option(names = {"--buildpaths"},
+        description = "attempt to add class files from build tree")
+    private String buildpaths;
+
+    @Option(names = {"--config"},
+        description = "Ozone config directory")
+    private String config;
+
+    @Option(names = {"--debug"},
+        description = "turn on shell script debug mode")
+    private String debug;
+
+    @Option(names = {"--daemon"},
+        description = "attempt to add class files from build tree")
+    private String daemon;
+
+    @Option(names = {"--help"},
+        description = "usage information")
+    private String help;
+
+    @Option(names = {"--hostnames"},
+        description = "hosts to use in worker mode")
+    private String hostnames;
+
+    @Option(names = {"--hosts"},
+        description = "list of hosts to use in worker mode")
+    private String hosts;
+
+    @Option(names = {"--loglevel"},
+        description = "set the log4j level for this command")
+    private String loglevel;
+
+    @Option(names = {"--workers"},
+        description = "turn on worker mode")
+    private String workers;
+
+    @Option(names = {"--jvmargs"},
+        description = "append JVM options to any existing options defined in the OZONE_OPTS environment variable. " +
+            "Any defined in OZONE_CLIENT_OPTS will be appended after these jvmargs")
+    private String jvmargs;
+
+    @Option(names = {"--validate"},
+        description = "validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath " +
+            "file are present, command execution shall continue post validation failure if 'continue' is passed")
+    private String validate;
+
   }
 }
