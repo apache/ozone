@@ -159,7 +159,7 @@ class TestUpgradeContainerSchema {
     shutdownAllVolume();
 
     final List<VolumeUpgradeResult> results =
-        UpgradeContainerSchema.run(CONF,
+        new UpgradeContainerSchema().run(CONF,
             StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()));
 
     checkV3MetaData(keyValueContainerBlockDataMap, results);

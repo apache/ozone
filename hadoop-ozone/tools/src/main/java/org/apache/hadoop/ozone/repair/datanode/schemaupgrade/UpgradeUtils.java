@@ -26,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -38,11 +39,20 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaTwoDBDefinition;
 
 /**
  * Utils functions to help upgrade v2 to v3 container functions.
  */
 final class UpgradeUtils {
+
+  public static final Set<String> COLUMN_FAMILIES_NAME =
+      (new DatanodeSchemaTwoDBDefinition("", new OzoneConfiguration()))
+          .getMap().keySet();
+
+  public static final String BACKUP_CONTAINER_DATA_FILE_SUFFIX = ".backup";
+  public static final String UPGRADE_COMPLETE_FILE_NAME = "upgrade.complete";
+  public static final String UPGRADE_LOCK_FILE_NAME = "upgrade.lock";
 
   /** Never constructed. **/
   private UpgradeUtils() {
@@ -65,13 +75,11 @@ final class UpgradeUtils {
   }
 
   public static File getVolumeUpgradeCompleteFile(HddsVolume volume) {
-    return new File(volume.getHddsRootDir(),
-        UpgradeTask.UPGRADE_COMPLETE_FILE_NAME);
+    return new File(volume.getHddsRootDir(), UPGRADE_COMPLETE_FILE_NAME);
   }
 
   public static File getVolumeUpgradeLockFile(HddsVolume volume) {
-    return new File(volume.getHddsRootDir(),
-        UpgradeTask.UPGRADE_LOCK_FILE_NAME);
+    return new File(volume.getHddsRootDir(), UPGRADE_LOCK_FILE_NAME);
   }
 
   public static boolean createFile(File file) throws IOException {
