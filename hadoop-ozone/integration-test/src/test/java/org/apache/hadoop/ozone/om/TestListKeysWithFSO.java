@@ -24,7 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -643,13 +642,10 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
 
   private static void createAndAssertKeys(OzoneBucket ozoneBucket, List<String> keys)
       throws Exception {
-    int length = 10;
-    byte[] input = new byte[length];
-    Arrays.fill(input, (byte) 96);
     for (String key : keys) {
-      createKey(ozoneBucket, key, input);
+      byte[] input = createKey(ozoneBucket, key, 10);
       // Read the key with given key name.
-      readkey(ozoneBucket, key, length, input);
+      readkey(ozoneBucket, key, 10, input);
     }
   }
 

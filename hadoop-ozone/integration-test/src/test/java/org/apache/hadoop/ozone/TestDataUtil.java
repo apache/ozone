@@ -25,6 +25,7 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -102,6 +103,14 @@ public final class TestDataUtil {
     objectStore.createVolume(volumeName, volumeArgs);
     return objectStore.getVolume(volumeName);
 
+  }
+
+  public static byte[] createKey(OzoneBucket bucket,
+                                 String keyName, int length) throws IOException{
+    byte[] content = RandomStringUtils.random(length, 0, 0
+        , true, true, null, new SecureRandom()).getBytes(UTF_8);
+    createKey(bucket, keyName, content);
+    return content;
   }
 
   public static void createKey(OzoneBucket bucket, String keyName,

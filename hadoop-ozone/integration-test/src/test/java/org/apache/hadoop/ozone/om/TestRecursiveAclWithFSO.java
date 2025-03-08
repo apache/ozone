@@ -329,12 +329,11 @@ public abstract class TestRecursiveAclWithFSO implements NonHATests.TestCase {
 
   private void createKeys(ObjectStore objectStore, OzoneBucket ozoneBucket,
       List<String> keys) throws Exception {
-    int length = 10;
+
     String aclWorldAll = "world::a";
-    byte[] input = new byte[length];
-    Arrays.fill(input, (byte) 96);
+
     for (String key : keys) {
-      createKey(ozoneBucket, key, input);
+      createKey(ozoneBucket, key, 10);
       setKeyAcl(objectStore, ozoneBucket.getVolumeName(), ozoneBucket.getName(),
           key, aclWorldAll);
     }

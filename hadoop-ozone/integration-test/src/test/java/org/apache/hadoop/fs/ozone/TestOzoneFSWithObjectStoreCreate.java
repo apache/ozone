@@ -352,13 +352,9 @@ public abstract class TestOzoneFSWithObjectStoreCreate implements NonHATests.Tes
     keys.add(OmUtils.normalizeKey(key2, false));
     keys.add(OmUtils.normalizeKey(key3, false));
 
-    int length = 10;
-    byte[] input = new byte[length];
-    Arrays.fill(input, (byte)96);
-
-    createAndAssertKey(ozoneBucket, key1, 10, input);
-    createAndAssertKey(ozoneBucket, key2, 10, input);
-    createAndAssertKey(ozoneBucket, key3, 10, input);
+    createAndAssertKey(ozoneBucket, key1, 10);
+    createAndAssertKey(ozoneBucket, key2, 10);
+    createAndAssertKey(ozoneBucket, key3, 10);
 
     // Iterator with key name as prefix.
 
@@ -403,10 +399,10 @@ public abstract class TestOzoneFSWithObjectStoreCreate implements NonHATests.Tes
     assertEquals(keys, outputKeys);
   }
 
-  private void createAndAssertKey(OzoneBucket ozoneBucket, String key, int length, byte[] input)
+  private void createAndAssertKey(OzoneBucket ozoneBucket, String key, int length)
       throws Exception {
     
-    createKey(ozoneBucket, key, input);
+    byte[] input = createKey(ozoneBucket, key, length);
     // Read the key with given key name.
     readKey(ozoneBucket, key, length, input);
 
