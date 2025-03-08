@@ -24,6 +24,7 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
@@ -46,9 +47,9 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaTwoDBDefinition;
  */
 final class UpgradeUtils {
 
-  public static final Set<String> COLUMN_FAMILIES_NAME =
-      (new DatanodeSchemaTwoDBDefinition("", new OzoneConfiguration()))
-          .getMap().keySet();
+  public static final Set<String> COLUMN_FAMILIES_NAME = Collections.unmodifiableSet(
+      new DatanodeSchemaTwoDBDefinition("", new OzoneConfiguration())
+          .getMap().keySet());
 
   public static final String BACKUP_CONTAINER_DATA_FILE_SUFFIX = ".backup";
   public static final String UPGRADE_COMPLETE_FILE_NAME = "upgrade.complete";
