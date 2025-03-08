@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.ozone.test.GenericTestUtils;
@@ -134,13 +135,16 @@ public abstract class TestSCMContainerManagerMetrics implements NonHATests.TestC
     assertThat(getLongCounter("NumContainerReportsProcessedSuccessful", metrics))
         .isPositive();
 
+    final long previous = getLongCounter("NumICRReportsProcessedSuccessful", metrics);
+    OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
+
     // Create key should create container on DN.
     TestDataUtil.createKeys(cluster(), 1);
 
     GenericTestUtils.waitFor(() -> {
       final MetricsRecordBuilder scmMetrics =
           getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
-      return getLongCounter("NumICRReportsProcessedSuccessful", scmMetrics) > 0;
+      return getLongCounter("NumICRReportsProcessedSuccessful", scmMetrics) > previous;
     }, 100, 30_000);
   }
 }
