@@ -23,7 +23,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 /**
  * This class represents upgrade v2 to v3 container result.
  */
-public class ContainerUpgradeResult {
+class ContainerUpgradeResult {
   private final ContainerData originContainerData;
   private ContainerData newContainerData;
   private long totalRow = 0L;

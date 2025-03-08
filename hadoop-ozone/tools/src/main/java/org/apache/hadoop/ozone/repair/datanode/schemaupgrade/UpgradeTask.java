@@ -60,7 +60,7 @@ import org.slf4j.LoggerFactory;
 /**
  * This class implements the v2 to v3 container upgrade process.
  */
-public class UpgradeTask {
+class UpgradeTask {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(UpgradeTask.class);

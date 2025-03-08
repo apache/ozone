@@ -27,7 +27,7 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 /**
  * This class contains v2 to v3 container upgrade result.
  */
-public class VolumeUpgradeResult {
+class VolumeUpgradeResult {
   private Map<Long, ContainerUpgradeResult> resultMap;
   private final HddsVolume hddsVolume;
   private final long startTimeMs = System.currentTimeMillis();

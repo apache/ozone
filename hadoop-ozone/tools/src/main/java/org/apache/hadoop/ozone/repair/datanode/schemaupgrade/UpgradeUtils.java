@@ -42,7 +42,7 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 /**
  * Utils functions to help upgrade v2 to v3 container functions.
  */
-public final class UpgradeUtils {
+final class UpgradeUtils {
 
   /** Never constructed. **/
   private UpgradeUtils() {

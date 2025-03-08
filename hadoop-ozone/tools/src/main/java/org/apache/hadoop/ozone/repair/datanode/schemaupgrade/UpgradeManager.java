@@ -31,12 +31,12 @@ import org.slf4j.LoggerFactory;
 /**
  * This class manages v2 to v3 container upgrade.
  */
-public class UpgradeManager {
+class UpgradeManager {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(UpgradeManager.class);
 
-  public static List<VolumeUpgradeResult> run(OzoneConfiguration configuration,
+  static List<VolumeUpgradeResult> run(OzoneConfiguration configuration,
       List<HddsVolume> volumes) throws IOException {
     List<VolumeUpgradeResult> results = new ArrayList<>();
     Map<HddsVolume, CompletableFuture<VolumeUpgradeResult>> volumeFutures = new HashMap<>();
