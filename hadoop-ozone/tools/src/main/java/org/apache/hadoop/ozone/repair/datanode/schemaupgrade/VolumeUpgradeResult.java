@@ -36,7 +36,7 @@ class VolumeUpgradeResult {
   private Status status = Status.FAIL;
   private DatanodeStoreSchemaThreeImpl store;
 
-  public VolumeUpgradeResult(HddsVolume hddsVolume) {
+  VolumeUpgradeResult(HddsVolume hddsVolume) {
     this.hddsVolume = hddsVolume;
   }
 
@@ -48,11 +48,11 @@ class VolumeUpgradeResult {
     return endTimeMs - startTimeMs;
   }
 
-  DatanodeStoreSchemaThreeImpl getDBStore() {
+  DatanodeStoreSchemaThreeImpl getStore() {
     return store;
   }
 
-  void setDBStore(DatanodeStoreSchemaThreeImpl store) {
+  void setStore(DatanodeStoreSchemaThreeImpl store) {
     this.store = store;
   }
 

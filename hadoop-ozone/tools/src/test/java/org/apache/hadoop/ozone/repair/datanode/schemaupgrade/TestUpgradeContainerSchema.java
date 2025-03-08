@@ -280,7 +280,7 @@ class TestUpgradeContainerSchema {
       Long containerID = containerData.getContainerID();
 
       final DatanodeStoreSchemaThreeImpl datanodeStoreSchemaThree =
-          volumeResults.get(containerID).getDBStore();
+          volumeResults.get(containerID).getStore();
       final Table<String, BlockData> blockDataTable =
           datanodeStoreSchemaThree.getBlockDataTable();
 

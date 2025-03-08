@@ -29,15 +29,13 @@ class ContainerUpgradeResult {
   private long totalRow = 0L;
   private final long startTimeMs = System.currentTimeMillis();
   private long endTimeMs = 0L;
-  private Status status;
+  private Status status = Status.FAIL;
 
   private String backupContainerFilePath;
   private String newContainerFilePath;
 
-  public ContainerUpgradeResult(
-      ContainerData originContainerData) {
+  ContainerUpgradeResult(ContainerData originContainerData) {
     this.originContainerData = originContainerData;
-    this.status = Status.FAIL;
   }
 
   public long getTotalRow() {

@@ -210,7 +210,7 @@ public class UpgradeContainerSchema extends RepairTool {
     private final HddsVolume hddsVolume;
     private DatanodeStoreSchemaThreeImpl dataStore;
 
-    public UpgradeTask(ConfigurationSource config, HddsVolume hddsVolume) {
+    UpgradeTask(ConfigurationSource config, HddsVolume hddsVolume) {
       this.config = config;
       this.hddsVolume = hddsVolume;
     }
@@ -275,7 +275,7 @@ public class UpgradeContainerSchema extends RepairTool {
         // backup DB directory
         final File volumeDBPath;
         try {
-          volumeDBPath = getVolumeDBPath(hddsVolume);
+          volumeDBPath = getVolumeDBPath();
           dbBackup(volumeDBPath);
         } catch (IOException e) {
           result.fail(new Exception(e.getMessage() + ", skip upgrade."));
@@ -288,7 +288,7 @@ public class UpgradeContainerSchema extends RepairTool {
           RawDB db = DatanodeStoreCache.getInstance().getDB(
               volumeDBPath.getAbsolutePath(), config);
           dataStore = (DatanodeStoreSchemaThreeImpl) db.getStore();
-          result.setDBStore(dataStore);
+          result.setStore(dataStore);
         } catch (IOException e) {
           result.fail(new Exception(
               "Failed to load db for volume " + hddsVolume.getVolumeRootDir() +
@@ -481,9 +481,9 @@ public class UpgradeContainerSchema extends RepairTool {
       }
     }
 
-    private File getVolumeDBPath(HddsVolume volume) throws IOException {
-      File clusterIdDir = new File(volume.getStorageDir(), volume.getClusterID());
-      File storageIdDir = new File(clusterIdDir, volume.getStorageID());
+    private File getVolumeDBPath() throws IOException {
+      File clusterIdDir = new File(hddsVolume.getStorageDir(), hddsVolume.getClusterID());
+      File storageIdDir = new File(clusterIdDir, hddsVolume.getStorageID());
       File containerDBPath = new File(storageIdDir, CONTAINER_DB_NAME);
       if (containerDBPath.exists() && containerDBPath.isDirectory()) {
         return containerDBPath;
