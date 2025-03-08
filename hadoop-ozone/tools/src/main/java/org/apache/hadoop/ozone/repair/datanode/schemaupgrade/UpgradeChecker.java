@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.repair.datanode.schemaupgrade;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -36,40 +35,6 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
  * This is the handler that process container upgrade checker.
  */
 public class UpgradeChecker {
-
-  /*
-   * Verify that the datanode is in the shutdown state or running.
-   */
-  public Pair<Boolean, String> checkDatanodeRunning() {
-    String command =
-        "ps aux | grep org.apache.hadoop.ozone.HddsDatanodeService " +
-            "| grep -v grep";
-    try {
-      Process exec = Runtime.getRuntime().exec(new String[]{"/bin/bash", "-c",
-          command});
-      boolean notTimeout = exec.waitFor(10, TimeUnit.SECONDS);
-      if (!notTimeout) {
-        return Pair.of(true,
-            String.format("Execution of the command '%s' timeout", command));
-      }
-      if (exec.exitValue() == 0) {
-        return Pair.of(true, "HddsDatanodeService is running." +
-            " This upgrade command requires datanode to be off and in" +
-            " the IN_MAINTENANCE mode. Please put the datanode in" +
-            " the desired state first, then try this command later again.");
-      } else if (exec.exitValue() == 1) {
-        return Pair.of(false, "HddsDatanodeService is not running.");
-      } else {
-        return Pair.of(true,
-            String.format("Return code of the command '%s' is %d", command,
-                exec.exitValue()));
-      }
-    } catch (IOException | InterruptedException e) {
-      return Pair.of(true,
-          String.format("Run command '%s' has error '%s'",
-              command, e.getMessage()));
-    }
-  }
 
   public Pair<HDDSLayoutFeature, HDDSLayoutFeature> getLayoutFeature(
       DatanodeDetails dnDetail, OzoneConfiguration conf) throws IOException {

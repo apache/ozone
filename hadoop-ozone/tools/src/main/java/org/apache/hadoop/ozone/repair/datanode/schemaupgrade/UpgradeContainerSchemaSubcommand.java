@@ -19,11 +19,8 @@ package org.apache.hadoop.ozone.repair.datanode.schemaupgrade;
 
 import com.google.common.base.Strings;
 import java.io.File;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Scanner;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -52,10 +49,6 @@ public class UpgradeContainerSchemaSubcommand extends RepairTool {
       required = false,
       description = "volume path")
   private String volume;
-
-  @CommandLine.Option(names = {"-y", "--yes"},
-      description = "Continue without interactive user confirmation")
-  private boolean yes;
 
   @Override
   protected Component serviceToBeOffline() {
@@ -132,19 +125,6 @@ public class UpgradeContainerSchemaSubcommand extends RepairTool {
     if (allVolume.isEmpty()) {
       info("There is no more volume to upgrade. Exit.");
       return;
-    }
-
-    if (!yes) {
-      Scanner scanner = new Scanner(new InputStreamReader(
-          System.in, StandardCharsets.UTF_8));
-      System.out.println(
-          "All volume db stores will be automatically backup," +
-              " should we continue the upgrade ? [yes|no] : ");
-      boolean confirm = scanner.next().trim().equals("yes");
-      scanner.close();
-      if (!confirm) {
-        return;
-      }
     }
 
     // do upgrade

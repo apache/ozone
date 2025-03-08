@@ -150,7 +150,7 @@ public class TestOzoneContainerUpgradeShell {
     return withTextFromSystemIn("y")
         .execute(() -> cmd.execute(
             "-D", OZONE_METADATA_DIRS + "=" + conf.get(OZONE_METADATA_DIRS),
-            "datanode", "upgrade-container-schema", "--yes"));
+            "datanode", "upgrade-container-schema"));
   }
 
   private static ContainerInfo writeKeyAndCloseContainer() throws Exception {
