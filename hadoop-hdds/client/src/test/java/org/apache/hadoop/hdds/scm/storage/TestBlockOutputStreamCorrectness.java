@@ -20,8 +20,8 @@ package org.apache.hadoop.hdds.scm.storage;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -157,8 +157,7 @@ class TestBlockOutputStreamCorrectness {
     final Pipeline pipeline = MockPipeline.createRatisPipeline();
 
     final XceiverClientManager xcm = mock(XceiverClientManager.class);
-    when(xcm.acquireClient(any()))
-        .thenReturn(new MockXceiverClientSpi(pipeline));
+    doReturn(new MockXceiverClientSpi(pipeline)).when(xcm.acquireClient(any()));
 
     OzoneClientConfig config = new OzoneClientConfig();
     config.setStreamBufferSize(4 * 1024 * 1024);
@@ -186,8 +185,7 @@ class TestBlockOutputStreamCorrectness {
   private ECBlockOutputStream createECBlockOutputStream(OzoneClientConfig clientConfig,
       ECReplicationConfig repConfig, BlockID blockID, Pipeline pipeline) throws IOException {
     final XceiverClientManager xcm = mock(XceiverClientManager.class);
-    when(xcm.acquireClient(any()))
-        .thenReturn(new MockXceiverClientSpi(pipeline));
+    doReturn(new MockXceiverClientSpi(pipeline)).when(xcm.acquireClient(any()));
 
     ContainerClientMetrics clientMetrics = ContainerClientMetrics.acquire();
     StreamBufferArgs streamBufferArgs =

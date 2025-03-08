@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client.io;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -59,7 +60,7 @@ public class TestBlockInputStreamFactoryImpl {
         1024 * 1024 * 10);
     Pipeline pipeline = Mockito.spy(blockInfo.getPipeline());
     blockInfo.setPipeline(pipeline);
-    Mockito.when(pipeline.getReplicaIndex(any(DatanodeDetails.class))).thenReturn(1);
+    doReturn(1).when(pipeline.getReplicaIndex(any(DatanodeDetails.class)));
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(true);
     BlockExtendedInputStream stream =

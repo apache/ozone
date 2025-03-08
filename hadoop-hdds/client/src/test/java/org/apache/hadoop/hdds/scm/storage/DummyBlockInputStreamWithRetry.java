@@ -18,8 +18,8 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.List;
@@ -63,7 +63,7 @@ final class DummyBlockInputStreamWithRetry
           try {
             BlockLocationInfo blockLocationInfo = mock(BlockLocationInfo.class);
             Pipeline mockPipeline = MockPipeline.createPipeline(1);
-            when(blockLocationInfo.getPipeline()).thenReturn(mockPipeline);
+            doReturn(mockPipeline).when(blockLocationInfo.getPipeline());
             return blockLocationInfo;
           } catch (IOException e) {
             throw new RuntimeException(e);

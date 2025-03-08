@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -244,19 +245,16 @@ public class TestChunkInputStream {
     Pipeline newPipeline = MockPipeline.createSingleNodePipeline();
 
     Token<?> token = mock(Token.class);
-    when(token.encodeToUrlString())
-        .thenReturn("oldToken");
+    doReturn("oldToken").when(token.encodeToUrlString());
     Token<?> newToken = mock(Token.class);
-    when(newToken.encodeToUrlString())
-        .thenReturn("newToken");
+    doReturn("newToken").when(newToken.encodeToUrlString());
 
     AtomicReference<Pipeline> pipelineRef = new AtomicReference<>(pipeline);
     AtomicReference<Token<?>> tokenRef = new AtomicReference<>(token);
 
     XceiverClientFactory clientFactory = mock(XceiverClientFactory.class);
     XceiverClientSpi client = mock(XceiverClientSpi.class);
-    when(clientFactory.acquireClientForReadData(any()))
-        .thenReturn(client);
+    doReturn(client).when(clientFactory.acquireClientForReadData(any()));
     ArgumentCaptor<ContainerCommandRequestProto> requestCaptor =
         ArgumentCaptor.forClass(ContainerCommandRequestProto.class);
     when(client.getPipeline())

@@ -26,6 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
@@ -69,7 +71,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.stubbing.OngoingStubbing;
 import org.slf4j.event.Level;
 
 /**
@@ -296,18 +297,18 @@ public class TestBlockInputStream {
     // GIVEN
     Pipeline pipeline = MockPipeline.createSingleNodePipeline();
     BlockLocationInfo blockLocationInfo = mock(BlockLocationInfo.class);
-    when(blockLocationInfo.getPipeline()).thenReturn(pipeline);
+    doReturn(pipeline).when(blockLocationInfo.getPipeline());
     Pipeline newPipeline = MockPipeline.createSingleNodePipeline();
     BlockLocationInfo newBlockLocationInfo = mock(BlockLocationInfo.class);
 
     testRefreshesPipelineOnReadFailure(ex, blockLocationInfo,
         id -> newBlockLocationInfo);
 
-    when(newBlockLocationInfo.getPipeline()).thenReturn(newPipeline);
+    doReturn(newPipeline).when(newBlockLocationInfo.getPipeline());
     testRefreshesPipelineOnReadFailure(ex, blockLocationInfo,
         id -> blockLocationInfo);
 
-    when(newBlockLocationInfo.getPipeline()).thenReturn(null);
+    doReturn(null).when(newBlockLocationInfo.getPipeline());
     testRefreshesPipelineOnReadFailure(ex, blockLocationInfo,
         id -> newBlockLocationInfo);
   }
@@ -352,14 +353,11 @@ public class TestBlockInputStream {
   private static ChunkInputStream throwingChunkInputStream(IOException ex,
       int len, boolean succeedOnRetry) throws IOException {
     final ChunkInputStream stream = mock(ChunkInputStream.class);
-    OngoingStubbing<Integer> stubbing =
-        when(stream.read(any(), anyInt(), anyInt()))
-            .thenThrow(ex);
+    doThrow(ex).doReturn(len).when(stream.read(any(), anyInt(), anyInt()));
     if (succeedOnRetry) {
-      stubbing.thenReturn(len);
+      doReturn(len).when(stream).read(any(), anyInt(), anyInt());
     }
-    when(stream.getRemaining())
-        .thenReturn((long) len);
+    doReturn((long) len).when(stream.getRemaining());
     return stream;
   }
 
@@ -415,15 +413,13 @@ public class TestBlockInputStream {
     XceiverClientFactory clientFactory = mock(XceiverClientFactory.class);
     XceiverClientSpi client = mock(XceiverClientSpi.class);
     BlockLocationInfo blockLocationInfo = mock(BlockLocationInfo.class);
-    when(clientFactory.acquireClientForReadData(pipeline))
-        .thenReturn(client);
+    doReturn(client).when(clientFactory.acquireClientForReadData(pipeline));
 
     final int len = 200;
     final ChunkInputStream stream = throwingChunkInputStream(ex, len, true);
 
-    when(refreshFunction.apply(blockID))
-        .thenReturn(blockLocationInfo);
-    when(blockLocationInfo.getPipeline()).thenReturn(newPipeline);
+    doReturn(blockLocationInfo).when(refreshFunction.apply(blockID));
+    doReturn(newPipeline).when(blockLocationInfo.getPipeline());
 
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(false);
