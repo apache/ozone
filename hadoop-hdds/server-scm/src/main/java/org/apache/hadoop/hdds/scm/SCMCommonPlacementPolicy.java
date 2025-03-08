@@ -1,27 +1,39 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm;
-
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.PriorityQueue;
+import java.util.Queue;
+import java.util.Random;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
@@ -37,20 +49,6 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.PriorityQueue;
-import java.util.Queue;
-import java.util.Random;
-import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * This policy implements a set of invariants which are common
@@ -237,7 +235,7 @@ public abstract class SCMCommonPlacementPolicy implements
       healthyNodes.removeAll(usedNodes);
     }
     String msg;
-    if (healthyNodes.size() == 0) {
+    if (healthyNodes.isEmpty()) {
       msg = "No healthy node found to allocate container.";
       LOG.error(msg);
       throw new SCMException(msg, SCMException.ResultCodes
@@ -442,7 +440,7 @@ public abstract class SCMCommonPlacementPolicy implements
     // We have a network topology so calculate if it is satisfied or not.
     int requiredRacks = getRequiredRackCount(replicas, 0);
     if (topology == null || replicas == 1 || requiredRacks == 1) {
-      if (dns.size() > 0) {
+      if (!dns.isEmpty()) {
         // placement is always satisfied if there is at least one DN.
         return validPlacement;
       } else {
@@ -558,7 +556,7 @@ public abstract class SCMCommonPlacementPolicy implements
                 .limit(numberOfReplicasToBeCopied)
                 .collect(Collectors.toList());
         if (numberOfReplicasToBeCopied > replicasToBeCopied.size()) {
-          Node rack = replicaList.size() > 0 ? this.getPlacementGroup(
+          Node rack = !replicaList.isEmpty() ? this.getPlacementGroup(
                   replicaList.get(0).getDatanodeDetails()) : null;
           LOG.warn("Not enough copyable replicas available in rack {}. " +
                   "Required number of Replicas to be copied: {}." +
@@ -643,14 +641,14 @@ public abstract class SCMCommonPlacementPolicy implements
         Node rack = pq.poll();
         Set<ContainerReplica> replicaSet =
                 placementGroupReplicaIdMap.get(rack).get(rid);
-        if (replicaSet.size() > 0) {
+        if (!replicaSet.isEmpty()) {
           ContainerReplica r = replicaSet.stream().findFirst().get();
           replicasToRemove.add(r);
           replicaSet.remove(r);
           replicaIdMap.get(rid).remove(r);
           placementGroupCntMap.compute(rack,
                   (group, cnt) -> (cnt == null ? 0 : cnt) - 1);
-          if (replicaSet.size() == 0) {
+          if (replicaSet.isEmpty()) {
             placementGroupReplicaIdMap.get(rack).remove(rid);
           } else {
             pq.add(rack);

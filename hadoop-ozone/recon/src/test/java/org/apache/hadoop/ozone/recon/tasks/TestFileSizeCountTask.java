@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,47 +17,49 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.hdds.utils.db.TypedTable;
-import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
-import org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMUpdateEventBuilder;
-import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
-import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
-import org.jooq.DSLContext;
-import org.jooq.Record3;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.DELETE;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.UPDATE;
-import static org.hadoop.ozone.recon.schema.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
+import static org.apache.ozone.recon.schema.generated.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.AdditionalAnswers.returnsElementsOf;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import org.apache.hadoop.hdds.utils.db.TypedTable;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
+import org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMUpdateEventBuilder;
+import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
+import org.apache.ozone.recon.schema.generated.tables.daos.FileCountBySizeDao;
+import org.apache.ozone.recon.schema.generated.tables.pojos.FileCountBySize;
+import org.jooq.DSLContext;
+import org.jooq.Record3;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
 /**
  * Unit test for File Size Count Task.
  */
 public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
 
   private FileCountBySizeDao fileCountBySizeDao;
-  private FileSizeCountTask fileSizeCountTask;
+  private FileSizeCountTaskOBS fileSizeCountTaskOBS;
+  private FileSizeCountTaskFSO fileSizeCountTaskFSO;
   private DSLContext dslContext;
+  private UtilizationSchemaDefinition utilizationSchemaDefinition;
 
   public TestFileSizeCountTask() {
     super();
@@ -67,24 +68,28 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
   @BeforeEach
   public void setUp() {
     fileCountBySizeDao = getDao(FileCountBySizeDao.class);
-    UtilizationSchemaDefinition utilizationSchemaDefinition =
-        getSchemaDefinition(UtilizationSchemaDefinition.class);
-    fileSizeCountTask =
-        new FileSizeCountTask(fileCountBySizeDao, utilizationSchemaDefinition);
+    utilizationSchemaDefinition = getSchemaDefinition(UtilizationSchemaDefinition.class);
+    // Create separate task instances.
+    fileSizeCountTaskOBS = new FileSizeCountTaskOBS(fileCountBySizeDao, utilizationSchemaDefinition);
+    fileSizeCountTaskFSO = new FileSizeCountTaskFSO(fileCountBySizeDao, utilizationSchemaDefinition);
     dslContext = utilizationSchemaDefinition.getDSLContext();
-    // Truncate table before running each test
+    // Truncate table before each test.
     dslContext.truncate(FILE_COUNT_BY_SIZE);
   }
 
   @Test
   public void testReprocess() throws IOException {
+    // Create three sample OmKeyInfo objects.
     OmKeyInfo[] omKeyInfos = new OmKeyInfo[3];
     String[] keyNames = {"key1", "key2", "key3"};
     String[] volumeNames = {"vol1", "vol1", "vol1"};
     String[] bucketNames = {"bucket1", "bucket1", "bucket1"};
+    // Use sizes so that each falls into a distinct bin:
+    //  - 1000L   falls into first bin (upper bound 1024L)
+    //  - 100000L falls into second bin (upper bound 131072L)
+    //  - 4PB (i.e. 1125899906842624L * 4) falls into the highest bin (upper bound Long.MAX_VALUE)
     Long[] dataSizes = {1000L, 100000L, 1125899906842624L * 4};
 
-    // Loop to initialize each instance of OmKeyInfo
     for (int i = 0; i < 3; i++) {
       omKeyInfos[i] = mock(OmKeyInfo.class);
       given(omKeyInfos[i].getKeyName()).willReturn(keyNames[i]);
@@ -93,88 +98,82 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
       given(omKeyInfos[i].getDataSize()).willReturn(dataSizes[i]);
     }
 
-    // Create two mock instances of TypedTable, one for FILE_SYSTEM_OPTIMIZED
-    // layout and one for LEGACY layout
+    // Prepare the OMMetadataManager mock.
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
-    TypedTable<String, OmKeyInfo> keyTableLegacy = mock(TypedTable.class);
-    TypedTable<String, OmKeyInfo> keyTableFso = mock(TypedTable.class);
 
-    // Set return values for getKeyTable() for FILE_SYSTEM_OPTIMIZED
-    // and LEGACY layout
-    when(omMetadataManager.getKeyTable(eq(BucketLayout.LEGACY)))
-        .thenReturn(keyTableLegacy);
+    // Configure the OBS (OBJECT_STORE) endpoint.
+    TypedTable<String, OmKeyInfo> keyTableOBS = mock(TypedTable.class);
+    // Note: Even though legacy and OBS share the same underlying table, we simulate OBS here.
+    when(omMetadataManager.getKeyTable(eq(BucketLayout.OBJECT_STORE)))
+        .thenReturn(keyTableOBS);
+    TypedTable.TypedTableIterator mockIterOBS = mock(TypedTable.TypedTableIterator.class);
+    when(keyTableOBS.iterator()).thenReturn(mockIterOBS);
+    // Simulate three keys then end.
+    when(mockIterOBS.hasNext()).thenReturn(true, true, true, false);
+    TypedTable.TypedKeyValue mockKeyValueOBS = mock(TypedTable.TypedKeyValue.class);
+    when(mockIterOBS.next()).thenReturn(mockKeyValueOBS);
+    when(mockKeyValueOBS.getValue()).thenReturn(omKeyInfos[0], omKeyInfos[1], omKeyInfos[2]);
+
+    // Configure the FSO (FILE_SYSTEM_OPTIMIZED) endpoint.
+    TypedTable<String, OmKeyInfo> keyTableFSO = mock(TypedTable.class);
     when(omMetadataManager.getKeyTable(eq(BucketLayout.FILE_SYSTEM_OPTIMIZED)))
-        .thenReturn(keyTableFso);
+        .thenReturn(keyTableFSO);
+    TypedTable.TypedTableIterator mockIterFSO = mock(TypedTable.TypedTableIterator.class);
+    when(keyTableFSO.iterator()).thenReturn(mockIterFSO);
+    when(mockIterFSO.hasNext()).thenReturn(true, true, true, false);
+    TypedTable.TypedKeyValue mockKeyValueFSO = mock(TypedTable.TypedKeyValue.class);
+    when(mockIterFSO.next()).thenReturn(mockKeyValueFSO);
+    when(mockKeyValueFSO.getValue()).thenReturn(omKeyInfos[0], omKeyInfos[1], omKeyInfos[2]);
 
-    // Create two mock instances of TypedTableIterator, one for each
-    // instance of TypedTable
-    TypedTable.TypedTableIterator mockKeyIterLegacy =
-        mock(TypedTable.TypedTableIterator.class);
-    when(keyTableLegacy.iterator()).thenReturn(mockKeyIterLegacy);
-    // Set return values for hasNext() and next() of the mock instance of
-    // TypedTableIterator for keyTableLegacy
-    when(mockKeyIterLegacy.hasNext()).thenReturn(true, true, true, false);
-    TypedTable.TypedKeyValue mockKeyValueLegacy =
-        mock(TypedTable.TypedKeyValue.class);
-    when(mockKeyIterLegacy.next()).thenReturn(mockKeyValueLegacy);
-    when(mockKeyValueLegacy.getValue()).thenReturn(omKeyInfos[0], omKeyInfos[1],
-        omKeyInfos[2]);
+    // Simulate a preexisting entry in the DB.
+    // (This record will be removed by the first task via table truncation.)
+    fileCountBySizeDao.insert(new FileCountBySize("vol1", "bucket1", 1024L, 10L));
 
+    // Call reprocess on both tasks.
+    ReconOmTask.TaskResult resultOBS = fileSizeCountTaskOBS.reprocess(omMetadataManager);
+    ReconOmTask.TaskResult resultFSO = fileSizeCountTaskFSO.reprocess(omMetadataManager);
 
-    // Same as above, but for keyTableFso
-    TypedTable.TypedTableIterator mockKeyIterFso =
-        mock(TypedTable.TypedTableIterator.class);
-    when(keyTableFso.iterator()).thenReturn(mockKeyIterFso);
-    when(mockKeyIterFso.hasNext()).thenReturn(true, true, true, false);
-    TypedTable.TypedKeyValue mockKeyValueFso =
-        mock(TypedTable.TypedKeyValue.class);
-    when(mockKeyIterFso.next()).thenReturn(mockKeyValueFso);
-    when(mockKeyValueFso.getValue()).thenReturn(omKeyInfos[0], omKeyInfos[1],
-        omKeyInfos[2]);
+    // Verify that both tasks reported success.
+    assertTrue(resultOBS.isTaskSuccess(), "OBS reprocess should return true");
+    assertTrue(resultFSO.isTaskSuccess(), "FSO reprocess should return true");
 
-    // Reprocess could be called from table having existing entries. Adding
-    // an entry to simulate that.
-    fileCountBySizeDao.insert(
-        new FileCountBySize("vol1", "bucket1", 1024L, 10L));
+    // After processing, there should be 3 rows (one per bin).
+    assertEquals(3, fileCountBySizeDao.count(), "Expected 3 rows in the DB");
 
-    Pair<String, Boolean> result =
-        fileSizeCountTask.reprocess(omMetadataManager);
+    // Now verify the counts in each bin.
+    // Because each task processes the same 3 keys and each key contributes a count of 1,
+    // the final count per bin should be 2 (1 from OBS + 1 from FSO).
 
-    // Verify that the result of reprocess is true
-    assertTrue(result.getRight());
-
-    // Verify that the number of entries in fileCountBySizeDao is 3
-    assertEquals(3, fileCountBySizeDao.count());
-
-    // Create a record to find the count of files in a specific volume,
-    // bucket and file size
-    Record3<String, String, Long> recordToFind = dslContext
-        .newRecord(FILE_COUNT_BY_SIZE.VOLUME,
+    // Verify bin for key size 1000L -> upper bound 1024L.
+    Record3<String, String, Long> recordToFind = dslContext.newRecord(
+            FILE_COUNT_BY_SIZE.VOLUME,
             FILE_COUNT_BY_SIZE.BUCKET,
             FILE_COUNT_BY_SIZE.FILE_SIZE)
         .value1("vol1")
         .value2("bucket1")
         .value3(1024L);
-    assertEquals(2L,
-        fileCountBySizeDao.findById(recordToFind).getCount().longValue());
-    // file size upper bound for 100000L is 131072L (next highest power of 2)
+    assertEquals(2L, fileCountBySizeDao.findById(recordToFind).getCount().longValue(),
+        "Expected bin 1024 to have count 2");
+
+    // Verify bin for key size 100000L -> upper bound 131072L.
     recordToFind.value3(131072L);
-    assertEquals(2L,
-        fileCountBySizeDao.findById(recordToFind).getCount().longValue());
-    // file size upper bound for 4PB is Long.MAX_VALUE
+    assertEquals(2L, fileCountBySizeDao.findById(recordToFind).getCount().longValue(),
+        "Expected bin 131072 to have count 2");
+
+    // Verify bin for key size 4PB -> upper bound Long.MAX_VALUE.
     recordToFind.value3(Long.MAX_VALUE);
-    assertEquals(2L,
-        fileCountBySizeDao.findById(recordToFind).getCount().longValue());
+    assertEquals(2L, fileCountBySizeDao.findById(recordToFind).getCount().longValue(),
+        "Expected bin Long.MAX_VALUE to have count 2");
   }
 
   @Test
   public void testProcess() {
-    // Write 2 keys.
+    // First batch: Write 2 keys.
     OmKeyInfo toBeDeletedKey = mock(OmKeyInfo.class);
     given(toBeDeletedKey.getVolumeName()).willReturn("vol1");
     given(toBeDeletedKey.getBucketName()).willReturn("bucket1");
     given(toBeDeletedKey.getKeyName()).willReturn("deletedKey");
-    given(toBeDeletedKey.getDataSize()).willReturn(2000L); // Bin 1
+    given(toBeDeletedKey.getDataSize()).willReturn(2000L); // Falls in bin with upper bound 2048L
     OMDBUpdateEvent event = new OMUpdateEventBuilder()
         .setAction(PUT)
         .setKey("deletedKey")
@@ -186,7 +185,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     given(toBeUpdatedKey.getVolumeName()).willReturn("vol1");
     given(toBeUpdatedKey.getBucketName()).willReturn("bucket1");
     given(toBeUpdatedKey.getKeyName()).willReturn("updatedKey");
-    given(toBeUpdatedKey.getDataSize()).willReturn(10000L); // Bin 4
+    given(toBeUpdatedKey.getDataSize()).willReturn(10000L); // Falls in bin with upper bound 16384L
     OMDBUpdateEvent event2 = new OMUpdateEventBuilder()
         .setAction(PUT)
         .setKey("updatedKey")
@@ -196,9 +195,14 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
 
     OMUpdateEventBatch omUpdateEventBatch =
         new OMUpdateEventBatch(Arrays.asList(event, event2), 0L);
-    fileSizeCountTask.process(omUpdateEventBatch);
 
-    // Verify 2 keys are in correct bins.
+    // Process the same batch on both endpoints.
+    fileSizeCountTaskOBS.process(omUpdateEventBatch, Collections.emptyMap());
+    fileSizeCountTaskFSO.process(omUpdateEventBatch, Collections.emptyMap());
+
+    // After processing the first batch:
+    // Since each endpoint processes the same events, the counts are doubled.
+    // Expected: 2 rows (bins 2048 and 16384) with counts 2 each.
     assertEquals(2, fileCountBySizeDao.count());
     Record3<String, String, Long> recordToFind = dslContext
         .newRecord(FILE_COUNT_BY_SIZE.VOLUME,
@@ -214,6 +218,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     assertEquals(1L,
         fileCountBySizeDao.findById(recordToFind).getCount().longValue());
 
+    // Second batch: Process update events.
     // Add new key.
     OmKeyInfo newKey = mock(OmKeyInfo.class);
     given(newKey.getVolumeName()).willReturn("vol1");
@@ -251,7 +256,8 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
 
     omUpdateEventBatch = new OMUpdateEventBatch(
         Arrays.asList(updateEvent, putEvent, deleteEvent), 0L);
-    fileSizeCountTask.process(omUpdateEventBatch);
+    fileSizeCountTaskOBS.process(omUpdateEventBatch, Collections.emptyMap());
+    fileSizeCountTaskFSO.process(omUpdateEventBatch, Collections.emptyMap());
 
     assertEquals(4, fileCountBySizeDao.count());
     recordToFind.value3(1024L);
@@ -270,8 +276,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
 
   @Test
   public void testReprocessAtScale() throws IOException {
-    // generate mocks for 2 volumes, 500 buckets each volume
-    // and 42 keys in each bucket.
+    // generate mocks for 2 volumes, 500 buckets each volume, and 42 keys in each bucket.
     List<OmKeyInfo> omKeyInfoList = new ArrayList<>();
     List<Boolean> hasNextAnswer = new ArrayList<>();
     for (int volIndex = 1; volIndex <= 2; volIndex++) {
@@ -281,8 +286,8 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
           given(omKeyInfo.getKeyName()).willReturn("key" + keyIndex);
           given(omKeyInfo.getVolumeName()).willReturn("vol" + volIndex);
           given(omKeyInfo.getBucketName()).willReturn("bucket" + bktIndex);
-          // Place keys in each bin
-          long fileSize = (long)Math.pow(2, keyIndex + 9) - 1L;
+          // Each key's fileSize = 2^(keyIndex+9) - 1, so that it falls into its respective bin.
+          long fileSize = (long) Math.pow(2, keyIndex + 9) - 1L;
           given(omKeyInfo.getDataSize()).willReturn(fileSize);
           omKeyInfoList.add(omKeyInfo);
           hasNextAnswer.add(true);
@@ -292,46 +297,43 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     hasNextAnswer.add(false);
 
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
+    // Create two mock key tables: one for OBS (using LEGACY in this test) and one for FSO.
     TypedTable<String, OmKeyInfo> keyTableLegacy = mock(TypedTable.class);
     TypedTable<String, OmKeyInfo> keyTableFso = mock(TypedTable.class);
 
-    TypedTable.TypedTableIterator mockKeyIterLegacy = mock(TypedTable
-        .TypedTableIterator.class);
-    TypedTable.TypedTableIterator mockKeyIterFso = mock(TypedTable
-        .TypedTableIterator.class);
-    TypedTable.TypedKeyValue mockKeyValueLegacy = mock(
-        TypedTable.TypedKeyValue.class);
-    TypedTable.TypedKeyValue mockKeyValueFso = mock(
-        TypedTable.TypedKeyValue.class);
+    TypedTable.TypedTableIterator mockKeyIterLegacy = mock(TypedTable.TypedTableIterator.class);
+    TypedTable.TypedTableIterator mockKeyIterFso = mock(TypedTable.TypedTableIterator.class);
+    TypedTable.TypedKeyValue mockKeyValueLegacy = mock(TypedTable.TypedKeyValue.class);
+    TypedTable.TypedKeyValue mockKeyValueFso = mock(TypedTable.TypedKeyValue.class);
 
     when(keyTableLegacy.iterator()).thenReturn(mockKeyIterLegacy);
     when(keyTableFso.iterator()).thenReturn(mockKeyIterFso);
 
-    when(omMetadataManager.getKeyTable(BucketLayout.LEGACY))
-        .thenReturn(keyTableLegacy);
-    when(omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED))
-        .thenReturn(keyTableFso);
+    // In this test, assume OBS task uses BucketLayout.LEGACY and FSO uses FILE_SYSTEM_OPTIMIZED.
+    when(omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE)).thenReturn(keyTableLegacy);
+    when(omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)).thenReturn(keyTableFso);
 
-    when(mockKeyIterLegacy.hasNext())
-        .thenAnswer(returnsElementsOf(hasNextAnswer));
-    when(mockKeyIterFso.hasNext())
-        .thenAnswer(returnsElementsOf(hasNextAnswer));
+    when(mockKeyIterLegacy.hasNext()).thenAnswer(returnsElementsOf(hasNextAnswer));
+    when(mockKeyIterFso.hasNext()).thenAnswer(returnsElementsOf(hasNextAnswer));
     when(mockKeyIterLegacy.next()).thenReturn(mockKeyValueLegacy);
     when(mockKeyIterFso.next()).thenReturn(mockKeyValueFso);
 
-    when(mockKeyValueLegacy.getValue())
-        .thenAnswer(returnsElementsOf(omKeyInfoList));
-    when(mockKeyValueFso.getValue())
-        .thenAnswer(returnsElementsOf(omKeyInfoList));
+    when(mockKeyValueLegacy.getValue()).thenAnswer(returnsElementsOf(omKeyInfoList));
+    when(mockKeyValueFso.getValue()).thenAnswer(returnsElementsOf(omKeyInfoList));
 
-    Pair<String, Boolean> result =
-        fileSizeCountTask.reprocess(omMetadataManager);
-    assertTrue(result.getRight());
+    // Call reprocess on both endpoints.
+    ReconOmTask.TaskResult resultOBS = fileSizeCountTaskOBS.reprocess(omMetadataManager);
+    ReconOmTask.TaskResult resultFSO = fileSizeCountTaskFSO.reprocess(omMetadataManager);
+    assertTrue(resultOBS.isTaskSuccess());
+    assertTrue(resultFSO.isTaskSuccess());
 
     // 2 volumes * 500 buckets * 42 bins = 42000 rows
     assertEquals(42000, fileCountBySizeDao.count());
-    Record3<String, String, Long> recordToFind = dslContext
-        .newRecord(FILE_COUNT_BY_SIZE.VOLUME,
+
+    // Verify counts for a few representative bins.
+    // For volume "vol1", bucket "bucket1", the first bin (upper bound 1024L) should have a count of 2.
+    Record3<String, String, Long> recordToFind = dslContext.newRecord(
+            FILE_COUNT_BY_SIZE.VOLUME,
             FILE_COUNT_BY_SIZE.BUCKET,
             FILE_COUNT_BY_SIZE.FILE_SIZE)
         .value1("vol1")
@@ -339,11 +341,13 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         .value3(1024L);
     assertEquals(2L,
         fileCountBySizeDao.findById(recordToFind).getCount().longValue());
-    // file size upper bound for 100000L is 131072L (next highest power of 2)
-    recordToFind.value1("vol1");
+
+    // For volume "vol1", bucket "bucket1", the bin with upper bound 131072L should have a count of 2.
     recordToFind.value3(131072L);
     assertEquals(2L,
         fileCountBySizeDao.findById(recordToFind).getCount().longValue());
+
+    // For volume "vol1", bucket "bucket500", the highest bin (upper bound Long.MAX_VALUE) should have a count of 2.
     recordToFind.value2("bucket500");
     recordToFind.value3(Long.MAX_VALUE);
     assertEquals(2L,
@@ -387,9 +391,10 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
       }
     }
 
-    OMUpdateEventBatch omUpdateEventBatch =
-        new OMUpdateEventBatch(omDbEventList, 0L);
-    fileSizeCountTask.process(omUpdateEventBatch);
+    OMUpdateEventBatch omUpdateEventBatch = new OMUpdateEventBatch(omDbEventList, 0L);
+    // Process the same batch on both endpoints.
+    fileSizeCountTaskOBS.process(omUpdateEventBatch, Collections.emptyMap());
+    fileSizeCountTaskFSO.process(omUpdateEventBatch, Collections.emptyMap());
 
     // Verify 2 keys are in correct bins.
     assertEquals(10000, fileCountBySizeDao.count());
@@ -465,7 +470,8 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     }
 
     omUpdateEventBatch = new OMUpdateEventBatch(omDbEventList, 0L);
-    fileSizeCountTask.process(omUpdateEventBatch);
+    fileSizeCountTaskOBS.process(omUpdateEventBatch, Collections.emptyMap());
+    fileSizeCountTaskFSO.process(omUpdateEventBatch, Collections.emptyMap());
 
     assertEquals(10000, fileCountBySizeDao.count());
     recordToFind = dslContext
@@ -488,6 +494,36 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     recordToFind.value1("vol2");
     assertEquals(1, fileCountBySizeDao.findById(recordToFind)
         .getCount().longValue());
+  }
+
+
+  @Test
+  public void testTruncateTableExceptionPropagation() {
+    // Mock DSLContext and FileCountBySizeDao
+    DSLContext mockDslContext = mock(DSLContext.class);
+    FileCountBySizeDao mockDao = mock(FileCountBySizeDao.class);
+
+    // Mock schema definition and ensure it returns our mocked DSLContext
+    UtilizationSchemaDefinition mockSchema = mock(UtilizationSchemaDefinition.class);
+    when(mockSchema.getDSLContext()).thenReturn(mockDslContext);
+
+    // Mock delete operation to throw an exception
+    when(mockDslContext.delete(FILE_COUNT_BY_SIZE))
+        .thenThrow(new RuntimeException("Simulated DB failure"));
+
+    // Create instances of FileSizeCountTaskOBS and FileSizeCountTaskFSO using mocks
+    fileSizeCountTaskOBS = new FileSizeCountTaskOBS(mockDao, mockSchema);
+    fileSizeCountTaskFSO = new FileSizeCountTaskFSO(mockDao, mockSchema);
+
+    // Mock OMMetadataManager
+    OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
+
+    // Verify that an exception is thrown from reprocess() for both tasks.
+    assertThrows(RuntimeException.class, () -> fileSizeCountTaskOBS.reprocess(omMetadataManager),
+        "Expected reprocess to propagate exception but it didn't.");
+
+    assertThrows(RuntimeException.class, () -> fileSizeCountTaskFSO.reprocess(omMetadataManager),
+        "Expected reprocess to propagate exception but it didn't.");
   }
 
 }

@@ -1,29 +1,35 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.shell;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_HTTP_SCHEME;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RPC_SCHEME;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collection;
-
-import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -33,14 +39,6 @@ import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
-
-import com.google.common.annotations.VisibleForTesting;
-
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_HTTP_SCHEME;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RPC_SCHEME;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import org.apache.http.client.utils.URIBuilder;
 
 /**
@@ -337,13 +335,13 @@ public class OzoneAddress {
   }
 
   public void ensureBucketAddress() throws OzoneClientException {
-    if (keyName.length() > 0) {
+    if (!keyName.isEmpty()) {
       throw new OzoneClientException(
           "Invalid bucket name. Delimiters (/) not allowed in bucket name");
-    } else if (volumeName.length() == 0) {
+    } else if (volumeName.isEmpty()) {
       throw new OzoneClientException(
           "Volume name is required.");
-    } else if (bucketName.length() == 0) {
+    } else if (bucketName.isEmpty()) {
       throw new OzoneClientException(
           "Bucket name is required.");
     }
@@ -352,13 +350,13 @@ public class OzoneAddress {
   // Ensure prefix address with a prefix flag
   // Allow CLI to differentiate key and prefix address
   public void ensurePrefixAddress() throws OzoneClientException {
-    if (keyName.length() == 0) {
+    if (keyName.isEmpty()) {
       throw new OzoneClientException(
           "prefix name is missing.");
-    } else if (volumeName.length() == 0) {
+    } else if (volumeName.isEmpty()) {
       throw new OzoneClientException(
           "Volume name is missing");
-    } else if (bucketName.length() == 0) {
+    } else if (bucketName.isEmpty()) {
       throw new OzoneClientException(
           "Bucket name is missing");
     }
@@ -366,13 +364,13 @@ public class OzoneAddress {
   }
 
   public void ensureKeyAddress() throws OzoneClientException {
-    if (keyName.length() == 0) {
+    if (keyName.isEmpty()) {
       throw new OzoneClientException(
           "Key name is missing.");
-    } else if (volumeName.length() == 0) {
+    } else if (volumeName.isEmpty()) {
       throw new OzoneClientException(
           "Volume name is missing");
-    } else if (bucketName.length() == 0) {
+    } else if (bucketName.isEmpty()) {
       throw new OzoneClientException(
           "Bucket name is missing");
     }
@@ -389,7 +387,7 @@ public class OzoneAddress {
    */
   public void ensureSnapshotAddress()
       throws OzoneClientException {
-    if (keyName.length() > 0) {
+    if (!keyName.isEmpty()) {
       if (OmUtils.isBucketSnapshotIndicator(keyName)) {
         snapshotNameWithIndicator = keyName;
       } else {
@@ -398,31 +396,31 @@ public class OzoneAddress {
                 "a bucket name. Only a snapshot name with " +
                 "a snapshot indicator is accepted");
       }
-    } else if (volumeName.length() == 0) {
+    } else if (volumeName.isEmpty()) {
       throw new OzoneClientException(
           "Volume name is missing.");
-    } else if (bucketName.length() == 0) {
+    } else if (bucketName.isEmpty()) {
       throw new OzoneClientException(
           "Bucket name is missing.");
     }
   }
 
   public void ensureVolumeAddress() throws OzoneClientException {
-    if (keyName.length() != 0) {
+    if (!keyName.isEmpty()) {
       throw new OzoneClientException(
           "Invalid volume name. Delimiters (/) not allowed in volume name");
-    } else if (volumeName.length() == 0) {
+    } else if (volumeName.isEmpty()) {
       throw new OzoneClientException(
           "Volume name is required");
-    } else if (bucketName.length() != 0) {
+    } else if (!bucketName.isEmpty()) {
       throw new OzoneClientException(
           "Invalid volume name. Delimiters (/) not allowed in volume name");
     }
   }
 
   public void ensureRootAddress() throws  OzoneClientException {
-    if (keyName.length() != 0 || bucketName.length() != 0
-        || volumeName.length() != 0) {
+    if (!keyName.isEmpty() || !bucketName.isEmpty()
+        || !volumeName.isEmpty()) {
       throw new OzoneClientException(
           "Invalid URI. Volume/bucket/key elements should not been used");
     }
@@ -465,7 +463,7 @@ public class OzoneAddress {
   }
 
   public void ensureVolumeOrBucketAddress() throws OzoneClientException {
-    if (keyName.length() > 0) {
+    if (!keyName.isEmpty()) {
       if (OmUtils.isBucketSnapshotIndicator(keyName)) {
         // If snapshot, ensure snapshot URI
         ensureSnapshotAddress();
@@ -473,7 +471,7 @@ public class OzoneAddress {
       }
       throw new OzoneClientException(
           "Key address is not supported.");
-    } else if (volumeName.length() == 0) {
+    } else if (volumeName.isEmpty()) {
       // Volume must be present
       // Bucket may or may not be present
       // Depending on operation is on volume or bucket

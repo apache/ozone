@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,13 +13,13 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
+
 package org.apache.hadoop.hdds.security.x509.keys;
 
-import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static java.nio.file.Files.readAllBytes;
+import static java.nio.file.attribute.PosixFilePermissions.asFileAttribute;
+import static java.nio.file.attribute.PosixFilePermissions.fromString;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -32,10 +31,9 @@ import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.util.Set;
-
-import static java.nio.file.Files.readAllBytes;
-import static java.nio.file.attribute.PosixFilePermissions.asFileAttribute;
-import static java.nio.file.attribute.PosixFilePermissions.fromString;
+import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The KeyStorage is responsible to persist and read an RSA keypair for an Ozone component in PEM format.<br/>
@@ -76,7 +74,6 @@ import static java.nio.file.attribute.PosixFilePermissions.fromString;
 // Also see:
 // DefaultCertificateClient on rotation tasks
 // RootCARotationManager on the root CA certificate rotation tasks
-
 public class KeyStorage {
   private static final Logger LOG = LoggerFactory.getLogger(KeyStorage.class);
 
