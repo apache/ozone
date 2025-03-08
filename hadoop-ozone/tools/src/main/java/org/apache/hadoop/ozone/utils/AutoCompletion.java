@@ -67,7 +67,8 @@ public class AutoCompletion {
         .addSubcommand("s3g", new Gateway().getCmd())
         .addSubcommand("scm", new StorageContainerManagerStarter(null).getCmd())
         .addSubcommand("sh", new OzoneShell().getCmd(), "shell")
-        .addSubcommand("tenant", new TenantShell().getCmd());
+        .addSubcommand("tenant", new TenantShell().getCmd())
+        .addSubcommand("version", new OzoneVersionInfo());
 
     /*
      * The following commands are marked as hidden,
@@ -145,5 +146,11 @@ public class AutoCompletion {
             "file are present, command execution shall continue post validation failure if 'continue' is passed")
     private String validate;
 
+  }
+
+  // OzoneVersionInfo class doen't extend GenericCli, so this dummy class is required here.
+  @CommandLine.Command(name = "version",
+          description = "Ozone Version Information")
+  private static class OzoneVersionInfo{
   }
 }
