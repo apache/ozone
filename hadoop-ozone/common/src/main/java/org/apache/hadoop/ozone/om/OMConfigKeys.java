@@ -623,11 +623,6 @@ public final class OMConfigKeys {
       "ozone.om.max.buckets";
   public static final int OZONE_OM_MAX_BUCKET_DEFAULT = 100000;
   /**
-   * Configuration property to configure the max server side response size for list calls.
-   */
-  public static final String OZONE_OM_SERVER_LIST_MAX_SIZE = "ozone.om.server.list.max.size";
-  public static final int OZONE_OM_SERVER_LIST_MAX_SIZE_DEFAULT = 1000;
-  /**
    * Configuration properties for Compaction Service.
    */
   public static final String OZONE_COMPACTION_SERVICE_ENABLED = "ozone.compaction.service.enabled";
