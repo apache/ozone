@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
-import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.CommandQueue;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
@@ -68,10 +67,6 @@ public class ReplicationNodeManagerMock implements NodeManager {
     Preconditions.checkNotNull(nodeStatus);
     this.nodeStateMap = nodeStatus;
     this.commandQueue = commandQueue;
-  }
-
-  @Override
-  public void setReplicationManager(ReplicationManager rm) {
   }
 
   /**

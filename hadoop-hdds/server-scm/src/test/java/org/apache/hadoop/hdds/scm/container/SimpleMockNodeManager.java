@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
-import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
@@ -93,10 +92,6 @@ public class SimpleMockNodeManager implements NodeManager {
       pipelines.add(PipelineID.randomId());
     }
     pipelineMap.put(dd.getUuid(), pipelines);
-  }
-
-  @Override
-  public void setReplicationManager(ReplicationManager rm) {
   }
 
   /**

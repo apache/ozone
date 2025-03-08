@@ -69,7 +69,6 @@ import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
-import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -135,7 +134,6 @@ public class SCMNodeManager implements NodeManager {
   private final SCMContext scmContext;
   private final Map<SCMCommandProto.Type,
       BiConsumer<DatanodeDetails, SCMCommand<?>>> sendCommandNotifyMap;
-  private volatile ReplicationManager replicationManager;
 
   /**
    * Lock used to synchronize some operation in Node manager to ensure a
@@ -295,11 +293,6 @@ public class SCMNodeManager implements NodeManager {
   public NodeStatus getNodeStatus(DatanodeDetails datanodeDetails)
       throws NodeNotFoundException {
     return nodeStateManager.getNodeStatus(datanodeDetails);
-  }
-
-  @Override
-  public void setReplicationManager(ReplicationManager rm) {
-    replicationManager = rm;
   }
 
   /**

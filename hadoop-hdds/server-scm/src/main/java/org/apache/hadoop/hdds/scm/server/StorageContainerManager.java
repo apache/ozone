@@ -474,7 +474,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     StaleNodeHandler staleNodeHandler =
         new StaleNodeHandler(scmNodeManager, pipelineManager);
     DeadNodeHandler deadNodeHandler = new DeadNodeHandler(scmNodeManager,
-        pipelineManager, containerManager, replicationManager);
+        pipelineManager, containerManager);
     StartDatanodeAdminHandler datanodeStartAdminHandler =
         new StartDatanodeAdminHandler(scmNodeManager, pipelineManager);
     ReadOnlyHealthyToHealthyNodeHandler readOnlyHealthyToHealthyNodeHandler =
@@ -818,7 +818,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           containerReplicaPendingOps);
       reconfigurationHandler.register(replicationManager.getConfig());
     }
-    scmNodeManager.setReplicationManager(replicationManager);
     serviceManager.register(replicationManager);
     // RM gets notified of expired pending delete from containerReplicaPendingOps by subscribing to it
     // so it can resend them.

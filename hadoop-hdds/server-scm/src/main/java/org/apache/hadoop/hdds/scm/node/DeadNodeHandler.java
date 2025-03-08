@@ -52,34 +52,23 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
   private final ContainerManager containerManager;
   @Nullable
   private final DeletedBlockLog deletedBlockLog;
-  @Nullable
-  private final ReplicationManager replicationManager;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DeadNodeHandler.class);
 
   public DeadNodeHandler(final NodeManager nodeManager,
-      final PipelineManager pipelineManager,
-      final ContainerManager containerManager) {
-    this(nodeManager, pipelineManager, containerManager, null, null);
+                         final PipelineManager pipelineManager,
+                         final ContainerManager containerManager) {
+    this(nodeManager, pipelineManager, containerManager, null);
   }
 
   public DeadNodeHandler(final NodeManager nodeManager,
                          final PipelineManager pipelineManager,
                          final ContainerManager containerManager,
-                         final ReplicationManager replicationManager) {
-    this(nodeManager, pipelineManager, containerManager, replicationManager, null);
-  }
-
-  public DeadNodeHandler(final NodeManager nodeManager,
-                         final PipelineManager pipelineManager,
-                         final ContainerManager containerManager,
-                         @Nullable final ReplicationManager replicationManager,
                          @Nullable final DeletedBlockLog deletedBlockLog) {
     this.nodeManager = nodeManager;
     this.pipelineManager = pipelineManager;
     this.containerManager = containerManager;
-    this.replicationManager = replicationManager;
     this.deletedBlockLog = deletedBlockLog;
   }
 
