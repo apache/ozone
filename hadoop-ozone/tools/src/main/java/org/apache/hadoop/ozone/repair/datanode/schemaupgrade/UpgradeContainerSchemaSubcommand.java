@@ -19,8 +19,13 @@ package org.apache.hadoop.ozone.repair.datanode.schemaupgrade;
 
 import com.google.common.base.Strings;
 import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -31,6 +36,8 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.repair.RepairTool;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
@@ -45,10 +52,48 @@ import picocli.CommandLine.Command;
     versionProvider = HddsVersionProvider.class)
 public class UpgradeContainerSchemaSubcommand extends RepairTool {
 
+  public static final Logger LOG =
+      LoggerFactory.getLogger(UpgradeContainerSchemaSubcommand.class);
+
   @CommandLine.Option(names = {"--volume"},
       required = false,
       description = "volume path")
   private String volume;
+
+  static List<VolumeUpgradeResult> run(OzoneConfiguration configuration,
+      List<HddsVolume> volumes) throws IOException {
+    List<VolumeUpgradeResult> results = new ArrayList<>();
+    Map<HddsVolume, CompletableFuture<VolumeUpgradeResult>> volumeFutures = new HashMap<>();
+    long startTime = System.currentTimeMillis();
+
+    LOG.info("Start to upgrade {} volume(s)", volumes.size());
+    for (HddsVolume hddsVolume : volumes) {
+      final UpgradeTask task =
+          new UpgradeTask(configuration, hddsVolume);
+      final CompletableFuture<VolumeUpgradeResult> future = task.getUpgradeFuture();
+      volumeFutures.put(hddsVolume, future);
+    }
+
+    for (Map.Entry<HddsVolume, CompletableFuture<VolumeUpgradeResult>> entry :
+        volumeFutures.entrySet()) {
+      final HddsVolume hddsVolume = entry.getKey();
+      final CompletableFuture<VolumeUpgradeResult> volumeFuture = entry.getValue();
+
+      try {
+        final VolumeUpgradeResult result = volumeFuture.get();
+        results.add(result);
+        LOG.info("Finish upgrading containers on volume {}, {}",
+            hddsVolume.getVolumeRootDir(), result.toString());
+      } catch (Exception e) {
+        LOG.error("Failed to upgrade containers on volume {}",
+            hddsVolume.getVolumeRootDir(), e);
+      }
+    }
+
+    LOG.info("It took {}ms to finish all volume upgrade.",
+        (System.currentTimeMillis() - startTime));
+    return results;
+  }
 
   @Override
   protected Component serviceToBeOffline() {
@@ -126,6 +171,6 @@ public class UpgradeContainerSchemaSubcommand extends RepairTool {
     }
 
     // do upgrade
-    UpgradeManager.run(configuration, allVolume);
+    run(configuration, allVolume);
   }
 }
