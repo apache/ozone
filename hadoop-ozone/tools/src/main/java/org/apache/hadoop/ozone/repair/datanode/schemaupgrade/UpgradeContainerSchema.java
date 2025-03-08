@@ -85,7 +85,6 @@ public class UpgradeContainerSchema extends RepairTool {
       LoggerFactory.getLogger(UpgradeContainerSchema.class);
 
   @CommandLine.Option(names = {"--volume"},
-      required = false,
       description = "volume path")
   private String volume;
 
