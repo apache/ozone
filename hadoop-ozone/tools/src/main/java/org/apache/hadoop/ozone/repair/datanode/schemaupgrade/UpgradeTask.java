@@ -183,7 +183,6 @@ public class UpgradeTask {
       result.success();
       return result;
     }).whenComplete((r, e) -> {
-      final File hddsRootDir = r.getHddsVolume().getHddsRootDir();
       final File file =
           UpgradeUtils.getVolumeUpgradeCompleteFile(r.getHddsVolume());
       // create a flag file
@@ -412,10 +411,6 @@ public class UpgradeTask {
 
     public ContainerData getOriginContainerData() {
       return originContainerData;
-    }
-
-    public ContainerData getNewContainerData() {
-      return newContainerData;
     }
 
     public void setBackupContainerFilePath(String backupContainerFilePath) {
