@@ -74,7 +74,7 @@ public final class AutoCompletion {
 
     /*
      * The following commands are marked as hidden,
-     * so they won't have completed.
+     * so they won't have auto complete.
      *   - OzoneAdmin
      *   - Insight
      *   - CsiServer
