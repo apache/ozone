@@ -402,7 +402,7 @@ public abstract class TestOzoneFSWithObjectStoreCreate implements NonHATests.Tes
   private void createAndAssertKey(OzoneBucket ozoneBucket, String key, int length)
       throws Exception {
     
-    byte[] input = createKey(ozoneBucket, key, length);
+    byte[] input = TestDataUtil.createStringKey(ozoneBucket, key, length);
     // Read the key with given key name.
     readKey(ozoneBucket, key, length, input);
 

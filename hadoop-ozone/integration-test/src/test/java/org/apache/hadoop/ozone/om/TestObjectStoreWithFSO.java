@@ -560,7 +560,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
       throws Exception {
 
     for (String key : keys) {
-      byte[] input = createKey(ozoneBucket, key, 10);
+      byte[] input = TestDataUtil.createStringKey(ozoneBucket, key, 10);
       // Read the key with given key name.
       readKey(ozoneBucket, key, 10, input);
     }

@@ -643,7 +643,7 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
   private static void createAndAssertKeys(OzoneBucket ozoneBucket, List<String> keys)
       throws Exception {
     for (String key : keys) {
-      byte[] input = createKey(ozoneBucket, key, 10);
+      byte[] input = TestDataUtil.createStringKey(ozoneBucket, key, 10);
       // Read the key with given key name.
       readkey(ozoneBucket, key, 10, input);
     }

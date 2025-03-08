@@ -105,10 +105,9 @@ public final class TestDataUtil {
 
   }
 
-  public static byte[] createKey(OzoneBucket bucket,
-                                 String keyName, int length) throws IOException {
-    byte[] content = RandomStringUtils.random(length, 0, 0,
-        true, true, null, new SecureRandom()).getBytes(UTF_8);
+  public static byte[] createStringKey(OzoneBucket bucket, String keyName, int length)
+      throws IOException {
+    byte[] content = RandomStringUtils.secure().nextAlphanumeric(length).getBytes(UTF_8);
     createKey(bucket, keyName, content);
     return content;
   }
