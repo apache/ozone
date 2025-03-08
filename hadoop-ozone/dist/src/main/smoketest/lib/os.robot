@@ -15,6 +15,7 @@
 
 *** Settings ***
 Library     OperatingSystem
+Library     String
 
 *** Keywords ***
 Execute
