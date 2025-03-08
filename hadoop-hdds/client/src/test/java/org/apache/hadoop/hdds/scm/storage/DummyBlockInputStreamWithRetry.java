@@ -63,7 +63,7 @@ final class DummyBlockInputStreamWithRetry
           try {
             BlockLocationInfo blockLocationInfo = mock(BlockLocationInfo.class);
             Pipeline mockPipeline = MockPipeline.createPipeline(1);
-            doReturn(mockPipeline).when(blockLocationInfo.getPipeline());
+            doReturn(mockPipeline).when(blockLocationInfo).getPipeline();
             return blockLocationInfo;
           } catch (IOException e) {
             throw new RuntimeException(e);

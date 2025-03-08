@@ -157,7 +157,7 @@ class TestBlockOutputStreamCorrectness {
     final Pipeline pipeline = MockPipeline.createRatisPipeline();
 
     final XceiverClientManager xcm = mock(XceiverClientManager.class);
-    doReturn(new MockXceiverClientSpi(pipeline)).when(xcm.acquireClient(any()));
+    doReturn(new MockXceiverClientSpi(pipeline)).when(xcm).acquireClient(any());
 
     OzoneClientConfig config = new OzoneClientConfig();
     config.setStreamBufferSize(4 * 1024 * 1024);
@@ -185,7 +185,7 @@ class TestBlockOutputStreamCorrectness {
   private ECBlockOutputStream createECBlockOutputStream(OzoneClientConfig clientConfig,
       ECReplicationConfig repConfig, BlockID blockID, Pipeline pipeline) throws IOException {
     final XceiverClientManager xcm = mock(XceiverClientManager.class);
-    doReturn(new MockXceiverClientSpi(pipeline)).when(xcm.acquireClient(any()));
+    doReturn(new MockXceiverClientSpi(pipeline)).when(xcm).acquireClient(any());
 
     ContainerClientMetrics clientMetrics = ContainerClientMetrics.acquire();
     StreamBufferArgs streamBufferArgs =

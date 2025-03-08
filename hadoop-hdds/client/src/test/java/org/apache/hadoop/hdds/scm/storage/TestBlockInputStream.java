@@ -297,18 +297,18 @@ public class TestBlockInputStream {
     // GIVEN
     Pipeline pipeline = MockPipeline.createSingleNodePipeline();
     BlockLocationInfo blockLocationInfo = mock(BlockLocationInfo.class);
-    doReturn(pipeline).when(blockLocationInfo.getPipeline());
+    doReturn(pipeline).when(blockLocationInfo).getPipeline();
     Pipeline newPipeline = MockPipeline.createSingleNodePipeline();
     BlockLocationInfo newBlockLocationInfo = mock(BlockLocationInfo.class);
 
     testRefreshesPipelineOnReadFailure(ex, blockLocationInfo,
         id -> newBlockLocationInfo);
 
-    doReturn(newPipeline).when(newBlockLocationInfo.getPipeline());
+    doReturn(newPipeline).when(newBlockLocationInfo).getPipeline();
     testRefreshesPipelineOnReadFailure(ex, blockLocationInfo,
         id -> blockLocationInfo);
 
-    doReturn(null).when(newBlockLocationInfo.getPipeline());
+    doReturn(null).when(newBlockLocationInfo).getPipeline();
     testRefreshesPipelineOnReadFailure(ex, blockLocationInfo,
         id -> newBlockLocationInfo);
   }
@@ -359,7 +359,7 @@ public class TestBlockInputStream {
     if (succeedOnRetry) {
       stubbing.thenReturn(len);
     }
-    doReturn((long) len).when(stream.getRemaining());
+    doReturn((long) len).when(stream).getRemaining();
     return stream;
   }
 
@@ -415,13 +415,13 @@ public class TestBlockInputStream {
     XceiverClientFactory clientFactory = mock(XceiverClientFactory.class);
     XceiverClientSpi client = mock(XceiverClientSpi.class);
     BlockLocationInfo blockLocationInfo = mock(BlockLocationInfo.class);
-    doReturn(client).when(clientFactory.acquireClientForReadData(pipeline));
+    doReturn(client).when(clientFactory).acquireClientForReadData(pipeline);
 
     final int len = 200;
     final ChunkInputStream stream = throwingChunkInputStream(ex, len, true);
 
-    doReturn(blockLocationInfo).when(refreshFunction.apply(blockID));
-    doReturn(newPipeline).when(blockLocationInfo.getPipeline());
+    doReturn(blockLocationInfo).when(refreshFunction).apply(blockID);
+    doReturn(newPipeline).when(blockLocationInfo).getPipeline();
 
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(false);

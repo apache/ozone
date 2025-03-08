@@ -245,16 +245,16 @@ public class TestChunkInputStream {
     Pipeline newPipeline = MockPipeline.createSingleNodePipeline();
 
     Token<?> token = mock(Token.class);
-    doReturn("oldToken").when(token.encodeToUrlString());
+    doReturn("oldToken").when(token).encodeToUrlString();
     Token<?> newToken = mock(Token.class);
-    doReturn("newToken").when(newToken.encodeToUrlString());
+    doReturn("newToken").when(newToken).encodeToUrlString();
 
     AtomicReference<Pipeline> pipelineRef = new AtomicReference<>(pipeline);
     AtomicReference<Token<?>> tokenRef = new AtomicReference<>(token);
 
     XceiverClientFactory clientFactory = mock(XceiverClientFactory.class);
     XceiverClientSpi client = mock(XceiverClientSpi.class);
-    doReturn(client).when(clientFactory.acquireClientForReadData(any()));
+    doReturn(client).when(clientFactory).acquireClientForReadData(any());
     ArgumentCaptor<ContainerCommandRequestProto> requestCaptor =
         ArgumentCaptor.forClass(ContainerCommandRequestProto.class);
     when(client.getPipeline())

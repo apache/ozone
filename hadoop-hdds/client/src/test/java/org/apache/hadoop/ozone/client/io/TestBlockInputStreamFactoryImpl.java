@@ -60,7 +60,7 @@ public class TestBlockInputStreamFactoryImpl {
         1024 * 1024 * 10);
     Pipeline pipeline = Mockito.spy(blockInfo.getPipeline());
     blockInfo.setPipeline(pipeline);
-    doReturn(1).when(pipeline.getReplicaIndex(any(DatanodeDetails.class)));
+    doReturn(1).when(pipeline).getReplicaIndex(any(DatanodeDetails.class));
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(true);
     BlockExtendedInputStream stream =
