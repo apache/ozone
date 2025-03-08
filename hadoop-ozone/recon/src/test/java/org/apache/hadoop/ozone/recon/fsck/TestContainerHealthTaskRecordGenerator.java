@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.anyInt;
@@ -168,8 +169,8 @@ public class TestContainerHealthTaskRecordGenerator {
             status, (long) 123456, unhealthyContainerStateStatsMap);
 
     // Assert that none of the records are for negative.
-    records.forEach(record -> assertFalse(record.getContainerState()
-        .equals(UnHealthyContainerStates.NEGATIVE_SIZE.toString())));
+    records.forEach(record -> assertNotEquals(
+        UnHealthyContainerStates.NEGATIVE_SIZE.toString(), record.getContainerState()));
 
 
     // Assert that the NEGATIVE_SIZE state is logged
