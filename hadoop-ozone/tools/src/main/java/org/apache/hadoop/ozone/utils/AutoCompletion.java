@@ -36,12 +36,14 @@ import org.apache.hadoop.ozone.shell.OzoneShell;
 import org.apache.hadoop.ozone.shell.checknative.CheckNative;
 import org.apache.hadoop.ozone.shell.s3.S3Shell;
 import org.apache.hadoop.ozone.shell.tenant.TenantShell;
-import org.apache.hadoop.util.Classpath;
 import picocli.AutoComplete;
 import picocli.CommandLine;
 import picocli.CommandLine.Option;
 
-public class AutoCompletion {
+/**
+ * Tool to generate bash/zsh auto-complete scripts for Ozone CLI.
+ */
+public final class AutoCompletion {
 
   private AutoCompletion() { }
 
@@ -51,13 +53,13 @@ public class AutoCompletion {
         .addSubcommand("admin", new OzoneAdmin().getCmd())
         .addSubcommand("auditparser", new AuditParser().getCmd())
         .addSubcommand("checknative", new CheckNative().getCmd())
-        .addSubcommand("classpath", new Classpath())
         .addSubcommand("csi", new CsiServer().getCmd())
         .addSubcommand("datanode", new HddsDatanodeService().getCmd())
         .addSubcommand("debug", new OzoneDebug().getCmd())
         .addSubcommand("freon", new Freon().getCmd())
         .addSubcommand("genconf", new GenerateOzoneRequiredConfigurations().getCmd())
         .addSubcommand("getconf", new OzoneGetConf().getCmd())
+        .addSubcommand("httpfs", new HttpFSServerWebServer())
         .addSubcommand("insight", new Insight().getCmd())
         .addSubcommand("om", new OzoneManagerStarter(null).getCmd())
         .addSubcommand("ratis", new OzoneRatis().getCmd())
@@ -84,11 +86,11 @@ public class AutoCompletion {
 
     /*
      * We don't have auto-complete support for the following commands
-     *   - dtutil
-     *   - envvars
-     *   - fs
-     *   - insight
-     *   - daemonlog
+     *   - dtutil    -- hadoop command
+     *   - classpath -- handled in shell script, we can introduce a dummy class here
+     *   - envvars   -- handled in shell script, we can introduce a dummy class here
+     *   - fs        -- hadoop command
+     *   - daemonlog -- hadoop command
      */
 
     System.out.println(AutoComplete.bash("ozone", hierarchy));
@@ -148,9 +150,15 @@ public class AutoCompletion {
 
   }
 
-  // OzoneVersionInfo class doen't extend GenericCli, so this dummy class is required here.
+  // OzoneVersionInfo class doesn't extend GenericCli, so this dummy class is required here.
   @CommandLine.Command(name = "version",
           description = "Ozone Version Information")
-  private static class OzoneVersionInfo{
+  private static class OzoneVersionInfo {
+  }
+
+  // HttpFSServerWebServer class doesn't extend GenericCli, so this dummy class is required here.
+  @CommandLine.Command(name = "httpfs",
+          description = "HttpFSServerWebServer")
+  private static class HttpFSServerWebServer {
   }
 }
