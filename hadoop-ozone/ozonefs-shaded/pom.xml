@@ -171,6 +171,10 @@
                 <relocation>
                   <pattern>org.apache.ratis</pattern>
                   <shadedPattern>${shaded.prefix}.org.apache.ratis</shadedPattern>
+                  <!-- thirdparty netty will use native library and cannot be relocated -->
+                  <excludes>
+                    <exclude>org.apache.ratis.thirdparty.io.netty.**</exclude>
+                  </excludes>
                 </relocation>
                 <relocation>
                   <pattern>com</pattern>
