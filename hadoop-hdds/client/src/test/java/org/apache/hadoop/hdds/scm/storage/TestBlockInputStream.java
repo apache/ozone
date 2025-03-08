@@ -27,7 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
@@ -71,6 +70,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.stubbing.OngoingStubbing;
 import org.slf4j.event.Level;
 
 /**
@@ -353,9 +353,11 @@ public class TestBlockInputStream {
   private static ChunkInputStream throwingChunkInputStream(IOException ex,
       int len, boolean succeedOnRetry) throws IOException {
     final ChunkInputStream stream = mock(ChunkInputStream.class);
-    doThrow(ex).doReturn(len).when(stream.read(any(), anyInt(), anyInt()));
+    OngoingStubbing<Integer> stubbing =
+        when(stream.read(any(), anyInt(), anyInt()))
+            .thenThrow(ex);
     if (succeedOnRetry) {
-      doReturn(len).when(stream).read(any(), anyInt(), anyInt());
+      stubbing.thenReturn(len);
     }
     doReturn((long) len).when(stream.getRemaining());
     return stream;
