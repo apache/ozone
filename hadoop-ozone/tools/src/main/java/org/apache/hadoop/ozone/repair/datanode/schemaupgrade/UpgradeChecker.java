@@ -36,7 +36,7 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
  */
 public class UpgradeChecker {
 
-  public Pair<HDDSLayoutFeature, HDDSLayoutFeature> getLayoutFeature(
+  public static Pair<HDDSLayoutFeature, HDDSLayoutFeature> getLayoutFeature(
       DatanodeDetails dnDetail, OzoneConfiguration conf) throws IOException {
     DatanodeLayoutStorage layoutStorage =
         new DatanodeLayoutStorage(conf, dnDetail.getUuidString());
@@ -58,7 +58,7 @@ public class UpgradeChecker {
     return Pair.of(softwareLayoutFeature, metadataLayoutFeature);
   }
 
-  public List<HddsVolume> getAllVolume(DatanodeDetails detail,
+  public static List<HddsVolume> getAllVolume(DatanodeDetails detail,
       OzoneConfiguration configuration) throws IOException {
     final MutableVolumeSet dataVolumeSet = UpgradeUtils
         .getHddsVolumes(configuration, StorageVolume.VolumeType.DATA_VOLUME,

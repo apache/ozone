@@ -59,13 +59,11 @@ public class UpgradeContainerSchemaSubcommand extends RepairTool {
   public void execute() throws Exception {
     OzoneConfiguration configuration = getOzoneConf();
 
-    final UpgradeChecker upgradeChecker = new UpgradeChecker();
-
     DatanodeDetails dnDetail =
         UpgradeUtils.getDatanodeDetails(configuration);
 
     Pair<HDDSLayoutFeature, HDDSLayoutFeature> layoutFeature =
-        upgradeChecker.getLayoutFeature(dnDetail, configuration);
+        UpgradeChecker.getLayoutFeature(dnDetail, configuration);
     final HDDSLayoutFeature softwareLayoutFeature = layoutFeature.getLeft();
     final HDDSLayoutFeature metadataLayoutFeature = layoutFeature.getRight();
     final int needLayoutVersion =
@@ -110,7 +108,7 @@ public class UpgradeContainerSchemaSubcommand extends RepairTool {
     }
 
     List<HddsVolume> allVolume =
-        upgradeChecker.getAllVolume(dnDetail, configuration);
+        UpgradeChecker.getAllVolume(dnDetail, configuration);
 
     Iterator<HddsVolume> volumeIterator = allVolume.iterator();
     while (volumeIterator.hasNext()) {
