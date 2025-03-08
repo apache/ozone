@@ -22,6 +22,7 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableRate;
 
 /**
  * Metrics related to DiskBalancer Service running on Datanode.
@@ -42,6 +43,12 @@ public final class DiskBalancerServiceMetrics {
 
   @Metric(about = "The number of failed balance job.")
   private MutableCounterLong failureCount;
+
+  @Metric(about = "The time spent on successful container moves.")
+  private MutableRate moveSuccessTime;
+
+  @Metric(about = "The time spent on failed container moves.")
+  private MutableRate moveFailureTime;
 
   @Metric(about = "The number of total running loop")
   private MutableCounterLong runningLoopCount;
@@ -122,12 +129,22 @@ public final class DiskBalancerServiceMetrics {
     return idleLoopExceedsBandwidthCount.value();
   }
 
+  public MutableRate getMoveSuccessTime() {
+    return moveSuccessTime;
+  }
+
+  public MutableRate getMoveFailureTime() {
+    return moveFailureTime;
+  }
+
   @Override
   public String toString() {
     StringBuffer buffer = new StringBuffer();
     buffer.append("successCount = " + successCount.value()).append("\t")
         .append("successBytes = " + successBytes.value()).append("\t")
         .append("failureCount = " + failureCount.value()).append("\t")
+        .append("moveSuccessTime = " + moveSuccessTime.lastStat().mean()).append("\t")
+        .append("moveFailureTime = " + moveFailureTime.lastStat().mean()).append("\t")
         .append("idleLoopNoAvailableVolumePairCount = " +
             idleLoopNoAvailableVolumePairCount.value()).append("\t")
         .append("idleLoopExceedsBandwidthCount = " +

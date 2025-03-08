@@ -392,6 +392,8 @@ public class DiskBalancerService extends BackgroundService {
 
     @Override
     public BackgroundTaskResult call() {
+      long startTime = Time.monotonicNow();
+      boolean moveSucceeded = true;
       long containerId = containerData.getContainerID();
       boolean destVolumeIncreased = false;
       Path diskBalancerTmpDir = null, diskBalancerDestDir = null;
@@ -449,6 +451,7 @@ public class DiskBalancerService extends BackgroundService {
         metrics.incrSuccessCount(1);
         metrics.incrSuccessBytes(containerSize);
       } catch (IOException e) {
+        moveSucceeded = false;
         if (diskBalancerTmpDir != null) {
           try {
             Files.deleteIfExists(diskBalancerTmpDir);
@@ -472,6 +475,12 @@ public class DiskBalancerService extends BackgroundService {
         }
         metrics.incrFailureCount();
       } finally {
+        long endTime = Time.monotonicNow();
+        if (moveSucceeded) {
+          metrics.getMoveSuccessTime().add(endTime - startTime);
+        } else {
+          metrics.getMoveFailureTime().add(endTime - startTime);
+        }
         postCall();
       }
       return BackgroundTaskResult.EmptyTaskResult.newResult();
