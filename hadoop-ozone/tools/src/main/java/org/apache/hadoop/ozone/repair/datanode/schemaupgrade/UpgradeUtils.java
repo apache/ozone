@@ -47,7 +47,7 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaTwoDBDefinition;
  */
 final class UpgradeUtils {
 
-  public static final Set<String> COLUMN_FAMILIES_NAME = Collections.unmodifiableSet(
+  public static final Set<String> COLUMN_FAMILY_NAMES = Collections.unmodifiableSet(
       new DatanodeSchemaTwoDBDefinition("", new OzoneConfiguration())
           .getMap().keySet());
 

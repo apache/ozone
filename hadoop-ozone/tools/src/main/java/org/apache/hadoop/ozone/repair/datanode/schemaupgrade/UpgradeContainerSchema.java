@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.repair.datanode.schemaupgrade;
 
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
 import static org.apache.hadoop.ozone.repair.datanode.schemaupgrade.UpgradeUtils.BACKUP_CONTAINER_DATA_FILE_SUFFIX;
-import static org.apache.hadoop.ozone.repair.datanode.schemaupgrade.UpgradeUtils.COLUMN_FAMILIES_NAME;
+import static org.apache.hadoop.ozone.repair.datanode.schemaupgrade.UpgradeUtils.COLUMN_FAMILY_NAMES;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -407,7 +407,7 @@ public class UpgradeContainerSchema extends RepairTool {
       final DBStore sourceDBStore = dbStore.getStore();
 
       long total = 0L;
-      for (String tableName : COLUMN_FAMILIES_NAME) {
+      for (String tableName : COLUMN_FAMILY_NAMES) {
         total += transferTableData(targetDBStore, sourceDBStore, tableName,
             containerData);
       }
