@@ -89,8 +89,7 @@ public class UpgradeContainerSchema extends RepairTool {
       description = "volume path")
   private String volume;
 
-  List<VolumeUpgradeResult> run(OzoneConfiguration configuration,
-      List<HddsVolume> volumes) throws IOException {
+  List<VolumeUpgradeResult> run(OzoneConfiguration configuration, List<HddsVolume> volumes) {
     List<VolumeUpgradeResult> results = new ArrayList<>();
     Map<HddsVolume, CompletableFuture<VolumeUpgradeResult>> volumeFutures = new HashMap<>();
     long startTime = System.currentTimeMillis();
