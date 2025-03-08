@@ -63,7 +63,7 @@ public class UpgradeContainerSchemaSubcommand extends RepairTool {
         UpgradeUtils.getDatanodeDetails(configuration);
 
     Pair<HDDSLayoutFeature, HDDSLayoutFeature> layoutFeature =
-        UpgradeChecker.getLayoutFeature(dnDetail, configuration);
+        UpgradeUtils.getLayoutFeature(dnDetail, configuration);
     final HDDSLayoutFeature softwareLayoutFeature = layoutFeature.getLeft();
     final HDDSLayoutFeature metadataLayoutFeature = layoutFeature.getRight();
     final int needLayoutVersion =
@@ -108,12 +108,12 @@ public class UpgradeContainerSchemaSubcommand extends RepairTool {
     }
 
     List<HddsVolume> allVolume =
-        UpgradeChecker.getAllVolume(dnDetail, configuration);
+        UpgradeUtils.getAllVolume(dnDetail, configuration);
 
     Iterator<HddsVolume> volumeIterator = allVolume.iterator();
     while (volumeIterator.hasNext()) {
       HddsVolume hddsVolume = volumeIterator.next();
-      if (UpgradeChecker.isAlreadyUpgraded(hddsVolume)) {
+      if (UpgradeUtils.isAlreadyUpgraded(hddsVolume)) {
         info("Volume " + hddsVolume.getVolumeRootDir() +
             " is already upgraded, skip it.");
         volumeIterator.remove();

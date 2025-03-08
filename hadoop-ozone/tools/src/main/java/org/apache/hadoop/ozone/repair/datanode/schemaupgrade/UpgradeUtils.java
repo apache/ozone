@@ -25,10 +25,16 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Date;
+import java.util.List;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -77,4 +83,38 @@ public final class UpgradeUtils {
     return file.exists();
   }
 
+  public static Pair<HDDSLayoutFeature, HDDSLayoutFeature> getLayoutFeature(
+      DatanodeDetails dnDetail, OzoneConfiguration conf) throws IOException {
+    DatanodeLayoutStorage layoutStorage =
+        new DatanodeLayoutStorage(conf, dnDetail.getUuidString());
+    HDDSLayoutVersionManager layoutVersionManager =
+        new HDDSLayoutVersionManager(layoutStorage.getLayoutVersion());
+
+    final int metadataLayoutVersion =
+        layoutVersionManager.getMetadataLayoutVersion();
+    final HDDSLayoutFeature metadataLayoutFeature =
+        (HDDSLayoutFeature) layoutVersionManager.getFeature(
+            metadataLayoutVersion);
+
+    final int softwareLayoutVersion =
+        layoutVersionManager.getSoftwareLayoutVersion();
+    final HDDSLayoutFeature softwareLayoutFeature =
+        (HDDSLayoutFeature) layoutVersionManager.getFeature(
+            softwareLayoutVersion);
+
+    return Pair.of(softwareLayoutFeature, metadataLayoutFeature);
+  }
+
+  public static List<HddsVolume> getAllVolume(DatanodeDetails detail,
+      OzoneConfiguration configuration) throws IOException {
+    final MutableVolumeSet dataVolumeSet = getHddsVolumes(configuration, StorageVolume.VolumeType.DATA_VOLUME,
+            detail.getUuidString());
+    return StorageVolumeUtil.getHddsVolumesList(dataVolumeSet.getVolumesList());
+  }
+
+  public static boolean isAlreadyUpgraded(HddsVolume hddsVolume) {
+    final File migrateFile =
+        getVolumeUpgradeCompleteFile(hddsVolume);
+    return migrateFile.exists();
+  }
 }
