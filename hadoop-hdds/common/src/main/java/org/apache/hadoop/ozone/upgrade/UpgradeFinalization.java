@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
+import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.INVALID_REQUEST;
+
+import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -110,6 +113,60 @@ public final class UpgradeFinalization {
     }
   }
 
+  public static void handleInvalidRequestAfterInitiatingFinalization(
+      boolean force, UpgradeException e) throws IOException {
+    if (INVALID_REQUEST.equals(e.getResult())) {
+      if (force) {
+        return;
+      }
+      System.err.println("Finalization is already in progress, it is not"
+          + "possible to initiate it again.");
+      e.printStackTrace(System.err);
+      System.err.println("If you want to track progress from a new client"
+          + "for any reason, use --takeover, and the status update will be"
+          + "received by the new client. Note that with forcing to monitor"
+          + "progress from a new client, the old one initiated the upgrade"
+          + "will not be able to monitor the progress further and exit.");
+      throw new IOException("Exiting...");
+    } else {
+      throw e;
+    }
+  }
+
+  public static void emitExitMsg() {
+    System.out.println("Exiting...");
+  }
+
+  public static boolean isFinalized(Status status) {
+    return Status.ALREADY_FINALIZED.equals(status);
+  }
+
+  public static boolean isDone(Status status) {
+    return Status.FINALIZATION_DONE.equals(status);
+  }
+
+  public static boolean isInprogress(Status status) {
+    return Status.FINALIZATION_IN_PROGRESS.equals(status);
+  }
+
+  public static boolean isStarting(Status status) {
+    return Status.STARTING_FINALIZATION.equals(status);
+  }
+
+  public static void emitGeneralErrorMsg() {
+    System.err.println("Finalization was not successful.");
+  }
+
+  public static void emitFinishedMsg(String component) {
+    System.out.println("Finalization of " + component + "'s metadata upgrade "
+        + "finished.");
+  }
+
+  public static void emitCancellationMsg(String component) {
+    System.err.println("Finalization command was cancelled. Note that, this"
+        + "will not cancel finalization in " + component + ". Progress can be"
+        + "monitored in the Ozone Manager's log.");
+  }
   private UpgradeFinalization() {
     // no instances
   }

@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.ozone.om.multitenant;
 
-import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isDone;
-import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isStarting;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
 import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isDone;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isStarting;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
