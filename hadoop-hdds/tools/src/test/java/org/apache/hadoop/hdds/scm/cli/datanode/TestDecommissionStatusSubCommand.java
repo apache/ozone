@@ -58,7 +58,7 @@ public class TestDecommissionStatusSubCommand {
   private DecommissionStatusSubCommand cmd;
   private List<HddsProtos.Node> nodes = getNodeDetails(2);
   private Map<String, List<ContainerID>> containerOnDecom = getContainersOnDecomNodes();
-  private ArrayList<String> metrics = getMetrics();
+  private List<String> metrics = getMetrics();
 
   @BeforeEach
   public void setup() throws UnsupportedEncodingException {
@@ -276,8 +276,8 @@ public class TestDecommissionStatusSubCommand {
     return containerMap;
   }
 
-  private ArrayList<String> getMetrics() {
-    ArrayList<String> result = new ArrayList<>();
+  private List<String> getMetrics() {
+    List<String> result = new ArrayList<>();
     // no nodes decommissioning
     result.add("{  \"beans\" : [ {    " +
         "\"name\" : \"Hadoop:service=StorageContainerManager,name=NodeDecommissionMetrics\",    " +

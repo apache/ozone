@@ -68,7 +68,7 @@ public class TestTableCache {
           tableCache.get(new CacheKey<>(Integer.toString(i))).getCacheValue());
     }
 
-    ArrayList<Long> epochs = new ArrayList<>();
+    List<Long> epochs = new ArrayList<>();
     epochs.add(0L);
     epochs.add(1L);
     epochs.add(2L);
@@ -131,7 +131,7 @@ public class TestTableCache {
               .getCacheValue());
     }
 
-    ArrayList<Long> epochs = new ArrayList<>();
+    List<Long> epochs = new ArrayList<>();
     epochs.add(0L);
     epochs.add(1L);
     epochs.add(2L);
@@ -163,7 +163,7 @@ public class TestTableCache {
 
     int cleanupCount = 0;
 
-    ArrayList<Long> epochs = new ArrayList<>();
+    List<Long> epochs = new ArrayList<>();
     for (long i = 0; i < insertedCount; i += 2) {
       if (cleanupCount++ < 1000) {
         epochs.add(i);
@@ -419,7 +419,7 @@ public class TestTableCache {
 
       // cleanup first 5 entries
 
-      ArrayList<Long> epochs = new ArrayList<>();
+      List<Long> epochs = new ArrayList<>();
       epochs.add(1L);
       epochs.add(2L);
       epochs.add(3L);
@@ -445,7 +445,7 @@ public class TestTableCache {
       // Cleaned up all entries, so cache size should be zero.
       assertEquals(0, tableCache.size());
     } else {
-      ArrayList<Long> epochs = new ArrayList<>();
+      List<Long> epochs = new ArrayList<>();
       for (long i = 0; i <= totalCount; i++) {
         epochs.add(i);
       }

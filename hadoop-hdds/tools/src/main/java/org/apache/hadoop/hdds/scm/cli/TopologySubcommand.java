@@ -33,6 +33,7 @@ import java.util.HashMap;
 import java.util.InvalidPropertiesFormatException;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.cli.AdminSubcommand;
@@ -138,7 +139,7 @@ public class TopologySubcommand extends ScmSubcommand
   //  ipAddress(hostName) OperationalState
   private void printOrderedByLocation(List<HddsProtos.Node> nodes,
                                       String state) throws IOException {
-    Map<String, TreeSet<DatanodeDetails>> tree = new HashMap<>();
+    Map<String, Set<DatanodeDetails>> tree = new HashMap<>();
     Map<DatanodeDetails, HddsProtos.NodeOperationalState> operationalState =
         new HashMap<>();
     for (HddsProtos.Node node : nodes) {
@@ -150,7 +151,7 @@ public class TopologySubcommand extends ScmSubcommand
       tree.get(location).add(dn);
       operationalState.put(dn, node.getNodeOperationalStates(0));
     }
-    ArrayList<String> locations = new ArrayList<>(tree.keySet());
+    List<String> locations = new ArrayList<>(tree.keySet());
     Collections.sort(locations);
 
     if (json) {

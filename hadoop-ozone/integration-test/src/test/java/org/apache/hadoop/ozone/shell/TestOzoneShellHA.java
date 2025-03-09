@@ -55,6 +55,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -2138,7 +2139,7 @@ public class TestOzoneShellHA {
     // Can include s3v and volumes from other test cases that aren't cleaned up,
     //  hence >= instead of equals.
     assertThat(volumeListOut.size()).isGreaterThanOrEqualTo(testVolumes.size());
-    final HashSet<String> volumeSet = new HashSet<>(testVolumes);
+    final Set<String> volumeSet = new HashSet<>(testVolumes);
     volumeListOut.forEach(map -> volumeSet.remove(map.get("name")));
     // Should have found all the volumes created for this test
     assertEquals(0, volumeSet.size());
@@ -2151,7 +2152,7 @@ public class TestOzoneShellHA {
     final List<Map<String, Object>> bucketListOut =
         parseOutputIntoArrayList();
     assertEquals(testBuckets.size(), bucketListOut.size());
-    final HashSet<String> bucketSet = new HashSet<>(testBuckets);
+    final Set<String> bucketSet = new HashSet<>(testBuckets);
     bucketListOut.forEach(map -> bucketSet.remove(map.get("name")));
     // Should have found all the buckets created for this test
     assertEquals(0, bucketSet.size());
@@ -2164,7 +2165,7 @@ public class TestOzoneShellHA {
     final List<Map<String, Object>> keyListOut =
         parseOutputIntoArrayList();
     assertEquals(testKeys.size(), keyListOut.size());
-    final HashSet<String> keySet = new HashSet<>(testKeys);
+    final Set<String> keySet = new HashSet<>(testKeys);
     keyListOut.forEach(map -> keySet.remove(map.get("name")));
     // Should have found all the keys put for this test
     assertEquals(0, keySet.size());

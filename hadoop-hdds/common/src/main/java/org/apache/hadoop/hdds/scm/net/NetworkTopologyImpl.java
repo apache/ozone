@@ -393,7 +393,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
       scope = ROOT;
     }
     if (scope.startsWith(SCOPE_REVERSE_STR)) {
-      ArrayList<String> excludedScopes = new ArrayList<>();
+      List<String> excludedScopes = new ArrayList<>();
       excludedScopes.add(scope.substring(1));
       return chooseRandom(ROOT, excludedScopes, null, null,
           ANCESTOR_GENERATION_DEFAULT);
@@ -434,7 +434,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
       scope = ROOT;
     }
     if (scope.startsWith(SCOPE_REVERSE_STR)) {
-      ArrayList<String> excludedScopes = new ArrayList<>();
+      List<String> excludedScopes = new ArrayList<>();
       excludedScopes.add(scope.substring(1));
       return chooseRandom(ROOT, excludedScopes, excludedNodes, null,
           ANCESTOR_GENERATION_DEFAULT);
@@ -469,7 +469,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
       scope = ROOT;
     }
     if (scope.startsWith(SCOPE_REVERSE_STR)) {
-      ArrayList<String> excludedScopes = new ArrayList<>();
+      List<String> excludedScopes = new ArrayList<>();
       excludedScopes.add(scope.substring(1));
       return chooseRandom(ROOT, excludedScopes, excludedNodes, null,
           ancestorGen);

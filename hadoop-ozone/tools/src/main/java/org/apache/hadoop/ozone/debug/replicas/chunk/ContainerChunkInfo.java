@@ -18,8 +18,8 @@
 package org.apache.hadoop.ozone.debug.replicas.chunk;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
@@ -31,12 +31,12 @@ public class ContainerChunkInfo {
   private String containerPath;
   private List<ChunkDetails> chunkInfos;
 
-  private HashSet<String> files;
+  private Set<String> files;
   private UUID pipelineID;
   private Pipeline pipeline;
   private ChunkType chunkType;
 
-  public void setFiles(HashSet<String> files) {
+  public void setFiles(Set<String> files) {
     this.files = files;
   }
 
@@ -72,7 +72,7 @@ public class ContainerChunkInfo {
     return chunkInfos;
   }
 
-  public HashSet<String> getFiles() {
+  public Set<String> getFiles() {
     return files;
   }
 

@@ -201,7 +201,7 @@ public class TestReplicationManagerScenarios {
           return NODE_STATUS_MAP.getOrDefault(dn, NodeStatus.inServiceHealthy());
         });
 
-    final HashMap<SCMCommandProto.Type, Integer> countMap = new HashMap<>();
+    final Map<SCMCommandProto.Type, Integer> countMap = new HashMap<>();
     for (SCMCommandProto.Type type : SCMCommandProto.Type.values()) {
       countMap.put(type, 0);
     }

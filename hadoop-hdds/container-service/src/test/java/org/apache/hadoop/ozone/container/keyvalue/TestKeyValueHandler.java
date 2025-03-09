@@ -43,6 +43,7 @@ import java.time.Clock;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
@@ -99,7 +100,7 @@ public class TestKeyValueHandler {
     // Create mock HddsDispatcher and KeyValueHandler.
     handler = mock(KeyValueHandler.class);
 
-    HashMap<ContainerType, Handler> handlers = new HashMap<>();
+    Map<ContainerType, Handler> handlers = new HashMap<>();
     handlers.put(ContainerType.KeyValueContainer, handler);
 
     dispatcher = new HddsDispatcher(

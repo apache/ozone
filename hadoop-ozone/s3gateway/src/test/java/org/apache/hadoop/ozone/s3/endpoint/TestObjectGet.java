@@ -168,6 +168,7 @@ public class TestObjectGet {
   }
 
   @Test
+  @SuppressWarnings("PMD.LooseCoupling")
   public void overrideResponseHeader() throws IOException, OS3Exception {
     setDefaultHeader();
 

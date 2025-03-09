@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -31,19 +31,19 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
  */
 public interface DeletedBlockLogStateManager {
   @Replicate
-  void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs)
+  void addTransactionsToDB(List<DeletedBlocksTransaction> txs)
       throws IOException;
 
   @Replicate
-  void removeTransactionsFromDB(ArrayList<Long> txIDs)
+  void removeTransactionsFromDB(List<Long> txIDs)
       throws IOException;
 
   @Replicate
-  void increaseRetryCountOfTransactionInDB(ArrayList<Long> txIDs)
+  void increaseRetryCountOfTransactionInDB(List<Long> txIDs)
       throws IOException;
 
   @Replicate
-  int resetRetryCountOfTransactionInDB(ArrayList<Long> txIDs)
+  int resetRetryCountOfTransactionInDB(List<Long> txIDs)
       throws IOException;
 
   TableIterator<Long,

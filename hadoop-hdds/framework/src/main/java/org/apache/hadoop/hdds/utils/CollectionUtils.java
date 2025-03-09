@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.PriorityQueue;
+import java.util.Queue;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -122,7 +123,7 @@ public interface CollectionUtils {
       Comparator<T> comparator,
       Predicate<? super T> filter
   ) {
-    PriorityQueue<T> heap = new PriorityQueue<>(comparator);
+    Queue<T> heap = new PriorityQueue<>(comparator);
 
     for (T item : input) {
       if (filter.test(item)) {

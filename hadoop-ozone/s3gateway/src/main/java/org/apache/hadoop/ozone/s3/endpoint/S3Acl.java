@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.s3.endpoint.S3BucketAcl.Grant;
 import org.apache.hadoop.ozone.s3.endpoint.S3BucketAcl.Grantee;
@@ -225,7 +226,7 @@ public final class S3Acl {
           grant.getGrantee().getXsiType());
       if (identityType != null && identityType.isSupported()) {
         String permission = grant.getPermission();
-        EnumSet<IAccessAuthorizer.ACLType> acls = getOzoneAclOnBucketFromS3Permission(permission);
+        Set<IAccessAuthorizer.ACLType> acls = getOzoneAclOnBucketFromS3Permission(permission);
         OzoneAcl defaultOzoneAcl = new OzoneAcl(
             IAccessAuthorizer.ACLIdentityType.USER,
             grant.getGrantee().getId(), OzoneAcl.AclScope.DEFAULT, acls
@@ -246,13 +247,13 @@ public final class S3Acl {
     return ozoneAclList;
   }
 
-  public static EnumSet<IAccessAuthorizer.ACLType> getOzoneAclOnBucketFromS3Permission(String permission)
+  public static Set<IAccessAuthorizer.ACLType> getOzoneAclOnBucketFromS3Permission(String permission)
       throws OS3Exception {
     ACLType permissionType = ACLType.getType(permission);
     if (permissionType == null) {
       throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, permission);
     }
-    EnumSet<IAccessAuthorizer.ACLType> acls = EnumSet.noneOf(IAccessAuthorizer.ACLType.class);
+    Set<IAccessAuthorizer.ACLType> acls = EnumSet.noneOf(IAccessAuthorizer.ACLType.class);
     switch (permissionType) {
     case FULL_CONTROL:
       acls.add(IAccessAuthorizer.ACLType.ALL);
@@ -289,7 +290,7 @@ public final class S3Acl {
           grant.getGrantee().getXsiType());
       if (identityType != null && identityType.isSupported()) {
         String permission = grant.getPermission();
-        EnumSet<IAccessAuthorizer.ACLType> acls = getOzoneAclOnVolumeFromS3Permission(permission);
+        Set<IAccessAuthorizer.ACLType> acls = getOzoneAclOnVolumeFromS3Permission(permission);
         OzoneAcl accessOzoneAcl = new OzoneAcl(
             IAccessAuthorizer.ACLIdentityType.USER,
             grant.getGrantee().getId(), OzoneAcl.AclScope.ACCESS, acls
@@ -306,9 +307,9 @@ public final class S3Acl {
   }
 
   // User privilege on volume follows the "lest privilege" principle.
-  public static EnumSet<IAccessAuthorizer.ACLType> getOzoneAclOnVolumeFromS3Permission(String permission)
+  public static Set<IAccessAuthorizer.ACLType> getOzoneAclOnVolumeFromS3Permission(String permission)
       throws OS3Exception {
-    EnumSet<IAccessAuthorizer.ACLType> acls = EnumSet.noneOf(IAccessAuthorizer.ACLType.class);
+    Set<IAccessAuthorizer.ACLType> acls = EnumSet.noneOf(IAccessAuthorizer.ACLType.class);
     ACLType permissionType = ACLType.getType(permission);
     if (permissionType == null) {
       throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, permission);

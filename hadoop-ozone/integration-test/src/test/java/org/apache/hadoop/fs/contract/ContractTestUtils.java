@@ -1611,7 +1611,7 @@ public final class ContractTestUtils {
   @SuppressWarnings("InfiniteLoopStatement")
   public static List<LocatedFileStatus> toListThroughNextCallsAlone(
       RemoteIterator<LocatedFileStatus> iterator) throws IOException {
-    ArrayList<LocatedFileStatus> list = new ArrayList<>();
+    List<LocatedFileStatus> list = new ArrayList<>();
     try {
       while (true) {
         list.add(iterator.next());

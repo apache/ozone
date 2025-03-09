@@ -226,7 +226,7 @@ public class RecoverSCMCertificate extends RepairTool {
 
   public CertPath addRootCertInPath(X509Certificate scmCert,
       X509Certificate rootCert) throws CertificateException {
-    ArrayList<X509Certificate> updatedList = new ArrayList<>();
+    List<X509Certificate> updatedList = new ArrayList<>();
     updatedList.add(scmCert);
     updatedList.add(rootCert);
     CertificateFactory certFactory =
@@ -236,7 +236,7 @@ public class RecoverSCMCertificate extends RepairTool {
 
   public CertPath getRootCertPath(X509Certificate rootCert)
       throws CertificateException {
-    ArrayList<X509Certificate> updatedList = new ArrayList<>();
+    List<X509Certificate> updatedList = new ArrayList<>();
     updatedList.add(rootCert);
     CertificateFactory factory = CertificateCodec.getCertFactory();
     return factory.generateCertPath(updatedList);

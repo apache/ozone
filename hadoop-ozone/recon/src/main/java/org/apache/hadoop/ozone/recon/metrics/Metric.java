@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.recon.metrics;
 
 import java.util.Map;
-import java.util.SortedMap;
 import java.util.TreeMap;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
@@ -30,10 +29,10 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 public final class Metric {
 
   private final Map<String, String> metadata;
-  private final TreeMap<Double, Double> values;
+  private final Map<Double, Double> values;
 
   public Metric(Map<String, String> metadata,
-                SortedMap<Double, Double> values) {
+                Map<Double, Double> values) {
     this.metadata = metadata;
     this.values = new TreeMap<>();
     this.values.putAll(values);
@@ -43,7 +42,7 @@ public final class Metric {
     return metadata;
   }
 
-  public SortedMap<Double, Double> getValues() {
+  public Map<Double, Double> getValues() {
     return values;
   }
 }

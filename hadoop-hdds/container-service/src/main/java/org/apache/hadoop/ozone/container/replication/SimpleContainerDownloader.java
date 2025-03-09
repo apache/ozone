@@ -109,7 +109,7 @@ public class SimpleContainerDownloader implements ContainerDownloader {
   protected List<DatanodeDetails> shuffleDatanodes(
       List<DatanodeDetails> sourceDatanodes) {
 
-    final ArrayList<DatanodeDetails> shuffledDatanodes =
+    final List<DatanodeDetails> shuffledDatanodes =
         new ArrayList<>(sourceDatanodes);
 
     Collections.shuffle(shuffledDatanodes);

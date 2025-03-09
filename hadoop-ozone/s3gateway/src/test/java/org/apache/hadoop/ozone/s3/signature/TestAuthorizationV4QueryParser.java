@@ -283,7 +283,7 @@ public class TestAuthorizationV4QueryParser {
     final SignatureInfo signatureInfo = parser.parseSignature();
     signatureInfo.setUnfilteredURI("/test.txt");
 
-    LowerCaseKeyStringMap headers = new LowerCaseKeyStringMap();
+    Map<String, String> headers = new LowerCaseKeyStringMap();
     headers.put("host", "localhost");
 
     final String stringToSign =

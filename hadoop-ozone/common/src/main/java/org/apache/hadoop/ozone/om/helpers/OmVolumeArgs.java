@@ -58,7 +58,7 @@ public final class OmVolumeArgs extends WithObjectID
   private long quotaInBytes;
   private long quotaInNamespace;
   private long usedNamespace;
-  private final CopyOnWriteArrayList<OzoneAcl> acls;
+  private final List<OzoneAcl> acls;
   /**
    * Reference count on this Ozone volume.
    *

@@ -32,7 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -65,11 +64,12 @@ public class ContainerSet implements Iterable<Container<?>> {
     return new ContainerSet(containerIdsTable, recoveringTimeout);
   }
 
+  @SuppressWarnings("PMD.LooseCoupling")
   private final ConcurrentSkipListMap<Long, Container<?>> containerMap = new
       ConcurrentSkipListMap<>();
-  private final ConcurrentSkipListSet<Long> missingContainerSet =
+  private final Set<Long> missingContainerSet =
       new ConcurrentSkipListSet<>();
-  private final ConcurrentSkipListMap<Long, Long> recoveringContainerMap =
+  private final Map<Long, Long> recoveringContainerMap =
       new ConcurrentSkipListMap<>();
   private final Clock clock;
   private long recoveringTimeout;
@@ -410,7 +410,7 @@ public class ContainerSet implements Iterable<Container<?>> {
             "must be positive");
     LOG.debug("listContainer returns containerData starting from {} of count " +
         "{}", startContainerId, count);
-    ConcurrentNavigableMap<Long, Container<?>> map;
+    Map<Long, Container<?>> map;
     if (startContainerId == 0) {
       map = containerMap;
     } else {

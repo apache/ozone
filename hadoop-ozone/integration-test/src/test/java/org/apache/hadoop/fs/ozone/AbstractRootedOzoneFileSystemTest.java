@@ -1122,6 +1122,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
    * @return Array of the statuses of the files/directories in the given path
    * @throws IOException See specific implementation
    */
+  @SuppressWarnings("PMD.LooseCoupling")
   private FileStatus[] customListStatus(Path f, boolean recursive,
       String startPath, int numEntries) throws IOException {
     assertThat(numEntries).isGreaterThan(0);
@@ -1198,7 +1199,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     ACLType[] userRights = aclConfig.getUserDefaultRights();
     // Construct ACL for world access
     // ACL admin owner, world read+write
-    EnumSet<ACLType> aclRights = EnumSet.of(READ, WRITE);
+    Set<ACLType> aclRights = EnumSet.of(READ, WRITE);
     // volume acls have all access to admin and read+write access to world
 
     // Construct VolumeArgs

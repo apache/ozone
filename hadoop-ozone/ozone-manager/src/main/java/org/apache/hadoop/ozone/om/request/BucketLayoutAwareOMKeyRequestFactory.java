@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
+import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -72,7 +73,7 @@ public final class BucketLayoutAwareOMKeyRequestFactory {
   private static final Logger LOG =
       LoggerFactory.getLogger(BucketLayoutAwareOMKeyRequestFactory.class);
 
-  static final HashMap<String, Class<? extends OMKeyRequest>>
+  static final Map<String, Class<? extends OMKeyRequest>>
       OM_KEY_REQUEST_CLASSES = new HashMap<>();
 
   static {

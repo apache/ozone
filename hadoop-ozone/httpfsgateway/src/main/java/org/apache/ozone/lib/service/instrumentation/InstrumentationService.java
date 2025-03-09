@@ -42,6 +42,7 @@ import org.json.simple.JSONStreamAware;
  * Hadoop server instrumentation.
  */
 @InterfaceAudience.Private
+@SuppressWarnings("PMD.LooseCoupling")
 public class InstrumentationService extends BaseService
     implements Instrumentation {
   public static final String PREFIX = "instrumentation";

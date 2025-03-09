@@ -380,7 +380,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
     String keye21 = "/a/b3/e2/e21.tx";
     String keye31 = "/a/b3/e3/e31.tx";
 
-    LinkedList<String> keys = new LinkedList<>();
+    List<String> keys = new LinkedList<>();
     keys.add(keyc1);
     keys.add(keyc2);
 
@@ -408,7 +408,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
         ozoneBucket.listKeys("a/", null);
     verifyFullTreeStructure(ozoneKeyIterator);
 
-    LinkedList<String> expectedKeys;
+    List<String> expectedKeys;
 
     // Intermediate level keyPrefix - 2nd level
     ozoneKeyIterator =
@@ -467,7 +467,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
   }
 
   private void verifyFullTreeStructure(Iterator<? extends OzoneKey> keyItr) {
-    LinkedList<String> expectedKeys = new LinkedList<>();
+    List<String> expectedKeys = new LinkedList<>();
     expectedKeys.add("a/");
     expectedKeys.add("a/b1/");
     expectedKeys.add("a/b1/c1/");
@@ -504,7 +504,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
     String key2 = "/dir1///dir2/file2/";
     String key3 = "/dir1///dir2/file3/";
 
-    LinkedList<String> keys = new LinkedList<>();
+    List<String> keys = new LinkedList<>();
     keys.add("dir1/");
     keys.add("dir1/dir2/");
     keys.add(OmUtils.normalizeKey(key1, false));
@@ -546,7 +546,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
   private void checkKeyList(Iterator<? extends OzoneKey > ozoneKeyIterator,
       List<String> keys) {
 
-    LinkedList<String> outputKeys = new LinkedList<>();
+    List<String> outputKeys = new LinkedList<>();
     while (ozoneKeyIterator.hasNext()) {
       OzoneKey ozoneKey = ozoneKeyIterator.next();
       outputKeys.add(ozoneKey.getName());

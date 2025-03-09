@@ -39,8 +39,8 @@ public final class VolumeArgs {
   private final String owner;
   private final long quotaInBytes;
   private final long quotaInNamespace;
-  private final ImmutableList<OzoneAcl> acls;
-  private final ImmutableMap<String, String> metadata;
+  private final List<OzoneAcl> acls;
+  private final Map<String, String> metadata;
 
   /**
    * Private constructor, constructed via builder.

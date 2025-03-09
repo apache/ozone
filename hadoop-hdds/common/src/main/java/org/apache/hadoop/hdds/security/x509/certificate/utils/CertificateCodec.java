@@ -92,7 +92,7 @@ public class CertificateCodec {
   public static String getPEMEncodedString(CertPath certPath)
       throws SCMSecurityException {
     List<? extends Certificate> certsInPath = certPath.getCertificates();
-    ArrayList<String> pemEncodedList = new ArrayList<>(certsInPath.size());
+    List<String> pemEncodedList = new ArrayList<>(certsInPath.size());
     for (Certificate cert : certsInPath) {
       pemEncodedList.add(getPEMEncodedString((X509Certificate) cert));
     }
@@ -296,7 +296,7 @@ public class CertificateCodec {
    */
   public CertPath prependCertToCertPath(X509Certificate certificate, CertPath path) throws CertificateException {
     List<? extends Certificate> certificates = path.getCertificates();
-    ArrayList<X509Certificate> updatedList = new ArrayList<>();
+    List<X509Certificate> updatedList = new ArrayList<>();
     updatedList.add(certificate);
     for (Certificate cert : certificates) {
       updatedList.add((X509Certificate) cert);

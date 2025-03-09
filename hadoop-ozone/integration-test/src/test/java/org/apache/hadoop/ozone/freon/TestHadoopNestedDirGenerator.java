@@ -105,7 +105,7 @@ public abstract class TestHadoopNestedDirGenerator implements NonHATests.TestCas
      * queue and follow BFS, as we encounter the child directories
      * we put them in an array and increment the depth variable by 1.
      */
-
+  @SuppressWarnings("PMD.LooseCoupling")
   private Path depthBFS(FileSystem fs, FileStatus[] fileStatuses,
                         int span, int actualDepth) throws IOException {
     int depth = 0;

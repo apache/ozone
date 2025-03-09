@@ -135,7 +135,7 @@ public class FullTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
     if (epochCleanupQueue.isEmpty()) {
       return;
     }
-    ArrayList<Long> epochList = new ArrayList<>(epochCleanupQueue);
+    List<Long> epochList = new ArrayList<>(epochCleanupQueue);
     epochCleanupQueue.removeAll(epochList);
     evictCache(epochList);
   }

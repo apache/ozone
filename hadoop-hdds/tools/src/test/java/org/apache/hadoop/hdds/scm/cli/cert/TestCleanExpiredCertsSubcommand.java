@@ -29,6 +29,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.List;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.security.x509.CertificateTestUtils;
@@ -66,7 +67,7 @@ class TestCleanExpiredCertsSubcommand {
     cmd = new CleanExpiredCertsSubcommand();
     KeyPair keyPair = CertificateTestUtils.aKeyPair(new OzoneConfiguration());
     X509Certificate cert = createSelfSignedCert(keyPair, "aCert");
-    ArrayList<String> certPemList = new ArrayList<>();
+    List<String> certPemList = new ArrayList<>();
     certPemList.add(CertificateCodec.getPEMEncodedString(cert));
     when(scmSecurityProtocolMock.removeExpiredCertificates())
         .thenReturn(certPemList);

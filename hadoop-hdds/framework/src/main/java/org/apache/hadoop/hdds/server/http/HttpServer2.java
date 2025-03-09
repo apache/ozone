@@ -216,7 +216,7 @@ public final class HttpServer2 implements FilterContainer {
    * Class to construct instances of HTTP server with specific options.
    */
   public static class Builder {
-    private ArrayList<URI> endpoints = Lists.newArrayList();
+    private List<URI> endpoints = Lists.newArrayList();
     private String name;
     private MutableConfigurationSource conf;
     private ConfigurationSource sslConf;

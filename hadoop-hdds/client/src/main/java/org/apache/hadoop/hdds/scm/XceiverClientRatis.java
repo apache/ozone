@@ -29,7 +29,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -80,7 +79,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   private final ConfigurationSource ozoneConfiguration;
 
   // Map to track commit index at every server
-  private final ConcurrentHashMap<UUID, Long> commitInfoMap;
+  private final Map<UUID, Long> commitInfoMap;
 
   private final XceiverClientMetrics metrics
       = XceiverClientManager.getXceiverClientMetrics();
@@ -240,7 +239,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
 
 
   @VisibleForTesting
-  public ConcurrentMap<UUID, Long> getCommitInfoMap() {
+  public Map<UUID, Long> getCommitInfoMap() {
     return commitInfoMap;
   }
 

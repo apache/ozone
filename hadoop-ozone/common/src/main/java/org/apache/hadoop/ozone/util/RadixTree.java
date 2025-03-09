@@ -21,8 +21,8 @@ import com.google.common.annotations.VisibleForTesting;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
@@ -66,7 +66,7 @@ public class RadixTree<T> {
     RadixNode<T> n = root;
     Path p = Paths.get(path);
     for (int level = 0; level < p.getNameCount(); level++) {
-      HashMap<String, RadixNode> child = n.getChildren();
+      Map<String, RadixNode> child = n.getChildren();
       String component = p.getName(level).toString();
       if (child.containsKey(component)) {
         n = child.get(component);
@@ -147,7 +147,7 @@ public class RadixTree<T> {
     List<RadixNode<T>> result = new ArrayList<>();
     result.add(root);
     while (level < p.getNameCount()) {
-      HashMap<String, RadixNode> children = n.getChildren();
+      Map<String, RadixNode> children = n.getChildren();
       if (children.isEmpty()) {
         break;
       }
@@ -189,7 +189,7 @@ public class RadixTree<T> {
     Path p = Paths.get(path);
     int level = 0;
     while (level < p.getNameCount()) {
-      HashMap<String, RadixNode> children = n.getChildren();
+      Map<String, RadixNode> children = n.getChildren();
       if (children.isEmpty()) {
         break;
       }

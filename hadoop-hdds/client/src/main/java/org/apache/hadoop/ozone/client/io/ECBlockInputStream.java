@@ -65,7 +65,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   private final BlockLocationInfo blockInfo;
   private final DatanodeDetails[] dataLocations;
   private final BlockExtendedInputStream[] blockStreams;
-  private final Map<Integer, LinkedList<DatanodeDetails>> spareDataLocations
+  private final Map<Integer, Deque<DatanodeDetails>> spareDataLocations
       = new TreeMap<>();
   private final List<DatanodeDetails> failedLocations = new ArrayList<>();
   private final int maxLocations;

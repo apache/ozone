@@ -36,6 +36,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -1087,8 +1088,8 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
    * Generate and return a mapping from roles to a set of user principals from
    * tenantCache.
    */
-  public HashMap<String, HashSet<String>> getAllRolesFromCache() {
-    final HashMap<String, HashSet<String>> mtRoles = new HashMap<>();
+  public Map<String, Set<String>> getAllRolesFromCache() {
+    final Map<String, Set<String>> mtRoles = new HashMap<>();
 
     tenantCacheLock.readLock().lock();
 
@@ -1130,13 +1131,13 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
   /**
    * Helper function to add user principal to a role in mtRoles.
    */
-  private void addUserToMtRoles(HashMap<String, HashSet<String>> mtRoles,
+  private void addUserToMtRoles(Map<String, Set<String>> mtRoles,
       String roleName, String userPrincipal) {
     if (!mtRoles.containsKey(roleName)) {
       mtRoles.put(roleName, new HashSet<>(
           Collections.singletonList(userPrincipal)));
     } else {
-      final HashSet<String> usersInTheRole = mtRoles.get(roleName);
+      final Set<String> usersInTheRole = mtRoles.get(roleName);
       usersInTheRole.add(userPrincipal);
     }
   }

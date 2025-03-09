@@ -27,6 +27,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Scanner;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -101,7 +102,7 @@ public class DeleteBucketHandler extends BucketHandler {
    * @param bucket OzoneBucket
    */
   private void deleteOBSBucketRecursive(OzoneVolume vol, OzoneBucket bucket) {
-    ArrayList<String> keys = new ArrayList<>();
+    List<String> keys = new ArrayList<>();
     try {
       if (!bucket.isLink()) {
         Iterator<? extends OzoneKey> iterator = bucket.listKeys(null);

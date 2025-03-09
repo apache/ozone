@@ -29,6 +29,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -63,7 +64,7 @@ public class TestKeyOutputStream {
       return invocation.callRealMethod();
     }).when(keyOutputStream).write(any(), anyInt(), anyInt());
 
-    final ConcurrentHashMap<Long, CountDownLatch> mapNotifiers = new ConcurrentHashMap<>();
+    final Map<Long, CountDownLatch> mapNotifiers = new ConcurrentHashMap<>();
 
     final AtomicInteger countHandleWrite = new AtomicInteger(0);
     // mock handleWrite()

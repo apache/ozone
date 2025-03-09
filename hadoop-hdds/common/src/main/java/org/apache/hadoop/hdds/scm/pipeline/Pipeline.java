@@ -80,7 +80,7 @@ public final class Pipeline {
   private final Map<DatanodeDetails, Long> nodeStatus;
   private final Map<DatanodeDetails, Integer> replicaIndexes;
   // nodes with ordered distance to client
-  private final ImmutableList<DatanodeDetails> nodesInOrder;
+  private final List<DatanodeDetails> nodesInOrder;
   // Current reported Leader for the pipeline
   private UUID leaderId;
   // Timestamp for pipeline upon creation

@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheLoader;
 import java.io.IOException;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -44,7 +45,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   // Key:   SnapshotId
   // Value: OmSnapshot instance, each holds a DB instance handle inside
   // TODO: [SNAPSHOT] Consider wrapping SoftReference<> around IOmMetadataReader
-  private final ConcurrentHashMap<UUID, ReferenceCounted<OmSnapshot>> dbMap;
+  private final Map<UUID, ReferenceCounted<OmSnapshot>> dbMap;
 
   private final CacheLoader<UUID, OmSnapshot> cacheLoader;
 
@@ -76,7 +77,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   }
 
   @VisibleForTesting
-  ConcurrentHashMap<UUID, ReferenceCounted<OmSnapshot>> getDbMap() {
+  Map<UUID, ReferenceCounted<OmSnapshot>> getDbMap() {
     return dbMap;
   }
 

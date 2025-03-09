@@ -41,6 +41,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
@@ -611,7 +612,7 @@ public class TestPipelinePlacementPolicy {
   }
 
   private boolean checkDuplicateNodesUUID(List<DatanodeDetails> nodes) {
-    HashSet<UUID> uuids = nodes.stream().
+    Set<UUID> uuids = nodes.stream().
         map(DatanodeDetails::getUuid).
         collect(Collectors.toCollection(HashSet::new));
     return uuids.size() == nodes.size();

@@ -29,6 +29,7 @@ import org.apache.hadoop.util.StringUtils;
  * @param <E> the enum type
  */
 @InterfaceAudience.Private
+@SuppressWarnings("PMD.LooseCoupling")
 public abstract class EnumSetParam<E extends Enum<E>>
     extends Param<EnumSet<E>> {
   private Class<E> klass;

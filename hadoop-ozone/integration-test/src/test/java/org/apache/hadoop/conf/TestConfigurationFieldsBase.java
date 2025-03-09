@@ -148,14 +148,14 @@ public abstract class TestConfigurationFieldsBase {
    * @param fields The class member variables
    * @return HashMap containing (StringValue, MemberVariableName) entries
    */
-  private HashMap<String, String>
+  private Map<String, String>
       extractMemberVariablesFromConfigurationFields(Field[] fields) {
     // Sanity Check
     if (fields == null) {
       return null;
     }
 
-    HashMap<String, String> retVal = new HashMap<>();
+    Map<String, String> retVal = new HashMap<>();
 
     // Setup regexp for valid properties
     String propRegex = "^[A-Za-z][A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)+$";
@@ -237,7 +237,7 @@ public abstract class TestConfigurationFieldsBase {
    * @param filename XML filename
    * @return HashMap containing &lt;Property,Value&gt; entries from XML file
    */
-  private HashMap<String, String> extractPropertiesFromXml(String filename) {
+  private Map<String, String> extractPropertiesFromXml(String filename) {
     if (filename == null) {
       return null;
     }
@@ -247,7 +247,7 @@ public abstract class TestConfigurationFieldsBase {
     conf.setAllowNullValueProperties(true);
     conf.addResource(filename);
 
-    HashMap<String, String> retVal = new HashMap<>();
+    Map<String, String> retVal = new HashMap<>();
     Iterator<Map.Entry<String, String>> kvItr = conf.iterator();
     while (kvItr.hasNext()) {
       Map.Entry<String, String> entry = kvItr.next();
@@ -294,14 +294,14 @@ public abstract class TestConfigurationFieldsBase {
    * @param fields The class member variables
    * @return HashMap containing (DefaultVariableName, DefaultValue) entries
    */
-  private HashMap<String, String>
+  private Map<String, String>
       extractDefaultVariablesFromConfigurationFields(Field[] fields) {
     // Sanity Check
     if (fields == null) {
       return null;
     }
 
-    HashMap<String, String> retVal = new HashMap<String, String>();
+    Map<String, String> retVal = new HashMap<String, String>();
 
     // Iterate through class member variables
     for (Field f : fields) {
@@ -511,12 +511,12 @@ public abstract class TestConfigurationFieldsBase {
     assertNotNull(configurationMemberVariables);
     assertNotNull(configurationDefaultVariables);
 
-    TreeSet<String> xmlPropertiesWithEmptyValue = new TreeSet<>();
-    TreeSet<String> configPropertiesWithNoDefaultConfig = new TreeSet<>();
-    HashMap<String, String> xmlPropertiesMatchingConfigDefault =
+    Set<String> xmlPropertiesWithEmptyValue = new TreeSet<>();
+    Set<String> configPropertiesWithNoDefaultConfig = new TreeSet<>();
+    Map<String, String> xmlPropertiesMatchingConfigDefault =
         new HashMap<>();
     // Ugly solution.  Should have tuple-based solution.
-    HashMap<HashMap<String, String>, HashMap<String, String>> mismatchingXmlConfig
+    Map<Map<String, String>, Map<String, String>> mismatchingXmlConfig
         = new HashMap<>();
 
     for (Map.Entry<String, String> xEntry : xmlKeyValueMap.entrySet()) {
@@ -560,9 +560,9 @@ public abstract class TestConfigurationFieldsBase {
           if (xmlDefaultValue == null) {
             xmlPropertiesWithEmptyValue.add(xmlProperty);
           } else if (!xmlDefaultValue.equals(defaultConfigValue)) {
-            HashMap<String, String> xmlEntry = new HashMap<>();
+            Map<String, String> xmlEntry = new HashMap<>();
             xmlEntry.put(xmlProperty, xmlDefaultValue);
-            HashMap<String, String> configEntry = new HashMap<>();
+            Map<String, String> configEntry = new HashMap<>();
             configEntry.put(defaultConfigName, defaultConfigValue);
             mismatchingXmlConfig.put(xmlEntry, configEntry);
           } else {
@@ -581,7 +581,7 @@ public abstract class TestConfigurationFieldsBase {
     if (mismatchingXmlConfig.isEmpty()) {
       LOG.info("  (None)");
     } else {
-      for (Map.Entry<HashMap<String, String>, HashMap<String, String>> xcEntry : mismatchingXmlConfig.entrySet()) {
+      for (Map.Entry<Map<String, String>, Map<String, String>> xcEntry : mismatchingXmlConfig.entrySet()) {
         xcEntry.getKey().forEach((key, value) -> {
           LOG.info("XML Property: {}", key);
           LOG.info("XML Value:    {}", value);

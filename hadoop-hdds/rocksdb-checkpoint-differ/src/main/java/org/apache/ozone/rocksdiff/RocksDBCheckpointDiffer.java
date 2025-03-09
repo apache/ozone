@@ -310,7 +310,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   // Hash table to track CompactionNode for a given SST File.
-  private final ConcurrentHashMap<String, CompactionNode> compactionNodeMap =
+  private final Map<String, CompactionNode> compactionNodeMap =
       new ConcurrentHashMap<>();
 
   // We are maintaining a two way DAG. This allows easy traversal from
@@ -326,7 +326,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   public static final Integer DEBUG_DAG_TRAVERSAL = 3;
   public static final Integer DEBUG_DAG_LIVE_NODES = 4;
   public static final Integer DEBUG_READ_ALL_DB_KEYS = 5;
-  private static final HashSet<Integer> DEBUG_LEVEL = new HashSet<>();
+  private static final Set<Integer> DEBUG_LEVEL = new HashSet<>();
 
   static {
     addDebugLevel(DEBUG_DAG_BUILD_UP);
@@ -645,7 +645,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * @return a list of SST files (without extension) in the DB.
    */
   public Set<String> readRocksDBLiveFiles(ManagedRocksDB rocksDB) {
-    HashSet<String> liveFiles = new HashSet<>();
+    Set<String> liveFiles = new HashSet<>();
 
     final List<String> cfs = Arrays.asList(
         org.apache.hadoop.hdds.StringUtils.bytes2String(
@@ -1397,7 +1397,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   @VisibleForTesting
-  public ConcurrentHashMap<String, CompactionNode> getCompactionNodeMap() {
+  public Map<String, CompactionNode> getCompactionNodeMap() {
     return compactionNodeMap;
   }
 

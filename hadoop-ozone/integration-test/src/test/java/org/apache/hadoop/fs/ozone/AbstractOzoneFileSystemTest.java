@@ -852,7 +852,7 @@ abstract class AbstractOzoneFileSystemTest {
     FileStatus[] fileStatuses = o3fs.listStatus(ROOT, EXCLUDE_TRASH);
     // Added logs for debugging failures, to check any sub-path mismatches.
     Set<String> actualPaths = new TreeSet<>();
-    ArrayList<String> actualPathList = new ArrayList<>();
+    List<String> actualPathList = new ArrayList<>();
     if (numDirs != fileStatuses.length) {
       for (FileStatus fileStatus : fileStatuses) {
         boolean duplicate = actualPaths.add(fileStatus.getPath().getName());

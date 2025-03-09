@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon.upgrade;
 
 import java.util.Arrays;
 import java.util.EnumMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.reflections.Reflections;
@@ -34,7 +35,7 @@ public enum ReconLayoutFeature {
 
   private final int version;
   private final String description;
-  private final EnumMap<ReconUpgradeAction.UpgradeActionType, ReconUpgradeAction> actions =
+  private final Map<ReconUpgradeAction.UpgradeActionType, ReconUpgradeAction> actions =
       new EnumMap<>(ReconUpgradeAction.UpgradeActionType.class);
 
   ReconLayoutFeature(final int version, String description) {

@@ -101,7 +101,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
   protected int processKeyDeletes(List<BlockGroup> keyBlocksList,
       KeyManager manager,
-      HashMap<String, RepeatedOmKeyInfo> keysToModify,
+      Map<String, RepeatedOmKeyInfo> keysToModify,
       String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException {
 
     long startTime = Time.monotonicNow();
@@ -141,7 +141,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
    * @param keysToModify Updated list of RepeatedOmKeyInfo
    */
   private int submitPurgeKeysRequest(List<DeleteBlockGroupResult> results,
-      HashMap<String, RepeatedOmKeyInfo> keysToModify, String snapTableKey, UUID expectedPreviousSnapshotId) {
+      Map<String, RepeatedOmKeyInfo> keysToModify, String snapTableKey, UUID expectedPreviousSnapshotId) {
     Map<Pair<String, String>, List<String>> purgeKeysMapPerBucket =
         new HashMap<>();
 

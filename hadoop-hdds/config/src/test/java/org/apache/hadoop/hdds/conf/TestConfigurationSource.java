@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class TestConfigurationSource {
@@ -45,7 +46,7 @@ class TestConfigurationSource {
   @Test
   void reconfigurableProperties() {
     String prefix = "ozone.test.config";
-    ImmutableSet<String> expected = ImmutableSet.of(
+    Set<String> expected = ImmutableSet.of(
         prefix + ".dynamic",
         prefix + ".grandpa.dyna"
     );

@@ -313,7 +313,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
 
     // Testing PUT events
     // Create 5 OMDBUpdateEvent instances for 5 different deletedDirectory paths
-    ArrayList<OMDBUpdateEvent> putEvents = new ArrayList<>();
+    List<OMDBUpdateEvent> putEvents = new ArrayList<>();
     for (long i = 0L; i < 5L; i++) {
       putEvents.add(getOMUpdateEvent(paths.get((int) i),
           getOmKeyInfo("vol1", "bucket1", DIR_ONE, (i + 1), false),
@@ -326,7 +326,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
 
     // Testing DELETE events
     // Create 2 OMDBUpdateEvent instances for 2 different deletedDirectory paths
-    ArrayList<OMDBUpdateEvent> deleteEvents = new ArrayList<>();
+    List<OMDBUpdateEvent> deleteEvents = new ArrayList<>();
     deleteEvents.add(getOMUpdateEvent(paths.get(0),
         getOmKeyInfo("vol1", "bucket1", DIR_ONE, 1L, false), DELETED_DIR_TABLE,
         DELETE, null));
@@ -521,7 +521,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
 
     // Test PUT events.
     // Add 5 PUT events for OpenKeyTable and OpenFileTable.
-    ArrayList<OMDBUpdateEvent> putEvents = new ArrayList<>();
+    List<OMDBUpdateEvent> putEvents = new ArrayList<>();
     for (int i = 0; i < 10; i++) {
       String table = (i < 5) ? OPEN_KEY_TABLE : OPEN_FILE_TABLE;
       putEvents.add(getOMUpdateEvent("item" + i, omKeyInfo, table, PUT, null));
@@ -538,7 +538,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     }
 
     // Test DELETE events
-    ArrayList<OMDBUpdateEvent> deleteEvents = new ArrayList<>();
+    List<OMDBUpdateEvent> deleteEvents = new ArrayList<>();
     // Delete "item0" for OpenKeyTable and OpenFileTable.
     deleteEvents.add(
         getOMUpdateEvent("item0", omKeyInfo, OPEN_KEY_TABLE, DELETE, null));
@@ -556,7 +556,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     }
 
     // Test UPDATE events
-    ArrayList<OMDBUpdateEvent> updateEvents = new ArrayList<>();
+    List<OMDBUpdateEvent> updateEvents = new ArrayList<>();
     Long newSizeToBeReturned = 2000L;
     for (String tableName : new ArrayList<>(
         Arrays.asList(OPEN_KEY_TABLE, OPEN_FILE_TABLE))) {
@@ -585,7 +585,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     // Prepare mock data size
     ImmutablePair<Long, Long> sizeToBeReturned =
         new ImmutablePair<>(1000L, 3000L);
-    ArrayList<OmKeyInfo> omKeyInfoList = new ArrayList<>();
+    List<OmKeyInfo> omKeyInfoList = new ArrayList<>();
     // Add 5 OmKeyInfo objects to the list
     for (long i = 0; i < 5; i++) {
       OmKeyInfo omKeyInfo =
@@ -599,7 +599,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     when(repeatedOmKeyInfo.getOmKeyInfoList()).thenReturn(omKeyInfoList);
 
     // Test PUT events
-    ArrayList<OMDBUpdateEvent> putEvents = new ArrayList<>();
+    List<OMDBUpdateEvent> putEvents = new ArrayList<>();
     for (int i = 0; i < 5; i++) {
       putEvents.add(
           getOMUpdateEvent("item" + i, repeatedOmKeyInfo, DELETED_TABLE, PUT,
@@ -616,7 +616,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
 
 
     // Test DELETE events
-    ArrayList<OMDBUpdateEvent> deleteEvents = new ArrayList<>();
+    List<OMDBUpdateEvent> deleteEvents = new ArrayList<>();
     // Delete "item0"
     deleteEvents.add(
         getOMUpdateEvent("item0", repeatedOmKeyInfo, DELETED_TABLE, DELETE,

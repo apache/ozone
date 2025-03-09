@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.utils.db;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
@@ -80,7 +80,7 @@ public interface DBStore extends Closeable, BatchOperationHandler {
    * least one entry called DEFAULT.
    * @throws IOException on Failure
    */
-  ArrayList<Table> listTables() throws IOException;
+  List<Table> listTables() throws IOException;
 
   /**
    * Flush the DB buffer onto persistent storage.

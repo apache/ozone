@@ -25,9 +25,11 @@ import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.PriorityQueue;
+import java.util.Queue;
 import java.util.TreeMap;
 import java.util.function.Predicate;
 import org.apache.commons.lang3.StringUtils;
@@ -285,8 +287,8 @@ public class ListIterator {
    * This process is repeated till both the lists are exhausted.
    */
   public static class MinHeapIterator implements ClosableIterator {
-    private final PriorityQueue<HeapEntry> minHeap = new PriorityQueue<>();
-    private final ArrayList<ClosableIterator> iterators = new ArrayList<>();
+    private final Queue<HeapEntry> minHeap = new PriorityQueue<>();
+    private final List<ClosableIterator> iterators = new ArrayList<>();
 
     MinHeapIterator(OMMetadataManager omMetadataManager, String prefixKey,
                     BucketLayout bucketLayout, String startKey,

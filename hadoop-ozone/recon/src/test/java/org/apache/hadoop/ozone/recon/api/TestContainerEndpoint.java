@@ -993,7 +993,7 @@ public class TestContainerEndpoint {
         (UnhealthyContainersResponse) containerEndpoint.getUnhealthyContainers(
             3, 2).getEntity();
 
-    ArrayList<UnhealthyContainerMetadata> records
+    List<UnhealthyContainerMetadata> records
         = new ArrayList<>(firstBatch.getContainers());
     assertEquals(3, records.size());
     assertEquals(1L, records.get(0).getContainerID());
@@ -1116,7 +1116,7 @@ public class TestContainerEndpoint {
     missing.setReplicaDelta(delta);
     missing.setReason(reason);
 
-    ArrayList<UnhealthyContainers> missingList = new ArrayList<>();
+    List<UnhealthyContainers> missingList = new ArrayList<>();
     missingList.add(missing);
     containerHealthSchemaManager.insertUnhealthyContainerRecords(missingList);
 

@@ -3447,7 +3447,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     // We have not uploaded any parts, but passing some list it should throw
     // error.
-    TreeMap<Integer, String> partsMap = new TreeMap<>();
+    Map<Integer, String> partsMap = new TreeMap<>();
     partsMap.put(1, UUID.randomUUID().toString());
 
     OzoneTestUtils.expectOmException(ResultCodes.INVALID_PART,
@@ -3474,7 +3474,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     uploadPart(bucket, keyName, uploadID, 1, "data".getBytes(UTF_8));
     // We have not uploaded any parts, but passing some list it should throw
     // error.
-    TreeMap<Integer, String> eTagsMaps = new TreeMap<>();
+    Map<Integer, String> eTagsMaps = new TreeMap<>();
     eTagsMaps.put(1, DigestUtils.md5Hex(UUID.randomUUID().toString()));
 
     OzoneTestUtils.expectOmException(ResultCodes.INVALID_PART,
@@ -3500,7 +3500,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     uploadPart(bucket, keyName, uploadID, 1, "data".getBytes(UTF_8));
     // We have not uploaded any parts, but passing some list it should throw
     // error.
-    TreeMap<Integer, String> eTagsMap = new TreeMap<>();
+    Map<Integer, String> eTagsMap = new TreeMap<>();
     eTagsMap.put(3, DigestUtils.md5Hex("random"));
 
     OzoneTestUtils.expectOmException(ResultCodes.INVALID_PART,

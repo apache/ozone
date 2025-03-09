@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.helpers;
 
 import java.io.Closeable;
 import java.util.EnumMap;
+import java.util.Map;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -58,10 +59,10 @@ public class ContainerMetrics implements Closeable {
   @Metric private MutableCounterLong bytesReadStateMachine;
 
 
-  private final EnumMap<ContainerProtos.Type, MutableCounterLong> numOpsArray;
-  private final EnumMap<ContainerProtos.Type, MutableCounterLong> opsBytesArray;
-  private final EnumMap<ContainerProtos.Type, MutableRate> opsLatency;
-  private final EnumMap<ContainerProtos.Type, MutableQuantiles[]> opsLatQuantiles;
+  private final Map<ContainerProtos.Type, MutableCounterLong> numOpsArray;
+  private final Map<ContainerProtos.Type, MutableCounterLong> opsBytesArray;
+  private final Map<ContainerProtos.Type, MutableRate> opsLatency;
+  private final Map<ContainerProtos.Type, MutableQuantiles[]> opsLatQuantiles;
   private MetricsRegistry registry = null;
 
   public ContainerMetrics(int[] intervals) {

@@ -267,7 +267,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
         while (delCount < keyLimitPerTask && iterator.hasNext()) {
           List<BlockGroup> keysToPurge = new ArrayList<>();
-          HashMap<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
+          Map<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
           SnapshotInfo currSnapInfo = snapshotInfoTable.get(iterator.next().getKey());
           // Deep clean only on active snapshot. Deleted Snapshots will be
           // cleaned up by SnapshotDeletingService.

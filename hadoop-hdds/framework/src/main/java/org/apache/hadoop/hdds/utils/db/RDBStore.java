@@ -34,6 +34,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -308,8 +309,8 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public ArrayList<Table> listTables() {
-    ArrayList<Table> returnList = new ArrayList<>();
+  public List<Table> listTables() {
+    List<Table> returnList = new ArrayList<>();
     for (ColumnFamily family : getColumnFamilies()) {
       returnList.add(new RDBTable(db, family, rdbMetrics));
     }

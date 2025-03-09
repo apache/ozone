@@ -248,7 +248,7 @@ public abstract class TestOmSnapshotFileSystem {
     ozoneKeyIterator = ozoneBucket.listKeys(keyPrefix + "a/", null);
     verifyFullTreeStructure(ozoneKeyIterator);
 
-    LinkedList<String> expectedKeys;
+    List<String> expectedKeys;
 
     // Intermediate level keyPrefix - 2nd level
     ozoneKeyIterator = ozoneBucket.listKeys(keyPrefix + "a/b2/", null);
@@ -307,7 +307,7 @@ public abstract class TestOmSnapshotFileSystem {
   }
 
   private void verifyFullTreeStructure(Iterator<? extends OzoneKey> keyItr) {
-    LinkedList<String> expectedKeys = new LinkedList<>();
+    List<String> expectedKeys = new LinkedList<>();
     expectedKeys.add("a/");
     expectedKeys.add("a/b1/");
     expectedKeys.add("a/b1/c1/");
@@ -335,7 +335,7 @@ public abstract class TestOmSnapshotFileSystem {
   private void checkKeyList(Iterator<? extends OzoneKey> ozoneKeyIterator,
                             List<String> keys) {
 
-    LinkedList<String> outputKeys = new LinkedList<>();
+    List<String> outputKeys = new LinkedList<>();
     while (ozoneKeyIterator.hasNext()) {
       OzoneKey ozoneKey = ozoneKeyIterator.next();
       String keyName = ozoneKey.getName();
@@ -703,7 +703,7 @@ public abstract class TestOmSnapshotFileSystem {
     FileStatus[] fileStatuses = o3fs.listStatus(snapshotRoot);
     // Added logs for debugging failures, to check any sub-path mismatches.
     Set<String> actualPaths = new TreeSet<>();
-    ArrayList<String> actualPathList = new ArrayList<>();
+    List<String> actualPathList = new ArrayList<>();
     if (numDirs != fileStatuses.length) {
       for (FileStatus fileStatus : fileStatuses) {
         boolean duplicate = actualPaths.add(fileStatus.getPath().getName());

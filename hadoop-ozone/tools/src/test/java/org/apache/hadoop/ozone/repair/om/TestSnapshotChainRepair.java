@@ -137,7 +137,7 @@ public class TestSnapshotChainRepair {
       when(rocksIterator.isValid())
           .thenReturn(true, remainingValidResponses);
 
-      ArrayList<byte[]> valueResponses = new ArrayList<>();
+      List<byte[]> valueResponses = new ArrayList<>();
       for (SnapshotInfo snap : snapshots) {
         valueResponses.add(SnapshotInfo.getCodec().toPersistedFormat(snap));
       }

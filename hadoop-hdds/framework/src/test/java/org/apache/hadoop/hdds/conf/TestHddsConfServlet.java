@@ -70,7 +70,7 @@ public class TestHddsConfServlet {
 
   @Test
   public void testParseHeaders() throws Exception {
-    HashMap<String, String> verifyMap = new HashMap<String, String>();
+    Map<String, String> verifyMap = new HashMap<String, String>();
     verifyMap.put("text/plain", HddsConfServlet.FORMAT_XML);
     verifyMap.put(null, HddsConfServlet.FORMAT_XML);
     verifyMap.put("text/xml", HddsConfServlet.FORMAT_XML);

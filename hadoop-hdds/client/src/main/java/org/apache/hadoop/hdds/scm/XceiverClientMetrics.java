@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.EnumMap;
+import java.util.Map;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -48,9 +49,9 @@ public class XceiverClientMetrics implements MetricsSource {
   private @Metric MutableCounterLong totalOps;
   private @Metric MutableCounterLong ecReconstructionTotal;
   private @Metric MutableCounterLong ecReconstructionFailsTotal;
-  private EnumMap<ContainerProtos.Type, MutableCounterLong> pendingOpsArray;
-  private EnumMap<ContainerProtos.Type, MutableCounterLong> opsArray;
-  private EnumMap<ContainerProtos.Type, PerformanceMetrics> containerOpsLatency;
+  private Map<ContainerProtos.Type, MutableCounterLong> pendingOpsArray;
+  private Map<ContainerProtos.Type, MutableCounterLong> opsArray;
+  private Map<ContainerProtos.Type, PerformanceMetrics> containerOpsLatency;
   private MetricsRegistry registry;
   private OzoneConfiguration conf = new OzoneConfiguration();
   private int[] intervals = conf.getInts(OzoneConfigKeys

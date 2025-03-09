@@ -55,7 +55,7 @@ class TestManagedRawSSTFileIterator {
   private Path tempDir;
 
   private File createSSTFileWithKeys(
-      TreeMap<Pair<String, Integer>, String> keys) throws Exception {
+      Map<Pair<String, Integer>, String> keys) throws Exception {
     File file = Files.createFile(tempDir.resolve("tmp_sst_file.sst")).toFile();
     try (ManagedEnvOptions envOptions = new ManagedEnvOptions();
          ManagedOptions managedOptions = new ManagedOptions();
@@ -99,7 +99,7 @@ class TestManagedRawSSTFileIterator {
   @ParameterizedTest
   @MethodSource("keyValueFormatArgs")
   public void testSSTDumpIteratorWithKeyFormat(String keyFormat, String valueFormat) throws Exception {
-    TreeMap<Pair<String, Integer>, String> keys = IntStream.range(0, 100).boxed().collect(Collectors.toMap(
+    Map<Pair<String, Integer>, String> keys = IntStream.range(0, 100).boxed().collect(Collectors.toMap(
         i -> Pair.of(String.format(keyFormat, i), i % 2),
         i -> i % 2 == 0 ? "" : String.format(valueFormat, i),
         (v1, v2) -> v2,

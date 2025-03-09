@@ -76,7 +76,7 @@ public final class OzoneBucketStub extends OzoneBucket {
 
   private Map<String, Map<Integer, Part>> partList = new HashMap<>();
 
-  private ArrayList<OzoneAcl> aclList = new ArrayList<>();
+  private List<OzoneAcl> aclList = new ArrayList<>();
   private ReplicationConfig replicationConfig;
 
   public static Builder newBuilder() {
@@ -575,7 +575,7 @@ public final class OzoneBucketStub extends OzoneBucket {
 
   @Override
   public List<OzoneAcl> getAcls() throws IOException {
-    return (List<OzoneAcl>)aclList.clone();
+    return new ArrayList<>(aclList);
   }
 
   @Override

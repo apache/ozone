@@ -46,6 +46,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
@@ -1268,7 +1269,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     // A HashSet for fast lookup. Gathers all ContainerBlockID entries inside
     // the referenceKey.
-    HashSet<ContainerBlockID> cbIdSet = referenceKey.getKeyLocationVersions()
+    Set<ContainerBlockID> cbIdSet = referenceKey.getKeyLocationVersions()
         .stream()
         .flatMap(e -> e.getLocationList().stream())
         .map(omKeyLocationInfo ->

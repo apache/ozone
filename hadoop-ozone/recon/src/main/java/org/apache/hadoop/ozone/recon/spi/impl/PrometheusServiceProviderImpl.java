@@ -176,7 +176,7 @@ public class PrometheusServiceProviderImpl
               for (Map<String, Object> metricJson : result) {
                 Map<String, String> metadata =
                     (Map<String, String>) metricJson.get("metric");
-                TreeMap<Double, Double> values = new TreeMap<>();
+                Map<Double, Double> values = new TreeMap<>();
                 List<List<Object>> valuesJson = new ArrayList<>();
                 if (resultType.equals("matrix")) {
                   valuesJson = (List<List<Object>>) metricJson.get(valueKey);

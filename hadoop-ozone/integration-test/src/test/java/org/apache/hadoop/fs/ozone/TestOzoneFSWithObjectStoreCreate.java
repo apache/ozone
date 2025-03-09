@@ -344,7 +344,7 @@ public abstract class TestOzoneFSWithObjectStoreCreate implements NonHATests.Tes
     String key2 = "/dir1///dir2/file2/";
     String key3 = "/dir1///dir2/file3/";
 
-    LinkedList<String> keys = new LinkedList<>();
+    List<String> keys = new LinkedList<>();
     keys.add("dir1/");
     keys.add("dir1/dir2/");
     keys.add(OmUtils.normalizeKey(key1, false));
@@ -389,7 +389,7 @@ public abstract class TestOzoneFSWithObjectStoreCreate implements NonHATests.Tes
   private void checkKeyList(Iterator<? extends OzoneKey > ozoneKeyIterator,
       List<String> keys) {
 
-    LinkedList<String> outputKeys = new LinkedList<>();
+    List<String> outputKeys = new LinkedList<>();
     while (ozoneKeyIterator.hasNext()) {
       OzoneKey ozoneKey = ozoneKeyIterator.next();
       outputKeys.add(ozoneKey.getName());

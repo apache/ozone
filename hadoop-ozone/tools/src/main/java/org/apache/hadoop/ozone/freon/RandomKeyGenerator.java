@@ -38,6 +38,7 @@ import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
@@ -237,7 +238,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   private AtomicLong writeValidationFailureCount;
 
   private BlockingQueue<KeyValidate> validationQueue;
-  private ArrayList<Histogram> histograms = new ArrayList<>();
+  private List<Histogram> histograms = new ArrayList<>();
 
   private OzoneConfiguration ozoneConfiguration;
   private ProgressBar progressbar;
@@ -868,7 +869,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     }
     LOG.trace("Cleaning bucket: {} in volume: {}",
         bucketName, volume.getName());
-    ArrayList<String> keys = new ArrayList<>();
+    List<String> keys = new ArrayList<>();
     try {
       bucket.listKeys(null).forEachRemaining(x -> keys.add(x.getName()));
       bucket.deleteKeys(keys);

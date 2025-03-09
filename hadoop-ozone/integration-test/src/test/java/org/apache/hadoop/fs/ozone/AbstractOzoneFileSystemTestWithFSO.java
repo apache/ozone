@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.LeaseRecoverable;
@@ -116,7 +117,7 @@ abstract class AbstractOzoneFileSystemTestWithFSO extends AbstractOzoneFileSyste
     // Root Directory
     FileStatus[] fileStatusList = getFs().listStatus(new Path("/"));
     assertEquals(3, fileStatusList.length, "FileStatus should return files and directories");
-    ArrayList<String> expectedPaths = new ArrayList<>();
+    List<String> expectedPaths = new ArrayList<>();
     expectedPaths.add("o3fs://" + bucketName + "." + volumeName + "/d1");
     expectedPaths.add("o3fs://" + bucketName + "." + volumeName + "/d2");
     expectedPaths.add("o3fs://" + bucketName + "." + volumeName + "/key1");
@@ -207,7 +208,7 @@ abstract class AbstractOzoneFileSystemTestWithFSO extends AbstractOzoneFileSyste
     RemoteIterator<LocatedFileStatus> fileStatusItr = getFs().listFiles(
             new Path("/"), true);
     String uriPrefix = "o3fs://" + getBucketName() + "." + getVolumeName();
-    ArrayList<String> expectedPaths = new ArrayList<>();
+    List<String> expectedPaths = new ArrayList<>();
     expectedPaths.add(uriPrefix + dir1Dir1Dir2Key1.toString());
     expectedPaths.add(uriPrefix + key1.toString());
     expectedPaths.add(uriPrefix + key2.toString());
@@ -409,7 +410,7 @@ abstract class AbstractOzoneFileSystemTestWithFSO extends AbstractOzoneFileSyste
     final long volumeId = omMgr.getVolumeId(getVolumeName());
     final long bucketId = omMgr.getBucketId(getVolumeName(), getBucketName());
 
-    ArrayList<String> dirKeys = new ArrayList<>();
+    List<String> dirKeys = new ArrayList<>();
     long d1ObjectID =
         verifyDirKey(volumeId, bucketId, omBucketInfo.getObjectID(),
                 "d1", "/d1", dirKeys, omMgr);
@@ -456,7 +457,7 @@ abstract class AbstractOzoneFileSystemTestWithFSO extends AbstractOzoneFileSyste
         .get(omMgr.getBucketKey(getVolumeName(), getBucketName()));
     assertNotNull(omBucketInfo, "Failed to find bucketInfo");
 
-    ArrayList<String> dirKeys = new ArrayList<>();
+    List<String> dirKeys = new ArrayList<>();
 
     final long volumeId = omMgr.getVolumeId(getVolumeName());
     final long bucketId = omMgr.getBucketId(getVolumeName(), getBucketName());
@@ -537,7 +538,7 @@ abstract class AbstractOzoneFileSystemTestWithFSO extends AbstractOzoneFileSyste
 
   long verifyDirKey(long volumeId, long bucketId, long parentId,
                     String dirKey, String absolutePath,
-                    ArrayList<String> dirKeys, OMMetadataManager omMgr)
+                    List<String> dirKeys, OMMetadataManager omMgr)
       throws Exception {
     String dbKey = "/" + volumeId + "/" + bucketId + "/" +
             parentId + "/" + dirKey;

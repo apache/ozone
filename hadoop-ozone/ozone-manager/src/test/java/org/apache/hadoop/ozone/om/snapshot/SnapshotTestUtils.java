@@ -85,6 +85,7 @@ public class SnapshotTestUtils {
   /**
    * Stubbed implementation Persistent Map for testing.
    */
+  @SuppressWarnings("PMD.LooseCoupling")
   public static class StubbedPersistentMap<K, V> implements
       PersistentMap<K, V>  {
 

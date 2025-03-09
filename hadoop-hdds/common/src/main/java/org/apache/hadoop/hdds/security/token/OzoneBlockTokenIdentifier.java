@@ -46,7 +46,7 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
   static final Text KIND_NAME = new Text("HDDS_BLOCK_TOKEN");
 
   private String blockId;
-  private EnumSet<AccessModeProto> modes;
+  private Set<AccessModeProto> modes;
   private long maxLength;
 
   public static String getTokenService(BlockID blockID) {

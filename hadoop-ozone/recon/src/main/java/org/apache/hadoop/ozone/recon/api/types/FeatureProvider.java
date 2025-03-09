@@ -25,6 +25,7 @@ import com.google.inject.Singleton;
 import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -34,7 +35,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
  */
 @Singleton
 public final class FeatureProvider {
-  private static EnumMap<Feature, Boolean> featureDisableMap =
+  private static Map<Feature, Boolean> featureDisableMap =
       new EnumMap<>(Feature.class);
 
   private FeatureProvider() {
@@ -69,7 +70,7 @@ public final class FeatureProvider {
     }
   }
 
-  public static EnumMap<Feature, Boolean> getFeatureDisableMap() {
+  public static Map<Feature, Boolean> getFeatureDisableMap() {
     return featureDisableMap;
   }
 

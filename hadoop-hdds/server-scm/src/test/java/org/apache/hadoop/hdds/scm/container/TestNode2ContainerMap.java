@@ -36,6 +36,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Test classes for Node2ContainerMap.
  */
+@SuppressWarnings("PMD.LooseCoupling")
 public class TestNode2ContainerMap {
   private static final int DATANODE_COUNT = 300;
   private static final int CONTAINER_COUNT = 1000;
@@ -193,14 +194,14 @@ public class TestNode2ContainerMap {
 
     final int newCount = 100;
     ContainerID last = values.last();
-    TreeSet<ContainerID> addedContainers = new TreeSet<>();
+    Set<ContainerID> addedContainers = new TreeSet<>();
     for (int x = 1; x <= newCount; x++) {
       long cTemp = last.getId() + x;
       addedContainers.add(ContainerID.valueOf(cTemp));
     }
 
     // This set is the super set of existing containers and new containers.
-    TreeSet<ContainerID> newContainersSet = new TreeSet<>(values);
+    Set<ContainerID> newContainersSet = new TreeSet<>(values);
     newContainersSet.addAll(addedContainers);
 
     ReportResult result = map.processReport(key, newContainersSet);
@@ -232,7 +233,7 @@ public class TestNode2ContainerMap {
     Random r = new Random();
 
     ContainerID first = values.first();
-    TreeSet<ContainerID> removedContainers = new TreeSet<>();
+    Set<ContainerID> removedContainers = new TreeSet<>();
 
     // Pick a random container to remove it is ok to collide no issues.
     for (int x = 0; x < removeCount; x++) {
@@ -242,7 +243,7 @@ public class TestNode2ContainerMap {
     }
 
     // This set is a new set with some containers removed.
-    TreeSet<ContainerID> newContainersSet = new TreeSet<>(values);
+    Set<ContainerID> newContainersSet = new TreeSet<>(values);
     newContainersSet.removeAll(removedContainers);
 
     ReportResult result = map.processReport(key, newContainersSet);
@@ -277,7 +278,7 @@ public class TestNode2ContainerMap {
     Random r = new Random();
 
     ContainerID first = values.first();
-    TreeSet<ContainerID> removedContainers = new TreeSet<>();
+    Set<ContainerID> removedContainers = new TreeSet<>();
 
     // Pick a random container to remove it is ok to collide no issues.
     for (int x = 0; x < removeCount; x++) {

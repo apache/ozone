@@ -77,7 +77,7 @@ public class SCMNodeInfo {
     List<SCMNodeInfo> scmNodeInfoList = new ArrayList<>();
     String scmServiceId = HddsUtils.getScmServiceId(conf);
     if (scmServiceId != null) {
-      ArrayList< String > scmNodeIds = new ArrayList<>(
+      List<String> scmNodeIds = new ArrayList<>(
           HddsUtils.getSCMNodeIds(conf, scmServiceId));
       if (scmNodeIds.isEmpty()) {
         throw new ConfigurationException(

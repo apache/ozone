@@ -129,7 +129,7 @@ public final class ContainerStateManagerImpl
    * We use the containers in round-robin fashion for operations like block
    * allocation. This map is used for remembering the last used container.
    */
-  private ConcurrentHashMap<ContainerState, ContainerID> lastUsedMap;
+  private Map<ContainerState, ContainerID> lastUsedMap;
 
   private final Map<LifeCycleEvent, CheckedConsumer<ContainerInfo, IOException>>
       containerStateChangeActions;

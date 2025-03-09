@@ -43,8 +43,8 @@ import org.reflections.util.ConfigurationBuilder;
  */
 public class ValidatorRegistry {
 
-  private final EnumMap<ValidationCondition,
-      EnumMap<Type, EnumMap<RequestProcessingPhase, List<Method>>>>
+  private final Map<ValidationCondition,
+      Map<Type, Map<RequestProcessingPhase, List<Method>>>>
       validators = new EnumMap<>(ValidationCondition.class);
 
   /**
@@ -120,13 +120,13 @@ public class ValidatorRegistry {
       Type requestType,
       RequestProcessingPhase phase) {
 
-    EnumMap<Type, EnumMap<RequestProcessingPhase, List<Method>>>
+    Map<Type, Map<RequestProcessingPhase, List<Method>>>
         requestTypeMap = validators.get(condition);
     if (requestTypeMap == null || requestTypeMap.isEmpty()) {
       return Collections.emptyList();
     }
 
-    EnumMap<RequestProcessingPhase, List<Method>> phases =
+    Map<RequestProcessingPhase, List<Method>> phases =
         requestTypeMap.get(requestType);
     if (phases == null) {
       return Collections.emptyList();
@@ -156,10 +156,10 @@ public class ValidatorRegistry {
       m.setAccessible(true);
 
       for (ValidationCondition condition : descriptor.conditions()) {
-        EnumMap<Type, EnumMap<RequestProcessingPhase, List<Method>>>
+        Map<Type, Map<RequestProcessingPhase, List<Method>>>
             requestTypeMap = getAndInitialize(
                 condition, this::newTypeMap, validators);
-        EnumMap<RequestProcessingPhase, List<Method>> phases = getAndInitialize(
+        Map<RequestProcessingPhase, List<Method>> phases = getAndInitialize(
             descriptor.requestType(), this::newPhaseMap, requestTypeMap);
         if (isPreProcessValidator(descriptor)) {
           getAndInitialize(PRE_PROCESS, ArrayList::new, phases).add(m);
@@ -170,12 +170,12 @@ public class ValidatorRegistry {
     }
   }
 
-  private EnumMap<Type,
-      EnumMap<RequestProcessingPhase, List<Method>>> newTypeMap() {
+  private Map<Type,
+      Map<RequestProcessingPhase, List<Method>>> newTypeMap() {
     return new EnumMap<>(Type.class);
   }
 
-  private EnumMap<RequestProcessingPhase, List<Method>> newPhaseMap() {
+  private Map<RequestProcessingPhase, List<Method>> newPhaseMap() {
     return new EnumMap<>(RequestProcessingPhase.class);
   }
 

@@ -133,7 +133,7 @@ public final class HddsTestUtils {
    */
   public static List<DatanodeDetails> getListOfRegisteredDatanodeDetails(
       SCMNodeManager nodeManager, int count) {
-    ArrayList<DatanodeDetails> datanodes = new ArrayList<>();
+    List<DatanodeDetails> datanodes = new ArrayList<>();
     for (int i = 0; i < count; i++) {
       datanodes.add(createRandomDatanodeAndRegister(nodeManager));
     }

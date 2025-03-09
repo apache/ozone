@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.server.http;
 
 import java.util.HashMap;
+import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogConfigurationException;
 import org.apache.commons.logging.LogFactory;
@@ -36,7 +37,7 @@ public final class HttpRequestLog {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(HttpRequestLog.class);
-  private static final HashMap<String, String> SERVER_TO_COMPONENT;
+  private static final Map<String, String> SERVER_TO_COMPONENT;
 
   private HttpRequestLog() {
   }

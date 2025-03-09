@@ -90,6 +90,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 /**
  * Tests OzoneManager MetadataManager.
  */
+@SuppressWarnings("PMD.LooseCoupling")
 public class TestOmMetadataManager {
 
   private OMMetadataManager omMetadataManager;
@@ -228,7 +229,7 @@ public class TestOmMetadataManager {
     }
 
     String volumeName2 = "volumeB";
-    TreeSet<String> volumeBBucketsPrefixWithHadoopOwner = new TreeSet<>();
+    Set<String> volumeBBucketsPrefixWithHadoopOwner = new TreeSet<>();
     OMRequestTestUtils.addVolumeToDB(volumeName2, omMetadataManager);
 
     // Add exact name in prefixBucketNameWithOzoneOwner without postfix.
@@ -303,7 +304,7 @@ public class TestOmMetadataManager {
     // Try to get buckets by count 10, like that get all buckets in the
     // volumeB with prefixBucketNameWithHadoopOwner.
     startBucket = null;
-    TreeSet<String> expectedBuckets = new TreeSet<>();
+    Set<String> expectedBuckets = new TreeSet<>();
     for (int i = 0; i < 5; i++) {
 
       omBucketInfoList = omMetadataManager.listBuckets(volumeName2,

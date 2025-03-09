@@ -27,6 +27,16 @@
   </description>
 
   <rule ref="category/java/bestpractices.xml/ForLoopCanBeForeach"/>
+  <rule ref="category/java/bestpractices.xml/LooseCoupling">
+    <properties>
+      <property name="allowedTypes" value="
+        java.util.Stack,
+        java.util.Properties
+        org.apache.hadoop.ozone.container.common.utils.ContainerCache,
+        org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor.LowerCaseKeyStringMap,
+        "/>
+    </properties>
+  </rule>
   <rule ref="category/java/bestpractices.xml/MissingOverride"/>
   <rule ref="category/java/bestpractices.xml/UnusedPrivateMethod"/>
   <rule ref="category/java/bestpractices.xml/UnusedPrivateField"/>

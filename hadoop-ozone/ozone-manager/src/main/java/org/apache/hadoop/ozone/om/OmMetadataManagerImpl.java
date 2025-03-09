@@ -1309,7 +1309,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     int currentCount = 0;
 
 
-    TreeMap<String, OmKeyInfo> cacheKeyMap = new TreeMap<>();
+    Map<String, OmKeyInfo> cacheKeyMap = new TreeMap<>();
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> iterator =
         keyTable.cacheIterator();
 
@@ -1600,7 +1600,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                              OmSnapshotManager omSnapshotManager)
       throws IOException {
     List<BlockGroup> keyBlocksList = Lists.newArrayList();
-    HashMap<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
+    Map<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
     try (TableIterator<String, ? extends KeyValue<String, RepeatedOmKeyInfo>>
              keyIter = getDeletedTable().iterator()) {
       int currentCount = 0;

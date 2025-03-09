@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
@@ -81,7 +82,7 @@ public class OzoneAcl {
     this(type, name, scope, toInt(acls));
   }
 
-  public OzoneAcl(ACLIdentityType type, String name, AclScope scope, EnumSet<ACLType> acls) {
+  public OzoneAcl(ACLIdentityType type, String name, AclScope scope, Set<ACLType> acls) {
     this(type, name, scope, toInt(acls));
   }
 
@@ -187,7 +188,7 @@ public class OzoneAcl {
           parts[2].indexOf("]")));
     }
 
-    EnumSet<ACLType> acls = EnumSet.noneOf(ACLType.class);
+    Set<ACLType> acls = EnumSet.noneOf(ACLType.class);
     for (char ch : bits.toCharArray()) {
       acls.add(ACLType.getACLRight(String.valueOf(ch)));
     }

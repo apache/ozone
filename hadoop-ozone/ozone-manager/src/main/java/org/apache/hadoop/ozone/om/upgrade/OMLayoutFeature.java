@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.upgrade;
 
 import java.util.EnumMap;
+import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
@@ -58,7 +59,7 @@ public enum OMLayoutFeature implements LayoutFeature {
 
   private int layoutVersion;
   private String description;
-  private EnumMap<UpgradeActionType, OmUpgradeAction> actions =
+  private Map<UpgradeActionType, OmUpgradeAction> actions =
       new EnumMap<>(UpgradeActionType.class);
 
   OMLayoutFeature(final int layoutVersion, String description) {

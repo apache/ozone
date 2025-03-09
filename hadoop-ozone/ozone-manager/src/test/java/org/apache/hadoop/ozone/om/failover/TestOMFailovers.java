@@ -26,6 +26,8 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
@@ -124,11 +126,11 @@ public class TestOMFailovers {
     @Override
     protected void loadOMClientConfigs(ConfigurationSource config,
         String omSvcId) {
-      HashMap<String, ProxyInfo<OzoneManagerProtocolPB>> omProxies =
+      Map<String, ProxyInfo<OzoneManagerProtocolPB>> omProxies =
           new HashMap<>();
-      HashMap<String, OMProxyInfo> omProxyInfos = new HashMap<>();
-      HashMap<String, InetSocketAddress> omNodeAddressMap = new HashMap<>();
-      ArrayList<String> omNodeIDList = new ArrayList<>();
+      Map<String, OMProxyInfo> omProxyInfos = new HashMap<>();
+      Map<String, InetSocketAddress> omNodeAddressMap = new HashMap<>();
+      List<String> omNodeIDList = new ArrayList<>();
 
       for (int i = 1; i <= 3; i++) {
         String nodeId = "om" + i;

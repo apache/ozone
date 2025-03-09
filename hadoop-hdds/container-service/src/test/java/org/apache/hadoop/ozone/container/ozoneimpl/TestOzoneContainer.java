@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
@@ -77,7 +78,7 @@ public class TestOzoneContainer {
   private KeyValueContainerData keyValueContainerData;
   private KeyValueContainer keyValueContainer;
   private final DatanodeDetails datanodeDetails = createDatanodeDetails();
-  private HashMap<String, Long> commitSpaceMap; //RootDir -> committed space
+  private Map<String, Long> commitSpaceMap; //RootDir -> committed space
 
   private ContainerLayoutVersion layout;
   private String schemaVersion;

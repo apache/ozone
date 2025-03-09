@@ -137,7 +137,7 @@ public abstract class TestHadoopDirTreeGenerator implements NonHATests.TestCase 
       verifyActualSpan(expectedSpanCnt, fileStatusList);
     }
     int actualNumFiles = 0;
-    ArrayList <String> files = new ArrayList<>();
+    List <String> files = new ArrayList<>();
     for (FileStatus fileStatus : fileStatusList) {
       if (fileStatus.isDirectory()) {
         ++depth;

@@ -132,7 +132,7 @@ public class DeleteVolumeHandler extends VolumeHandler {
    * @return boolean
    */
   private boolean cleanOBSBucket(OzoneBucket bucket) {
-    ArrayList<String> keys = new ArrayList<>();
+    List<String> keys = new ArrayList<>();
     try {
       if (!bucket.isLink()) {
         Iterator<? extends OzoneKey> iterator = bucket.listKeys(null);

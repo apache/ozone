@@ -933,7 +933,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return fileStatuses;
   }
 
-  
+  @SuppressWarnings("PMD.LooseCoupling")
   private List<FileStatusAdapter> listStatusAdapter(Path f, boolean lite) throws IOException {
     incrementCounter(Statistic.INVOCATION_LIST_STATUS, 1);
     statistics.incrementReadOps(1);

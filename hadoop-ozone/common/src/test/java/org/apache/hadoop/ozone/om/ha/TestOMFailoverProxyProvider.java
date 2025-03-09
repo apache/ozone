@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.StringJoiner;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
@@ -170,7 +171,7 @@ public class TestOMFailoverProxyProvider {
   @Test
   public void testCanonicalTokenServiceName() throws IOException {
     OzoneConfiguration ozoneConf = new OzoneConfiguration();
-    ArrayList<String> nodeAddrs = new ArrayList<>(
+    List<String> nodeAddrs = new ArrayList<>(
         Arrays.asList("4.3.2.1:9862", "2.1.0.5:9862", "3.2.1.0:9862"));
     assertEquals(numNodes, nodeAddrs.size());
 

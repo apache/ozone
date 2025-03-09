@@ -300,7 +300,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
     if (startKey != null) {
       iterator.get().seek(getValueObject(dbColumnFamilyDef, startKey));
     }
-    ArrayList<ByteArrayKeyValue> batch = new ArrayList<>(batchSize);
+    List<ByteArrayKeyValue> batch = new ArrayList<>(batchSize);
     // Used to ensure that the output of a multi-threaded parsed Json is in
     // the same order as the RocksDB iterator.
     long sequenceId = FIRST_SEQUENCE_ID;
@@ -671,7 +671,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
   private class Task implements Callable<Void> {
 
     private final DBColumnFamilyDefinition dbColumnFamilyDefinition;
-    private final ArrayList<ByteArrayKeyValue> batch;
+    private final List<ByteArrayKeyValue> batch;
     private final LogWriter logWriter;
     private final ObjectWriter writer =
         JsonSerializationHelper.getWriter();
@@ -682,7 +682,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
 
     @SuppressWarnings("checkstyle:parameternumber")
     Task(DBColumnFamilyDefinition dbColumnFamilyDefinition,
-         ArrayList<ByteArrayKeyValue> batch, LogWriter logWriter,
+         List<ByteArrayKeyValue> batch, LogWriter logWriter,
          long sequenceId, boolean withKey, boolean schemaV3, String valueFields) {
       this.dbColumnFamilyDefinition = dbColumnFamilyDefinition;
       this.batch = batch;
@@ -714,7 +714,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
     @Override
     public Void call() {
       try {
-        ArrayList<String> results = new ArrayList<>(batch.size());
+        List<String> results = new ArrayList<>(batch.size());
         Map<String, Object> fieldsSplitMap = new HashMap<>();
 
         if (valueFields != null) {
@@ -874,7 +874,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
   }
 
   private static class LogWriter {
-    private final Map<Long, ArrayList<String>> logs;
+    private final Map<Long, List<String>> logs;
     private final PrintWriter printWriter;
     private final Thread writerThread;
     private volatile boolean stop = false;
@@ -892,7 +892,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
       writerThread.start();
     }
 
-    public void log(ArrayList<String> msg, long sequenceId) {
+    public void log(List<String> msg, long sequenceId) {
       synchronized (lock) {
         if (!stop) {
           logs.put(sequenceId, msg);
@@ -915,7 +915,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
               // Note that the order here not only requires the sequenceId to be
               // incremental, but also demands that the sequenceId of the
               // next output is the current sequenceId + 1.
-              ArrayList<String> results = logs.get(expectedSequenceId);
+              List<String> results = logs.get(expectedSequenceId);
               if (results != null) {
                 for (String result : results) {
                   printWriter.println(result);
@@ -944,7 +944,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
     }
 
     private void drainRemainingMessages() {
-      ArrayList<String> results;
+      List<String> results;
       while ((results = logs.get(expectedSequenceId)) != null) {
         for (String result : results) {
           printWriter.println(result);

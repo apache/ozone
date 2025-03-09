@@ -33,6 +33,7 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Collectors;
@@ -104,7 +105,7 @@ public final class DatabaseHelper {
     try (Connection connection = getConnection(dbName);
          PreparedStatement preparedStatement = connection.prepareStatement(
              properties.get(ParserConsts.INSERT_AUDITS))) {
-      ArrayList<AuditEntry> auditEntries = parseAuditLogs(logs);
+      List<AuditEntry> auditEntries = parseAuditLogs(logs);
       final int batchSize = 1000;
       int count = 0;
       //Insert list to db
@@ -132,9 +133,9 @@ public final class DatabaseHelper {
   }
 
   @SuppressWarnings("squid:S3776")
-  private static ArrayList<AuditEntry> parseAuditLogs(String filePath)
+  private static List<AuditEntry> parseAuditLogs(String filePath)
       throws IOException {
-    ArrayList<AuditEntry> listResult = new ArrayList<>();
+    List<AuditEntry> listResult = new ArrayList<>();
     try (InputStream fis = Files.newInputStream(Paths.get(filePath));
          InputStreamReader isr = new InputStreamReader(fis, UTF_8);
          BufferedReader bReader = new BufferedReader(isr)) {

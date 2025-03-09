@@ -678,6 +678,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     }
   }
 
+  @SuppressWarnings("PMD.LooseCoupling")
   @Override
   public FileStatus[] listStatus(Path f) throws IOException {
     incrementCounter(Statistic.INVOCATION_LIST_STATUS, 1);
