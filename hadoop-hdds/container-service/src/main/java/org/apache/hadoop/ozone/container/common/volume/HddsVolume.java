@@ -84,8 +84,6 @@ public class HddsVolume extends StorageVolume {
 
   private final AtomicLong committedBytes = new AtomicLong(); // till Open containers become full
 
-  private final AtomicLong containerImportCommittedBytes = new AtomicLong();
-
   // Mentions the type of volume
   private final VolumeType type = VolumeType.DATA_VOLUME;
   // The dedicated DbVolume that the db instance of this HddsVolume resides.
