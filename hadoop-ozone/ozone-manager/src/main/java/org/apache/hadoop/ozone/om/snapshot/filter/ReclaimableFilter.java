@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -38,13 +38,13 @@ import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.ozone.om.snapshot.MultiSnapshotLocks;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
-import org.apache.hadoop.ozone.util.CheckedExceptionOperation;
+import org.apache.hadoop.ozone.util.CheckedFunction;
 
 /**
  * This class is responsible for opening last N snapshot given a snapshot metadata manager or AOS metadata manager by
  * acquiring a lock.
  */
-public abstract class ReclaimableFilter<V> implements CheckedExceptionOperation<Table.KeyValue<String, V>,
+public abstract class ReclaimableFilter<V> implements CheckedFunction<Table.KeyValue<String, V>,
     Boolean, IOException>, Closeable {
 
   private final OzoneManager ozoneManager;
@@ -57,7 +57,7 @@ public abstract class ReclaimableFilter<V> implements CheckedExceptionOperation<
   private final MultiSnapshotLocks snapshotIdLocks;
   private Long volumeId;
   private OmBucketInfo bucketInfo;
-  private final OMMetadataManager metadataManager;
+  private final KeyManager keyManager;
   private final int numberOfPreviousSnapshotsFromChain;
 
   /**
@@ -66,12 +66,12 @@ public abstract class ReclaimableFilter<V> implements CheckedExceptionOperation<
    *
    * @param currentSnapshotInfo  : If null the deleted keys in AOS needs to be processed, hence the latest snapshot
    *                             in the snapshot chain corresponding to bucket key needs to be processed.
-   * @param metadataManager      : MetadataManager corresponding to snapshot or AOS.
+   * @param keyManager      : KeyManager corresponding to snapshot or AOS.
    * @param lock                 : Lock for Active OM.
    */
   public ReclaimableFilter(OzoneManager ozoneManager, OmSnapshotManager omSnapshotManager,
                            SnapshotChainManager snapshotChainManager,
-                           SnapshotInfo currentSnapshotInfo, OMMetadataManager metadataManager,
+                           SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
                            IOzoneManagerLock lock,
                            int numberOfPreviousSnapshotsFromChain) {
     this.ozoneManager = ozoneManager;
@@ -79,7 +79,7 @@ public abstract class ReclaimableFilter<V> implements CheckedExceptionOperation<
     this.currentSnapshotInfo = currentSnapshotInfo;
     this.snapshotChainManager = snapshotChainManager;
     this.snapshotIdLocks = new MultiSnapshotLocks(lock, OzoneManagerLock.Resource.SNAPSHOT_GC_LOCK, false);
-    this.metadataManager = metadataManager;
+    this.keyManager = keyManager;
     this.numberOfPreviousSnapshotsFromChain = numberOfPreviousSnapshotsFromChain;
     this.previousOmSnapshots = new ArrayList<>(numberOfPreviousSnapshotsFromChain);
     this.previousSnapshotInfos = new ArrayList<>(numberOfPreviousSnapshotsFromChain);
@@ -136,18 +136,15 @@ public abstract class ReclaimableFilter<V> implements CheckedExceptionOperation<
       List<UUID> lockIds = expectedLastNSnapshotsInChain.stream()
           .map(snapshotInfo -> snapshotInfo == null ? null : snapshotInfo.getSnapshotId())
           .collect(Collectors.toList());
+      //currentSnapshotInfo for AOS will be null.
       lockIds.add(currentSnapshotInfo == null ? null : currentSnapshotInfo.getSnapshotId());
 
       if (snapshotIdLocks.acquireLock(lockIds).isLockAcquired()) {
         for (SnapshotInfo snapshotInfo : expectedLastNSnapshotsInChain) {
           if (snapshotInfo != null) {
-            // For AOS fail operation if any of the previous snapshots are not active. currentSnapshotInfo for
-            // AOS will be null.
-            previousOmSnapshots.add(currentSnapshotInfo == null
-                ? omSnapshotManager.getActiveSnapshot(snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(),
-                snapshotInfo.getName())
-                : omSnapshotManager.getSnapshot(snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(),
-                snapshotInfo.getName()));
+            // Fail operation if any of the previous snapshots are not active.
+            previousOmSnapshots.add(omSnapshotManager.getActiveSnapshot(snapshotInfo.getVolumeName(),
+                snapshotInfo.getBucketName(), snapshotInfo.getName()));
             previousSnapshotInfos.add(snapshotInfo);
           } else {
             previousOmSnapshots.add(null);
@@ -156,9 +153,8 @@ public abstract class ReclaimableFilter<V> implements CheckedExceptionOperation<
 
           // TODO: Getting volumeId and bucket from active OM. This would be wrong on volume & bucket renames
           //  support.
+          bucketInfo = ozoneManager.getBucketInfo(volume, bucket);
           volumeId = ozoneManager.getMetadataManager().getVolumeId(volume);
-          String dbBucketKey = ozoneManager.getMetadataManager().getBucketKey(volume, bucket);
-          bucketInfo = ozoneManager.getMetadataManager().getBucketTable().get(dbBucketKey);
         }
       } else {
         throw new IOException("Lock acquisition failed for last N snapshots : " +
@@ -185,7 +181,7 @@ public abstract class ReclaimableFilter<V> implements CheckedExceptionOperation<
 
   protected abstract String getBucketName(Table.KeyValue<String, V> keyValue) throws IOException;
 
-  protected abstract Boolean isReclaimable(Table.KeyValue<String, V> omKeyInfo) throws IOException;
+  protected abstract Boolean isReclaimable(Table.KeyValue<String, V> keyValue) throws IOException;
 
   @Override
   public void close() throws IOException {
@@ -201,8 +197,8 @@ public abstract class ReclaimableFilter<V> implements CheckedExceptionOperation<
     return previousOmSnapshots.get(index);
   }
 
-  protected OMMetadataManager getMetadataManager() {
-    return metadataManager;
+  protected KeyManager getKeyManager() {
+    return keyManager;
   }
 
   protected Long getVolumeId() {

@@ -26,6 +26,6 @@ package org.apache.hadoop.ozone.util;
  * <R> – the type of the result of the function
  * <E> - the type of exception thrown.
  */
-public interface CheckedExceptionOperation<T, R, E extends Exception> {
+public interface CheckedFunction<T, R, E extends Exception> {
   R apply(T t) throws E;
 }

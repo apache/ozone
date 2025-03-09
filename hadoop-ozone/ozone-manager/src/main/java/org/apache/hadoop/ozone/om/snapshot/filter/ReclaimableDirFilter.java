@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om.snapshot.filter;
 
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -40,17 +40,12 @@ public class ReclaimableDirFilter extends ReclaimableFilter<OmKeyInfo> {
   /**
    * Filter to return deleted directories which are reclaimable based on their presence in previous snapshot in
    * the snapshot chain.
-   *
-   * @param currentSnapshotInfo  : If null the deleted keys in AOS needs to be processed, hence the latest snapshot
-   *                             in the snapshot chain corresponding to bucket key needs to be processed.
-   * @param metadataManager      : MetadataManager corresponding to snapshot or AOS.
-   * @param lock                 : Lock for Active OM.
    */
   public ReclaimableDirFilter(OzoneManager ozoneManager,
                               OmSnapshotManager omSnapshotManager, SnapshotChainManager snapshotChainManager,
-                              SnapshotInfo currentSnapshotInfo, OMMetadataManager metadataManager,
+                              SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
                               IOzoneManagerLock lock) {
-    super(ozoneManager, omSnapshotManager, snapshotChainManager, currentSnapshotInfo, metadataManager, lock, 1);
+    super(ozoneManager, omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager, lock, 1);
   }
 
   @Override
@@ -66,33 +61,17 @@ public class ReclaimableDirFilter extends ReclaimableFilter<OmKeyInfo> {
   @Override
   protected Boolean isReclaimable(Table.KeyValue<String, OmKeyInfo> deletedDirInfo) throws IOException {
     ReferenceCounted<OmSnapshot> previousSnapshot = getPreviousOmSnapshot(0);
-    Table<String, OmDirectoryInfo> prevDirTable = previousSnapshot == null ? null :
-        previousSnapshot.get().getMetadataManager().getDirectoryTable();
-    return isDirReclaimable(deletedDirInfo.getValue(), getVolumeId(), getBucketInfo(), prevDirTable,
-        getMetadataManager().getSnapshotRenamedTable());
+    KeyManager prevKeyManager = previousSnapshot == null ? null : previousSnapshot.get().getKeyManager();
+    return isDirReclaimable(getVolumeId(), getBucketInfo(), deletedDirInfo.getValue(), getKeyManager(), prevKeyManager);
   }
 
-  private boolean isDirReclaimable(OmKeyInfo dirInfo,
-                                   long volumeId, OmBucketInfo bucketInfo,
-                                   Table<String, OmDirectoryInfo> previousDirTable,
-                                   Table<String, String> renamedTable) throws IOException {
-    if (previousDirTable == null) {
+  private boolean isDirReclaimable(long volumeId, OmBucketInfo bucketInfo, OmKeyInfo dirInfo,
+                                   KeyManager keyManager, KeyManager previousKeyManager) throws IOException {
+    if (previousKeyManager == null) {
       return true;
     }
-    String dbRenameKey = getOzoneManager().getMetadataManager().getRenameKey(
-        dirInfo.getVolumeName(), dirInfo.getBucketName(), dirInfo.getObjectID());
-
-    // snapshotRenamedTable: /volumeName/bucketName/objectID -> /volumeId/bucketId/parentId/dirName
-    String dbKeyBeforeRename = renamedTable.getIfExist(dbRenameKey);
-    String prevDbKey;
-    if (dbKeyBeforeRename != null) {
-      prevDbKey = dbKeyBeforeRename;
-    } else {
-      prevDbKey = getOzoneManager().getMetadataManager().getOzonePathKey(
-          volumeId, bucketInfo.getObjectID(), dirInfo.getParentObjectID(), dirInfo.getFileName());
-    }
-
-    OmDirectoryInfo prevDirectoryInfo = previousDirTable.get(prevDbKey);
+    OmDirectoryInfo prevDirectoryInfo =
+        keyManager.getPreviousSnapshotOzoneDirInfo(volumeId, bucketInfo, dirInfo).apply(previousKeyManager);
     return prevDirectoryInfo == null || prevDirectoryInfo.getObjectID() != dirInfo.getObjectID();
   }
 }

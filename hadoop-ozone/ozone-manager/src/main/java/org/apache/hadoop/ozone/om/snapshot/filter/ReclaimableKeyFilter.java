@@ -24,9 +24,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -50,14 +49,14 @@ public class ReclaimableKeyFilter extends ReclaimableFilter<OmKeyInfo> {
   /**
    * @param currentSnapshotInfo  : If null the deleted keys in AOS needs to be processed, hence the latest snapshot
    *                             in the snapshot chain corresponding to bucket key needs to be processed.
-   * @param metadataManager      : MetadataManager corresponding to snapshot or AOS.
+   * @param keyManager      : keyManager corresponding to snapshot or AOS.
    * @param lock                 : Lock for Active OM.
    */
   public ReclaimableKeyFilter(OzoneManager ozoneManager,
                               OmSnapshotManager omSnapshotManager, SnapshotChainManager snapshotChainManager,
-                              SnapshotInfo currentSnapshotInfo, OMMetadataManager metadataManager,
+                              SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
                               IOzoneManagerLock lock) {
-    super(ozoneManager, omSnapshotManager, snapshotChainManager, currentSnapshotInfo, metadataManager, lock, 2);
+    super(ozoneManager, omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager, lock, 2);
     this.exclusiveSizeMap = new HashMap<>();
     this.exclusiveReplicatedSizeMap = new HashMap<>();
   }
@@ -75,36 +74,30 @@ public class ReclaimableKeyFilter extends ReclaimableFilter<OmKeyInfo> {
   @Override
   protected Boolean isReclaimable(Table.KeyValue<String, OmKeyInfo> deletedKeyInfo) throws IOException {
     ReferenceCounted<OmSnapshot> previousSnapshot = getPreviousOmSnapshot(1);
-    ReferenceCounted<OmSnapshot> previousToPreviousSnapshot = getPreviousOmSnapshot(0);
 
-    AtomicReference<Table<String, OmKeyInfo>> previousKeyTable = new AtomicReference<>();
 
-    Table<String, String> renamedTable = getMetadataManager().getSnapshotRenamedTable();
-    AtomicReference<Table<String, String>> prevRenamedTable = new AtomicReference<>();
+    KeyManager previousKeyManager = Optional.ofNullable(previousSnapshot)
+        .map(i -> i.get().getKeyManager()).orElse(null);
 
-    if (previousSnapshot != null) {
-      previousKeyTable.set(previousSnapshot.get().getMetadataManager().getKeyTable(getBucketInfo().getBucketLayout()));
-      prevRenamedTable.set(previousSnapshot.get().getMetadataManager().getSnapshotRenamedTable());
-    }
 
     // Getting keyInfo from prev snapshot's keyTable/fileTable
     CheckedSupplier<Optional<OmKeyInfo>, IOException> previousKeyInfo =
-        MemoizedCheckedSupplier.valueOf(() -> getPreviousSnapshotKey(deletedKeyInfo.getValue(), getBucketInfo(),
-            getVolumeId(), renamedTable, previousKeyTable.get()));
+        MemoizedCheckedSupplier.valueOf(() -> getPreviousSnapshotKey(getVolumeId(), getBucketInfo(),
+            deletedKeyInfo.getValue(), getKeyManager(), previousKeyManager));
     // If file not present in previous snapshot then it won't be present in previous to previous snapshot either.
     if (!previousKeyInfo.get().isPresent()) {
       return true;
     }
 
-    AtomicReference<Table<String, OmKeyInfo>> previousPrevKeyTable = new AtomicReference<>();
-    if (previousToPreviousSnapshot != null) {
-      previousPrevKeyTable.set(previousToPreviousSnapshot.get().getMetadataManager()
-          .getKeyTable(getBucketInfo().getBucketLayout()));
-    }
+    ReferenceCounted<OmSnapshot> previousToPreviousSnapshot = getPreviousOmSnapshot(0);
+    KeyManager previousToPreviousKeyManager = Optional.ofNullable(previousToPreviousSnapshot)
+        .map(i -> i.get().getKeyManager()).orElse(null);
+
     // Getting keyInfo from prev to prev snapshot's keyTable/fileTable based on keyInfo of prev keyTable
     CheckedSupplier<Optional<OmKeyInfo>, IOException> previousPrevKeyInfo =
-        MemoizedCheckedSupplier.valueOf(() -> getPreviousSnapshotKey(previousKeyInfo.get().orElse(null),
-            getBucketInfo(), getVolumeId(), prevRenamedTable.get(), previousPrevKeyTable.get()));
+        MemoizedCheckedSupplier.valueOf(() -> getPreviousSnapshotKey(
+            getVolumeId(), getBucketInfo(), previousKeyInfo.get().orElse(null), previousKeyManager,
+            previousToPreviousKeyManager));
     SnapshotInfo previousSnapshotInfo = getPreviousSnapshotInfo(1);
     calculateExclusiveSize(previousSnapshotInfo, previousKeyInfo, previousPrevKeyInfo,
         exclusiveSizeMap, exclusiveReplicatedSizeMap);
@@ -150,40 +143,17 @@ public class ReclaimableKeyFilter extends ReclaimableFilter<OmKeyInfo> {
 
   }
 
-  private Optional<OmKeyInfo> getPreviousSnapshotKey(OmKeyInfo keyInfo, OmBucketInfo bucketInfo, long volumeId,
-                                                     Table<String, String> snapRenamedTable,
-                                                     Table<String, OmKeyInfo> previousKeyTable) throws IOException {
+  private Optional<OmKeyInfo> getPreviousSnapshotKey(long volumeId, OmBucketInfo bucketInfo,
+                                                     OmKeyInfo keyInfo, KeyManager keyManager,
+                                                     KeyManager previousKeyManager) throws IOException {
 
-    if (keyInfo == null || previousKeyTable == null) {
+    if (keyInfo == null || previousKeyManager == null) {
       return Optional.empty();
     }
-    String dbRenameKey = getOzoneManager().getMetadataManager().getRenameKey(
-        keyInfo.getVolumeName(),
-        keyInfo.getBucketName(),
-        keyInfo.getObjectID());
+    OmKeyInfo prevKeyInfo = keyManager.getPreviousSnapshotOzoneKeyInfo(volumeId, bucketInfo, keyInfo)
+        .apply(previousKeyManager);
 
-    String renamedKey = snapRenamedTable.getIfExist(dbRenameKey);
-    OmKeyInfo prevKeyInfo;
-
-    if (renamedKey == null) {
-      String dbKeyPrevSnap;
-      if (bucketInfo.getBucketLayout().isFileSystemOptimized()) {
-        dbKeyPrevSnap = getOzoneManager().getMetadataManager().getOzonePathKey(
-            volumeId,
-            bucketInfo.getObjectID(),
-            keyInfo.getParentObjectID(),
-            keyInfo.getFileName());
-      } else {
-        dbKeyPrevSnap = getOzoneManager().getMetadataManager().getOzoneKey(
-            keyInfo.getVolumeName(),
-            keyInfo.getBucketName(),
-            keyInfo.getKeyName());
-      }
-      prevKeyInfo = previousKeyTable.get(dbKeyPrevSnap);
-    } else {
-      prevKeyInfo = previousKeyTable.get(renamedKey);
-    }
-
+    // Check if objectIds are matching then the keys are the same.
     if (prevKeyInfo == null || prevKeyInfo.getObjectID() != keyInfo.getObjectID()) {
       return Optional.empty();
     }

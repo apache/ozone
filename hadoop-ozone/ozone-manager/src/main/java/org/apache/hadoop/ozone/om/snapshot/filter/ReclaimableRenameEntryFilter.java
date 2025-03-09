@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om.snapshot.filter;
 
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 
@@ -36,17 +37,12 @@ import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
  */
 public class ReclaimableRenameEntryFilter extends ReclaimableFilter<String> {
 
-  /**
-   * @param currentSnapshotInfo  : If null the deleted keys in AOS needs to be processed, hence the latest snapshot
-   *                             in the snapshot chain corresponding to bucket key needs to be processed.
-   * @param metadataManager      : MetadataManager corresponding to snapshot or AOS.
-   * @param lock                 : Lock for Active OM.
-   */
+
   public ReclaimableRenameEntryFilter(OzoneManager ozoneManager,
                                       OmSnapshotManager omSnapshotManager, SnapshotChainManager snapshotChainManager,
-                                      SnapshotInfo currentSnapshotInfo, OMMetadataManager metadataManager,
+                                      SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
                                       IOzoneManagerLock lock) {
-    super(ozoneManager, omSnapshotManager, snapshotChainManager, currentSnapshotInfo, metadataManager, lock, 1);
+    super(ozoneManager, omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager, lock, 1);
   }
 
   @Override
@@ -63,34 +59,26 @@ public class ReclaimableRenameEntryFilter extends ReclaimableFilter<String> {
 
   @Override
   protected String getVolumeName(Table.KeyValue<String, String> keyValue) throws IOException {
-    return getMetadataManager().splitRenameKey(keyValue.getKey())[0];
+    return getKeyManager().getMetadataManager().splitRenameKey(keyValue.getKey())[0];
   }
 
   @Override
   protected String getBucketName(Table.KeyValue<String, String> keyValue) throws IOException {
-    return getMetadataManager().splitRenameKey(keyValue.getKey())[1];
+    return getKeyManager().getMetadataManager().splitRenameKey(keyValue.getKey())[1];
   }
 
-  private boolean isRenameEntryReclaimable(Table.KeyValue<String, String> renameEntry,
-                                           Table<String, OmDirectoryInfo> previousDirTable,
-                                           Table<String, OmKeyInfo> prevKeyInfoTable) throws IOException {
-
-    if (previousDirTable == null && prevKeyInfoTable == null) {
-      return true;
-    }
-    String prevDbKey = renameEntry.getValue();
-
-
-    if (previousDirTable != null) {
-      OmDirectoryInfo prevDirectoryInfo = previousDirTable.getIfExist(prevDbKey);
-      if (prevDirectoryInfo != null) {
-        return false;
+  @SafeVarargs
+  private final boolean isRenameEntryReclaimable(Table.KeyValue<String, String> renameEntry,
+                                                 Table<String, ? extends WithObjectID>... previousTables)
+      throws IOException {
+    for (Table<String, ? extends  WithObjectID> previousTable : previousTables) {
+      if (previousTable != null) {
+        String prevDbKey = renameEntry.getValue();
+        WithObjectID withObjectID = previousTable.getIfExist(prevDbKey);
+        if (withObjectID != null) {
+          return false;
+        }
       }
-    }
-
-    if (prevKeyInfoTable != null) {
-      OmKeyInfo omKeyInfo = prevKeyInfoTable.getIfExist(prevDbKey);
-      return omKeyInfo == null;
     }
     return true;
   }
