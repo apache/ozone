@@ -598,7 +598,7 @@ public abstract class StorageVolume
       throws Exception {
     boolean directoryChecksPassed =
         DiskCheckUtil.checkExistence(storageDir) &&
-            DiskCheckUtil.checkPermissions(storageDir);
+        DiskCheckUtil.checkPermissions(storageDir);
     // If the directory is not present or has incorrect permissions, fail the
     // volume immediately. This is not an intermittent error.
     if (!directoryChecksPassed) {

@@ -286,7 +286,7 @@ public class TestStorageVolumeHealthChecks {
    *    should fail after the last IO check is completed.
    */
   private void testCheckIOUntilFailure(StorageVolume.Builder<?> builder,
-                                       int ioTestCount, int ioFailureTolerance, boolean... checkResults)
+      int ioTestCount, int ioFailureTolerance, boolean... checkResults)
       throws Exception {
     DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
     dnConf.setVolumeIOTestCount(ioTestCount);
@@ -300,12 +300,12 @@ public class TestStorageVolumeHealthChecks {
     for (int i = 0; i < checkResults.length; i++) {
       final boolean result = checkResults[i];
       final DiskCheckUtil.DiskChecks ioResult = new DiskCheckUtil.DiskChecks() {
-        @Override
-        public boolean checkReadWrite(File storageDir, File testDir,
-                                      int numBytesToWrite) {
-          return result;
-        }
-      };
+            @Override
+            public boolean checkReadWrite(File storageDir, File testDir,
+                int numBytesToWrite) {
+              return result;
+            }
+          };
       DiskCheckUtil.setTestImpl(ioResult);
       if (i < checkResults.length - 1) {
         assertEquals(VolumeCheckResult.HEALTHY, volume.check(false),
