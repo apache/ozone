@@ -51,7 +51,7 @@ public class TestBlockInputStreamFactoryImpl {
   private OzoneConfiguration conf = new OzoneConfiguration();
 
   @Test
-  @SuppressWarnings("java:S1854")
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   public void testNonECGivesBlockInputStream() throws IOException {
     BlockInputStreamFactory factory = new BlockInputStreamFactoryImpl();
     ReplicationConfig repConfig =

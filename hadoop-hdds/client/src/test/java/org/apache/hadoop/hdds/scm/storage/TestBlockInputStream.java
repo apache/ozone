@@ -293,7 +293,7 @@ public class TestBlockInputStream {
 
   @ParameterizedTest
   @MethodSource("exceptionsTriggersRefresh")
-  @SuppressWarnings("java:S1854")
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   void refreshesPipelineOnReadFailure(IOException ex) throws Exception {
     // GIVEN
     Pipeline pipeline = MockPipeline.createSingleNodePipeline();
@@ -407,7 +407,7 @@ public class TestBlockInputStream {
 
   @ParameterizedTest
   @MethodSource("exceptionsTriggersRefresh")
-  @SuppressWarnings("java:S1854")
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   public void testRefreshOnReadFailureAfterUnbuffer(IOException ex)
       throws Exception {
     // GIVEN
