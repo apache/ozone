@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -54,7 +55,7 @@ public class TestOzoneAclUtil {
   @Test
   public void testAddAcl() throws IOException {
     List<OzoneAcl> currentAcls = getDefaultAcls();
-    assertTrue(!currentAcls.isEmpty());
+    assertFalse(currentAcls.isEmpty());
 
     // Add new permission to existing acl entry.
     OzoneAcl oldAcl = currentAcls.get(0);
@@ -86,7 +87,7 @@ public class TestOzoneAclUtil {
     removeAndVerifyAcl(currentAcls, USER1, false, 0);
 
     currentAcls = getDefaultAcls();
-    assertTrue(!currentAcls.isEmpty());
+    assertFalse(currentAcls.isEmpty());
 
     // Add new permission to existing acl entru.
     OzoneAcl oldAcl = currentAcls.get(0);
