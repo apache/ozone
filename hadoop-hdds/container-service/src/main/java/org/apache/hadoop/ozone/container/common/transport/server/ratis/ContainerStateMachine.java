@@ -49,6 +49,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -301,8 +302,8 @@ public class ContainerStateMachine extends BaseStateMachine {
     this.waitOnBothFollowers = conf.getObject(
         DatanodeConfiguration.class).waitOnAllFollowers();
 
-    this.writeChunkWaitMaxMs = conf.getLong(ScmConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL,
-        ScmConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL_DEFAULT);
+    this.writeChunkWaitMaxMs = conf.getTimeDuration(ScmConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL,
+        ScmConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
   }
 
   private void validatePeers() throws IOException {

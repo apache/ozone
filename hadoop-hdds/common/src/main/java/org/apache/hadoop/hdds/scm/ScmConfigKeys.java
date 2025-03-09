@@ -634,7 +634,7 @@ public final class ScmConfigKeys {
       "net.topology.node.switch.mapping.impl";
   public static final String HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL
       = "hdds.container.ratis.statemachine.write.wait.interval";
-  public static final long HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL_DEFAULT = 10 * 1000L;
+  public static final long HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL_DEFAULT = 10 * 60 * 1000L;
   /**
    * Never constructed.
    */
