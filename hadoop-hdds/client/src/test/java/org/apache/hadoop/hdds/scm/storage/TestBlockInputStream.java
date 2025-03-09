@@ -293,14 +293,15 @@ public class TestBlockInputStream {
 
   @ParameterizedTest
   @MethodSource("exceptionsTriggersRefresh")
+  @SuppressWarnings("java:S1854")
   void refreshesPipelineOnReadFailure(IOException ex) throws Exception {
     // GIVEN
     Pipeline pipeline = MockPipeline.createSingleNodePipeline();
     BlockLocationInfo blockLocationInfo = mock(BlockLocationInfo.class);
-    doReturn(pipeline).when(blockLocationInfo).getPipeline();
     Pipeline newPipeline = MockPipeline.createSingleNodePipeline();
     BlockLocationInfo newBlockLocationInfo = mock(BlockLocationInfo.class);
 
+    doReturn(pipeline).when(blockLocationInfo).getPipeline();
     testRefreshesPipelineOnReadFailure(ex, blockLocationInfo,
         id -> newBlockLocationInfo);
 
@@ -406,6 +407,7 @@ public class TestBlockInputStream {
 
   @ParameterizedTest
   @MethodSource("exceptionsTriggersRefresh")
+  @SuppressWarnings("java:S1854")
   public void testRefreshOnReadFailureAfterUnbuffer(IOException ex)
       throws Exception {
     // GIVEN
