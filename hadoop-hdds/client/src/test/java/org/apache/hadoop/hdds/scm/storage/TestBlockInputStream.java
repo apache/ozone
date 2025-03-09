@@ -293,7 +293,7 @@ public class TestBlockInputStream {
 
   @ParameterizedTest
   @MethodSource("exceptionsTriggersRefresh")
-  @SuppressWarnings("ResultOfMethodCallIgnored")
+  @SuppressWarnings("java:S2201")
   void refreshesPipelineOnReadFailure(IOException ex) throws Exception {
     // GIVEN
     Pipeline pipeline = MockPipeline.createSingleNodePipeline();
@@ -407,7 +407,7 @@ public class TestBlockInputStream {
 
   @ParameterizedTest
   @MethodSource("exceptionsTriggersRefresh")
-  @SuppressWarnings("ResultOfMethodCallIgnored")
+  @SuppressWarnings("java:S2201")
   public void testRefreshOnReadFailureAfterUnbuffer(IOException ex)
       throws Exception {
     // GIVEN
