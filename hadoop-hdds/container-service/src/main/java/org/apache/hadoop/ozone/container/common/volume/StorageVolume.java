@@ -103,8 +103,7 @@ public abstract class StorageVolume
     NON_EXISTENT,
     INCONSISTENT,
     NOT_FORMATTED,
-    NOT_INITIALIZED,
-    READ_ONLY
+    NOT_INITIALIZED
   }
 
   private volatile VolumeState state;
@@ -597,13 +596,12 @@ public abstract class StorageVolume
   @Override
   public synchronized VolumeCheckResult check(@Nullable Boolean unused)
       throws Exception {
-    DiskCheckUtil.ReadWriteStatus readWriteStatus = DiskCheckUtil.checkPermissions(storageDir);
-
     boolean directoryChecksPassed =
-        DiskCheckUtil.checkExistence(storageDir);
+        DiskCheckUtil.checkExistence(storageDir) &&
+            DiskCheckUtil.checkPermissions(storageDir);
     // If the directory is not present or has incorrect permissions, fail the
     // volume immediately. This is not an intermittent error.
-    if (!directoryChecksPassed || readWriteStatus == DiskCheckUtil.ReadWriteStatus.READ_FAIL) {
+    if (!directoryChecksPassed) {
       if (Thread.currentThread().isInterrupted()) {
         throw new InterruptedException("Directory check of volume " + this +
             " interrupted.");
@@ -611,25 +609,24 @@ public abstract class StorageVolume
       return VolumeCheckResult.FAILED;
     }
 
-    if (readWriteStatus == DiskCheckUtil.ReadWriteStatus.WRITE_FAIL) {
-      setState(VolumeState.READ_ONLY);
-      return VolumeCheckResult.HEALTHY;
-    }
-
     // If IO test count is set to 0, IO tests for disk health are disabled.
     if (ioTestCount == 0) {
       return VolumeCheckResult.HEALTHY;
     }
 
-    // Since IO errors may be intermittent, volume remains healthy until the
-    // threshold of failures is crossed.
-    readWriteStatus = DiskCheckUtil.checkReadWrite(storageDir,
-        diskCheckDir, healthCheckFileSize);
-    if (readWriteStatus == DiskCheckUtil.ReadWriteStatus.WRITE_FAIL) {
-      // Mark volume as READ only
-      setState(VolumeState.READ_ONLY);
+    // At least some space required to check disk read/write
+    // If there are not enough space remaining,
+    // to avoid volume failure we can ignore checking disk read/write
+    int hundredMB = 100 * 1024 * 1024;
+    int minimumDiskSpace = Math.max(healthCheckFileSize * 10, hundredMB);
+    if (volumeInfo.get().getCurrentUsage().getAvailable() < minimumDiskSpace) {
       return VolumeCheckResult.HEALTHY;
     }
+
+    // Since IO errors may be intermittent, volume remains healthy until the
+    // threshold of failures is crossed.
+    boolean diskChecksPassed = DiskCheckUtil.checkReadWrite(storageDir,
+        diskCheckDir, healthCheckFileSize);
     if (Thread.currentThread().isInterrupted()) {
       // Thread interrupt may have caused IO operations to abort. Do not
       // consider this a failure.
@@ -637,7 +634,13 @@ public abstract class StorageVolume
           " interrupted.");
     }
 
-    boolean diskChecksPassed = readWriteStatus == DiskCheckUtil.ReadWriteStatus.READ_WRITE_OK;
+    // As WRITE keeps happening there is probability, disk has become full during above check.
+    // We can check again if disk is full. If it is full,
+    // in this case keep volume as healthy so that READ can still be served
+    if (!diskChecksPassed && volumeInfo.get().getCurrentUsage().getAvailable() < minimumDiskSpace) {
+      return VolumeCheckResult.HEALTHY;
+    }
+
     // Move the sliding window of IO test results forward 1 by adding the
     // latest entry and removing the oldest entry from the window.
     // Update the failure counter for the new window.
@@ -650,7 +653,8 @@ public abstract class StorageVolume
       currentIOFailureCount.decrementAndGet();
     }
 
-    // If the failure threshold has been crossed, mark volume as READ only
+    // If the failure threshold has been crossed, fail the volume without
+    // further scans.
     // Once the volume is failed, it will not be checked anymore.
     // The failure counts can be left as is.
     if (currentIOFailureCount.get() > ioFailureTolerance) {

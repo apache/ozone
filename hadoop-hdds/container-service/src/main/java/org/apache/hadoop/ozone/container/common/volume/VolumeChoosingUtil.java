@@ -40,8 +40,8 @@ final class VolumeChoosingUtil {
 
   static void logIfSomeVolumesOutOfSpace(AvailableSpaceFilter filter,
       Logger log) {
-    if (log.isDebugEnabled() && filter.excludedSomeVolumes()) {
-      log.debug("Some volumes cannot host new containers; {}",
+    if (log.isDebugEnabled() && filter.foundFullVolumes()) {
+      log.debug("Some volumes do not have enough space for a new container; {}",
           filter);
     }
   }

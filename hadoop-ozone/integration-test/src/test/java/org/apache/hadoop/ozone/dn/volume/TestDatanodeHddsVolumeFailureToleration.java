@@ -150,6 +150,5 @@ public class TestDatanodeHddsVolumeFailureToleration {
     // restore bad volumes
     DatanodeTestUtils.restoreBadRootDir(volRootDir0);
     DatanodeTestUtils.restoreBadRootDir(volRootDir1);
-    cluster.restartHddsDatanode(0, false);
   }
 }

@@ -17,9 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
@@ -33,8 +31,6 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
   private final long requiredSpace;
   private final Map<HddsVolume, AvailableSpace> fullVolumes =
       new HashMap<>();
-
-  private final List<HddsVolume> readOnlyVolumes = new ArrayList<>();
   private long mostAvailableSpace = Long.MIN_VALUE;
 
   AvailableSpaceFilter(long requiredSpace) {
@@ -43,10 +39,6 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
 
   @Override
   public boolean test(HddsVolume vol) {
-    if (vol.getStorageState() == StorageVolume.VolumeState.READ_ONLY) {
-      readOnlyVolumes.add(vol);
-      return false;
-    }
     SpaceUsageSource usage = vol.getCurrentUsage();
     long volumeCapacity = usage.getCapacity();
     long free = usage.getAvailable();
@@ -66,8 +58,8 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
     return hasEnoughSpace;
   }
 
-  boolean excludedSomeVolumes() {
-    return !fullVolumes.isEmpty() || !readOnlyVolumes.isEmpty();
+  boolean foundFullVolumes() {
+    return !fullVolumes.isEmpty();
   }
 
   long mostAvailableSpace() {
@@ -77,8 +69,7 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
   @Override
   public String toString() {
     return "required space: " + requiredSpace +
-        ", full volumes: " + fullVolumes +
-        ", read-only volumes:" + readOnlyVolumes;
+        ", volumes: " + fullVolumes;
   }
 
   private static class AvailableSpace {

@@ -186,7 +186,7 @@ public final class DatanodeTestUtils {
    */
   public static void simulateBadRootDir(File rootDir) {
     if (rootDir.exists()) {
-      rootDir.setReadable(false);
+      rootDir.setWritable(false);
     }
   }
 
@@ -207,7 +207,7 @@ public final class DatanodeTestUtils {
    */
   public static void restoreBadRootDir(File rootDir) {
     if (rootDir.exists()) {
-      rootDir.setReadable(true);
+      rootDir.setWritable(true);
     }
   }
 

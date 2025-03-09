@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.common.utils;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -44,21 +43,21 @@ public class TestDiskCheckUtil {
     assertTrue(testDir.canRead());
     assertTrue(testDir.canWrite());
     assertTrue(testDir.canExecute());
-    assertSame(DiskCheckUtil.checkPermissions(testDir), DiskCheckUtil.ReadWriteStatus.READ_WRITE_OK);
+    assertTrue(DiskCheckUtil.checkPermissions(testDir));
 
     // Test failure without read permissiosns.
     assertTrue(testDir.setReadable(false));
-    assertSame(DiskCheckUtil.checkPermissions(testDir), DiskCheckUtil.ReadWriteStatus.READ_FAIL);
+    assertFalse(DiskCheckUtil.checkPermissions(testDir));
     assertTrue(testDir.setReadable(true));
 
     // Test failure without write permissiosns.
     assertTrue(testDir.setWritable(false));
-    assertSame(DiskCheckUtil.checkPermissions(testDir), DiskCheckUtil.ReadWriteStatus.WRITE_FAIL);
+    assertFalse(DiskCheckUtil.checkPermissions(testDir));
     assertTrue(testDir.setWritable(true));
 
     // Test failure without execute permissiosns.
     assertTrue(testDir.setExecutable(false));
-    assertSame(DiskCheckUtil.checkPermissions(testDir), DiskCheckUtil.ReadWriteStatus.READ_FAIL);
+    assertFalse(DiskCheckUtil.checkPermissions(testDir));
     assertTrue(testDir.setExecutable(true));
   }
 
@@ -74,8 +73,7 @@ public class TestDiskCheckUtil {
 
   @Test
   public void testReadWrite() {
-    assertSame(DiskCheckUtil.checkReadWrite(testDir, testDir, 10),
-        DiskCheckUtil.ReadWriteStatus.READ_WRITE_OK);
+    assertTrue(DiskCheckUtil.checkReadWrite(testDir, testDir, 10));
 
     // Test file should have been deleted.
     File[] children = testDir.listFiles();
