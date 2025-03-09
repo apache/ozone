@@ -19,6 +19,9 @@ package org.apache.hadoop.ozone.s3.signature;
 
 import static java.time.temporal.ChronoUnit.SECONDS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_UNSIGNED_PAYLOAD_TRAILER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.UnsupportedEncodingException;
@@ -53,14 +56,12 @@ import org.slf4j.LoggerFactory;
  */
 public final class StringToSignProducer {
 
-  public static final String X_AMZ_CONTENT_SHA256 = "x-amz-content-sha256";
   public static final String X_AMAZ_DATE = "x-amz-date";
   private static final Logger LOG =
       LoggerFactory.getLogger(StringToSignProducer.class);
   private static final Charset UTF_8 = StandardCharsets.UTF_8;
   private static final String NEWLINE = "\n";
   public static final String HOST = "host";
-  private static final String UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
   /**
    * Seconds in a week, which is the max expiration time Sig-v4 accepts.
    */
@@ -201,8 +202,9 @@ public final class StringToSignProducer {
         unsignedPayload);
 
     String payloadHash;
-    if (UNSIGNED_PAYLOAD.equals(
-        headers.get(X_AMZ_CONTENT_SHA256)) || unsignedPayload) {
+    if (UNSIGNED_PAYLOAD.equals(headers.get(X_AMZ_CONTENT_SHA256)) ||
+        STREAMING_UNSIGNED_PAYLOAD_TRAILER.equals(headers.get(X_AMZ_CONTENT_SHA256)) ||
+        unsignedPayload) {
       payloadHash = UNSIGNED_PAYLOAD;
     } else {
       // According to AWS Sig V4 documentation
