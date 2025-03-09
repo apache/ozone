@@ -51,7 +51,6 @@ public class TestBlockInputStreamFactoryImpl {
   private OzoneConfiguration conf = new OzoneConfiguration();
 
   @Test
-  @SuppressWarnings("java:S2201")
   public void testNonECGivesBlockInputStream() throws IOException {
     BlockInputStreamFactory factory = new BlockInputStreamFactoryImpl();
     ReplicationConfig repConfig =

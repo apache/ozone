@@ -40,7 +40,6 @@ import org.apache.hadoop.security.token.Token;
  * A dummy BlockInputStream with pipeline refresh function to mock read
  * block call to DN.
  */
-@SuppressWarnings("java:S2201")
 final class DummyBlockInputStreamWithRetry
     extends DummyBlockInputStream {
 
