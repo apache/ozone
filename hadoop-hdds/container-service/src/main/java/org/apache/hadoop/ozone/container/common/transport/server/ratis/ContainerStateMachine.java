@@ -45,6 +45,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -190,18 +191,18 @@ public class ContainerStateMachine extends BaseStateMachine {
   }
 
   static class WriteFutureContext {
-    private final CompletableFuture<ContainerCommandResponseProto> writeChunkFuture;
+    private final Future<ContainerCommandResponseProto> writeChunkFuture;
     private final CompletableFuture<Message> raftFuture;
     private final long startTime;
 
-    WriteFutureContext(CompletableFuture<ContainerCommandResponseProto> writeChunkFuture,
+    WriteFutureContext(Future<ContainerCommandResponseProto> writeChunkFuture,
                        CompletableFuture<Message> raftFuture, long startTime) {
       this.writeChunkFuture = writeChunkFuture;
       this.raftFuture = raftFuture;
       this.startTime = startTime;
     }
 
-    public CompletableFuture<ContainerCommandResponseProto> getWriteChunkFuture() {
+    public Future<ContainerCommandResponseProto> getWriteChunkFuture() {
       return writeChunkFuture;
     }
 
@@ -576,7 +577,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       return writeChunkFutureMap.get(entryIndex).getRaftFuture();
     }
     try {
-      validateLongRunningWrite(entryIndex);
+      validateLongRunningWrite();
     } catch (IOException e) {
       return completeExceptionally(e);
     }
@@ -602,82 +603,85 @@ public class ContainerStateMachine extends BaseStateMachine {
             .setContainer2BCSIDMap(container2BCSIDMap)
             .build();
     CompletableFuture<Message> raftFuture = new CompletableFuture<>();
-    // ensure the write chunk happens asynchronously in writeChunkExecutor pool
-    // thread.
-    CompletableFuture<ContainerCommandResponseProto> writeChunkFuture =
-        CompletableFuture.supplyAsync(() -> {
-          try {
-            try {
-              checkContainerHealthy(write.getBlockID().getContainerID(), true);
-            } catch (StorageContainerException e) {
-              return ContainerUtils.logAndReturnError(LOG, e, requestProto);
-            }
-            metrics.recordWriteStateMachineQueueingLatencyNs(
-                Time.monotonicNowNanos() - startTime);
-            return dispatchCommand(requestProto, context);
-          } catch (Exception e) {
-            LOG.error("{}: writeChunk writeStateMachineData failed: blockId" +
+    // ensure the write chunk happens asynchronously in writeChunkExecutor pool thread.
+    Future<ContainerCommandResponseProto> future = getChunkExecutor(requestProto.getWriteChunk()).submit(() -> {
+      try {
+        try {
+          checkContainerHealthy(write.getBlockID().getContainerID(), true);
+        } catch (StorageContainerException e) {
+          ContainerCommandResponseProto result = ContainerUtils.logAndReturnError(LOG, e, requestProto);
+          handleCommandResult(requestProto, entryIndex, startTime, result, write, raftFuture);
+          return result;
+        }
+        metrics.recordWriteStateMachineQueueingLatencyNs(
+            Time.monotonicNowNanos() - startTime);
+        ContainerCommandResponseProto result = dispatchCommand(requestProto, context);
+        handleCommandResult(requestProto, entryIndex, startTime, result, write, raftFuture);
+        return result;
+      } catch (Exception e) {
+        LOG.error("{}: writeChunk writeStateMachineData failed: blockId" +
                 "{} logIndex {} chunkName {}", getGroupId(), write.getBlockID(),
-                entryIndex, write.getChunkData().getChunkName(), e);
-            metrics.incNumWriteDataFails();
-            // write chunks go in parallel. It's possible that one write chunk
-            // see the stateMachine is marked unhealthy by other parallel thread
-            unhealthyContainers.add(write.getBlockID().getContainerID());
-            stateMachineHealthy.set(false);
-            raftFuture.completeExceptionally(e);
-            throw e;
-          }
-        }, getChunkExecutor(requestProto.getWriteChunk()));
+            entryIndex, write.getChunkData().getChunkName(), e);
+        metrics.incNumWriteDataFails();
+        // write chunks go in parallel. It's possible that one write chunk
+        // see the stateMachine is marked unhealthy by other parallel thread
+        unhealthyContainers.add(write.getBlockID().getContainerID());
+        stateMachineHealthy.set(false);
+        raftFuture.completeExceptionally(e);
+        throw e;
+      } finally {
+        // Remove the future once it finishes execution from the
+        writeChunkFutureMap.remove(entryIndex);
+      }
+    });
 
-    writeChunkFutureMap.put(entryIndex, new WriteFutureContext(writeChunkFuture, raftFuture, startTime));
+    writeChunkFutureMap.put(entryIndex, new WriteFutureContext(future, raftFuture, startTime));
     if (LOG.isDebugEnabled()) {
       LOG.debug("{}: writeChunk writeStateMachineData : blockId" +
               "{} logIndex {} chunkName {}", getGroupId(), write.getBlockID(),
           entryIndex, write.getChunkData().getChunkName());
     }
-    // Remove the future once it finishes execution from the
-    // writeChunkFutureMap.
-    writeChunkFuture.thenApply(r -> {
-      if (r.getResult() != ContainerProtos.Result.SUCCESS
-          && r.getResult() != ContainerProtos.Result.CONTAINER_NOT_OPEN
-          && r.getResult() != ContainerProtos.Result.CLOSED_CONTAINER_IO
-          // After concurrent flushes are allowed on the same key, chunk file inconsistencies can happen and
-          // that should not crash the pipeline.
-          && r.getResult() != ContainerProtos.Result.CHUNK_FILE_INCONSISTENCY) {
-        StorageContainerException sce =
-            new StorageContainerException(r.getMessage(), r.getResult());
-        LOG.error(getGroupId() + ": writeChunk writeStateMachineData failed: blockId" +
-            write.getBlockID() + " logIndex " + entryIndex + " chunkName " +
-            write.getChunkData().getChunkName() + " Error message: " +
-            r.getMessage() + " Container Result: " + r.getResult());
-        metrics.incNumWriteDataFails();
-        // If the write fails currently we mark the stateMachine as unhealthy.
-        // This leads to pipeline close. Any change in that behavior requires
-        // handling the entry for the write chunk in cache.
-        stateMachineHealthy.set(false);
-        unhealthyContainers.add(write.getBlockID().getContainerID());
-        raftFuture.completeExceptionally(sce);
-      } else {
-        metrics.incNumBytesWrittenCount(
-            requestProto.getWriteChunk().getChunkData().getLen());
-        if (LOG.isDebugEnabled()) {
-          LOG.debug(getGroupId() +
-              ": writeChunk writeStateMachineData  completed: blockId" +
-              write.getBlockID() + " logIndex " + entryIndex + " chunkName " +
-              write.getChunkData().getChunkName());
-        }
-        raftFuture.complete(r::toByteString);
-        metrics.recordWriteStateMachineCompletionNs(
-            Time.monotonicNowNanos() - startTime);
-      }
-
-      writeChunkFutureMap.remove(entryIndex);
-      return r;
-    });
     return raftFuture;
   }
 
-  private void validateLongRunningWrite(long currIndex) throws IOException {
+  private void handleCommandResult(ContainerCommandRequestProto requestProto, long entryIndex, long startTime,
+                                   ContainerCommandResponseProto r, WriteChunkRequestProto write,
+                                   CompletableFuture<Message> raftFuture) {
+    if (r.getResult() != ContainerProtos.Result.SUCCESS
+        && r.getResult() != ContainerProtos.Result.CONTAINER_NOT_OPEN
+        && r.getResult() != ContainerProtos.Result.CLOSED_CONTAINER_IO
+        // After concurrent flushes are allowed on the same key, chunk file inconsistencies can happen and
+        // that should not crash the pipeline.
+        && r.getResult() != ContainerProtos.Result.CHUNK_FILE_INCONSISTENCY) {
+      StorageContainerException sce =
+          new StorageContainerException(r.getMessage(), r.getResult());
+      LOG.error(getGroupId() + ": writeChunk writeStateMachineData failed: blockId" +
+          write.getBlockID() + " logIndex " + entryIndex + " chunkName " +
+          write.getChunkData().getChunkName() + " Error message: " +
+          r.getMessage() + " Container Result: " + r.getResult());
+      metrics.incNumWriteDataFails();
+      // If the write fails currently we mark the stateMachine as unhealthy.
+      // This leads to pipeline close. Any change in that behavior requires
+      // handling the entry for the write chunk in cache.
+      stateMachineHealthy.set(false);
+      unhealthyContainers.add(write.getBlockID().getContainerID());
+      raftFuture.completeExceptionally(sce);
+    } else {
+      metrics.incNumBytesWrittenCount(
+          requestProto.getWriteChunk().getChunkData().getLen());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(getGroupId() +
+            ": writeChunk writeStateMachineData  completed: blockId" +
+            write.getBlockID() + " logIndex " + entryIndex + " chunkName " +
+            write.getChunkData().getChunkName());
+      }
+      raftFuture.complete(r::toByteString);
+      metrics.recordWriteStateMachineCompletionNs(
+          Time.monotonicNowNanos() - startTime);
+    }
+  }
+
+  private void validateLongRunningWrite() throws IOException {
     // get min valid write chunk operation's future context
     Map.Entry<Long, WriteFutureContext> longWriteFutureContextEntry = writeChunkFutureMap.firstEntry();
     if (null == longWriteFutureContextEntry) {
@@ -880,7 +884,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   public CompletableFuture<Void> flush(long index) {
     return CompletableFuture.allOf(
         writeChunkFutureMap.entrySet().stream().filter(x -> x.getKey() <= index)
-            .map(e -> e.getValue().getWriteChunkFuture()).toArray(CompletableFuture[]::new));
+            .map(e -> e.getValue().getRaftFuture()).toArray(CompletableFuture[]::new));
   }
 
   /**
