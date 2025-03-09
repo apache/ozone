@@ -348,13 +348,14 @@ public class AbstractContainerReportHandler {
       // HDDS-12421: If a DELETING or DELETED container has a non-empty replica, transition the container to CLOSED
       boolean replicaStateAllowed = (replica.getState() != State.INVALID && replica.getState() != State.DELETED);
       if (!replicaIsEmpty && replicaStateAllowed) {
-        getLogger().info("transitionDeletingToClosed for non-empty CLOSED replica (keyCount={}) for {}",
+        getLogger().info("transitionDeletingToClosed due to non-empty CLOSED replica (keyCount={}) for {}",
             replica.getKeyCount(), detailsForLogging);
         containerManager.transitionDeletingOrDeletedToClosedState(containerId);
       }
       return false;
     default:
-      getLogger().warn("Unprocessed state {}", container.getState());
+      getLogger().error("Replica not processed due to container state {}: {}",
+          container.getState(), detailsForLogging);
       return false;
     }
   }

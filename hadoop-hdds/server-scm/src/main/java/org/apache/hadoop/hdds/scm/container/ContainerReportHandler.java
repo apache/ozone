@@ -227,7 +227,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
     if (container == null) {
       if (unknownContainerHandleAction.equals(
           UNKNOWN_CONTAINER_ACTION_WARN)) {
-        getLogger().error("Received report for {}", detailsForLogging);
+        getLogger().error("CONTAINER_NOT_FOUND for {}", detailsForLogging);
       } else if (unknownContainerHandleAction.equals(
           UNKNOWN_CONTAINER_ACTION_DELETE)) {
         final ContainerID containerId = ContainerID
@@ -240,7 +240,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
       processContainerReplica(
           datanodeDetails, container, replicaProto, publisher);
     } catch (IOException | InvalidStateTransitionException e) {
-      getLogger().error("Failed to process report for {}", detailsForLogging, e);
+      getLogger().error("Failed to process {}", detailsForLogging, e);
     }
   }
 
