@@ -86,7 +86,6 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
       // Already committed bytes increased above, so required space is not required here in AvailableSpaceFilter
       AvailableSpaceFilter filter = new AvailableSpaceFilter(0);
       if (!filter.test(targetVolume)) {
-        targetVolume.incCommittedBytes(-containerSize * 2);
         LOG.warn("Container {} replication was unsuccessful, due to no space left", containerID);
         task.setStatus(Status.FAILED);
         return;
