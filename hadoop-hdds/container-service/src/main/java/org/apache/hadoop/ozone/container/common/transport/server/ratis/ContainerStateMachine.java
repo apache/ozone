@@ -688,7 +688,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     while (!writeChunkFutureMap.isEmpty()) {
       writeFutureContextEntry = writeChunkFutureMap.firstEntry();
       // there is a possibility of entry being removed before added in map, cleanup those
-      if (!writeFutureContextEntry.getValue().getWriteChunkFuture().isDone()) {
+      if (null == writeFutureContextEntry || !writeFutureContextEntry.getValue().getWriteChunkFuture().isDone()) {
         break;
       }
       writeChunkFutureMap.remove(writeFutureContextEntry.getKey());
