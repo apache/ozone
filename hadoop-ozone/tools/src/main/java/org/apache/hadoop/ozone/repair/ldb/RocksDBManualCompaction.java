@@ -15,16 +15,17 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.repair;
+package org.apache.hadoop.ozone.repair.ldb;
 
-import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
+import org.apache.hadoop.ozone.repair.RepairTool;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
@@ -35,7 +36,8 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(
     name = "compact",
-    description = "CLI to compact a table in the DB.",
+    description = "CLI to compact a column-family in the DB. " +
+        "Note: If om.db is compacted then it will impact efficient snapshot diff.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
@@ -48,7 +50,7 @@ public class RocksDBManualCompaction extends RepairTool {
 
   @CommandLine.Option(names = {"--column_family", "--column-family", "--cf"},
       required = true,
-      description = "Table name")
+      description = "Column family name")
   private String columnFamilyName;
 
   @Override
@@ -64,32 +66,20 @@ public class RocksDBManualCompaction extends RepairTool {
             " is not in a column family in DB for the given path.");
       }
 
-      info("Running compaction on " + (columnFamilyName == null ? "entire DB" : columnFamilyName));
-
+      info("Running compaction on " + columnFamilyName);
       if (!isDryRun()) {
-        db.get().compactRange(cfh);
-        info("Compaction completed.");
+        ManagedCompactRangeOptions compactOptions = new ManagedCompactRangeOptions();
+        compactOptions.setBottommostLevelCompaction(ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
+        db.get().compactRange(cfh, null, null, compactOptions);
       }
+      info("Compaction completed.");
+
     } catch (RocksDBException exception) {
       error("Failed to compact the RocksDB for the given path: %s, column-family:%s", dbPath, columnFamilyName);
       error("Exception: " + exception);
       throw new IOException("Failed to compact RocksDB.", exception);
     } finally {
       IOUtils.closeQuietly(cfHandleList);
-    }
-  }
-
-  @Override
-  @Nonnull
-  protected Component serviceToBeOffline() {
-    final String parent = spec().parent().name();
-    switch (parent) {
-    case "om":
-      return Component.OM;
-    case "scm":
-      return Component.SCM;
-    default:
-      throw new IllegalStateException("Unknown component: " + parent);
     }
   }
 }

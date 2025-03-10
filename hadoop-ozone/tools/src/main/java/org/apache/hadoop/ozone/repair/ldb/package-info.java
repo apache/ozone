@@ -15,25 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.repair.scm;
-
-import org.apache.hadoop.hdds.cli.RepairSubcommand;
-import org.apache.hadoop.ozone.repair.TransactionInfoRepair;
-import org.apache.hadoop.ozone.repair.scm.cert.CertRepair;
-import org.kohsuke.MetaInfServices;
-import picocli.CommandLine;
-
 /**
- * Ozone Repair CLI for SCM.
+ * OM related repair tools.
  */
-@CommandLine.Command(name = "scm",
-    description = "Operational tool to repair SCM.",
-    subcommands = {
-        CertRepair.class,
-        TransactionInfoRepair.class
-    }
-)
-@MetaInfServices(RepairSubcommand.class)
-public class SCMRepair implements RepairSubcommand {
-
-}
+package org.apache.hadoop.ozone.repair.ldb;
