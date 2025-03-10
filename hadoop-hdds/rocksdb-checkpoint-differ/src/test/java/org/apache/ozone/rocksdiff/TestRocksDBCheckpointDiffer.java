@@ -26,11 +26,11 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT;
 import static org.apache.hadoop.util.Time.now;
-import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
-import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COMPACTION_LOG_FILE_NAME_SUFFIX;
-import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_DAG_LIVE_NODES;
-import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_READ_ALL_DB_KEYS;
-import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.SST_FILE_EXTENSION;
+import static org.apache.ozone.compaction.log.RocksDBConsts.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
+import static org.apache.ozone.compaction.log.RocksDBConsts.COMPACTION_LOG_FILE_NAME_SUFFIX;
+import static org.apache.ozone.compaction.log.RocksDBConsts.DEBUG_DAG_LIVE_NODES;
+import static org.apache.ozone.compaction.log.RocksDBConsts.DEBUG_READ_ALL_DB_KEYS;
+import static org.apache.ozone.compaction.log.RocksDBConsts.SST_FILE_EXTENSION;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -579,10 +579,11 @@ public class TestRocksDBCheckpointDiffer {
       if (compactionLog != null) {
         // Construct DAG from compaction log input
         Arrays.stream(compactionLog.split("\n")).forEach(
-            rocksDBCheckpointDiffer::processCompactionLogLine);
+            rocksDBCheckpointDiffer.getPopulateCompactionTable()::processCompactionLogLine);
       } else if (compactionLogEntries != null) {
         compactionLogEntries.forEach(entry ->
-            rocksDBCheckpointDiffer.addToCompactionLogTable(entry));
+            rocksDBCheckpointDiffer.getPopulateCompactionTable()
+                .addToCompactionLogTable(entry, activeRocksDB, compactionLogTableCFHandle));
       } else {
         throw new IllegalArgumentException("One of compactionLog and " +
             "compactionLogEntries should be non-null.");
@@ -1436,7 +1437,8 @@ public class TestRocksDBCheckpointDiffer {
       }
     } else if (compactionLogEntries != null) {
       compactionLogEntries.forEach(entry ->
-          rocksDBCheckpointDiffer.addToCompactionLogTable(entry));
+          rocksDBCheckpointDiffer.getPopulateCompactionTable()
+              .addToCompactionLogTable(entry, activeRocksDB, compactionLogTableCFHandle));
     } else {
       throw new IllegalArgumentException("One of compactionLog or" +
           " compactionLogEntries should be present.");
@@ -1664,7 +1666,8 @@ public class TestRocksDBCheckpointDiffer {
       assertTrue(Files.exists(compactionLogFilePath));
     } else if (compactionLogEntries != null) {
       compactionLogEntries.forEach(entry ->
-          rocksDBCheckpointDiffer.addToCompactionLogTable(entry));
+          rocksDBCheckpointDiffer.getPopulateCompactionTable()
+              .addToCompactionLogTable(entry, activeRocksDB, compactionLogTableCFHandle));
     } else {
       throw new IllegalArgumentException("One of compactionLog or" +
           " compactionLogEntries should be present.");
@@ -1905,7 +1908,8 @@ public class TestRocksDBCheckpointDiffer {
       Map<String, String> columnFamilyToPrefixMap
   ) {
     compactionLogEntryList.forEach(entry ->
-        rocksDBCheckpointDiffer.addToCompactionLogTable(entry));
+        rocksDBCheckpointDiffer.getPopulateCompactionTable()
+            .addToCompactionLogTable(entry, activeRocksDB, compactionLogTableCFHandle));
 
     rocksDBCheckpointDiffer.loadAllCompactionLogs();
 
@@ -1953,7 +1957,8 @@ public class TestRocksDBCheckpointDiffer {
   public void testShouldSkipNode(Map<String, String> columnFamilyToPrefixMap,
                                  List<Boolean> expectedResponse) {
     compactionLogEntryList.forEach(entry ->
-        rocksDBCheckpointDiffer.addToCompactionLogTable(entry));
+        rocksDBCheckpointDiffer.getPopulateCompactionTable()
+            .addToCompactionLogTable(entry, activeRocksDB, compactionLogTableCFHandle));
 
     rocksDBCheckpointDiffer.loadAllCompactionLogs();
 
@@ -1994,7 +1999,8 @@ public class TestRocksDBCheckpointDiffer {
       boolean expectedResponse
   ) {
     compactionLogEntryList.forEach(entry ->
-        rocksDBCheckpointDiffer.addToCompactionLogTable(entry));
+        rocksDBCheckpointDiffer.getPopulateCompactionTable()
+            .addToCompactionLogTable(entry, activeRocksDB, compactionLogTableCFHandle));
 
     rocksDBCheckpointDiffer.loadAllCompactionLogs();
 
