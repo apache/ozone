@@ -184,6 +184,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   private final RatisOverReplicationHandler ratisOverReplicationHandler;
   private final RatisMisReplicationHandler ratisMisReplicationHandler;
   private final QuasiClosedStuckUnderReplicationHandler quasiClosedStuckUnderReplicationHandler;
+  private final QuasiClosedStuckOverReplicationHandler quasiClosedStuckOverReplicationHandler;
   private Thread underReplicatedProcessorThread;
   private Thread overReplicatedProcessorThread;
   private final UnderReplicatedProcessor underReplicatedProcessor;
@@ -252,6 +253,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         ratisContainerPlacement, conf, this);
     quasiClosedStuckUnderReplicationHandler =
         new QuasiClosedStuckUnderReplicationHandler(ratisContainerPlacement, conf, this);
+    quasiClosedStuckOverReplicationHandler =
+        new QuasiClosedStuckOverReplicationHandler(ratisContainerPlacement, conf, this);
     underReplicatedProcessor =
         new UnderReplicatedProcessor(this, rmConf::getUnderReplicatedInterval);
     overReplicatedProcessor =
@@ -781,8 +784,16 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         containerReplicaPendingOps.getPendingOps(containerID);
 
     final boolean isEC = isEC(result.getContainerInfo().getReplicationConfig());
-    final UnhealthyReplicationHandler handler = isEC ? ecOverReplicationHandler
-        : ratisOverReplicationHandler;
+    UnhealthyReplicationHandler handler;
+    if (isEC) {
+      handler = ecOverReplicationHandler;
+    } else {
+      if (QuasiClosedStuckReplicationCheck.shouldHandleAsQuasiClosedStuck(result.getContainerInfo(), replicas)) {
+        handler = quasiClosedStuckUnderReplicationHandler;
+      } else {
+        handler = ratisOverReplicationHandler;
+      }
+    }
 
     return handler.processAndSendCommands(replicas,
           pendingOps, result, getRemainingMaintenanceRedundancy(isEC));
