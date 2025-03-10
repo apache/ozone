@@ -19,4 +19,16 @@
     <Class name="org.apache.hadoop.hdds.scm.storage.ByteArrayReader"></Class>
     <Bug pattern="EI_EXPOSE_REP2" /> <!-- "Deep copy byte[] has bad impact on performance" -->
   </Match>
+  <Match>
+    <Class name="org.apache.hadoop.hdds.scm.storage.DummyBlockInputStreamWithRetry"/>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.hdds.scm.storage.TestBlockInputStream"/>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.ozone.client.io.TestBlockInputStreamFactoryImpl"/>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT" />
+  </Match>
 </FindBugsFilter>
