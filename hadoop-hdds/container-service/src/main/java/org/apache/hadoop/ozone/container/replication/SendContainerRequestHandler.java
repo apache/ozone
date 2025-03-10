@@ -23,9 +23,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerResponse;
@@ -94,14 +91,9 @@ class SendContainerRequestHandler
         volume.incCommittedBytes(importer.getDefaultContainerSize() * 2);
         // Already committed bytes increased above, so required space is not required here in AvailableSpaceFilter
         AvailableSpaceFilter filter = new AvailableSpaceFilter(0);
-        List<HddsVolume> hddsVolumeList = new ArrayList<>();
-        hddsVolumeList.add(volume);
-        List<HddsVolume> volumeWithEnoughSpace = hddsVolumeList.stream()
-            .filter(filter)
-            .collect(Collectors.toList());
-        if (volumeWithEnoughSpace.isEmpty()) {
+        if (!filter.test(volume)) {
           volume.incCommittedBytes(-importer.getDefaultContainerSize() * 2);
-          LOG.error("Container {} import was unsuccessful, due to no space left", containerId);
+          LOG.warn("Container {} import was unsuccessful, due to no space left", containerId);
           volume = null;
           throw new DiskChecker.DiskOutOfSpaceException("No more available volumes");
         }

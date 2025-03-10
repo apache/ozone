@@ -20,9 +20,7 @@ package org.apache.hadoop.ozone.container.replication;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -87,14 +85,9 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
       targetVolume.incCommittedBytes(containerSize * 2);
       // Already committed bytes increased above, so required space is not required here in AvailableSpaceFilter
       AvailableSpaceFilter filter = new AvailableSpaceFilter(0);
-      List<HddsVolume> hddsVolumeList = new ArrayList<>();
-      hddsVolumeList.add(targetVolume);
-      List<HddsVolume> volumeWithEnoughSpace = hddsVolumeList.stream()
-          .filter(filter)
-          .collect(Collectors.toList());
-      if (volumeWithEnoughSpace.isEmpty()) {
+      if (!filter.test(targetVolume)) {
         targetVolume.incCommittedBytes(-containerSize * 2);
-        LOG.error("Container {} replication was unsuccessful, due to no space left", containerID);
+        LOG.warn("Container {} replication was unsuccessful, due to no space left", containerID);
         task.setStatus(Status.FAILED);
         return;
       }
