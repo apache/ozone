@@ -89,4 +89,4 @@ services:
 
 networks:
   ozone:
-    name: ozone_nw
+    name: ozonenw
