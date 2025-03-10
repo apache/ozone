@@ -26,8 +26,6 @@ services:
       - ENSURE_OM_INITIALIZED=/data/metadata/om/current/VERSION
       - OZONE-SITE.XML_ozone.server.default.replication=${OZONE_REPLICATION_FACTOR:-1}
       - OZONE_MANAGER_CLASSPATH=/opt/hadoop/ranger-ozone-plugin/lib/libext/*:/opt/hadoop/ranger-ozone-plugin/conf
-    networks:
-      - ozone
     command: bash -c "/opt/hadoop/ranger-ozone-plugin/ranger-plugin-install.sh && /opt/hadoop/bin/ozone om"
   ranger:
     image: apache/ranger:${RANGER_VERSION}
@@ -35,8 +33,6 @@ services:
     hostname: ranger.example.com
     stdin_open: true
     tty: true
-    networks:
-      - ozone
     ports:
       - "6080:6080"
     depends_on:
@@ -57,8 +53,6 @@ services:
     image: apache/ranger-zk:${RANGER_VERSION}
     container_name: ranger-zk
     hostname: ranger-zk.example.com
-    networks:
-      - ozone
     ports:
       - "2181:2181"
 
@@ -66,8 +60,6 @@ services:
     image: apache/ranger-solr:${RANGER_VERSION}
     container_name: ranger-solr
     hostname: ranger-solr.example.com
-    networks:
-      - ozone
     ports:
       - "8983:8983"
     command:
@@ -79,14 +71,9 @@ services:
     image: apache/ranger-db:${RANGER_VERSION}
     container_name: ranger-postgres
     hostname: ranger-db.example.com
-    networks:
-      - ozone
     healthcheck:
       test: 'su -c "pg_isready -q" postgres'
       interval: 10s
       timeout: 2s
       retries: 30
 
-networks:
-  ozone:
-    name: ozonenw
