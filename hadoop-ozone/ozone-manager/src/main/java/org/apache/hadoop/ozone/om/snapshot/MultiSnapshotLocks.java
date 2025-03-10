@@ -38,12 +38,14 @@ public class MultiSnapshotLocks {
   private final IOzoneManagerLock lock;
   private final OzoneManagerLock.Resource resource;
   private final boolean writeLock;
+  private OMLockDetails lockDetails;
 
   public MultiSnapshotLocks(IOzoneManagerLock lock, OzoneManagerLock.Resource resource, boolean writeLock) {
     this.writeLock = writeLock;
     this.resource = resource;
     this.lock = lock;
     this.objectLocks = new ArrayList<>();
+    this.lockDetails = OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 
   public OMLockDetails acquireLock(Collection<UUID> ids) throws OMException {
@@ -53,20 +55,22 @@ public class MultiSnapshotLocks {
           OMException.ResultCodes.INTERNAL_ERROR);
     }
     List<String[]> keys =
-        ids.stream().filter(Objects::nonNull).map(id -> new String[] {id.toString()}).collect(Collectors.toList());
+        ids.stream().filter(Objects::nonNull).map(id -> new String[] {id.toString()})
+            .collect(Collectors.toList());
     OMLockDetails omLockDetails = this.writeLock ? lock.acquireWriteLocks(resource, keys) :
         lock.acquireReadLocks(resource, keys);
     if (omLockDetails.isLockAcquired()) {
       objectLocks.addAll(keys);
     }
+    this.lockDetails = omLockDetails;
     return omLockDetails;
   }
 
   public void releaseLock() {
     if (this.writeLock) {
-      lock.releaseWriteLocks(resource, this.objectLocks);
+      lockDetails = lock.releaseWriteLocks(resource, this.objectLocks);
     } else {
-      lock.releaseReadLocks(resource, this.objectLocks);
+      lockDetails = lock.releaseReadLocks(resource, this.objectLocks);
     }
     this.objectLocks.clear();
   }
@@ -74,5 +78,9 @@ public class MultiSnapshotLocks {
   @VisibleForTesting
   public List<String[]> getObjectLocks() {
     return objectLocks;
+  }
+
+  public boolean isLockAcquired() {
+    return lockDetails.isLockAcquired();
   }
 }

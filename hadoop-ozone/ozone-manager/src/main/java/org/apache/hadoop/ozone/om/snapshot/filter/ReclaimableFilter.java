@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.snapshot.filter;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import java.io.Closeable;
 import java.io.IOException;
@@ -25,6 +26,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -39,6 +41,8 @@ import org.apache.hadoop.ozone.om.snapshot.MultiSnapshotLocks;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.util.CheckedFunction;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class is responsible for opening last N snapshot given a snapshot metadata manager or AOS metadata manager by
@@ -46,6 +50,8 @@ import org.apache.hadoop.ozone.util.CheckedFunction;
  */
 public abstract class ReclaimableFilter<V> implements CheckedFunction<Table.KeyValue<String, V>,
     Boolean, IOException>, Closeable {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ReclaimableFilter.class);
 
   private final OzoneManager ozoneManager;
   private final SnapshotInfo currentSnapshotInfo;
@@ -94,17 +100,17 @@ public abstract class ReclaimableFilter<V> implements CheckedFunction<Table.KeyV
     SnapshotInfo expectedPreviousSnapshotInfo = currentSnapshotInfo == null
         ? SnapshotUtils.getLatestSnapshotInfo(volume, bucket, ozoneManager, snapshotChainManager)
         : SnapshotUtils.getPreviousSnapshot(ozoneManager, snapshotChainManager, currentSnapshotInfo);
-    List<SnapshotInfo> snapshotInfos = Lists.newArrayList(expectedPreviousSnapshotInfo);
+    List<SnapshotInfo> snapshotInfos = Lists.newArrayList();
     SnapshotInfo snapshotInfo = expectedPreviousSnapshotInfo;
     while (snapshotInfos.size() < numberOfPreviousSnapshotsFromChain) {
-      snapshotInfo = snapshotInfo == null ? null
-          : SnapshotUtils.getPreviousSnapshot(ozoneManager, snapshotChainManager, snapshotInfo);
-      snapshotInfos.add(snapshotInfo);
       // If changes made to the snapshot have not been flushed to disk, throw exception immediately, next run of
       // garbage collection would process the snapshot.
       if (!OmSnapshotManager.areSnapshotChangesFlushedToDB(ozoneManager.getMetadataManager(), snapshotInfo)) {
         throw new IOException("Changes made to the snapshot " + snapshotInfo + " have not been flushed to the disk ");
       }
+      snapshotInfos.add(snapshotInfo);
+      snapshotInfo = snapshotInfo == null ? null
+          : SnapshotUtils.getPreviousSnapshot(ozoneManager, snapshotChainManager, snapshotInfo);
     }
 
     // Reversing list to get the correct order in chain. To ensure locking order is as per the chain ordering.
@@ -125,7 +131,7 @@ public abstract class ReclaimableFilter<V> implements CheckedFunction<Table.KeyV
 
   // Initialize the last N snapshots in the chain by acquiring locks. Throw IOException if it fails.
   private void initializePreviousSnapshotsFromChain(String volume, String bucket) throws IOException {
-    if (validateExistingLastNSnapshotsInChain(volume, bucket)) {
+    if (validateExistingLastNSnapshotsInChain(volume, bucket) && snapshotIdLocks.isLockAcquired()) {
       return;
     }
     // If existing snapshotIds don't match then close all snapshots and reopen the previous N snapshots.
@@ -187,7 +193,7 @@ public abstract class ReclaimableFilter<V> implements CheckedFunction<Table.KeyV
   public void close() throws IOException {
     this.snapshotIdLocks.releaseLock();
     for (ReferenceCounted<OmSnapshot> previousOmSnapshot : previousOmSnapshots) {
-      previousOmSnapshot.close();
+      IOUtils.close(LOG, previousOmSnapshot);
     }
     previousOmSnapshots.clear();
     previousSnapshotInfos.clear();
@@ -215,5 +221,15 @@ public abstract class ReclaimableFilter<V> implements CheckedFunction<Table.KeyV
 
   protected OzoneManager getOzoneManager() {
     return ozoneManager;
+  }
+
+  @VisibleForTesting
+  List<SnapshotInfo> getPreviousSnapshotInfos() {
+    return previousSnapshotInfos;
+  }
+
+  @VisibleForTesting
+  List<ReferenceCounted<OmSnapshot>> getPreviousOmSnapshots() {
+    return previousOmSnapshots;
   }
 }
