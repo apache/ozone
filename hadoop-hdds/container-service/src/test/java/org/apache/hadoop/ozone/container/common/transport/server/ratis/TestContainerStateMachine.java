@@ -313,6 +313,8 @@ abstract class TestContainerStateMachine {
 
     secondWrite.exceptionally(throwableSetter).get();
     assertNotNull(throwable.get());
-    assertInstanceOf(IOException.class, throwable.get());
+    assertInstanceOf(StorageContainerException.class, throwable.get());
+    StorageContainerException sce = (StorageContainerException) throwable.get();
+    assertEquals(ContainerProtos.Result.CONTAINER_INTERNAL_ERROR, sce.getResult());
   }
 }
