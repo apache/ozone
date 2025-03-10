@@ -19,12 +19,11 @@ package org.apache.hadoop.hdds.scm.container;
 
 import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
+import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
-
-import java.util.Objects;
 
 /**
  * Container ID is an integer that is a value between 1..MAX_CONTAINER ID.
