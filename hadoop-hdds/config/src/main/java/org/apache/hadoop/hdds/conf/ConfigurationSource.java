@@ -98,7 +98,7 @@ public interface ConfigurationSource {
 
   default String[] getTrimmedStrings(String name) {
     String valueString = get(name);
-    if (null == valueString || valueString.trim().isEmpty()) {
+    if (null == valueString) {
       return EMPTY_STRING_ARRAY;
     }
 
