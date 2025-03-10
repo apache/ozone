@@ -25,13 +25,13 @@ downloadIfNotPresent() {
   then
     echo "downloading ${urlBase}/${fileName}.."
 
-    curl -L ${urlBase}/${fileName} --output ./../../share/${fileName}
+    curl -L "${urlBase}/${fileName}" --output ./../../share/${fileName}
   else
     echo "file already in cache: ${fileName}"
   fi
 }
 
-downloadIfNotPresent ranger-${RANGER_VERSION}-ozone-plugin.tar.gz https://dist.apache.org/repos/dist/release/ranger/${RANGER_VERSION}/plugins/ozone
+downloadIfNotPresent ranger-${RANGER_VERSION}-ozone-plugin.tar.gz "https://www.apache.org/dyn/closer.lua?action=download&filename=ranger/${RANGER_VERSION}/plugins/ozone"
 
 if [ ! -d ./../../share/ranger-${RANGER_VERSION}-ozone-plugin ]
 then
