@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.QUASI_CLOSED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CHUNK_FILE_INCONSISTENCY;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CLOSED_CONTAINER_IO;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_ALREADY_EXISTS;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
@@ -1695,6 +1696,7 @@ public class KeyValueHandler extends Handler {
           continue;
         }
 
+        verifyChunksLength(chunkInfoProto, localChunksMap.get(chunkInfoProto.getOffset()));
         ByteString chunkData = readChunkData(xceiverClient, chunkInfoProto, blockID, blockToken);
         ChunkBuffer chunkBuffer = ChunkBuffer.wrap(chunkData.asReadOnlyByteBuffer());
         ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
@@ -1711,6 +1713,23 @@ public class KeyValueHandler extends Handler {
     List<ContainerProtos.ChunkInfo> localChunkList = new ArrayList<>(localChunksMap.values());
     localBlockData.setChunks(localChunkList);
     putBlockForClosedContainer(container, localBlockData, maxBcsId, overwriteBcsId);
+  }
+
+  private void verifyChunksLength(ContainerProtos.ChunkInfo peerChunkInfo, ContainerProtos.ChunkInfo localChunkInfo)
+      throws StorageContainerException {
+    if (localChunkInfo == null || peerChunkInfo == null) {
+      return;
+    }
+
+    if (peerChunkInfo.getOffset() != localChunkInfo.getOffset()) {
+      throw new StorageContainerException("Offset mismatch for chunk. Expected: " + localChunkInfo.getOffset() +
+          ", Actual: " + peerChunkInfo.getOffset(), CHUNK_FILE_INCONSISTENCY);
+    }
+
+    if (peerChunkInfo.getLen() != localChunkInfo.getLen()) {
+      throw new StorageContainerException("Length mismatch for chunk at offset " + localChunkInfo.getOffset() +
+          ". Expected: " + localChunkInfo.getLen() + ", Actual: " + peerChunkInfo.getLen(), CHUNK_FILE_INCONSISTENCY);
+    }
   }
 
   /**

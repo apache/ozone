@@ -61,6 +61,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.Properties;
+import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -475,6 +476,7 @@ public class TestContainerCommandReconciliation {
 
     // 3. Set Unhealthy for first chunk of all blocks. This should be done by the scanner, Until then this is a
     // manual step.
+    Random random = new Random();
     ContainerProtos.ContainerChecksumInfo.Builder builder = containerChecksumAfterChunkCorruption.toBuilder();
     List<ContainerProtos.BlockMerkleTree> blockMerkleTreeList = builder.getContainerMerkleTree()
         .getBlockMerkleTreeList();
@@ -483,9 +485,11 @@ public class TestContainerCommandReconciliation {
       ContainerProtos.BlockMerkleTree.Builder blockMerkleTreeBuilder = blockMerkleTree.toBuilder();
       List<ContainerProtos.ChunkMerkleTree.Builder> chunkMerkleTreeBuilderList =
           blockMerkleTreeBuilder.getChunkMerkleTreeBuilderList();
-      chunkMerkleTreeBuilderList.get(0).setIsHealthy(false);
+      chunkMerkleTreeBuilderList.get(0).setIsHealthy(false).setDataChecksum(random.nextLong());
+      blockMerkleTreeBuilder.setDataChecksum(random.nextLong());
       builder.getContainerMerkleTreeBuilder().addBlockMerkleTree(blockMerkleTreeBuilder.build());
     }
+    builder.getContainerMerkleTreeBuilder().setDataChecksum(random.nextLong());
     Files.deleteIfExists(getContainerChecksumFile(container.getContainerData()).toPath());
     writeContainerDataTreeProto(container.getContainerData(), builder.getContainerMerkleTree());
 
