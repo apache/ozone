@@ -23,7 +23,7 @@ export COMPOSE_DIR
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
-export SECURITY_ENABLED=true
+export SECURITY_ENABLED=false
 export COMPOSE_FILE=docker-compose.yaml:docker-compose.ranger.yaml
 
 start_docker_env

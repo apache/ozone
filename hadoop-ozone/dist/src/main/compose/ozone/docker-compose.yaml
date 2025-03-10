@@ -96,3 +96,7 @@ services:
     networks:
       - ozone
     command: ["ozone","recon"]
+
+networks:
+  ozone:
+    name: ozone_nw
