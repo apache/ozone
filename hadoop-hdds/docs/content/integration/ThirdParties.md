@@ -59,5 +59,5 @@ For more information, see the [File Systems](https://nightlies.apache.org/flink/
 * Starburst https://docs.starburst.io/latest/connector/starburst-ozone.html
 
 ## Via Ozone S3 Gateway
-Various applications can access Ozone via the S3 Gateway, which opens up Ozone for more use cases.
+Various applications can access Ozone via the S3 Gateway, which opens up Ozone to more cloud native use cases.
 For example, send Fluentd logs to Ozone S3 Gateway.
