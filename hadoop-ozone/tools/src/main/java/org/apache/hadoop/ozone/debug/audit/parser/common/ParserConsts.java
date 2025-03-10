@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.audit.parser.common;
+package org.apache.hadoop.ozone.debug.audit.parser.common;
 
 /**
  * Constants used for ozone audit parser.

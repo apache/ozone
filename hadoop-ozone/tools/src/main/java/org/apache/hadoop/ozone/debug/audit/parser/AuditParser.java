@@ -15,20 +15,21 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.audit.parser;
+package org.apache.hadoop.ozone.debug.audit.parser;
 
-import org.apache.hadoop.hdds.cli.GenericCli;
+import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.ozone.audit.parser.handler.LoadCommandHandler;
-import org.apache.hadoop.ozone.audit.parser.handler.QueryCommandHandler;
-import org.apache.hadoop.ozone.audit.parser.handler.TemplateCommandHandler;
+import org.apache.hadoop.ozone.debug.audit.parser.handler.LoadCommandHandler;
+import org.apache.hadoop.ozone.debug.audit.parser.handler.QueryCommandHandler;
+import org.apache.hadoop.ozone.debug.audit.parser.handler.TemplateCommandHandler;
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 
 /**
  * Ozone audit parser tool.
  */
-@Command(name = "ozone auditparser",
+@Command(name = "auditparser",
     description = "Shell parser for Ozone Audit Logs",
     subcommands = {
         LoadCommandHandler.class,
@@ -37,7 +38,8 @@ import picocli.CommandLine.Parameters;
     },
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
-public class AuditParser extends GenericCli {
+@MetaInfServices(DebugSubcommand.class)
+public class AuditParser implements DebugSubcommand {
   /*
   <.db file path> load <file>
   <.db file path> template <template name>
@@ -50,10 +52,6 @@ public class AuditParser extends GenericCli {
       "exception text, " +
       "UNIQUE(datetime,level,logger,user,ip,op,params,result))")
   private String database;
-
-  public static void main(String[] argv) throws Exception {
-    new AuditParser().run(argv);
-  }
 
   public String getDatabase() {
     return database;

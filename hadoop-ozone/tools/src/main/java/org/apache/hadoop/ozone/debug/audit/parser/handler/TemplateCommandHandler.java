@@ -15,13 +15,13 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.audit.parser.handler;
+package org.apache.hadoop.ozone.debug.audit.parser.handler;
 
 import java.sql.SQLException;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.ozone.audit.parser.AuditParser;
-import org.apache.hadoop.ozone.audit.parser.common.DatabaseHelper;
+import org.apache.hadoop.ozone.debug.audit.parser.AuditParser;
+import org.apache.hadoop.ozone.debug.audit.parser.common.DatabaseHelper;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
@@ -33,7 +33,7 @@ import picocli.CommandLine.ParentCommand;
     aliases = "t",
     description = "Execute template query.\n\n" +
         "To run a template query:\n" +
-        "ozone auditparser <path to db file> template <template>\n\n" +
+        "ozone debug auditparser <path to db file> template <template>\n\n" +
         "Following templates are available:\n" +
         "(Template)              (Description)\n" +
         "top5users              : Top 5 users.\n" +
