@@ -863,7 +863,7 @@ public class TestKeyValueHandler {
         kvHandler.getBlockManager().putBlock(container, blockData);
       }
 
-      ContainerLayoutTestInfo.FILE_PER_BLOCK.validateFileCount(chunksPath, blocks, blocks * CHUNKS_PER_BLOCK);
+      ContainerLayoutTestInfo.FILE_PER_BLOCK.validateFileCount(chunksPath, blocks, (long) blocks * CHUNKS_PER_BLOCK);
       container.close();
       kvHandler.closeContainer(container);
       containers.add(container);
@@ -942,9 +942,9 @@ public class TestKeyValueHandler {
 
       // Corrupt the last byte and middle bytes of the block. The scanner should log this as two errors.
       final byte[] corruptedBytes = Arrays.copyOf(original, fileLength);
-      corruptedBytes[chunkEnd - 1] = (byte) (original[chunkEnd - 1] << 1);
+      corruptedBytes[chunkEnd - 1] = (byte) ((original[chunkEnd - 1] << 1) & 0xFF);
       final int chunkMid = offset + (chunkLength - offset) / 2;
-      corruptedBytes[chunkMid / 2] = (byte) (original[chunkMid / 2] << 1);
+      corruptedBytes[chunkMid / 2] = (byte) ((original[chunkMid / 2] << 1) & 0xFF);
 
       Files.write(path, corruptedBytes,
           StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
