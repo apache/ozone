@@ -42,8 +42,6 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeySetTimesResponseWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
 
 /**
  * Handle set times request for bucket for prefix layout.
@@ -72,22 +70,12 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean lockAcquired = false;
-    String volume = null;
-    String bucket = null;
-    String key = null;
+    String volume = getVolumeName();
+    String bucket = getBucketName();
+    String key = getKeyName();
     boolean operationResult = false;
     Result result = null;
     try {
-      volume = getVolumeName();
-      bucket = getBucketName();
-      key = getKeyName();
-
-      // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.KEY,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
-            volume, bucket, key);
-      }
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volume, bucket));
       lockAcquired = getOmLockDetails().isLockAcquired();
