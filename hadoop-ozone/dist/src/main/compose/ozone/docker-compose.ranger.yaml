@@ -1,0 +1,92 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+services:
+  om:
+    volumes:
+      - ../..:/opt/hadoop
+      - ./../../share/ranger-${RANGER_VERSION}-ozone-plugin:/opt/hadoop/ranger-ozone-plugin
+    env_file:
+      - docker-config
+      - ranger-plugin/ranger-config
+    environment:
+      - ENSURE_OM_INITIALIZED=/data/metadata/om/current/VERSION
+      - OZONE-SITE.XML_ozone.server.default.replication=${OZONE_REPLICATION_FACTOR:-1}
+      - OZONE_MANAGER_CLASSPATH=/opt/hadoop/ranger-ozone-plugin/lib/libext/*:/opt/hadoop/ranger-ozone-plugin/conf
+    networks:
+      - ozone
+    command: bash -c "/opt/hadoop/ranger-ozone-plugin/ranger-plugin-install.sh && /opt/hadoop/bin/ozone om"
+  ranger:
+    image: apache/ranger:${RANGER_VERSION}
+    container_name: ranger
+    hostname: ranger.example.com
+    stdin_open: true
+    tty: true
+    networks:
+      - ozone
+    ports:
+      - "6080:6080"
+    depends_on:
+      ranger-zk:
+        condition: service_started
+      ranger-db:
+        condition: service_healthy
+      ranger-solr:
+        condition: service_started
+    environment:
+      - RANGER_VERSION=${RANGER_VERSION}
+      - RANGER_DB_TYPE=postgres
+      - DEBUG_ADMIN=${DEBUG_ADMIN:-false}
+    command:
+      - /home/ranger/scripts/ranger.sh
+
+  ranger-zk:
+    image: apache/ranger-zk:${RANGER_VERSION}
+    container_name: ranger-zk
+    hostname: ranger-zk.example.com
+    networks:
+      - ozone
+    ports:
+      - "2181:2181"
+
+  ranger-solr:
+    image: apache/ranger-solr:${RANGER_VERSION}
+    container_name: ranger-solr
+    hostname: ranger-solr.example.com
+    networks:
+      - ozone
+    ports:
+      - "8983:8983"
+    command:
+      - solr-precreate
+      - ranger_audits
+      - /opt/solr/server/solr/configsets/ranger_audits/
+
+  ranger-db:
+    image: apache/ranger-db:${RANGER_VERSION}
+    container_name: ranger-postgres
+    hostname: ranger-db.example.com
+    networks:
+      - ozone
+    healthcheck:
+      test: 'su -c "pg_isready -q" postgres'
+      interval: 10s
+      timeout: 2s
+      retries: 30
+
+networks:
+  ozone:
+    name: ozone_nw
