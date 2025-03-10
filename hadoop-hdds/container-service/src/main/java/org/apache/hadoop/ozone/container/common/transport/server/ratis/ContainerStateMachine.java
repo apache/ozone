@@ -684,12 +684,20 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   private void validateLongRunningWrite() throws IOException {
     // get min valid write chunk operation's future context
-    Map.Entry<Long, WriteFutureContext> longWriteFutureContextEntry = writeChunkFutureMap.firstEntry();
-    if (null == longWriteFutureContextEntry) {
+    Map.Entry<Long, WriteFutureContext> writeFutureContextEntry = null;
+    while (!writeChunkFutureMap.isEmpty()) {
+      writeFutureContextEntry = writeChunkFutureMap.firstEntry();
+      // there is a possibility of entry being removed before added in map, cleanup those
+      if (!writeFutureContextEntry.getValue().getWriteChunkFuture().isDone()) {
+        break;
+      }
+      writeChunkFutureMap.remove(writeFutureContextEntry.getKey());
+    }
+    if (null == writeFutureContextEntry) {
       return;
     }
     // validate for timeout in milli second
-    long waitTime = Time.monotonicNow() - longWriteFutureContextEntry.getValue().getStartTime() / 1000000;
+    long waitTime = Time.monotonicNow() - writeFutureContextEntry.getValue().getStartTime() / 1000000;
     if (waitTime > writeChunkWaitMaxMs) {
       LOG.error("Write chunk has taken {}ms crossing threshold {}ms for groupId {}", waitTime, writeChunkWaitMaxMs,
           getGroupId());
