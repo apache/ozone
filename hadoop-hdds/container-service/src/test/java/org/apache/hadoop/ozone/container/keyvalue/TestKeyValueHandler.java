@@ -942,9 +942,10 @@ public class TestKeyValueHandler {
 
       // Corrupt the last byte and middle bytes of the block. The scanner should log this as two errors.
       final byte[] corruptedBytes = Arrays.copyOf(original, fileLength);
-      corruptedBytes[chunkEnd - 1] = (byte) ((original[chunkEnd - 1] << 1) & 0xFF);
-      final int chunkMid = offset + (chunkLength - offset) / 2;
-      corruptedBytes[chunkMid / 2] = (byte) ((original[chunkMid / 2] << 1) & 0xFF);
+      corruptedBytes[chunkEnd - 1] = (byte) (original[chunkEnd - 1] << 1);
+      final long chunkMid = offset + ((long) chunkLength - offset) / 2;
+      corruptedBytes[(int) (chunkMid / 2)] = (byte) (original[(int) (chunkMid / 2)] << 1);
+
 
       Files.write(path, corruptedBytes,
           StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
