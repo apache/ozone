@@ -298,7 +298,7 @@ public class TestSnapshotDiffCleanupService {
 
     SnapshotDiffJob job = new SnapshotDiffJob(creationTime, jobId, jobStatus,
         volume, bucket, fromSnapshot, toSnapshot, false, false, noOfEntries,
-        new ArrayList<>());
+        null, 0.0);
 
     db.get().put(jobTableCfh, codecRegistry.asRawData(jobKey),
         codecRegistry.asRawData(job));

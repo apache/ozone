@@ -55,6 +55,7 @@ import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.FA
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.QUEUED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.REJECTED;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus.*;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
@@ -492,10 +493,11 @@ public class SnapshotDiffManager implements AutoCloseable {
           disableNativeDiff);
     case IN_PROGRESS:
       SnapshotDiffResponse response = new SnapshotDiffResponse(
-          new SnapshotDiffReportOzone(snapshotRoot.toString(), volumeName,
-              bucketName, fromSnapshotName, toSnapshotName, new ArrayList<>(),
-              null), IN_PROGRESS, defaultWaitTime);
-      response.setActivities(snapDiffJob.getActivities());
+          new SnapshotDiffReportOzone(snapshotRoot.toString(), volumeName, bucketName,
+              fromSnapshotName, toSnapshotName,
+              new ArrayList<>(), null), IN_PROGRESS, defaultWaitTime);
+      response.setSubStatus(snapDiffJob.getSubStatus());
+      response.setProgressPercent(snapDiffJob.getKeysProcessedPct());
       return response;
     case FAILED:
       return new SnapshotDiffResponse(
@@ -754,7 +756,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       String jobId = UUID.randomUUID().toString();
       snapDiffJob = new SnapshotDiffJob(System.currentTimeMillis(), jobId,
           QUEUED, volumeName, bucketName, fromSnapshotName, toSnapshotName,
-          forceFullDiff, disableNativeDiff, 0L, Collections.EMPTY_LIST);
+          forceFullDiff, disableNativeDiff, 0L, null,0.0);
       snapDiffJobTable.put(jobKey, snapDiffJob);
     }
 
@@ -908,8 +910,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       // repetition while constantly checking if the job is cancelled.
       Callable<Void>[] methodCalls = new Callable[]{
           () -> {
-            recordActivity(jobKey, "Candidate Key Generation :" +
-                " Generating the ObjectId-Key Map");
+            recordActivity(jobKey, OBJECT_ID_MAP_GEN_OBS);
             getDeltaFilesAndDiffKeysToObjectIdToKeyMap(fsKeyTable, tsKeyTable,
                 fromSnapshot, toSnapshot, fsInfo, tsInfo, useFullDiff,
                 performNonNativeDiff, tablePrefixes,
@@ -920,8 +921,7 @@ public class SnapshotDiffManager implements AutoCloseable {
           },
           () -> {
             if (bucketLayout.isFileSystemOptimized()) {
-              recordActivity(jobKey, "Candidate Key Generation : " +
-                  "Generating the ObjectId-Key Map for Directory Keys");
+              recordActivity(jobKey, OBJECT_ID_MAP_GEN_FSO);
               getDeltaFilesAndDiffKeysToObjectIdToKeyMap(fsDirTable, tsDirTable,
                   fromSnapshot, toSnapshot, fsInfo, tsInfo, useFullDiff,
                   performNonNativeDiff, tablePrefixes,
@@ -950,8 +950,7 @@ public class SnapshotDiffManager implements AutoCloseable {
             return null;
           },
           () -> {
-            recordActivity(jobKey, "Final Stage : " +
-                "Generating and storing the Diff Report");
+            recordActivity(jobKey, DIFF_REPORT_GEN);
             long totalDiffEntries = generateDiffReport(jobId,
                 fsKeyTable,
                 tsKeyTable,
@@ -1031,9 +1030,8 @@ public class SnapshotDiffManager implements AutoCloseable {
       final String diffDir, final String jobKey) throws IOException, RocksDBException {
 
     List<String> tablesToLookUp = Collections.singletonList(fsTable.getName());
-    recordActivity(jobKey, "Computing Delta SST File Set");
     Set<String> deltaFiles = getDeltaFiles(fromSnapshot, toSnapshot,
-        tablesToLookUp, fsInfo, tsInfo, useFullDiff, tablePrefixes, diffDir);
+        tablesToLookUp, fsInfo, tsInfo, useFullDiff, tablePrefixes, diffDir, jobKey);
 
     // Workaround to handle deletes if native rocksDb tool for reading
     // tombstone is not loaded.
@@ -1044,8 +1042,9 @@ public class SnapshotDiffManager implements AutoCloseable {
       RocksDiffUtils.filterRelevantSstFiles(inputFiles, tablePrefixes, fromDB);
       deltaFiles.addAll(inputFiles);
     }
-    recordActivity(jobKey, "Computed Delta SST File Set, Total count = " +
-        deltaFiles.size());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Computed Delta SST File Set, Total count = {} ", deltaFiles.size());
+    }
     addToObjectIdMap(fsTable, tsTable, deltaFiles,
         !skipNativeDiff && isNativeLibsLoaded,
         oldObjIdToKeyMap, newObjIdToKeyMap, objectIdToIsDirMap, oldParentIds,
@@ -1071,9 +1070,12 @@ public class SnapshotDiffManager implements AutoCloseable {
         fsTable.getName().equals(DIRECTORY_TABLE);
     SstFileSetReader sstFileReader = new SstFileSetReader(deltaFiles);
     validateEstimatedKeyChangesAreInLimits(sstFileReader);
+    long totalEstimatedKeysToProcess = sstFileReader.getEstimatedTotalKeys();
     String sstFileReaderLowerBound = tablePrefix;
     String sstFileReaderUpperBound = null;
-    int stepIncrease = 100;
+    double stepIncreasePct = 0.1;
+    double[] checkpoint = new double[1];
+    checkpoint[0] = stepIncreasePct;
     if (Strings.isNotEmpty(tablePrefix)) {
       char[] upperBoundCharArray = tablePrefix.toCharArray();
       upperBoundCharArray[upperBoundCharArray.length - 1] += 1;
@@ -1084,9 +1086,12 @@ public class SnapshotDiffManager implements AutoCloseable {
         : sstFileReader.getKeyStream(sstFileReaderLowerBound, sstFileReaderUpperBound)) {
       AtomicLong keysProcessed = new AtomicLong(0);
       keysToCheck.forEach(key -> {
-        if (keysProcessed.get() % stepIncrease == 0) {
-          String status = "Completed processing " + keysProcessed + " number of keys";
-          recordActivity(jobKey, status);
+        if (totalEstimatedKeysToProcess > 0) {
+          double progressPct = (double) keysProcessed.get() / totalEstimatedKeysToProcess;
+          if (progressPct >= checkpoint[0]) {
+            updateProgress(jobKey, progressPct);
+            checkpoint[0] += stepIncreasePct;
+          }
         }
 
         try {
@@ -1141,7 +1146,7 @@ public class SnapshotDiffManager implements AutoCloseable {
                             SnapshotInfo tsInfo,
                             boolean useFullDiff,
                             Map<String, String> tablePrefixes,
-                            String diffDir)
+                            String diffDir, String jobKey)
       throws IOException {
     // TODO: [SNAPSHOT] Refactor the parameter list
     Optional<Set<String>> deltaFiles = Optional.empty();
@@ -1156,10 +1161,12 @@ public class SnapshotDiffManager implements AutoCloseable {
       final DifferSnapshotInfo toDSI =
           getDSIFromSI(tsInfo, toSnapshot, volume, bucket);
 
+      recordActivity(jobKey, SST_FILE_DELTA_DAG_WALK);
       LOG.debug("Calling RocksDBCheckpointDiffer");
       try {
         deltaFiles = differ.getSSTDiffListWithFullPath(toDSI, fromDSI, diffDir).map(HashSet::new);
       } catch (Exception exception) {
+        recordActivity(jobKey, SST_FILE_DELTA_FULL_DIFF);
         LOG.warn("Failed to get SST diff file using RocksDBCheckpointDiffer. " +
             "It will fallback to full diff now.", exception);
       }
@@ -1172,6 +1179,7 @@ public class SnapshotDiffManager implements AutoCloseable {
         LOG.warn("RocksDBCheckpointDiffer is not available, falling back to" +
                 " slow path");
       }
+      recordActivity(jobKey, SST_FILE_DELTA_FULL_DIFF);
       ManagedRocksDB fromDB = ((RDBStore)fromSnapshot.getMetadataManager().getStore())
           .getDb().getManagedRocksDb();
       ManagedRocksDB toDB = ((RDBStore)toSnapshot.getMetadataManager().getStore())
@@ -1520,16 +1528,23 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   private synchronized void recordActivity(String jobKey,
-      String statusText) {
+      SnapshotDiffResponse.SubStatus subStatus) {
     SnapshotDiffJob snapshotDiffJob = snapDiffJobTable.get(jobKey);
-    String timestamp = getTimeStampString() + "";
-    snapshotDiffJob.addActivity(timestamp + " : " + statusText);
+    snapshotDiffJob.setSubStatus(subStatus);
     snapDiffJobTable.put(jobKey, snapshotDiffJob);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Snapshot Diff for jobKey = {} transitions to {} state", jobKey, subStatus);
+    }
   }
 
-  private static String getTimeStampString() {
-    Date date = new Date(System.currentTimeMillis());
-    return date.toString();
+  private synchronized void updateProgress(String jobKey,
+      double pct) {
+    SnapshotDiffJob snapshotDiffJob = snapDiffJobTable.get(jobKey);
+    snapshotDiffJob.setKeysProcessedPct(pct * 100);
+    snapDiffJobTable.put(jobKey, snapshotDiffJob);
+    if (LOG.isDebugEnabled()){
+      LOG.debug("Completed processing {}% of keys for snapshot diff job {}", pct, jobKey);
+    }
   }
 
   private synchronized void updateJobStatusToFailed(String jobKey,

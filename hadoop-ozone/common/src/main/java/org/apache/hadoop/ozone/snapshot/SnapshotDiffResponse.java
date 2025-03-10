@@ -18,8 +18,8 @@
 package org.apache.hadoop.ozone.snapshot;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffResponse.JobStatusProto;
-import java.util.List;
 
 /**
  * POJO for Snapshot Diff Response.
@@ -46,11 +46,28 @@ public class SnapshotDiffResponse {
     }
   }
 
+  public enum SubStatus {
+    SST_FILE_DELTA_DAG_WALK,
+    SST_FILE_DELTA_FULL_DIFF,
+    OBJECT_ID_MAP_GEN_OBS,
+    OBJECT_ID_MAP_GEN_FSO,
+    DIFF_REPORT_GEN;
+
+    public static SubStatus fromProtoBuf(OzoneManagerProtocolProtos.SnapshotDiffResponse.SubStatus subStatusProto) {
+      return SubStatus.valueOf(subStatusProto.name());
+    }
+
+    public OzoneManagerProtocolProtos.SnapshotDiffResponse.SubStatus toProtoBuf() {
+      return OzoneManagerProtocolProtos.SnapshotDiffResponse.SubStatus.valueOf(this.name());
+    }
+  }
+
   private final SnapshotDiffReportOzone snapshotDiffReport;
   private final JobStatus jobStatus;
   private final long waitTimeInMs;
   private final String reason;
-  private List<String> activities;
+  private SubStatus subStatus;
+  private double progressPercent = 0.0;
 
   public SnapshotDiffResponse(final SnapshotDiffReportOzone snapshotDiffReport,
                               final JobStatus jobStatus,
@@ -87,8 +104,12 @@ public class SnapshotDiffResponse {
     return reason;
   }
 
-  public void setActivities(List<String> activities) {
-    this.activities = activities;
+  public void setSubStatus(SubStatus subStatus) {
+    this.subStatus = subStatus;
+  }
+
+  public void setProgressPercent(double progressPercent) {
+    this.progressPercent = progressPercent;
   }
 
   @Override
@@ -118,18 +139,14 @@ public class SnapshotDiffResponse {
           .append(". Please retry after ")
           .append(waitTimeInMs)
           .append(" ms.\n");
-      if (activities != null && !activities.isEmpty()) {
-        str.append("Activities: [");
-        for (int i = 0; i < activities.size(); i++) {
-          String activity = activities.get(i);
-          str.append("{")
-              .append(", op : ").append(activity)
-              .append("}");
-          if (i < activities.size() - 1) {
-            str.append(", "); // Add comma except for the last element
-          }
+      if (subStatus != null) {
+        str.append("SubStatus is ")
+            .append(subStatus);
+        if (subStatus.equals(SubStatus.OBJECT_ID_MAP_GEN_OBS) ||
+            subStatus.equals(SubStatus.OBJECT_ID_MAP_GEN_FSO)) {
+          str.append("Keys Processed Estimated Percentage : ")
+              .append(progressPercent);
         }
-        str.append("]");
       }
     }
     return str.toString();

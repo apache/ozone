@@ -21,12 +21,12 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
-import java.util.List;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffJobProto;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus;
 
 /**
  * POJO for Snapshot diff job.
@@ -55,8 +55,12 @@ public class SnapshotDiffJob {
   // is FAILED.
   private String reason;
 
-  // Represents current status of the job if the job is in IN_PROGRESS state.
-  private List<String> activities;
+  // Represents current sub-status of the job if the job is in IN_PROGRESS state.
+  private SubStatus subStatus;
+  // percentage of keys processed in the Object-ID generation phase.
+  // This is the most time-consuming phase as it loads both snapshots
+  // and reads from it populating the ObjectID-key map.
+  double keysProcessedPct;
 
   // Default constructor for Jackson Serializer.
   public SnapshotDiffJob() {
@@ -74,7 +78,8 @@ public class SnapshotDiffJob {
                          boolean forceFullDiff,
                          boolean disableNativeDiff,
                          long totalDiffEntries,
-                         List<String> activities) {
+                         SubStatus subStatus,
+                         double keysProcessedPct) {
     this.creationTime = creationTime;
     this.jobId = jobId;
     this.status = jobStatus;
@@ -86,7 +91,8 @@ public class SnapshotDiffJob {
     this.disableNativeDiff = disableNativeDiff;
     this.totalDiffEntries = totalDiffEntries;
     this.reason = StringUtils.EMPTY;
-    this.activities = activities;
+    this.subStatus = subStatus;
+    this.keysProcessedPct = keysProcessedPct;
   }
 
   public String getJobId() {
@@ -177,16 +183,20 @@ public class SnapshotDiffJob {
     this.disableNativeDiff = disableNativeDiffVal;
   }
 
-  public List<String> getActivities() {
-    return activities;
+  public SubStatus getSubStatus() {
+    return subStatus;
   }
 
-  public void setActivities(List<String> activities) {
-    this.activities = activities;
+  public void setSubStatus(SubStatus subStatus) {
+    this.subStatus = subStatus;
   }
 
-  public void addActivity(String activity){
-    this.activities.add(activity);
+  public double getKeysProcessedPct() {
+    return keysProcessedPct;
+  }
+
+  public void setKeysProcessedPct(double keysProcessedPct) {
+    this.keysProcessedPct = keysProcessedPct;
   }
 
   @Override
@@ -204,6 +214,13 @@ public class SnapshotDiffJob {
 
     if (StringUtils.isNotEmpty(reason)) {
       sb.append(", reason: ").append(reason);
+    }
+    if (status.equals(JobStatus.IN_PROGRESS) && subStatus != null) {
+      sb.append(", subStatus: ").append(status);
+      if (subStatus.equals(SubStatus.OBJECT_ID_MAP_GEN_FSO)
+          || subStatus.equals(SubStatus.OBJECT_ID_MAP_GEN_OBS)){
+        sb.append(", keysProcessedPercent");
+      }
     }
     return sb.toString();
   }
@@ -227,7 +244,8 @@ public class SnapshotDiffJob {
           Objects.equals(this.totalDiffEntries, otherJob.totalDiffEntries) &&
           Objects.equals(this.disableNativeDiff, otherJob.disableNativeDiff)
           && Objects.equals(this.reason, otherJob.reason) &&
-          Objects.equals(this.activities, otherJob.activities);
+          Objects.equals(this.subStatus, otherJob.subStatus) &&
+          Objects.equals(this.keysProcessedPct, otherJob.keysProcessedPct);
     }
     return false;
   }
@@ -236,7 +254,7 @@ public class SnapshotDiffJob {
   public int hashCode() {
     return Objects.hash(creationTime, jobId, status, volume, bucket,
         fromSnapshot, toSnapshot, forceFullDiff, disableNativeDiff,
-        totalDiffEntries, reason, activities);
+        totalDiffEntries, reason, subStatus, keysProcessedPct);
   }
 
   public SnapshotDiffJobProto toProtoBuf() {
@@ -251,7 +269,8 @@ public class SnapshotDiffJob {
         .setForceFullDiff(forceFullDiff)
         .setDisableNativeDiff(disableNativeDiff)
         .setTotalDiffEntries(totalDiffEntries)
-        .addAllActivities(activities)
+        .setSubStatus(subStatus.toProtoBuf())
+        .setKeysProcessedPct(keysProcessedPct)
         .build();
   }
 
@@ -268,7 +287,8 @@ public class SnapshotDiffJob {
         diffJobProto.getForceFullDiff(),
         diffJobProto.getDisableNativeDiff(),
         diffJobProto.getTotalDiffEntries(),
-        diffJobProto.getActivitiesList());
+        SubStatus.fromProtoBuf(diffJobProto.getSubStatus()),
+        diffJobProto.getKeysProcessedPct());
   }
 
   /**

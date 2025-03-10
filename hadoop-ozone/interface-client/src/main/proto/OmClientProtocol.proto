@@ -912,7 +912,8 @@ message SnapshotDiffJobProto {
   optional uint64 totalDiffEntries = 9;
   optional string message = 10;
   optional bool disableNativeDiff = 11;
-  repeated string activities = 12;
+  optional SnapshotDiffResponse.SubStatus subStatus = 12;
+  optional double keysProcessedPct = 13;
 }
 
 message OzoneObj {
@@ -2102,10 +2103,19 @@ message SnapshotDiffResponse {
     CANCELLED = 6;
   }
 
+  enum SubStatus {
+      SST_FILE_DELTA_DAG_WALK = 1;
+      SST_FILE_DELTA_FULL_DIFF = 2;
+      OBJECT_ID_MAP_GEN_OBS = 3;
+      OBJECT_ID_MAP_GEN_FSO = 4;
+      DIFF_REPORT_GEN = 5;
+  }
+
   optional SnapshotDiffReportProto snapshotDiffReport = 1;
   optional JobStatusProto jobStatus = 2;
   optional int64 waitTimeInMs = 3;
   optional string reason = 4;
+  optional SubStatus subStatus = 5;
 }
 
 message CancelSnapshotDiffResponse {
