@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Stack;
 import java.util.UUID;
@@ -286,6 +287,37 @@ class TestOzoneManagerLock {
     }
 
   }
+
+  @Test
+  void testMultiLocksResourceParallel() throws Exception {
+    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
+
+    for (Resource resource : Resource.values()) {
+      final List<String[]> resourceName = Arrays.asList(generateResourceName(resource),
+          generateResourceName(resource), generateResourceName(resource));
+      lock.acquireWriteLocks(resource, resourceName.subList(1, resourceName.size()));
+
+      AtomicBoolean gotLock = new AtomicBoolean(false);
+      new Thread(() -> {
+        lock.acquireWriteLocks(resource, resourceName.subList(0, 2));
+        gotLock.set(true);
+        lock.releaseWriteLocks(resource, resourceName.subList(0, 2));
+      }).start();
+      // Let's give some time for the new thread to run
+      Thread.sleep(100);
+      // Since the new thread is trying to get lock on same resource,
+      // it will wait.
+      assertFalse(gotLock.get());
+      lock.releaseWriteLocks(resource, resourceName.subList(1, resourceName.size()));
+      // Since we have released the lock, the new thread should have the lock
+      // now.
+      // Let's give some time for the new thread to run
+      Thread.sleep(100);
+      assertTrue(gotLock.get());
+    }
+
+  }
+
 
   @Test
   void testMultiLockResourceParallel() throws Exception {

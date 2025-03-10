@@ -161,6 +161,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKey
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
+import org.apache.hadoop.ozone.util.CheckedFunction;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
@@ -729,6 +730,45 @@ public class KeyManagerImpl implements KeyManager {
              renamedKeyIter = metadataManager.getSnapshotRenamedTable().iterator(bucketPrefix.orElse(""))) {
       return getTableEntries(startKey, renamedKeyIter, Function.identity(), size);
     }
+  }
+
+  @Override
+  public CheckedFunction<KeyManager, OmDirectoryInfo, IOException> getPreviousSnapshotOzoneDirInfo(
+      long volumeId, OmBucketInfo bucketInfo, OmDirectoryInfo keyInfo) throws IOException {
+    String currentKeyPath = metadataManager.getOzonePathKey(volumeId, bucketInfo.getObjectID(),
+        keyInfo.getParentObjectID(), keyInfo.getName());
+    return getPreviousSnapshotOzoneDirInfo(volumeId, bucketInfo, keyInfo.getObjectID(), currentKeyPath,
+        (km) -> km.getMetadataManager().getDirectoryTable());
+  }
+
+  @Override
+  public CheckedFunction<KeyManager, OmDirectoryInfo, IOException> getPreviousSnapshotOzoneDirInfo(
+      long volumeId, OmBucketInfo bucketInfo, OmKeyInfo keyInfo) throws IOException {
+    String currentKeyPath = metadataManager.getOzonePathKey(volumeId, bucketInfo.getObjectID(),
+        keyInfo.getParentObjectID(), keyInfo.getFileName());
+    return getPreviousSnapshotOzoneDirInfo(volumeId, bucketInfo, keyInfo.getObjectID(), currentKeyPath,
+        (km) -> km.getMetadataManager().getDirectoryTable());
+  }
+
+  @Override
+  public CheckedFunction<KeyManager, OmKeyInfo, IOException> getPreviousSnapshotOzoneKeyInfo(
+      long volumeId, OmBucketInfo bucketInfo, OmKeyInfo keyInfo) throws IOException {
+    String currentKeyPath = bucketInfo.getBucketLayout().isFileSystemOptimized()
+        ? metadataManager.getOzonePathKey(volumeId, bucketInfo.getObjectID(), keyInfo.getParentObjectID(),
+        keyInfo.getFileName()) : metadataManager.getOzoneKey(bucketInfo.getVolumeName(), bucketInfo.getBucketName(),
+        keyInfo.getKeyName());
+    return getPreviousSnapshotOzoneDirInfo(volumeId, bucketInfo, keyInfo.getObjectID(), currentKeyPath,
+        (km) -> km.getMetadataManager().getKeyTable(bucketInfo.getBucketLayout()));
+  }
+
+
+  private <T> CheckedFunction<KeyManager, T, IOException> getPreviousSnapshotOzoneDirInfo(
+      long volumeId, OmBucketInfo bucketInfo, long objectId, String currentKeyPath,
+      Function<KeyManager, Table<String, T>> table) throws IOException {
+    String renameKey = metadataManager.getRenameKey(bucketInfo.getVolumeName(), bucketInfo.getBucketName(), objectId);
+    String renamedKey = metadataManager.getSnapshotRenamedTable().getIfExist(renameKey);
+
+    return (km) -> table.apply(km).get(renamedKey == null ? renameKey : currentKeyPath);
   }
 
   @Override
