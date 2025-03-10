@@ -487,6 +487,7 @@ function get_count_misc_files() {
         "\.txt$"
         "\.md$"
         "findbugsExcludeFile.xml"
+        "pmd-ruleset.xml"
         "/NOTICE$"
         "^hadoop-ozone/dist/src/main/compose/common/grafana/dashboards"
     )
