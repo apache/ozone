@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
+import static org.apache.hadoop.ozone.container.common.volume.StorageVolume.HUNDRED_MB;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -117,9 +118,8 @@ public class TestStorageVolumeHealthChecks {
     StorageVolume volume = builder.build();
 
     VolumeUsage usage = volume.getVolumeInfo().get().getUsageForTesting();
-    int hundredMB = 100 * 1024 * 1024;
     // Keep remaining space as just less than 100 MB
-    usage.incrementUsedSpace(usage.getCurrentUsage().getAvailable() - hundredMB + 1);
+    usage.incrementUsedSpace(usage.getCurrentUsage().getAvailable() - HUNDRED_MB + 1);
     usage.realUsage();
     DiskCheckUtil.DiskChecks ioFailure = new DiskCheckUtil.DiskChecks() {
       @Override
@@ -135,7 +135,7 @@ public class TestStorageVolumeHealthChecks {
     assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
 
     // Now keep enough space for read/write check to go through
-    usage.decrementUsedSpace(hundredMB + 1);
+    usage.decrementUsedSpace(HUNDRED_MB + 1);
 
     // volumeIOFailureTolerance is 1, so first time it will be HEALTHY
     assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));

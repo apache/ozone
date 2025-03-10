@@ -75,6 +75,7 @@ public abstract class StorageVolume
   // The name of the directory where temporary files used to check disk
   // health are written to. This will go inside the tmp directory.
   public static final String TMP_DISK_CHECK_DIR_NAME = "disk-check";
+  public static final int HUNDRED_MB = 100 * 1024 * 1024;
 
   /**
    * Type for StorageVolume.
@@ -617,8 +618,7 @@ public abstract class StorageVolume
     // At least some space required to check disk read/write
     // If there are not enough space remaining,
     // to avoid volume failure we can ignore checking disk read/write
-    int hundredMB = 100 * 1024 * 1024;
-    int minimumDiskSpace = Math.max(healthCheckFileSize * 10, hundredMB);
+    int minimumDiskSpace = Math.max(healthCheckFileSize * 10, HUNDRED_MB);
     if (volumeInfo.get().getCurrentUsage().getAvailable() < minimumDiskSpace) {
       return VolumeCheckResult.HEALTHY;
     }
