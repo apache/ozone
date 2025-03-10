@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.impl;
 
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -66,7 +67,7 @@ public class TestContainerSet {
   public void testAddGetRemoveContainer(ContainerLayoutVersion layout)
       throws StorageContainerException {
     setLayoutVersion(layout);
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = newContainerSet();
     long containerId = 100L;
     ContainerProtos.ContainerDataProto.State state = ContainerProtos
         .ContainerDataProto.State.CLOSED;
@@ -155,7 +156,7 @@ public class TestContainerSet {
     HddsVolume vol2 = mock(HddsVolume.class);
     when(vol2.getStorageID()).thenReturn("uuid-2");
 
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = newContainerSet();
     for (int i = 0; i < 10; i++) {
       KeyValueContainerData kvData = new KeyValueContainerData(i,
           layout,
@@ -198,7 +199,7 @@ public class TestContainerSet {
     HddsVolume vol = mock(HddsVolume.class);
     when(vol.getStorageID()).thenReturn("uuid-1");
     Random random = new Random();
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = newContainerSet();
     int containerCount = 50;
     for (int i = 0; i < containerCount; i++) {
       KeyValueContainerData kvData = new KeyValueContainerData(i,
@@ -296,7 +297,7 @@ public class TestContainerSet {
   }
 
   private ContainerSet createContainerSet() throws StorageContainerException {
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = newContainerSet();
     for (int i = FIRST_ID; i < FIRST_ID + 10; i++) {
       KeyValueContainerData kvData = new KeyValueContainerData(i,
           layoutVersion,
