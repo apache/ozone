@@ -60,7 +60,7 @@ public class SnapshotDiffJob {
   // percentage of keys processed in the Object-ID generation phase.
   // This is the most time-consuming phase as it loads both snapshots
   // and reads from it populating the ObjectID-key map.
-  double keysProcessedPct;
+  private double keysProcessedPct;
 
   // Default constructor for Jackson Serializer.
   public SnapshotDiffJob() {
@@ -217,8 +217,8 @@ public class SnapshotDiffJob {
     }
     if (status.equals(JobStatus.IN_PROGRESS) && subStatus != null) {
       sb.append(", subStatus: ").append(status);
-      if (subStatus.equals(SubStatus.OBJECT_ID_MAP_GEN_FSO)
-          || subStatus.equals(SubStatus.OBJECT_ID_MAP_GEN_OBS)){
+      if (subStatus.equals(SubStatus.OBJECT_ID_MAP_GEN_FSO) ||
+          subStatus.equals(SubStatus.OBJECT_ID_MAP_GEN_OBS)) {
         sb.append(", keysProcessedPercent");
       }
     }

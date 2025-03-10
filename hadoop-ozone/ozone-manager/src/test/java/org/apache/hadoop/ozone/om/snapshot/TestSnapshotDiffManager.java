@@ -529,7 +529,7 @@ public class TestSnapshotDiffManager {
           toSnapshotInfo,
           false,
           Collections.emptyMap(),
-          snapDiffDir.getAbsolutePath(),diffJobKey);
+          snapDiffDir.getAbsolutePath(), diffJobKey);
       assertEquals(deltaStrings, deltaFiles);
     }
   }
@@ -708,9 +708,8 @@ public class TestSnapshotDiffManager {
           nativeLibraryLoaded, oldObjectIdKeyMap, newObjectIdKeyMap,
           objectIdsToCheck, Optional.of(oldParentIds),
           Optional.of(newParentIds),
-          ImmutableMap.of(OmMetadataManagerImpl.DIRECTORY_TABLE, "",
-              OmMetadataManagerImpl.KEY_TABLE, "",
-              OmMetadataManagerImpl.FILE_TABLE, ""),"");
+          ImmutableMap.of(OmMetadataManagerImpl.DIRECTORY_TABLE, "", OmMetadataManagerImpl.KEY_TABLE, "",
+              OmMetadataManagerImpl.FILE_TABLE, ""), "");
 
       try (ClosableIterator<Map.Entry<byte[], byte[]>> oldObjectIdIter =
                oldObjectIdKeyMap.iterator()) {
@@ -1070,8 +1069,8 @@ public class TestSnapshotDiffManager {
 
     String jobId = UUID.randomUUID().toString();
     SnapshotDiffJob snapshotDiffJob = new SnapshotDiffJob(0L,
-        jobId, jobStatus, volumeName, bucketName,
-        fromSnapshotName, toSnapshotName, true, false, 10, null,0.0);
+        jobId, jobStatus, volumeName, bucketName, fromSnapshotName, toSnapshotName,
+        true, false, 10, null, 0.0);
 
     snapDiffJobMap.put(diffJobKey, snapshotDiffJob);
 
@@ -1560,13 +1559,14 @@ public class TestSnapshotDiffManager {
 
     doReturn(testDeltaFiles).when(spy).getDeltaFiles(any(OmSnapshot.class),
         any(OmSnapshot.class), anyList(), eq(fromSnapInfo), eq(toSnapInfo),
-        eq(false), anyMap(), anyString(),anyString());
+        eq(false), anyMap(), anyString(),
+        anyString());
 
     doReturn(testDeltaFiles).when(spy)
         .getSSTFileListForSnapshot(any(OmSnapshot.class), anyList());
 
     doNothing().when(spy).addToObjectIdMap(eq(keyInfoTable), eq(keyInfoTable),
-        any(), anyBoolean(), any(), any(), any(), any(), any(), anyMap(),anyString());
+        any(), anyBoolean(), any(), any(), any(), any(), any(), anyMap(), anyString());
     doNothing().when(spy).checkReportsIntegrity(any(), anyInt(), anyInt());
 
     doReturn(10L).when(spy).generateDiffReport(anyString(),

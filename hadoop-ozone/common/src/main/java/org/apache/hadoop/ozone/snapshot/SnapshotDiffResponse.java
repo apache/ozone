@@ -45,7 +45,9 @@ public class SnapshotDiffResponse {
       return JobStatus.valueOf(jobStatusProto.name());
     }
   }
-
+  /**
+   * Snapshot diff job sub-status enum.
+   */
   public enum SubStatus {
     SST_FILE_DELTA_DAG_WALK,
     SST_FILE_DELTA_FULL_DIFF,

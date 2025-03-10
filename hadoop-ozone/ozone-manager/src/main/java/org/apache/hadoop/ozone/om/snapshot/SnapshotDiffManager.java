@@ -55,7 +55,11 @@ import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.FA
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.QUEUED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.REJECTED;
-import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus.*;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus.DIFF_REPORT_GEN;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus.OBJECT_ID_MAP_GEN_FSO;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus.OBJECT_ID_MAP_GEN_OBS;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus.SST_FILE_DELTA_DAG_WALK;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus.SST_FILE_DELTA_FULL_DIFF;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
@@ -71,7 +75,6 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -80,12 +83,12 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
 import java.util.stream.Stream;
 import org.apache.commons.io.file.PathUtils;
@@ -755,8 +758,8 @@ public class SnapshotDiffManager implements AutoCloseable {
     if (snapDiffJob == null) {
       String jobId = UUID.randomUUID().toString();
       snapDiffJob = new SnapshotDiffJob(System.currentTimeMillis(), jobId,
-          QUEUED, volumeName, bucketName, fromSnapshotName, toSnapshotName,
-          forceFullDiff, disableNativeDiff, 0L, null,0.0);
+          QUEUED, volumeName, bucketName, fromSnapshotName, toSnapshotName, forceFullDiff,
+          disableNativeDiff, 0L, null, 0.0);
       snapDiffJobTable.put(jobKey, snapDiffJob);
     }
 
@@ -1542,7 +1545,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     SnapshotDiffJob snapshotDiffJob = snapDiffJobTable.get(jobKey);
     snapshotDiffJob.setKeysProcessedPct(pct * 100);
     snapDiffJobTable.put(jobKey, snapshotDiffJob);
-    if (LOG.isDebugEnabled()){
+    if (LOG.isDebugEnabled()) {
       LOG.debug("Completed processing {}% of keys for snapshot diff job {}", pct, jobKey);
     }
   }
