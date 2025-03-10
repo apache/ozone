@@ -63,6 +63,7 @@ Get Random Filename
     File Should Not Exist    ${tmpfile}
     [return]                 ${tmpfile}
 
-List All Processes
-    ${output} =    Execute    ps aux
+List Processes
+    [arguments]    ${pattern}=${EMPTY}
+    ${output} =    Execute and ignore error    ps aux | grep '${pattern}' | grep -v grep
     [return]    ${output}
