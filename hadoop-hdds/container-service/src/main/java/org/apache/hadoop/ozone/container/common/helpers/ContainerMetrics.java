@@ -56,6 +56,8 @@ public class ContainerMetrics implements Closeable {
   @Metric private MutableCounterLong containerForceDelete;
   @Metric private MutableCounterLong numReadStateMachine;
   @Metric private MutableCounterLong bytesReadStateMachine;
+  @Metric private MutableCounterLong numContainerReconciledWithoutChanges;
+  @Metric private MutableCounterLong numContainerReconciledWithChanges;
 
 
   private final EnumMap<ContainerProtos.Type, MutableCounterLong> numOpsArray;
@@ -171,5 +173,13 @@ public class ContainerMetrics implements Closeable {
 
   public long getBytesReadStateMachine() {
     return bytesReadStateMachine.value();
+  }
+
+  public void incContainerReconciledWithoutChanges() {
+    numContainerReconciledWithoutChanges.incr();
+  }
+
+  public void incContainerReconciledWithChanges() {
+    numContainerReconciledWithChanges.incr();
   }
 }
