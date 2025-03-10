@@ -51,9 +51,13 @@ Because Ozone does not yet support truncate() API, to use Ozone ofs as a DataStr
 For more information, see the [File Systems](https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/filesystems/overview/) documentation.
 
 * PyArrow https://hackmd.io/@cxorm/cxorm
-* Cloudera Hue https://gethue.com/blog/discover-the-power-of-apache-ozone-using-the-hue-file-browser/
+* Cloudera Hue can access Ozone through Ozone HTTPFS interface https://gethue.com/blog/discover-the-power-of-apache-ozone-using-the-hue-file-browser/
 * Alluxio https://docs.alluxio.io/os/user/stable/en/ufs/Ozone.html
 
 ## Commercial
 * Teradata https://docs.teradata.com/r/Enterprise_IntelliFlex_VMware/Teradata-VantageTM-Native-Object-Store-Getting-Started-Guide-17.20
 * Starburst https://docs.starburst.io/latest/connector/starburst-ozone.html
+
+## Via Ozone S3 Gateway
+Various applications can access Ozone via the S3 Gateway, which opens up Ozone for more use cases.
+For example, send Fluentd logs to Ozone S3 Gateway.
