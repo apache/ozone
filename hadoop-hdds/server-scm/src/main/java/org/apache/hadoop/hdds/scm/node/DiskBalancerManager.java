@@ -260,13 +260,20 @@ public class DiskBalancerManager {
         getVolumeDataDensitySumForDatanodeDetails(dn);
     HddsProtos.DiskBalancerRunningStatus runningStatus =
         getRunningStatus(dn);
+
+    DiskBalancerStatus status = statusMap.get(dn);
+    if (status == null) {
+      status = new DiskBalancerStatus(false, new DiskBalancerConfiguration(), 0, 0);
+      statusMap.put(dn, status);
+    }
+
     HddsProtos.DatanodeDiskBalancerInfoProto.Builder builder =
         HddsProtos.DatanodeDiskBalancerInfoProto.newBuilder()
             .setNode(dn.toProto(clientVersion))
             .setCurrentVolumeDensitySum(volumeDensitySum)
             .setRunningStatus(getRunningStatus(dn))
-            .setSuccessMoveCount(statusMap.get(dn).getSuccessMoveCount())
-            .setFailureMoveCount(statusMap.get(dn).getFailureMoveCount());
+            .setSuccessMoveCount(status.getSuccessMoveCount())
+            .setFailureMoveCount(status.getFailureMoveCount());
     if (runningStatus != HddsProtos.DiskBalancerRunningStatus.UNKNOWN) {
       builder.setDiskBalancerConf(statusMap.get(dn)
           .getDiskBalancerConfiguration().toProtobufBuilder());
