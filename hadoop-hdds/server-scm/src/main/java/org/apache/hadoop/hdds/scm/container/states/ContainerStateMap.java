@@ -72,8 +72,8 @@ public class ContainerStateMap {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerStateMap.class);
 
-  private final ContainerAttribute<LifeCycleState> lifeCycleStateMap;
-  private final ContainerAttribute<ReplicationType> typeMap;
+  private final ContainerAttribute<LifeCycleState> lifeCycleStateMap = new ContainerAttribute<>(LifeCycleState.class);
+  private final ContainerAttribute<ReplicationType> typeMap = new ContainerAttribute<>(ReplicationType.class);
   private final Map<ContainerID, ContainerInfo> containerMap;
   private final Map<ContainerID, Set<ContainerReplica>> replicaMap;
 
@@ -81,8 +81,6 @@ public class ContainerStateMap {
    * Create a ContainerStateMap.
    */
   public ContainerStateMap() {
-    this.lifeCycleStateMap = new ContainerAttribute<>(LifeCycleState.class);
-    this.typeMap = new ContainerAttribute<>(ReplicationType.class);
     this.containerMap = new ConcurrentHashMap<>();
     this.replicaMap = new ConcurrentHashMap<>();
   }

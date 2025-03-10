@@ -32,11 +32,11 @@ import org.junit.jupiter.api.Test;
  * Test ContainerAttribute management.
  */
 public class TestContainerAttribute {
-  enum Key {K1, K2, K3}
+  enum Key { K1, K2, K3 }
 
-  static final Key key1 = Key.K1;
-  static final Key key2 = Key.K2;
-  static final Key key3 = Key.K3;
+  private final Key key1 = Key.K1;
+  private final Key key2 = Key.K2;
+  private final Key key3 = Key.K3;
 
   static <T extends Enum<T>> boolean hasContainerID(ContainerAttribute<T> attribute, T key, int id) {
     return hasContainerID(attribute, key, ContainerID.valueOf(id));
@@ -48,7 +48,7 @@ public class TestContainerAttribute {
   }
 
   @Test
-  public void testInsert() throws SCMException {
+  public void testInsert() {
     ContainerAttribute<Key> containerAttribute = new ContainerAttribute<>(Key.class);
     ContainerID id = ContainerID.valueOf(42);
     containerAttribute.insert(key1, id);
@@ -64,7 +64,7 @@ public class TestContainerAttribute {
   }
 
   @Test
-  public void testClearSet() throws SCMException {
+  public void testClearSet() {
     ContainerAttribute<Key> containerAttribute = new ContainerAttribute<>(Key.class);
     for (Key k : Key.values()) {
       for (int x = 1; x < 101; x++) {
@@ -79,7 +79,7 @@ public class TestContainerAttribute {
   }
 
   @Test
-  public void testRemove() throws SCMException {
+  public void testRemove() {
 
     ContainerAttribute<Key> containerAttribute = new ContainerAttribute<>(Key.class);
 

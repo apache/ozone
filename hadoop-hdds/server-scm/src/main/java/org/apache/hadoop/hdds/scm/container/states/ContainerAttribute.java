@@ -21,11 +21,11 @@ import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAI
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedSet;
+import com.google.common.collect.Maps;
 import java.util.EnumMap;
 import java.util.NavigableSet;
 import java.util.Objects;
 import java.util.TreeSet;
-import com.google.common.collect.Maps;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.slf4j.Logger;
