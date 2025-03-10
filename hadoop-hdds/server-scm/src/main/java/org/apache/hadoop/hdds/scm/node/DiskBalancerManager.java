@@ -59,8 +59,6 @@ public class DiskBalancerManager {
   private final NodeManager nodeManager;
   private Map<DatanodeDetails, DiskBalancerStatus> statusMap;
   private Map<DatanodeDetails, Long> balancedBytesMap;
-  private long successMoveCount;
-  private long failureMoveCount;
   private boolean useHostnames;
 
   /**
@@ -267,8 +265,8 @@ public class DiskBalancerManager {
             .setNode(dn.toProto(clientVersion))
             .setCurrentVolumeDensitySum(volumeDensitySum)
             .setRunningStatus(getRunningStatus(dn))
-            .setSuccessMoveCount(successMoveCount)
-            .setFailureMoveCount(failureMoveCount);
+            .setSuccessMoveCount(statusMap.get(dn).getSuccessMoveCount())
+            .setFailureMoveCount(statusMap.get(dn).getFailureMoveCount());
     if (runningStatus != HddsProtos.DiskBalancerRunningStatus.UNKNOWN) {
       builder.setDiskBalancerConf(statusMap.get(dn)
           .getDiskBalancerConfiguration().toProtobufBuilder());
@@ -321,7 +319,7 @@ public class DiskBalancerManager {
   @VisibleForTesting
   public void addRunningDatanode(DatanodeDetails datanodeDetails) {
     statusMap.put(datanodeDetails, new DiskBalancerStatus(true,
-        new DiskBalancerConfiguration()));
+        new DiskBalancerConfiguration(),0 ,0));
   }
 
   public void processDiskBalancerReport(DiskBalancerReportProto reportProto,
@@ -332,13 +330,13 @@ public class DiskBalancerManager {
             DiskBalancerConfiguration.fromProtobuf(
                 reportProto.getDiskBalancerConf(), conf) :
             new DiskBalancerConfiguration();
+    long successMoveCount = reportProto.getSuccessMoveCount();
+    long failureMoveCount = reportProto.getFailureMoveCount();
     statusMap.put(dn, new DiskBalancerStatus(isRunning,
-        diskBalancerConfiguration));
+        diskBalancerConfiguration, successMoveCount, failureMoveCount));
     if (reportProto.hasBalancedBytes()) {
       balancedBytesMap.put(dn, reportProto.getBalancedBytes());
     }
-    successMoveCount = reportProto.getSuccessCount();
-    failureMoveCount = reportProto.getFailureCount();
   }
 
   private DiskBalancerConfiguration attachDiskBalancerConf(

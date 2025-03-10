@@ -299,8 +299,6 @@ public class DiskBalancerService extends BackgroundService {
         DiskBalancerReportProto.newBuilder();
     return builder.setIsRunning(shouldRun)
         .setBalancedBytes(totalBalancedBytes.get())
-        .setSuccessCount(metrics.getSuccessCount())
-        .setFailureCount(metrics.getFailureCount())
         .setDiskBalancerConf(
             HddsProtos.DiskBalancerConfigurationProto.newBuilder()
                 .setThreshold(threshold)

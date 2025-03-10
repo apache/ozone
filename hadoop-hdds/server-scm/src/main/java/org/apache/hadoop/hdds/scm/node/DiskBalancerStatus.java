@@ -30,11 +30,14 @@ public class DiskBalancerStatus {
 
   private boolean isRunning;
   private DiskBalancerConfiguration diskBalancerConfiguration;
+  private long successMoveCount;
+  private long failureMoveCount;
 
-
-  public DiskBalancerStatus(boolean isRunning, DiskBalancerConfiguration conf) {
+  public DiskBalancerStatus(boolean isRunning, DiskBalancerConfiguration conf, long successMoveCount, long failureMoveCount) {
     this.isRunning = isRunning;
     this.diskBalancerConfiguration = conf;
+    this.successMoveCount = successMoveCount;
+    this.failureMoveCount = failureMoveCount;
   }
 
   public boolean isRunning() {
@@ -43,5 +46,13 @@ public class DiskBalancerStatus {
 
   public DiskBalancerConfiguration getDiskBalancerConfiguration() {
     return diskBalancerConfiguration;
+  }
+
+  public long getSuccessMoveCount() {
+    return successMoveCount;
+  }
+
+  public long getFailureMoveCount() {
+    return failureMoveCount;
   }
 }
