@@ -253,8 +253,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         ratisContainerPlacement, conf, this);
     quasiClosedStuckUnderReplicationHandler =
         new QuasiClosedStuckUnderReplicationHandler(ratisContainerPlacement, conf, this);
-    quasiClosedStuckOverReplicationHandler =
-        new QuasiClosedStuckOverReplicationHandler(ratisContainerPlacement, conf, this);
+    quasiClosedStuckOverReplicationHandler = new QuasiClosedStuckOverReplicationHandler(this);
     underReplicatedProcessor =
         new UnderReplicatedProcessor(this, rmConf::getUnderReplicatedInterval);
     overReplicatedProcessor =

@@ -18,10 +18,11 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import java.io.IOException;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 /**
@@ -29,15 +30,80 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
  */
 public class QuasiClosedStuckOverReplicationHandler implements UnhealthyReplicationHandler {
 
+  private static final org.slf4j.Logger LOG =
+      org.slf4j.LoggerFactory.getLogger(QuasiClosedStuckOverReplicationHandler.class);
+  private final ReplicationManager replicationManager;
+  private final ReplicationManagerMetrics metrics;
 
-  public QuasiClosedStuckOverReplicationHandler(final PlacementPolicy placementPolicy,
-      final ConfigurationSource conf, final ReplicationManager replicationManager) {
+  public QuasiClosedStuckOverReplicationHandler(final ReplicationManager replicationManager) {
+    this.replicationManager = replicationManager;
+    this.metrics = replicationManager.getMetrics();
   }
 
   @Override
   public int processAndSendCommands(Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
       ContainerHealthResult result, int remainingMaintenanceRedundancy)
       throws IOException {
-    return 0;
+
+    ContainerInfo containerInfo = result.getContainerInfo();
+    LOG.debug("Handling over replicated QuasiClosed Stuck Ratis container {}", containerInfo);
+
+    int pendingDelete = 0;
+    for (ContainerReplicaOp op : pendingOps) {
+      if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
+        pendingDelete++;
+      }
+    }
+
+    if (pendingDelete > 0) {
+      LOG.debug("Container {} has pending delete operations. No more over replication will be scheduled until they " +
+          "complete", containerInfo);
+      return 0;
+    }
+
+    QuasiClosedStuckReplicaCount replicaCount =
+        new QuasiClosedStuckReplicaCount(replicas, remainingMaintenanceRedundancy);
+
+    List<QuasiClosedStuckReplicaCount.MisReplicatedOrigin> misReplicatedOrigins
+        = replicaCount.getOverReplicatedOrigins();
+
+    if (misReplicatedOrigins.isEmpty()) {
+      LOG.debug("Container {} is not over replicated", containerInfo);
+      return 0;
+    }
+
+    int totalCommandsSent = 0;
+    IOException firstException = null;
+    for (QuasiClosedStuckReplicaCount.MisReplicatedOrigin origin : misReplicatedOrigins) {
+      List<ContainerReplica> sortedReplicas = getEligibleReplicas(origin.getSources());
+      for (int i = 0; i < origin.getReplicaDelta(); i++) {
+        try {
+          replicationManager.sendThrottledDeleteCommand(
+              containerInfo, 0, sortedReplicas.get(i).getDatanodeDetails(), true);
+          totalCommandsSent++;
+        } catch (CommandTargetOverloadedException e) {
+          LOG.debug("Unable to send delete command for container {} to {} as it has too many pending delete commands",
+              containerInfo, sortedReplicas.get(i).getDatanodeDetails());
+          firstException = e;
+        }
+      }
+    }
+
+    if (firstException != null) {
+      // Some nodes were overloaded when attempting to send commands.
+      if (totalCommandsSent > 0) {
+        metrics.incrPartialReplicationTotal();
+      }
+      throw firstException;
+    }
+    return totalCommandsSent;
+  }
+
+  private List<ContainerReplica> getEligibleReplicas(
+      Set<ContainerReplica> replicas) {
+    // sort replicas so that they can be selected in a deterministic way
+    return replicas.stream()
+        .sorted(Comparator.comparingLong(ContainerReplica::hashCode))
+        .collect(Collectors.toList());
   }
 }
