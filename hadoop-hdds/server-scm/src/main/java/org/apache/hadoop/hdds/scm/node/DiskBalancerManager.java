@@ -319,7 +319,7 @@ public class DiskBalancerManager {
   @VisibleForTesting
   public void addRunningDatanode(DatanodeDetails datanodeDetails) {
     statusMap.put(datanodeDetails, new DiskBalancerStatus(true,
-        new DiskBalancerConfiguration(),0 ,0));
+        new DiskBalancerConfiguration(), 0, 0));
   }
 
   public void processDiskBalancerReport(DiskBalancerReportProto reportProto,
