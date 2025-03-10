@@ -103,6 +103,7 @@ public class DiskBalancerService extends BackgroundService {
   private final File diskBalancerInfoFile;
 
   private DiskBalancerServiceMetrics metrics;
+  private long queueSize;
 
   public DiskBalancerService(OzoneContainer ozoneContainer,
       long serviceCheckInterval, long serviceCheckTimeout, TimeUnit timeUnit,
@@ -352,6 +353,7 @@ public class DiskBalancerService extends BackgroundService {
     if (queue.isEmpty()) {
       metrics.incrIdleLoopNoAvailableVolumePairCount();
     }
+    queueSize = queue.size();
     return queue;
   }
 
@@ -509,42 +511,44 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   private long estimatedTotalSizePendingToMove() {
-    long totalUsedSpace = 0;
-    int numVolumes = 0;
-
-    // Collect total used space across all data volumes
-    for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())) {
-        totalUsedSpace += (volume.getTotalCapacity() - volume.getFreeSpace());
-        numVolumes++;
-    }
-
-    if (numVolumes == 0) {
-      return 0; // Avoid division by zero
-    }
-    LOG.info("Number of data volumes {}.",
-        numVolumes);
-    LOG.info("Total used space across all data volumes {}.",
-        totalUsedSpace);
-    // Compute target usage per volume
-    long targetUsagePerVolume = totalUsedSpace / numVolumes;
-    LOG.info("Target usage per data volumes {}.",
-        targetUsagePerVolume);
     long totalDataPendingToMove = 0;
+
+    if (queueSize == 0) {
+      LOG.debug("No available Volume pair to perform move.");
+      return totalDataPendingToMove;
+    }
+
+    long totalUsedSpace = 0;
+    long totalCapacity = 0;
+
+    for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())) {
+      totalUsedSpace += volume.getCurrentUsage().getUsedSpace();
+      totalCapacity += volume.getCurrentUsage().getCapacity();
+    }
+
+    if (totalCapacity == 0) {
+      return 0;
+    }
+
+    double datanodeUtilization = (double) totalUsedSpace / totalCapacity;
+
+    double thresholdFraction = threshold / 100.0;
+    double upperLimit = datanodeUtilization + thresholdFraction;
 
     // Calculate excess data in overused volumes
     for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())) {
-        long usedSpace = (volume.getTotalCapacity() - volume.getFreeSpace());
-        long deviation = usedSpace - targetUsagePerVolume;
-        if (deviation > 0) {
-          totalDataPendingToMove += deviation;
-        }
-    }
-    LOG.info("Total data pending to move before disk" +
-        " usage becomes even {}.", totalDataPendingToMove);
+      long usedSpace = volume.getCurrentUsage().getUsedSpace();
+      long capacity = volume.getCurrentUsage().getCapacity();
+      double volumeUtilization = (double) usedSpace / capacity;
 
+      // Consider only volumes exceeding the upper threshold
+      if (volumeUtilization > upperLimit) {
+        long excessData = usedSpace - (long) (upperLimit * capacity);
+        totalDataPendingToMove += excessData;
+      }
+    }
     return totalDataPendingToMove;
   }
-
 
   private Path getDiskBalancerTmpDir(HddsVolume hddsVolume) {
     return Paths.get(hddsVolume.getVolumeRootDir())

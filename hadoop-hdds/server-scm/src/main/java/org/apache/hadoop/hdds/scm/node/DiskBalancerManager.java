@@ -32,7 +32,6 @@ import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
@@ -61,6 +60,7 @@ public class DiskBalancerManager {
   private Map<DatanodeDetails, DiskBalancerStatus> statusMap;
   private Map<DatanodeDetails, Long> balancedBytesMap;
   private boolean useHostnames;
+  private long totalDataPendingToMove;
 
   /**
    * Constructs DiskBalancer Manager.
