@@ -71,6 +71,7 @@ import org.apache.hadoop.hdds.scm.container.replication.health.HealthCheck;
 import org.apache.hadoop.hdds.scm.container.replication.health.MismatchedReplicasHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.OpenContainerHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.QuasiClosedContainerHandler;
+import org.apache.hadoop.hdds.scm.container.replication.health.QuasiClosedStuckReplicationCheck;
 import org.apache.hadoop.hdds.scm.container.replication.health.RatisReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.RatisUnhealthyReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.VulnerableUnhealthyReplicasHandler;
@@ -182,6 +183,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   private final RatisUnderReplicationHandler ratisUnderReplicationHandler;
   private final RatisOverReplicationHandler ratisOverReplicationHandler;
   private final RatisMisReplicationHandler ratisMisReplicationHandler;
+  private final QuasiClosedStuckUnderReplicationHandler quasiClosedStuckUnderReplicationHandler;
   private Thread underReplicatedProcessorThread;
   private Thread overReplicatedProcessorThread;
   private final UnderReplicatedProcessor underReplicatedProcessor;
@@ -248,6 +250,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         new RatisOverReplicationHandler(ratisContainerPlacement, this);
     ratisMisReplicationHandler = new RatisMisReplicationHandler(
         ratisContainerPlacement, conf, this);
+    quasiClosedStuckUnderReplicationHandler =
+        new QuasiClosedStuckUnderReplicationHandler(ratisContainerPlacement, conf, this);
     underReplicatedProcessor =
         new UnderReplicatedProcessor(this, rmConf::getUnderReplicatedInterval);
     overReplicatedProcessor =
@@ -262,6 +266,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         .addNext(new MismatchedReplicasHandler(this))
         .addNext(new EmptyContainerHandler(this))
         .addNext(new DeletingContainerHandler(this))
+        .addNext(new QuasiClosedStuckReplicationCheck())
         .addNext(ecReplicationCheckHandler)
         .addNext(ratisReplicationCheckHandler)
         .addNext(new ClosedWithUnhealthyReplicasHandler(this))
@@ -746,8 +751,15 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
 
     if (result.getHealthState()
         == ContainerHealthResult.HealthState.UNDER_REPLICATED) {
-      handler = isEC ? ecUnderReplicationHandler
-          : ratisUnderReplicationHandler;
+      if (isEC) {
+        handler = ecUnderReplicationHandler;
+      } else {
+        if (QuasiClosedStuckReplicationCheck.shouldHandleAsQuasiClosedStuck(result.getContainerInfo(), replicas)) {
+          handler = quasiClosedStuckUnderReplicationHandler;
+        } else {
+          handler = ratisUnderReplicationHandler;
+        }
+      }
     } else if (result.getHealthState()
         == ContainerHealthResult.HealthState.MIS_REPLICATED) {
       handler = isEC ? ecMisReplicationHandler : ratisMisReplicationHandler;
