@@ -56,6 +56,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
+import static org.mockito.Mockito.anyDouble;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyMap;
@@ -450,7 +451,10 @@ public class TestSnapshotDiffManager {
       mockedRdbUtil.when(() -> RdbUtil.getSSTFilesForComparison(any(), any()))
           .thenReturn(Collections.singleton(RandomStringUtils.randomAlphabetic(10)));
       mockedRocksDiffUtils.when(() -> RocksDiffUtils.filterRelevantSstFiles(any(), any())).thenAnswer(i -> null);
-      Set<String> deltaFiles = snapshotDiffManager.getDeltaFiles(
+      SnapshotDiffManager spy = spy(snapshotDiffManager);
+      doNothing().when(spy).recordActivity(any(), any());
+      doNothing().when(spy).updateProgress(anyString(), anyDouble());
+      Set<String> deltaFiles = spy.getDeltaFiles(
           fromSnapshot,
           toSnapshot,
           Arrays.asList("cf1", "cf2"), fromSnapshotInfo,
@@ -521,7 +525,10 @@ public class TestSnapshotDiffManager {
       SnapshotInfo fromSnapshotInfo = getMockedSnapshotInfo(snap1);
       SnapshotInfo toSnapshotInfo = getMockedSnapshotInfo(snap1);
       when(jobTableIterator.isValid()).thenReturn(false);
-      Set<String> deltaFiles = snapshotDiffManager.getDeltaFiles(
+      SnapshotDiffManager spy = spy(snapshotDiffManager);
+      doNothing().when(spy).recordActivity(any(), any());
+      doNothing().when(spy).updateProgress(anyString(), anyDouble());
+      Set<String> deltaFiles = spy.getDeltaFiles(
           fromSnapshot,
           toSnapshot,
           Arrays.asList("cf1", "cf2"),
@@ -590,7 +597,10 @@ public class TestSnapshotDiffManager {
       SnapshotInfo toSnapshotInfo = getMockedSnapshotInfo(snap1);
       when(jobTableIterator.isValid()).thenReturn(false);
       String diffJobKey = snap1 + DELIMITER + snap2;
-      Set<String> deltaFiles = snapshotDiffManager.getDeltaFiles(
+      SnapshotDiffManager spy = spy(snapshotDiffManager);
+      doNothing().when(spy).recordActivity(any(), any());
+      doNothing().when(spy).updateProgress(anyString(), anyDouble());
+      Set<String> deltaFiles = spy.getDeltaFiles(
           fromSnapshot,
           toSnapshot,
           Arrays.asList("cf1", "cf2"),
@@ -1542,6 +1552,8 @@ public class TestSnapshotDiffManager {
       return Sets.newHashSet("6", "7", "8");
     }).when(spy).getSSTFileListForSnapshot(Mockito.any(OmSnapshot.class),
         Mockito.anyList());
+    doNothing().when(spy).recordActivity(any(), any());
+    doNothing().when(spy).updateProgress(anyString(), anyDouble());
     String diffJobKey = snap1 + DELIMITER + snap2;
     Set<String> deltaFiles = spy.getDeltaFiles(fromSnapshot, toSnapshot, Collections.emptyList(), snapshotInfo,
         snapshotInfo, true, Collections.emptyMap(), null, diffJobKey);

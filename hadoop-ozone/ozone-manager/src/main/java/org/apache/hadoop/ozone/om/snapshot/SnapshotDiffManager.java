@@ -1530,7 +1530,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     snapDiffJobTable.put(jobKey, snapshotDiffJob);
   }
 
-  private synchronized void recordActivity(String jobKey,
+  synchronized void recordActivity(String jobKey,
       SnapshotDiffResponse.SubStatus subStatus) {
     SnapshotDiffJob snapshotDiffJob = snapDiffJobTable.get(jobKey);
     snapshotDiffJob.setSubStatus(subStatus);
@@ -1540,7 +1540,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     }
   }
 
-  private synchronized void updateProgress(String jobKey,
+  synchronized void updateProgress(String jobKey,
       double pct) {
     SnapshotDiffJob snapshotDiffJob = snapDiffJobTable.get(jobKey);
     snapshotDiffJob.setKeysProcessedPct(pct * 100);
