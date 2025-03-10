@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
+import static org.apache.hadoop.ozone.container.common.volume.StorageVolume.HUNDRED_MB;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -108,6 +109,38 @@ public class TestStorageVolumeHealthChecks {
     DiskCheckUtil.setTestImpl(doesNotExist);
     result = volume.check(false);
     assertEquals(VolumeCheckResult.FAILED, result);
+  }
+
+  @ParameterizedTest
+  @MethodSource("volumeBuilders")
+  public void testVolumeFullHealth(StorageVolume.Builder<?> builder)
+      throws Exception {
+    StorageVolume volume = builder.build();
+
+    VolumeUsage usage = volume.getVolumeInfo().get().getUsageForTesting();
+    // Keep remaining space as just less than 100 MB
+    usage.incrementUsedSpace(usage.getCurrentUsage().getAvailable() - HUNDRED_MB + 1);
+    usage.realUsage();
+    DiskCheckUtil.DiskChecks ioFailure = new DiskCheckUtil.DiskChecks() {
+      @Override
+      public boolean checkReadWrite(File storageDir, File testFileDir,
+                                    int numBytesToWrite) {
+        return false;
+      }
+    };
+    DiskCheckUtil.setTestImpl(ioFailure);
+    // Volume will remain healthy as volume don't have enough space to check READ/WRITE
+    assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+    // Even in second try volume will remain HEALTHY
+    assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+
+    // Now keep enough space for read/write check to go through
+    usage.decrementUsedSpace(HUNDRED_MB + 1);
+
+    // volumeIOFailureTolerance is 1, so first time it will be HEALTHY
+    assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+    // second time volume will fail as READ/WRITE check has failed
+    assertEquals(VolumeCheckResult.FAILED, volume.check(false));
   }
 
   @ParameterizedTest
