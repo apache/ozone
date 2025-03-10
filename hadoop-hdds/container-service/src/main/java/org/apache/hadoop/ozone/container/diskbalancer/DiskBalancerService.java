@@ -363,7 +363,10 @@ public class DiskBalancerService extends BackgroundService {
   private boolean shouldDelay() {
     // We should wait for next AvailableTime.
     if (Time.monotonicNow() <= nextAvailableTime.get()) {
-      LOG.info("Skipping balancing until nextAvailableTime ({})", nextAvailableTime.get());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Skipping balancing until nextAvailableTime ({})",
+            (nextAvailableTime.get() - Time.monotonicNow()));
+      }
       return true;
     }
     // Calculate the next AvailableTime based on bandwidth
@@ -374,8 +377,10 @@ public class DiskBalancerService extends BackgroundService {
     float bytesPerMillisec = bandwidthInMB * megaByte / 1000f;
     long delayInMillisec = (long) (bytesBalanced / bytesPerMillisec);
     nextAvailableTime.set(Time.monotonicNow() + delayInMillisec);
-    LOG.debug("Bytes balanced: {} MB, Calculated delay: {} ms ({} sec)",
-        bytesBalanced / megaByte, delayInMillisec, delayInMillisec / 1000);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Bytes balanced: {} MB, Calculated delay: {} ms ({} sec)",
+          bytesBalanced / megaByte, delayInMillisec, delayInMillisec / 1000);
+    }
     return false;
   }
 
