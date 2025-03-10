@@ -14,9 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-HDDS_VERSION=${hdds.version}
-HADOOP_IMAGE=apache/hadoop
-OZONE_RUNNER_VERSION=${docker.ozone-runner.version}
-OZONE_RUNNER_IMAGE=apache/ozone-runner
-OZONE_OPTS=
-RANGER_VERSION=2.6.0
+# To enable Ranger as the Authorizer in Ozone
+OZONE-SITE.XML_ozone.acl.enabled=true
+OZONE-SITE.XML_ozone.acl.authorizer.class=org.apache.ranger.authorization.ozone.authorizer.RangerOzoneAuthorizer

@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -14,9 +16,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-HDDS_VERSION=${hdds.version}
-HADOOP_IMAGE=apache/hadoop
-OZONE_RUNNER_VERSION=${docker.ozone-runner.version}
-OZONE_RUNNER_IMAGE=apache/ozone-runner
-OZONE_OPTS=
-RANGER_VERSION=2.6.0
+OZONE_HOME=/opt/hadoop
+cd "${OZONE_HOME}"/ranger-ozone-plugin || exit
+
+if [[ ! -f "${OZONE_HOME}"/.setupDone ]];
+then
+  if [ ! -d conf ]; then
+    mkdir -p conf
+    echo "conf directory created!"
+  else
+    echo "conf directory exists already!"
+  fi
+  echo "export JAVA_HOME=${JAVA_HOME}" >> conf/ozone-env.sh
+  sudo JAVA_HOME=/usr/lib/jvm/jre/ ./enable-ozone-plugin.sh
+  touch "${OZONE_HOME}"/.setupDone
+else
+  echo "Ranger Ozone Plugin Installation is already complete!"
+fi
