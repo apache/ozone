@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -122,6 +124,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {
+    keyManager.start(getOzoneConfiguration());
     // Create and Delete keys. The keys should be moved to DeletedKeys table
     List<String> deletedKeyNames = createAndDeleteKeys(1, null);
 
@@ -165,6 +168,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
 
   @Test
   public void testKeyPurgeInSnapshot() throws Exception {
+    keyManager.start(getOzoneConfiguration());
     // Create and Delete keys. The keys should be moved to DeletedKeys table
     List<String> deletedKeyNames = createAndDeleteKeys(1, null);
 
@@ -211,8 +215,11 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
     try (BatchOperation batchOperation =
         omMetadataManager.getStore().initBatchOperation()) {
 
-      OMKeyPurgeResponse omKeyPurgeResponse = new OMKeyPurgeResponse(omResponse, deletedKeyNames, snapInfo, null);
+      OMKeyPurgeResponse omKeyPurgeResponse = new OMKeyPurgeResponse(
+          omResponse, deletedKeyNames, snapInfo, null);
       omKeyPurgeResponse.addToDBBatch(omMetadataManager, batchOperation);
+      assertEquals(deletedKeyNames.size(),
+          ((TypedTable)this.omMetadataManager.getTable(DELETED_TABLE)).getUncompactedDeletes().get());
 
       // Do manual commit and see whether addToBatch is successful or not.
       omMetadataManager.getStore().commitBatchOperation(batchOperation);

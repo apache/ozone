@@ -622,4 +622,21 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_MAX_BUCKET =
       "ozone.om.max.buckets";
   public static final int OZONE_OM_MAX_BUCKET_DEFAULT = 100000;
+  /**
+   * Configuration properties for Compaction Service.
+   */
+  public static final String OZONE_COMPACTION_SERVICE_ENABLED = "ozone.compaction.service.enabled";
+  public static final boolean OZONE_COMPACTION_SERVICE_ENABLED_DEFAULT = true;
+  public static final String OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL =
+      "ozone.om.compaction.service.run.interval";
+  public static final long
+      OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL_DEFAULT
+      = TimeUnit.MINUTES.toMillis(5);
+
+  public static final String OZONE_OM_COMPACTION_SERVICE_TIMEOUT
+      = "ozone.om.compaction.service.timeout";
+  public static final String OZONE_COMPACTION_SERVICE_TIMEOUT_DEFAULT = "10m";
+  public static final String OZONE_OM_COMPACTION_SERVICE_THRESHOLD
+      = "ozone.om.compaction.service.threshold";
+  public static final String OZONE_COMPACTION_SERVICE_THRESHOLD_DEFAULT = "10000";
 }
