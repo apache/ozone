@@ -364,7 +364,7 @@ public class DiskBalancerService extends BackgroundService {
     // We should wait for next AvailableTime.
     if (Time.monotonicNow() <= nextAvailableTime.get()) {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Skipping balancing until nextAvailableTime ({})",
+        LOG.debug("Skipping balancing until nextAvailableTime ({} ms)",
             (nextAvailableTime.get() - Time.monotonicNow()));
       }
       return true;
