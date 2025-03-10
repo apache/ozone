@@ -260,11 +260,20 @@ public class DiskBalancerManager {
         getVolumeDataDensitySumForDatanodeDetails(dn);
     HddsProtos.DiskBalancerRunningStatus runningStatus =
         getRunningStatus(dn);
+
+    DiskBalancerStatus status = statusMap.get(dn);
+    if (status == null) {
+      status = new DiskBalancerStatus(false, new DiskBalancerConfiguration(), 0, 0);
+      statusMap.put(dn, status);
+    }
+
     HddsProtos.DatanodeDiskBalancerInfoProto.Builder builder =
         HddsProtos.DatanodeDiskBalancerInfoProto.newBuilder()
             .setNode(dn.toProto(clientVersion))
             .setCurrentVolumeDensitySum(volumeDensitySum)
-            .setRunningStatus(getRunningStatus(dn));
+            .setRunningStatus(getRunningStatus(dn))
+            .setSuccessMoveCount(status.getSuccessMoveCount())
+            .setFailureMoveCount(status.getFailureMoveCount());
     if (runningStatus != HddsProtos.DiskBalancerRunningStatus.UNKNOWN) {
       builder.setDiskBalancerConf(statusMap.get(dn)
           .getDiskBalancerConfiguration().toProtobufBuilder());
@@ -317,7 +326,7 @@ public class DiskBalancerManager {
   @VisibleForTesting
   public void addRunningDatanode(DatanodeDetails datanodeDetails) {
     statusMap.put(datanodeDetails, new DiskBalancerStatus(true,
-        new DiskBalancerConfiguration()));
+        new DiskBalancerConfiguration(), 0, 0));
   }
 
   public void processDiskBalancerReport(DiskBalancerReportProto reportProto,
@@ -328,8 +337,10 @@ public class DiskBalancerManager {
             DiskBalancerConfiguration.fromProtobuf(
                 reportProto.getDiskBalancerConf(), conf) :
             new DiskBalancerConfiguration();
+    long successMoveCount = reportProto.getSuccessMoveCount();
+    long failureMoveCount = reportProto.getFailureMoveCount();
     statusMap.put(dn, new DiskBalancerStatus(isRunning,
-        diskBalancerConfiguration));
+        diskBalancerConfiguration, successMoveCount, failureMoveCount));
     if (reportProto.hasBalancedBytes()) {
       balancedBytesMap.put(dn, reportProto.getBalancedBytes());
     }

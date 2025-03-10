@@ -561,4 +561,6 @@ message DatanodeDiskBalancerInfoProto {
     required double currentVolumeDensitySum = 2;
     optional DiskBalancerRunningStatus runningStatus = 3;
     optional DiskBalancerConfigurationProto diskBalancerConf = 4;
+    optional uint64 successMoveCount = 5;
+    optional uint64 failureMoveCount = 6;
 }
