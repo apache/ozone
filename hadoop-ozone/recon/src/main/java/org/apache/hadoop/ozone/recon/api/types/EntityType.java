@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
  */
 public enum EntityType {
   ROOT {
+    @Override
     public EntityHandler create(
         ReconNamespaceSummaryManager reconNamespaceSummaryManager,
         ReconOMMetadataManager omMetadataManager,
@@ -44,6 +45,7 @@ public enum EntityType {
     }
   },
   VOLUME {
+    @Override
     public EntityHandler create(
         ReconNamespaceSummaryManager reconNamespaceSummaryManager,
         ReconOMMetadataManager omMetadataManager,
@@ -54,6 +56,7 @@ public enum EntityType {
     }
   },
   BUCKET {
+    @Override
     public EntityHandler create(
         ReconNamespaceSummaryManager reconNamespaceSummaryManager,
         ReconOMMetadataManager omMetadataManager,
@@ -64,6 +67,7 @@ public enum EntityType {
     }
   },
   DIRECTORY {
+    @Override
     public EntityHandler create(
         ReconNamespaceSummaryManager reconNamespaceSummaryManager,
         ReconOMMetadataManager omMetadataManager,
@@ -74,6 +78,7 @@ public enum EntityType {
     }
   },
   KEY {
+    @Override
     public EntityHandler create(
         ReconNamespaceSummaryManager reconNamespaceSummaryManager,
         ReconOMMetadataManager omMetadataManager,
@@ -84,6 +89,7 @@ public enum EntityType {
     }
   },
   UNKNOWN { // if path is invalid
+    @Override
     public EntityHandler create(
         ReconNamespaceSummaryManager reconNamespaceSummaryManager,
         ReconOMMetadataManager omMetadataManager,

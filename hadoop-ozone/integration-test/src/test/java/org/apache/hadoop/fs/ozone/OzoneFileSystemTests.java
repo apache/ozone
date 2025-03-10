@@ -20,6 +20,8 @@ package org.apache.hadoop.fs.ozone;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -33,15 +35,28 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationTarget;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.ratis.util.Preconditions;
 
 /**
  * Common test cases for Ozone file systems.
  */
-final class OzoneFileSystemTests {
+public final class OzoneFileSystemTests {
 
   private OzoneFileSystemTests() {
     // no instances
+  }
+
+  /**
+   * Set file system listing page size.  Also disable the file system cache to
+   * ensure new {@link FileSystem} instance reflects the updated page size.
+   */
+  public static void setPageSize(ConfigurationTarget conf, int pageSize) {
+    Preconditions.assertTrue(pageSize > 0, () -> "pageSize=" + pageSize + " <= 0");
+    conf.setInt(OZONE_FS_LISTING_PAGE_SIZE, pageSize);
+    conf.setBoolean(String.format("fs.%s.impl.disable.cache", OZONE_URI_SCHEME), true);
+    conf.setBoolean(String.format("fs.%s.impl.disable.cache", OZONE_OFS_URI_SCHEME), true);
   }
 
   /**
@@ -60,10 +75,8 @@ final class OzoneFileSystemTests {
         pageSize + pageSize
     };
     OzoneConfiguration config = new OzoneConfiguration(conf);
-    config.setInt(OZONE_FS_LISTING_PAGE_SIZE, pageSize);
+    setPageSize(config, pageSize);
     URI uri = FileSystem.getDefaultUri(config);
-    config.setBoolean(
-        String.format("fs.%s.impl.disable.cache", uri.getScheme()), true);
     try (FileSystem subject = FileSystem.get(uri, config)) {
       Path dir = new Path(Objects.requireNonNull(rootPath),
           "listStatusIterator");

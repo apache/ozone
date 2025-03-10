@@ -35,6 +35,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.Set;
@@ -77,8 +78,6 @@ import picocli.CommandLine;
  */
 public class TestOzoneDebugShell {
 
-  private static String omServiceId;
-
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient client;
   private static OzoneDebug ozoneDebugShell;
@@ -87,7 +86,6 @@ public class TestOzoneDebugShell {
 
   protected static void startCluster() throws Exception {
     // Init HA cluster
-    omServiceId = "om-service-test1";
     final int numDNs = 5;
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(numDNs)
@@ -194,7 +192,7 @@ public class TestOzoneDebugShell {
           BucketLayout.LEGACY);
       TestDataUtil.createKey(
           client.getObjectStore().getVolume(volumeName).getBucket(bucketName),
-          keyName, repConfig, "test");
+          keyName, repConfig, "test".getBytes(StandardCharsets.UTF_8));
     }
   }
 

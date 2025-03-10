@@ -301,11 +301,9 @@ public class TestStorageContainerManager {
     // eventually these TX will success.
     GenericTestUtils.waitFor(() -> {
       try {
-        if (SCMHAUtils.isSCMHAEnabled(cluster.getConf())) {
-          cluster.getStorageContainerManager().getScmHAManager()
-              .asSCMHADBTransactionBuffer().flush();
-        }
-        return delLog.getFailedTransactions(-1, 0).size() == 0;
+        cluster.getStorageContainerManager().getScmHAManager()
+            .asSCMHADBTransactionBuffer().flush();
+        return delLog.getFailedTransactions(-1, 0).isEmpty();
       } catch (IOException e) {
         return false;
       }
@@ -887,9 +885,7 @@ public class TestStorageContainerManager {
       Map<Long, List<Long>> containerBlocksMap)
       throws IOException, TimeoutException {
     delLog.addTransactions(containerBlocksMap);
-    if (SCMHAUtils.isSCMHAEnabled(scm.getConfiguration())) {
-      scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
-    }
+    scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
   }
 
   public List<Long> getAllBlocks(MiniOzoneCluster cluster, Set<Long> containerIDs) throws IOException {

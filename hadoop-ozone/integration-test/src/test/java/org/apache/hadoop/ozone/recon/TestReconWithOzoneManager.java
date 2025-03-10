@@ -49,8 +49,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -414,16 +412,6 @@ public class TestReconWithOzoneManager {
       writeDataToOm("key" + i, "bucket" + i, "vol" + i,
           Collections.singletonList(omKeyLocationInfoGroup));
     }
-  }
-
-  private long getTableKeyCount(TableIterator<String, ? extends
-      Table.KeyValue<String, OmKeyInfo>> iterator) {
-    long keyCount = 0;
-    while (iterator.hasNext()) {
-      keyCount++;
-      iterator.next();
-    }
-    return keyCount;
   }
 
   private static OmKeyLocationInfo getOmKeyLocationInfo(BlockID blockID,

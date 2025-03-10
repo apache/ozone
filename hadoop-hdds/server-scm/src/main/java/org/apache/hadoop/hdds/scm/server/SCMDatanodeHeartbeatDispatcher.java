@@ -140,7 +140,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
       final List<IncrementalContainerReportProto> icrs =
           heartbeat.getIncrementalContainerReportList();
 
-      if (icrs.size() > 0) {
+      if (!icrs.isEmpty()) {
         LOG.debug("Dispatching ICRs.");
         for (IncrementalContainerReportProto icr : icrs) {
           eventPublisher.fireEvent(INCREMENTAL_CONTAINER_REPORT,
@@ -322,6 +322,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
       return this.getDatanodeDetails().getUuid().hashCode();
     }
     
+    @Override
     public ContainerReportType getType() {
       return ContainerReportType.FCR;
     }
@@ -369,6 +370,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
       return this.getDatanodeDetails().getUuid().hashCode();
     }
 
+    @Override
     public ContainerReportType getType() {
       return ContainerReportType.ICR;
     }

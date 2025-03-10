@@ -29,9 +29,9 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.HashSet;
@@ -43,6 +43,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -74,6 +75,7 @@ class TestContainerImporter {
   @BeforeEach
   void setup() {
     conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, tempDir.getAbsolutePath());
   }
 
   @Test
@@ -188,7 +190,7 @@ class TestContainerImporter {
         yamlFile);
     File tarFile = new File(tempDir,
         ContainerUtils.getContainerTarName(containerId));
-    try (FileOutputStream output = new FileOutputStream(tarFile)) {
+    try (OutputStream output = Files.newOutputStream(tarFile.toPath())) {
       ArchiveOutputStream<TarArchiveEntry> archive = new TarArchiveOutputStream(output);
       TarArchiveEntry entry = archive.createArchiveEntry(yamlFile,
           "container.yaml");

@@ -70,7 +70,6 @@ import com.amazonaws.services.s3.transfer.model.UploadResult;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
@@ -82,13 +81,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Random;
+import java.util.Set;
 import java.util.stream.Collectors;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -673,13 +674,10 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     uploadIds.add(uploadId1);
     String uploadId2 = initiateMultipartUpload(bucketName, multipartKey1, null, null, null);
     uploadIds.add(uploadId2);
-    // TODO: Currently, Ozone sorts based on uploadId instead of MPU init time within the same key.
-    //  Remove this sorting step once HDDS-11532 has been implemented
-    Collections.sort(uploadIds);
+
     String uploadId3 = initiateMultipartUpload(bucketName, multipartKey2, null, null, null);
     uploadIds.add(uploadId3);
 
-    // TODO: Add test for max uploads threshold and marker once HDDS-11530 has been implemented
     ListMultipartUploadsRequest listMultipartUploadsRequest = new ListMultipartUploadsRequest(bucketName);
 
     MultipartUploadListing result = s3Client.listMultipartUploads(listMultipartUploadsRequest);
@@ -689,6 +687,98 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
         .collect(Collectors.toList());
 
     assertEquals(uploadIds, listUploadIds);
+  }
+
+  @Test
+  public void testListMultipartUploadsPagination() {
+    final String bucketName = getBucketName();
+    final String multipartKeyPrefix = getKeyName("multipart");
+
+    s3Client.createBucket(bucketName);
+
+    // Create 25 multipart uploads to test pagination
+    List<String> allKeys = new ArrayList<>();
+    Map<String, String> keyToUploadId = new HashMap<>();
+
+    for (int i = 0; i < 25; i++) {
+      String key = String.format("%s-%03d", multipartKeyPrefix, i);
+      allKeys.add(key);
+      String uploadId = initiateMultipartUpload(bucketName, key, null, null, null);
+      keyToUploadId.put(key, uploadId);
+    }
+    Collections.sort(allKeys);
+
+    // Test pagination with maxUploads=10
+    Set<String> retrievedKeys = new HashSet<>();
+    String keyMarker = null;
+    String uploadIdMarker = null;
+    boolean truncated = true;
+    int pageCount = 0;
+
+    do {
+      ListMultipartUploadsRequest request = new ListMultipartUploadsRequest(bucketName)
+          .withMaxUploads(10)
+          .withKeyMarker(keyMarker)
+          .withUploadIdMarker(uploadIdMarker);
+
+      MultipartUploadListing result = s3Client.listMultipartUploads(request);
+
+      // Verify page size
+      if (pageCount < 2) {
+        assertEquals(10, result.getMultipartUploads().size());
+        assertTrue(result.isTruncated());
+      } else {
+        assertEquals(5, result.getMultipartUploads().size());
+        assertFalse(result.isTruncated());
+      }
+
+      // Collect keys and verify uploadIds
+      for (MultipartUpload upload : result.getMultipartUploads()) {
+        String key = upload.getKey();
+        retrievedKeys.add(key);
+        assertEquals(keyToUploadId.get(key), upload.getUploadId());
+      }
+
+      // Verify response
+      assertNull(result.getPrefix());
+      assertEquals(result.getUploadIdMarker(), uploadIdMarker);
+      assertEquals(result.getKeyMarker(), keyMarker);
+      assertEquals(result.getMaxUploads(), 10);
+
+      // Update markers for next page
+      keyMarker = result.getNextKeyMarker();
+      uploadIdMarker = result.getNextUploadIdMarker();
+
+      truncated = result.isTruncated();
+      pageCount++;
+
+    } while (truncated);
+
+    // Verify pagination results
+    assertEquals(3, pageCount, "Should have exactly 3 pages");
+    assertEquals(25, retrievedKeys.size(), "Should retrieve all uploads");
+    assertEquals(
+        allKeys,
+        retrievedKeys.stream().sorted().collect(Collectors.toList()),
+        "Retrieved keys should match expected keys in order");
+
+    // Test with prefix
+    String prefix = multipartKeyPrefix + "-01";
+    ListMultipartUploadsRequest prefixRequest = new ListMultipartUploadsRequest(bucketName)
+        .withPrefix(prefix);
+
+    MultipartUploadListing prefixResult = s3Client.listMultipartUploads(prefixRequest);
+
+    assertEquals(prefix, prefixResult.getPrefix());
+    assertEquals(
+        Arrays.asList(multipartKeyPrefix + "-010", multipartKeyPrefix + "-011",
+            multipartKeyPrefix + "-012", multipartKeyPrefix + "-013",
+            multipartKeyPrefix + "-014", multipartKeyPrefix + "-015",
+            multipartKeyPrefix + "-016", multipartKeyPrefix + "-017",
+            multipartKeyPrefix + "-018", multipartKeyPrefix + "-019"),
+        prefixResult.getMultipartUploads().stream()
+            .map(MultipartUpload::getKey)
+            .collect(Collectors.toList()));
   }
 
   @Test
@@ -904,7 +994,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     // Upload the file parts.
     long filePosition = 0;
     long fileLength = file.length();
-    try (FileInputStream fileInputStream = new FileInputStream(file)) {
+    try (InputStream fileInputStream = Files.newInputStream(file.toPath())) {
       for (int i = 1; filePosition < fileLength; i++) {
         // Because the last part could be less than 5 MB, adjust the part size as
         // needed.
@@ -970,9 +1060,8 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
   private static void createFile(File newFile, int size) throws IOException {
     // write random data so that filesystems with compression enabled (e.g. ZFS)
     // can't compress the file
-    Random random = new Random();
     byte[] data = new byte[size];
-    random.nextBytes(data);
+    data = RandomUtils.secure().randomBytes(data.length);
 
     RandomAccessFile file = new RandomAccessFile(newFile, "rws");
 

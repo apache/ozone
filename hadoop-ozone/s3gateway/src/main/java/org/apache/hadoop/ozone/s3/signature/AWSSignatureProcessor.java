@@ -59,6 +59,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
   @Context
   private ContainerRequestContext context;
 
+  @Override
   public SignatureInfo parseSignature() throws OS3Exception {
 
     LowerCaseKeyStringMap headers =
@@ -133,7 +134,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
           new LowerCaseKeyStringMap();
 
       for (Entry<String, List<String>> headerEntry : rawHeaders.entrySet()) {
-        if (0 < headerEntry.getValue().size()) {
+        if (!headerEntry.getValue().isEmpty()) {
           String headerKey = headerEntry.getKey();
           if (headers.containsKey(headerKey)) {
             //multiple headers from the same type are combined

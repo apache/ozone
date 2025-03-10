@@ -86,8 +86,6 @@ public class ContainerManagerImpl implements ContainerManager {
   @SuppressWarnings("java:S2245") // no need for secure random
   private final Random random = new Random();
 
-  private int maxCountOfContainerList;
-
   /**
    *
    */
@@ -116,10 +114,6 @@ public class ContainerManagerImpl implements ContainerManager {
     this.numContainerPerVolume = conf
         .getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
             ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
-
-    this.maxCountOfContainerList = conf
-        .getInt(ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT,
-            ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT_DEFAULT);
 
     this.scmContainerManagerMetrics = SCMContainerManagerMetrics.create();
   }
@@ -296,12 +290,12 @@ public class ContainerManagerImpl implements ContainerManager {
   }
 
   @Override
-  public void transitionDeletingToClosedState(ContainerID containerID) throws IOException {
+  public void transitionDeletingOrDeletedToClosedState(ContainerID containerID) throws IOException {
     HddsProtos.ContainerID proto = containerID.getProtobuf();
     lock.lock();
     try {
       if (containerExist(containerID)) {
-        containerStateManager.transitionDeletingToClosedState(proto);
+        containerStateManager.transitionDeletingOrDeletedToClosedState(proto);
       } else {
         throwContainerNotFoundException(containerID);
       }
@@ -465,6 +459,7 @@ public class ContainerManagerImpl implements ContainerManager {
   }
 
   // Remove this after fixing Recon
+  @Override
   @VisibleForTesting
   public ContainerStateManager getContainerStateManager() {
     return containerStateManager;

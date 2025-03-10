@@ -59,7 +59,6 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
@@ -73,7 +72,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -96,8 +94,6 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
@@ -116,7 +112,6 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
@@ -126,9 +121,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
@@ -138,7 +131,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.ozone.rocksdiff.CompactionNode;
@@ -304,7 +297,7 @@ public abstract class TestOmSnapshot {
     final OzoneManagerProtocol omClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
     final String upgradeClientID = "Test-Upgrade-Client-" + UUID.randomUUID();
-    UpgradeFinalizer.StatusAndMessages finalizationResponse =
+    UpgradeFinalization.StatusAndMessages finalizationResponse =
         omClient.finalizeUpgrade(upgradeClientID);
 
     // The status should transition as soon as the client call above returns
@@ -312,7 +305,7 @@ public abstract class TestOmSnapshot {
     // Wait for the finalization to be marked as done.
     // 10s timeout should be plenty.
     await(POLL_MAX_WAIT_MILLIS, POLL_INTERVAL_MILLIS, () -> {
-      final UpgradeFinalizer.StatusAndMessages progress =
+      final UpgradeFinalization.StatusAndMessages progress =
           omClient.queryUpgradeFinalizationProgress(
               upgradeClientID, false, false);
       return isDone(progress.status());
@@ -587,30 +580,6 @@ public abstract class TestOmSnapshot {
     // Volume is empty
     assertThrows(IllegalArgumentException.class,
             () -> createSnapshot(nullstr, bucket));
-  }
-
-  private Set<OmKeyInfo> getDeletedKeysFromRocksDb(
-      OMMetadataManager metadataManager) throws IOException {
-    Set<OmKeyInfo> deletedKeys = Sets.newHashSet();
-    try (TableIterator<String,
-        ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
-             deletedTableIterator = metadataManager.getDeletedTable()
-            .iterator()) {
-      while (deletedTableIterator.hasNext()) {
-        Table.KeyValue<String, RepeatedOmKeyInfo> val =
-            deletedTableIterator.next();
-        deletedKeys.addAll(val.getValue().getOmKeyInfoList());
-      }
-    }
-
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-         deletedDirTableIterator = metadataManager.getDeletedDirTable()
-        .iterator()) {
-      while (deletedDirTableIterator.hasNext()) {
-        deletedKeys.add(deletedDirTableIterator.next().getValue());
-      }
-    }
-    return deletedKeys;
   }
 
   private void getOmKeyInfo(String volume, String bucket,

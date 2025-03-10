@@ -227,7 +227,7 @@ public final class OzoneClientUtils {
       ClientProtocol rpcClient) throws IOException {
     Preconditions.checkArgument(length >= 0);
 
-    if (keyName.length() == 0) {
+    if (keyName.isEmpty()) {
       return null;
     }
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volume.getName())

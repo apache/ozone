@@ -746,7 +746,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
     OzoneObj srcObj = buildBucketObj(srcBucket);
     // As by default create will add some default acls in RpcClient.
     List<OzoneAcl> acls = getObjectStore().getAcl(linkObj);
-    assertTrue(acls.size() > 0);
+    assertFalse(acls.isEmpty());
     // Remove an existing acl.
     boolean removeAcl = getObjectStore().removeAcl(linkObj, acls.get(0));
     assertTrue(removeAcl);
@@ -759,7 +759,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
     OzoneObj srcObj2 = buildBucketObj(srcBucket2);
     // As by default create will add some default acls in RpcClient.
     List<OzoneAcl> acls2 = getObjectStore().getAcl(srcObj2);
-    assertTrue(acls2.size() > 0);
+    assertFalse(acls2.isEmpty());
     // Remove an existing acl.
     boolean removeAcl2 = getObjectStore().removeAcl(srcObj2, acls.get(0));
     assertTrue(removeAcl2);
@@ -994,7 +994,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
         OzoneObj.ResourceType.PREFIX.name())) {
       List<OzoneAcl> acls = objectStore.getAcl(ozoneObj);
 
-      assertTrue(acls.size() > 0);
+      assertFalse(acls.isEmpty());
     }
 
     OzoneAcl modifiedUserAcl = new OzoneAcl(USER, remoteUserName,
@@ -1036,27 +1036,6 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
     assertTrue(addAcl);
   }
 
-  private void testAddLinkAcl(String remoteUserName, OzoneObj ozoneObj,
-      OzoneAcl userAcl) throws Exception {
-    ObjectStore objectStore = getObjectStore();
-    boolean addAcl = objectStore.addAcl(ozoneObj, userAcl);
-    assertTrue(addAcl);
-
-    List<OzoneAcl> acls = objectStore.getAcl(ozoneObj);
-
-    assertTrue(containsAcl(userAcl, acls));
-
-    // Add an already existing acl.
-    addAcl = objectStore.addAcl(ozoneObj, userAcl);
-    assertFalse(addAcl);
-
-    // Add an acl by changing acl type with same type, name and scope.
-    userAcl = new OzoneAcl(USER, remoteUserName,
-        DEFAULT, WRITE);
-    addAcl = objectStore.addAcl(ozoneObj, userAcl);
-    assertTrue(addAcl);
-  }
-
   private void testRemoveAcl(String remoteUserName, OzoneObj ozoneObj,
       OzoneAcl userAcl) throws Exception {
     ObjectStore objectStore = getObjectStore();
@@ -1072,7 +1051,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
     }
     acls = objectStore.getAcl(ozoneObj);
 
-    assertTrue(acls.size() > 0);
+    assertFalse(acls.isEmpty());
 
     // Remove an existing acl.
     boolean removeAcl = objectStore.removeAcl(ozoneObj, acls.get(0));
