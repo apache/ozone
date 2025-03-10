@@ -340,15 +340,6 @@ public abstract class ContainerKeyMapperHelper {
     }
   }
 
-  /**
-   * Writes container key data to the database.
-   *
-   * @param containerKeyMap         Map containing container key mappings.
-   * @param containerKeyCountMap    Map containing container key counts.
-   * @param deletedContainerKeyList List of deleted container keys.
-   * @param reconContainerMetadataManager Recon metadata manager instance.
-   * @throws IOException If unable to write to the Recon DB.
-   */
   private static void writeToTheDB(Map<ContainerKeyPrefix, Integer> containerKeyMap,
                                    Map<Long, Long> containerKeyCountMap,
                                    List<ContainerKeyPrefix> deletedContainerKeyList,
@@ -393,14 +384,18 @@ public abstract class ContainerKeyMapperHelper {
   }
 
   /**
-   * Handles reprocessing of OM keys for container key mapping.
+   * Write an OM key to container DB and update containerID -> no. of keys
+   * count to the Global Stats table.
    *
    * @param key key String
-   * @param omKeyInfo OmKeyInfo value
-   * @param containerKeyMap map of (container, key) -> count
-   * @param containerKeyCountMap map of containerId -> key count
+   * @param omKeyInfo omKeyInfo value
+   * @param containerKeyMap we keep the added containerKeys in this map
+   *                        to allow incremental batching to containerKeyTable
+   * @param containerKeyCountMap we keep the containerKey counts in this map
+   *                             to allow batching to containerKeyCountTable
+   *                             after reprocessing is done
    * @param reconContainerMetadataManager Recon metadata manager instance
-   * @throws IOException if unable to write to Recon DB.
+   * @throws IOException if unable to write to recon DB.
    */
   public static void handleKeyReprocess(String key,
                                         OmKeyInfo omKeyInfo,
@@ -442,14 +437,6 @@ public abstract class ContainerKeyMapperHelper {
     }
   }
 
-  /**
-   * Flushes and commits container key mappings to the database.
-   *
-   * @param containerKeyMap map of (container, key) -> count
-   * @param containerKeyCountMap map of containerId -> key count
-   * @param reconContainerMetadataManager Recon metadata manager instance
-   * @return true if the data was successfully flushed, false otherwise
-   */
   public static boolean flushAndCommitContainerKeyInfoToDB(
       Map<ContainerKeyPrefix, Integer> containerKeyMap,
       Map<Long, Long> containerKeyCountMap,

@@ -83,16 +83,11 @@ public class ReconDBProvider {
     if (table == null) {
       return;
     }
-    try (TableIterator<Object, ? extends KeyValue<Object, Object>> iterator = table.iterator()) {
-      if (iterator.hasNext()) {
-        Object firstKey = iterator.next().getKey();
-        Object lastKey = null;
-        while (iterator.hasNext()) {
-          lastKey = iterator.next().getKey();
-        }
-        if (lastKey != null) {
-          table.deleteRange(firstKey, lastKey);  // Efficient bulk deletion
-        }
+    try (TableIterator<Object, ? extends KeyValue<Object, Object>>
+             tableIterator = table.iterator()) {
+      while (tableIterator.hasNext()) {
+        KeyValue<Object, Object> entry = tableIterator.next();
+        table.delete(entry.getKey());
       }
     }
   }
