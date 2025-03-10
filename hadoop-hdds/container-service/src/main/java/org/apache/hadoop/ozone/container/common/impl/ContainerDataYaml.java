@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.ozone.container.common.impl;
 
-import static java.nio.file.StandardOpenOption.CREATE;
-import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
-import static java.nio.file.StandardOpenOption.WRITE;
 import static org.apache.hadoop.ozone.OzoneConsts.REPLICA_INDEX;
 import static org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData.KEYVALUE_YAML_TAG;
 
@@ -28,10 +25,6 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,10 +34,9 @@ import java.util.TreeSet;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.server.YamlUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.ratis.util.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.DumperOptions;
@@ -77,41 +69,15 @@ public final class ContainerDataYaml {
 
   /**
    * Creates a .container file in yaml format.
-   *
-   * @param containerFile
-   * @param containerData
-   * @throws IOException
    */
-  public static void createContainerFile(ContainerType containerType,
-      ContainerData containerData, File containerFile) throws IOException {
-    Writer writer = null;
-    OutputStream out = null;
-    try {
-      boolean withReplicaIndex =
-          containerData instanceof KeyValueContainerData &&
-          ((KeyValueContainerData) containerData).getReplicaIndex() > 0;
+  public static void createContainerFile(ContainerData containerData, File containerFile) throws IOException {
+    // Create Yaml for given container type
+    final Yaml yaml = getYamlForContainerType(containerData.getContainerType(), containerData.getReplicaIndex() > 0);
+    // Compute Checksum and update ContainerData
+    containerData.computeAndSetChecksum(yaml);
 
-      // Create Yaml for given container type
-      Yaml yaml = getYamlForContainerType(containerType, withReplicaIndex);
-      // Compute Checksum and update ContainerData
-      containerData.computeAndSetChecksum(yaml);
-
-      // Write the ContainerData with checksum to Yaml file.
-      out = FileUtils.newOutputStreamForceAtClose(containerFile, CREATE, TRUNCATE_EXISTING, WRITE);
-      writer = new OutputStreamWriter(out, StandardCharsets.UTF_8);
-      yaml.dump(containerData, writer);
-    } finally {
-      try {
-        if (writer != null) {
-          writer.flush();
-          writer.close();
-        }
-      } catch (IOException ex) {
-        LOG.warn("Error occurred during closing the writer. ContainerID: " +
-            containerData.getContainerID());
-      }
-      IOUtils.closeQuietly(out);
-    }
+    // Write the ContainerData with checksum to Yaml file.
+    YamlUtils.dump(yaml, containerData, containerFile, LOG);
   }
 
   /**
