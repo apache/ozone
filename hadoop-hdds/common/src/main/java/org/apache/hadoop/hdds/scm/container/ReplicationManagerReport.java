@@ -154,10 +154,6 @@ public class ReplicationManagerReport {
     return result;
   }
 
-  /**
-   * Return a map of all samples, with the stat as the key and the samples
-   * for the stat as a List of Long.
-   */
   public Map<String, List<Long>> getSamples() {
     Map<String, List<Long>> result = new HashMap<>();
     for (Map.Entry<String, List<ContainerID>> e : containerSample.entrySet()) {

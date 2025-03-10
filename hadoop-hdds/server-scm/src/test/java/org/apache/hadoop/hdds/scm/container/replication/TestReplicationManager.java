@@ -1755,12 +1755,12 @@ public class TestReplicationManager {
     ContainerReplicaOp delOp = new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.DELETE, dn2, 1, command, commandDeadline);
 
-    replicationManager.opCompleted(addOp, new ContainerID(1L), false);
-    replicationManager.opCompleted(delOp, new ContainerID(1L), false);
+    replicationManager.opCompleted(addOp, ContainerID.valueOf(1L), false);
+    replicationManager.opCompleted(delOp, ContainerID.valueOf(1L), false);
     // No commands should be sent for either of the above ops.
     assertEquals(0, commandsSent.size());
 
-    replicationManager.opCompleted(delOp, new ContainerID(1L), true);
+    replicationManager.opCompleted(delOp, ContainerID.valueOf(1L), true);
     assertEquals(1, commandsSent.size());
     Pair<UUID, SCMCommand<?>> sentCommand = commandsSent.iterator().next();
     // The target should be DN2 and the deadline should have been updated from the value set in commandDeadline above
