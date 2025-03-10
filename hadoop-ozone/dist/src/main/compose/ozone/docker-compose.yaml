@@ -36,8 +36,6 @@ services:
     environment:
       <<: *replication
       OZONE_OPTS:
-    networks:
-      - ozone
     command: ["ozone","datanode"]
   om:
     <<: *common-config
@@ -45,8 +43,6 @@ services:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       OZONE_OPTS:
       <<: *replication
-    networks:
-      - ozone
     ports:
       - 9874:9874
       - 9862:9862
@@ -61,8 +57,6 @@ services:
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
       OZONE_OPTS:
       <<: *replication
-    networks:
-      - ozone
     command: ["ozone","scm"]
   httpfs:
     <<: *common-config
@@ -71,8 +65,6 @@ services:
       <<: *replication
     ports:
       - 14000:14000
-    networks:
-      - ozone
     command: [ "ozone","httpfs" ]
   s3g:
     <<: *common-config
@@ -82,8 +74,6 @@ services:
     ports:
       - 9878:9878
       - 19878:19878
-    networks:
-      - ozone
     command: ["ozone","s3g"]
   recon:
     <<: *common-config
@@ -93,10 +83,4 @@ services:
     environment:
       OZONE_OPTS:
       <<: *replication
-    networks:
-      - ozone
     command: ["ozone","recon"]
-
-networks:
-  ozone:
-    name: ozonenw
