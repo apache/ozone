@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common.volume;
 
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -264,7 +265,7 @@ public class TestVolumeSetDiskChecks {
         new DummyChecker(conf, new Timer(), 0);
 
     OzoneContainer ozoneContainer = mock(OzoneContainer.class);
-    ContainerSet conSet = new ContainerSet(20);
+    ContainerSet conSet = newContainerSet(20);
     when(ozoneContainer.getContainerSet()).thenReturn(conSet);
 
     String path = dir.getPath();

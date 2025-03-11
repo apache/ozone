@@ -268,7 +268,7 @@ public class TestContainerCommandsEC {
 
     Token<ContainerTokenIdentifier> orphanContainerToken =
         containerTokenGenerator.generateToken(
-            ANY_USER, new ContainerID(orphanContainerID));
+            ANY_USER, ContainerID.valueOf(orphanContainerID));
 
     // Close the container by closing the pipeline
     scm.getPipelineManager().closePipeline(orphanPipeline, false);
@@ -689,7 +689,7 @@ public class TestContainerCommandsEC {
       OzoneKeyDetails key = bucket.getKey(keyString);
       long conID = key.getOzoneKeyLocations().get(0).getContainerID();
       Token<ContainerTokenIdentifier> cToken = containerTokenGenerator
-          .generateToken(ANY_USER, new ContainerID(conID));
+          .generateToken(ANY_USER, ContainerID.valueOf(conID));
 
       //Close the container first.
       closeContainer(conID);
@@ -876,7 +876,7 @@ public class TestContainerCommandsEC {
     OzoneKeyDetails key = bucket.getKey(keyString);
     long conID = key.getOzoneKeyLocations().get(0).getContainerID();
     Token<ContainerTokenIdentifier> cToken =
-        containerTokenGenerator.generateToken(ANY_USER, new ContainerID(conID));
+        containerTokenGenerator.generateToken(ANY_USER, ContainerID.valueOf(conID));
     closeContainer(conID);
 
     Pipeline containerPipeline = scm.getPipelineManager().getPipeline(
@@ -1050,7 +1050,7 @@ public class TestContainerCommandsEC {
     blockTokenGenerator = new OzoneBlockTokenSecretManager(
         tokenLifetime, secretKeyClient);
     containerToken = containerTokenGenerator
-        .generateToken(ANY_USER, new ContainerID(containerID));
+        .generateToken(ANY_USER, ContainerID.valueOf(containerID));
   }
 
   public static void stopCluster() throws IOException {

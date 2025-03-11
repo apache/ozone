@@ -452,7 +452,7 @@ public class TestReplicationManagerScenarios {
 
       ContainerReplica.ContainerReplicaBuilder builder = new ContainerReplica.ContainerReplicaBuilder();
       return builder.setReplicaIndex(index)
-          .setContainerID(new ContainerID(containerId))
+          .setContainerID(ContainerID.valueOf(containerId))
           .setContainerState(state)
           .setSequenceId(sequenceId)
           .setDatanodeDetails(datanodeDetails)
