@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
@@ -32,6 +33,11 @@ import java.net.URLEncoder;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD_TRAILER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 
 /**
  * Utilities.
@@ -124,5 +130,18 @@ public final class S3Utils {
         Response.status(ex.getHttpCode())
             .entity(ex.toXml())
             .build());
+  }
+
+  public static boolean hasSignedPayloadHeader(HttpHeaders headers) {
+    final String signingAlgorithm = headers.getHeaderString(X_AMZ_CONTENT_SHA256);
+    if (signingAlgorithm == null) {
+      return false;
+    }
+
+    // Handles both AWS Signature Version 4 (HMAC-256) and AWS Signature Version 4A (ECDSA-P256-SHA256)
+    return signingAlgorithm.equals(STREAMING_AWS4_HMAC_SHA256_PAYLOAD) ||
+        signingAlgorithm.equals(STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER) ||
+        signingAlgorithm.equals(STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD) ||
+        signingAlgorithm.equals(STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD_TRAILER);
   }
 }
