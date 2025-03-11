@@ -306,8 +306,7 @@ public class ObjectEndpoint extends EndpointBase {
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(headers.getRequestHeaders());
 
-      if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
-          .equals(headers.getHeaderString("x-amz-content-sha256"))) {
+      if (S3Utils.hasSignedPayloadHeader(headers)) {
         digestInputStream = new DigestInputStream(new SignedChunksInputStream(body),
             getMessageDigestInstance());
         length = Long.parseLong(amzDecodedLength);
@@ -333,7 +332,8 @@ public class ObjectEndpoint extends EndpointBase {
           long metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
           perf.appendMetaLatencyNanos(metadataLatencyNs);
-          putLength = IOUtils.copy(digestInputStream, output, getIOBufferSize(length));
+          putLength = IOUtils.copyLarge(digestInputStream, output, 0, length,
+              new byte[getIOBufferSize(length)]);
           eTag = DatatypeConverter.printHexBinary(
                   digestInputStream.getMessageDigest().digest())
               .toLowerCase();
@@ -958,8 +958,7 @@ public class ObjectEndpoint extends EndpointBase {
     DigestInputStream digestInputStream = null;
     try {
 
-      if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
-          .equals(headers.getHeaderString("x-amz-content-sha256"))) {
+      if (S3Utils.hasSignedPayloadHeader(headers)) {
         digestInputStream = new DigestInputStream(new SignedChunksInputStream(body),
             getMessageDigestInstance());
         length = Long.parseLong(
@@ -1048,7 +1047,8 @@ public class ObjectEndpoint extends EndpointBase {
                     partNumber, uploadID)) {
               metadataLatencyNs =
                   getMetrics().updateCopyKeyMetadataStats(startNanos);
-              copyLength = IOUtils.copy(sourceObject, ozoneOutputStream, getIOBufferSize(length));
+              copyLength = IOUtils.copyLarge(sourceObject, ozoneOutputStream, 0, length,
+                  new byte[getIOBufferSize(length)]);
               ozoneOutputStream.getMetadata()
                   .putAll(sourceKeyDetails.getMetadata());
               outputStream = ozoneOutputStream;
@@ -1064,7 +1064,8 @@ public class ObjectEndpoint extends EndpointBase {
                 partNumber, uploadID)) {
           metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
-          putLength = IOUtils.copy(digestInputStream, ozoneOutputStream, getIOBufferSize(length));
+          putLength = IOUtils.copyLarge(digestInputStream, ozoneOutputStream, 0, length,
+              new byte[getIOBufferSize(length)]);
           byte[] digest = digestInputStream.getMessageDigest().digest();
           ozoneOutputStream.getMetadata()
               .put(ETAG, DatatypeConverter.printHexBinary(digest).toLowerCase());
@@ -1218,7 +1219,7 @@ public class ObjectEndpoint extends EndpointBase {
         long metadataLatencyNs =
             getMetrics().updateCopyKeyMetadataStats(startNanos);
         perf.appendMetaLatencyNanos(metadataLatencyNs);
-        copyLength = IOUtils.copy(src, dest, getIOBufferSize(srcKeyLen));
+        copyLength = IOUtils.copyLarge(src, dest, 0, srcKeyLen, new byte[getIOBufferSize(srcKeyLen)]);
         String eTag = DatatypeConverter.printHexBinary(src.getMessageDigest().digest()).toLowerCase();
         dest.getMetadata().put(ETAG, eTag);
       }
