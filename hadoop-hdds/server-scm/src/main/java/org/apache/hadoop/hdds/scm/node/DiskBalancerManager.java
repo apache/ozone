@@ -60,7 +60,6 @@ public class DiskBalancerManager {
   private Map<DatanodeDetails, DiskBalancerStatus> statusMap;
   private Map<DatanodeDetails, Long> balancedBytesMap;
   private boolean useHostnames;
-  private long totalDataPendingToMove;
 
   /**
    * Constructs DiskBalancer Manager.
