@@ -20,10 +20,7 @@ package org.apache.hadoop.ozone.container.common.helpers;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
 import java.lang.reflect.Field;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -71,10 +68,8 @@ public final class DatanodeIdYaml {
     options.setDefaultFlowStyle(DumperOptions.FlowStyle.FLOW);
     Yaml yaml = new Yaml(options);
 
-    try (Writer writer = new OutputStreamWriter(
-        Files.newOutputStream(path.toPath()), StandardCharsets.UTF_8)) {
-      yaml.dump(getDatanodeDetailsYaml(datanodeDetails, conf), writer);
-    }
+    final DatanodeDetailsYaml data = getDatanodeDetailsYaml(datanodeDetails, conf);
+    YamlUtils.dump(yaml, data, path, LOG);
   }
 
   /**
@@ -228,6 +223,11 @@ public final class DatanodeIdYaml {
     public void setCurrentVersion(int version) {
       this.currentVersion = version;
     }
+
+    @Override
+    public String toString() {
+      return "DatanodeDetailsYaml(" + uuid + ", " + hostName + "/" + ipAddress + ")";
+    }
   }
 
   private static DatanodeDetailsYaml getDatanodeDetailsYaml(
@@ -268,7 +268,7 @@ public final class DatanodeIdYaml {
     }
 
     return new DatanodeDetailsYaml(
-        datanodeDetails.getUuid().toString(),
+        datanodeDetails.getUuidString(),
         datanodeDetails.getIpAddress(),
         datanodeDetails.getHostName(),
         datanodeDetails.getCertSerialId(),

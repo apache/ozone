@@ -53,6 +53,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Testing ContainerStatemanager.
@@ -147,11 +149,14 @@ public class TestContainerStateManager {
     assertEquals(3, c1.getReplicationConfig().getRequiredNodes());
   }
 
-  @Test
-  public void testTransitionDeletingToClosedState() throws IOException {
+  @ParameterizedTest
+  @EnumSource(value = HddsProtos.LifeCycleState.class,
+      names = {"DELETING", "DELETED"})
+  public void testTransitionDeletingOrDeletedToClosedState(HddsProtos.LifeCycleState lifeCycleState)
+      throws IOException {
     HddsProtos.ContainerInfoProto.Builder builder = HddsProtos.ContainerInfoProto.newBuilder();
     builder.setContainerID(1)
-        .setState(HddsProtos.LifeCycleState.DELETING)
+        .setState(lifeCycleState)
         .setUsedBytes(0)
         .setNumberOfKeys(0)
         .setOwner("root")
@@ -161,16 +166,22 @@ public class TestContainerStateManager {
     HddsProtos.ContainerInfoProto container = builder.build();
     HddsProtos.ContainerID cid = HddsProtos.ContainerID.newBuilder().setId(container.getContainerID()).build();
     containerStateManager.addContainer(container);
-    containerStateManager.transitionDeletingToClosedState(cid);
+    containerStateManager.transitionDeletingOrDeletedToClosedState(cid);
     assertEquals(HddsProtos.LifeCycleState.CLOSED, containerStateManager.getContainer(ContainerID.getFromProtobuf(cid))
         .getState());
   }
 
-  @Test
-  public void testTransitionDeletingToClosedStateAllowsOnlyDeletingContainer() throws IOException {
+  @ParameterizedTest
+  @EnumSource(value = HddsProtos.LifeCycleState.class,
+      names = {"CLOSING", "QUASI_CLOSED", "CLOSED", "RECOVERING"})
+  public void testTransitionContainerToClosedStateAllowOnlyDeletingOrDeletedContainer(
+      HddsProtos.LifeCycleState initialState) throws IOException {
+    // Negative test for non-OPEN Ratis container -> CLOSED transitions. OPEN -> CLOSED is tested in:
+    // TestContainerManagerImpl#testTransitionContainerToClosedStateAllowOnlyDeletingOrDeletedContainers
+
     HddsProtos.ContainerInfoProto.Builder builder = HddsProtos.ContainerInfoProto.newBuilder();
     builder.setContainerID(1)
-        .setState(HddsProtos.LifeCycleState.QUASI_CLOSED)
+        .setState(initialState)
         .setUsedBytes(0)
         .setNumberOfKeys(0)
         .setOwner("root")
@@ -181,7 +192,7 @@ public class TestContainerStateManager {
     HddsProtos.ContainerID cid = HddsProtos.ContainerID.newBuilder().setId(container.getContainerID()).build();
     containerStateManager.addContainer(container);
     try {
-      containerStateManager.transitionDeletingToClosedState(cid);
+      containerStateManager.transitionDeletingOrDeletedToClosedState(cid);
       fail("Was expecting an Exception, but did not catch any.");
     } catch (IOException e) {
       assertInstanceOf(InvalidContainerStateException.class, e.getCause().getCause());

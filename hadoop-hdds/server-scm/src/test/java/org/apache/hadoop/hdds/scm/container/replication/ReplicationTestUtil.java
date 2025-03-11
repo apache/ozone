@@ -89,6 +89,16 @@ public final class ReplicationTestUtil {
     return createReplicas(containerID, CLOSED, indexes);
   }
 
+  public static Set<ContainerReplica> createEmptyReplicas(ContainerID containerID,
+      ContainerReplicaProto.State replicaState, int... indexes) {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    for (int i : indexes) {
+      replicas.add(createEmptyContainerReplica(
+          containerID, i, IN_SERVICE, replicaState));
+    }
+    return replicas;
+  }
+
   public static Set<ContainerReplica> createReplicas(ContainerID containerID,
       ContainerReplicaProto.State replicaState, int... indexes) {
     Set<ContainerReplica> replicas = new HashSet<>();
@@ -123,6 +133,15 @@ public final class ReplicationTestUtil {
           MockDatanodeDetails.randomDatanodeDetails(), originNodeId));
     }
     return replicas;
+  }
+  public static ContainerReplica createEmptyContainerReplica(ContainerID containerID,
+      int replicaIndex, HddsProtos.NodeOperationalState opState,
+      ContainerReplicaProto.State replicaState) {
+    DatanodeDetails datanodeDetails
+        = MockDatanodeDetails.randomDatanodeDetails();
+    return createContainerReplica(containerID, replicaIndex, opState,
+        replicaState, 0L, 0L,
+        datanodeDetails, datanodeDetails.getUuid());
   }
 
   public static ContainerReplica createContainerReplica(ContainerID containerID,

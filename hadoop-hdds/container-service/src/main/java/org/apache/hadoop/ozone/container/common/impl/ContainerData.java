@@ -80,9 +80,9 @@ public abstract class ContainerData {
   private boolean committedSpace;
 
   //ID of the pipeline where this container is created
-  private String originPipelineId;
+  private final String originPipelineId;
   //ID of the datanode where this container is created
-  private String originNodeId;
+  private final String originNodeId;
 
   /** parameters for read/write statistics on the container. **/
   private final AtomicLong readBytes;
@@ -667,4 +667,12 @@ public abstract class ContainerData {
     incrWriteBytes(bytesWritten);
   }
 
+  @Override
+  public String toString() {
+    return getClass().getSimpleName() + " #" + containerID
+        + " (" + state
+        + ", " + (isEmpty ? "empty" : "non-empty")
+        + ", ri=" + replicaIndex
+        + ", origin=[dn_" + originNodeId + ", pipeline_" + originPipelineId + "])";
+  }
 }

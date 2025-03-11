@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.container.states;
 
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_CHANGE_CONTAINER_STATE;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
@@ -91,6 +92,11 @@ public class ContainerStateMap {
     this.typeMap = new ContainerAttribute<>();
     this.containerMap = new ConcurrentHashMap<>();
     this.replicaMap = new ConcurrentHashMap<>();
+  }
+
+  @VisibleForTesting
+  public static Logger getLogger() {
+    return LOG;
   }
 
   /**

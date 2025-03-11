@@ -370,16 +370,16 @@ public final class ContainerStateManagerImpl
   }
 
   @Override
-  public void transitionDeletingToClosedState(HddsProtos.ContainerID containerID) throws IOException {
+  public void transitionDeletingOrDeletedToClosedState(HddsProtos.ContainerID containerID) throws IOException {
     final ContainerID id = ContainerID.getFromProtobuf(containerID);
 
     try (AutoCloseableLock ignored = writeLock(id)) {
       if (containers.contains(id)) {
         final ContainerInfo oldInfo = containers.getContainerInfo(id);
         final LifeCycleState oldState = oldInfo.getState();
-        if (oldState != DELETING) {
+        if (oldState != DELETING && oldState != DELETED) {
           throw new InvalidContainerStateException("Cannot transition container " + id + " from " + oldState +
-              " back to CLOSED. The container must be in the DELETING state.");
+              " back to CLOSED. The container must be in the DELETING or DELETED state.");
         }
         ExecutionUtil.create(() -> {
           containers.updateState(id, oldState, CLOSED);

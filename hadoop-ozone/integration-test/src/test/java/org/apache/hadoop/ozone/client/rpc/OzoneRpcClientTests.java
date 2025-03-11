@@ -953,9 +953,9 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     assertEquals(3, bucketAcls.size());
     assertTrue(bucketAcls.contains(currentUserAcl));
     assertTrue(bucketAcls.contains(currentUserPrimaryGroupAcl));
-    assertTrue(bucketAcls.get(2).getName().equals(userAcl1.getName()));
-    assertTrue(bucketAcls.get(2).getAclList().equals(userAcl1.getAclList()));
-    assertTrue(bucketAcls.get(2).getAclScope().equals(ACCESS));
+    assertEquals(userAcl1.getName(), bucketAcls.get(2).getName());
+    assertEquals(userAcl1.getAclList(), bucketAcls.get(2).getAclList());
+    assertEquals(ACCESS, bucketAcls.get(2).getAclScope());
 
     // link bucket
     OzoneAcl userAcl2 = new OzoneAcl(USER, "test-link", DEFAULT, READ);
@@ -971,9 +971,9 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     assertTrue(linkBucketAcls.contains(currentUserPrimaryGroupAcl));
     assertTrue(linkBucketAcls.contains(userAcl2));
     assertTrue(linkBucketAcls.contains(OzoneAcl.LINK_BUCKET_DEFAULT_ACL));
-    assertTrue(linkBucketAcls.get(4).getName().equals(userAcl1.getName()));
-    assertTrue(linkBucketAcls.get(4).getAclList().equals(userAcl1.getAclList()));
-    assertTrue(linkBucketAcls.get(4).getAclScope().equals(ACCESS));
+    assertEquals(userAcl1.getName(), linkBucketAcls.get(4).getName());
+    assertEquals(userAcl1.getAclList(), linkBucketAcls.get(4).getAclList());
+    assertEquals(ACCESS, linkBucketAcls.get(4).getAclScope());
   }
 
   @Test

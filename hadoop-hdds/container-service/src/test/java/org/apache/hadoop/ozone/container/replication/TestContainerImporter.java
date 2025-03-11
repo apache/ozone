@@ -185,9 +185,7 @@ class TestContainerImporter {
   private File containerTarFile(
       long containerId, ContainerData containerData) throws IOException {
     File yamlFile = new File(tempDir, "container.yaml");
-    ContainerDataYaml.createContainerFile(
-        ContainerProtos.ContainerType.KeyValueContainer, containerData,
-        yamlFile);
+    ContainerDataYaml.createContainerFile(containerData, yamlFile);
     File tarFile = new File(tempDir,
         ContainerUtils.getContainerTarName(containerId));
     try (OutputStream output = Files.newOutputStream(tarFile.toPath())) {

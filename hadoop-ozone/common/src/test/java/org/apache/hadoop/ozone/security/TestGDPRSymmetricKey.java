@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.security;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -38,7 +39,7 @@ public class TestGDPRSymmetricKey {
         .equalsIgnoreCase(OzoneConsts.GDPR_ALGORITHM_NAME));
 
     gkey.acceptKeyDetails(
-        (k, v) -> assertTrue(!v.isEmpty()));
+        (k, v) -> assertFalse(v.isEmpty()));
   }
 
   @Test
@@ -51,7 +52,7 @@ public class TestGDPRSymmetricKey {
         .equalsIgnoreCase(OzoneConsts.GDPR_ALGORITHM_NAME));
 
     gkey.acceptKeyDetails(
-        (k, v) -> assertTrue(!v.isEmpty()));
+        (k, v) -> assertFalse(v.isEmpty()));
   }
 
   @Test
