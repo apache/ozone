@@ -108,6 +108,11 @@ public abstract class RepairTool extends AbstractSubcommand implements Callable<
     err().println(formatMessage(msg, args));
   }
 
+  protected void error(Throwable t, String msg, Object... args) {
+    error(msg, args);
+    rootCommand().printError(t);
+  }
+
   private String formatMessage(String msg, Object[] args) {
     if (args != null && args.length > 0) {
       msg = String.format(msg, args);

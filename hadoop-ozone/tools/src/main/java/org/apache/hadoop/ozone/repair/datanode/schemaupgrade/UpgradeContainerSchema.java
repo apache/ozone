@@ -106,8 +106,8 @@ public class UpgradeContainerSchema extends RepairTool {
         info("Finish upgrading containers on volume %s, %s",
             hddsVolume.getVolumeRootDir(), result);
       } catch (Exception e) {
-        error("Failed to upgrade containers on volume %s",
-            hddsVolume.getVolumeRootDir(), e);
+        error(e, "Failed to upgrade containers on volume %s",
+            hddsVolume.getVolumeRootDir());
       }
     }
 
@@ -309,7 +309,7 @@ public class UpgradeContainerSchema extends RepairTool {
           try {
             UpgradeUtils.createFile(file);
           } catch (IOException ioe) {
-            error("Failed to create upgrade complete file %s.", file, ioe);
+            error(ioe, "Failed to create upgrade complete file %s.", file);
           }
         }
         if (lockFile.exists()) {
@@ -373,11 +373,11 @@ public class UpgradeContainerSchema extends RepairTool {
             return null;
           }
         } catch (IOException ex) {
-          error("Failed to parse ContainerFile: %s.", containerFile, ex);
+          error(ex, "Failed to parse ContainerFile: %s.", containerFile);
           return null;
         }
       } catch (Throwable e) {
-        error("Failed to load container: %s.", containerDir, e);
+        error(e, "Failed to load container: %s.", containerDir);
         return null;
       }
     }
