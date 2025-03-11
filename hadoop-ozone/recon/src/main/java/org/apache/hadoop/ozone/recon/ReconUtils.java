@@ -34,11 +34,12 @@ import jakarta.annotation.Nonnull;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
@@ -167,11 +168,11 @@ public class ReconUtils {
    */
   public static File createTarFile(Path sourcePath) throws IOException {
     TarArchiveOutputStream tarOs = null;
-    FileOutputStream fileOutputStream = null;
+    OutputStream fileOutputStream = null;
     try {
       String sourceDir = sourcePath.toString();
       String fileName = sourceDir.concat(".tar");
-      fileOutputStream = new FileOutputStream(fileName);
+      fileOutputStream = Files.newOutputStream(Paths.get(fileName));
       tarOs = new TarArchiveOutputStream(fileOutputStream);
       tarOs.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
       File folder = new File(sourceDir);
@@ -199,7 +200,7 @@ public class ReconUtils {
       throws IOException {
     tarFileOutputStream.putArchiveEntry(new TarArchiveEntry(file, source));
     if (file.isFile()) {
-      try (FileInputStream fileInputStream = new FileInputStream(file)) {
+      try (InputStream fileInputStream = Files.newInputStream(file.toPath())) {
         BufferedInputStream bufferedInputStream =
             new BufferedInputStream(fileInputStream);
         org.apache.commons.compress.utils.IOUtils.copy(bufferedInputStream,
@@ -228,9 +229,9 @@ public class ReconUtils {
   public void untarCheckpointFile(File tarFile, Path destPath)
       throws IOException {
 
-    FileInputStream fileInputStream = null;
+    InputStream fileInputStream = null;
     try {
-      fileInputStream = new FileInputStream(tarFile);
+      fileInputStream = Files.newInputStream(tarFile.toPath());
 
       //Create Destination directory if it does not exist.
       if (!destPath.toFile().exists()) {
@@ -259,7 +260,7 @@ public class ReconUtils {
             int count;
             byte[] data = new byte[WRITE_BUFFER];
 
-            FileOutputStream fos = new FileOutputStream(f);
+            OutputStream fos = Files.newOutputStream(f.toPath());
             try (BufferedOutputStream dest =
                      new BufferedOutputStream(fos, WRITE_BUFFER)) {
               while ((count =

@@ -28,8 +28,9 @@ import static org.apache.hadoop.ozone.container.common.impl.ContainerData.CHARSE
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -177,7 +178,7 @@ public final class ContainerUtils {
       LOG.warn("Error loading DatanodeDetails yaml from {}",
           path.getAbsolutePath(), e);
       // Try to load as protobuf before giving up
-      try (FileInputStream in = new FileInputStream(path)) {
+      try (InputStream in = Files.newInputStream(path.toPath())) {
         return DatanodeDetails.getFromProtoBuf(
             HddsProtos.DatanodeDetailsProto.parseFrom(in));
       } catch (IOException io) {

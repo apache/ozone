@@ -349,18 +349,15 @@ public abstract class TestOmSnapshotFileSystem {
 
   private void createKeys(OzoneBucket ozoneBucket, List<String> keys)
       throws Exception {
-    int length = 10;
-    byte[] input = new byte[length];
-    Arrays.fill(input, (byte) 96);
     for (String key : keys) {
-      createKey(ozoneBucket, key, 10, input);
+      createKey(ozoneBucket, key, 10);
     }
   }
 
-  private void createKey(OzoneBucket ozoneBucket, String key, int length,
-                         byte[] input) throws Exception {
+  private void createKey(OzoneBucket ozoneBucket, String key, int length)
+      throws Exception {
 
-    TestDataUtil.createKey(ozoneBucket, key, input);
+    byte[] input = TestDataUtil.createStringKey(ozoneBucket, key, length);
     // Read the key with given key name.
     readkey(ozoneBucket, key, length, input);
   }

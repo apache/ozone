@@ -104,20 +104,32 @@ public final class TestDataUtil {
 
   }
 
+  public static byte[] createStringKey(OzoneBucket bucket, String keyName, int length)
+      throws IOException {
+    byte[] content = RandomStringUtils.secure().nextAlphanumeric(length).getBytes(UTF_8);
+    createKey(bucket, keyName, content);
+    return content;
+  }
+
   public static void createKey(OzoneBucket bucket, String keyName,
                                byte[] content) throws IOException {
-    ReplicationConfig replicationConfig = ReplicationConfig.
-        fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE);
-    createKey(bucket, keyName, replicationConfig, content);
+    createKey(bucket, keyName, null, content);
 
+  }
+
+  public static OutputStream createOutputStream(OzoneBucket bucket, String keyName,
+                                                ReplicationConfig repConfig, byte[] content)
+      throws IOException {
+    return repConfig == null
+        ? bucket.createKey(keyName, content.length)
+        : bucket.createKey(keyName, content.length, repConfig, new HashMap<>());
   }
 
   public static void createKey(OzoneBucket bucket, String keyName,
                                ReplicationConfig repConfig, byte[] content)
       throws IOException {
-    try (OutputStream stream = bucket
-        .createKey(keyName, content.length, repConfig,
-            new HashMap<>())) {
+    try (OutputStream stream = createOutputStream(bucket, keyName,
+        repConfig, content)) {
       stream.write(content);
     }
   }
@@ -214,7 +226,9 @@ public final class TestDataUtil {
       OzoneBucket bucket = createVolumeAndBucket(client);
       for (int i = 0; i < numOfKeys; i++) {
         String keyName = RandomStringUtils.randomAlphabetic(5) + i;
-        createKey(bucket, keyName, RandomStringUtils.randomAlphabetic(5).getBytes(UTF_8));
+        createKey(bucket, keyName, ReplicationConfig
+            .fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
+            RandomStringUtils.randomAlphabetic(5).getBytes(UTF_8));
         keyLocationMap.put(keyName, lookupOmKeyInfo(cluster, bucket, keyName));
       }
     }

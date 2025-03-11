@@ -24,8 +24,6 @@ import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.Err
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -244,7 +242,7 @@ public class CertificateCodec {
     File certificateFile =
         Paths.get(basePath.toString(), fileName).toFile();
 
-    try (FileOutputStream file = new FileOutputStream(certificateFile)) {
+    try (OutputStream file = Files.newOutputStream(certificateFile.toPath())) {
       file.write(pemEncodedCertificate.getBytes(DEFAULT_CHARSET));
     }
     LOG.info("Save certificate to {}", certificateFile.getAbsolutePath());
@@ -271,7 +269,7 @@ public class CertificateCodec {
       throw new IOException("Unable to find the requested certificate file. " +
           "Path: " + certFile);
     }
-    try (FileInputStream is = new FileInputStream(certFile)) {
+    try (InputStream is = Files.newInputStream(certFile.toPath())) {
       return generateCertPathFromInputStream(is);
     }
   }

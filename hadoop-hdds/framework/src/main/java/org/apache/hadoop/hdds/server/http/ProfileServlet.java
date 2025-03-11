@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.server.http;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.management.ManagementFactory;
@@ -395,7 +394,7 @@ public class ProfileServlet extends HttpServlet {
       } else if (safeFileName.endsWith(".tree")) {
         resp.setContentType("text/html");
       }
-      try (InputStream input = new FileInputStream(requestedFile)) {
+      try (InputStream input = Files.newInputStream(requestedFile.toPath())) {
         IOUtils.copy(input, resp.getOutputStream());
       }
     }

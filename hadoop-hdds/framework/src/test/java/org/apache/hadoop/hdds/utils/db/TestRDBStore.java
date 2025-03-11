@@ -28,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -430,8 +429,8 @@ public class TestRDBStore {
       long length2 = fileInCk2.length();
       assertEquals(length1, length2, name);
 
-      try (InputStream fileStream1 = new FileInputStream(fileInCk1);
-           InputStream fileStream2 = new FileInputStream(fileInCk2)) {
+      try (InputStream fileStream1 = Files.newInputStream(fileInCk1.toPath());
+           InputStream fileStream2 = Files.newInputStream(fileInCk2.toPath())) {
         byte[] content1 = new byte[fileStream1.available()];
         byte[] content2 = new byte[fileStream2.available()];
         fileStream1.read(content1);

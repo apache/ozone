@@ -34,8 +34,8 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,7 +107,7 @@ public class FinalizationManagerImpl implements FinalizationManager {
   }
 
   @Override
-  public UpgradeFinalizer.StatusAndMessages finalizeUpgrade(
+  public UpgradeFinalization.StatusAndMessages finalizeUpgrade(
       String upgradeClientID)
       throws IOException {
     Preconditions.checkNotNull(context, "Cannot finalize upgrade without " +
@@ -116,11 +116,11 @@ public class FinalizationManagerImpl implements FinalizationManager {
   }
 
   @Override
-  public UpgradeFinalizer.StatusAndMessages queryUpgradeFinalizationProgress(
+  public UpgradeFinalization.StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean takeover, boolean readonly
   ) throws IOException {
     if (readonly) {
-      return new UpgradeFinalizer.StatusAndMessages(
+      return new UpgradeFinalization.StatusAndMessages(
           upgradeFinalizer.getStatus(), Collections.emptyList());
     }
     return upgradeFinalizer.reportStatus(upgradeClientID, takeover);

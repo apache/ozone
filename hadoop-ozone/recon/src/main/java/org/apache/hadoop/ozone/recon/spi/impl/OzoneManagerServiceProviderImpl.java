@@ -52,6 +52,7 @@ import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -267,6 +268,36 @@ public class OzoneManagerServiceProviderImpl
     reconTaskController.getRegisteredTasks()
         .values()
         .forEach(ReconOmTask::init);
+
+    // Verify if 'OmDeltaRequest' task's lastUpdatedSeqNumber number not matching with
+    // lastUpdatedSeqNumber number for any of the OM task, then just run reprocess for such tasks.
+    ReconTaskStatusUpdater deltaTaskStatusUpdater =
+        taskStatusUpdaterManager.getTaskStatusUpdater(OmSnapshotTaskName.OmDeltaRequest.name());
+
+    Map<String, ReconOmTask> reconOmTaskMap = reconTaskController.getRegisteredTasks()
+        .entrySet()
+        .stream()
+        .filter(entry -> {
+          String taskName = entry.getKey();
+          ReconTaskStatusUpdater taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
+
+          return !taskName.equals(OmSnapshotTaskName.OmDeltaRequest.name()) &&  // Condition 1
+              !taskStatusUpdater.getLastUpdatedSeqNumber()
+                  .equals(deltaTaskStatusUpdater.getLastUpdatedSeqNumber());  // Condition 2
+        })
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));  // Collect into desired Map
+    if (!reconOmTaskMap.isEmpty()) {
+      LOG.info("Task name and last updated sequence number of tasks, that are not matching with " +
+          "the last updated sequence number of OmDeltaRequest task:\n");
+      LOG.info("{} -> {}", deltaTaskStatusUpdater.getTaskName(), deltaTaskStatusUpdater.getLastUpdatedSeqNumber());
+      reconOmTaskMap.keySet()
+          .forEach(taskName -> {
+            LOG.info("{} -> {}", taskName,
+                taskStatusUpdaterManager.getTaskStatusUpdater(taskName).getLastUpdatedSeqNumber());
+
+          });
+    }
+    reconTaskController.reInitializeTasks(omMetadataManager, reconOmTaskMap);
     startSyncDataFromOM(initialDelay);
   }
 
@@ -633,7 +664,7 @@ public class OzoneManagerServiceProviderImpl
 
               // Reinitialize tasks that are listening.
               LOG.info("Calling reprocess on Recon tasks.");
-              reconTaskController.reInitializeTasks(omMetadataManager);
+              reconTaskController.reInitializeTasks(omMetadataManager, null);
 
               // Update health status in ReconContext
               reconContext.updateHealthStatus(new AtomicBoolean(true));
