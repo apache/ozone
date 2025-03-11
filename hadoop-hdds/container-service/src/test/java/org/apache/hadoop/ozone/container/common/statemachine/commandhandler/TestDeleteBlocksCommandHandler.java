@@ -21,6 +21,7 @@ import static java.util.Collections.emptyList;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.BLOCK_DELETE_COMMAND_WORKER_INTERVAL;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler.DeleteBlockTransactionExecutionResult;
@@ -110,7 +111,7 @@ public class TestDeleteBlocksCommandHandler {
     conf = new OzoneConfiguration();
     layout = ContainerLayoutVersion.FILE_PER_BLOCK;
     ozoneContainer = mock(OzoneContainer.class);
-    containerSet = new ContainerSet(1000);
+    containerSet = newContainerSet();
     volume1 = mock(HddsVolume.class);
     when(volume1.getStorageID()).thenReturn("uuid-1");
     for (int i = 0; i <= 10; i++) {
