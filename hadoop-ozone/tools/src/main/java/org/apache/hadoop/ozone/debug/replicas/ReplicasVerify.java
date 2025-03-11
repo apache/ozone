@@ -49,7 +49,7 @@ public class ReplicasVerify extends Handler {
   private String uri;
 
   @CommandLine.Option(names = {"-o", "--output-dir"},
-      description = "Destination where the directory where the generated output will be saved.",
+      description = "Destination directory to save the generated output.",
       required = true)
   private String outputDir;
 
@@ -82,7 +82,7 @@ public class ReplicasVerify extends Handler {
 
     findCandidateKeys(client, address);
 
-    if (doExecuteChecksums) {
+    if (doExecutePadding) {
       findMissingPadding.execute();
     }
   }
