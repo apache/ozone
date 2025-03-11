@@ -152,12 +152,14 @@ public class UpgradeContainerSchema extends RepairTool {
         error("Volume path %s is not a directory or doesn't exist", volume);
         return;
       }
-      File hddsRootDir = new File(volume + "/" + HddsVolume.HDDS_VOLUME_DIR);
-      File versionFile = new File(volume + "/" + HddsVolume.HDDS_VOLUME_DIR +
-          "/" + Storage.STORAGE_FILE_VERSION);
-      if (!hddsRootDir.exists() || !hddsRootDir.isDirectory() ||
-          !versionFile.exists() || !versionFile.isFile()) {
+      File hddsRootDir = new File(volumeDir, HddsVolume.HDDS_VOLUME_DIR);
+      if (!hddsRootDir.exists() || !hddsRootDir.isDirectory()) {
         error("Volume path %s is not a valid data volume", volume);
+        return;
+      }
+      File versionFile = new File(hddsRootDir, Storage.STORAGE_FILE_VERSION);
+      if (!versionFile.exists() || !versionFile.isFile()) {
+        error("Version file %s does not exist", versionFile);
         return;
       }
       configuration.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, volume);
