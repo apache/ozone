@@ -52,7 +52,9 @@ public class ReclaimableRenameEntryFilter extends ReclaimableFilter<String> {
     Table<String, OmDirectoryInfo> prevDirTable = null;
     if (previousSnapshot != null) {
       previousKeyTable = previousSnapshot.get().getMetadataManager().getKeyTable(getBucketInfo().getBucketLayout());
-      prevDirTable = previousSnapshot.get().getMetadataManager().getDirectoryTable();
+      if (getBucketInfo().getBucketLayout().isFileSystemOptimized()) {
+        prevDirTable = previousSnapshot.get().getMetadataManager().getDirectoryTable();
+      }
     }
     return isRenameEntryReclaimable(renameEntry, prevDirTable, previousKeyTable);
   }
