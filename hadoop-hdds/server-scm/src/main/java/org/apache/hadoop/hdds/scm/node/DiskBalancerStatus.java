@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
 import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,12 +29,12 @@ public class DiskBalancerStatus {
   public static final Logger LOG =
       LoggerFactory.getLogger(DiskBalancerStatus.class);
 
-  private boolean isRunning;
+  private DiskBalancerRunningStatus isRunning;
   private DiskBalancerConfiguration diskBalancerConfiguration;
   private long successMoveCount;
   private long failureMoveCount;
 
-  public DiskBalancerStatus(boolean isRunning, DiskBalancerConfiguration conf,
+  public DiskBalancerStatus(DiskBalancerRunningStatus isRunning, DiskBalancerConfiguration conf,
       long successMoveCount, long failureMoveCount) {
     this.isRunning = isRunning;
     this.diskBalancerConfiguration = conf;
@@ -41,7 +42,7 @@ public class DiskBalancerStatus {
     this.failureMoveCount = failureMoveCount;
   }
 
-  public boolean isRunning() {
+  public DiskBalancerRunningStatus getRunningStatus() {
     return isRunning;
   }
 
