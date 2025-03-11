@@ -102,18 +102,15 @@ public class TarContainerPacker
     }
     if (FileUtils.isEmptyDirectory(destContainerDir.toFile())) {
       // Before the atomic move, the destination dir is empty and doesn't have a metadata directory.
-      // Writing the .container file will fail as the metadata dir doesn't exist
+      // Writing the .container file will fail as the metadata dir doesn't exist.
+      // So we instead save the container file to the containerUntarDir.
       Path containerMetadataPath = Paths.get(container.getContainerData().getMetadataPath());
       Path tempContainerMetadataPath = Paths.get(containerUntarDir.toString(),
           containerMetadataPath.getName(containerMetadataPath.getNameCount() - 1).toString());
-      container.getContainerData().setMetadataPath(tempContainerMetadataPath.toString());
-      persistCustomContainerState(container, descriptorFileContent, State.RECOVERING);
-      container.getContainerData().setMetadataPath(containerMetadataPath.toString());
+      persistCustomContainerState(container, descriptorFileContent, State.RECOVERING, tempContainerMetadataPath);
       Files.move(containerUntarDir, destContainerDir,
               StandardCopyOption.ATOMIC_MOVE,
               StandardCopyOption.REPLACE_EXISTING);
-      // Persist again to update the metadata path to point the destination dir
-      persistCustomContainerState(container, descriptorFileContent, State.RECOVERING);
     } else {
       String errorMessage = "Container " + containerId +
           " unpack failed because ContainerFile " +
@@ -125,7 +122,7 @@ public class TarContainerPacker
   }
 
   private void persistCustomContainerState(Container<KeyValueContainerData> container, byte[] descriptorContent,
-      ContainerProtos.ContainerDataProto.State state) throws IOException {
+      ContainerProtos.ContainerDataProto.State state, Path containerMetadataPath) throws IOException {
     if (descriptorContent == null) {
       LOG.warn("Skipping persisting of custom state. Container descriptor is null for container {}",
           container.getContainerData().getContainerID());
@@ -135,7 +132,7 @@ public class TarContainerPacker
     KeyValueContainerData originalContainerData =
         (KeyValueContainerData) ContainerDataYaml.readContainer(descriptorContent);
     container.getContainerData().setState(state);
-    container.update(originalContainerData.getMetadata(), true);
+    container.update(originalContainerData.getMetadata(), true, containerMetadataPath.toString());
   }
 
   private void extractEntry(ArchiveEntry entry, InputStream input, long size,
