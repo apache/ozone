@@ -158,7 +158,7 @@ public class ECContainerSafeModeRule extends SafeModeExitRule<NodeRegistrationCo
       long containerID = c.getContainerID();
       if (ecContainers.contains(containerID)) {
         putInContainerDNsMap(containerID, ecContainerDNsMap, datanodeUUID);
-        recordReportedContainer(containerID, true);
+        recordReportedContainer(containerID);
       }
     });
 
@@ -181,7 +181,7 @@ public class ECContainerSafeModeRule extends SafeModeExitRule<NodeRegistrationCo
    *
    * @param containerID containerID
    */
-  private void recordReportedContainer(long containerID, boolean isEcContainer) {
+  private void recordReportedContainer(long containerID) {
 
     int uuids = 1;
     if (ecContainerDNsMap.containsKey(containerID)) {
@@ -231,10 +231,7 @@ public class ECContainerSafeModeRule extends SafeModeExitRule<NodeRegistrationCo
       Long containerId = entry.getKey();
       int minReplica = getMinReplica(containerId);
       Set<UUID> allReplicas = entry.getValue();
-      if (allReplicas.size() >= minReplica) {
-        return false;
-      }
-      return true;
+      return allReplicas.size() < minReplica;
     }).map(Map.Entry::getKey).limit(SAMPLE_CONTAINER_DISPLAY_LIMIT).collect(Collectors.toSet());
 
     if (!sampleEcContainers.isEmpty()) {

@@ -318,29 +318,35 @@ public class SCMSafeModeManager implements SafeModeManager {
     return LOG;
   }
 
+  @VisibleForTesting
   public double getCurrentContainerThreshold() {
     return ((RatisContainerSafeModeRule) exitRules.get(RATIS_CONTAINER_EXIT_RULE))
         .getCurrentContainerThreshold();
   }
 
+  @VisibleForTesting
   public double getCurrentECContainerThreshold() {
     return ((ECContainerSafeModeRule) exitRules.get(EC_CONTAINER_EXIT_RULE))
         .getCurrentContainerThreshold();
   }
 
+  @VisibleForTesting
   public RatisContainerSafeModeRule getRatisContainerSafeModeRule() {
     return (RatisContainerSafeModeRule) exitRules.get(RATIS_CONTAINER_EXIT_RULE);
   }
 
+  @VisibleForTesting
   public ECContainerSafeModeRule getECContainerSafeModeRule() {
     return (ECContainerSafeModeRule) exitRules.get(EC_CONTAINER_EXIT_RULE);
   }
 
+  @VisibleForTesting
   public HealthyPipelineSafeModeRule getHealthyPipelineSafeModeRule() {
     return (HealthyPipelineSafeModeRule)
         exitRules.get(HEALTHY_PIPELINE_EXIT_RULE);
   }
 
+  @VisibleForTesting
   public OneReplicaPipelineSafeModeRule getOneReplicaPipelineSafeModeRule() {
     return (OneReplicaPipelineSafeModeRule)
         exitRules.get(ATLEAST_ONE_DATANODE_REPORTED_PIPELINE_EXIT_RULE);
