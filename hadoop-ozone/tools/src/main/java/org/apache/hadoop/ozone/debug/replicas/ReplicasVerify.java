@@ -37,7 +37,7 @@ import picocli.CommandLine;
 
 @CommandLine.Command(
     name = "verify",
-    description = "Run various debug tools to verify data across replicas")
+    description = "Run checks to verify data across replicas")
 public class ReplicasVerify extends Handler {
   @CommandLine.Mixin
   private ScmOption scmOption;
