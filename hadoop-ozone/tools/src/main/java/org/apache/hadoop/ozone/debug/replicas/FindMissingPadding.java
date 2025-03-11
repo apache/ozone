@@ -63,7 +63,7 @@ import org.slf4j.Logger;
 /**
  * Find EC keys affected by missing padding blocks (HDDS-10681).
  */
-public class FindMissingPadding {
+public class FindMissingPadding implements ReplicasVerifier {
 
   private OzoneClient ozoneClient;
   private ScmOption scmOption;
@@ -92,7 +92,8 @@ public class FindMissingPadding {
     handleAffectedKeys();
   }
 
-  public void checkKeyConsumer(KeyParts keyParts) {
+  @Override
+  public void verifyKey(KeyParts keyParts) {
     ObjectStore objectStore = ozoneClient.getObjectStore();
     ClientProtocol rpcClient = objectStore.getClientProxy();
     try {

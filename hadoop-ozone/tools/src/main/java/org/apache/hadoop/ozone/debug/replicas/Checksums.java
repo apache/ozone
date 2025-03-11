@@ -52,7 +52,7 @@ import org.slf4j.Logger;
  * given key. It also generates a manifest file with information about the
  * downloaded replicas.
  */
-public class Checksums  {
+public class Checksums implements ReplicasVerifier {
 
   private static final String JSON_PROPERTY_FILE_NAME = "filename";
   private static final String JSON_PROPERTY_FILE_SIZE = "datasize";
@@ -179,7 +179,8 @@ public class Checksums  {
     return dir;
   }
 
-  void processKeyConsumer(KeyParts keyParts) {
+  @Override
+  public void verifyKey(KeyParts keyParts) {
     String volumeName = keyParts.getVolumeName();
     String bucketName = keyParts.getBucketName();
     String keyName = keyParts.getKeyName();
@@ -239,6 +240,5 @@ public class Checksums  {
     rpcClient = new RpcClient(configuration, null);
     return rpcClient;
   }
-
 
 }

@@ -18,7 +18,9 @@
 package org.apache.hadoop.ozone.debug.replicas;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import org.apache.hadoop.hdds.scm.cli.ScmOption;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -48,7 +50,7 @@ public class ReplicasVerify extends Handler {
 
   @CommandLine.Option(names = {"-o", "--output-dir"},
       description = "Destination where the directory where the generated output will be saved.",
-      defaultValue = "/opt/hadoop")
+      required = true)
   private String outputDir;
 
   @CommandLine.Option(names = "--checksums",
@@ -62,15 +64,24 @@ public class ReplicasVerify extends Handler {
       defaultValue = "false")
   private boolean doExecutePadding;
 
-  private Checksums checksums;
   private FindMissingPadding findMissingPadding;
+  private List<ReplicasVerifier> replicasVerifiers;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) throws IOException {
-    LOG.info("Verifying replicas for {}", address);
-    checksums = new Checksums(client, outputDir, LOG, getConf());
-    findMissingPadding = new FindMissingPadding(client, scmOption, LOG, out(), getConf());
+    replicasVerifiers = new ArrayList<>();
+
+    if (doExecuteChecksums) {
+      replicasVerifiers.add(new Checksums(client, outputDir, LOG, getConf()));
+    }
+
+    if (doExecutePadding) {
+      findMissingPadding = new FindMissingPadding(client, scmOption, LOG, out(), getConf());
+      replicasVerifiers.add(findMissingPadding);
+    }
+
     findCandidateKeys(client, address);
+
     if (doExecuteChecksums) {
       findMissingPadding.execute();
     }
@@ -123,12 +134,6 @@ public class ReplicasVerify extends Handler {
   }
 
   void processKey(KeyParts keyParts) {
-    if (doExecuteChecksums) {
-      checksums.processKeyConsumer(keyParts);
-    }
-
-    if (doExecutePadding) {
-      findMissingPadding.checkKeyConsumer(keyParts);
-    }
+    replicasVerifiers.forEach(verifier -> verifier.verifyKey(keyParts));
   }
 }
