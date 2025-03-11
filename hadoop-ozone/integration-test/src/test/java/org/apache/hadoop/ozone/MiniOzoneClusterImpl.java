@@ -45,6 +45,7 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -106,6 +107,10 @@ import org.apache.ozone.recon.schema.ReconSqlDbConfig;
 import org.apache.ozone.test.GenericTestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
 
 /**
  * MiniOzoneCluster creates a complete in-process Ozone cluster suitable for
@@ -307,6 +312,11 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     return createS3Client(true);
   }
 
+  @Override
+  public S3Client newS3ClientV2() throws Exception {
+    return createS3ClientV2(true);
+  }
+
   public AmazonS3 createS3Client(boolean enablePathStyle) {
     final String accessKey = "user";
     final String secretKey = "password";
@@ -317,6 +327,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     String host;
 
     if (webPolicy.isHttpsEnabled()) {
+      // TODO: Currently HTTPS is disabled in the test, we can add HTTPS
+      //  integration in the future
       protocol = HTTPS_SCHEME;
       host = conf.get(OZONE_S3G_HTTPS_ADDRESS_KEY);
     } else {
@@ -334,19 +346,49 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     ClientConfiguration clientConfiguration = new ClientConfiguration();
     LOG.info("S3 Endpoint is {}", endpoint);
 
-    AmazonS3 s3Client =
-        AmazonS3ClientBuilder.standard()
-            .withPathStyleAccessEnabled(enablePathStyle)
-            .withEndpointConfiguration(
-                new AwsClientBuilder.EndpointConfiguration(
-                    endpoint, region.getName()
-                )
+    return AmazonS3ClientBuilder.standard()
+        .withPathStyleAccessEnabled(enablePathStyle)
+        .withEndpointConfiguration(
+            new AwsClientBuilder.EndpointConfiguration(
+                endpoint, region.getName()
             )
-            .withClientConfiguration(clientConfiguration)
-            .withCredentials(credentials)
-            .build();
+        )
+        .withClientConfiguration(clientConfiguration)
+        .withCredentials(credentials)
+        .build();
+  }
 
-    return s3Client;
+  public S3Client createS3ClientV2(boolean enablePathStyle) throws Exception {
+    final String accessKey = "user";
+    final String secretKey = "password";
+    final Region region = Region.US_EAST_1;
+
+    final String protocol;
+    final HttpConfig.Policy webPolicy = getHttpPolicy(conf);
+    String host;
+
+    if (webPolicy.isHttpsEnabled()) {
+      // TODO: Currently HTTPS is disabled in the test, we can add HTTPS
+      //  integration in the future
+      protocol = HTTPS_SCHEME;
+      host = conf.get(OZONE_S3G_HTTPS_ADDRESS_KEY);
+    } else {
+      protocol = HTTP_SCHEME;
+      host = conf.get(OZONE_S3G_HTTP_ADDRESS_KEY);
+    }
+
+    String endpoint = protocol + "://" + host;
+
+    LOG.info("S3 Endpoint is {}", endpoint);
+
+    AwsBasicCredentials credentials = AwsBasicCredentials.create(accessKey, secretKey);
+
+    return S3Client.builder()
+        .region(region)
+        .endpointOverride(new URI(endpoint))
+        .credentialsProvider(StaticCredentialsProvider.create(credentials))
+        .forcePathStyle(enablePathStyle)
+        .build();
   }
 
   protected OzoneClient createClient() throws IOException {
