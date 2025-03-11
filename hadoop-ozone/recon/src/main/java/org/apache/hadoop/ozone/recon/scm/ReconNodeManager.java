@@ -222,9 +222,9 @@ public class ReconNodeManager extends SCMNodeManager {
    * @return SCMheartbeat response.
    */
   @Override
-  public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
+  public List<SCMCommand<?>> processHeartbeat(DatanodeDetails datanodeDetails,
       CommandQueueReportProto queueReport) {
-    List<SCMCommand> cmds = new ArrayList<>();
+    List<SCMCommand<?>> cmds = new ArrayList<>();
     long currentTime = Time.now();
     if (needUpdate(datanodeDetails, currentTime)) {
       cmds.add(new ReregisterCommand());

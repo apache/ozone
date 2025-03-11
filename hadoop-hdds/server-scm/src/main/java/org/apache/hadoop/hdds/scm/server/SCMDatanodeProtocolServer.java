@@ -302,7 +302,7 @@ public class SCMDatanodeProtocolServer implements
   public SCMHeartbeatResponseProto sendHeartbeat(
       SCMHeartbeatRequestProto heartbeat) throws IOException, TimeoutException {
     List<SCMCommandProto> cmdResponses = new ArrayList<>();
-    for (SCMCommand cmd : heartbeatDispatcher.dispatch(heartbeat)) {
+    for (SCMCommand<?> cmd : heartbeatDispatcher.dispatch(heartbeat)) {
       cmdResponses.add(getCommandResponse(cmd, scm));
     }
     final OptionalLong term = getTermIfLeader();
@@ -352,7 +352,7 @@ public class SCMDatanodeProtocolServer implements
    * @throws IOException
    */
   @VisibleForTesting
-  public static SCMCommandProto getCommandResponse(SCMCommand cmd,
+  public static SCMCommandProto getCommandResponse(SCMCommand<?> cmd,
       OzoneStorageContainerManager scm) throws IOException, TimeoutException {
     SCMCommandProto.Builder builder = SCMCommandProto.newBuilder()
         .setEncodedToken(cmd.getEncodedToken());

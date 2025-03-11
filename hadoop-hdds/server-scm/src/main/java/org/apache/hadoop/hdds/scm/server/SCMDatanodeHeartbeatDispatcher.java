@@ -82,10 +82,10 @@ public final class SCMDatanodeHeartbeatDispatcher {
    *
    * @return list of SCMCommand
    */
-  public List<SCMCommand> dispatch(SCMHeartbeatRequestProto heartbeat) {
+  public List<SCMCommand<?>> dispatch(SCMHeartbeatRequestProto heartbeat) {
     DatanodeDetails datanodeDetails =
         DatanodeDetails.getFromProtoBuf(heartbeat.getDatanodeDetails());
-    List<SCMCommand> commands;
+    List<SCMCommand<?>> commands;
 
     // If node is not registered, ask the node to re-register. Do not process
     // Heartbeat for unregistered nodes.

@@ -454,10 +454,10 @@ public class TestStorageContainerManager {
       GenericTestUtils.waitFor(() -> {
         NodeManager nodeManager = cluster.getStorageContainerManager()
             .getScmNodeManager();
-        List<SCMCommand> commands = nodeManager.processHeartbeat(
+        List<SCMCommand<?>> commands = nodeManager.processHeartbeat(
             nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0));
         if (commands != null) {
-          for (SCMCommand cmd : commands) {
+          for (SCMCommand<?> cmd : commands) {
             if (cmd.getType() == SCMCommandProto.Type.deleteBlocksCommand) {
               List<DeletedBlocksTransaction> deletedTXs =
                   ((DeleteBlocksCommand) cmd).blocksTobeDeleted();
