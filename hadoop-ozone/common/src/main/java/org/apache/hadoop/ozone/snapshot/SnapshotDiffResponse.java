@@ -142,7 +142,7 @@ public class SnapshotDiffResponse {
           .append(waitTimeInMs)
           .append(" ms.\n");
       if (subStatus != null) {
-        str.append("SubStatus is ")
+        str.append("SubStatus : ")
             .append(subStatus);
         if (subStatus.equals(SubStatus.OBJECT_ID_MAP_GEN_OBS) ||
             subStatus.equals(SubStatus.OBJECT_ID_MAP_GEN_FSO)) {
