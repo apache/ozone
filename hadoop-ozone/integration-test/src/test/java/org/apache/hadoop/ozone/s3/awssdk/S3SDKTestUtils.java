@@ -43,17 +43,18 @@ public final class S3SDKTestUtils {
    * @return byte array of the MD5 digest of the input stream from a specific offset and length.
    * @throws Exception exception.
    */
-  public static byte[] calculateDigest(InputStream inputStream, int skip, int length) throws Exception {
+  public static byte[] calculateDigest(final InputStream inputStream, int skip, int length) throws Exception {
     int numRead;
     byte[] buffer = new byte[1024];
 
     MessageDigest complete = MessageDigest.getInstance("MD5");
+    InputStream subStream = inputStream;
     if (skip > -1 && length > -1) {
-      inputStream = new InputSubstream(inputStream, skip, length);
+      subStream = new InputSubstream(inputStream, skip, length);
     }
 
     do {
-      numRead = inputStream.read(buffer);
+      numRead = subStream.read(buffer);
       if (numRead > 0) {
         complete.update(buffer, 0, numRead);
       }
