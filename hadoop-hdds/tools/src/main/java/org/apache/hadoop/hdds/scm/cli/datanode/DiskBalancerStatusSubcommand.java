@@ -60,27 +60,31 @@ public class DiskBalancerStatusSubcommand extends ScmSubcommand {
   private String generateStatus(
       List<HddsProtos.DatanodeDiskBalancerInfoProto> protos) {
     StringBuilder formatBuilder = new StringBuilder("Status result:%n" +
-        "%-50s %s %s %s %s %s%n");
+        "%-40s %-20s %-10s %-10s %-15s %-15s %-15s %-15s%n");
 
     List<String> contentList = new ArrayList<>();
     contentList.add("Datanode");
     contentList.add("VolumeDensity");
     contentList.add("Status");
-    contentList.add("Threshold");
+    contentList.add("Threshold(%)");
     contentList.add("BandwidthInMB");
-    contentList.add("ParallelThread");
+    contentList.add("Threads");
+    contentList.add("SuccessMove");
+    contentList.add("FailureMove");
 
     for (HddsProtos.DatanodeDiskBalancerInfoProto proto: protos) {
-      formatBuilder.append("%-50s %s %s %s %s %s%n");
+      formatBuilder.append("%-40s %-20s %-10s %-10s %-15s %-15s %-15s %-15s%n");
       contentList.add(proto.getNode().getHostName());
       contentList.add(String.valueOf(proto.getCurrentVolumeDensitySum()));
       contentList.add(proto.getRunningStatus().name());
       contentList.add(
-          String.valueOf(proto.getDiskBalancerConf().getThreshold()));
+          String.format("%.4f", proto.getDiskBalancerConf().getThreshold()));
       contentList.add(
           String.valueOf(proto.getDiskBalancerConf().getDiskBandwidthInMB()));
       contentList.add(
           String.valueOf(proto.getDiskBalancerConf().getParallelThread()));
+      contentList.add(String.valueOf(proto.getSuccessMoveCount()));
+      contentList.add(String.valueOf(proto.getFailureMoveCount()));
     }
 
     return String.format(formatBuilder.toString(),
