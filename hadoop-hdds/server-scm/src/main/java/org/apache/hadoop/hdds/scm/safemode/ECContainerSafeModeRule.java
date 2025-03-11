@@ -34,7 +34,6 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -199,13 +198,9 @@ public class ECContainerSafeModeRule extends SafeModeExitRule<NodeRegistrationCo
   private void initializeRule() {
     ecContainers.clear();
     ecContainerDNsMap.clear();
-    containerManager.getContainers().forEach(container -> {
-      if (container.getReplicationType() == HddsProtos.ReplicationType.EC
-          && isClosed(container)
-          && container.getNumberOfKeys() > 0) {
-        ecContainers.add(container.getContainerID());
-      }
-    });
+    containerManager.getContainers(ReplicationType.EC).stream()
+        .filter(this::isClosed).filter(c -> c.getNumberOfKeys() > 0)
+        .map(ContainerInfo::getContainerID).forEach(ecContainers::add);
     ecMaxContainer = ecContainers.size();
     long ecCutOff = (long) Math.ceil(ecMaxContainer * safeModeCutoff);
     getSafeModeMetrics().setNumContainerWithECDataReplicaReportedThreshold(ecCutOff);

@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -132,7 +133,7 @@ public class TestSCMSafeModeManager {
       container.setNumberOfKeys(10);
     }
     ContainerManager containerManager = mock(ContainerManager.class);
-    when(containerManager.getContainers()).thenReturn(containers);
+    when(containerManager.getContainers(ReplicationType.RATIS)).thenReturn(containers);
     scmSafeModeManager = new SCMSafeModeManager(
         config, containerManager, null, queue,
         serviceManager, scmContext);
@@ -171,7 +172,7 @@ public class TestSCMSafeModeManager {
       container.setNumberOfKeys(10);
     }
     ContainerManager containerManager = mock(ContainerManager.class);
-    when(containerManager.getContainers()).thenReturn(containers);
+    when(containerManager.getContainers(ReplicationType.RATIS)).thenReturn(containers);
     scmSafeModeManager = new SCMSafeModeManager(
         config, containerManager, null, queue,
         serviceManager, scmContext);
@@ -240,7 +241,7 @@ public class TestSCMSafeModeManager {
         serviceManager,
         Clock.system(ZoneOffset.UTC));
     ContainerManager containerManager = mock(ContainerManager.class);
-    when(containerManager.getContainers()).thenReturn(containers);
+    when(containerManager.getContainers(ReplicationType.RATIS)).thenReturn(containers);
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
         () -> new SCMSafeModeManager(conf, containerManager,
             pipelineManager, queue, serviceManager, scmContext));
@@ -306,7 +307,7 @@ public class TestSCMSafeModeManager {
     }
 
     ContainerManager containerManager = mock(ContainerManager.class);
-    when(containerManager.getContainers()).thenReturn(containers);
+    when(containerManager.getContainers(ReplicationType.RATIS)).thenReturn(containers);
 
     scmSafeModeManager = new SCMSafeModeManager(
         conf, containerManager, pipelineManager, queue, serviceManager,
@@ -443,7 +444,7 @@ public class TestSCMSafeModeManager {
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, false);
     PipelineManager pipelineManager = mock(PipelineManager.class);
     ContainerManager containerManager = mock(ContainerManager.class);
-    when(containerManager.getContainers()).thenReturn(containers);
+    when(containerManager.getContainers(ReplicationType.RATIS)).thenReturn(containers);
     scmSafeModeManager = new SCMSafeModeManager(
         conf, containerManager, pipelineManager, queue, serviceManager,
         scmContext);
@@ -484,7 +485,7 @@ public class TestSCMSafeModeManager {
     }
 
     ContainerManager containerManager = mock(ContainerManager.class);
-    when(containerManager.getContainers()).thenReturn(containers);
+    when(containerManager.getContainers(ReplicationType.RATIS)).thenReturn(containers);
 
     scmSafeModeManager = new SCMSafeModeManager(
         config, containerManager, null, queue, serviceManager, scmContext);
@@ -588,7 +589,7 @@ public class TestSCMSafeModeManager {
     OzoneConfiguration conf = new OzoneConfiguration(config);
     conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE, numOfDns);
     ContainerManager containerManager = mock(ContainerManager.class);
-    when(containerManager.getContainers()).thenReturn(containers);
+    when(containerManager.getContainers(ReplicationType.RATIS)).thenReturn(containers);
     scmSafeModeManager = new SCMSafeModeManager(
         conf, containerManager, null, queue,
         serviceManager, scmContext);
@@ -701,7 +702,7 @@ public class TestSCMSafeModeManager {
       pipeline = pipelineManager.getPipeline(pipeline.getId());
       MockRatisPipelineProvider.markPipelineHealthy(pipeline);
       ContainerManager containerManager = mock(ContainerManager.class);
-      when(containerManager.getContainers()).thenReturn(containers);
+      when(containerManager.getContainers(ReplicationType.RATIS)).thenReturn(containers);
 
       scmSafeModeManager = new SCMSafeModeManager(
           config, containerManager, pipelineManager, queue, serviceManager,
@@ -756,7 +757,7 @@ public class TestSCMSafeModeManager {
         mockRatisProvider);
 
     ContainerManager containerManager = mock(ContainerManager.class);
-    when(containerManager.getContainers()).thenReturn(containers);
+    when(containerManager.getContainers(ReplicationType.RATIS)).thenReturn(containers);
 
     scmSafeModeManager = new SCMSafeModeManager(
         config, containerManager, pipelineManager, queue, serviceManager,

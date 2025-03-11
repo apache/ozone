@@ -28,7 +28,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -152,13 +151,9 @@ public class RatisContainerSafeModeRule extends SafeModeExitRule<NodeRegistratio
 
   private void initializeRule() {
     ratisContainers.clear();
-    containerManager.getContainers().forEach(container -> {
-      if (container.getReplicationType() == HddsProtos.ReplicationType.RATIS
-          && isClosed(container)
-          && container.getNumberOfKeys() > 0) {
-        ratisContainers.add(container.getContainerID());
-      }
-    });
+    containerManager.getContainers(ReplicationType.RATIS).stream()
+        .filter(this::isClosed).filter(c -> c.getNumberOfKeys() > 0)
+        .map(ContainerInfo::getContainerID).forEach(ratisContainers::add);
     ratisMaxContainer = ratisContainers.size();
     long ratisCutOff = (long) Math.ceil(ratisMaxContainer * safeModeCutoff);
     getSafeModeMetrics().setNumContainerWithOneReplicaReportedThreshold(ratisCutOff);
