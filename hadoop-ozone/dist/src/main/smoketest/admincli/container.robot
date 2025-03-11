@@ -96,6 +96,33 @@ List all containers from a particular container ID
     ${output} =         Execute          ozone admin container list --all --start 1
                         Should contain   ${output}   OPEN
 
+List containers in JSON array format
+    ${output} =         Execute          ozone admin container list --json | jq -r '.'
+                        Should Start With   ${output}   [
+                        Should Contain   ${output}   containerID
+                        Should End With   ${output}   ]
+
+List all containers in JSON array format
+    ${output} =         Execute          ozone admin container list --all --json | jq -r '.'
+                        Should Start With   ${output}   [
+                        Should Contain   ${output}   containerID
+                        Should End With   ${output}   ]
+
+List containers with state in JSON array format
+    ${output} =         Execute          ozone admin container list --state=OPEN --json | jq -r '.'
+                        Should Start With   ${output}   [
+                        Should Contain   ${output}   OPEN
+                        Should Not Contain   ${output}   CLOSED
+                        Should End With   ${output}   ]
+
+List containers with count in JSON array format
+    ${output} =         Execute          ozone admin container list --count 5 --json | jq -r '.'
+                        Should Start With   ${output}   [
+                        Should Contain   ${output}   containerID
+                        Should End With   ${output}   ]
+    ${count} =          Execute          echo '${output}' | jq -r 'length'
+                        Should Be True   ${count} <= 5
+
 Close container
     ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
                         Execute          ozone admin container close "${container}"

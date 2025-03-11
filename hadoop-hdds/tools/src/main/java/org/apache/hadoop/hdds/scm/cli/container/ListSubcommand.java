@@ -76,6 +76,11 @@ public class ListSubcommand extends ScmSubcommand {
       description = "Container replication (ONE, THREE for Ratis, " +
           "rs-6-3-1024k for EC)")
   private String replication;
+  
+  @Option(names = {"--json"},
+      description = "Output the entire list in JSON array format",
+      defaultValue = "false")
+  private boolean jsonFormat;
 
   private static final ObjectWriter WRITER;
 
@@ -90,10 +95,34 @@ public class ListSubcommand extends ScmSubcommand {
   }
 
 
-  private void outputContainerInfo(ContainerInfo containerInfo)
-      throws IOException {
-    // Print container report info.
+  private void outputContainerInfo(ContainerInfo containerInfo) throws IOException {
+    // Original behavior - just print the container JSON
     System.out.println(WRITER.writeValueAsString(containerInfo));
+  }
+  
+  private void outputContainerInfoAsJsonMember(ContainerInfo containerInfo, boolean isFirst,
+      boolean isLast) throws IOException {
+    // JSON array format with proper brackets and commas
+    if (isFirst) {
+      // Start of array
+      System.out.print("[");
+    }
+    
+    // Print the container JSON
+    System.out.print(WRITER.writeValueAsString(containerInfo));
+    
+    if (!isLast) {
+      // Add comma between elements
+      System.out.print(",");
+    }
+    
+    if (isLast) {
+      // End of array
+      System.out.println("]");
+    } else {
+      // Add newline for readability
+      System.out.println();
+    }
   }
 
   @Override
@@ -124,8 +153,20 @@ public class ListSubcommand extends ScmSubcommand {
         count = maxCountAllowed;
       }
       containerListAndTotalCount = scmClient.listContainer(startId, count, state, type, repConfig);
-      for (ContainerInfo container : containerListAndTotalCount.getContainerInfoList()) {
-        outputContainerInfo(container);
+      
+      int totalSize = containerListAndTotalCount.getContainerInfoList().size();
+      
+      if (jsonFormat) {
+        // JSON array format
+        for (int i = 0; i < totalSize; i++) {
+          ContainerInfo container = containerListAndTotalCount.getContainerInfoList().get(i);
+          outputContainerInfoAsJsonMember(container, i == 0, i == totalSize - 1);
+        }
+      } else {
+        // Original format - one JSON object per line
+        for (ContainerInfo container : containerListAndTotalCount.getContainerInfoList()) {
+          outputContainerInfo(container);
+        }
       }
 
       if (containerListAndTotalCount.getTotalCount() > count) {
@@ -138,20 +179,58 @@ public class ListSubcommand extends ScmSubcommand {
       int batchSize = (count > 0) ? count : maxCountAllowed;
       long currentStartId = startId;
       int fetchedCount;
+      
+      if (jsonFormat) {
+        // JSON array format for all containers
+        boolean isFirstContainer = true;
+        
+        // Start JSON array
+        System.out.print("[");
 
-      do {
-        // Fetch containers in batches of 'batchSize'
-        containerListAndTotalCount = scmClient.listContainer(currentStartId, batchSize, state, type, repConfig);
-        fetchedCount = containerListAndTotalCount.getContainerInfoList().size();
+        do {
+          // Fetch containers in batches of 'batchSize'
+          containerListAndTotalCount = scmClient.listContainer(currentStartId, batchSize, state, type, repConfig);
+          fetchedCount = containerListAndTotalCount.getContainerInfoList().size();
 
-        for (ContainerInfo container : containerListAndTotalCount.getContainerInfoList()) {
-          outputContainerInfo(container);
-        }
+          for (int i = 0; i < fetchedCount; i++) {
+            ContainerInfo container = containerListAndTotalCount.getContainerInfoList().get(i);
+            
+            // Only the first container overall doesn't need a preceding comma
+            if (!isFirstContainer) {
+              System.out.print(",");
+              System.out.println();
+            }
+            
+            // Print the container JSON
+            System.out.print(WRITER.writeValueAsString(container));
+            isFirstContainer = false;
+          }
 
-        if (fetchedCount > 0) {
-          currentStartId = containerListAndTotalCount.getContainerInfoList().get(fetchedCount - 1).getContainerID() + 1;
-        }
-      } while (fetchedCount > 0);
+          if (fetchedCount > 0) {
+            currentStartId =
+                containerListAndTotalCount.getContainerInfoList().get(fetchedCount - 1).getContainerID() + 1;
+          }
+        } while (fetchedCount > 0);
+        
+        // Close the JSON array
+        System.out.println("]");
+      } else {
+        // Original format - one JSON object per line
+        do {
+          // Fetch containers in batches of 'batchSize'
+          containerListAndTotalCount = scmClient.listContainer(currentStartId, batchSize, state, type, repConfig);
+          fetchedCount = containerListAndTotalCount.getContainerInfoList().size();
+
+          for (ContainerInfo container : containerListAndTotalCount.getContainerInfoList()) {
+            outputContainerInfo(container);
+          }
+
+          if (fetchedCount > 0) {
+            currentStartId =
+                containerListAndTotalCount.getContainerInfoList().get(fetchedCount - 1).getContainerID() + 1;
+          }
+        } while (fetchedCount > 0);
+      }
     }
   }
 }
