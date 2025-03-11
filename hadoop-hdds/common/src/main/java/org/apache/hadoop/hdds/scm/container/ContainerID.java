@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
 import java.util.Objects;
 import java.util.function.Supplier;
+import net.jcip.annotations.Immutable;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
@@ -35,6 +36,7 @@ import org.apache.ratis.util.MemoizedSupplier;
  * <p>
  * This class is immutable.
  */
+@Immutable
 public final class ContainerID implements Comparable<ContainerID> {
   private static final Codec<ContainerID> CODEC = new DelegatedCodec<>(
       LongCodec.get(), ContainerID::valueOf, c -> c.id,
