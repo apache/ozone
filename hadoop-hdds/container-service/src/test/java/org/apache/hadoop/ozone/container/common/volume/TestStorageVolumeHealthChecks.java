@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import static org.apache.hadoop.ozone.container.common.volume.StorageVolume.HUNDRED_MB;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -113,34 +112,50 @@ public class TestStorageVolumeHealthChecks {
 
   @ParameterizedTest
   @MethodSource("volumeBuilders")
-  public void testVolumeFullHealth(StorageVolume.Builder<?> builder)
+  public void testVolumeFullHealth(StorageVolume.Builder<?> builder) throws Exception {
+    verifyFullVolumeHealthWithDiskReadWriteStatus(builder, true, false);
+  }
+
+
+  public void verifyFullVolumeHealthWithDiskReadWriteStatus(StorageVolume.Builder<?> builder, boolean... checkResult)
       throws Exception {
-    StorageVolume volume = builder.build();
 
-    VolumeUsage usage = volume.getVolumeInfo().get().getUsageForTesting();
-    // Keep remaining space as just less than 100 MB
-    usage.incrementUsedSpace(usage.getCurrentUsage().getAvailable() - HUNDRED_MB + 1);
-    usage.realUsage();
-    DiskCheckUtil.DiskChecks ioFailure = new DiskCheckUtil.DiskChecks() {
-      @Override
-      public boolean checkReadWrite(File storageDir, File testFileDir,
-                                    int numBytesToWrite) {
-        return false;
+    for (int i = 0; i < checkResult.length; i++) {
+      final boolean result = checkResult[i];
+      StorageVolume volume = builder.build();
+
+      VolumeUsage usage = volume.getVolumeInfo().get().getUsageForTesting();
+      DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
+      int minimumDiskSpace = dnConf.getVolumeHealthCheckFileSize() * 2;
+      // Keep remaining space as just less than double of VolumeHealthCheckFileSize.
+      usage.incrementUsedSpace(usage.getCurrentUsage().getAvailable() - minimumDiskSpace + 1);
+      usage.realUsage();
+      DiskCheckUtil.DiskChecks ioFailure = new DiskCheckUtil.DiskChecks() {
+        @Override
+        public boolean checkReadWrite(File storageDir, File testFileDir,
+                                      int numBytesToWrite) {
+          return result;
+        }
+      };
+      DiskCheckUtil.setTestImpl(ioFailure);
+      // Volume will remain healthy as volume don't have enough space to check READ/WRITE
+      assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+      // Even in second try volume will remain HEALTHY
+      assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+
+      // Now keep enough space for read/write check to go through
+      usage.decrementUsedSpace(minimumDiskSpace + 1);
+
+      // volumeIOFailureTolerance is 1, so first time it will be HEALTHY always
+      assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+      if (result) {
+        // Volume will remain as healthy as READ/WRITE check is fine
+        assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+      } else {
+        // Second time volume will fail as READ/WRITE check has failed
+        assertEquals(VolumeCheckResult.FAILED, volume.check(false));
       }
-    };
-    DiskCheckUtil.setTestImpl(ioFailure);
-    // Volume will remain healthy as volume don't have enough space to check READ/WRITE
-    assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
-    // Even in second try volume will remain HEALTHY
-    assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
-
-    // Now keep enough space for read/write check to go through
-    usage.decrementUsedSpace(HUNDRED_MB + 1);
-
-    // volumeIOFailureTolerance is 1, so first time it will be HEALTHY
-    assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
-    // second time volume will fail as READ/WRITE check has failed
-    assertEquals(VolumeCheckResult.FAILED, volume.check(false));
+    }
   }
 
   @ParameterizedTest
