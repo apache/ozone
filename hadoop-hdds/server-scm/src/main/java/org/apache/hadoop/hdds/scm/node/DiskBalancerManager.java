@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
@@ -248,7 +249,7 @@ public class DiskBalancerManager {
       DatanodeDetails datanodeDetails) {
     boolean shouldReturn = true;
     // If status specified, do not return if status not match.
-    if (status != null && getRunningStatus(datanodeDetails) != status) {
+    if (status != null && getStatus(datanodeDetails).getRunningStatus() != status) {
       shouldReturn = false;
     }
     return shouldReturn;
@@ -258,14 +259,16 @@ public class DiskBalancerManager {
       DatanodeInfo dn, int clientVersion) {
     double volumeDensitySum =
         getVolumeDataDensitySumForDatanodeDetails(dn);
-    HddsProtos.DiskBalancerRunningStatus runningStatus =
-        getRunningStatus(dn);
+    DiskBalancerStatus status = getStatus(dn);
+
     HddsProtos.DatanodeDiskBalancerInfoProto.Builder builder =
         HddsProtos.DatanodeDiskBalancerInfoProto.newBuilder()
             .setNode(dn.toProto(clientVersion))
             .setCurrentVolumeDensitySum(volumeDensitySum)
-            .setRunningStatus(getRunningStatus(dn));
-    if (runningStatus != HddsProtos.DiskBalancerRunningStatus.UNKNOWN) {
+            .setRunningStatus(status.getRunningStatus())
+            .setSuccessMoveCount(status.getSuccessMoveCount())
+            .setFailureMoveCount(status.getFailureMoveCount());
+    if (status.getRunningStatus() != DiskBalancerRunningStatus.UNKNOWN) {
       builder.setDiskBalancerConf(statusMap.get(dn)
           .getDiskBalancerConfiguration().toProtobufBuilder());
     }
@@ -301,23 +304,15 @@ public class DiskBalancerManager {
     return volumeDensitySum;
   }
 
-  private HddsProtos.DiskBalancerRunningStatus getRunningStatus(
-      DatanodeDetails datanodeDetails) {
-    if (!statusMap.containsKey(datanodeDetails)) {
-      return HddsProtos.DiskBalancerRunningStatus.UNKNOWN;
-    } else {
-      if (statusMap.get(datanodeDetails).isRunning()) {
-        return HddsProtos.DiskBalancerRunningStatus.RUNNING;
-      } else {
-        return HddsProtos.DiskBalancerRunningStatus.STOPPED;
-      }
-    }
+  private DiskBalancerStatus getStatus(DatanodeDetails datanodeDetails) {
+    return statusMap.computeIfAbsent(datanodeDetails,
+        dn -> new DiskBalancerStatus(DiskBalancerRunningStatus.UNKNOWN, new DiskBalancerConfiguration(), 0, 0));
   }
 
   @VisibleForTesting
   public void addRunningDatanode(DatanodeDetails datanodeDetails) {
-    statusMap.put(datanodeDetails, new DiskBalancerStatus(true,
-        new DiskBalancerConfiguration()));
+    statusMap.put(datanodeDetails, new DiskBalancerStatus(DiskBalancerRunningStatus.RUNNING,
+        new DiskBalancerConfiguration(), 0, 0));
   }
 
   public void processDiskBalancerReport(DiskBalancerReportProto reportProto,
@@ -328,8 +323,11 @@ public class DiskBalancerManager {
             DiskBalancerConfiguration.fromProtobuf(
                 reportProto.getDiskBalancerConf(), conf) :
             new DiskBalancerConfiguration();
-    statusMap.put(dn, new DiskBalancerStatus(isRunning,
-        diskBalancerConfiguration));
+    long successMoveCount = reportProto.getSuccessMoveCount();
+    long failureMoveCount = reportProto.getFailureMoveCount();
+    statusMap.put(dn, new DiskBalancerStatus(
+        isRunning ? DiskBalancerRunningStatus.RUNNING : DiskBalancerRunningStatus.STOPPED,
+        diskBalancerConfiguration, successMoveCount, failureMoveCount));
     if (reportProto.hasBalancedBytes()) {
       balancedBytesMap.put(dn, reportProto.getBalancedBytes());
     }
