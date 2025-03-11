@@ -46,7 +46,7 @@ import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.CONTENT_MD
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.CONTENT_TYPE;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.HOST_HEADER;
 import static org.apache.hadoop.ozone.s3.signature.StringToSignProducer.X_AMAZ_DATE;
-import static org.apache.hadoop.ozone.s3.signature.StringToSignProducer.X_AMZ_CONTENT_SHA256;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertNull;
