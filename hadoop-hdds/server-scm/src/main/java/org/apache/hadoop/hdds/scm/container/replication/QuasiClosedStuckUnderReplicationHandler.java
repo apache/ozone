@@ -113,7 +113,7 @@ public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplica
           mutablePendingOps.add(ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD, target, 0));
           totalCommandsSent++;
         } catch (CommandTargetOverloadedException e) {
-          LOG.warn("Cannot replicate container {} because target {} is overloaded.", containerInfo, target);
+          LOG.warn("Cannot replicate container {} because all sources are overloaded.", containerInfo);
           if (firstException == null) {
             firstException = e;
           }
