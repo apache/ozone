@@ -33,6 +33,16 @@ public final class S3SDKTestUtils {
   private S3SDKTestUtils() {
   }
 
+  /**
+   * Calculate the MD5 digest from an input stream from a specific offset and length.
+   * @param inputStream The input stream where the digest will be read from.
+   *                    Note that the input stream will not be closed, the caller is responsible in closing
+   *                    the input stream.
+   * @param skip The byte offset to start the digest from.
+   * @param length The number of bytes from the starting offset that will be digested.
+   * @return byte array of the MD5 digest of the input stream from a specific offset and length.
+   * @throws Exception exception.
+   */
   public static byte[] calculateDigest(InputStream inputStream, int skip, int length) throws Exception {
     int numRead;
     byte[] buffer = new byte[1024];
