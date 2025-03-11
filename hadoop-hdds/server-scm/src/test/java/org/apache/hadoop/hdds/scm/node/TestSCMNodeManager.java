@@ -2067,26 +2067,35 @@ public class TestSCMNodeManager {
   @ParameterizedTest
   @MethodSource("nodeStateTransitions")
   public void testNodeOperationalStateChange(
-      HddsProtos.NodeOperationalState oldState, 
-      HddsProtos.NodeOperationalState newState, 
+      HddsProtos.NodeOperationalState oldState,
+      HddsProtos.NodeOperationalState newState,
       boolean shouldNotify)
       throws IOException, NodeNotFoundException, AuthenticationException {
     OzoneConfiguration conf = new OzoneConfiguration();
     SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
     when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
     EventPublisher eventPublisher = mock(EventPublisher.class);
-    HDDSLayoutVersionManager lvm  =
-        new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
+    HDDSLayoutVersionManager lvm = new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
     createNodeManager(getConf());
-    SCMNodeManager nodeManager  = new SCMNodeManager(conf,
+    SCMNodeManager nodeManager = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
         scmContext, lvm);
 
     DatanodeDetails datanode = MockDatanodeDetails.randomDatanodeDetails();
     datanode.setPersistedOpState(oldState);
     nodeManager.register(datanode, null, HddsTestUtils.getRandomPipelineReports());
+
     nodeManager.setNodeOperationalState(datanode, newState, 0);
-    verify(eventPublisher, times(shouldNotify ? 1 : 0)).fireEvent(SCMEvents.REPLICATION_MANAGER_NOTIFY, datanode);
+    verify(eventPublisher, times(0)).fireEvent(SCMEvents.REPLICATION_MANAGER_NOTIFY, datanode);
+
+    DatanodeDetails reportedDatanode = MockDatanodeDetails.createDatanodeDetails(
+        datanode.getUuid());
+    reportedDatanode.setPersistedOpState(newState);
+
+    nodeManager.processHeartbeat(reportedDatanode);
+
+    verify(eventPublisher, times(shouldNotify ? 1 : 0)).fireEvent(
+        SCMEvents.REPLICATION_MANAGER_NOTIFY, reportedDatanode);
 
     nodeManager.close();
   }
