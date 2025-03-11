@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone;
 
-import com.amazonaws.services.s3.AmazonS3;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
@@ -35,6 +34,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.ozone.s3.Gateway;
+import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
@@ -163,9 +163,11 @@ public interface MiniOzoneCluster extends AutoCloseable {
   OzoneClient newClient() throws IOException;
 
   /**
-   * Returns an {@link AmazonS3} to use AWS SDK V1 to access the {@link MiniOzoneCluster}.
+   * Returns an S3ClientFactory to create S3 clients for the {@link MiniOzoneCluster}.
+   *
+   * @return {@link S3ClientFactory}
    */
-  AmazonS3 newS3Client();
+  S3ClientFactory getS3ClientFactory();
 
   /**
    * Returns an {@link S3Client} to use AWS SDK V2 to access the {@link MiniOzoneCluster}.

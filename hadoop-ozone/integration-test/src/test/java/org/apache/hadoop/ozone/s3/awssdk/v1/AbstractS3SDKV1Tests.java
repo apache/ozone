@@ -186,7 +186,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
         .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
-    s3Client = cluster.newS3Client();
+    s3Client = cluster.getS3ClientFactory().createS3Client();
   }
 
   /**
