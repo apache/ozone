@@ -363,17 +363,24 @@ public class DiskBalancerService extends BackgroundService {
   private boolean shouldDelay() {
     // We should wait for next AvailableTime.
     if (Time.monotonicNow() <= nextAvailableTime.get()) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Skipping balancing until nextAvailableTime ({} ms)",
+            (nextAvailableTime.get() - Time.monotonicNow()));
+      }
       return true;
     }
     // Calculate the next AvailableTime based on bandwidth
     long bytesBalanced = balancedBytesInLastWindow.getAndSet(0L);
-
     final int megaByte = 1024 * 1024;
 
     // converting disk bandwidth in byte/millisec
     float bytesPerMillisec = bandwidthInMB * megaByte / 1000f;
-    nextAvailableTime.set(Time.monotonicNow() +
-        ((long) (bytesBalanced / bytesPerMillisec)));
+    long delayInMillisec = (long) (bytesBalanced / bytesPerMillisec);
+    nextAvailableTime.set(Time.monotonicNow() + delayInMillisec);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Bytes balanced: {} MB, Calculated delay: {} ms ({} sec)",
+          bytesBalanced / megaByte, delayInMillisec, delayInMillisec / 1000);
+    }
     return false;
   }
 
@@ -448,6 +455,7 @@ public class DiskBalancerService extends BackgroundService {
         }
         oldContainer.getContainerData().getVolume()
             .decrementUsedSpace(containerSize);
+        balancedBytesInLastWindow.addAndGet(containerSize);
         metrics.incrSuccessCount(1);
         metrics.incrSuccessBytes(containerSize);
       } catch (IOException e) {
