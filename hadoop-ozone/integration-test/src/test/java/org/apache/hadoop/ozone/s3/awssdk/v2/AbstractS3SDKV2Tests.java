@@ -99,6 +99,9 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
    * Shutdown the MiniOzoneCluster.
    */
   static void shutdownCluster() throws IOException {
+    if (s3Client != null) {
+      s3Client.close();
+    }
     if (cluster != null) {
       cluster.shutdown();
     }
