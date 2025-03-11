@@ -41,7 +41,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -162,16 +161,6 @@ public class UpgradeContainerSchema extends RepairTool {
         return;
       }
       configuration.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, volume);
-    }
-
-    final HddsProtos.NodeOperationalState opState =
-        dnDetail.getPersistedOpState();
-
-    if (!opState.equals(HddsProtos.NodeOperationalState.IN_MAINTENANCE)) {
-      error("This command requires the datanode's " +
-          "NodeOperationalState to be IN_MAINTENANCE, currently is " +
-          opState);
-      return;
     }
 
     List<HddsVolume> allVolume =
