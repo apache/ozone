@@ -58,7 +58,7 @@ public class ReplicasVerify extends Handler {
   private boolean doExecuteChecksums;
 
   @CommandLine.Option(names = "--padding",
-      description = "List all keys with any missing padding, optionally limited to a volume/bucket/key URI.",
+      description = "Check for missing padding in erasure coded replicas.",
       defaultValue = "false")
   private boolean doExecutePadding;
 
