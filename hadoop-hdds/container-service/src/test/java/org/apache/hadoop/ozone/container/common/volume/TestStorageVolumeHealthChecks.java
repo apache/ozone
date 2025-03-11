@@ -120,8 +120,7 @@ public class TestStorageVolumeHealthChecks {
   public void verifyFullVolumeHealthWithDiskReadWriteStatus(StorageVolume.Builder<?> builder, boolean... checkResult)
       throws Exception {
 
-    for (int i = 0; i < checkResult.length; i++) {
-      final boolean result = checkResult[i];
+    for (boolean result : checkResult) {
       StorageVolume volume = builder.build();
 
       VolumeUsage usage = volume.getVolumeInfo().get().getUsageForTesting();
