@@ -20,10 +20,12 @@ package org.apache.hadoop.hdds.scm.container;
 import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
 import java.util.Objects;
+import java.util.function.Supplier;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
+import org.apache.ratis.util.MemoizedSupplier;
 
 /**
  * Container ID is an integer that is a value between 1..MAX_CONTAINER ID.
@@ -45,8 +47,8 @@ public final class ContainerID implements Comparable<ContainerID> {
   }
 
   private final long id;
-  private final HddsProtos.ContainerID proto;
-  private final int hash;
+  private final Supplier<HddsProtos.ContainerID> proto;
+  private final Supplier<Integer> hash;
 
   /**
    * Constructs ContainerID.
@@ -57,8 +59,8 @@ public final class ContainerID implements Comparable<ContainerID> {
     Preconditions.checkState(id >= 0,
         "Container ID should be positive. %s.", id);
     this.id = id;
-    this.proto = HddsProtos.ContainerID.newBuilder().setId(id).build();
-    this.hash = 61 * 71 + Long.hashCode(id);
+    this.proto = MemoizedSupplier.valueOf(() -> HddsProtos.ContainerID.newBuilder().setId(id).build());
+    this.hash = MemoizedSupplier.valueOf(() -> 61 * 71 + Long.hashCode(id));
   }
 
   /**
@@ -88,7 +90,7 @@ public final class ContainerID implements Comparable<ContainerID> {
   }
 
   public HddsProtos.ContainerID getProtobuf() {
-    return proto;
+    return proto.get();
   }
 
   public static ContainerID getFromProtobuf(HddsProtos.ContainerID proto) {
@@ -111,7 +113,7 @@ public final class ContainerID implements Comparable<ContainerID> {
 
   @Override
   public int hashCode() {
-    return hash;
+    return hash.get();
   }
 
   @Override
