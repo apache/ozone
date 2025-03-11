@@ -61,6 +61,10 @@ public class QuasiClosedStuckReplicaCount {
     }
   }
 
+  public int availableOrigins() {
+    return replicasByOrigin.size();
+  }
+
   public boolean hasOutOfServiceReplicas() {
     return hasOutOfServiceReplicas;
   }

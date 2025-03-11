@@ -46,12 +46,15 @@ public class QuasiClosedStuckReplicationCheck  extends AbstractCheck {
     if (!QuasiClosedContainerHandler.isQuasiClosedStuck(containerInfo, replicas)) {
       return false;
     }
-    if (hasEnoughOriginsWithOpen(containerInfo, replicas)) {
-      // If we have all origins with open replicas, and not unhealthy then the container should close after the close
-      // goes through, so this handler should not run.
+    QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 0);
+    if (replicaCount.availableOrigins() == 1) {
+      // This is the 3 copies of a single origin case, so allow it to be handled via the normal under-replicated
+      // handler.
       return false;
     }
-    return true;
+    // If we have all origins with open replicas, and not unhealthy then the container should close after the close
+    // goes through, so this handler should not run.
+    return !hasEnoughOriginsWithOpen(containerInfo, replicas);
   }
 
   @Override
