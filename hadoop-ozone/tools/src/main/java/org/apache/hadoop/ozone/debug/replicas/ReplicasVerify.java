@@ -52,7 +52,7 @@ public class ReplicasVerify extends Handler {
   private String outputDir;
 
   @CommandLine.Option(names = "--checksums",
-      description = "Reads every replica for all the blocks associated with a given key.",
+      description = "Do client side data checksum validation of all replicas.",
       // value will be true only if the "--checksums" option was specified on the CLI
       defaultValue = "false")
   private boolean doExecuteChecksums;
