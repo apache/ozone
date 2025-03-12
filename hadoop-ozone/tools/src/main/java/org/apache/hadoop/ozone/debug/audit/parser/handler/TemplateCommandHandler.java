@@ -32,7 +32,7 @@ import picocli.CommandLine.ParentCommand;
 @Command(name = "template",
     aliases = "t",
     description = "Execute template query.\n\n" +
-        "To run a template query:\n" +
+        "To run a template query on the audit logs loaded to the database:\n" +
         "ozone debug auditparser <path to db file> template <template>\n\n" +
         "Following templates are available:\n" +
         "(Template)              (Description)\n" +

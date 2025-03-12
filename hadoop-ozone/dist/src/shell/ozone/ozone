@@ -304,7 +304,13 @@ if [[ $# = 0 ]]; then
 fi
 
 OZONE_SUBCMD=$1
-shift
+
+if [[ "$OZONE_SUBCMD" == "auditparser" ]]; then
+  echo "warning: 'ozone auditparser' is deprecated, use 'ozone debug auditparser' instead."
+  OZONE_SUBCMD="debug"
+else
+  shift
+fi
 
 
 if ozone_need_reexec ozone "${OZONE_SUBCMD}"; then
