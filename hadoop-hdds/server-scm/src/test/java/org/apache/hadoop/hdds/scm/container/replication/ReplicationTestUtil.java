@@ -124,6 +124,18 @@ public final class ReplicationTestUtil {
     return replicas;
   }
 
+  public static Set<ContainerReplica> createReplicasWithOriginAndOpState(
+      ContainerID containerID, ContainerReplicaProto.State replicaState,
+      Pair<UUID, HddsProtos.NodeOperationalState>... nodes) {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    for (Pair<UUID, HddsProtos.NodeOperationalState> i : nodes) {
+      replicas.add(createContainerReplica(
+          containerID, 0, i.getRight(), replicaState, 123L, 1234L,
+          MockDatanodeDetails.randomDatanodeDetails(), i.getLeft()));
+    }
+    return replicas;
+  }
+
   public static ContainerReplica createContainerReplica(ContainerID containerID,
       int replicaIndex, HddsProtos.NodeOperationalState opState,
       ContainerReplicaProto.State replicaState) {
