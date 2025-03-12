@@ -76,7 +76,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -451,8 +450,7 @@ public class TestReplicationSupervisor {
   private File containerTarFile(
       long containerId, ContainerData containerData) throws IOException {
     File yamlFile = new File(tempDir, "container.yaml");
-    ContainerDataYaml.createContainerFile(
-        ContainerProtos.ContainerType.KeyValueContainer, containerData,
+    ContainerDataYaml.createContainerFile(containerData,
         yamlFile);
     File tarFile = new File(tempDir,
         ContainerUtils.getContainerTarName(containerId));
