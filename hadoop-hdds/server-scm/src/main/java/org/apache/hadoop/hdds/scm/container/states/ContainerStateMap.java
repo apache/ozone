@@ -17,8 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container.states;
 
-import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_CHANGE_CONTAINER_STATE;
-
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
@@ -27,7 +26,6 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -74,10 +72,8 @@ public class ContainerStateMap {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerStateMap.class);
 
-  private final ContainerAttribute<LifeCycleState> lifeCycleStateMap;
-  private final ContainerAttribute<String> ownerMap;
-  private final ContainerAttribute<ReplicationConfig> repConfigMap;
-  private final ContainerAttribute<ReplicationType> typeMap;
+  private final ContainerAttribute<LifeCycleState> lifeCycleStateMap = new ContainerAttribute<>(LifeCycleState.class);
+  private final ContainerAttribute<ReplicationType> typeMap = new ContainerAttribute<>(ReplicationType.class);
   private final Map<ContainerID, ContainerInfo> containerMap;
   private final Map<ContainerID, Set<ContainerReplica>> replicaMap;
 
@@ -85,12 +81,13 @@ public class ContainerStateMap {
    * Create a ContainerStateMap.
    */
   public ContainerStateMap() {
-    this.lifeCycleStateMap = new ContainerAttribute<>();
-    this.ownerMap = new ContainerAttribute<>();
-    this.repConfigMap = new ContainerAttribute<>();
-    this.typeMap = new ContainerAttribute<>();
     this.containerMap = new ConcurrentHashMap<>();
     this.replicaMap = new ConcurrentHashMap<>();
+  }
+
+  @VisibleForTesting
+  public static Logger getLogger() {
+    return LOG;
   }
 
   /**
@@ -106,8 +103,6 @@ public class ContainerStateMap {
     if (!contains(id)) {
       containerMap.put(id, info);
       lifeCycleStateMap.insert(info.getState(), id);
-      ownerMap.insert(info.getOwner(), id);
-      repConfigMap.insert(info.getReplicationConfig(), id);
       typeMap.insert(info.getReplicationType(), id);
       replicaMap.put(id, Collections.emptySet());
 
@@ -131,8 +126,6 @@ public class ContainerStateMap {
       // remove operation fails?
       final ContainerInfo info = containerMap.remove(id);
       lifeCycleStateMap.remove(info.getState(), id);
-      ownerMap.remove(info.getOwner(), id);
-      repConfigMap.remove(info.getReplicationConfig(), id);
       typeMap.remove(info.getReplicationType(), id);
       replicaMap.remove(id);
       LOG.trace("Container {} removed from ContainerStateMap.", id);
@@ -209,56 +202,16 @@ public class ContainerStateMap {
    */
   public void updateState(ContainerID containerID, LifeCycleState currentState,
       LifeCycleState newState) throws SCMException {
-    Preconditions.checkNotNull(currentState);
-    Preconditions.checkNotNull(newState);
-    if (!contains(containerID)) {
+    if (currentState == newState) { // state not changed
       return;
     }
-    // Return if updating state not changed
-    if (currentState == newState) {
-      LOG.debug("CurrentState and NewState are the same, return from " +
-          "updateState directly.");
-      return;
-    }
-    // TODO: Simplify this logic.
     final ContainerInfo currentInfo = containerMap.get(containerID);
-    try {
-      currentInfo.setState(newState);
-
-      // We are updating two places before this update is done, these can
-      // fail independently, since the code needs to handle it.
-
-      // We update the attribute map, if that fails it will throw an
-      // exception, so no issues, if we are successful, we keep track of the
-      // fact that we have updated the lifecycle state in the map, and update
-      // the container state. If this second update fails, we will attempt to
-      // roll back the earlier change we did. If the rollback fails, we can
-      // be in an inconsistent state,
-
-      lifeCycleStateMap.update(currentState, newState, containerID);
-      if (LOG.isTraceEnabled()) {
-        LOG.trace("Updated the container {} to new state. Old = {}, new = " +
-            "{}", containerID, currentState, newState);
-      }
-    } catch (SCMException ex) {
-      LOG.error("Unable to update the container state.", ex);
-      // we need to revert the change in this attribute since we are not
-      // able to update the hash table.
-      LOG.info("Reverting the update to lifecycle state. Moving back to " +
-              "old state. Old = {}, Attempted state = {}", currentState,
-          newState);
-
-      currentInfo.revertState();
-
-      // if this line throws, the state map can be in an inconsistent
-      // state, since we will have modified the attribute by the
-      // container state will not in sync since we were not able to put
-      // that into the hash table.
-      lifeCycleStateMap.update(newState, currentState, containerID);
-
-      throw new SCMException("Updating the container map failed.", ex,
-          FAILED_TO_CHANGE_CONTAINER_STATE);
+    if (currentInfo == null) { // container not found
+      return;
     }
+    lifeCycleStateMap.update(currentState, newState, containerID);
+    LOG.trace("Updated the container {} from {} to {}", containerID, currentState, newState);
+    currentInfo.setState(newState);
   }
 
   public Set<ContainerID> getAllContainerIDs() {

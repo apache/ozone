@@ -80,13 +80,13 @@ class TestReplicationManagerReport {
 
     report.incrementAndSample(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED,
-        new ContainerID(1));
+        ContainerID.valueOf(1));
     report.incrementAndSample(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED,
-        new ContainerID(2));
+        ContainerID.valueOf(2));
     report.incrementAndSample(
         ReplicationManagerReport.HealthState.OVER_REPLICATED,
-        new ContainerID(3));
+        ContainerID.valueOf(3));
     report.setComplete();
 
     String jsonString = JsonUtils.toJsonStringWithDefaultPrettyPrinter(report);
@@ -124,13 +124,13 @@ class TestReplicationManagerReport {
   void testContainerIDsCanBeSampled() {
     report.incrementAndSample(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED,
-        new ContainerID(1));
+        ContainerID.valueOf(1));
     report.incrementAndSample(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED,
-        new ContainerID(2));
+        ContainerID.valueOf(2));
     report.incrementAndSample(
         ReplicationManagerReport.HealthState.OVER_REPLICATED,
-        new ContainerID(3));
+        ContainerID.valueOf(3));
 
     assertEquals(2,
         report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED));
@@ -141,13 +141,13 @@ class TestReplicationManagerReport {
 
     List<ContainerID> sample =
         report.getSample(ReplicationManagerReport.HealthState.UNDER_REPLICATED);
-    assertEquals(new ContainerID(1), sample.get(0));
-    assertEquals(new ContainerID(2), sample.get(1));
+    assertEquals(ContainerID.valueOf(1), sample.get(0));
+    assertEquals(ContainerID.valueOf(2), sample.get(1));
     assertEquals(2, sample.size());
 
     sample =
         report.getSample(ReplicationManagerReport.HealthState.OVER_REPLICATED);
-    assertEquals(new ContainerID(3), sample.get(0));
+    assertEquals(ContainerID.valueOf(3), sample.get(0));
     assertEquals(1, sample.size());
 
     sample =
@@ -160,13 +160,13 @@ class TestReplicationManagerReport {
     for (int i = 0; i < ReplicationManagerReport.SAMPLE_LIMIT * 2; i++) {
       report.incrementAndSample(
           ReplicationManagerReport.HealthState.UNDER_REPLICATED,
-          new ContainerID(i));
+          ContainerID.valueOf(i));
     }
     List<ContainerID> sample =
         report.getSample(ReplicationManagerReport.HealthState.UNDER_REPLICATED);
     assertEquals(ReplicationManagerReport.SAMPLE_LIMIT, sample.size());
     for (int i = 0; i < ReplicationManagerReport.SAMPLE_LIMIT; i++) {
-      assertEquals(new ContainerID(i), sample.get(i));
+      assertEquals(ContainerID.valueOf(i), sample.get(i));
     }
   }
 

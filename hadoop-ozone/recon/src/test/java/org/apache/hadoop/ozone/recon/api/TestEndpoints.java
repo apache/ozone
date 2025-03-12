@@ -954,12 +954,12 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   public void testGetContainerCounts() throws Exception {
     // Mock container info objects with different sizes
     ContainerInfo omContainerInfo1 = mock(ContainerInfo.class);
-    given(omContainerInfo1.containerID()).willReturn(new ContainerID(1));
+    given(omContainerInfo1.containerID()).willReturn(ContainerID.valueOf(1));
     given(omContainerInfo1.getUsedBytes()).willReturn(1500000000L); // 1.5GB
     given(omContainerInfo1.getState()).willReturn(LifeCycleState.OPEN);
 
     ContainerInfo omContainerInfo2 = mock(ContainerInfo.class);
-    given(omContainerInfo2.containerID()).willReturn(new ContainerID(2));
+    given(omContainerInfo2.containerID()).willReturn(ContainerID.valueOf(2));
     given(omContainerInfo2.getUsedBytes()).willReturn(2500000000L); // 2.5GB
     given(omContainerInfo2.getState()).willReturn(LifeCycleState.OPEN);
 
@@ -1437,14 +1437,14 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private Map<String, List<ContainerID>> getContainersOnDecomNodes() {
     Map<String, List<ContainerID>> containerMap = new HashMap<>();
     List<ContainerID> underReplicated = new ArrayList<>();
-    underReplicated.add(new ContainerID(1L));
-    underReplicated.add(new ContainerID(2L));
-    underReplicated.add(new ContainerID(3L));
+    underReplicated.add(ContainerID.valueOf(1L));
+    underReplicated.add(ContainerID.valueOf(2L));
+    underReplicated.add(ContainerID.valueOf(3L));
     containerMap.put("UnderReplicated", underReplicated);
     List<ContainerID> unclosed = new ArrayList<>();
-    unclosed.add(new ContainerID(10L));
-    unclosed.add(new ContainerID(11L));
-    unclosed.add(new ContainerID(12L));
+    unclosed.add(ContainerID.valueOf(10L));
+    unclosed.add(ContainerID.valueOf(11L));
+    unclosed.add(ContainerID.valueOf(12L));
     containerMap.put("UnClosed", unclosed);
     return containerMap;
   }

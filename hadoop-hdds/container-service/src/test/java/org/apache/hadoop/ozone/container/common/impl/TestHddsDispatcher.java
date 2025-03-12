@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.fs.MockSpaceUsagePersistence.inMemory;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -129,7 +130,7 @@ public class TestHddsDispatcher {
 
     try {
       UUID scmId = UUID.randomUUID();
-      ContainerSet containerSet = new ContainerSet(1000);
+      ContainerSet containerSet = newContainerSet();
       StateContext context = ContainerTestUtils.getMockContext(dd, conf);
       KeyValueContainerData containerData = new KeyValueContainerData(1L,
           layout,
@@ -264,7 +265,7 @@ public class TestHddsDispatcher {
         .thenReturn(Collections.singletonList(volumeBuilder.build()));
     try {
       UUID scmId = UUID.randomUUID();
-      ContainerSet containerSet = new ContainerSet(1000);
+      ContainerSet containerSet = newContainerSet();
       StateContext context = ContainerTestUtils.getMockContext(dd, conf);
       // create a 50 byte container
       KeyValueContainerData containerData = new KeyValueContainerData(1L,
@@ -514,7 +515,7 @@ public class TestHddsDispatcher {
 
   static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
       OzoneConfiguration conf, TokenVerifier tokenVerifier) throws IOException {
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = newContainerSet();
     VolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     volumeSet.getVolumesList().stream().forEach(v -> {

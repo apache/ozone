@@ -90,18 +90,18 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
   public void testProcess() {
     // mock a container with invalid used bytes
     ContainerInfo omContainerInfo0 = mock(ContainerInfo.class);
-    given(omContainerInfo0.containerID()).willReturn(new ContainerID(0));
+    given(omContainerInfo0.containerID()).willReturn(ContainerID.valueOf(0));
     given(omContainerInfo0.getUsedBytes()).willReturn(-1L);
     given(omContainerInfo0.getState()).willReturn(OPEN);
 
     // Write 2 keys
     ContainerInfo omContainerInfo1 = mock(ContainerInfo.class);
-    given(omContainerInfo1.containerID()).willReturn(new ContainerID(1));
+    given(omContainerInfo1.containerID()).willReturn(ContainerID.valueOf(1));
     given(omContainerInfo1.getUsedBytes()).willReturn(1500000000L); // 1.5GB
     given(omContainerInfo1.getState()).willReturn(CLOSED);
 
     ContainerInfo omContainerInfo2 = mock(ContainerInfo.class);
-    given(omContainerInfo2.containerID()).willReturn(new ContainerID(2));
+    given(omContainerInfo2.containerID()).willReturn(ContainerID.valueOf(2));
     given(omContainerInfo2.getUsedBytes()).willReturn(2500000000L); // 2.5GB
     given(omContainerInfo2.getState()).willReturn(CLOSING);
 
@@ -134,13 +134,13 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
 
     // Add a new container
     ContainerInfo omContainerInfo3 = mock(ContainerInfo.class);
-    given(omContainerInfo3.containerID()).willReturn(new ContainerID(3));
+    given(omContainerInfo3.containerID()).willReturn(ContainerID.valueOf(3));
     given(omContainerInfo3.getUsedBytes()).willReturn(1000000000L); // 1GB
     given(omContainerInfo3.getState()).willReturn(QUASI_CLOSED);
     containers.add(omContainerInfo3);
 
     // Update existing key.
-    given(omContainerInfo2.containerID()).willReturn(new ContainerID(2));
+    given(omContainerInfo2.containerID()).willReturn(ContainerID.valueOf(2));
     given(omContainerInfo2.getUsedBytes()).willReturn(50000L); // 50KB
 
     task.processContainers(containers);
@@ -178,23 +178,23 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
   public void testProcessDeletedAndNegativeSizedContainers() {
     // Create a list of containers, including one that is deleted
     ContainerInfo omContainerInfo1 = mock(ContainerInfo.class);
-    given(omContainerInfo1.containerID()).willReturn(new ContainerID(1));
+    given(omContainerInfo1.containerID()).willReturn(ContainerID.valueOf(1));
     given(omContainerInfo1.getUsedBytes()).willReturn(1500000000L); // 1.5GB
     given(omContainerInfo1.getState()).willReturn(OPEN);
 
     ContainerInfo omContainerInfo2 = mock(ContainerInfo.class);
-    given(omContainerInfo2.containerID()).willReturn(new ContainerID(2));
+    given(omContainerInfo2.containerID()).willReturn(ContainerID.valueOf(2));
     given(omContainerInfo2.getUsedBytes()).willReturn(2500000000L); // 2.5GB
     given(omContainerInfo2.getState()).willReturn(CLOSED);
 
     ContainerInfo omContainerInfoDeleted = mock(ContainerInfo.class);
-    given(omContainerInfoDeleted.containerID()).willReturn(new ContainerID(3));
+    given(omContainerInfoDeleted.containerID()).willReturn(ContainerID.valueOf(3));
     given(omContainerInfoDeleted.getUsedBytes()).willReturn(1000000000L);
     given(omContainerInfoDeleted.getState()).willReturn(DELETED); // 1GB
 
     // Create a mock container with negative size
     final ContainerInfo negativeSizeContainer = mock(ContainerInfo.class);
-    given(negativeSizeContainer.containerID()).willReturn(new ContainerID(0));
+    given(negativeSizeContainer.containerID()).willReturn(ContainerID.valueOf(0));
     given(negativeSizeContainer.getUsedBytes()).willReturn(-1L);
     given(negativeSizeContainer.getState()).willReturn(OPEN);
 
@@ -202,13 +202,13 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
     final ContainerInfo negativeSizeDeletedContainer =
         mock(ContainerInfo.class);
     given(negativeSizeDeletedContainer.containerID()).willReturn(
-        new ContainerID(0));
+        ContainerID.valueOf(0));
     given(negativeSizeDeletedContainer.getUsedBytes()).willReturn(-1L);
     given(negativeSizeDeletedContainer.getState()).willReturn(DELETED);
 
     // Create a mock container with id 1 and updated size of 1GB from 1.5GB
     final ContainerInfo validSizeContainer = mock(ContainerInfo.class);
-    given(validSizeContainer.containerID()).willReturn(new ContainerID(1));
+    given(validSizeContainer.containerID()).willReturn(ContainerID.valueOf(1));
     given(validSizeContainer.getUsedBytes()).willReturn(1000000000L); // 1GB
     given(validSizeContainer.getState()).willReturn(CLOSED);
 

@@ -294,8 +294,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     long containerId = containerData.getContainerID();
     try {
       tempContainerFile = createTempFile(containerFile);
-      ContainerDataYaml.createContainerFile(
-          ContainerType.KeyValueContainer, containerData, tempContainerFile);
+      ContainerDataYaml.createContainerFile(containerData, tempContainerFile);
 
       // NativeIO.renameTo is an atomic function. But it might fail if the
       // container file already exists. Hence, we handle the two cases

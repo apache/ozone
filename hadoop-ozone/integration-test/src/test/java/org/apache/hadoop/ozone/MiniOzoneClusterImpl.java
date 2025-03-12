@@ -23,26 +23,13 @@ import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_K
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD;
-import static org.apache.hadoop.hdds.server.http.HttpConfig.getHttpPolicy;
-import static org.apache.hadoop.hdds.server.http.HttpServer2.HTTPS_SCHEME;
-import static org.apache.hadoop.hdds.server.http.HttpServer2.HTTP_SCHEME;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTPS_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_ADDRESS_KEY;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.anyHostWithFreePort;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
 
-import com.amazonaws.ClientConfiguration;
-import com.amazonaws.auth.AWSCredentialsProvider;
-import com.amazonaws.auth.AWSStaticCredentialsProvider;
-import com.amazonaws.auth.BasicAWSCredentials;
-import com.amazonaws.client.builder.AwsClientBuilder;
-import com.amazonaws.regions.Regions;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -81,7 +68,6 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.CodecTestUtil;
@@ -299,54 +285,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     OzoneClient client = createClient();
     clients.add(client);
     return client;
-  }
-
-  @Override
-  public AmazonS3 newS3Client() {
-    // TODO: Parameterize tests between Virtual host style and Path style
-    return createS3Client(true);
-  }
-
-  public AmazonS3 createS3Client(boolean enablePathStyle) {
-    final String accessKey = "user";
-    final String secretKey = "password";
-    final Regions region = Regions.DEFAULT_REGION;
-
-    final String protocol;
-    final HttpConfig.Policy webPolicy = getHttpPolicy(conf);
-    String host;
-
-    if (webPolicy.isHttpsEnabled()) {
-      protocol = HTTPS_SCHEME;
-      host = conf.get(OZONE_S3G_HTTPS_ADDRESS_KEY);
-    } else {
-      protocol = HTTP_SCHEME;
-      host = conf.get(OZONE_S3G_HTTP_ADDRESS_KEY);
-    }
-
-    String endpoint = protocol + "://" + host;
-
-    AWSCredentialsProvider credentials = new AWSStaticCredentialsProvider(
-        new BasicAWSCredentials(accessKey, secretKey)
-    );
-
-
-    ClientConfiguration clientConfiguration = new ClientConfiguration();
-    LOG.info("S3 Endpoint is {}", endpoint);
-
-    AmazonS3 s3Client =
-        AmazonS3ClientBuilder.standard()
-            .withPathStyleAccessEnabled(enablePathStyle)
-            .withEndpointConfiguration(
-                new AwsClientBuilder.EndpointConfiguration(
-                    endpoint, region.getName()
-                )
-            )
-            .withClientConfiguration(clientConfiguration)
-            .withCredentials(credentials)
-            .build();
-
-    return s3Client;
   }
 
   protected OzoneClient createClient() throws IOException {

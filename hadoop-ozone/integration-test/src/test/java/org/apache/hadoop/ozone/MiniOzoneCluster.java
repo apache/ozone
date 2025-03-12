@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone;
 
-import com.amazonaws.services.s3.AmazonS3;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
@@ -160,11 +159,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
    * @return {@link OzoneClient}
    */
   OzoneClient newClient() throws IOException;
-
-  /**
-   * Returns an {@link AmazonS3} to access the {@link MiniOzoneCluster}.
-   */
-  AmazonS3 newS3Client();
 
   /**
    * Returns StorageContainerLocationClient to communicate with
