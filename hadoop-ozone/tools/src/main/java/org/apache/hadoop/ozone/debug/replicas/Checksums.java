@@ -52,7 +52,7 @@ import org.slf4j.Logger;
  * given key. It also generates a manifest file with information about the
  * downloaded replicas.
  */
-public class Checksums implements ReplicasVerifier {
+public class Checksums implements ReplicaVerifier {
 
   private static final String JSON_PROPERTY_FILE_NAME = "filename";
   private static final String JSON_PROPERTY_FILE_SIZE = "datasize";
@@ -180,10 +180,10 @@ public class Checksums implements ReplicasVerifier {
   }
 
   @Override
-  public void verifyKey(KeyParts keyParts) {
-    String volumeName = keyParts.getVolumeName();
-    String bucketName = keyParts.getBucketName();
-    String keyName = keyParts.getKeyName();
+  public void verifyKey(OzoneKeyDetails keyDetails) {
+    String volumeName = keyDetails.getVolumeName();
+    String bucketName = keyDetails.getBucketName();
+    String keyName = keyDetails.getName();
     System.out.println("Processing key : " + volumeName + "/" + bucketName + "/" + keyName);
     boolean isChecksumVerifyEnabled = ozoneConfiguration.getBoolean("ozone.client.verify.checksum", true);
     RpcClient newClient = null;
@@ -240,5 +240,4 @@ public class Checksums implements ReplicasVerifier {
     rpcClient = new RpcClient(configuration, null);
     return rpcClient;
   }
-
 }

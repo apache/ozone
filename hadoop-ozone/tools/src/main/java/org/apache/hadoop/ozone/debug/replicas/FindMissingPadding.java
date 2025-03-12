@@ -48,12 +48,10 @@ import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.utils.HAUtils;
-import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneKeyLocation;
-import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
@@ -63,7 +61,7 @@ import org.slf4j.Logger;
 /**
  * Find EC keys affected by missing padding blocks (HDDS-10681).
  */
-public class FindMissingPadding implements ReplicasVerifier {
+public class FindMissingPadding implements ReplicaVerifier {
 
   private OzoneClient ozoneClient;
   private ScmOption scmOption;
@@ -93,16 +91,8 @@ public class FindMissingPadding implements ReplicasVerifier {
   }
 
   @Override
-  public void verifyKey(KeyParts keyParts) {
-    ObjectStore objectStore = ozoneClient.getObjectStore();
-    ClientProtocol rpcClient = objectStore.getClientProxy();
-    try {
-      OzoneKeyDetails keyDetails =
-          rpcClient.getKeyDetails(keyParts.getVolumeName(), keyParts.getBucketName(), keyParts.getKeyName());
-      checkECKey(keyDetails);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+  public void verifyKey(OzoneKeyDetails keyDetails) {
+    checkECKey(keyDetails);
   }
 
   private void checkECKey(OzoneKeyDetails keyDetails) {

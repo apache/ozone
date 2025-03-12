@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKey;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
@@ -65,19 +66,19 @@ public class ReplicasVerify extends Handler {
   private boolean doExecutePadding;
 
   private FindMissingPadding findMissingPadding;
-  private List<ReplicasVerifier> replicasVerifiers;
+  private List<ReplicaVerifier> replicaVerifiers;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) throws IOException {
-    replicasVerifiers = new ArrayList<>();
+    replicaVerifiers = new ArrayList<>();
 
     if (doExecuteChecksums) {
-      replicasVerifiers.add(new Checksums(client, outputDir, LOG, getConf()));
+      replicaVerifiers.add(new Checksums(client, outputDir, LOG, getConf()));
     }
 
     if (doExecutePadding) {
       findMissingPadding = new FindMissingPadding(client, scmOption, LOG, out(), getConf());
-      replicasVerifiers.add(findMissingPadding);
+      replicaVerifiers.add(findMissingPadding);
     }
 
     findCandidateKeys(client, address);
@@ -98,7 +99,8 @@ public class ReplicasVerify extends Handler {
     String bucketName = address.getBucketName();
     String keyName = address.getKeyName();
     if (!keyName.isEmpty()) {
-      processKey(new KeyParts(volumeName, bucketName, keyName));
+      OzoneKeyDetails keyDetails = ozoneClient.getProxy().getKeyDetails(volumeName, bucketName, keyName);
+      processKey(keyDetails);
     } else if (!bucketName.isEmpty()) {
       OzoneVolume volume = objectStore.getVolume(volumeName);
       OzoneBucket bucket = volume.getBucket(bucketName);
@@ -121,19 +123,16 @@ public class ReplicasVerify extends Handler {
   }
 
   void checkBucket(OzoneBucket bucket) throws IOException {
-    String volumeName = bucket.getVolumeName();
-    String bucketName = bucket.getName();
     for (Iterator<? extends OzoneKey> it = bucket.listKeys(null); it.hasNext();) {
       OzoneKey key = it.next();
-//    TODO: Remove this check once HDDS-12094 is fixed
-      if (key.getName().endsWith("/")) {
-        continue;
+      // TODO: Remove this check once HDDS-12094 is fixed
+      if (!key.getName().endsWith("/")) {
+        processKey(bucket.getKey(key.getName()));
       }
-      processKey(new KeyParts(volumeName, bucketName, key.getName()));
     }
   }
 
-  void processKey(KeyParts keyParts) {
-    replicasVerifiers.forEach(verifier -> verifier.verifyKey(keyParts));
+  void processKey(OzoneKeyDetails keyDetails) {
+    replicaVerifiers.forEach(verifier -> verifier.verifyKey(keyDetails));
   }
 }

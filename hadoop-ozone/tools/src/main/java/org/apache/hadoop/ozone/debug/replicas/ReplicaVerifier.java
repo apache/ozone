@@ -17,9 +17,12 @@
 
 package org.apache.hadoop.ozone.debug.replicas;
 
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+
 /**
  * Functional interface for implementing a key verifier.
  */
-public interface ReplicasVerifier {
-  void verifyKey(KeyParts keyParts);
+@FunctionalInterface
+public interface ReplicaVerifier {
+  void verifyKey(OzoneKeyDetails keyDetails);
 }
