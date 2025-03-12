@@ -80,11 +80,11 @@ find_project_paths_for_test_class() {
   local test_class="$1"
   # Reset the global PROJECT_PATHS array
   PROJECT_PATHS=()
-  
+
   if [[ -z "${test_class}" ]] || [[ "${test_class}" == "Abstract"* ]]; then
     return
   fi
-  
+
   echo "Finding project for test class: ${test_class}"
 
   # Extract the base part of the class name (before any wildcard)
@@ -96,7 +96,7 @@ find_project_paths_for_test_class() {
     echo "Test class name contains only wildcards, searching in all test directories"
     return
   fi
-  
+
   echo "Searching for files matching base name: ${base_class_name}"
 
   # Find all projects containing matching test classes - use a more flexible search approach
@@ -126,6 +126,8 @@ find_project_paths_for_test_class() {
         PROJECT_PATHS+=("${project_path}")
       fi
     done
+    # sort and uniq the project paths
+    PROJECT_PATHS=($(printf '%s\n' "${PROJECT_PATHS[@]}" | sort -u))
   else
     echo "Could not find project for test class pattern: ${test_class}"
   fi
