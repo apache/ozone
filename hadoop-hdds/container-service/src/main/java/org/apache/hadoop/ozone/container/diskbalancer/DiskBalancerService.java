@@ -515,7 +515,9 @@ public class DiskBalancerService extends BackgroundService {
     long totalDataPendingToMove = 0;
 
     if (queueSize == 0) {
-      LOG.debug("No available Volume pair to perform move.");
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("No available Volume pair to perform move.");
+      }
       return totalDataPendingToMove;
     }
 

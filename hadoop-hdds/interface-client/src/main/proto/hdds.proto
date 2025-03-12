@@ -563,5 +563,5 @@ message DatanodeDiskBalancerInfoProto {
     optional DiskBalancerConfigurationProto diskBalancerConf = 4;
     optional uint64 successMoveCount = 5;
     optional uint64 failureMoveCount = 6;
-    optional int64 estimatedTotalSizePendingToMove = 7;
+    optional uint64 estimatedTotalSizePendingToMove = 7;
 }
