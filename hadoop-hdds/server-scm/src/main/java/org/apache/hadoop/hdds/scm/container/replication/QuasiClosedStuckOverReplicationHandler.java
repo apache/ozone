@@ -75,7 +75,7 @@ public class QuasiClosedStuckOverReplicationHandler implements UnhealthyReplicat
     int totalCommandsSent = 0;
     IOException firstException = null;
     for (QuasiClosedStuckReplicaCount.MisReplicatedOrigin origin : misReplicatedOrigins) {
-      List<ContainerReplica> sortedReplicas = getEligibleReplicas(origin.getSources());
+      List<ContainerReplica> sortedReplicas = getSortedReplicas(origin.getSources());
       for (int i = 0; i < origin.getReplicaDelta(); i++) {
         try {
           replicationManager.sendThrottledDeleteCommand(
@@ -99,7 +99,7 @@ public class QuasiClosedStuckOverReplicationHandler implements UnhealthyReplicat
     return totalCommandsSent;
   }
 
-  private List<ContainerReplica> getEligibleReplicas(
+  private List<ContainerReplica> getSortedReplicas(
       Set<ContainerReplica> replicas) {
     // sort replicas so that they can be selected in a deterministic way
     return replicas.stream()

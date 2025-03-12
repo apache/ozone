@@ -788,7 +788,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       handler = ecOverReplicationHandler;
     } else {
       if (QuasiClosedStuckReplicationCheck.shouldHandleAsQuasiClosedStuck(result.getContainerInfo(), replicas)) {
-        handler = quasiClosedStuckUnderReplicationHandler;
+        handler = quasiClosedStuckOverReplicationHandler;
       } else {
         handler = ratisOverReplicationHandler;
       }
