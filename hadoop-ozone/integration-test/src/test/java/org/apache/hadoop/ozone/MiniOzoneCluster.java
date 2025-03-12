@@ -34,12 +34,10 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.ozone.s3.Gateway;
-import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.CheckedFunction;
-import software.amazon.awssdk.services.s3.S3Client;
 
 /**
  * Interface used for MiniOzoneClusters.
@@ -161,18 +159,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
    * @return {@link OzoneClient}
    */
   OzoneClient newClient() throws IOException;
-
-  /**
-   * Returns an S3ClientFactory to create S3 clients for the {@link MiniOzoneCluster}.
-   *
-   * @return {@link S3ClientFactory}
-   */
-  S3ClientFactory getS3ClientFactory();
-
-  /**
-   * Returns an {@link S3Client} to use AWS SDK V2 to access the {@link MiniOzoneCluster}.
-   */
-  S3Client newS3ClientV2() throws Exception;
 
   /**
    * Returns StorageContainerLocationClient to communicate with

@@ -93,7 +93,6 @@ import org.apache.ozone.recon.schema.ReconSqlDbConfig;
 import org.apache.ozone.test.GenericTestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import software.amazon.awssdk.services.s3.S3Client;
 
 /**
  * MiniOzoneCluster creates a complete in-process Ozone cluster suitable for
@@ -289,16 +288,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     OzoneClient client = createClient();
     clients.add(client);
     return client;
-  }
-
-  @Override
-  public S3ClientFactory getS3ClientFactory() {
-    return s3ClientFactory;
-  }
-
-  @Override
-  public S3Client newS3ClientV2() throws Exception {
-    return s3ClientFactory.createS3ClientV2(true);
   }
 
   protected OzoneClient createClient() throws IOException {
