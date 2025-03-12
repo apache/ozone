@@ -21,6 +21,7 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import com.fasterxml.jackson.databind.SequenceWriter;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.base.Strings;
@@ -99,31 +100,6 @@ public class ListSubcommand extends ScmSubcommand {
     // Original behavior - just print the container JSON
     System.out.println(WRITER.writeValueAsString(containerInfo));
   }
-  
-  private void outputContainerInfoAsJsonMember(ContainerInfo containerInfo, boolean isFirst,
-      boolean isLast) throws IOException {
-    // JSON array format with proper brackets and commas
-    if (isFirst) {
-      // Start of array
-      System.out.print("[");
-    }
-    
-    // Print the container JSON
-    System.out.print(WRITER.writeValueAsString(containerInfo));
-    
-    if (!isLast) {
-      // Add comma between elements
-      System.out.print(",");
-    }
-    
-    if (isLast) {
-      // End of array
-      System.out.println("]");
-    } else {
-      // Add newline for readability
-      System.out.println();
-    }
-  }
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
@@ -154,14 +130,13 @@ public class ListSubcommand extends ScmSubcommand {
       }
       containerListAndTotalCount = scmClient.listContainer(startId, count, state, type, repConfig);
       
-      int totalSize = containerListAndTotalCount.getContainerInfoList().size();
-      
       if (jsonFormat) {
-        // JSON array format
-        for (int i = 0; i < totalSize; i++) {
-          ContainerInfo container = containerListAndTotalCount.getContainerInfoList().get(i);
-          outputContainerInfoAsJsonMember(container, i == 0, i == totalSize - 1);
+        // JSON array format using SequenceWriter directly
+        try (SequenceWriter sequenceWriter = WRITER.writeValues(System.out)) {
+          sequenceWriter.init(true); // Initialize as a JSON array
+          sequenceWriter.writeAll(containerListAndTotalCount.getContainerInfoList());
         }
+        System.out.println(); // Add final newline
       } else {
         // Original format - one JSON object per line
         for (ContainerInfo container : containerListAndTotalCount.getContainerInfoList()) {
@@ -181,39 +156,27 @@ public class ListSubcommand extends ScmSubcommand {
       int fetchedCount;
       
       if (jsonFormat) {
-        // JSON array format for all containers
-        boolean isFirstContainer = true;
-        
-        // Start JSON array
-        System.out.print("[");
-
-        do {
-          // Fetch containers in batches of 'batchSize'
-          containerListAndTotalCount = scmClient.listContainer(currentStartId, batchSize, state, type, repConfig);
-          fetchedCount = containerListAndTotalCount.getContainerInfoList().size();
-
-          for (int i = 0; i < fetchedCount; i++) {
-            ContainerInfo container = containerListAndTotalCount.getContainerInfoList().get(i);
+        // For JSON array format, use SequenceWriter to stream containers as we fetch them
+        try (SequenceWriter sequenceWriter = WRITER.writeValues(System.out)) {
+          sequenceWriter.init(true); // Initialize as a JSON array
+          
+          do {
+            // Fetch containers in batches of 'batchSize'
+            containerListAndTotalCount = scmClient.listContainer(currentStartId, batchSize, state, type, repConfig);
+            fetchedCount = containerListAndTotalCount.getContainerInfoList().size();
             
-            // Only the first container overall doesn't need a preceding comma
-            if (!isFirstContainer) {
-              System.out.print(",");
-              System.out.println();
+            // Write containers directly to the SequenceWriter
+            for (ContainerInfo container : containerListAndTotalCount.getContainerInfoList()) {
+              sequenceWriter.write(container);
             }
             
-            // Print the container JSON
-            System.out.print(WRITER.writeValueAsString(container));
-            isFirstContainer = false;
-          }
-
-          if (fetchedCount > 0) {
-            currentStartId =
-                containerListAndTotalCount.getContainerInfoList().get(fetchedCount - 1).getContainerID() + 1;
-          }
-        } while (fetchedCount > 0);
-        
-        // Close the JSON array
-        System.out.println("]");
+            if (fetchedCount > 0) {
+              currentStartId =
+                  containerListAndTotalCount.getContainerInfoList().get(fetchedCount - 1).getContainerID() + 1;
+            }
+          } while (fetchedCount > 0);
+        }
+        System.out.println(); // Add final newline
       } else {
         // Original format - one JSON object per line
         do {

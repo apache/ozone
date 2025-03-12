@@ -97,26 +97,31 @@ List all containers from a particular container ID
                         Should contain   ${output}   OPEN
 
 List containers in JSON array format
-    ${output} =         Execute          ozone admin container list --json | jq -r '.'
+    ${output} =         Execute          ozone admin container list --json
                         Should Start With   ${output}   [
                         Should Contain   ${output}   containerID
                         Should End With   ${output}   ]
+    ${containerIDs} =   Execute          echo '${output}' | jq -r '.[].containerID'
+                        Should Not Be Empty   ${containerIDs}
 
 List all containers in JSON array format
-    ${output} =         Execute          ozone admin container list --all --json | jq -r '.'
+    ${output} =         Execute          ozone admin container list --all --json
                         Should Start With   ${output}   [
                         Should Contain   ${output}   containerID
                         Should End With   ${output}   ]
+    ${containers} =     Execute          echo '${output}' | jq -r '.[]'
+                        Should Not Be Empty   ${containers}
 
 List containers with state in JSON array format
-    ${output} =         Execute          ozone admin container list --state=OPEN --json | jq -r '.'
+    ${output} =         Execute          ozone admin container list --state=OPEN --json
                         Should Start With   ${output}   [
-                        Should Contain   ${output}   OPEN
-                        Should Not Contain   ${output}   CLOSED
                         Should End With   ${output}   ]
+    ${states} =         Execute          echo '${output}' | jq -r '.[].state'
+                        Should Contain   ${states}   OPEN
+                        Should Not Contain   ${states}   CLOSED
 
 List containers with count in JSON array format
-    ${output} =         Execute          ozone admin container list --count 5 --json | jq -r '.'
+    ${output} =         Execute          ozone admin container list --count 5 --json
                         Should Start With   ${output}   [
                         Should Contain   ${output}   containerID
                         Should End With   ${output}   ]
