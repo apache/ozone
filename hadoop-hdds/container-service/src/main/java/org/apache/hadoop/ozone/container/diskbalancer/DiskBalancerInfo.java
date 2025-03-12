@@ -51,6 +51,7 @@ public class DiskBalancerInfo {
     this.version = version;
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public DiskBalancerInfo(boolean shouldRun, double threshold,
       long bandwidthInMB, int parallelThread, DiskBalancerVersion version,
       long successCount, long failureCount, long totalDataPendingToMove) {

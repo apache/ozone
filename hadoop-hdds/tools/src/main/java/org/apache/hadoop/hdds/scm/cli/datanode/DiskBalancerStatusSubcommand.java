@@ -60,7 +60,7 @@ public class DiskBalancerStatusSubcommand extends ScmSubcommand {
   private String generateStatus(
       List<HddsProtos.DatanodeDiskBalancerInfoProto> protos) {
     StringBuilder formatBuilder = new StringBuilder("Status result:%n" +
-        "%-40s %-20s %-10s %-10s %-15s %-15s %-15s %-15s %-15s%n");
+        "%-35s %-25s %-15s %-15s %-15s %-12s %-12s %-12s %-12s%n");
 
     List<String> contentList = new ArrayList<>();
     contentList.add("Datanode");
@@ -74,11 +74,11 @@ public class DiskBalancerStatusSubcommand extends ScmSubcommand {
     contentList.add("EstTimeLeft(min)");
 
     for (HddsProtos.DatanodeDiskBalancerInfoProto proto: protos) {
-      formatBuilder.append("%-40s %-20s %-10s %-10s %-15s %-15s %-15s %-15s %-15s%n");
+      formatBuilder.append("%-35s %-25s %-15s %-15s %-15s %-12s %-12s %-12s %-12s%n");
       double estimatedTimeLeft = calculateEstimatedTimeLeft(proto);
 
       contentList.add(proto.getNode().getHostName());
-      contentList.add(String.valueOf(proto.getCurrentVolumeDensitySum()));
+      contentList.add(String.format("%.18f", proto.getCurrentVolumeDensitySum()));
       contentList.add(proto.getRunningStatus().name());
       contentList.add(
           String.format("%.4f", proto.getDiskBalancerConf().getThreshold()));

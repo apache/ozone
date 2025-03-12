@@ -507,7 +507,8 @@ public class DiskBalancerService extends BackgroundService {
 
   public DiskBalancerInfo getDiskBalancerInfo() {
     return new DiskBalancerInfo(shouldRun, threshold, bandwidthInMB,
-        parallelThread, version, metrics.getSuccessCount(), metrics.getFailureCount(), estimatedTotalSizePendingToMove());
+        parallelThread, version, metrics.getSuccessCount(),
+        metrics.getFailureCount(), estimatedTotalSizePendingToMove());
   }
 
   private long estimatedTotalSizePendingToMove() {
