@@ -216,7 +216,7 @@ public abstract class ContainerKeyMapperHelper {
   }
 
   /**
-   * Note to add an OM key and update containerID -> no. of keys count.
+   * Note to add an OM key and update containerID -&gt; no. of keys count.
    *
    * @param key key String
    * @param omKeyInfo omKeyInfo value
@@ -276,7 +276,7 @@ public abstract class ContainerKeyMapperHelper {
   }
 
   /**
-   * Note to delete an OM Key and update the containerID -> no. of keys counts
+   * Note to delete an OM Key and update the containerID -&gt; no. of keys counts
    * (we are preparing for batch deletion in these data structures).
    *
    * @param key key String.
