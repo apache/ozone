@@ -23,6 +23,7 @@ import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -60,6 +61,7 @@ import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.junit.jupiter.api.AfterEach;
@@ -175,6 +177,9 @@ public abstract class TestAbstractReclaimableFilter {
 
   private void mockOmSnapshotManager(OzoneManager om) throws RocksDBException, IOException {
     try (MockedStatic<ManagedRocksDB> rocksdb = Mockito.mockStatic(ManagedRocksDB.class);
+         MockedConstruction<SnapshotDiffManager> mockedSnapshotDiffManager =
+             Mockito.mockConstruction(SnapshotDiffManager.class, (mock, context) ->
+                 doNothing().when(mock).close());
          MockedConstruction<SnapshotCache> mockedCache = Mockito.mockConstruction(SnapshotCache.class,
              (mock, context) -> {
                Map<UUID, ReferenceCounted<OmSnapshot>> map = new HashMap<>();
