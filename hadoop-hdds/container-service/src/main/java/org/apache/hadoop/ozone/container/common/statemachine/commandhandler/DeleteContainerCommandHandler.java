@@ -93,7 +93,7 @@ public class DeleteContainerCommandHandler implements CommandHandler {
     }
   }
 
-  private void handleInternal(SCMCommand command, StateContext context,
+  private void handleInternal(SCMCommand<?> command, StateContext context,
       DeleteContainerCommand deleteContainerCommand,
       ContainerController controller) {
     final long startTime = Time.monotonicNow();

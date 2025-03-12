@@ -131,8 +131,7 @@ public class CommandQueue {
    * @param datanodeUuid DatanodeDetails.Uuid
    * @param command    - Command
    */
-  public void addCommand(final UUID datanodeUuid, final SCMCommand
-      command) {
+  public void addCommand(final UUID datanodeUuid, final SCMCommand<?> command) {
     commandMap.computeIfAbsent(datanodeUuid, s -> new Commands()).add(command);
     commandsInQueue++;
   }
