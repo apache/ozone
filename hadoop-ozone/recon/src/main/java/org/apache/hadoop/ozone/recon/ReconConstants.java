@@ -70,7 +70,8 @@ public final class ReconConstants {
   public static final String RECON_ACCESS_METADATA_START_DATE = "startDate";
   public static final String CONTAINER_COUNT = "CONTAINER_COUNT";
   public static final String TOTAL_KEYS = "TOTAL_KEYS";
-  public static final String TOTAL_USED_BYTES = "TOTAL_USED_BYTES";
+  public static final String TOTAL_USED_BYTES = "TOTAL" +
+      "_USED_BYTES";
 
   // 1125899906842624L = 1PB
   public static final long MAX_FILE_SIZE_UPPER_BOUND = 1125899906842624L;
@@ -98,7 +99,7 @@ public final class ReconConstants {
   public static final AtomicBoolean CONTAINER_KEY_TABLES_TRUNCATED = new AtomicBoolean(false);
 
   /**
-   * Resets the table-truncated flag for the given tables. This should be called once per reprocess cycle,
+   * Resets the table truncated flag for the given tables. This should be called once per reprocess cycle,
    * for example by the OM task controller, before the tasks run.
    */
   public static void resetTableTruncatedFlags() {

@@ -384,7 +384,7 @@ public abstract class ContainerKeyMapperHelper {
   }
 
   /**
-   * Write an OM key to container DB and update containerID -> no. of keys
+   * Write an OM key to container DB and update containerID -&gt; no. of keys
    * count to the Global Stats table.
    *
    * @param key key String
