@@ -1311,7 +1311,7 @@ public class TestReplicationManager {
     replicationManager.sendLowPriorityReplicateContainerCommand(containerInfo,
         0, src, target, scmDeadline);
 
-    ArgumentCaptor<SCMCommand> command =
+    ArgumentCaptor<SCMCommand<?>> command =
         ArgumentCaptor.forClass(SCMCommand.class);
     ArgumentCaptor<UUID> targetUUID =
         ArgumentCaptor.forClass(UUID.class);

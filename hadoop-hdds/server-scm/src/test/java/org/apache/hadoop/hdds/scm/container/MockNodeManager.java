@@ -102,7 +102,7 @@ public class MockNodeManager implements NodeManager {
   private final List<DatanodeDetails> deadNodes;
   private final Map<DatanodeDetails, SCMNodeStat> nodeMetricMap;
   private final SCMNodeStat aggregateStat;
-  private final Map<UUID, List<SCMCommand>> commandMap;
+  private final Map<UUID, List<SCMCommand<?>>> commandMap;
   private Node2PipelineMap node2PipelineMap;
   private final Node2ContainerMap node2ContainerMap;
   private NetworkTopology clusterMap;
@@ -533,13 +533,13 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public void addDatanodeCommand(UUID dnId, SCMCommand command) {
+  public void addDatanodeCommand(UUID dnId, SCMCommand<?> command) {
     if (commandMap.containsKey(dnId)) {
-      List<SCMCommand> commandList = commandMap.get(dnId);
+      List<SCMCommand<?>> commandList = commandMap.get(dnId);
       Preconditions.checkNotNull(commandList);
       commandList.add(command);
     } else {
-      List<SCMCommand> commandList = new LinkedList<>();
+      List<SCMCommand<?>> commandList = new LinkedList<>();
       commandList.add(command);
       commandMap.put(dnId, commandList);
     }
@@ -656,7 +656,7 @@ public class MockNodeManager implements NodeManager {
 
   // Returns the number of commands that is queued to this node manager.
   public int getCommandCount(DatanodeDetails dd) {
-    List<SCMCommand> list = commandMap.get(dd.getUuid());
+    List<SCMCommand<?>> list = commandMap.get(dd.getUuid());
     return (list == null) ? 0 : list.size();
   }
 
@@ -760,7 +760,7 @@ public class MockNodeManager implements NodeManager {
    * @return SCMheartbeat response list
    */
   @Override
-  public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
+  public List<SCMCommand<?>> processHeartbeat(DatanodeDetails datanodeDetails,
       CommandQueueReportProto commandQueueReportProto) {
     return null;
   }
@@ -847,7 +847,7 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public List<SCMCommand> getCommandQueue(UUID dnID) {
+  public List<SCMCommand<?>> getCommandQueue(UUID dnID) {
     return null;
   }
 

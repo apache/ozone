@@ -282,7 +282,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @param dnId datanode uuid
    * @param command
    */
-  void addDatanodeCommand(UUID dnId, SCMCommand command);
+  void addDatanodeCommand(UUID dnId, SCMCommand<?> command);
 
 
   /**
@@ -368,7 +368,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @return list of commands
    */
   // TODO: We can give better name to this method!
-  List<SCMCommand> getCommandQueue(UUID dnID);
+  List<SCMCommand<?>> getCommandQueue(UUID dnID);
 
   /**
    * Given datanode uuid, returns the DatanodeDetails for the node.
