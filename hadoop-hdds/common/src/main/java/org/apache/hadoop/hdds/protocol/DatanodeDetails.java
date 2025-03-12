@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -180,23 +181,28 @@ public class DatanodeDetails extends NodeImpl implements
   /**
    * Resolves and validates the IP address of the datanode based on its hostname.
    * If the resolved IP address differs from the current IP address,
-   * it updates the IP address to the newly resolved value and logs a warning.
+   * it updates the IP address to the newly resolved value.
    */
   public void validateDatanodeIpAddress() {
-    if (getIpAddress() == null) {
+    final String oldIP = getIpAddress();
+    final String hostname = getHostName();
+    if (StringUtils.isBlank(hostname)) {
+      LOG.warn("Could not resolve IP address of datanode '{}'", this);
       return;
     }
 
     try {
-      InetAddress inetAddress = InetAddress.getByName(getHostName());
+      final String newIP = InetAddress.getByName(hostname).getHostAddress();
+      if (StringUtils.isBlank(newIP)) {
+        throw new UnknownHostException("New IP address is invalid: " + newIP);
+      }
 
-      if (!inetAddress.getHostAddress().equals(getIpAddress())) {
-        LOG.warn("Using resolved IP address '{}' as it differs from the persisted IP address '{}' for datanode '{}'",
-            inetAddress.getHostAddress(), getIpAddress(), getHostName());
-        setIpAddress(inetAddress.getHostAddress());
+      if (!newIP.equals(oldIP)) {
+        LOG.info("Updating IP address of datanode {} to {}", this, newIP);
+        setIpAddress(newIP);
       }
     } catch (UnknownHostException e) {
-      LOG.warn("Failed to validate IP address for the datanode '{}'", getHostName(), e);
+      LOG.warn("Could not resolve IP address of datanode '{}'", this, e);
     }
   }
 
