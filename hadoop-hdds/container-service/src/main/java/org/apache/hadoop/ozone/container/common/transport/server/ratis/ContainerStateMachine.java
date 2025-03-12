@@ -624,7 +624,7 @@ public class ContainerStateMachine extends BaseStateMachine {
             return result;
           } catch (Exception e) {
             LOG.error("{}: writeChunk writeStateMachineData failed: blockId" +
-                  "{} logIndex {} chunkName {}", getGroupId(), write.getBlockID(),
+                "{} logIndex {} chunkName {}", getGroupId(), write.getBlockID(),
                 entryIndex, write.getChunkData().getChunkName(), e);
             metrics.incNumWriteDataFails();
             // write chunks go in parallel. It's possible that one write chunk
