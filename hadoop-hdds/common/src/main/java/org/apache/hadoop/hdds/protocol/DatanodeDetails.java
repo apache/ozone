@@ -212,7 +212,7 @@ public class DatanodeDetails extends NodeImpl implements
    * @return IP address
    */
   public String getIpAddress() {
-    return ipAddress.getString();
+    return ipAddress == null ? null : ipAddress.getString();
   }
 
   /**
@@ -239,7 +239,7 @@ public class DatanodeDetails extends NodeImpl implements
    * @return Hostname
    */
   public String getHostName() {
-    return hostName.getString();
+    return hostName == null ? null : hostName.getString();
   }
 
   /**
