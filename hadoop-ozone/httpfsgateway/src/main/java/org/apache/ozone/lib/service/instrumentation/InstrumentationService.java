@@ -129,43 +129,23 @@ public class InstrumentationService extends BaseService
                          Class<T> klass,
                          Lock lock,
                          Map<String, Map<String, T>> map) {
-    boolean locked = false;
+    lock.lock();
     try {
-      Map<String, T> groupMap = map.get(group);
-      if (groupMap == null) {
-        lock.lock();
-        locked = true;
-        groupMap = map.get(group);
-        if (groupMap == null) {
-          groupMap = new ConcurrentHashMap<String, T>();
-          map.put(group, groupMap);
-        }
-      }
-      T element = groupMap.get(name);
-      if (element == null) {
-        if (!locked) {
-          lock.lock();
-          locked = true;
-        }
-        element = groupMap.get(name);
-        if (element == null) {
-          try {
-            if (klass == Timer.class) {
-              element = (T) new Timer(timersSize);
-            } else {
-              element = klass.newInstance();
+      return map
+          .computeIfAbsent(group, k -> new ConcurrentHashMap<>())
+          .computeIfAbsent(name, k -> {
+            try {
+              if (klass == Timer.class) {
+                return (T) new Timer(timersSize);
+              } else {
+                return klass.newInstance();
+              }
+            } catch (Exception ex) {
+              throw new RuntimeException(ex);
             }
-          } catch (Exception ex) {
-            throw new RuntimeException(ex);
-          }
-          groupMap.put(name, element);
-        }
-      }
-      return element;
+          });
     } finally {
-      if (locked) {
-        lock.unlock();
-      }
+      lock.unlock();
     }
   }
 

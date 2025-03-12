@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.s3.awssdk.v1;
 
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
+import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.calculateDigest;
+import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.createFile;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -72,11 +74,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -89,7 +89,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -102,7 +101,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.utils.InputSubstream;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
@@ -117,7 +115,6 @@ import org.junit.jupiter.api.io.TempDir;
  * - https://github.com/awsdocs/aws-doc-sdk-examples/tree/main/java/example_code/s3/
  * - https://github.com/ceph/s3-tests
  *
- * TODO: Currently we are using AWS SDK V1, need to also add tests for AWS SDK V2.
  */
 @TestMethodOrder(MethodOrderer.MethodName.class)
 public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
@@ -1036,38 +1033,5 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
   private void abortMultipartUpload(String bucketName, String key, String uploadId) {
     AbortMultipartUploadRequest abortRequest = new AbortMultipartUploadRequest(bucketName, key, uploadId);
     s3Client.abortMultipartUpload(abortRequest);
-  }
-
-  private static byte[] calculateDigest(InputStream inputStream, int skip, int length) throws Exception {
-    int numRead;
-    byte[] buffer = new byte[1024];
-
-    MessageDigest complete = MessageDigest.getInstance("MD5");
-    if (skip > -1 && length > -1) {
-      inputStream = new InputSubstream(inputStream, skip, length);
-    }
-
-    do {
-      numRead = inputStream.read(buffer);
-      if (numRead > 0) {
-        complete.update(buffer, 0, numRead);
-      }
-    } while (numRead != -1);
-
-    return complete.digest();
-  }
-
-  private static void createFile(File newFile, int size) throws IOException {
-    // write random data so that filesystems with compression enabled (e.g. ZFS)
-    // can't compress the file
-    byte[] data = new byte[size];
-    data = RandomUtils.secure().randomBytes(data.length);
-
-    RandomAccessFile file = new RandomAccessFile(newFile, "rws");
-
-    file.write(data);
-
-    file.getFD().sync();
-    file.close();
   }
 }
