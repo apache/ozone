@@ -86,7 +86,6 @@ import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.ozone.s3.Gateway;
 import org.apache.hadoop.ozone.s3.OzoneClientCache;
 import org.apache.hadoop.ozone.s3.OzoneConfigurationHolder;
-import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.recon.schema.ReconSqlDbConfig;
@@ -118,7 +117,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   private final List<HddsDatanodeService> hddsDatanodes;
   private ReconServer reconServer;
   private Gateway s3g;
-  private S3ClientFactory s3ClientFactory;
 
   // Timeout for the cluster to be ready
   private int waitForClusterToBeReadyTimeout = 120000; // 2 min
@@ -143,7 +141,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     this.reconServer = reconServer;
     this.scmConfigurator = scmConfigurator;
     this.s3g = s3g;
-    this.s3ClientFactory = new S3ClientFactory(conf);
   }
 
   /**
