@@ -28,6 +28,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.ThreadLocalRandom;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -40,6 +42,25 @@ import org.junit.jupiter.api.Test;
  */
 
 public class TestContainerInfo {
+  static int oldHash(long id) {
+    return new HashCodeBuilder(61, 71)
+        .append(id)
+        .toHashCode();
+  }
+
+  static void assertHash(long value) {
+    final ContainerID id = ContainerID.valueOf(value);
+    assertEquals(oldHash(value), id.hashCode(), id::toString);
+  }
+
+  @Test
+  void testContainIdHash() {
+    for (int i = 0; i < 100; i++) {
+      assertHash(i);
+      final long id = ThreadLocalRandom.current().nextLong(Long.MAX_VALUE);
+      assertHash(id);
+    }
+  }
 
   @Test
   void getProtobufRatis() {

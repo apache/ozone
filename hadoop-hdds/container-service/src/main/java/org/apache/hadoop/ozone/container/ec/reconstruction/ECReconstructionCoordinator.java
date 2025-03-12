@@ -493,7 +493,7 @@ public class ECReconstructionCoordinator implements Closeable {
 
     SortedMap<Long, BlockData[]> resultMap = new TreeMap<>();
     Token<ContainerTokenIdentifier> containerToken =
-        tokenHelper.getContainerToken(new ContainerID(containerID));
+        tokenHelper.getContainerToken(ContainerID.valueOf(containerID));
 
     Iterator<Map.Entry<Integer, DatanodeDetails>> iterator =
         sourceNodeMap.entrySet().iterator();

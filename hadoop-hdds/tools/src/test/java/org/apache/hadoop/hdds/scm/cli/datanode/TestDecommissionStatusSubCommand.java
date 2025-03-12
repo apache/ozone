@@ -264,14 +264,14 @@ public class TestDecommissionStatusSubCommand {
   private Map<String, List<ContainerID>> getContainersOnDecomNodes() {
     Map<String, List<ContainerID>> containerMap = new HashMap<>();
     List<ContainerID> underReplicated = new ArrayList<>();
-    underReplicated.add(new ContainerID(1L));
-    underReplicated.add(new ContainerID(2L));
-    underReplicated.add(new ContainerID(3L));
+    underReplicated.add(ContainerID.valueOf(1L));
+    underReplicated.add(ContainerID.valueOf(2L));
+    underReplicated.add(ContainerID.valueOf(3L));
     containerMap.put("UnderReplicated", underReplicated);
     List<ContainerID> unclosed = new ArrayList<>();
-    unclosed.add(new ContainerID(10L));
-    unclosed.add(new ContainerID(11L));
-    unclosed.add(new ContainerID(12L));
+    unclosed.add(ContainerID.valueOf(10L));
+    unclosed.add(ContainerID.valueOf(11L));
+    unclosed.add(ContainerID.valueOf(12L));
     containerMap.put("UnClosed", unclosed);
     return containerMap;
   }
