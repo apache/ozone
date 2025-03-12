@@ -162,6 +162,7 @@ public final class ContainerUtils {
 
   /**
    * Read {@link DatanodeDetails} from a local ID file.
+   * Use {@link DatanodeDetails#validateDatanodeIpAddress()} to ensure that the IP address matches with the hostname
    *
    * @param path ID file local path
    * @return {@link DatanodeDetails}
@@ -172,25 +173,20 @@ public final class ContainerUtils {
     if (!path.exists()) {
       throw new IOException("Datanode ID file not found.");
     }
-    DatanodeDetails datanodeDetails;
     try {
-      datanodeDetails = DatanodeIdYaml.readDatanodeIdFile(path);
+      return DatanodeIdYaml.readDatanodeIdFile(path);
     } catch (IOException e) {
       LOG.warn("Error loading DatanodeDetails yaml from {}",
           path.getAbsolutePath(), e);
       // Try to load as protobuf before giving up
       try (InputStream in = Files.newInputStream(path.toPath())) {
-        datanodeDetails = DatanodeDetails.getFromProtoBuf(
+        return DatanodeDetails.getFromProtoBuf(
             HddsProtos.DatanodeDetailsProto.parseFrom(in));
       } catch (IOException io) {
         throw new IOException("Failed to parse DatanodeDetails from "
             + path.getAbsolutePath(), io);
       }
     }
-
-    datanodeDetails.validateDatanodeIpAddress();
-
-    return datanodeDetails;
   }
 
   /**

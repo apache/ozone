@@ -102,7 +102,8 @@ public class TestContainerUtils {
           .thenReturn(mockedInetAddress);
 
       // If persisted ip address is different from resolved ip address,
-      // DatanodeDetails should be set with the resolved ip address
+      // DatanodeDetails should return the persisted ip address.
+      // Upon validation of the ip address, DatanodeDetails should return the resolved ip address.
       when(mockedInetAddress.getHostAddress())
           .thenReturn("127.0.0.1");
       assertWriteReadWithChangedIpAddress(tempDir, id1);
@@ -159,6 +160,8 @@ public class TestContainerUtils {
     File file = new File(tempDir, "valid-values.id");
     ContainerUtils.writeDatanodeDetailsTo(details, file, conf);
     DatanodeDetails read = ContainerUtils.readDatanodeDetailsFrom(file);
+    assertEquals(details.getIpAddress(), read.getIpAddress());
+    read.validateDatanodeIpAddress();
     assertEquals("127.0.0.1", read.getIpAddress());
   }
 
@@ -178,5 +181,6 @@ public class TestContainerUtils {
     assertEquals(expected.getCertSerialId(), actual.getCertSerialId());
     assertEquals(expected.getProtoBufMessage(), actual.getProtoBufMessage());
     assertEquals(expected.getInitialVersion(), actual.getInitialVersion());
+    assertEquals(expected.getIpAddress(), actual.getIpAddress());
   }
 }
