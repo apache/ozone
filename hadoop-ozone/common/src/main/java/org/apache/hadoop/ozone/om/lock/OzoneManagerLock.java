@@ -253,7 +253,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   }
 
   private OMLockDetails acquireLock(Resource resource, boolean isReadLock,
-      String[] keys) {
+      String... keys) {
     omLockDetails.get().clear();
     if (!resource.canLock(lockSet.get())) {
       String errorMessage = getErrorMessage(resource);
