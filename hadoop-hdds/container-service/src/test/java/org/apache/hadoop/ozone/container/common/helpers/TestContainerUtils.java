@@ -113,31 +113,32 @@ public class TestContainerUtils {
       id1.setPort(DatanodeDetails.newStandalonePort(1));
       assertWriteRead(tempDir, id1);
 
-    // Add certificate serial  id.
-    id1.setCertSerialId("" + RandomUtils.nextLong());
-    assertWriteRead(tempDir, id1);
+      // Add certificate serial  id.
+      id1.setCertSerialId("" + RandomUtils.nextLong());
+      assertWriteRead(tempDir, id1);
 
-    // Read should return an empty value if file doesn't exist
-    File nonExistFile = new File(tempDir, "non_exist.id");
-    assertThrows(IOException.class,
-        () -> ContainerUtils.readDatanodeDetailsFrom(nonExistFile));
+      // Read should return an empty value if file doesn't exist
+      File nonExistFile = new File(tempDir, "non_exist.id");
+      assertThrows(IOException.class,
+          () -> ContainerUtils.readDatanodeDetailsFrom(nonExistFile));
 
-    // Read should fail if the file is malformed
-    File malformedFile = new File(tempDir, "malformed.id");
-    createMalformedIDFile(malformedFile);
-    assertThrows(IOException.class,
-        () -> ContainerUtils.readDatanodeDetailsFrom(malformedFile));
+      // Read should fail if the file is malformed
+      File malformedFile = new File(tempDir, "malformed.id");
+      createMalformedIDFile(malformedFile);
+      assertThrows(IOException.class,
+          () -> ContainerUtils.readDatanodeDetailsFrom(malformedFile));
 
-    // Test upgrade scenario - protobuf file instead of yaml
-    File protoFile = new File(tempDir, "valid-proto.id");
-    try (OutputStream out = Files.newOutputStream(protoFile.toPath())) {
-      HddsProtos.DatanodeDetailsProto proto = id1.getProtoBufMessage();
-      proto.writeTo(out);
+      // Test upgrade scenario - protobuf file instead of yaml
+      File protoFile = new File(tempDir, "valid-proto.id");
+      try (OutputStream out = Files.newOutputStream(protoFile.toPath())) {
+        HddsProtos.DatanodeDetailsProto proto = id1.getProtoBufMessage();
+        proto.writeTo(out);
+      }
+      assertDetailsEquals(id1, ContainerUtils.readDatanodeDetailsFrom(protoFile));
+
+      id1.setInitialVersion(1);
+      assertWriteRead(tempDir, id1);
     }
-    assertDetailsEquals(id1, ContainerUtils.readDatanodeDetailsFrom(protoFile));
-
-    id1.setInitialVersion(1);
-    assertWriteRead(tempDir, id1);
   }
 
   private void assertWriteRead(@TempDir File tempDir,
