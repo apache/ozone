@@ -24,7 +24,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -42,15 +41,12 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test for QuasiClosedStuckOverReplicationHandler.
@@ -59,21 +55,17 @@ public class TestQuasiClosedStuckOverReplicationHandler {
 
   private static final RatisReplicationConfig RATIS_REPLICATION_CONFIG = RatisReplicationConfig.getInstance(THREE);
   private ContainerInfo container;
-  private NodeManager nodeManager;
-  private OzoneConfiguration conf;
   private ReplicationManager replicationManager;
   private ReplicationManagerMetrics metrics;
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
   private QuasiClosedStuckOverReplicationHandler handler;
 
   @BeforeEach
-  void setup(@TempDir File testDir) throws NodeNotFoundException,
+  void setup() throws NodeNotFoundException,
       CommandTargetOverloadedException, NotLeaderException {
     container = ReplicationTestUtil.createContainer(
         HddsProtos.LifeCycleState.QUASI_CLOSED, RATIS_REPLICATION_CONFIG);
 
-    nodeManager = mock(NodeManager.class);
-    conf = SCMTestUtils.getConf(testDir);
     replicationManager = mock(ReplicationManager.class);
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.setBoolean("hdds.scm.replication.push", true);
