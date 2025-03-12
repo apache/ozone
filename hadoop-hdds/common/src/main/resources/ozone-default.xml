@@ -171,8 +171,7 @@
     <name>hdds.datanode.dir</name>
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
-    <description>Determines where on the local filesystem HDDS data will be
-      stored. Defaults to dfs.datanode.data.dir if not specified.
+    <description>Determines where on the local filesystem HDDS data will be stored.
       The directories should be tagged with corresponding storage types
       ([SSD]/[DISK]/[ARCHIVE]/[RAM_DISK]) for storage policies. The default
       storage type will be DISK if the directory does not have a storage type
@@ -427,27 +426,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.block.deleting.container.limit.per.interval</name>
-    <value>10</value>
-    <tag>OZONE, PERFORMANCE, SCM</tag>
-    <description>A maximum number of containers to be scanned by block deleting
-      service per
-      time interval. The block deleting service spawns a thread to handle block
-      deletions in a container. This property is used to throttle the number of
-      threads spawned for block deletions.
-    </description>
-  </property>
-  <property>
-    <name>ozone.block.deleting.limit.per.task</name>
-    <value>1000</value>
-    <tag>OZONE, PERFORMANCE, SCM</tag>
-    <description>A maximum number of blocks to be deleted by block deleting
-      service per
-      time interval. This property is used to throttle the actual number of
-      block deletions on a data node per container.
-    </description>
-  </property>
-  <property>
     <name>ozone.block.deleting.service.interval</name>
     <value>1m</value>
     <tag>OZONE, PERFORMANCE, SCM</tag>
@@ -464,8 +442,7 @@
     <description>A timeout value of block deletion service. If this is set
       greater than 0,
       the service will stop waiting for the block deleting completion after this
-      time. If timeout happens to a large proportion of block deletion, this
-      needs to be increased with ozone.block.deleting.limit.per.task. This
+      time. This
       setting supports multiple time unit suffixes as described in
       dfs.heartbeat.interval. If no suffix is specified, then milliseconds is
       assumed.
@@ -1369,9 +1346,8 @@
       specified when writing the key. The default is used if replication
       is not specified when creating key or no default replication set at
       bucket. Supported values:
-      For Standalone: 1
-      For Ratis: 3
-      For Erasure Coding(EC) supported format:
+      For RATIS: 1, 3
+      For EC (Erasure Coding) supported format:
       {ECCodec}-{DataBlocks}-{ParityBlocks}-{ChunkSize}
         ECCodec: Codec for encoding stripe. Supported values : XOR, RS (Reed Solomon)
         DataBlocks: Number of data blocks in a stripe.
@@ -1389,7 +1365,7 @@
       Default replication type to be used while writing key into ozone. The
       value can be specified when writing the key, default is used when
       nothing is specified when creating key or no default value set at bucket.
-      Supported values: RATIS, STAND_ALONE, CHAINED and EC.
+      Supported values: RATIS, EC.
     </description>
   </property>
 
@@ -1541,6 +1517,16 @@
       to the OM.
     </description>
   </property>
+
+  <property>
+    <name>ozone.om.snapshot.rocksdb.metrics.enabled</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Skip collecting RocksDBStore metrics for Snapshotted DB.
+    </description>
+  </property>
+
   <property>
     <name>hdds.rest.http-address</name>
     <value>0.0.0.0:9880</value>
@@ -1893,6 +1879,48 @@
   </property>
 
   <property>
+    <name>ozone.s3g.webadmin.http.enabled</name>
+    <value>true</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>This option can be used to disable the web server which serves additional content in Ozone S3 Gateway.</description>
+  </property>
+
+  <property>
+    <name>ozone.s3g.webadmin.https-address</name>
+    <value/>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>Ozone S3Gateway content server's HTTPS address and port.</description>
+  </property>
+
+  <property>
+    <name>ozone.s3g.webadmin.https-bind-host</name>
+    <value/>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>The actual address the HTTPS server will bind to. If this optional address
+      is set, it overrides only the hostname portion of ozone.s3g.webadmin.https-address.
+      This is useful for making the Ozone S3Gateway HTTPS server listen on all
+      interfaces by setting it to 0.0.0.0.</description>
+  </property>
+
+  <property>
+    <name>ozone.s3g.webadmin.http-address</name>
+    <value>0.0.0.0:19878</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>The address and port where Ozone S3Gateway serves
+      web content.</description>
+  </property>
+
+  <property>
+    <name>ozone.s3g.webadmin.http-bind-host</name>
+    <value>0.0.0.0</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>The actual address the HTTP server will bind to. If this optional address
+      is set, it overrides only the hostname portion of ozone.s3g.webadmin.http-address.
+      This is useful for making the Ozone S3Gateway HTTP server listen on all
+      interfaces by setting it to 0.0.0.0.</description>
+  </property>
+
+  <property>
     <name>ozone.s3g.http.auth.kerberos.principal</name>
     <value>HTTP/_HOST@REALM</value>
     <tag>OZONE, S3GATEWAY, SECURITY, KERBEROS</tag>
@@ -2042,15 +2070,6 @@
       false, uses non-fair ordering. See
       java.util.concurrent.locks.ReentrantReadWriteLock
       for more information on fair/non-fair locks.
-    </description>
-  </property>
-
-  <property>
-    <name>ozone.om.ratis.enable</name>
-    <value>true</value>
-    <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
-    <description>Property to enable or disable Ratis server on OM.
-    Please note - this is a temporary property to disable OM Ratis server.
     </description>
   </property>
 
@@ -3323,10 +3342,10 @@
   </property>
   <property>
     <name>ozone.recon.om.snapshot.task.interval.delay</name>
-    <value>10m</value>
+    <value>5s</value>
     <tag>OZONE, RECON, OM</tag>
     <description>
-      Interval in MINUTES by Recon to request OM DB Snapshot.
+      Interval in SECONDS by Recon to request OM DB Snapshot.
     </description>
   </property>
   <property>
@@ -3339,7 +3358,7 @@
   </property>
   <property>
     <name>recon.om.delta.update.limit</name>
-    <value>2000</value>
+    <value>50000</value>
     <tag>OZONE, RECON</tag>
     <description>
       Recon each time get a limited delta updates from OM.
@@ -3359,12 +3378,13 @@
     </description>
   </property>
   <property>
-    <name>recon.om.delta.update.loop.limit</name>
-    <value>10</value>
+    <name>recon.om.delta.update.lag.threshold</name>
+    <value>0</value>
     <tag>OZONE, RECON</tag>
     <description>
-      The sync between Recon and OM consists of several small
-      fetch loops.
+      At every Recon OM sync, recon starts fetching OM DB updates, and it continues to
+      fetch from OM till the lag, between OM DB WAL sequence number and Recon OM DB
+      snapshot WAL sequence number, is less than this lag threshold value.
     </description>
   </property>
   <property>
@@ -3548,21 +3568,6 @@
   </property>
 
   <property>
-    <name>ozone.om.enable.filesystem.paths</name>
-    <tag>OZONE, OM</tag>
-    <value>false</value>
-    <description>If true, key names will be interpreted as file system paths.
-      "/" will be treated as a special character and paths will be normalized
-      and must follow Unix filesystem path naming conventions. This flag will
-      be helpful when objects created by S3G need to be accessed using OFS/O3Fs.
-      If false, it will fallback to default behavior of Key/MPU create
-      requests where key paths are not normalized and any intermediate
-      directories will not be created or any file checks happens to check
-      filesystem semantics.
-    </description>
-  </property>
-
-  <property>
     <name>ozone.om.key.path.lock.enabled</name>
     <tag>OZONE, OM</tag>
     <value>false</value>
@@ -3652,14 +3657,6 @@
       orphan directory it deletes the sub-path tree structure(dirs/files). It
       sends sub-files to KeyDeletingService to deletes its blocks. Unit could
       be defined with postfix (ns,ms,s,m,h,d)
-    </description>
-  </property>
-  <property>
-    <name>ozone.path.deleting.limit.per.task</name>
-    <value>6000</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
-    <description>A maximum number of paths(dirs/files) to be deleted by
-      directory deleting service per time interval.
     </description>
   </property>
   <property>
@@ -4557,11 +4554,124 @@
   </property>
 
   <property>
-    <name>ozone.om.server.list.max.size</name>
-    <value>1000</value>
-    <tag>OZONE, OM</tag>
+    <name>hdds.datanode.dns.interface</name>
+    <value>default</value>
+    <tag>OZONE, DATANODE</tag>
     <description>
-      Configuration property to configure the max server side response size for list calls on om.
+      The name of the Network Interface from which a Datanode should
+      report its IP address. e.g. eth2. This setting may be required for some
+      multi-homed nodes where the Datanodes are assigned multiple hostnames
+      and it is desirable for the Datanodes to use a non-default hostname.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.dns.nameserver</name>
+    <value>default</value>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      The host name or IP address of the name server (DNS) which a Datanode
+      should use to determine its own host name.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.hostname</name>
+    <value/>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      Optional. The hostname for the Datanode containing this
+      configuration file.  Will be different for each machine.
+      Defaults to current hostname.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.use.datanode.hostname</name>
+    <value>false</value>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      Whether Datanodes should use Datanode hostnames when
+      connecting to other Datanodes for data transfer.
+    </description>
+  </property>
+  <property>
+    <name>hdds.xframe.enabled</name>
+    <value>true</value>
+    <tag>OZONE, HDDS</tag>
+    <description>
+      If true, then enables protection against clickjacking by returning
+      X_FRAME_OPTIONS header value set to SAMEORIGIN.
+      Clickjacking protection prevents an attacker from using transparent or
+      opaque layers to trick a user into clicking on a button
+      or link on another page.
+    </description>
+  </property>
+  <property>
+    <name>hdds.xframe.value</name>
+    <value>SAMEORIGIN</value>
+    <tag>OZONE, HDDS</tag>
+    <description>
+      This configration value allows user to specify the value for the
+      X-FRAME-OPTIONS. The possible values for this field are
+      DENY, SAMEORIGIN and ALLOW-FROM. Any other value will throw an
+      exception when Datanodes are starting up.
+    </description>
+  </property>
+  <property>
+    <name>hdds.metrics.session-id</name>
+    <value/>
+    <tag>OZONE, HDDS</tag>
+    <description>
+      Get the user-specified session identifier. The default is the empty string.
+      The session identifier is used to tag metric data that is reported to some
+      performance metrics system via the org.apache.hadoop.metrics API.  The
+      session identifier is intended, in particular, for use by Hadoop-On-Demand
+      (HOD) which allocates a virtual Hadoop cluster dynamically and transiently.
+      HOD will set the session identifier by modifying the mapred-site.xml file
+      before starting the cluster.
+      When not running under HOD, this identifer is expected to remain set to
+      the empty string.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.kerberos.principal</name>
+    <value/>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      The Datanode service principal. This is typically set to
+      dn/_HOST@REALM.TLD. Each Datanode will substitute _HOST with its
+      own fully qualified hostname at startup. The _HOST placeholder
+      allows using the same configuration setting on all Datanodes.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.kerberos.keytab.file</name>
+    <value/>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      The keytab file used by each Datanode daemon to login as its
+      service principal. The principal name is configured with
+      hdds.datanode.kerberos.principal.
+    </description>
+  </property>
+  <property>
+    <name>hdds.metrics.percentiles.intervals</name>
+    <value></value>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      Comma-delimited set of integers denoting the desired rollover intervals
+      (in seconds) for percentile latency metrics on the Datanode.
+      By default, percentile latency metrics are disabled.
+    </description>
+  </property>
+
+  <property>
+    <name>net.topology.node.switch.mapping.impl</name>
+    <value>org.apache.hadoop.net.ScriptBasedMapping</value>
+    <tag>OZONE, SCM</tag>
+    <description>
+      The default implementation of the DNSToSwitchMapping. It
+      invokes a script specified in net.topology.script.file.name to resolve
+      node names. If the value for net.topology.script.file.name is not set, the
+      default value of DEFAULT_RACK is returned for all node names.
     </description>
   </property>
 </configuration>

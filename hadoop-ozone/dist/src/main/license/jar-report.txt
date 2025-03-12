@@ -151,6 +151,7 @@ share/ozone/lib/jgrapht-core.jar
 share/ozone/lib/jgrapht-ext.jar
 share/ozone/lib/jgraphx.jar
 share/ozone/lib/jheaps.jar
+share/ozone/lib/jline.jar
 share/ozone/lib/jmespath-java.jar
 share/ozone/lib/jna.jar
 share/ozone/lib/jna-platform.jar
@@ -216,6 +217,7 @@ share/ozone/lib/opentracing-util.jar
 share/ozone/lib/orc-core.jar
 share/ozone/lib/osgi-resource-locator.jar
 share/ozone/lib/ozone-client.jar
+share/ozone/lib/ozone-cli-shell.jar
 share/ozone/lib/ozone-common.jar
 share/ozone/lib/ozone-csi.jar
 share/ozone/lib/ozone-datanode.jar
@@ -236,6 +238,7 @@ share/ozone/lib/ozone-s3gateway.jar
 share/ozone/lib/ozone-tools.jar
 share/ozone/lib/perfmark-api.jar
 share/ozone/lib/picocli.jar
+share/ozone/lib/picocli-shell-jline3.jar
 share/ozone/lib/protobuf-java.jar
 share/ozone/lib/protobuf-java.jar
 share/ozone/lib/protobuf-java-util.jar

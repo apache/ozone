@@ -21,7 +21,7 @@ Resource            ../commonlib.robot
 Resource            commonawslib.robot
 Test Timeout        5 minutes
 Suite Setup         Setup s3 tests
-Default Tags        no-bucket-type
+Test Tags           no-bucket-type
 
 *** Variables ***
 ${ENDPOINT_URL}       http://s3g:9878
@@ -42,7 +42,8 @@ Create bucket with invalid bucket name
     ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket invalid_bucket_${randStr}   255
                         Should contain          ${result}           InvalidBucketName
 
-Create new bucket and check no group ACL
+Create new bucket and check default group ACL
+    [tags]    aws-skip
     ${bucket} =         Create bucket
     ${acl} =            Execute     ozone sh bucket getacl s3v/${bucket}
     ${group} =          Get Regexp Matches   ${acl}     "GROUP"
@@ -50,5 +51,15 @@ Create new bucket and check no group ACL
         ${json} =           Evaluate    json.loads('''${acl}''')    json
         # make sure this check is for group acl
         Should contain      ${json}[1][type]       GROUP
-        Should contain      ${json}[1][aclList]    NONE
+        Should contain      ${json}[1][aclList]    READ
+        Should contain      ${json}[1][aclList]    LIST
+    END
+
+Test buckets named like web endpoints
+    [tags]    aws-skip
+    ${path} =    Create Random File KB    64
+
+    FOR  ${name}   IN    conf    jmx    logs    logstream    prof    prom    secret    stacks    static
+        Create bucket with name    ${name}
+        Put object to bucket    bucket=${name}    key=testkey    path=${path}
     END

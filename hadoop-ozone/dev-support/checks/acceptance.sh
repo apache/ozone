@@ -22,7 +22,7 @@ cd "$DIR/../../.." || exit 1
 OZONE_ROOT=$(pwd -P)
 
 : ${HADOOP_AWS_DIR:=""}
-: ${OZONE_ACCEPTANCE_SUITE:=""}
+: ${OZONE_ACCEPTANCE_SUITE:="${1:-}"}
 : ${OZONE_TEST_SELECTOR:=""}
 : ${OZONE_ACCEPTANCE_TEST_TYPE:="robot"}
 : ${OZONE_WITH_COVERAGE:="false"}
@@ -40,6 +40,8 @@ if [ ! -d "$DIST_DIR" ]; then
     "$DIR/build.sh" -Pcoverage
 fi
 
+create_aws_dir
+
 mkdir -p "$REPORT_DIR"
 
 if [[ "${OZONE_ACCEPTANCE_SUITE}" == "s3a" ]]; then
@@ -49,6 +51,25 @@ if [[ "${OZONE_ACCEPTANCE_SUITE}" == "s3a" ]]; then
     HADOOP_VERSION=$(mvn help:evaluate -Dexpression=hadoop.version -q -DforceStdout -Dscan=false)
     export HADOOP_AWS_DIR=${OZONE_ROOT}/target/hadoop-src
   fi
+
+  download_hadoop_aws() {
+    local dir="$1"
+
+    if [[ -z ${dir} ]]; then
+      echo "Required argument: target directory for Hadoop AWS sources" >&2
+      return 1
+    fi
+
+    if [[ ! -e "${dir}" ]] || [[ ! -d "${dir}"/src/test/resources ]]; then
+      mkdir -p "${dir}"
+      if [[ ! -f "${dir}.tar.gz" ]]; then
+        local url="https://www.apache.org/dyn/closer.lua?action=download&filename=hadoop/common/hadoop-${HADOOP_VERSION}/hadoop-${HADOOP_VERSION}-src.tar.gz"
+        echo "Downloading Hadoop from ${url}"
+        curl -LSs --fail -o "${dir}.tar.gz" "$url" || return 1
+      fi
+      tar -x -z -C "${dir}" --strip-components=3 -f "${dir}.tar.gz" --wildcards 'hadoop-*-src/hadoop-tools/hadoop-aws' || return 1
+    fi
+  }
 
   if ! download_hadoop_aws "${HADOOP_AWS_DIR}"; then
     echo "Failed to download Hadoop ${HADOOP_VERSION}" > "${REPORT_FILE}"

@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -25,16 +24,16 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializ
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LAG_THRESHOLD;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT;
 import static org.apache.hadoop.ozone.recon.ReconUtils.createTarFile;
 import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmDeltaRequest;
 import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmSnapshotRequest;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyString;
@@ -45,16 +44,13 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
+import java.nio.file.Files;
 import java.nio.file.Paths;
-
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
@@ -71,12 +67,11 @@ import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.common.CommonUtils;
 import org.apache.hadoop.ozone.recon.metrics.OzoneManagerSyncMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.tasks.OMDBUpdatesHandler;
 import org.apache.hadoop.ozone.recon.tasks.OMUpdateEventBatch;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
-
-import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
+import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -125,36 +120,37 @@ public class TestOzoneManagerServiceProviderImpl {
     DBCheckpoint checkpoint = omMetadataManager.getStore()
         .getCheckpoint(true);
     File tarFile = createTarFile(checkpoint.getCheckpointLocation());
-    InputStream inputStream = new FileInputStream(tarFile);
-    ReconUtils reconUtilsMock = getMockReconUtils();
-    HttpURLConnection httpURLConnectionMock = mock(HttpURLConnection.class);
-    when(httpURLConnectionMock.getInputStream()).thenReturn(inputStream);
-    when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
-        .thenReturn(httpURLConnectionMock);
-    when(reconUtilsMock.getReconNodeDetails(
-        any(OzoneConfiguration.class))).thenReturn(
-        commonUtils.getReconNodeDetails());
-    ReconTaskController reconTaskController = getMockTaskController();
+    try (InputStream inputStream = Files.newInputStream(tarFile.toPath())) {
+      ReconUtils reconUtilsMock = getMockReconUtils();
+      HttpURLConnection httpURLConnectionMock = mock(HttpURLConnection.class);
+      when(httpURLConnectionMock.getInputStream()).thenReturn(inputStream);
+      when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
+          .thenReturn(httpURLConnectionMock);
+      when(reconUtilsMock.getReconNodeDetails(
+          any(OzoneConfiguration.class))).thenReturn(
+          commonUtils.getReconNodeDetails());
+      ReconTaskController reconTaskController = getMockTaskController();
 
-    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
-        new OzoneManagerServiceProviderImpl(configuration,
-            reconOMMetadataManager, reconTaskController, reconUtilsMock,
-            ozoneManagerProtocol, reconContext);
+      OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
+          new OzoneManagerServiceProviderImpl(configuration,
+              reconOMMetadataManager, reconTaskController, reconUtilsMock, ozoneManagerProtocol,
+              reconContext, getMockTaskStatusUpdaterManager());
 
-    assertNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
-        .get("/sampleVol/bucketOne/key_one"));
-    assertNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
-        .get("/sampleVol/bucketOne/key_two"));
+      assertNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
+          .get("/sampleVol/bucketOne/key_one"));
+      assertNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
+          .get("/sampleVol/bucketOne/key_two"));
 
-    assertTrue(ozoneManagerServiceProvider.updateReconOmDBWithNewSnapshot());
+      assertTrue(ozoneManagerServiceProvider.updateReconOmDBWithNewSnapshot());
 
-    assertNotNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
-        .get("/sampleVol/bucketOne/key_one"));
-    assertNotNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
-        .get("/sampleVol/bucketOne/key_two"));
+      assertNotNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
+          .get("/sampleVol/bucketOne/key_one"));
+      assertNotNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
+          .get("/sampleVol/bucketOne/key_two"));
 
-    // Verifying if context error GET_OM_DB_SNAPSHOT_FAILED is removed
-    assertFalse(reconContext.getErrors().contains(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED));
+      // Verifying if context error GET_OM_DB_SNAPSHOT_FAILED is removed
+      assertFalse(reconContext.getErrors().contains(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED));
+    }
   }
 
   @Test
@@ -179,8 +175,8 @@ public class TestOzoneManagerServiceProviderImpl {
 
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         new OzoneManagerServiceProviderImpl(configuration,
-            reconOMMetadataManager, reconTaskController, reconUtilsMock,
-            ozoneManagerProtocol, reconContext);
+            reconOMMetadataManager, reconTaskController, reconUtilsMock, ozoneManagerProtocol,
+            reconContext, getMockTaskStatusUpdaterManager());
 
     assertFalse(ozoneManagerServiceProvider.updateReconOmDBWithNewSnapshot());
 
@@ -202,31 +198,32 @@ public class TestOzoneManagerServiceProviderImpl {
 
     DBCheckpoint checkpoint = omMetadataManager.getStore().getCheckpoint(true);
     File tarFile = createTarFile(checkpoint.getCheckpointLocation());
-    InputStream inputStream = new FileInputStream(tarFile);
-    ReconUtils reconUtilsMock = getMockReconUtils();
-    HttpURLConnection httpURLConnectionMock = mock(HttpURLConnection.class);
-    when(httpURLConnectionMock.getInputStream()).thenReturn(inputStream);
-    when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
-        .thenReturn(httpURLConnectionMock);
-    when(reconUtilsMock.getReconNodeDetails(any(OzoneConfiguration.class)))
-        .thenReturn(commonUtils.getReconNodeDetails());
-    ReconTaskController reconTaskController = getMockTaskController();
+    try (InputStream inputStream = Files.newInputStream(tarFile.toPath())) {
+      ReconUtils reconUtilsMock = getMockReconUtils();
+      HttpURLConnection httpURLConnectionMock = mock(HttpURLConnection.class);
+      when(httpURLConnectionMock.getInputStream()).thenReturn(inputStream);
+      when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
+          .thenReturn(httpURLConnectionMock);
+      when(reconUtilsMock.getReconNodeDetails(any(OzoneConfiguration.class)))
+          .thenReturn(commonUtils.getReconNodeDetails());
+      ReconTaskController reconTaskController = getMockTaskController();
 
-    reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
+      reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
 
-    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
-        new OzoneManagerServiceProviderImpl(configuration,
-            reconOMMetadataManager, reconTaskController, reconUtilsMock,
-            ozoneManagerProtocol, reconContext);
+      OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
+          new OzoneManagerServiceProviderImpl(configuration,
+              reconOMMetadataManager, reconTaskController, reconUtilsMock, ozoneManagerProtocol,
+              reconContext, getMockTaskStatusUpdaterManager());
 
-    assertTrue(reconContext.getErrors().contains(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED));
-    assertTrue(ozoneManagerServiceProvider.updateReconOmDBWithNewSnapshot());
-    assertFalse(reconContext.getErrors().contains(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED));
+      assertTrue(reconContext.getErrors().contains(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED));
+      assertTrue(ozoneManagerServiceProvider.updateReconOmDBWithNewSnapshot());
+      assertFalse(reconContext.getErrors().contains(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED));
 
-    assertNotNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
-        .get("/sampleVol/bucketOne/key_one"));
-    assertNotNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
-        .get("/sampleVol/bucketOne/key_two"));
+      assertNotNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
+          .get("/sampleVol/bucketOne/key_one"));
+      assertNotNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
+          .get("/sampleVol/bucketOne/key_two"));
+    }
   }
 
   @Test
@@ -245,33 +242,35 @@ public class TestOzoneManagerServiceProviderImpl {
         .getCheckpoint(true);
     File tarFile1 = createTarFile(checkpoint.getCheckpointLocation());
     File tarFile2 = createTarFile(checkpoint.getCheckpointLocation());
-    InputStream inputStream1 = new FileInputStream(tarFile1);
-    InputStream inputStream2 = new FileInputStream(tarFile2);
     ReconUtils reconUtilsMock = getMockReconUtils();
-    HttpURLConnection httpURLConnectionMock1 = mock(HttpURLConnection.class);
-    when(httpURLConnectionMock1.getInputStream()).thenReturn(inputStream1);
-    when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
-        .thenReturn(httpURLConnectionMock1);
-    when(reconUtilsMock.getReconNodeDetails(
-        any(OzoneConfiguration.class))).thenReturn(
-        commonUtils.getReconNodeDetails());
     ReconTaskController reconTaskController = getMockTaskController();
+    try (InputStream inputStream1 = Files.newInputStream(tarFile1.toPath())) {
+      HttpURLConnection httpURLConnectionMock1 = mock(HttpURLConnection.class);
+      when(httpURLConnectionMock1.getInputStream()).thenReturn(inputStream1);
+      when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
+          .thenReturn(httpURLConnectionMock1);
+      when(reconUtilsMock.getReconNodeDetails(
+          any(OzoneConfiguration.class))).thenReturn(
+          commonUtils.getReconNodeDetails());
 
-    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider1 =
-        new OzoneManagerServiceProviderImpl(configuration,
-            reconOMMetadataManager, reconTaskController, reconUtilsMock,
-            ozoneManagerProtocol, reconContext);
-    assertTrue(ozoneManagerServiceProvider1.updateReconOmDBWithNewSnapshot());
+      OzoneManagerServiceProviderImpl ozoneManagerServiceProvider1 =
+          new OzoneManagerServiceProviderImpl(configuration,
+              reconOMMetadataManager, reconTaskController, reconUtilsMock, ozoneManagerProtocol,
+              reconContext, getMockTaskStatusUpdaterManager());
+      assertTrue(ozoneManagerServiceProvider1.updateReconOmDBWithNewSnapshot());
+    }
 
-    HttpURLConnection httpURLConnectionMock2 = mock(HttpURLConnection.class);
-    when(httpURLConnectionMock2.getInputStream()).thenReturn(inputStream2);
-    when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
-        .thenReturn(httpURLConnectionMock2);
-    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider2 =
-        new OzoneManagerServiceProviderImpl(configuration,
-            reconOMMetadataManager, reconTaskController, reconUtilsMock,
-            ozoneManagerProtocol, reconContext);
-    assertTrue(ozoneManagerServiceProvider2.updateReconOmDBWithNewSnapshot());
+    try (InputStream inputStream2 = Files.newInputStream(tarFile2.toPath())) {
+      HttpURLConnection httpURLConnectionMock2 = mock(HttpURLConnection.class);
+      when(httpURLConnectionMock2.getInputStream()).thenReturn(inputStream2);
+      when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
+          .thenReturn(httpURLConnectionMock2);
+      OzoneManagerServiceProviderImpl ozoneManagerServiceProvider2 =
+          new OzoneManagerServiceProviderImpl(configuration,
+              reconOMMetadataManager, reconTaskController, reconUtilsMock, ozoneManagerProtocol,
+              reconContext, getMockTaskStatusUpdaterManager());
+      assertTrue(ozoneManagerServiceProvider2.updateReconOmDBWithNewSnapshot());
+    }
   }
 
   @Test
@@ -280,28 +279,19 @@ public class TestOzoneManagerServiceProviderImpl {
 
     File checkpointDir = Paths.get(dirReconMetadata.getAbsolutePath(),
         "testGetOzoneManagerDBSnapshot").toFile();
-    checkpointDir.mkdir();
+    assertTrue(checkpointDir.mkdirs());
 
     File file1 = Paths.get(checkpointDir.getAbsolutePath(), "file1")
         .toFile();
-    String str = "File1 Contents";
-
-    try (BufferedWriter writer1 = new BufferedWriter(new OutputStreamWriter(
-        new FileOutputStream(file1), UTF_8))) {
-      writer1.write(str);
-    }
+    FileUtils.write(file1, "File1 Contents", UTF_8);
 
     File file2 = Paths.get(checkpointDir.getAbsolutePath(), "file2")
         .toFile();
-    str = "File2 Contents";
-    try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
-        new FileOutputStream(file2), UTF_8))) {
-      writer.write(str);
-    }
+    FileUtils.write(file2, "File2 Contents", UTF_8);
 
     //Create test tar file.
     File tarFile = createTarFile(checkpointDir.toPath());
-    try (InputStream fileInputStream = new FileInputStream(tarFile)) {
+    try (InputStream fileInputStream = Files.newInputStream(tarFile.toPath())) {
       ReconUtils reconUtilsMock = getMockReconUtils();
       HttpURLConnection httpURLConnectionMock = mock(HttpURLConnection.class);
       when(httpURLConnectionMock.getInputStream()).thenReturn(fileInputStream);
@@ -315,8 +305,8 @@ public class TestOzoneManagerServiceProviderImpl {
       ReconTaskController reconTaskController = getMockTaskController();
       OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
           new OzoneManagerServiceProviderImpl(configuration,
-              reconOMMetadataManager, reconTaskController, reconUtilsMock,
-              ozoneManagerProtocol, reconContext);
+              reconOMMetadataManager, reconTaskController, reconUtilsMock, ozoneManagerProtocol,
+              reconContext, getMockTaskStatusUpdaterManager());
 
       DBCheckpoint checkpoint = ozoneManagerServiceProvider
           .getOzoneManagerDBSnapshot();
@@ -362,17 +352,19 @@ public class TestOzoneManagerServiceProviderImpl {
     OMMetadataManager omMetadataManager =
         initializeNewOmMetadataManager(dirOmMetadata);
 
+    OzoneConfiguration withLimitConfiguration =
+        new OzoneConfiguration(configuration);
+    withLimitConfiguration.setLong(RECON_OM_DELTA_UPDATE_LIMIT, 10);
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         new OzoneManagerServiceProviderImpl(configuration,
             getTestReconOmMetadataManager(omMetadataManager, dirReconMetadata),
-            getMockTaskController(), new ReconUtils(),
-            getMockOzoneManagerClient(dbUpdatesWrapper), reconContext);
+            getMockTaskController(), new ReconUtils(), getMockOzoneManagerClient(dbUpdatesWrapper),
+            reconContext, getMockTaskStatusUpdaterManager());
 
-    OMDBUpdatesHandler updatesHandler =
-        new OMDBUpdatesHandler(omMetadataManager);
-    ozoneManagerServiceProvider.getAndApplyDeltaUpdatesFromOM(
-        0L, updatesHandler);
+    long currentReconDBSequenceNumber = ozoneManagerServiceProvider.getCurrentOMDBSequenceNumber();
+    dbUpdatesWrapper.setLatestSequenceNumber(currentReconDBSequenceNumber + 4);
 
+    ozoneManagerServiceProvider.syncDataFromOM();
     OzoneManagerSyncMetrics metrics = ozoneManagerServiceProvider.getMetrics();
     assertEquals(4.0,
         metrics.getAverageNumUpdatesInDeltaRequest(), 0.0);
@@ -382,7 +374,7 @@ public class TestOzoneManagerServiceProviderImpl {
 
     // Assert GET path --> verify if the OMDBUpdatesHandler picked up the 4
     // events ( 1 Vol PUT + 1 Bucket PUT + 2 Key PUTs).
-    assertEquals(4, updatesHandler.getEvents().size());
+    assertEquals(currentReconDBSequenceNumber + 4, ozoneManagerServiceProvider.getCurrentOMDBSequenceNumber());
 
     // Assert APPLY path --> Verify if the OM service provider's RocksDB got
     // the changes.
@@ -429,24 +421,27 @@ public class TestOzoneManagerServiceProviderImpl {
 
     OzoneConfiguration withLimitConfiguration =
         new OzoneConfiguration(configuration);
-    withLimitConfiguration.setLong(RECON_OM_DELTA_UPDATE_LIMIT, 1);
-    withLimitConfiguration.setLong(RECON_OM_DELTA_UPDATE_LOOP_LIMIT, 3);
+    withLimitConfiguration.setLong(RECON_OM_DELTA_UPDATE_LIMIT, 3);
+    withLimitConfiguration.setLong(RECON_OM_DELTA_UPDATE_LAG_THRESHOLD, 1);
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         new OzoneManagerServiceProviderImpl(withLimitConfiguration,
             getTestReconOmMetadataManager(omMetadataManager, dirReconMetadata),
             getMockTaskController(), new ReconUtils(),
             getMockOzoneManagerClientWith4Updates(dbUpdatesWrapper[0],
-                dbUpdatesWrapper[1], dbUpdatesWrapper[2], dbUpdatesWrapper[3]), reconContext);
+                dbUpdatesWrapper[1], dbUpdatesWrapper[2], dbUpdatesWrapper[3]),
+            reconContext, getMockTaskStatusUpdaterManager());
+
+    long currentReconDBSequenceNumber = ozoneManagerServiceProvider.getCurrentOMDBSequenceNumber();
+    dbUpdatesWrapper[0].setLatestSequenceNumber(currentReconDBSequenceNumber + 4);
+    dbUpdatesWrapper[1].setLatestSequenceNumber(currentReconDBSequenceNumber + 4);
+    dbUpdatesWrapper[2].setLatestSequenceNumber(currentReconDBSequenceNumber + 4);
 
     assertTrue(dbUpdatesWrapper[0].isDBUpdateSuccess());
     assertTrue(dbUpdatesWrapper[1].isDBUpdateSuccess());
     assertTrue(dbUpdatesWrapper[2].isDBUpdateSuccess());
     assertTrue(dbUpdatesWrapper[3].isDBUpdateSuccess());
 
-    OMDBUpdatesHandler updatesHandler =
-        new OMDBUpdatesHandler(omMetadataManager);
-    ozoneManagerServiceProvider.getAndApplyDeltaUpdatesFromOM(
-        0L, updatesHandler);
+    ozoneManagerServiceProvider.syncDataFromOM();
 
     OzoneManagerSyncMetrics metrics = ozoneManagerServiceProvider.getMetrics();
     assertEquals(1.0,
@@ -457,7 +452,7 @@ public class TestOzoneManagerServiceProviderImpl {
 
     // Assert GET path --> verify if the OMDBUpdatesHandler picked up the first
     // 3 of 4 events ( 1 Vol PUT + 1 Bucket PUT + 2 Key PUTs).
-    assertEquals(3, updatesHandler.getEvents().size());
+    assertEquals(currentReconDBSequenceNumber + 3, ozoneManagerServiceProvider.getCurrentOMDBSequenceNumber());
 
     // Assert APPLY path --> Verify if the OM service provider's RocksDB got
     // the first 3 changes, last change not applied.
@@ -479,20 +474,15 @@ public class TestOzoneManagerServiceProviderImpl {
     // Empty OM DB to start with.
     ReconOMMetadataManager omMetadataManager = getTestReconOmMetadataManager(
         initializeEmptyOmMetadataManager(dirOmMetadata), dirReconMetadata);
-    ReconTaskStatusDao reconTaskStatusDaoMock =
-        mock(ReconTaskStatusDao.class);
-    doNothing().when(reconTaskStatusDaoMock)
-        .update(any(ReconTaskStatus.class));
 
     ReconTaskController reconTaskControllerMock = getMockTaskController();
-    when(reconTaskControllerMock.getReconTaskStatusDao())
-        .thenReturn(reconTaskStatusDaoMock);
     doNothing().when(reconTaskControllerMock)
-        .reInitializeTasks(omMetadataManager);
+        .reInitializeTasks(omMetadataManager, null);
+    ReconTaskStatusUpdaterManager reconTaskStatusUpdaterManager = getMockTaskStatusUpdaterManager();
 
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
-        new MockOzoneServiceProvider(configuration, omMetadataManager,
-            reconTaskControllerMock, new ReconUtils(), ozoneManagerProtocol, reconContext);
+        new MockOzoneServiceProvider(configuration, omMetadataManager, reconTaskControllerMock,
+            new ReconUtils(), ozoneManagerProtocol, reconContext, reconTaskStatusUpdaterManager);
 
     OzoneManagerSyncMetrics metrics = ozoneManagerServiceProvider.getMetrics();
     assertEquals(0, metrics.getNumSnapshotRequests());
@@ -500,13 +490,11 @@ public class TestOzoneManagerServiceProviderImpl {
     // Should trigger full snapshot request.
     ozoneManagerServiceProvider.syncDataFromOM();
 
-    ArgumentCaptor<ReconTaskStatus> captor =
-        ArgumentCaptor.forClass(ReconTaskStatus.class);
-    verify(reconTaskStatusDaoMock, times(1))
-        .update(captor.capture());
-    assertEquals(OmSnapshotRequest.name(), captor.getValue().getTaskName());
+    ArgumentCaptor<String> taskNameCaptor = ArgumentCaptor.forClass(String.class);
+    verify(reconTaskStatusUpdaterManager).getTaskStatusUpdater(taskNameCaptor.capture());
+    assertEquals(OmSnapshotRequest.name(), taskNameCaptor.getValue());
     verify(reconTaskControllerMock, times(1))
-        .reInitializeTasks(omMetadataManager);
+        .reInitializeTasks(omMetadataManager, null);
     assertEquals(1, metrics.getNumSnapshotRequests());
   }
 
@@ -518,32 +506,26 @@ public class TestOzoneManagerServiceProviderImpl {
     // Non-Empty OM DB to start with.
     ReconOMMetadataManager omMetadataManager = getTestReconOmMetadataManager(
         initializeNewOmMetadataManager(dirOmMetadata), dirReconMetadata);
-    ReconTaskStatusDao reconTaskStatusDaoMock =
-        mock(ReconTaskStatusDao.class);
-    doNothing().when(reconTaskStatusDaoMock)
-        .update(any(ReconTaskStatus.class));
 
     ReconTaskController reconTaskControllerMock = getMockTaskController();
-    when(reconTaskControllerMock.getReconTaskStatusDao())
-        .thenReturn(reconTaskStatusDaoMock);
     doNothing().when(reconTaskControllerMock)
         .consumeOMEvents(any(OMUpdateEventBatch.class),
             any(OMMetadataManager.class));
+    ReconTaskStatusUpdaterManager reconTaskStatusUpdaterManager = getMockTaskStatusUpdaterManager();
 
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
-        new OzoneManagerServiceProviderImpl(configuration, omMetadataManager,
-            reconTaskControllerMock, new ReconUtils(), ozoneManagerProtocol, reconContext);
+        new OzoneManagerServiceProviderImpl(configuration, omMetadataManager, reconTaskControllerMock,
+            new ReconUtils(), ozoneManagerProtocol, reconContext, reconTaskStatusUpdaterManager);
 
     OzoneManagerSyncMetrics metrics = ozoneManagerServiceProvider.getMetrics();
 
     // Should trigger delta updates.
     ozoneManagerServiceProvider.syncDataFromOM();
 
-    ArgumentCaptor<ReconTaskStatus> captor =
-        ArgumentCaptor.forClass(ReconTaskStatus.class);
-    verify(reconTaskStatusDaoMock, times(1))
-        .update(captor.capture());
-    assertEquals(OmDeltaRequest.name(), captor.getValue().getTaskName());
+    ArgumentCaptor<String> captor =
+        ArgumentCaptor.forClass(String.class);
+    verify(reconTaskStatusUpdaterManager).getTaskStatusUpdater(captor.capture());
+    assertEquals(OmDeltaRequest.name(), captor.getValue());
 
     verify(reconTaskControllerMock, times(1))
         .consumeOMEvents(any(OMUpdateEventBatch.class),
@@ -559,34 +541,28 @@ public class TestOzoneManagerServiceProviderImpl {
     // Non-Empty OM DB to start with.
     ReconOMMetadataManager omMetadataManager = getTestReconOmMetadataManager(
         initializeNewOmMetadataManager(dirOmMetadata), dirReconMetadata);
-    ReconTaskStatusDao reconTaskStatusDaoMock =
-        mock(ReconTaskStatusDao.class);
-    doNothing().when(reconTaskStatusDaoMock)
-        .update(any(ReconTaskStatus.class));
 
     ReconTaskController reconTaskControllerMock = getMockTaskController();
-    when(reconTaskControllerMock.getReconTaskStatusDao())
-        .thenReturn(reconTaskStatusDaoMock);
     doNothing().when(reconTaskControllerMock)
-        .reInitializeTasks(omMetadataManager);
+        .reInitializeTasks(omMetadataManager, null);
+    ReconTaskStatusUpdaterManager reconTaskStatusUpdaterManager = getMockTaskStatusUpdaterManager();
 
     OzoneManagerProtocol protocol = getMockOzoneManagerClientWithThrow();
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
-        new MockOzoneServiceProvider(configuration, omMetadataManager,
-            reconTaskControllerMock, new ReconUtils(), protocol, reconContext);
+        new MockOzoneServiceProvider(configuration, omMetadataManager, reconTaskControllerMock,
+            new ReconUtils(), protocol, reconContext, reconTaskStatusUpdaterManager);
 
     OzoneManagerSyncMetrics metrics = ozoneManagerServiceProvider.getMetrics();
 
     // Should trigger full snapshot request.
     ozoneManagerServiceProvider.syncDataFromOM();
 
-    ArgumentCaptor<ReconTaskStatus> captor =
-        ArgumentCaptor.forClass(ReconTaskStatus.class);
-    verify(reconTaskStatusDaoMock, times(1))
-        .update(captor.capture());
-    assertEquals(OmSnapshotRequest.name(), captor.getValue().getTaskName());
+    ArgumentCaptor<String> captor =
+        ArgumentCaptor.forClass(String.class);
+    verify(reconTaskStatusUpdaterManager).getTaskStatusUpdater(captor.capture());
+    assertEquals(OmSnapshotRequest.name(), captor.getValue());
     verify(reconTaskControllerMock, times(1))
-        .reInitializeTasks(omMetadataManager);
+        .reInitializeTasks(omMetadataManager, null);
     assertEquals(1, metrics.getNumSnapshotRequests());
   }
 
@@ -632,6 +608,15 @@ public class TestOzoneManagerServiceProviderImpl {
     return ozoneManagerProtocolMock;
   }
 
+  private ReconTaskStatusUpdaterManager getMockTaskStatusUpdaterManager() {
+    ReconTaskStatusUpdaterManager reconTaskStatusUpdaterManager = mock(ReconTaskStatusUpdaterManager.class);
+    when(reconTaskStatusUpdaterManager.getTaskStatusUpdater(anyString())).thenAnswer(inv -> new ReconTaskStatusUpdater(
+        mock(ReconTaskStatusDao.class), (String) inv.getArgument(0)));
+    when(reconTaskStatusUpdaterManager.getTaskStatusUpdater(anyString())).thenAnswer(inv ->
+        new ReconTaskStatusUpdater(mock(ReconTaskStatusDao.class), (String) inv.getArgument(0)));
+    return reconTaskStatusUpdaterManager;
+  }
+
   private BucketLayout getBucketLayout() {
     return BucketLayout.DEFAULT;
   }
@@ -648,13 +633,20 @@ class MockOzoneServiceProvider extends OzoneManagerServiceProviderImpl {
                            ReconTaskController reconTaskController,
                            ReconUtils reconUtils,
                            OzoneManagerProtocol ozoneManagerClient,
-                           ReconContext reconContext) {
-    super(configuration, omMetadataManager, reconTaskController, reconUtils,
-        ozoneManagerClient, reconContext);
+                           ReconContext reconContext,
+                           ReconTaskStatusUpdaterManager taskStatusUpdaterManager) {
+    super(configuration, omMetadataManager, reconTaskController, reconUtils, ozoneManagerClient,
+        reconContext, taskStatusUpdaterManager);
   }
 
   @Override
   public boolean updateReconOmDBWithNewSnapshot() {
     return true;
+  }
+
+  // Override to trigger full snapshot
+  @Override
+  public long getCurrentOMDBSequenceNumber() {
+    return 0;
   }
 }

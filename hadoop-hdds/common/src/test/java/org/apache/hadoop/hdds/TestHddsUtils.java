@@ -1,37 +1,21 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds;
-
-import java.net.InetSocketAddress;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.ozone.ha.ConfUtils;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
-import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.hdds.HddsUtils.getSCMAddressForDatanodes;
 import static org.apache.hadoop.hdds.HddsUtils.processForLogging;
@@ -41,9 +25,28 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_K
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.net.InetSocketAddress;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Testing HddsUtils.
@@ -67,23 +70,37 @@ public class TestHddsUtils {
         HddsUtils.getHostName(":1234"));
   }
 
-  @Test
-  void validatePath() {
-    HddsUtils.validatePath(Paths.get("/"), Paths.get("/"));
-    HddsUtils.validatePath(Paths.get("/a"), Paths.get("/"));
-    HddsUtils.validatePath(Paths.get("/a"), Paths.get("/a"));
-    HddsUtils.validatePath(Paths.get("/a/b"), Paths.get("/a"));
-    HddsUtils.validatePath(Paths.get("/a/b/c"), Paths.get("/a"));
-    HddsUtils.validatePath(Paths.get("/a/../a/b"), Paths.get("/a"));
+  static List<Arguments> validPaths() {
+    return Arrays.asList(
+        Arguments.of("/", "/"),
+        Arguments.of("/a", "/"),
+        Arguments.of("/a", "/a"),
+        Arguments.of("/a/b", "/a"),
+        Arguments.of("/a/b/c", "/a"),
+        Arguments.of("/a/../a/b", "/a")
+    );
+  }
 
+  @ParameterizedTest
+  @MethodSource("validPaths")
+  void validatePathAcceptsValidPath(String path, String ancestor) {
+    HddsUtils.validatePath(Paths.get(path), Paths.get(ancestor));
+  }
+
+  static List<Arguments> invalidPaths() {
+    return Arrays.asList(
+        Arguments.of("/b/c", "/a"),
+        Arguments.of("/", "/a"),
+        Arguments.of("/a/..", "/a"),
+        Arguments.of("/a/../b", "/a")
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidPaths")
+  void validatePathRejectsInvalidPath(String path, String ancestor) {
     assertThrows(IllegalArgumentException.class,
-        () -> HddsUtils.validatePath(Paths.get("/b/c"), Paths.get("/a")));
-    assertThrows(IllegalArgumentException.class,
-        () -> HddsUtils.validatePath(Paths.get("/"), Paths.get("/a")));
-    assertThrows(IllegalArgumentException.class,
-        () -> HddsUtils.validatePath(Paths.get("/a/.."), Paths.get("/a")));
-    assertThrows(IllegalArgumentException.class,
-        () -> HddsUtils.validatePath(Paths.get("/a/../b"), Paths.get("/a")));
+        () -> HddsUtils.validatePath(Paths.get(path), Paths.get(ancestor)));
   }
 
   @Test

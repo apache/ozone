@@ -1,29 +1,27 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.admin.scm;
 
-import static org.apache.hadoop.ozone.upgrade.UpgradeException
-    .ResultCodes.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.INVALID_REQUEST;
 
 import java.io.IOException;
-
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 
 /**
  * Base class to help with Upgrade finalization command.
@@ -59,20 +57,20 @@ public final class FinalizeUpgradeCommandUtil {
     System.out.println("Exiting...");
   }
 
-  public static boolean isFinalized(UpgradeFinalizer.Status status) {
-    return status.equals(UpgradeFinalizer.Status.ALREADY_FINALIZED);
+  public static boolean isFinalized(UpgradeFinalization.Status status) {
+    return status.equals(UpgradeFinalization.Status.ALREADY_FINALIZED);
   }
 
-  public static boolean isDone(UpgradeFinalizer.Status status) {
-    return status.equals(UpgradeFinalizer.Status.FINALIZATION_DONE);
+  public static boolean isDone(UpgradeFinalization.Status status) {
+    return status.equals(UpgradeFinalization.Status.FINALIZATION_DONE);
   }
 
-  public static boolean isInprogress(UpgradeFinalizer.Status status) {
-    return status.equals(UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS);
+  public static boolean isInprogress(UpgradeFinalization.Status status) {
+    return status.equals(UpgradeFinalization.Status.FINALIZATION_IN_PROGRESS);
   }
 
-  public static boolean isStarting(UpgradeFinalizer.Status status) {
-    return status.equals(UpgradeFinalizer.Status.STARTING_FINALIZATION);
+  public static boolean isStarting(UpgradeFinalization.Status status) {
+    return status.equals(UpgradeFinalization.Status.STARTING_FINALIZATION);
   }
 
   public static void emitGeneralErrorMsg() {

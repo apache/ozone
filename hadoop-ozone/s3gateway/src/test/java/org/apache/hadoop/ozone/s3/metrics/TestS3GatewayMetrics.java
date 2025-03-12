@@ -1,52 +1,21 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.s3.metrics;
-
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.s3.endpoint.BucketEndpoint;
-import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint;
-import org.apache.hadoop.ozone.s3.endpoint.RootEndpoint;
-import org.apache.hadoop.ozone.s3.endpoint.TestBucketAcl;
-import org.apache.hadoop.ozone.s3.endpoint.MultipartUploadInitiateResponse;
-import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest;
-import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
-import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MultivaluedHashMap;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.StreamingOutput;
-import javax.ws.rs.core.UriInfo;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
 
 import static java.net.HttpURLConnection.HTTP_CONFLICT;
 import static java.net.HttpURLConnection.HTTP_OK;
@@ -56,11 +25,37 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlEncode;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MultivaluedHashMap;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
+import javax.ws.rs.core.UriInfo;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.s3.endpoint.BucketEndpoint;
+import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest;
+import org.apache.hadoop.ozone.s3.endpoint.EndpointBuilder;
+import org.apache.hadoop.ozone.s3.endpoint.MultipartUploadInitiateResponse;
+import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint;
+import org.apache.hadoop.ozone.s3.endpoint.RootEndpoint;
+import org.apache.hadoop.ozone.s3.endpoint.TestBucketAcl;
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests for {@link S3GatewayMetrics}.
@@ -87,15 +82,17 @@ public class TestS3GatewayMetrics {
     clientStub.getObjectStore().createS3Bucket(bucketName);
     bucket = clientStub.getObjectStore().getS3Bucket(bucketName);
 
-    bucketEndpoint = new BucketEndpoint();
-    bucketEndpoint.setClient(clientStub);
+    bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
+        .setClient(clientStub)
+        .build();
 
-    rootEndpoint = new RootEndpoint();
-    rootEndpoint.setClient(clientStub);
+    rootEndpoint = EndpointBuilder.newRootEndpointBuilder()
+        .setClient(clientStub)
+        .build();
 
-    keyEndpoint = new ObjectEndpoint();
-    keyEndpoint.setClient(clientStub);
-    keyEndpoint.setOzoneConfiguration(new OzoneConfiguration());
+    keyEndpoint = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(clientStub)
+        .build();
 
     headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
@@ -145,7 +142,7 @@ public class TestS3GatewayMetrics {
     bucketEndpoint.get(bucketName, null,
         null, null, 1000, null,
         null, "random", null,
-        null, null).getEntity();
+        null, null, null, 0, null).getEntity();
 
     long curMetric = metrics.getGetBucketSuccess();
     assertEquals(1L, curMetric - oriMetric);
@@ -158,7 +155,7 @@ public class TestS3GatewayMetrics {
     // Searching for a bucket that does not exist
     OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
         "newBucket", null, null, null, 1000, null, null, "random", null,
-        null, null));
+        null, null, null, 0, null));
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), e.getCode());
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
         e.getErrorMessage());
@@ -222,7 +219,7 @@ public class TestS3GatewayMetrics {
     Response response =
         bucketEndpoint.get(bucketName, null, null,
             null, 0, null, null,
-            null, null, "acl", null);
+            null, null, "acl", null, null, 0, null);
     long curMetric = metrics.getGetAclSuccess();
     assertEquals(HTTP_OK, response.getStatus());
     assertEquals(1L, curMetric - oriMetric);
@@ -235,7 +232,7 @@ public class TestS3GatewayMetrics {
     // Failing the getACL endpoint by applying ACL on a non-Existent Bucket
     OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
         "random_bucket", null, null, null, 0, null,
-        null, null, null, "acl", null));
+        null, null, null, "acl", null, null, 0, null));
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), e.getCode());
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
         e.getErrorMessage());
@@ -310,7 +307,7 @@ public class TestS3GatewayMetrics {
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     // Create the file
     keyEndpoint.put(bucketName, keyName, CONTENT
-        .length(), 1, null, null, body);
+        .length(), 1, null, null, null, body);
     body.close();
     long curMetric = metrics.getCreateKeySuccess();
     assertEquals(1L, curMetric - oriMetric);
@@ -322,7 +319,8 @@ public class TestS3GatewayMetrics {
 
     // Create the file in a bucket that does not exist
     OS3Exception e = assertThrows(OS3Exception.class, () -> keyEndpoint.put(
-        "unknownBucket", keyName, CONTENT.length(), 1, null, null, null));
+        "unknownBucket", keyName, CONTENT.length(), 1, null, null,
+        null, null));
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), e.getCode());
     long curMetric = metrics.getCreateKeyFailure();
     assertEquals(1L, curMetric - oriMetric);
@@ -358,7 +356,7 @@ public class TestS3GatewayMetrics {
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     // Create the file
     keyEndpoint.put(bucketName, keyName, CONTENT
-        .length(), 1, null, null, body);
+        .length(), 1, null, null, null, body);
     // GET the key from the bucket
     Response response = keyEndpoint.get(bucketName, keyName, 0, null, 0, null, null);
     StreamingOutput stream = (StreamingOutput) response.getEntity();
@@ -466,7 +464,7 @@ public class TestS3GatewayMetrics {
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     keyEndpoint.put(bucketName, keyName, CONTENT.length(),
-        1, uploadID, null, body);
+        1, uploadID, null, null, body);
     long curMetric = metrics.getCreateMultipartKeySuccess();
     assertEquals(1L, curMetric - oriMetric);
   }
@@ -475,7 +473,7 @@ public class TestS3GatewayMetrics {
   public void testCreateMultipartKeyFailure() throws Exception {
     long oriMetric = metrics.getCreateMultipartKeyFailure();
     OS3Exception e = assertThrows(OS3Exception.class, () -> keyEndpoint.put(
-        bucketName, keyName, CONTENT.length(), 1, "randomId", null, null));
+        bucketName, keyName, CONTENT.length(), 1, "randomId", null, null, null));
     assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getCode(), e.getCode());
     long curMetric = metrics.getCreateMultipartKeyFailure();
     assertEquals(1L, curMetric - oriMetric);
@@ -522,14 +520,14 @@ public class TestS3GatewayMetrics {
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
 
     keyEndpoint.put(bucketName, keyName,
-        CONTENT.length(), 1, null, null, body);
+        CONTENT.length(), 1, null, null, null, body);
 
     // Add copy header, and then call put
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
         bucketName + "/" + urlEncode(keyName));
 
     keyEndpoint.put(destBucket, destKey, CONTENT.length(), 1,
-        null, null, body);
+        null, null, null, body);
     long curMetric = metrics.getCopyObjectSuccess();
     assertEquals(1L, curMetric - oriMetric);
 
@@ -538,7 +536,7 @@ public class TestS3GatewayMetrics {
     // source and dest same
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("");
     OS3Exception e = assertThrows(OS3Exception.class, () -> keyEndpoint.put(
-        bucketName, keyName, CONTENT.length(), 1, null, null, body),
+        bucketName, keyName, CONTENT.length(), 1, null, null, null, body),
         "Test for CopyObjectMetric failed");
     assertThat(e.getErrorMessage()).contains("This copy request is illegal");
     curMetric = metrics.getCopyObjectFailure();
@@ -553,11 +551,11 @@ public class TestS3GatewayMetrics {
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     // Create the file
     keyEndpoint.put(bucketName, keyName, CONTENT
-        .length(), 1, null, null, body);
+        .length(), 1, null, null, null, body);
     body.close();
 
     // Put object tagging
-    keyEndpoint.put(bucketName, keyName, 0, 1, null, "", getPutTaggingBody());
+    keyEndpoint.put(bucketName, keyName, 0, 1, null, "", null, getPutTaggingBody());
 
     long curMetric = metrics.getPutObjectTaggingSuccess();
     assertEquals(1L, curMetric - oriMetric);
@@ -569,7 +567,8 @@ public class TestS3GatewayMetrics {
 
     // Put object tagging for nonexistent key
     OS3Exception ex = assertThrows(OS3Exception.class, () ->
-        keyEndpoint.put(bucketName, "nonexistent", 0, 1, null, "", getPutTaggingBody())
+        keyEndpoint.put(bucketName, "nonexistent", 0, 1, null, "",
+            null, getPutTaggingBody())
     );
     assertEquals(S3ErrorTable.NO_SUCH_KEY.getCode(), ex.getCode());
 
@@ -585,11 +584,11 @@ public class TestS3GatewayMetrics {
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     keyEndpoint.put(bucketName, keyName, CONTENT
-        .length(), 1, null, null, body);
+        .length(), 1, null, null, null, body);
     body.close();
 
     // Put object tagging
-    keyEndpoint.put(bucketName, keyName, 0, 1, null, "", getPutTaggingBody());
+    keyEndpoint.put(bucketName, keyName, 0, 1, null, "", null, getPutTaggingBody());
 
     // Get object tagging
     keyEndpoint.get(bucketName, keyName, 0,
@@ -620,11 +619,11 @@ public class TestS3GatewayMetrics {
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     keyEndpoint.put(bucketName, keyName, CONTENT
-        .length(), 1, null, null, body);
+        .length(), 1, null, null, null, body);
     body.close();
 
     // Put object tagging
-    keyEndpoint.put(bucketName, keyName, 0, 1, null, "", getPutTaggingBody());
+    keyEndpoint.put(bucketName, keyName, 0, 1, null, "", null, getPutTaggingBody());
 
     // Delete object tagging
     keyEndpoint.delete(bucketName, keyName, null, "");

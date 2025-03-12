@@ -1,21 +1,31 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.s3.awssdk.v1;
+
+import static org.apache.hadoop.ozone.OzoneConsts.MB;
+import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.calculateDigest;
+import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.createFile;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.AmazonServiceException.ErrorType;
@@ -27,6 +37,7 @@ import com.amazonaws.services.s3.model.CanonicalGrantee;
 import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
 import com.amazonaws.services.s3.model.CompleteMultipartUploadResult;
 import com.amazonaws.services.s3.model.CreateBucketRequest;
+import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.Grantee;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadResult;
@@ -50,6 +61,7 @@ import com.amazonaws.services.s3.model.PutObjectResult;
 import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectInputStream;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
+import com.amazonaws.services.s3.model.SetObjectAclRequest;
 import com.amazonaws.services.s3.model.Tag;
 import com.amazonaws.services.s3.model.UploadPartRequest;
 import com.amazonaws.services.s3.model.UploadPartResult;
@@ -57,7 +69,27 @@ import com.amazonaws.services.s3.transfer.TransferManager;
 import com.amazonaws.services.s3.transfer.TransferManagerBuilder;
 import com.amazonaws.services.s3.transfer.Upload;
 import com.amazonaws.services.s3.transfer.model.UploadResult;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -69,42 +101,11 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.utils.InputSubstream;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.io.TempDir;
-
-import javax.xml.bind.DatatypeConverter;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.RandomAccessFile;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Random;
-import java.util.stream.Collectors;
-
-import static org.apache.hadoop.ozone.OzoneConsts.MB;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This is an abstract class to test the AWS Java S3 SDK operations.
@@ -114,7 +115,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * - https://github.com/awsdocs/aws-doc-sdk-examples/tree/main/java/example_code/s3/
  * - https://github.com/ceph/s3-tests
  *
- * TODO: Currently we are using AWS SDK V1, need to also add tests for AWS SDK V2.
  */
 @TestMethodOrder(MethodOrderer.MethodName.class)
 public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
@@ -376,6 +376,50 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
   }
 
   @Test
+  public void testPutObjectACL() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    final byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
+    s3Client.createBucket(bucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+
+    PutObjectResult putObjectResult = s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
+    String originalObjectETag = putObjectResult.getETag();
+    assertTrue(s3Client.doesObjectExist(bucketName, keyName));
+
+    AccessControlList aclList = new AccessControlList();
+    Owner owner = new Owner("owner", "owner");
+    aclList.withOwner(owner);
+    Grantee grantee = new CanonicalGrantee("testGrantee");
+    aclList.grantPermission(grantee, Permission.Read);
+
+    SetObjectAclRequest setObjectAclRequest = new SetObjectAclRequest(bucketName, keyName, aclList);
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.setObjectAcl(setObjectAclRequest));
+    assertEquals("NotImplemented", ase.getErrorCode());
+    assertEquals(501, ase.getStatusCode());
+    assertEquals(ErrorType.Service, ase.getErrorType());
+
+    // Ensure that the object content remains unchanged
+    ObjectMetadata updatedObjectMetadata = s3Client.getObjectMetadata(bucketName, keyName);
+    assertEquals(originalObjectETag, updatedObjectMetadata.getETag());
+    S3Object updatedObject = s3Client.getObject(bucketName, keyName);
+
+    try (S3ObjectInputStream s3is = updatedObject.getObjectContent();
+         ByteArrayOutputStream bos = new ByteArrayOutputStream(contentBytes.length)) {
+      byte[] readBuf = new byte[1024];
+      int readLen = 0;
+      while ((readLen = s3is.read(readBuf)) > 0) {
+        bos.write(readBuf, 0, readLen);
+      }
+      assertEquals(content, bos.toString("UTF-8"));
+    }
+  }
+
+  @Test
   public void testGetObject() throws Exception {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
@@ -627,13 +671,10 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     uploadIds.add(uploadId1);
     String uploadId2 = initiateMultipartUpload(bucketName, multipartKey1, null, null, null);
     uploadIds.add(uploadId2);
-    // TODO: Currently, Ozone sorts based on uploadId instead of MPU init time within the same key.
-    //  Remove this sorting step once HDDS-11532 has been implemented
-    Collections.sort(uploadIds);
+
     String uploadId3 = initiateMultipartUpload(bucketName, multipartKey2, null, null, null);
     uploadIds.add(uploadId3);
 
-    // TODO: Add test for max uploads threshold and marker once HDDS-11530 has been implemented
     ListMultipartUploadsRequest listMultipartUploadsRequest = new ListMultipartUploadsRequest(bucketName);
 
     MultipartUploadListing result = s3Client.listMultipartUploads(listMultipartUploadsRequest);
@@ -643,6 +684,98 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
         .collect(Collectors.toList());
 
     assertEquals(uploadIds, listUploadIds);
+  }
+
+  @Test
+  public void testListMultipartUploadsPagination() {
+    final String bucketName = getBucketName();
+    final String multipartKeyPrefix = getKeyName("multipart");
+
+    s3Client.createBucket(bucketName);
+
+    // Create 25 multipart uploads to test pagination
+    List<String> allKeys = new ArrayList<>();
+    Map<String, String> keyToUploadId = new HashMap<>();
+
+    for (int i = 0; i < 25; i++) {
+      String key = String.format("%s-%03d", multipartKeyPrefix, i);
+      allKeys.add(key);
+      String uploadId = initiateMultipartUpload(bucketName, key, null, null, null);
+      keyToUploadId.put(key, uploadId);
+    }
+    Collections.sort(allKeys);
+
+    // Test pagination with maxUploads=10
+    Set<String> retrievedKeys = new HashSet<>();
+    String keyMarker = null;
+    String uploadIdMarker = null;
+    boolean truncated = true;
+    int pageCount = 0;
+
+    do {
+      ListMultipartUploadsRequest request = new ListMultipartUploadsRequest(bucketName)
+          .withMaxUploads(10)
+          .withKeyMarker(keyMarker)
+          .withUploadIdMarker(uploadIdMarker);
+
+      MultipartUploadListing result = s3Client.listMultipartUploads(request);
+
+      // Verify page size
+      if (pageCount < 2) {
+        assertEquals(10, result.getMultipartUploads().size());
+        assertTrue(result.isTruncated());
+      } else {
+        assertEquals(5, result.getMultipartUploads().size());
+        assertFalse(result.isTruncated());
+      }
+
+      // Collect keys and verify uploadIds
+      for (MultipartUpload upload : result.getMultipartUploads()) {
+        String key = upload.getKey();
+        retrievedKeys.add(key);
+        assertEquals(keyToUploadId.get(key), upload.getUploadId());
+      }
+
+      // Verify response
+      assertNull(result.getPrefix());
+      assertEquals(result.getUploadIdMarker(), uploadIdMarker);
+      assertEquals(result.getKeyMarker(), keyMarker);
+      assertEquals(result.getMaxUploads(), 10);
+
+      // Update markers for next page
+      keyMarker = result.getNextKeyMarker();
+      uploadIdMarker = result.getNextUploadIdMarker();
+
+      truncated = result.isTruncated();
+      pageCount++;
+
+    } while (truncated);
+
+    // Verify pagination results
+    assertEquals(3, pageCount, "Should have exactly 3 pages");
+    assertEquals(25, retrievedKeys.size(), "Should retrieve all uploads");
+    assertEquals(
+        allKeys,
+        retrievedKeys.stream().sorted().collect(Collectors.toList()),
+        "Retrieved keys should match expected keys in order");
+
+    // Test with prefix
+    String prefix = multipartKeyPrefix + "-01";
+    ListMultipartUploadsRequest prefixRequest = new ListMultipartUploadsRequest(bucketName)
+        .withPrefix(prefix);
+
+    MultipartUploadListing prefixResult = s3Client.listMultipartUploads(prefixRequest);
+
+    assertEquals(prefix, prefixResult.getPrefix());
+    assertEquals(
+        Arrays.asList(multipartKeyPrefix + "-010", multipartKeyPrefix + "-011",
+            multipartKeyPrefix + "-012", multipartKeyPrefix + "-013",
+            multipartKeyPrefix + "-014", multipartKeyPrefix + "-015",
+            multipartKeyPrefix + "-016", multipartKeyPrefix + "-017",
+            multipartKeyPrefix + "-018", multipartKeyPrefix + "-019"),
+        prefixResult.getMultipartUploads().stream()
+            .map(MultipartUpload::getKey)
+            .collect(Collectors.toList()));
   }
 
   @Test
@@ -692,6 +825,65 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
   }
 
   @Test
+  public void testGetParticularPart(@TempDir Path tempDir) throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+
+    s3Client.createBucket(bucketName);
+
+    File multipartUploadFile = Files.createFile(tempDir.resolve("multipartupload.txt")).toFile();
+
+    createFile(multipartUploadFile, (int) (15 * MB));
+
+    multipartUpload(bucketName, keyName, multipartUploadFile, 5 * MB, null, null, null);
+
+    GetObjectRequest getObjectRequestAll = new GetObjectRequest(bucketName, keyName);
+    getObjectRequestAll.setPartNumber(0);
+    S3Object s3ObjectAll = s3Client.getObject(getObjectRequestAll);
+    long allPartContentLength = s3ObjectAll.getObjectMetadata().getContentLength();
+
+    GetObjectRequest getObjectRequestOne = new GetObjectRequest(bucketName, keyName);
+    getObjectRequestOne.setPartNumber(1);
+    S3Object s3ObjectOne = s3Client.getObject(getObjectRequestOne);
+    long partOneContentLength = s3ObjectOne.getObjectMetadata().getContentLength();
+    assertEquals(allPartContentLength / 3, partOneContentLength);
+
+    GetObjectRequest getObjectRequestTwo = new GetObjectRequest(bucketName, keyName);
+    getObjectRequestTwo.setPartNumber(2);
+    S3Object s3ObjectTwo = s3Client.getObject(getObjectRequestTwo);
+    long partTwoContentLength = s3ObjectTwo.getObjectMetadata().getContentLength();
+    assertEquals(allPartContentLength / 3, partTwoContentLength);
+
+    GetObjectRequest getObjectRequestThree = new GetObjectRequest(bucketName, keyName);
+    getObjectRequestThree.setPartNumber(1);
+    S3Object s3ObjectThree = s3Client.getObject(getObjectRequestTwo);
+    long partThreeContentLength = s3ObjectThree.getObjectMetadata().getContentLength();
+    assertEquals(allPartContentLength / 3, partThreeContentLength);
+
+    assertEquals(allPartContentLength, (partOneContentLength + partTwoContentLength + partThreeContentLength));
+  }
+
+  @Test
+  public void testGetNotExistedPart(@TempDir Path tempDir) throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+
+    s3Client.createBucket(bucketName);
+
+    File multipartUploadFile = Files.createFile(tempDir.resolve("multipartupload.txt")).toFile();
+
+    createFile(multipartUploadFile, (int) (15 * MB));
+
+    multipartUpload(bucketName, keyName, multipartUploadFile, 5 * MB, null, null, null);
+
+    GetObjectRequest getObjectRequestOne = new GetObjectRequest(bucketName, keyName);
+    getObjectRequestOne.setPartNumber(4);
+    S3Object s3ObjectOne = s3Client.getObject(getObjectRequestOne);
+    long partOneContentLength = s3ObjectOne.getObjectMetadata().getContentLength();
+    assertEquals(0, partOneContentLength);
+  }
+
+  @Test
   public void testListPartsNotFound() {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
@@ -707,6 +899,28 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     assertEquals(ErrorType.Client, ase.getErrorType());
     assertEquals(404, ase.getStatusCode());
     assertEquals("NoSuchUpload", ase.getErrorCode());
+  }
+
+  @Test
+  public void testQuotaExceeded() throws IOException {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+
+    s3Client.createBucket(bucketName);
+
+    cluster.newClient().getObjectStore()
+        .getVolume("s3v")
+        .getBucket(bucketName)
+        .setQuota(OzoneQuota.parseQuota("1", "10"));
+
+    // Upload some objects to the bucket
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.putObject(bucketName, keyName,
+            RandomStringUtils.randomAlphanumeric(1024)));
+
+    assertEquals(ErrorType.Client, ase.getErrorType());
+    assertEquals(403, ase.getStatusCode());
+    assertEquals("QuotaExceeded", ase.getErrorCode());
   }
 
   private boolean isBucketEmpty(Bucket bucket) {
@@ -777,7 +991,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     // Upload the file parts.
     long filePosition = 0;
     long fileLength = file.length();
-    try (FileInputStream fileInputStream = new FileInputStream(file)) {
+    try (InputStream fileInputStream = Files.newInputStream(file.toPath())) {
       for (int i = 1; filePosition < fileLength; i++) {
         // Because the last part could be less than 5 MB, adjust the part size as
         // needed.
@@ -819,39 +1033,5 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
   private void abortMultipartUpload(String bucketName, String key, String uploadId) {
     AbortMultipartUploadRequest abortRequest = new AbortMultipartUploadRequest(bucketName, key, uploadId);
     s3Client.abortMultipartUpload(abortRequest);
-  }
-
-  private static byte[] calculateDigest(InputStream inputStream, int skip, int length) throws Exception {
-    int numRead;
-    byte[] buffer = new byte[1024];
-
-    MessageDigest complete = MessageDigest.getInstance("MD5");
-    if (skip > -1 && length > -1) {
-      inputStream = new InputSubstream(inputStream, skip, length);
-    }
-
-    do {
-      numRead = inputStream.read(buffer);
-      if (numRead > 0) {
-        complete.update(buffer, 0, numRead);
-      }
-    } while (numRead != -1);
-
-    return complete.digest();
-  }
-
-  private static void createFile(File newFile, int size) throws IOException {
-    // write random data so that filesystems with compression enabled (e.g. ZFS)
-    // can't compress the file
-    Random random = new Random();
-    byte[] data = new byte[size];
-    random.nextBytes(data);
-
-    RandomAccessFile file = new RandomAccessFile(newFile, "rws");
-
-    file.write(data);
-
-    file.getFD().sync();
-    file.close();
   }
 }

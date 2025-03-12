@@ -1,28 +1,27 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone;
 
+import com.amazonaws.services.s3.AmazonS3;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
-
-import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -40,8 +39,7 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.CheckedFunction;
-
-import com.amazonaws.services.s3.AmazonS3;
+import software.amazon.awssdk.services.s3.S3Client;
 
 /**
  * Interface used for MiniOzoneClusters.
@@ -165,9 +163,14 @@ public interface MiniOzoneCluster extends AutoCloseable {
   OzoneClient newClient() throws IOException;
 
   /**
-   * Returns an {@link AmazonS3} to access the {@link MiniOzoneCluster}.
+   * Returns an {@link AmazonS3} to use AWS SDK V1 to access the {@link MiniOzoneCluster}.
    */
   AmazonS3 newS3Client();
+
+  /**
+   * Returns an {@link S3Client} to use AWS SDK V2 to access the {@link MiniOzoneCluster}.
+   */
+  S3Client newS3ClientV2() throws Exception;
 
   /**
    * Returns StorageContainerLocationClient to communicate with
@@ -254,6 +257,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
    */
   void shutdown();
 
+  @Override
   default void close() {
     shutdown();
   }
@@ -304,9 +308,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
 
     protected boolean includeRecon = false;
     protected boolean includeS3G = false;
-
-    protected int dnInitialVersion = DatanodeVersion.FUTURE_VERSION.toProtoValue();
-    protected int dnCurrentVersion = DatanodeVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC.toProtoValue();
 
     protected int numOfDatanodes = 3;
     protected boolean  startDataNodes = true;
@@ -376,30 +377,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
      */
     public Builder setNumDatanodes(int val) {
       numOfDatanodes = val;
-      return this;
-    }
-
-    /**
-     * Set the initialVersion for all datanodes.
-     *
-     * @param val initialVersion value to be set for all datanodes.
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setDatanodeInitialVersion(int val) {
-      dnInitialVersion = val;
-      return this;
-    }
-
-    /**
-     * Set the currentVersion for all datanodes.
-     *
-     * @param val currentVersion value to be set for all datanodes.
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setDatanodeCurrentVersion(int val) {
-      dnCurrentVersion = val;
       return this;
     }
 

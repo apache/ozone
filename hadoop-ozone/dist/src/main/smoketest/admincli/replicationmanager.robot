@@ -46,7 +46,7 @@ Start replicationmanager
 
 Incomplete command
     ${output} =         Execute And Ignore Error     ozone admin replicationmanager
-                        Should contain   ${output}   Incomplete command
+                        Should contain   ${output}   Missing required subcommand
                         Should contain   ${output}   start
                         Should contain   ${output}   stop
                         Should contain   ${output}   status

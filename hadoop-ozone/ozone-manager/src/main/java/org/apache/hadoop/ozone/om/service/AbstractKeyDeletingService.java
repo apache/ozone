@@ -1,37 +1,53 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.service;
+
+import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.service.SnapshotDeletingService.isBlockLocationInfoSame;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.BackgroundService;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.BlockGroup;
-import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
+import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
+import org.apache.hadoop.ozone.om.DeleteKeysResult;
+import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -49,20 +65,6 @@ import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.util.Preconditions;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
-
-import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.service.SnapshotDeletingService.isBlockLocationInfoSame;
-
 /**
  * Abstracts common code from KeyDeletingService and DirectoryDeletingService
  * which is now used by SnapshotDeletingService as well.
@@ -71,6 +73,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     implements BootstrapStateHandler {
 
   private final OzoneManager ozoneManager;
+  private final DeletingServiceMetrics metrics;
+  private final OMPerformanceMetrics perfMetrics;
   private final ScmBlockLocationProtocol scmClient;
   private final ClientId clientId = ClientId.randomId();
   private final AtomicLong deletedDirsCount;
@@ -91,6 +95,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     this.movedDirsCount = new AtomicLong(0);
     this.movedFilesCount = new AtomicLong(0);
     this.runCount = new AtomicLong(0);
+    this.metrics = ozoneManager.getDeletionMetrics();
+    this.perfMetrics = ozoneManager.getPerfMetrics();
   }
 
   protected int processKeyDeletes(List<BlockGroup> keyBlocksList,
@@ -116,52 +122,16 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     LOG.info("{} BlockGroup deletion are acked by SCM in {} ms",
         keyBlocksList.size(), Time.monotonicNow() - startTime);
     if (blockDeletionResults != null) {
-      startTime = Time.monotonicNow();
-      if (isRatisEnabled()) {
-        delCount = submitPurgeKeysRequest(blockDeletionResults,
-            keysToModify, snapTableKey, expectedPreviousSnapshotId);
-      } else {
-        // TODO: Once HA and non-HA paths are merged, we should have
-        //  only one code path here. Purge keys should go through an
-        //  OMRequest model.
-        delCount = deleteAllKeys(blockDeletionResults, manager);
-      }
-      LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms",
-          delCount, blockDeletionResults.size(), Time.monotonicNow() - startTime);
+      long purgeStartTime = Time.monotonicNow();
+      delCount = submitPurgeKeysRequest(blockDeletionResults,
+          keysToModify, snapTableKey, expectedPreviousSnapshotId);
+      int limit = ozoneManager.getConfiguration().getInt(OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK,
+          OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
+      LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms. Limit per task is {}.",
+          delCount, blockDeletionResults.size(), Time.monotonicNow() - purgeStartTime, limit);
     }
+    perfMetrics.setKeyDeletingServiceLatencyMs(Time.monotonicNow() - startTime);
     return delCount;
-  }
-
-  /**
-   * Deletes all the keys that SCM has acknowledged and queued for delete.
-   *
-   * @param results DeleteBlockGroups returned by SCM.
-   * @throws IOException      on Error
-   */
-  private int deleteAllKeys(List<DeleteBlockGroupResult> results,
-      KeyManager manager) throws IOException {
-    Table<String, RepeatedOmKeyInfo> deletedTable =
-        manager.getMetadataManager().getDeletedTable();
-    DBStore store = manager.getMetadataManager().getStore();
-
-    // Put all keys to delete in a single transaction and call for delete.
-    int deletedCount = 0;
-    try (BatchOperation writeBatch = store.initBatchOperation()) {
-      for (DeleteBlockGroupResult result : results) {
-        if (result.isSuccess()) {
-          // Purge key from OM DB.
-          deletedTable.deleteWithBatch(writeBatch,
-              result.getObjectKey());
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Key {} deleted from OM DB", result.getObjectKey());
-          }
-          deletedCount++;
-        }
-      }
-      // Write a single transaction for delete.
-      store.commitBatchOperation(writeBatch);
-    }
-    return deletedCount;
   }
 
   /**
@@ -237,7 +207,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         keysToUpdateList.add(keyToUpdate.build());
       }
 
-      if (keysToUpdateList.size() > 0) {
+      if (!keysToUpdateList.isEmpty()) {
         purgeKeysRequest.addAllKeysToUpdate(keysToUpdateList);
       }
     }
@@ -280,7 +250,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
   protected void submitPurgePaths(List<PurgePathRequest> requests,
                                   String snapTableKey,
-                                  UUID expectedPreviousSnapshotId) {
+                                  UUID expectedPreviousSnapshotId, long rnCnt) {
     OzoneManagerProtocolProtos.PurgeDirectoriesRequest.Builder purgeDirRequest =
         OzoneManagerProtocolProtos.PurgeDirectoriesRequest.newBuilder();
 
@@ -305,7 +275,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
 
     // Submit Purge paths request to OM
     try {
-      OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, runCount.get());
+      OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, rnCnt);
     } catch (ServiceException e) {
       LOG.error("PurgePaths request failed. Will retry at next run.", e);
     }
@@ -342,9 +312,9 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   }
 
   protected PurgePathRequest prepareDeleteDirRequest(
-      long remainNum, OmKeyInfo pendingDeletedDirInfo, String delDirName,
+      OmKeyInfo pendingDeletedDirInfo, String delDirName,
       List<Pair<String, OmKeyInfo>> subDirList,
-      KeyManager keyManager) throws IOException {
+      KeyManager keyManager, long remainingBufLimit) throws IOException {
     // step-0: Get one pending deleted directory
     if (LOG.isDebugEnabled()) {
       LOG.debug("Pending deleted dir name: {}",
@@ -356,10 +326,11 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     final long bucketId = Long.parseLong(keys[2]);
 
     // step-1: get all sub directories under the deletedDir
-    List<OmKeyInfo> subDirs = keyManager
-        .getPendingDeletionSubDirs(volumeId, bucketId,
-            pendingDeletedDirInfo, remainNum);
-    remainNum = remainNum - subDirs.size();
+    DeleteKeysResult subDirDeleteResult =
+        keyManager.getPendingDeletionSubDirs(volumeId, bucketId,
+            pendingDeletedDirInfo, remainingBufLimit);
+    List<OmKeyInfo> subDirs = subDirDeleteResult.getKeysToDelete();
+    remainingBufLimit -= subDirDeleteResult.getConsumedSize();
 
     OMMetadataManager omMetadataManager = keyManager.getMetadataManager();
     for (OmKeyInfo dirInfo : subDirs) {
@@ -372,10 +343,10 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     }
 
     // step-2: get all sub files under the deletedDir
-    List<OmKeyInfo> subFiles = keyManager
-        .getPendingDeletionSubFiles(volumeId, bucketId,
-            pendingDeletedDirInfo, remainNum);
-    remainNum = remainNum - subFiles.size();
+    DeleteKeysResult subFileDeleteResult =
+        keyManager.getPendingDeletionSubFiles(volumeId, bucketId,
+            pendingDeletedDirInfo, remainingBufLimit);
+    List<OmKeyInfo> subFiles = subFileDeleteResult.getKeysToDelete();
 
     if (LOG.isDebugEnabled()) {
       for (OmKeyInfo fileInfo : subFiles) {
@@ -383,49 +354,39 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       }
     }
 
-    // step-3: Since there is a boundary condition of 'numEntries' in
-    // each batch, check whether the sub paths count reached batch size
-    // limit. If count reached limit then there can be some more child
-    // paths to be visited and will keep the parent deleted directory
-    // for one more pass.
-    String purgeDeletedDir = remainNum > 0 ? delDirName : null;
+    // step-3: If both sub-dirs and sub-files are exhausted under a parent
+    // directory, only then delete the parent.
+    String purgeDeletedDir = subDirDeleteResult.isProcessedKeys() &&
+        subFileDeleteResult.isProcessedKeys() ? delDirName :  null;
     return wrapPurgeRequest(volumeId, bucketId,
         purgeDeletedDir, subFiles, subDirs);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  public long optimizeDirDeletesAndSubmitRequest(long remainNum,
+  public void optimizeDirDeletesAndSubmitRequest(
       long dirNum, long subDirNum, long subFileNum,
       List<Pair<String, OmKeyInfo>> allSubDirList,
       List<PurgePathRequest> purgePathRequestList,
       String snapTableKey, long startTime,
-      int remainingBufLimit, KeyManager keyManager,
-      UUID expectedPreviousSnapshotId) {
+      long remainingBufLimit, KeyManager keyManager,
+      UUID expectedPreviousSnapshotId, long rnCnt) {
 
     // Optimization to handle delete sub-dir and keys to remove quickly
     // This case will be useful to handle when depth of directory is high
     int subdirDelNum = 0;
     int subDirRecursiveCnt = 0;
     int consumedSize = 0;
-    while (remainNum > 0 && subDirRecursiveCnt < allSubDirList.size()) {
+    while (subDirRecursiveCnt < allSubDirList.size() && remainingBufLimit > 0) {
       try {
         Pair<String, OmKeyInfo> stringOmKeyInfoPair
             = allSubDirList.get(subDirRecursiveCnt);
         PurgePathRequest request = prepareDeleteDirRequest(
-            remainNum, stringOmKeyInfoPair.getValue(),
-            stringOmKeyInfoPair.getKey(), allSubDirList,
-            keyManager);
-        if (isBufferLimitCrossed(remainingBufLimit, consumedSize,
-            request.getSerializedSize())) {
-          // ignore further add request
-          break;
-        }
+            stringOmKeyInfoPair.getValue(),
+            stringOmKeyInfoPair.getKey(), allSubDirList, keyManager,
+            remainingBufLimit);
         consumedSize += request.getSerializedSize();
+        remainingBufLimit -= consumedSize;
         purgePathRequestList.add(request);
-        // reduce remain count for self, sub-files, and sub-directories
-        remainNum = remainNum - 1;
-        remainNum = remainNum - request.getDeletedSubFilesCount();
-        remainNum = remainNum - request.getMarkDeletedSubDirsCount();
         // Count up the purgeDeletedDir, subDirs and subFiles
         if (request.getDeletedDir() != null
             && !request.getDeletedDir().isEmpty()) {
@@ -442,22 +403,25 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     }
 
     if (!purgePathRequestList.isEmpty()) {
-      submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId);
+      submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId, rnCnt);
     }
 
     if (dirNum != 0 || subDirNum != 0 || subFileNum != 0) {
+      long subdirMoved = subDirNum - subdirDelNum;
       deletedDirsCount.addAndGet(dirNum + subdirDelNum);
-      movedDirsCount.addAndGet(subDirNum - subdirDelNum);
+      movedDirsCount.addAndGet(subdirMoved);
       movedFilesCount.addAndGet(subFileNum);
+      long timeTakenInIteration = Time.monotonicNow() - startTime;
       LOG.info("Number of dirs deleted: {}, Number of sub-dir " +
               "deleted: {}, Number of sub-files moved:" +
               " {} to DeletedTable, Number of sub-dirs moved {} to " +
-              "DeletedDirectoryTable, iteration elapsed: {}ms," +
+              "DeletedDirectoryTable, iteration elapsed: {}ms, " +
               " totalRunCount: {}",
           dirNum, subdirDelNum, subFileNum, (subDirNum - subdirDelNum),
-          Time.monotonicNow() - startTime, getRunCount());
+          timeTakenInIteration, rnCnt);
+      metrics.incrementDirectoryDeletionTotalMetrics(dirNum + subdirDelNum, subDirNum, subFileNum);
+      perfMetrics.setDirectoryDeletingServiceLatencyMs(timeTakenInIteration);
     }
-    return remainNum;
   }
 
   /**
@@ -631,13 +595,6 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     return !isBlockLocationInfoSame(prevKeyInfo, deletedKeyInfo);
   }
 
-  public boolean isRatisEnabled() {
-    if (ozoneManager == null) {
-      return false;
-    }
-    return ozoneManager.isRatisEnabled();
-  }
-
   public OzoneManager getOzoneManager() {
     return ozoneManager;
   }
@@ -687,6 +644,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     return movedFilesCount.get();
   }
 
+  @Override
   public BootstrapStateHandler.Lock getBootstrapStateLock() {
     return lock;
   }

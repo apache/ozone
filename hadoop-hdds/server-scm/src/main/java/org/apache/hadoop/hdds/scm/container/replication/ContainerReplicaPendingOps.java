@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,13 +14,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import com.google.common.util.concurrent.Striped;
-import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
+import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType;
+import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
+import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.DELETE;
 
+import com.google.common.util.concurrent.Striped;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,10 +32,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-
-import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType;
-import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
-import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.DELETE;
+import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
 /**
  * Class to track pending replication operations across the cluster. For
@@ -117,13 +117,14 @@ public class ContainerReplicaPendingOps {
    * @param containerID ContainerID for which to add a replica
    * @param target The target datanode
    * @param replicaIndex The replica index (zero for Ratis, &gt; 0 for EC)
+   * @param command The command to send to the datanode
    * @param deadlineEpochMillis The time by which the replica should have been
    *                            added and reported by the datanode, or it will
    *                            be discarded.
    */
   public void scheduleAddReplica(ContainerID containerID,
-      DatanodeDetails target, int replicaIndex, long deadlineEpochMillis) {
-    addReplica(ADD, containerID, target, replicaIndex, deadlineEpochMillis);
+      DatanodeDetails target, int replicaIndex, SCMCommand<?> command, long deadlineEpochMillis) {
+    addReplica(ADD, containerID, target, replicaIndex, command, deadlineEpochMillis);
   }
 
   /**
@@ -131,13 +132,14 @@ public class ContainerReplicaPendingOps {
    * @param containerID ContainerID for which to delete a replica
    * @param target The target datanode
    * @param replicaIndex The replica index (zero for Ratis, &gt; 0 for EC)
+   * @param command The command to send to the datanode
    * @param deadlineEpochMillis The time by which the replica should have been
    *                            deleted and reported by the datanode, or it will
    *                            be discarded.
    */
   public void scheduleDeleteReplica(ContainerID containerID,
-      DatanodeDetails target, int replicaIndex, long deadlineEpochMillis) {
-    addReplica(DELETE, containerID, target, replicaIndex, deadlineEpochMillis);
+      DatanodeDetails target, int replicaIndex, SCMCommand<?> command, long deadlineEpochMillis) {
+    addReplica(DELETE, containerID, target, replicaIndex, command, deadlineEpochMillis);
   }
 
   /**
@@ -150,7 +152,7 @@ public class ContainerReplicaPendingOps {
    */
   public boolean completeAddReplica(ContainerID containerID,
       DatanodeDetails target, int replicaIndex) {
-    boolean completed = completeOp(ADD, containerID, target, replicaIndex);
+    boolean completed = completeOp(ADD, containerID, target, replicaIndex, true);
     if (isMetricsNotNull() && completed) {
       if (isEC(replicaIndex)) {
         replicationMetrics.incrEcReplicasCreatedTotal();
@@ -172,7 +174,7 @@ public class ContainerReplicaPendingOps {
    */
   public boolean completeDeleteReplica(ContainerID containerID,
       DatanodeDetails target, int replicaIndex) {
-    boolean completed = completeOp(DELETE, containerID, target, replicaIndex);
+    boolean completed = completeOp(DELETE, containerID, target, replicaIndex, true);
     if (isMetricsNotNull() && completed) {
       if (isEC(replicaIndex)) {
         replicationMetrics.incrEcReplicasDeletedTotal();
@@ -192,7 +194,7 @@ public class ContainerReplicaPendingOps {
   public boolean removeOp(ContainerID containerID,
       ContainerReplicaOp op) {
     return completeOp(op.getOpType(), containerID, op.getTarget(),
-        op.getReplicaIndex());
+        op.getReplicaIndex(), true);
   }
 
   /**
@@ -221,13 +223,17 @@ public class ContainerReplicaPendingOps {
         while (iterator.hasNext()) {
           ContainerReplicaOp op = iterator.next();
           if (clock.millis() > op.getDeadlineEpochMillis()) {
-            iterator.remove();
+            if (op.getOpType() != DELETE) {
+              // For delete ops, we don't remove them from the list as RM must resend them, or they
+              // will be removed via a container report when they are confirmed as deleted.
+              iterator.remove();
+              decrementCounter(op.getOpType(), op.getReplicaIndex());
+            }
             expiredOps.add(op);
-            decrementCounter(op.getOpType(), op.getReplicaIndex());
             updateTimeoutMetrics(op);
           }
         }
-        if (ops.size() == 0) {
+        if (ops.isEmpty()) {
           pendingOps.remove(containerID);
         }
       } finally {
@@ -258,15 +264,18 @@ public class ContainerReplicaPendingOps {
   }
 
   private void addReplica(ContainerReplicaOp.PendingOpType opType,
-      ContainerID containerID, DatanodeDetails target, int replicaIndex,
+      ContainerID containerID, DatanodeDetails target, int replicaIndex, SCMCommand<?> command,
       long deadlineEpochMillis) {
     Lock lock = writeLock(containerID);
     lock(lock);
     try {
+      // Remove any existing duplicate op for the same target and replicaIndex before adding
+      // the new one. Especially for delete ops, they could be getting resent after expiry.
+      completeOp(opType, containerID, target, replicaIndex, false);
       List<ContainerReplicaOp> ops = pendingOps.computeIfAbsent(
           containerID, s -> new ArrayList<>());
       ops.add(new ContainerReplicaOp(opType,
-          target, replicaIndex, deadlineEpochMillis));
+          target, replicaIndex, command, deadlineEpochMillis));
       incrementCounter(opType, replicaIndex);
     } finally {
       unlock(lock);
@@ -274,7 +283,7 @@ public class ContainerReplicaPendingOps {
   }
 
   private boolean completeOp(ContainerReplicaOp.PendingOpType opType,
-      ContainerID containerID, DatanodeDetails target, int replicaIndex) {
+      ContainerID containerID, DatanodeDetails target, int replicaIndex, boolean notifySubsribers) {
     boolean found = false;
     // List of completed ops that subscribers will be notified about
     List<ContainerReplicaOp> completedOps = new ArrayList<>();
@@ -295,7 +304,7 @@ public class ContainerReplicaPendingOps {
             decrementCounter(op.getOpType(), replicaIndex);
           }
         }
-        if (ops.size() == 0) {
+        if (ops.isEmpty()) {
           pendingOps.remove(containerID);
         }
       }
@@ -303,7 +312,7 @@ public class ContainerReplicaPendingOps {
       unlock(lock);
     }
 
-    if (found) {
+    if (found && notifySubsribers) {
       notifySubscribers(completedOps, containerID, false);
     }
     return found;

@@ -1,33 +1,32 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.cli.container;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
-import java.util.ArrayList;
-import java.time.Instant;
 import java.util.Scanner;
 import java.util.stream.Collectors;
-
-import org.apache.hadoop.hdds.cli.GenericParentCommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -36,10 +35,7 @@ import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
-import org.apache.hadoop.hdds.scm.container.common.helpers
-    .ContainerWithPipeline;
-
-import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -47,9 +43,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Parameters;
-import picocli.CommandLine.Spec;
 
 /**
  * This is the handler that process container info command.
@@ -60,9 +54,6 @@ import picocli.CommandLine.Spec;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class InfoSubcommand extends ScmSubcommand {
-
-  @Spec
-  private CommandSpec spec;
 
   @CommandLine.Option(names = { "--json" },
       defaultValue = "false",
@@ -165,7 +156,7 @@ public class InfoSubcommand extends ScmSubcommand {
       printBreak();
     }
     if (json) {
-      if (container.getPipeline().size() != 0) {
+      if (!container.getPipeline().isEmpty()) {
         ContainerWithPipelineAndReplicas wrapper =
             new ContainerWithPipelineAndReplicas(container.getContainerInfo(),
                 container.getPipeline(), replicas,
@@ -181,10 +172,7 @@ public class InfoSubcommand extends ScmSubcommand {
     } else {
       // Print container report info.
       System.out.printf("Container id: %s%n", containerID);
-      boolean verbose = spec != null
-          && spec.root().userObject() instanceof GenericParentCommand
-          && ((GenericParentCommand) spec.root().userObject()).isVerbose();
-      if (verbose) {
+      if (isVerbose()) {
         System.out.printf("Pipeline Info: %s%n", container.getPipeline());
       } else {
         System.out.printf("Pipeline id: %s%n", container.getPipeline().getId().getId());

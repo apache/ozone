@@ -125,13 +125,9 @@ Basic code conventions followed by Ozone:
 
 These are checked by tools like Checkstyle and RAT.
 
-For IntelliJ users, it is recommended to import and select the Code Style scheme located at:
+Ozone code style is shared via `.editorconfig` configuration file and will be automatically imported when the project is opened.
 
-```
-./hadoop-ozone/dev-support/intellij/ozone-style.xml
-```
-
-See https://www.jetbrains.com/help/idea/configuring-code-style.html#import-code-style for detailed instructions.
+See https://www.jetbrains.com/help/idea/configure-project-settings.html#share-project-through-vcs for detailed instructions.
 
 ### Check your contribution
 
@@ -145,6 +141,7 @@ The [`hadoop-ozone/dev-support/checks` directory](https://github.com/apache/ozon
     * `docs.sh`: sanity checks for [Ozone documentation](https://github.com/apache/ozone/tree/master/hadoop-hdds/docs)
     * `dependency.sh`: compares list of jars in build output with known list
     * `checkstyle.sh`: Checkstyle
+    * `pmd.sh`: PMD
  3. moderate (around 10 minutes)
     * `findbugs.sh`: SpotBugs
     * `kubernetes.sh`: very limited set of tests run in Kubernetes environment
@@ -165,16 +162,17 @@ As Ozone uses Apache Maven it can be developed from any IDE.  IntelliJ IDEA is a
 
 ### Run Ozone from IntelliJ
 
-Ozone components depends on maven classpath. We generate classpath descriptor from the maven pom.xml files to use exactly the same classpath at runtime.
+Ozone components depend on maven classpath. We generate classpath descriptor from the maven pom.xml files to use exactly the same classpath at runtime.
 
-As a result, it's easy to start _all_ the components from IDE as the right classpath (without provided scope) has already been set.
+As a result, it's straightforward to start _all_ the components from IDE as the right classpath (without provided scope) has already been set.
 
-To start Ozone from IntelliJ:
+Ozone project has pre-defined run configurations shared via standard IDE folder for run configurations:
 
-1. Stop your IDE
-2. Execute the `./hadoop-ozone/dev-support/intellij/install-runconfigs.sh` helper script.
-3. Start the IDE
-4. New runner definitions are available from the Run menu.
+```
+.run
+```
+
+They will be automatically added to the IDE on project import.
 
 You can use the installed Run configurations in the following order:
 

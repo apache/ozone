@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,14 +13,42 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Random;
+import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 import org.apache.commons.compress.utils.Lists;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -56,45 +83,13 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
 import org.junit.jupiter.api.Order;
-import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.Timeout;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Random;
-import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.when;
 
 /**
  * Test Snapshot Deleting Service.
@@ -107,7 +102,6 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestSnapshotDeletingServiceIntegrationTest.class);
-  private static boolean omRatisEnabled = true;
   private static final ByteBuffer CONTENT =
       ByteBuffer.allocate(1024 * 1024 * 16);
 
@@ -135,10 +129,8 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT,
         10000, TimeUnit.MILLISECONDS);
     conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 500);
-    conf.setInt(OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK, 5);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 500,
         TimeUnit.MILLISECONDS);
-    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     // Enable filesystem snapshot feature for the test regardless of the default
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
@@ -207,10 +199,8 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     OzoneBucket bucket2 = TestDataUtil.createBucket(
         client, VOLUME_NAME, bucketArgs, BUCKET_NAME_TWO);
     // Create key1 and key2
-    TestDataUtil.createKey(bucket2, "bucket2key1", ReplicationFactor.THREE,
-        ReplicationType.RATIS, CONTENT);
-    TestDataUtil.createKey(bucket2, "bucket2key2", ReplicationFactor.THREE,
-        ReplicationType.RATIS, CONTENT);
+    TestDataUtil.createKey(bucket2, "bucket2key1", CONTENT.array());
+    TestDataUtil.createKey(bucket2, "bucket2key2", CONTENT.array());
 
     // Create Snapshot
     client.getObjectStore().createSnapshot(VOLUME_NAME, BUCKET_NAME_TWO,
@@ -270,14 +260,12 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
     // Create 10 keys
     for (int i = 1; i <= 10; i++) {
-      TestDataUtil.createKey(bucket2, "key" + i, ReplicationFactor.THREE,
-          ReplicationType.RATIS, CONTENT);
+      TestDataUtil.createKey(bucket2, "key" + i, CONTENT.array());
     }
 
     // Create 5 keys to overwrite
     for (int i = 11; i <= 15; i++) {
-      TestDataUtil.createKey(bucket2, "key" + i, ReplicationFactor.THREE,
-          ReplicationType.RATIS, CONTENT);
+      TestDataUtil.createKey(bucket2, "key" + i, CONTENT.array());
     }
 
     // Create Directory and Sub
@@ -290,8 +278,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
         String childDir = "/childDir" + j;
         client.getProxy().createDirectory(VOLUME_NAME,
             BUCKET_NAME_FSO, parent + childDir);
-        TestDataUtil.createKey(bucket2, parent + childFile,
-            ReplicationFactor.THREE, ReplicationType.RATIS, CONTENT);
+        TestDataUtil.createKey(bucket2, parent + childFile, CONTENT.array());
       }
     }
 
@@ -307,8 +294,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
     // Overwrite 3 keys -> Moves previous version to deletedTable
     for (int i = 11; i <= 13; i++) {
-      TestDataUtil.createKey(bucket2, "key" + i, ReplicationFactor.THREE,
-          ReplicationType.RATIS, CONTENT);
+      TestDataUtil.createKey(bucket2, "key" + i, CONTENT.array());
     }
     assertTableRowCount(keyTable, 24);
 
@@ -372,8 +358,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
     // Overwrite 2 keys
     for (int i = 14; i <= 15; i++) {
-      TestDataUtil.createKey(bucket2, "key" + i, ReplicationFactor.THREE,
-          ReplicationType.RATIS, CONTENT);
+      TestDataUtil.createKey(bucket2, "key" + i, CONTENT.array());
     }
 
     // Delete 2 more keys
@@ -480,22 +465,22 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
   private DirectoryDeletingService getMockedDirectoryDeletingService(AtomicBoolean dirDeletionWaitStarted,
                                                                      AtomicBoolean dirDeletionStarted)
-      throws InterruptedException, TimeoutException {
+      throws InterruptedException, TimeoutException, IOException {
     OzoneManager ozoneManager = Mockito.spy(om);
     om.getKeyManager().getDirDeletingService().shutdown();
     GenericTestUtils.waitFor(() -> om.getKeyManager().getDirDeletingService().getThreadCount() == 0, 1000,
         100000);
     DirectoryDeletingService directoryDeletingService = Mockito.spy(new DirectoryDeletingService(10000,
-        TimeUnit.MILLISECONDS, 100000, ozoneManager, cluster.getConf()));
+        TimeUnit.MILLISECONDS, 100000, ozoneManager, cluster.getConf(), 1));
     directoryDeletingService.shutdown();
     GenericTestUtils.waitFor(() -> directoryDeletingService.getThreadCount() == 0, 1000,
         100000);
-    when(ozoneManager.getMetadataManager()).thenAnswer(i -> {
+    doAnswer(i -> {
       // Wait for SDS to reach DDS wait block before processing any deleted directories.
       GenericTestUtils.waitFor(dirDeletionWaitStarted::get, 1000, 100000);
       dirDeletionStarted.set(true);
       return i.callRealMethod();
-    });
+    }).when(directoryDeletingService).getPendingDeletedDirInfo();
     return directoryDeletingService;
   }
 
@@ -601,6 +586,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
   @Test
   @Order(4)
+  @Flaky("HDDS-11847")
   public void testParallelExcecutionOfKeyDeletionAndSnapshotDeletion() throws Exception {
     AtomicBoolean keyDeletionWaitStarted = new AtomicBoolean(false);
     AtomicBoolean dirDeletionWaitStarted = new AtomicBoolean(false);
@@ -728,10 +714,8 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
         om.getMetadataManager();
 
-    TestDataUtil.createKey(bucket, bucket.getName() + "key0", ReplicationFactor.THREE,
-        ReplicationType.RATIS, CONTENT);
-    TestDataUtil.createKey(bucket, bucket.getName() + "key1", ReplicationFactor.THREE,
-        ReplicationType.RATIS, CONTENT);
+    TestDataUtil.createKey(bucket, bucket.getName() + "key0", CONTENT.array());
+    TestDataUtil.createKey(bucket, bucket.getName() + "key1", CONTENT.array());
     assertTableRowCount(keyTable, 2);
 
     // Create Snapshot 1.
@@ -741,10 +725,8 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
     // Overwrite bucket1key0, This is a newer version of the key which should
     // reclaimed as this is a different version of the key.
-    TestDataUtil.createKey(bucket, bucket.getName() + "key0", ReplicationFactor.THREE,
-        ReplicationType.RATIS, CONTENT);
-    TestDataUtil.createKey(bucket, bucket.getName() + "key2", ReplicationFactor.THREE,
-        ReplicationType.RATIS, CONTENT);
+    TestDataUtil.createKey(bucket, bucket.getName() + "key0", CONTENT.array());
+    TestDataUtil.createKey(bucket, bucket.getName() + "key2", CONTENT.array());
 
     // Key 1 cannot be reclaimed as it is still referenced by Snapshot 1.
     client.getProxy().deleteKey(bucket.getVolumeName(), bucket.getName(),
@@ -768,10 +750,8 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     // deletedTable when Snapshot 2 is taken.
     assertTableRowCount(deletedTable, 0);
 
-    TestDataUtil.createKey(bucket, bucket.getName() + "key3", ReplicationFactor.THREE,
-        ReplicationType.RATIS, CONTENT);
-    TestDataUtil.createKey(bucket, bucket.getName() + "key4", ReplicationFactor.THREE,
-        ReplicationType.RATIS, CONTENT);
+    TestDataUtil.createKey(bucket, bucket.getName() + "key3", CONTENT.array());
+    TestDataUtil.createKey(bucket, bucket.getName() + "key4", CONTENT.array());
     client.getProxy().deleteKey(bucket.getVolumeName(), bucket.getName(),
         bucket.getName() + "key4", false);
     assertTableRowCount(keyTable, 1);
@@ -831,19 +811,15 @@ public class TestSnapshotDeletingServiceIntegrationTest {
                 throw new RuntimeException(ex);
               }
             }));
-    TestDataUtil.createKey(bucket, "dir0/" + bucket.getName() + "key0", ReplicationFactor.THREE,
-        ReplicationType.RATIS, CONTENT);
-    TestDataUtil.createKey(bucket, "dir1/" + bucket.getName() + "key1", ReplicationFactor.THREE,
-        ReplicationType.RATIS, CONTENT);
+    TestDataUtil.createKey(bucket, "dir0/" + bucket.getName() + "key0", CONTENT.array());
+    TestDataUtil.createKey(bucket, "dir1/" + bucket.getName() + "key1", CONTENT.array());
     assertTableRowCount(keyTable, countMap.get(keyTable.getName()) + 2);
     assertTableRowCount(dirTable, countMap.get(dirTable.getName()) + 2);
 
     // Overwrite bucket1key0, This is a newer version of the key which should
     // reclaimed as this is a different version of the key.
-    TestDataUtil.createKey(bucket, "dir0/" + bucket.getName() + "key0", ReplicationFactor.THREE,
-        ReplicationType.RATIS, CONTENT);
-    TestDataUtil.createKey(bucket, "dir2/" + bucket.getName() + "key2", ReplicationFactor.THREE,
-        ReplicationType.RATIS, CONTENT);
+    TestDataUtil.createKey(bucket, "dir0/" + bucket.getName() + "key0", CONTENT.array());
+    TestDataUtil.createKey(bucket, "dir2/" + bucket.getName() + "key2", CONTENT.array());
     assertTableRowCount(keyTable, countMap.get(keyTable.getName()) + 3);
     assertTableRowCount(dirTable, countMap.get(dirTable.getName()) + 3);
     assertTableRowCount(deletedTable, countMap.get(deletedTable.getName()) + 1);
