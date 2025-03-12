@@ -44,9 +44,10 @@ public final class AutoCompletion {
     final CommandLine ozone = new CommandLine(new Ozone());
     for (String pkg : PACKAGES_TO_SCAN) {
       new Reflections(pkg).getSubTypesOf(GenericCli.class).stream()
-          .map(AutoCompletion::getCommand).filter(Objects::nonNull)
-          .filter(cmd -> commandFilter(cmd.getCommandSpec()))
-          .forEach(cmd -> ozone.addSubcommand(getCommandName(cmd), cmd));
+          .map(AutoCompletion::getCommand)
+          .filter(Objects::nonNull)
+          .filter(AutoCompletion::isPublicCommand)
+          .forEach(command -> ozone.addSubcommand(getCommandName(command), command));
     }
     System.out.println(AutoComplete.bash("ozone", ozone));
   }
@@ -61,15 +62,17 @@ public final class AutoCompletion {
     return command;
   }
 
-  private static boolean commandFilter(CommandLine.Model.CommandSpec spec) {
+  private static boolean isPublicCommand(CommandLine command) {
+    final CommandLine.Model.CommandSpec spec = command.getCommandSpec();
     return !spec.usageMessage().hidden() &&
       !CommandLine.Model.CommandSpec.DEFAULT_COMMAND_NAME.equals(spec.name());
   }
 
-  private static String getCommandName(CommandLine cmd) {
-    final CommandLine.Model.CommandSpec spec = cmd.getCommandSpec();
+  private static String getCommandName(CommandLine command) {
+    final CommandLine.Model.CommandSpec spec = command.getCommandSpec();
     final String qualifiedName = spec.qualifiedName();
-    return qualifiedName.startsWith(OZONE_COMMAND) ? qualifiedName.substring(PREFIX_LENGTH) : qualifiedName;
+    return qualifiedName.startsWith(OZONE_COMMAND) ?
+      qualifiedName.substring(PREFIX_LENGTH) : qualifiedName;
   }
 
   /**
