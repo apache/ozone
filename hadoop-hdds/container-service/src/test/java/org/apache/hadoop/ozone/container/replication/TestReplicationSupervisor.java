@@ -368,6 +368,9 @@ public class TestReplicationSupervisor {
     // create container
     KeyValueContainerData containerData = new KeyValueContainerData(containerId,
         ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test");
+    HddsVolume vol = mock(HddsVolume.class);
+    containerData.setVolume(vol);
+    containerData.incrBytesUsed(100);
     KeyValueContainer container = new KeyValueContainer(containerData, conf);
     ContainerController controllerMock = mock(ContainerController.class);
     Semaphore semaphore = new Semaphore(1);
@@ -391,8 +394,14 @@ public class TestReplicationSupervisor {
         new ContainerImporter(conf, set, controllerMock, volumeSet);
 
     HddsVolume vol1 = (HddsVolume) volumeSet.getVolumesList().get(0);
+    // Initially volume has 0 commit space
+    assertEquals(0, vol1.getCommittedBytes());
+    long usedSpace = vol1.getCurrentUsage().getUsedSpace();
+    // Initially volume has 0 used space
+    assertEquals(0, usedSpace);
     // Increase committed bytes so that volume has only remaining 3 times container size space
-    vol1.incCommittedBytes(vol1.getCurrentUsage().getCapacity() - containerSize * 3);
+    long initialCommittedBytes = vol1.getCurrentUsage().getCapacity() - containerSize * 3;
+    vol1.incCommittedBytes(initialCommittedBytes);
     ContainerReplicator replicator =
         new DownloadAndImportReplicator(conf, set, importer, moc);
     replicatorRef.set(replicator);
@@ -414,6 +423,8 @@ public class TestReplicationSupervisor {
         vol1.getCommittedBytes() > vol1.getCurrentUsage().getCapacity() - containerSize * 3,
         1000, 50000);
 
+    // Volume has reserved space of 2 * containerSize
+    assertEquals(vol1.getCommittedBytes(), initialCommittedBytes + 2 * containerSize);
     // Container 2 import will fail as container 1 has reserved space and no space left to import new container
     // New container import requires at least (2 * container size)
     long containerId2 = 2;
@@ -425,6 +436,14 @@ public class TestReplicationSupervisor {
     semaphore.release();
     GenericTestUtils.waitFor(() ->
         1 == supervisor.getReplicationSuccessCount(), 1000, 50000);
+
+    usedSpace = vol1.getCurrentUsage().getUsedSpace();
+    // After replication, volume used space should be increased by container used bytes
+    assertEquals(100, usedSpace);
+
+    // Volume committed bytes should become initial committed bytes which was before replication
+    assertEquals(initialCommittedBytes, vol1.getCommittedBytes());
+
   }
 
 

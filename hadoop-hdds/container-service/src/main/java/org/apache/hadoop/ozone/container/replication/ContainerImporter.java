@@ -128,6 +128,8 @@ public class ContainerImporter {
       try (InputStream input = Files.newInputStream(tarFilePath)) {
         Container container = controller.importContainer(
             containerData, input, packer);
+        // After container import is successful, increase used space for the volume
+        targetVolume.incrementUsedSpace(container.getContainerData().getBytesUsed());
         containerSet.addContainerByOverwriteMissingContainer(container);
       }
     } finally {
