@@ -84,7 +84,7 @@ public class GeneratorScm extends BaseGenerator {
               .setOwner(getUserId())
               .build();
 
-      containerStore.put(new ContainerID(containerId), containerInfo);
+      containerStore.put(ContainerID.valueOf(containerId), containerInfo);
       return null;
     });
 
