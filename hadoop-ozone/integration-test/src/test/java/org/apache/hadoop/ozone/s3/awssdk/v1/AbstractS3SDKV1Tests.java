@@ -101,6 +101,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
@@ -186,7 +187,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
         .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
-    s3Client = cluster.newS3Client();
+    s3Client = new S3ClientFactory(cluster.getConf()).createS3Client();
   }
 
   /**
