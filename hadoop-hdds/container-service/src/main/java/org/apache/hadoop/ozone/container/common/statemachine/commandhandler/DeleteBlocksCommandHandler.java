@@ -123,7 +123,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   }
 
   @Override
-  public void handle(SCMCommand command, OzoneContainer container,
+  public void handle(SCMCommand<?> command, OzoneContainer container,
       StateContext context, SCMConnectionManager connectionManager) {
     if (command.getType() != SCMCommandProto.Type.deleteBlocksCommand) {
       LOG.warn("Skipping handling command, expected command "

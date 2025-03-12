@@ -39,6 +39,8 @@ import java.util.Map;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.s3.S3ClientFactory;
+import org.apache.hadoop.ozone.s3.S3GatewayService;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
@@ -87,12 +89,13 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
    * @throws Exception exception thrown when waiting for the cluster to be ready.
    */
   static void startCluster(OzoneConfiguration conf) throws Exception {
+    S3GatewayService s3g = new S3GatewayService();
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .includeS3G(true)
+        .addService(s3g)
         .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
-    s3Client = cluster.newS3ClientV2();
+    s3Client = new S3ClientFactory(s3g.getConf()).createS3ClientV2();
   }
 
   /**
