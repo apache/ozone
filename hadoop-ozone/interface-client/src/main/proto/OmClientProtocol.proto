@@ -141,7 +141,7 @@ enum Type {
   ListSnapshotDiffJobs = 122;
   CancelSnapshotDiff = 123;
   SetSafeMode = 124;
-  PrintCompactionLogDag = 125;
+  PrintCompactionLogDag = 125; // [deprecated = true]
   ListKeysLight = 126;
   AbortExpiredMultiPartUploads = 127;
   SetSnapshotProperty = 128;
@@ -287,7 +287,7 @@ message OMRequest {
   optional ListSnapshotDiffJobRequest       ListSnapshotDiffJobRequest     = 122;
   optional CancelSnapshotDiffRequest        CancelSnapshotDiffRequest      = 123;
   optional SetSafeModeRequest               SetSafeModeRequest             = 124;
-  optional PrintCompactionLogDagRequest     PrintCompactionLogDagRequest   = 125;
+  optional PrintCompactionLogDagRequest     PrintCompactionLogDagRequest   = 125 [deprecated = true];
 
   optional MultipartUploadsExpiredAbortRequest multipartUploadsExpiredAbortRequest = 126;
   optional SetSnapshotPropertyRequest       SetSnapshotPropertyRequest     = 127;
@@ -420,7 +420,7 @@ message OMResponse {
   optional ListSnapshotDiffJobResponse       ListSnapshotDiffJobResponse   = 122;
   optional CancelSnapshotDiffResponse        cancelSnapshotDiffResponse    = 123;
   optional SetSafeModeResponse               SetSafeModeResponse           = 124;
-  optional PrintCompactionLogDagResponse     PrintCompactionLogDagResponse = 125;
+  optional PrintCompactionLogDagResponse     PrintCompactionLogDagResponse = 125 [deprecated = true];
   optional ListKeysLightResponse             listKeysLightResponse         = 126;
   optional MultipartUploadsExpiredAbortResponse multipartUploadsExpiredAbortResponse = 127;
   optional SetSnapshotPropertyResponse       SetSnapshotPropertyResponse   = 128;
