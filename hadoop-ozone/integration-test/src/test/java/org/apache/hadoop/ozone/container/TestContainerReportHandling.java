@@ -53,14 +53,12 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Tests for container report handling.
  */
-@Flaky("HDDS-12535")
 public class TestContainerReportHandling {
   private static final String VOLUME = "vol1";
   private static final String BUCKET = "bucket1";
@@ -96,6 +94,19 @@ public class TestContainerReportHandling {
         OmKeyLocationInfo keyLocation = keyLocations.get(0);
         ContainerID containerID = ContainerID.valueOf(keyLocation.getContainerID());
         waitForContainerClose(cluster, containerID.getId());
+
+        // also wait till the container is closed in SCM
+        GenericTestUtils.waitFor(() -> {
+          ContainerManager containerManager = cluster.getStorageContainerManager().getContainerManager();
+          try {
+            if (containerManager.getContainer(containerID).getState() != HddsProtos.LifeCycleState.CLOSED) {
+              return false;
+            }
+          } catch (ContainerNotFoundException e) {
+            return false;
+          }
+          return true;
+        }, 2000, 20000);
 
         // move the container to DELETING
         ContainerManager containerManager = cluster.getStorageContainerManager().getContainerManager();
