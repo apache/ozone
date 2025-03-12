@@ -624,7 +624,7 @@ public class ContainerStateMachine extends BaseStateMachine {
             return result;
           } catch (Exception e) {
             LOG.error("{}: writeChunk writeStateMachineData failed: blockId" +
-                    "{} logIndex {} chunkName {}", getGroupId(), write.getBlockID(),
+                  "{} logIndex {} chunkName {}", getGroupId(), write.getBlockID(),
                 entryIndex, write.getChunkData().getChunkName(), e);
             metrics.incNumWriteDataFails();
             // write chunks go in parallel. It's possible that one write chunk
@@ -700,18 +700,14 @@ public class ContainerStateMachine extends BaseStateMachine {
         found = true;
       }
     }
-    if (null == writeFutureContextEntry) {
-      return;
-    }
     // validate for timeout in milli second
     long waitTime = Time.monotonicNowNanos() - writeFutureContextEntry.getValue().getStartTime();
     if (waitTime > writeChunkWaitMaxNs) {
-      LOG.error("Write chunk has taken {}ns crossing threshold {}ns for index {} groupId {}", waitTime,
-          writeChunkWaitMaxNs, writeFutureContextEntry.getKey(), getGroupId());
+      LOG.error("Write chunk has taken {}ns crossing threshold {}ns for index {} groupId {}, " +
+              "cancelling pending write chunk for this group", waitTime, writeChunkWaitMaxNs,
+          writeFutureContextEntry.getKey(), getGroupId());
       stateMachineHealthy.set(false);
       writeChunkFutureMap.forEach((key, value) -> {
-        LOG.error("Cancelling write chunk due to timeout {}ns crossing {}ns for index {}, groupId {}", waitTime,
-            writeChunkWaitMaxNs, key, getGroupId());
         value.getWriteChunkFuture().cancel(true);
       });
       throw new StorageContainerException("Write chunk has taken " + waitTime + "ns crossing threshold "
