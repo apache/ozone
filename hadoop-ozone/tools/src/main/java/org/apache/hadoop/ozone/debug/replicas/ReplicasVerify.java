@@ -54,17 +54,21 @@ public class ReplicasVerify extends Handler {
       required = true)
   private String outputDir;
 
-  @CommandLine.Option(names = "--checksums",
-      description = "Do client side data checksum validation of all replicas.",
-      // value will be true only if the "--checksums" option was specified on the CLI
-      defaultValue = "false")
-  private boolean doExecuteChecksums;
+  @CommandLine.ArgGroup(exclusive = false, multiplicity = "1")
+  private Verification verification;
 
-  @CommandLine.Option(names = "--padding",
-      description = "Check for missing padding in erasure coded replicas.",
-      defaultValue = "false")
-  private boolean doExecutePadding;
+  static class Verification {
+    @CommandLine.Option(names = "--checksums",
+        description = "Do client side data checksum validation of all replicas.",
+        // value will be true only if the "--checksums" option was specified on the CLI
+        defaultValue = "false")
+    private boolean doExecuteChecksums;
 
+    @CommandLine.Option(names = "--padding",
+        description = "Check for missing padding in erasure coded replicas.",
+        defaultValue = "false")
+    private boolean doExecutePadding;
+  }
   private FindMissingPadding findMissingPadding;
   private List<ReplicaVerifier> replicaVerifiers;
 
@@ -72,18 +76,18 @@ public class ReplicasVerify extends Handler {
   protected void execute(OzoneClient client, OzoneAddress address) throws IOException {
     replicaVerifiers = new ArrayList<>();
 
-    if (doExecuteChecksums) {
+    if (verification.doExecuteChecksums) {
       replicaVerifiers.add(new Checksums(client, outputDir, LOG, getConf()));
     }
 
-    if (doExecutePadding) {
+    if (verification.doExecutePadding) {
       findMissingPadding = new FindMissingPadding(client, scmOption, LOG, out(), getConf());
       replicaVerifiers.add(findMissingPadding);
     }
 
     findCandidateKeys(client, address);
 
-    if (doExecutePadding) {
+    if (verification.doExecutePadding) {
       findMissingPadding.execute();
     }
   }
