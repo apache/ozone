@@ -166,6 +166,19 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
       throws IOException;
 
   /**
+   * Returns the iterator for this metadata store.
+   * @param keyCodec
+   * @param valueCodec
+   * @param prefix
+   * @return MetaStoreIterator
+   * @throws IOException on failure.
+   */
+  default TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator(Codec<KEY> keyCodec, Codec<VALUE> valueCodec,
+                                                                      KEY prefix) throws IOException {
+    throw new NotImplementedException("iterator is not implemented");
+  }
+
+  /**
    * Returns a prefixed iterator for this metadata store.
    * @param prefix
    * @return MetaStoreIterator

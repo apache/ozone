@@ -17,15 +17,24 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.CodedInputStream;
+import com.google.protobuf.Descriptors;
+import com.google.protobuf.DynamicMessage;
+import com.google.protobuf.ExtensionRegistryLite;
+import com.google.protobuf.Message;
 import com.google.protobuf.MessageLite;
 import com.google.protobuf.Parser;
+import com.google.protobuf.WireFormat;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Collections;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Supplier;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.ratis.util.function.CheckedFunction;
 
 /**
@@ -33,7 +42,7 @@ import org.apache.ratis.util.function.CheckedFunction;
  */
 public final class Proto2Codec<M extends MessageLite>
     implements Codec<M> {
-  private static final ConcurrentMap<Class<? extends MessageLite>,
+  private static final ConcurrentMap<Pair<Class<? extends MessageLite>, Set<String>>,
                                      Codec<? extends MessageLite>> CODECS
       = new ConcurrentHashMap<>();
 
@@ -41,17 +50,30 @@ public final class Proto2Codec<M extends MessageLite>
    * @return the {@link Codec} for the given class.
    */
   public static <T extends MessageLite> Codec<T> get(T t) {
-    final Codec<?> codec = CODECS.computeIfAbsent(t.getClass(),
-        key -> new Proto2Codec<>(t));
+    return get(t, Collections.emptySet());
+  }
+
+  /**
+   * @return the {@link Codec} for the given class.
+   */
+  public static <T extends MessageLite> Codec<T> get(T t, Set<String> fieldsToBeSkipped) {
+    final Codec<?> codec = CODECS.computeIfAbsent(Pair.of(t.getClass(), fieldsToBeSkipped),
+        key -> new Proto2Codec<>(t, fieldsToBeSkipped));
     return (Codec<T>) codec;
   }
 
   private final Class<M> clazz;
   private final Parser<M> parser;
+  private final Descriptors.Descriptor descriptor;
+  private final Supplier<Message.Builder> builderSupplier;
+  private final Set<String> fieldsToBeSkipped;
 
-  private Proto2Codec(M m) {
+  private Proto2Codec(M m, Set<String> fieldsToBeSkipped) {
     this.clazz = (Class<M>) m.getClass();
     this.parser = (Parser<M>) m.getParserForType();
+    this.descriptor = ((Message)m).getDescriptorForType();
+    this.fieldsToBeSkipped = fieldsToBeSkipped;
+    this.builderSupplier = ((Message)m)::newBuilderForType;
   }
 
   @Override
@@ -83,8 +105,107 @@ public final class Proto2Codec<M extends MessageLite>
   public M fromCodecBuffer(@Nonnull CodecBuffer buffer)
       throws IOException {
     try (InputStream in = buffer.getInputStream()) {
-      return parser.parseFrom(in);
+      if (this.fieldsToBeSkipped.isEmpty()) {
+        return parser.parseFrom(in);
+      } else {
+        return parse(CodedInputStream.newInstance(in));
+      }
     }
+  }
+
+  private Object getValue(CodedInputStream input, Descriptors.FieldDescriptor field) throws IOException {
+    Object value;
+    switch (field.getType()) {
+    case DOUBLE:
+      value = input.readDouble();
+      break;
+    case FLOAT:
+      value = input.readFloat();
+      break;
+    case INT64:
+      value = input.readInt64();
+      break;
+    case UINT64:
+      value = input.readUInt64();
+      break;
+    case INT32:
+      value = input.readInt32();
+      break;
+    case FIXED64:
+      value = input.readFixed64();
+      break;
+    case FIXED32:
+      value = input.readFixed32();
+      break;
+    case BOOL:
+      value = input.readBool();
+      break;
+    case STRING:
+      value = input.readString();
+      break;
+    case GROUP:
+    case MESSAGE:
+      value = DynamicMessage.newBuilder(field.getMessageType());
+      input.readMessage((MessageLite.Builder) value,
+          ExtensionRegistryLite.getEmptyRegistry());
+      value = ((MessageLite.Builder) value).build();
+      break;
+    case BYTES:
+      value = input.readBytes();
+      break;
+    case UINT32:
+      value = input.readUInt32();
+      break;
+    case ENUM:
+      value = field.getEnumType().findValueByNumber(input.readEnum());
+      System.out.println(((Descriptors.EnumValueDescriptor)value).getName());
+      break;
+    case SFIXED32:
+      value = input.readSFixed32();
+      break;
+    case SFIXED64:
+      value = input.readSFixed64();
+      break;
+    case SINT32:
+      value = input.readSInt32();
+      break;
+    case SINT64:
+      value = input.readSInt64();
+      break;
+    default:
+      throw new UnsupportedOperationException();
+    }
+    System.out.println(field.getName() + ": " + value);
+    return value;
+  }
+
+  private M parse(CodedInputStream codedInputStream) throws IOException {
+    Message.Builder builder = this.builderSupplier.get();
+    while (!codedInputStream.isAtEnd()) {
+      int tag = codedInputStream.readTag();
+
+      if (tag == 0) {
+        break;
+      }
+      int fieldNumber = WireFormat.getTagFieldNumber(tag);
+
+      final Descriptors.FieldDescriptor field = descriptor.findFieldByNumber(fieldNumber);
+      if (field != null && !this.fieldsToBeSkipped.contains(field.getName())) {
+        try {
+          Object value = getValue(codedInputStream, field);
+          if (field.isRepeated()) {
+            builder.addRepeatedField(field, value);
+          } else {
+            builder.setField(field, value);
+          }
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      } else {
+        codedInputStream.skipField(tag);
+      }
+    }
+    return (M) builder.build();
   }
 
   @Override
@@ -92,10 +213,16 @@ public final class Proto2Codec<M extends MessageLite>
     return message.toByteArray();
   }
 
+
   @Override
   public M fromPersistedFormat(byte[] bytes)
-      throws InvalidProtocolBufferException {
-    return parser.parseFrom(bytes);
+      throws IOException {
+    if (fieldsToBeSkipped.isEmpty()) {
+      return parser.parseFrom(bytes);
+    } else {
+      return parse(CodedInputStream.newInstance(bytes));
+    }
+
   }
 
   @Override

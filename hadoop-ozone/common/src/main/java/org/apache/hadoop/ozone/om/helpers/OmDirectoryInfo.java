@@ -17,16 +17,22 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import com.google.protobuf.Descriptors;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DirectoryInfo;
 
 /**
@@ -36,11 +42,20 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Directo
  */
 public class OmDirectoryInfo extends WithParentObjectId
     implements CopyObject<OmDirectoryInfo> {
-  private static final Codec<OmDirectoryInfo> CODEC = new DelegatedCodec<>(
-      Proto2Codec.get(DirectoryInfo.getDefaultInstance()),
-      OmDirectoryInfo::getFromProtobuf,
-      OmDirectoryInfo::getProtobuf,
-      OmDirectoryInfo.class);
+  private static final Codec<OmDirectoryInfo> CODEC = newCodec(Collections.emptySet());
+  private static final Map<Object, Codec<OmDirectoryInfo>> CODEC_MAP = new ConcurrentHashMap<>();
+  public static final Set<String> FIELDS_LIST = OzoneManagerProtocolProtos.DirectoryInfo.getDescriptor().getFields()
+      .stream().map(Descriptors.FieldDescriptor::getName).collect(Collectors.toSet());
+
+  public static Codec<OmDirectoryInfo> newCodec(Set<String> ignoredFields) {
+    assert CODEC_MAP != null;
+    return CODEC_MAP.computeIfAbsent(String.join(",", ignoredFields),
+        (k) -> new DelegatedCodec<>(
+            Proto2Codec.get(DirectoryInfo.getDefaultInstance(), ignoredFields),
+            OmDirectoryInfo::getFromProtobuf,
+            OmDirectoryInfo::getProtobuf,
+            OmDirectoryInfo.class));
+  }
 
   public static Codec<OmDirectoryInfo> getCodec() {
     return CODEC;
