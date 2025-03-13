@@ -125,7 +125,7 @@ public interface ContainerStateManager {
   List<ContainerInfo> getContainerInfos(LifeCycleState state);
 
   /**
-   * @return all {@link ContainerID}s for the given state.
+   * @return number of containers for the given state.
    */
   int getContainerCount(LifeCycleState state);
 
