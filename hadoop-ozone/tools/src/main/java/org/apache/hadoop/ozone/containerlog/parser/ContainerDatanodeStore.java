@@ -95,6 +95,20 @@ public class ContainerDatanodeStore {
     containerDbStore = openDb(dbFile);
   }
 
+  public void insertContainerData(Long containerId, List<ContainerInfo> containerInfoList) throws IOException {
+    containerLogTable.put(containerId, containerInfoList);
+  }
+
+  public  void  insertContainerDatanodeData(String key, List<DatanodeContainerInfo> transitionList) throws IOException {
+    if (datanodeContainerLogTable.isExist(key)) {
+      List<DatanodeContainerInfo> existingList = datanodeContainerLogTable.get(key);
+      existingList.addAll(transitionList);
+      datanodeContainerLogTable.put(key, existingList);
+    } else {
+      datanodeContainerLogTable.put(key, transitionList);
+    }
+  }
+
   public void close() throws IOException {
     if (containerDbStore != null) {
       containerDbStore.close();
