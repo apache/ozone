@@ -1144,6 +1144,11 @@ public class TestContainerEndpoint {
     return new ContainerWithPipeline(containerInfo, localPipeline);
   }
 
+  void assertContainerCount(HddsProtos.LifeCycleState state, int expected) {
+    final int computed = containerStateManager.getContainerCount(state);
+    assertEquals(expected, computed);
+  }
+
   @Test
   public void testGetSCMDeletedContainers() throws Exception {
     reconContainerManager.addNewContainer(
@@ -1161,9 +1166,7 @@ public class TestContainerEndpoint {
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(102L),
             HddsProtos.LifeCycleEvent.CLEANUP);
-    Set<ContainerID> containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(1, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 1);
 
     reconContainerManager.updateContainerState(ContainerID.valueOf(103L),
         HddsProtos.LifeCycleEvent.FINALIZE);
@@ -1172,14 +1175,10 @@ public class TestContainerEndpoint {
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(103L),
             HddsProtos.LifeCycleEvent.DELETE);
-    containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETING);
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(103L),
             HddsProtos.LifeCycleEvent.CLEANUP);
-    containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(2, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 2);
 
     Response scmDeletedContainers =
         containerEndpoint.getSCMDeletedContainers(2, 0);
@@ -1212,9 +1211,7 @@ public class TestContainerEndpoint {
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(104L),
             HddsProtos.LifeCycleEvent.CLEANUP);
-    Set<ContainerID> containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(1, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 1);
 
     reconContainerManager.updateContainerState(ContainerID.valueOf(105L),
         HddsProtos.LifeCycleEvent.FINALIZE);
@@ -1226,9 +1223,7 @@ public class TestContainerEndpoint {
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(105L),
             HddsProtos.LifeCycleEvent.CLEANUP);
-    containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(2, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 2);
 
     Response scmDeletedContainers =
         containerEndpoint.getSCMDeletedContainers(1, 0);
@@ -1258,9 +1253,7 @@ public class TestContainerEndpoint {
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(106L),
             HddsProtos.LifeCycleEvent.CLEANUP);
-    Set<ContainerID> containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(1, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 1);
 
     reconContainerManager.updateContainerState(ContainerID.valueOf(107L),
         HddsProtos.LifeCycleEvent.FINALIZE);
@@ -1272,9 +1265,7 @@ public class TestContainerEndpoint {
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(107L),
             HddsProtos.LifeCycleEvent.CLEANUP);
-    containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(2, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 2);
 
     Response scmDeletedContainers =
         containerEndpoint.getSCMDeletedContainers(2, 106L);
@@ -1554,16 +1545,12 @@ public class TestContainerEndpoint {
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(1),
             HddsProtos.LifeCycleEvent.DELETE);
-    Set<ContainerID> containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETING);
-    assertEquals(1, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETING, 1);
 
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(1),
             HddsProtos.LifeCycleEvent.CLEANUP);
-    containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(1, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 1);
 
     List<ContainerInfo> deletedSCMContainers =
         reconContainerManager.getContainers(HddsProtos.LifeCycleState.DELETED);
@@ -1603,9 +1590,7 @@ public class TestContainerEndpoint {
     // and then to DELETED
     updateContainerStateToDeleted(1);
 
-    Set<ContainerID> containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(1, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 1);
 
     List<ContainerInfo> deletedSCMContainers =
         reconContainerManager.getContainers(HddsProtos.LifeCycleState.DELETED);
@@ -1647,9 +1632,7 @@ public class TestContainerEndpoint {
     updateContainerStateToDeleted(1);
     updateContainerStateToDeleted(2);
 
-    Set<ContainerID> containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
-    assertEquals(2, containerIDs.size());
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 2);
 
     List<ContainerInfo> deletedSCMContainers =
         reconContainerManager.getContainers(HddsProtos.LifeCycleState.DELETED);

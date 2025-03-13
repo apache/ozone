@@ -25,6 +25,7 @@ import com.google.common.collect.Maps;
 import java.util.EnumMap;
 import java.util.NavigableSet;
 import java.util.Objects;
+import java.util.SortedSet;
 import java.util.TreeSet;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -136,6 +137,15 @@ public class ContainerAttribute<T extends Enum<T>> {
    */
   public NavigableSet<ContainerID> getCollection(T key) {
     return ImmutableSortedSet.copyOf(get(key));
+  }
+
+  public SortedSet<ContainerID> tailSet(T key, ContainerID start) {
+    Objects.requireNonNull(start, "start == null");
+    return get(key).tailSet(start);
+  }
+
+  public int count(T key) {
+    return get(key).size();
   }
 
   /**

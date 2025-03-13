@@ -18,20 +18,23 @@
 package org.apache.hadoop.hdds.scm.container.states;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSet;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
-import java.util.NavigableSet;
+import java.util.NavigableMap;
+import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,17 +75,107 @@ public class ContainerStateMap {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerStateMap.class);
 
+  /**
+   * Two levels map.
+   * Outer container map: {@link ContainerID} -> {@link Entry} (info and replicas)
+   * Inner replica map: {@link DatanodeID} -> {@link ContainerReplica}
+   */
+  private static class ContainerMap {
+    private static class Entry {
+      private final ContainerInfo info;
+      private final Map<DatanodeID, ContainerReplica> replicas = new HashMap<>();
+
+      Entry(ContainerInfo info) {
+        this.info = info;
+      }
+
+      ContainerInfo getInfo() {
+        return info;
+      }
+
+      Set<ContainerReplica> getReplicas() {
+        return new HashSet<>(replicas.values());
+      }
+
+      ContainerReplica put(ContainerReplica r) {
+        return replicas.put(r.getDatanodeDetails().getID(), r);
+      }
+
+      ContainerReplica removeReplica(DatanodeID datanodeID) {
+        return replicas.remove(datanodeID);
+      }
+    }
+
+    private final NavigableMap<ContainerID, Entry> map = new TreeMap<>();
+
+    boolean contains(ContainerID id) {
+      return map.containsKey(id);
+    }
+
+    ContainerInfo getInfo(ContainerID id) {
+      final Entry entry = map.get(id);
+      return entry == null ? null : entry.getInfo();
+    }
+
+    List<ContainerInfo> getInfos(ContainerID start, int count) {
+      Objects.requireNonNull(start, "start == null");
+      Preconditions.assertTrue(count >= 0, "count < 0");
+      return map.tailMap(start).values().stream()
+          .map(Entry::getInfo)
+          .limit(count)
+          .collect(Collectors.toList());
+    }
+
+    Set<ContainerReplica> getReplicas(ContainerID id) {
+      Objects.requireNonNull(id, "id == null");
+      final Entry entry = map.get(id);
+      return entry == null ? null : entry.getReplicas();
+    }
+
+    /**
+     * Add if the given info not already in this map.
+     *
+     * @return true iff the given info is added.
+     */
+    boolean addIfAbsent(ContainerInfo info) {
+      Objects.requireNonNull(info, "info == null");
+      final ContainerID id = info.containerID();
+      if (map.containsKey(id)) {
+        return false; // already exist
+      }
+      final Entry previous = map.put(id, new Entry(info));
+      Preconditions.assertNull(previous, "previous");
+      return true;
+    }
+
+    ContainerReplica put(ContainerReplica replica) {
+      Objects.requireNonNull(replica, "replica == null");
+      final Entry entry = map.get(replica.getContainerID());
+      return entry == null ? null : entry.put(replica);
+    }
+
+    ContainerInfo remove(ContainerID id) {
+      Objects.requireNonNull(id, "id == null");
+      final Entry removed = map.remove(id);
+      return removed == null ? null : removed.getInfo();
+    }
+
+    ContainerReplica removeReplica(ContainerID containerID, DatanodeID datanodeID) {
+      Objects.requireNonNull(containerID, "containerID == null");
+      Objects.requireNonNull(datanodeID, "datanodeID == null");
+      final Entry entry = map.get(containerID);
+      return entry == null ? null : entry.removeReplica(datanodeID);
+    }
+  }
+
   private final ContainerAttribute<LifeCycleState> lifeCycleStateMap = new ContainerAttribute<>(LifeCycleState.class);
   private final ContainerAttribute<ReplicationType> typeMap = new ContainerAttribute<>(ReplicationType.class);
-  private final Map<ContainerID, ContainerInfo> containerMap;
-  private final Map<ContainerID, Set<ContainerReplica>> replicaMap;
+  private final ContainerMap containerMap = new ContainerMap();
 
   /**
    * Create a ContainerStateMap.
    */
   public ContainerStateMap() {
-    this.containerMap = new ConcurrentHashMap<>();
-    this.replicaMap = new ConcurrentHashMap<>();
   }
 
   @VisibleForTesting
@@ -94,24 +187,19 @@ public class ContainerStateMap {
    * Adds a ContainerInfo Entry in the ContainerStateMap.
    *
    * @param info - container info
-   * @throws SCMException - throws if create failed.
    */
-  public void addContainer(final ContainerInfo info)
-      throws SCMException {
-    Preconditions.checkNotNull(info, "Container Info cannot be null");
-    final ContainerID id = info.containerID();
-    if (!contains(id)) {
-      containerMap.put(id, info);
+  public void addContainer(final ContainerInfo info) {
+    Objects.requireNonNull(info, "info == null");
+    if (containerMap.addIfAbsent(info)) {
+      final ContainerID id = info.containerID();
       lifeCycleStateMap.insert(info.getState(), id);
       typeMap.insert(info.getReplicationType(), id);
-      replicaMap.put(id, Collections.emptySet());
-
-      LOG.trace("Container {} added to ContainerStateMap.", id);
+      LOG.trace("Added {}", info);
     }
   }
 
   public boolean contains(final ContainerID id) {
-    return containerMap.containsKey(id);
+    return containerMap.contains(id);
   }
 
   /**
@@ -120,15 +208,12 @@ public class ContainerStateMap {
    * @param id - ContainerID
    */
   public void removeContainer(final ContainerID id) {
-    Preconditions.checkNotNull(id, "ContainerID cannot be null");
-    if (contains(id)) {
-      // Should we revert back to the original state if any of the below
-      // remove operation fails?
-      final ContainerInfo info = containerMap.remove(id);
+    Objects.requireNonNull(id, "id == null");
+    final ContainerInfo info = containerMap.remove(id);
+    if (info != null) {
       lifeCycleStateMap.remove(info.getState(), id);
       typeMap.remove(info.getReplicationType(), id);
-      replicaMap.remove(id);
-      LOG.trace("Container {} removed from ContainerStateMap.", id);
+      LOG.trace("Removed {}", info);
     }
   }
 
@@ -139,7 +224,7 @@ public class ContainerStateMap {
    * @return container info, if found else null.
    */
   public ContainerInfo getContainerInfo(final ContainerID containerID) {
-    return containerMap.get(containerID);
+    return containerMap.getInfo(containerID);
   }
 
   /**
@@ -148,8 +233,8 @@ public class ContainerStateMap {
    */
   public Set<ContainerReplica> getContainerReplicas(
       final ContainerID containerID) {
-    Preconditions.checkNotNull(containerID);
-    return replicaMap.get(containerID);
+    Objects.requireNonNull(containerID, "containerID == null");
+    return containerMap.getReplicas(containerID);
   }
 
   /**
@@ -157,39 +242,18 @@ public class ContainerStateMap {
    * Logs a debug entry if a datanode is already added as replica for given
    * ContainerId.
    */
-  public void updateContainerReplica(final ContainerID containerID,
-      final ContainerReplica replica) {
-    Preconditions.checkNotNull(containerID);
-    if (contains(containerID)) {
-      final Set<ContainerReplica> newSet = createNewReplicaSet(containerID);
-      newSet.remove(replica);
-      newSet.add(replica);
-      replaceReplicaSet(containerID, newSet);
-    }
+  public void updateContainerReplica(ContainerReplica replica) {
+    Objects.requireNonNull(replica, "replica == null");
+    containerMap.put(replica);
   }
 
   /**
    * Remove a container Replica for given DataNode.
    */
-  public void removeContainerReplica(final ContainerID containerID,
-      final ContainerReplica replica) {
-    Preconditions.checkNotNull(containerID);
-    Preconditions.checkNotNull(replica);
-    if (contains(containerID)) {
-      final Set<ContainerReplica> newSet = createNewReplicaSet(containerID);
-      newSet.remove(replica);
-      replaceReplicaSet(containerID, newSet);
-    }
-  }
-
-  private Set<ContainerReplica> createNewReplicaSet(ContainerID containerID) {
-    Set<ContainerReplica> existingSet = replicaMap.get(containerID);
-    return existingSet == null ? new HashSet<>() : new HashSet<>(existingSet);
-  }
-
-  private void replaceReplicaSet(ContainerID containerID,
-      Set<ContainerReplica> newSet) {
-    replicaMap.put(containerID, Collections.unmodifiableSet(newSet));
+  public void removeContainerReplica(final ContainerID containerID, DatanodeID datanodeID) {
+    Objects.requireNonNull(containerID, "containerID == null");
+    Objects.requireNonNull(datanodeID, "datanodeID == null");
+    containerMap.removeReplica(containerID, datanodeID);
   }
 
   /**
@@ -205,7 +269,7 @@ public class ContainerStateMap {
     if (currentState == newState) { // state not changed
       return;
     }
-    final ContainerInfo currentInfo = containerMap.get(containerID);
+    final ContainerInfo currentInfo = containerMap.getInfo(containerID);
     if (currentInfo == null) { // container not found
       return;
     }
@@ -214,30 +278,39 @@ public class ContainerStateMap {
     currentInfo.setState(newState);
   }
 
-  public Set<ContainerID> getAllContainerIDs() {
-    return ImmutableSet.copyOf(containerMap.keySet());
+  public List<ContainerInfo> getContainerInfos(ContainerID start, int count) {
+    return containerMap.getInfos(start, count);
   }
 
   /**
-   * Returns Containers in the System by the Type.
    *
-   * @param type - Replication type -- StandAlone, Ratis etc.
-   * @return NavigableSet
+   * @param state the state of the {@link ContainerInfo}s
+   * @param start the start id
+   * @param count the maximum size of the returned list
+   * @return a list of {@link ContainerInfo}s sorted by {@link ContainerID}
    */
-  public NavigableSet<ContainerID> getContainerIDsByType(final ReplicationType type) {
-    Preconditions.checkNotNull(type);
-    return typeMap.getCollection(type);
+  public List<ContainerInfo> getContainerInfos(LifeCycleState state, ContainerID start, int count) {
+    Preconditions.assertTrue(count >= 0, "count < 0");
+    return lifeCycleStateMap.tailSet(state, start).stream()
+        .map(this::getContainerInfo)
+        .limit(count)
+        .collect(Collectors.toList());
   }
 
-  /**
-   * Returns Containers by State.
-   *
-   * @param state - State - Open, Closed etc.
-   * @return List of containers by state.
-   */
-  public NavigableSet<ContainerID> getContainerIDsByState(
-      final LifeCycleState state) {
-    Preconditions.checkNotNull(state);
-    return lifeCycleStateMap.getCollection(state);
+  public List<ContainerInfo> getContainerInfos(LifeCycleState state) {
+    return lifeCycleStateMap.getCollection(state).stream()
+        .map(this::getContainerInfo)
+        .collect(Collectors.toList());
+  }
+
+  public List<ContainerInfo> getContainerInfos(ReplicationType type) {
+    return typeMap.getCollection(type).stream()
+        .map(this::getContainerInfo)
+        .collect(Collectors.toList());
+  }
+
+  /** @return the number of containers for the given state. */
+  public int getContainerCount(LifeCycleState state) {
+    return lifeCycleStateMap.count(state);
   }
 }

@@ -32,13 +32,14 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QU
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LOCK_STRIPE_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LOCK_STRIPE_SIZE_DEFAULT;
 
-import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Striped;
 import java.io.IOException;
 import java.util.EnumMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -68,6 +69,7 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.common.statemachine.StateMachine;
 import org.apache.ratis.util.AutoCloseableLock;
+import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -239,7 +241,7 @@ public final class ContainerStateManagerImpl
 
       while (iterator.hasNext()) {
         final ContainerInfo container = iterator.next().getValue();
-        Preconditions.checkNotNull(container);
+        Objects.requireNonNull(container, "container == null");
         containers.addContainer(container);
         if (container.getState() == LifeCycleState.OPEN) {
           try {
@@ -268,23 +270,37 @@ public final class ContainerStateManagerImpl
   }
 
   @Override
-  public Set<ContainerID> getContainerIDs() {
+  public List<ContainerInfo> getContainerInfos(ContainerID start, int count) {
     try (AutoCloseableLock ignored = readLock()) {
-      return containers.getAllContainerIDs();
+      return containers.getContainerInfos(start, count);
     }
   }
 
   @Override
-  public Set<ContainerID> getContainerIDs(final LifeCycleState state) {
+  public List<ContainerInfo> getContainerInfos(LifeCycleState state, ContainerID start, int count) {
     try (AutoCloseableLock ignored = readLock()) {
-      return containers.getContainerIDsByState(state);
+      return containers.getContainerInfos(state, start, count);
     }
   }
 
   @Override
-  public Set<ContainerID> getContainerIDs(final ReplicationType type) {
+  public List<ContainerInfo> getContainerInfos(final LifeCycleState state) {
     try (AutoCloseableLock ignored = readLock()) {
-      return containers.getContainerIDsByType(type);
+      return containers.getContainerInfos(state);
+    }
+  }
+
+  @Override
+  public List<ContainerInfo> getContainerInfos(ReplicationType type) {
+    try (AutoCloseableLock ignored = readLock()) {
+      return containers.getContainerInfos(type);
+    }
+  }
+
+  @Override
+  public int getContainerCount(final LifeCycleState state) {
+    try (AutoCloseableLock ignored = readLock()) {
+      return containers.getContainerCount(state);
     }
   }
 
@@ -303,7 +319,7 @@ public final class ContainerStateManagerImpl
     // ClosedPipelineException once ClosedPipelineException is introduced
     // in PipelineManager.
 
-    Preconditions.checkNotNull(containerInfo);
+    Objects.requireNonNull(containerInfo, "containerInfo == null");
     final ContainerInfo container = ContainerInfo.fromProtobuf(containerInfo);
     final ContainerID containerID = container.containerID();
     final PipelineID pipelineID = container.getPipelineID();
@@ -403,7 +419,7 @@ public final class ContainerStateManagerImpl
   public void updateContainerReplica(final ContainerID id,
                                      final ContainerReplica replica) {
     try (AutoCloseableLock ignored = writeLock(id)) {
-      containers.updateContainerReplica(id, replica);
+      containers.updateContainerReplica(replica);
       // Clear any pending additions for this replica as we have now seen it.
       containerReplicaPendingOps.completeAddReplica(id,
           replica.getDatanodeDetails(), replica.getReplicaIndex());
@@ -413,8 +429,10 @@ public final class ContainerStateManagerImpl
   @Override
   public void removeContainerReplica(final ContainerID id,
                                      final ContainerReplica replica) {
+    //TODO remove ContainerID parameter
+    Preconditions.assertEquals(id, replica.getContainerID(), "containerID");
     try (AutoCloseableLock ignored = writeLock(id)) {
-      containers.removeContainerReplica(id, replica);
+      containers.removeContainerReplica(id, replica.getDatanodeDetails().getID());
       // Remove any pending delete replication operations for the deleted
       // replica.
       containerReplicaPendingOps.completeDeleteReplica(id,
@@ -601,9 +619,9 @@ public final class ContainerStateManagerImpl
     }
 
     public ContainerStateManager build() throws IOException {
-      Preconditions.checkNotNull(conf);
-      Preconditions.checkNotNull(pipelineMgr);
-      Preconditions.checkNotNull(table);
+      Objects.requireNonNull(conf, "conf == null");
+      Objects.requireNonNull(pipelineMgr, "pipelineMgr == null");
+      Objects.requireNonNull(table, "table == null");
 
       final ContainerStateManager csm = new ContainerStateManagerImpl(
           conf, pipelineMgr, table, transactionBuffer,
