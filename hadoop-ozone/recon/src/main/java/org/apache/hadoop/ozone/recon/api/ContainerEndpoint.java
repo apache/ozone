@@ -421,7 +421,7 @@ public class ContainerEndpoint {
         long containerID = c.getContainerId();
         ContainerInfo containerInfo =
             containerManager.getContainer(ContainerID.valueOf(containerID));
-        long keyCount = containerInfo.getNumberOfKeys();
+        long keyCount = reconContainerMetadataManager.getKeyCountForContainer(containerID);
         UUID pipelineID = containerInfo.getPipelineID().getId();
         List<ContainerHistory> datanodes =
             containerManager.getLatestContainerHistory(containerID,
