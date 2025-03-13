@@ -517,4 +517,20 @@ public final class OzoneManagerRatisUtils {
       OzoneManager om, OMRequest omRequest, ClientId clientId, long callId) throws ServiceException {
     return om.getOmRatisServer().submitRequest(omRequest, clientId, callId);
   }
+
+  public static OzoneManagerProtocolProtos.OMResponse createErrorResponse(
+      OMRequest omRequest, IOException exception) {
+    // Added all write command types here, because in future if any of the
+    // preExecute is changed to return IOException, we can return the error
+    // OMResponse to the client.
+    OzoneManagerProtocolProtos.OMResponse.Builder omResponse = OzoneManagerProtocolProtos.OMResponse.newBuilder()
+        .setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(exception))
+        .setCmdType(omRequest.getCmdType())
+        .setTraceID(omRequest.getTraceID())
+        .setSuccess(false);
+    if (exception.getMessage() != null) {
+      omResponse.setMessage(exception.getMessage());
+    }
+    return omResponse.build();
+  }
 }
