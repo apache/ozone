@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.persistence;
 
+import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
 import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.ALL_REPLICAS_BAD;
 import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.UNDER_REPLICATED;
 import static org.apache.ozone.recon.schema.generated.tables.UnhealthyContainersTable.UNHEALTHY_CONTAINERS;
@@ -24,6 +25,7 @@ import static org.jooq.impl.DSL.count;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import java.sql.Connection;
 import java.util.List;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
@@ -35,6 +37,7 @@ import org.jooq.Cursor;
 import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jooq.SelectQuery;
+import org.jooq.exception.DataAccessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -123,7 +126,26 @@ public class ContainerHealthSchemaManager {
             rec.getContainerState());
       });
     }
-    unhealthyContainersDao.insert(recs);
+
+    try (Connection connection = containerSchemaDefinition.getDataSource().getConnection()) {
+      connection.setAutoCommit(false); // Turn off auto-commit for transactional control
+      for (UnhealthyContainers rec : recs) {
+        try {
+          unhealthyContainersDao.insert(rec);
+        } catch (DataAccessException dataAccessException) {
+          // Log the error and just update other fields of the existing record
+          // in case of ConstraintViolationException being actually thrown.
+          unhealthyContainersDao.update(rec);
+          LOG.error("Error while inserting unhealthy container record: {}", rec,
+              dataAccessException);
+        }
+      }
+      // Commit all the records inserted and updated.
+      connection.commit();
+    } catch (Exception e) {
+      LOG.error("Failed to get connection over {} ", UNHEALTHY_CONTAINERS_TABLE_NAME, e);
+      throw new RuntimeException("Recon failed to insert " + recs.size() + " num of unhealthy container records.", e);
+    }
   }
 
 }
