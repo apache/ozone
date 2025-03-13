@@ -112,20 +112,26 @@ public class OmTableInsightTask implements ReconOmTask {
     for (String tableName : tables) {
       Table table = omMetadataManager.getTable(tableName);
 
-      try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator
-               = table.iterator()) {
+      try {
         if (tableHandlers.containsKey(tableName)) {
-          Triple<Long, Long, Long> details =
-              tableHandlers.get(tableName).getTableSizeAndCount(iterator);
-          objectCountMap.put(getTableCountKeyFromTable(tableName),
-              details.getLeft());
-          unReplicatedSizeMap.put(
-              getUnReplicatedSizeKeyFromTable(tableName), details.getMiddle());
-          replicatedSizeMap.put(getReplicatedSizeKeyFromTable(tableName),
-              details.getRight());
+          try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator
+                   = table.iterator()) {
+            Triple<Long, Long, Long> details =
+                tableHandlers.get(tableName).getTableSizeAndCount(iterator);
+            objectCountMap.put(getTableCountKeyFromTable(tableName),
+                details.getLeft());
+            unReplicatedSizeMap.put(
+                getUnReplicatedSizeKeyFromTable(tableName), details.getMiddle());
+            replicatedSizeMap.put(getReplicatedSizeKeyFromTable(tableName),
+                details.getRight());
+          }
         } else {
-          long count = Iterators.size(iterator);
-          objectCountMap.put(getTableCountKeyFromTable(tableName), count);
+          try (
+              TableIterator<String, ? extends Table.KeyValue<String, ?>> rawTableIterator
+                  = table.getRawTable().iterator()) {
+            long count = Iterators.size(rawTableIterator);
+            objectCountMap.put(getTableCountKeyFromTable(tableName), count);
+          }
         }
       } catch (IOException ioEx) {
         LOG.error("Unable to populate Table Count in Recon DB.", ioEx);
