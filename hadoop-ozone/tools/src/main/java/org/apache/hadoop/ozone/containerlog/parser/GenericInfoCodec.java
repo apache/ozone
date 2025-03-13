@@ -1,10 +1,32 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.hadoop.ozone.containerlog.parser;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
-import java.io.*;
-import java.util.*;
+
+/**
+ * Generic information codec for the 2 tables.
+ */
 
 public class GenericInfoCodec<T> implements Codec<List<T>> {
 
@@ -13,6 +35,7 @@ public class GenericInfoCodec<T> implements Codec<List<T>> {
 
   @Override
   public Class<List<T>> getTypeClass() {
+
     return (Class<List<T>>) (Class<?>) List.class;
   }
 
@@ -159,8 +182,10 @@ public class GenericInfoCodec<T> implements Codec<List<T>> {
     int offset = 0;
 
     while (offset < rawData.length) {
-      if (rawData[offset] != 2) {;
-        throw new IOException("Expected flag byte '2' for DatanodeContainerInfo, but found " + rawData[offset]);
+      if (rawData[offset] != 2) {
+        throw new IOException(
+            "Expected flag byte '2' for DatanodeContainerInfo, but found " + rawData[offset]
+        );
       }
 
       offset++;
@@ -252,7 +277,8 @@ public class GenericInfoCodec<T> implements Codec<List<T>> {
   private byte[] sliceArray(byte[] array, int offset, int length) {
     // Check that the offset and length are within valid bounds
     if (offset < 0 || offset + length > array.length) {
-      throw new ArrayIndexOutOfBoundsException("Invalid offset or length: offset=" + offset + ", length=" + length + ", array.length=" + array.length);
+      throw new ArrayIndexOutOfBoundsException("Invalid offset or length: offset=" +
+          offset + ", length=" + length + ", array.length=" + array.length);
     }
 
     byte[] slicedArray = new byte[length];
