@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
@@ -30,8 +31,10 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -57,6 +60,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -245,5 +249,55 @@ abstract class TestContainerStateMachine {
     ContainerProtos.ContainerCommandResponseProto resp =
         ContainerProtos.ContainerCommandResponseProto.parseFrom(succcesfulTransaction.getContent());
     assertEquals(ContainerProtos.Result.SUCCESS, resp.getResult());
+  }
+
+  @Test
+  public void testWriteTimout() throws Exception {
+    RaftProtos.LogEntryProto entry = mock(RaftProtos.LogEntryProto.class);
+    when(entry.getTerm()).thenReturn(1L);
+    when(entry.getIndex()).thenReturn(1L);
+    RaftProtos.LogEntryProto entryNext = mock(RaftProtos.LogEntryProto.class);
+    when(entryNext.getTerm()).thenReturn(1L);
+    when(entryNext.getIndex()).thenReturn(2L);
+    TransactionContext trx = mock(TransactionContext.class);
+    ContainerStateMachine.Context context = mock(ContainerStateMachine.Context.class);
+    when(trx.getStateMachineContext()).thenReturn(context);
+    doAnswer(e -> {
+      try {
+        Thread.sleep(200000);
+      } catch (InterruptedException ie) {
+        Thread.currentThread().interrupt();
+        throw ie;
+      }
+      return null;
+    }).when(dispatcher).dispatch(any(), any());
+
+    when(context.getRequestProto()).thenReturn(ContainerProtos.ContainerCommandRequestProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.WriteChunk).setWriteChunk(
+            ContainerProtos.WriteChunkRequestProto.newBuilder().setData(ByteString.copyFromUtf8("Test Data"))
+                .setBlockID(
+                    ContainerProtos.DatanodeBlockID.newBuilder().setContainerID(1).setLocalID(1).build()).build())
+        .setContainerID(1)
+        .setDatanodeUuid(UUID.randomUUID().toString()).build());
+    AtomicReference<Throwable> throwable = new AtomicReference<>(null);
+    Function<Throwable, ? extends Message> throwableSetter = t -> {
+      throwable.set(t);
+      return null;
+    };
+    Field writeChunkWaitMaxNs = stateMachine.getClass().getDeclaredField("writeChunkWaitMaxNs");
+    writeChunkWaitMaxNs.setAccessible(true);
+    writeChunkWaitMaxNs.set(stateMachine, 1000_000_000);
+    CompletableFuture<Message> firstWrite = stateMachine.write(entry, trx);
+    Thread.sleep(2000);
+    CompletableFuture<Message> secondWrite = stateMachine.write(entryNext, trx);
+    firstWrite.exceptionally(throwableSetter).get();
+    assertNotNull(throwable.get());
+    assertInstanceOf(InterruptedException.class, throwable.get());
+
+    secondWrite.exceptionally(throwableSetter).get();
+    assertNotNull(throwable.get());
+    assertInstanceOf(StorageContainerException.class, throwable.get());
+    StorageContainerException sce = (StorageContainerException) throwable.get();
+    assertEquals(ContainerProtos.Result.CONTAINER_INTERNAL_ERROR, sce.getResult());
   }
 }
