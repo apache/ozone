@@ -88,6 +88,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -157,6 +158,7 @@ public class TestBlockDeletion {
         3, TimeUnit.SECONDS);
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
         false);
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED, false);
     conf.setTimeDuration(OZONE_SCM_EXPIRED_CONTAINER_REPLICA_OP_SCRUB_INTERVAL,
         100, TimeUnit.MILLISECONDS);
     conf.setInt(OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 100);
