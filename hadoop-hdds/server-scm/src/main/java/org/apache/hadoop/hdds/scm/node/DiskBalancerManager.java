@@ -268,7 +268,7 @@ public class DiskBalancerManager {
             .setRunningStatus(status.getRunningStatus())
             .setSuccessMoveCount(status.getSuccessMoveCount())
             .setFailureMoveCount(status.getFailureMoveCount())
-            .setEstimatedTotalSizePendingToMove(status.getEstimatedTotalSizePendingToMove());
+            .setBytesToMove(status.getBytesToMove());
     if (status.getRunningStatus() != DiskBalancerRunningStatus.UNKNOWN) {
       builder.setDiskBalancerConf(statusMap.get(dn)
           .getDiskBalancerConfiguration().toProtobufBuilder());
@@ -327,10 +327,10 @@ public class DiskBalancerManager {
             new DiskBalancerConfiguration();
     long successMoveCount = reportProto.getSuccessMoveCount();
     long failureMoveCount = reportProto.getFailureMoveCount();
-    long estimatedTotalSizePendingToMove = reportProto.getEstimatedTotalSizePendingToMove();
+    long bytesToMove = reportProto.getBytesToMove();
     statusMap.put(dn, new DiskBalancerStatus(
         isRunning ? DiskBalancerRunningStatus.RUNNING : DiskBalancerRunningStatus.STOPPED,
-        diskBalancerConfiguration, successMoveCount, failureMoveCount, estimatedTotalSizePendingToMove));
+        diskBalancerConfiguration, successMoveCount, failureMoveCount, bytesToMove));
     if (reportProto.hasBalancedBytes()) {
       balancedBytesMap.put(dn, reportProto.getBalancedBytes());
     }

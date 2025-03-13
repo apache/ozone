@@ -104,6 +104,7 @@ public class DiskBalancerService extends BackgroundService {
 
   private DiskBalancerServiceMetrics metrics;
   private long queueSize;
+  private long bytesToMove;
 
   public DiskBalancerService(OzoneContainer ozoneContainer,
       long serviceCheckInterval, long serviceCheckTimeout, TimeUnit timeUnit,
@@ -354,6 +355,7 @@ public class DiskBalancerService extends BackgroundService {
       metrics.incrIdleLoopNoAvailableVolumePairCount();
     }
     queueSize = queue.size();
+    bytesToMove = calculateBytesToMove();
     return queue;
   }
 
@@ -508,17 +510,17 @@ public class DiskBalancerService extends BackgroundService {
   public DiskBalancerInfo getDiskBalancerInfo() {
     return new DiskBalancerInfo(shouldRun, threshold, bandwidthInMB,
         parallelThread, version, metrics.getSuccessCount(),
-        metrics.getFailureCount(), estimatedTotalSizePendingToMove());
+        metrics.getFailureCount(), bytesToMove);
   }
 
-  private long estimatedTotalSizePendingToMove() {
-    long totalDataPendingToMove = 0;
+  private long calculateBytesToMove() {
+    long bytesPendingToMove = 0;
 
     if (queueSize == 0) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("No available Volume pair to perform move.");
       }
-      return totalDataPendingToMove;
+      return bytesPendingToMove;
     }
 
     long totalUsedSpace = 0;
@@ -547,10 +549,10 @@ public class DiskBalancerService extends BackgroundService {
       // Consider only volumes exceeding the upper threshold
       if (volumeUtilization > upperLimit) {
         long excessData = usedSpace - (long) (upperLimit * capacity);
-        totalDataPendingToMove += excessData;
+        bytesPendingToMove += excessData;
       }
     }
-    return totalDataPendingToMove;
+    return bytesPendingToMove;
   }
 
   private Path getDiskBalancerTmpDir(HddsVolume hddsVolume) {
@@ -577,6 +579,14 @@ public class DiskBalancerService extends BackgroundService {
 
   public VolumeChoosingPolicy getVolumeChoosingPolicy() {
     return volumeChoosingPolicy;
+  }
+
+  public long getBytesToMove() {
+    return calculateBytesToMove();
+  }
+
+  public void setQueueSize(long queueSize) {
+    this.queueSize = queueSize;
   }
 
   @Override

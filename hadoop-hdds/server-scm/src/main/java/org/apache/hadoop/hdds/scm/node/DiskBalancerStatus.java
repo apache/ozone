@@ -33,15 +33,15 @@ public class DiskBalancerStatus {
   private DiskBalancerConfiguration diskBalancerConfiguration;
   private long successMoveCount;
   private long failureMoveCount;
-  private long estimatedTotalSizePendingToMove;
+  private long bytesToMove;
 
   public DiskBalancerStatus(DiskBalancerRunningStatus isRunning, DiskBalancerConfiguration conf,
-      long successMoveCount, long failureMoveCount, long estimatedTotalSizePendingToMove) {
+      long successMoveCount, long failureMoveCount, long bytesToMove) {
     this.isRunning = isRunning;
     this.diskBalancerConfiguration = conf;
     this.successMoveCount = successMoveCount;
     this.failureMoveCount = failureMoveCount;
-    this.estimatedTotalSizePendingToMove = estimatedTotalSizePendingToMove;
+    this.bytesToMove = bytesToMove;
   }
 
   public DiskBalancerRunningStatus getRunningStatus() {
@@ -60,7 +60,7 @@ public class DiskBalancerStatus {
     return failureMoveCount;
   }
 
-  public long getEstimatedTotalSizePendingToMove() {
-    return estimatedTotalSizePendingToMove;
+  public long getBytesToMove() {
+    return bytesToMove;
   }
 }

@@ -28,6 +28,8 @@ import static org.mockito.Mockito.when;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -46,10 +48,13 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.util.DiskChecker;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * This is a test class for DiskBalancerService.
@@ -152,6 +157,10 @@ public class TestDiskBalancerService {
   }
 
   private String generateVolumeLocation(String base, int volumeCount) {
+    if (volumeCount == 0) {
+      return "";
+    }
+
     StringBuilder sb = new StringBuilder();
     for (int i = 0; i < volumeCount; i++) {
       sb.append(base + "/vol" + i);
@@ -168,6 +177,86 @@ public class TestDiskBalancerService {
         mockDependencies(containerSet, keyValueHandler, controller);
     return new DiskBalancerServiceTestImpl(ozoneContainer, 1000, config,
         threadCount);
+  }
+
+  static List<Integer> createVolumeSet() {
+    List<Integer> params = new ArrayList<>();
+    for (int i = 0; i < 4; i++) {
+      params.add(i);
+    }
+    return params;
+  }
+
+  @ParameterizedTest
+  @MethodSource("createVolumeSet")
+  public void testCalculateBytesToMove(Integer i) throws IOException {
+    try {
+      conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
+          generateVolumeLocation(testRoot.getAbsolutePath(), i));
+      volumeSet = new MutableVolumeSet(datanodeUuid, scmId, conf, null,
+          StorageVolume.VolumeType.DATA_VOLUME, null);
+      createDbInstancesForTestIfNeeded(volumeSet, scmId, scmId, conf);
+
+      double num1 = 0.02;
+      List<StorageVolume> volumes = new ArrayList<>();
+
+      for (StorageVolume volume : volumeSet.getVolumesList()) {
+        volume.incrementUsedSpace((long) (volume.getCurrentUsage().getCapacity() * num1));
+        volumes.add(volume);
+        num1 = 0.8;
+      }
+
+      ContainerSet containerSet = new ContainerSet(1000);
+      ContainerMetrics metrics = ContainerMetrics.create(conf);
+      KeyValueHandler keyValueHandler =
+          new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
+              metrics, c -> {
+          });
+      DiskBalancerServiceTestImpl svc =
+          getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1);
+      svc.setShouldRun(true);
+      svc.setThreshold(10);
+      svc.setQueueSize(2);
+
+      long expectedBytesToMove = calculateExpectedBytesToMove(volumes, svc.getDiskBalancerInfo().getThreshold());
+
+      assertEquals(expectedBytesToMove, svc.getBytesToMove(),
+          "The calculated bytes to move should match the expected reduction to meet the threshold.");
+    } catch (DiskChecker.DiskOutOfSpaceException e) {
+      assertEquals(0, i, "No storage locations configured");
+    }
+  }
+
+  private long calculateExpectedBytesToMove(List<StorageVolume> volumes, double threshold) {
+    long bytesPendingToMove = 0;
+
+    long totalUsedSpace = 0;
+    long totalCapacity = 0;
+
+    for (StorageVolume volume : volumes) {
+      totalUsedSpace += volume.getCurrentUsage().getUsedSpace();
+      totalCapacity += volume.getCurrentUsage().getCapacity();
+    }
+
+    if (totalCapacity == 0) {
+      return 0;
+    }
+
+    double datanodeUtilization = (double) totalUsedSpace / totalCapacity;
+    double thresholdFraction = threshold / 100.0;
+    double upperLimit = datanodeUtilization + thresholdFraction;
+
+    for (StorageVolume volume : volumes) {
+      long usedSpace = volume.getCurrentUsage().getUsedSpace();
+      long capacity = volume.getCurrentUsage().getCapacity();
+      double volumeUtilization = (double) usedSpace / capacity;
+
+      if (volumeUtilization > upperLimit) {
+        long excessData = usedSpace - (long) (upperLimit * capacity);
+        bytesPendingToMove += excessData;
+      }
+    }
+    return bytesPendingToMove;
   }
 
   private OzoneContainer mockDependencies(ContainerSet containerSet,
