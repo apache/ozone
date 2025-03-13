@@ -24,9 +24,6 @@ cd "$DIR/../../.." || exit 1
 : ${ITERATIONS:="1"}
 : ${OZONE_WITH_COVERAGE:="false"}
 : ${OZONE_REPO_CACHED:="false"}
-: ${TARGET_TEST_CLASS:=""}
-
-source "${DIR}/_lib.sh"
 
 declare -i ITERATIONS
 if [[ ${ITERATIONS} -le 0 ]]; then
@@ -61,23 +58,6 @@ REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/${CHECK}"}
 REPORT_FILE="${REPORT_DIR}/summary.txt"
 mkdir -p "$REPORT_DIR"
 
-echo "TARGET_TEST_CLASS: ${TARGET_TEST_CLASS}"
-
-# find project paths and build Maven project list argument
-PROJECT_LIST=""
-if [[ -n "${TARGET_TEST_CLASS}" ]]; then
-  # Call the function to populate PROJECT_PATHS array
-  find_project_paths_for_test_class "${TARGET_TEST_CLASS}"
-
-  # Join project paths with commas for Maven -pl option
-  if [[ ${#PROJECT_PATHS[@]} -gt 0 ]]; then
-    IFS=","
-    PROJECT_LIST="-pl ${PROJECT_PATHS[*]}"
-    unset IFS
-    echo "Setting project list to: ${PROJECT_LIST}"
-  fi
-fi
-
 rc=0
 for i in $(seq 1 ${ITERATIONS}); do
   if [[ ${ITERATIONS} -gt 1 ]]; then
@@ -86,7 +66,7 @@ for i in $(seq 1 ${ITERATIONS}); do
     mkdir -p "${REPORT_DIR}"
   fi
 
-  mvn ${MAVEN_OPTIONS} ${PROJECT_LIST} -Dmaven-surefire-plugin.argLineAccessArgs="${OZONE_MODULE_ACCESS_ARGS}" "$@" verify \
+  mvn ${MAVEN_OPTIONS} -Dmaven-surefire-plugin.argLineAccessArgs="${OZONE_MODULE_ACCESS_ARGS}" "$@" verify \
     | tee "${REPORT_DIR}/output.log"
   irc=$?
 
