@@ -145,14 +145,12 @@ public interface ContainerStateManager {
   /**
    *
    */
-  void updateContainerReplica(ContainerID id,
-                              ContainerReplica replica);
+  void updateContainerReplica(ContainerReplica replica);
 
   /**
    *
    */
-  void removeContainerReplica(ContainerID id,
-                              ContainerReplica replica);
+  void removeContainerReplica(ContainerReplica replica);
 
   /**
    *

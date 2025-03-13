@@ -311,7 +311,7 @@ public class ContainerManagerImpl implements ContainerManager {
                                      final ContainerReplica replica)
       throws ContainerNotFoundException {
     if (containerExist(cid)) {
-      containerStateManager.updateContainerReplica(cid, replica);
+      containerStateManager.updateContainerReplica(replica);
     } else {
       throwContainerNotFoundException(cid);
     }
@@ -322,7 +322,7 @@ public class ContainerManagerImpl implements ContainerManager {
                                      final ContainerReplica replica)
       throws ContainerNotFoundException, ContainerReplicaNotFoundException {
     if (containerExist(cid)) {
-      containerStateManager.removeContainerReplica(cid, replica);
+      containerStateManager.removeContainerReplica(replica);
     } else {
       throwContainerNotFoundException(cid);
     }
