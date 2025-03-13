@@ -99,7 +99,6 @@ import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -169,7 +168,7 @@ public class TestOzoneShellHA {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
     conf.setBoolean(OZONE_FS_HSYNC_ENABLED, true);
-    // startKMS();
+    startKMS();
     startCluster(conf);
   }
 
@@ -1808,7 +1807,6 @@ public class TestOzoneShellHA {
   }
 
   @Test
-  @Unhealthy("HDDS-11879")
   public void testSetEncryptionKey() throws Exception {
     final String volumeName = "volume111";
     getVolume(volumeName);
@@ -2488,7 +2486,6 @@ public class TestOzoneShellHA {
   }
 
   private static String getKeyProviderURI(MiniKMS kms) {
-    // HDDS-11879
     if (kms == null) {
       return "";
     }
