@@ -199,7 +199,7 @@ function run_all_tests_if_environment_files_changed() {
     )
     local ignore_array=(
         "^dev-support/ci/pr_title_check"
-        "^dev-support/ci/find_test_class_project.sh"
+        "^dev-support/ci/find_test_class_project"
     )
     filter_changed_files
 
