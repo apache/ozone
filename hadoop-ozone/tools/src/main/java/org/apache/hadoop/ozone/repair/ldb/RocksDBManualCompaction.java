@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
 import org.apache.hadoop.ozone.repair.RepairTool;
+import org.apache.hadoop.util.Time;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
@@ -36,8 +37,9 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(
     name = "compact",
-    description = "CLI to compact a column-family in the DB. " +
-        "Note: If om.db is compacted then it will impact efficient snapshot diff.",
+    description = "CLI to compact a column-family in the DB. while the service is offline." +
+        "Note: If om.db is compacted with this tool then it will negatively impact " +
+        "the Ozone Manager's efficient snapshot diff.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
@@ -48,7 +50,7 @@ public class RocksDBManualCompaction extends RepairTool {
       description = "Database File Path")
   private String dbPath;
 
-  @CommandLine.Option(names = {"--column_family", "--column-family", "--cf"},
+  @CommandLine.Option(names = {"--column-family", "--column_family", "--cf"},
       required = true,
       description = "Column family name")
   private String columnFamilyName;
@@ -67,17 +69,20 @@ public class RocksDBManualCompaction extends RepairTool {
       }
 
       info("Running compaction on " + columnFamilyName);
+      long startTime = Time.monotonicNow();
       if (!isDryRun()) {
         ManagedCompactRangeOptions compactOptions = new ManagedCompactRangeOptions();
         compactOptions.setBottommostLevelCompaction(ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
         db.get().compactRange(cfh, null, null, compactOptions);
       }
-      info("Compaction completed.");
+      long duration = Time.monotonicNow() - startTime;
+      info("Compaction completed in " + duration + "ms.");
 
     } catch (RocksDBException exception) {
-      error("Failed to compact the RocksDB for the given path: %s, column-family:%s", dbPath, columnFamilyName);
       error("Exception: " + exception);
-      throw new IOException("Failed to compact RocksDB.", exception);
+      String errorMsg = "Failed to compact RocksDB for the given path: " + dbPath +
+          ", column-family:" + columnFamilyName;
+      throw new IOException(errorMsg, exception);
     } finally {
       IOUtils.closeQuietly(cfHandleList);
     }
