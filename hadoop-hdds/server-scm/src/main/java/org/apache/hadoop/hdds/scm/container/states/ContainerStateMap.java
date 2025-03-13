@@ -303,8 +303,8 @@ public class ContainerStateMap {
         .collect(Collectors.toList());
   }
 
-  public List<ContainerInfo> getContainerInfos(ReplicationType state) {
-    return typeMap.getCollection(state).stream()
+  public List<ContainerInfo> getContainerInfos(ReplicationType type) {
+    return typeMap.getCollection(type).stream()
         .map(this::getContainerInfo)
         .collect(Collectors.toList());
   }
