@@ -4138,6 +4138,15 @@
   </property>
 
   <property>
+    <name>ozone.om.allocate.block.cache_enabled</name>
+    <value>true</value>
+    <tag>OZONE, OM, SCM</tag>
+    <description>
+      Enable prefetch blocks to be cached within OM.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.enable.ofs.shared.tmp.dir</name>
     <value>false</value>
     <tag>OZONE, OM</tag>

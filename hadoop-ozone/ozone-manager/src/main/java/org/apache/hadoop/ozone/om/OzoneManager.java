@@ -54,6 +54,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOU
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
@@ -421,6 +423,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final SecurityConfig secConfig;
   private S3SecretManager s3SecretManager;
   private final boolean isOmGrpcServerEnabled;
+  private final boolean isAllocateBlockCacheEnabled;
   private volatile boolean isOmRpcServerRunning = false;
   private volatile boolean isOmGrpcServerRunning = false;
   private String omComponent;
@@ -574,6 +577,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.isOmGrpcServerEnabled = conf.getBoolean(
         OZONE_OM_S3_GPRC_SERVER_ENABLED,
         OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT);
+    this.isAllocateBlockCacheEnabled = conf.getBoolean(
+        OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED,
+        OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED_DEFAULT);
     this.scmBlockSize = (long) conf.getStorageSize(OZONE_SCM_BLOCK_SIZE,
         OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
     this.preallocateBlocksMax = conf.getInt(
@@ -1759,7 +1765,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     try {
-      omBlockPrefetchClient.start(configuration);
+      if (isAllocateBlockCacheEnabled) {
+        omBlockPrefetchClient.start(configuration);
+      }
     } catch (IOException ex) {
       LOG.error("Unable to initialize OMBlockPrefetchClient ", ex);
       throw new UncheckedIOException(ex);
@@ -2519,6 +2527,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // Should not trigger exception here at all
       return false;
     }
+  }
+
+  public boolean getIsAllocateBlockCacheEnabled() {
+    return isAllocateBlockCacheEnabled;
   }
 
   public String getVolumeOwner(String vol, ACLType type, ResourceType resType)
