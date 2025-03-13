@@ -479,7 +479,7 @@ function get_count_misc_files() {
     start_end::group_start "Count misc. files"
     local pattern_array=(
         "^dev-support/ci/pr_title_check"
-        "^dev-support/ci/find_test_class_project.sh"
+        "^dev-support/ci/find_test_class_project"
         "^.github"
         "^hadoop-hdds/dev-support/checkstyle"
         "^hadoop-ozone/dev-support/checks"
