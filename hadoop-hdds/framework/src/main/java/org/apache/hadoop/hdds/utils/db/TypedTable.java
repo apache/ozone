@@ -146,7 +146,11 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   private VALUE decodeValue(byte[] value) throws IOException {
-    return value == null ? null : valueCodec.fromPersistedFormat(value);
+    return decodeValue(value, valueCodec);
+  }
+
+  private VALUE decodeValue(byte[] value, Codec<VALUE> customValueCodec) throws IOException {
+    return value == null ? null : customValueCodec.fromPersistedFormat(value);
   }
 
   @Override
@@ -420,10 +424,15 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   @Override
   public Table.KeyValueIterator<KEY, VALUE> iterator(KEY prefix)
       throws IOException {
+    return iterator(valueCodec, prefix);
+  }
+
+  public Table.KeyValueIterator<KEY, VALUE> iterator(Codec<VALUE> customValueCodec, KEY prefix) throws IOException {
+    Codec<VALUE> finalValueCodec = customValueCodec == null ? valueCodec : customValueCodec;
     if (supportCodecBuffer) {
       final CodecBuffer prefixBuffer = encodeKeyCodecBuffer(prefix);
       try {
-        return newCodecBufferTableIterator(rawTable.iterator(prefixBuffer));
+        return newCodecBufferTableIterator(rawTable.iterator(prefixBuffer), finalValueCodec);
       } catch (Throwable t) {
         if (prefixBuffer != null) {
           prefixBuffer.release();
@@ -432,7 +441,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       }
     } else {
       final byte[] prefixBytes = encodeKey(prefix);
-      return new TypedTableIterator(rawTable.iterator(prefixBytes));
+      return new TypedTableIterator(rawTable.iterator(prefixBytes), finalValueCodec);
     }
   }
 
@@ -558,9 +567,15 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   public final class TypedKeyValue implements KeyValue<KEY, VALUE> {
 
     private final KeyValue<byte[], byte[]> rawKeyValue;
+    private final Codec<VALUE> customValueCodec;
 
     private TypedKeyValue(KeyValue<byte[], byte[]> rawKeyValue) {
+      this(rawKeyValue, valueCodec);
+    }
+
+    private TypedKeyValue(KeyValue<byte[], byte[]> rawKeyValue, Codec<VALUE> customValueCodec) {
       this.rawKeyValue = rawKeyValue;
+      this.customValueCodec = customValueCodec;
     }
 
     @Override
@@ -570,7 +585,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
     @Override
     public VALUE getValue() throws IOException {
-      return decodeValue(rawKeyValue.getValue());
+      return decodeValue(rawKeyValue.getValue(), customValueCodec);
     }
 
     public byte[] getRawKey() throws IOException {
@@ -583,7 +598,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   RawIterator<CodecBuffer> newCodecBufferTableIterator(
-      TableIterator<CodecBuffer, KeyValue<CodecBuffer, CodecBuffer>> i) {
+      TableIterator<CodecBuffer, KeyValue<CodecBuffer, CodecBuffer>> i, Codec<VALUE> customValueCodec) {
     return new RawIterator<CodecBuffer>(i) {
       @Override
       AutoCloseSupplier<CodecBuffer> convert(KEY key) throws IOException {
@@ -606,7 +621,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
           throws IOException {
         final int rawSize = raw.getValue().readableBytes();
         final KEY key = keyCodec.fromCodecBuffer(raw.getKey());
-        final VALUE value = valueCodec.fromCodecBuffer(raw.getValue());
+        final VALUE value = customValueCodec.fromCodecBuffer(raw.getValue());
         return Table.newKeyValue(key, value, rawSize);
       }
     };
@@ -616,9 +631,10 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
    * Table Iterator implementation for strongly typed tables.
    */
   public class TypedTableIterator extends RawIterator<byte[]> {
-    TypedTableIterator(
-        TableIterator<byte[], KeyValue<byte[], byte[]>> rawIterator) {
+    private final Codec<VALUE> customValueCodec;
+    TypedTableIterator(TableIterator<byte[], KeyValue<byte[], byte[]>> rawIterator, Codec<VALUE> customValueCodec) {
       super(rawIterator);
+      this.customValueCodec = customValueCodec;
     }
 
     @Override
@@ -629,7 +645,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
     @Override
     KeyValue<KEY, VALUE> convert(KeyValue<byte[], byte[]> raw) {
-      return new TypedKeyValue(raw);
+      return new TypedKeyValue(raw, customValueCodec);
     }
   }
 

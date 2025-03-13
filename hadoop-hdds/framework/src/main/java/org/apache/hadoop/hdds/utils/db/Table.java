@@ -174,6 +174,17 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
       throws IOException;
 
   /**
+   * Returns a prefixed iterator for this metadata store with customized value codec.
+   * @param customValueCodec customized codec for value
+   * @param prefix key prefix
+   * @return MetaStoreIterator
+   */
+  default TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator(Codec<VALUE> customValueCodec, KEY prefix)
+      throws IOException {
+    return iterator(prefix);
+  }
+
+  /**
    * Returns the Name of this Table.
    * @return - Table Name.
    * @throws IOException on failure.
