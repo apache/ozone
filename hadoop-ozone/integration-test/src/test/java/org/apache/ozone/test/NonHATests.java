@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.admin.om.lease.TestLeaseRecoverer;
 import org.apache.hadoop.ozone.client.rpc.TestCloseContainerHandlingByClient;
 import org.apache.hadoop.ozone.client.rpc.TestContainerStateMachineStream;
 import org.apache.hadoop.ozone.client.rpc.TestDiscardPreallocatedBlocks;
+import org.apache.hadoop.ozone.client.rpc.TestOzoneRpcClientWithKeyLatestVersion;
 import org.apache.hadoop.ozone.om.TestBucketLayoutWithOlderClient;
 import org.apache.hadoop.ozone.om.TestListKeys;
 import org.apache.hadoop.ozone.om.TestListKeysWithFSO;
@@ -330,6 +331,14 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
 
   @Nested
   class OzoneManagerRestInterface extends TestOzoneManagerRestInterface {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class OzoneRpcClientWithKeyLatestVersion extends TestOzoneRpcClientWithKeyLatestVersion {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
