@@ -21,7 +21,7 @@ import java.util.Set;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 
 /**
- * A Container Report gets processsed by the Node2Container and returns the
+ * A Container Report gets processed by the Node2Container and returns the
  * Report Result class.
  */
 public class StorageReportResult {
