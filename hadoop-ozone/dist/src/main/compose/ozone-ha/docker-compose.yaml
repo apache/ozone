@@ -40,22 +40,32 @@ services:
     <<: *common-config
     environment:
       WAITFOR: scm3:9894
+      OZONE_OPTS: -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5015
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       <<: *replication
     ports:
       - 9874:9874
       - 9862
+      - 5015:5015
+      - 10101
+      - 10102
+      - 10103
     hostname: om1
     command: ["ozone","om"]
   om2:
     <<: *common-config
     environment:
       WAITFOR: scm3:9894
+      OZONE_OPTS: -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5025
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       <<: *replication
     ports:
       - 9874
       - 9862
+      - 5025:5025
+      - 10101
+      - 10102
+      - 10103
     hostname: om2
     command: ["ozone","om"]
   om3:
@@ -63,10 +73,15 @@ services:
     environment:
       WAITFOR: scm3:9894
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
+      OZONE_OPTS: -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5035
       <<: *replication
     ports:
       - 9874
       - 9862
+      - 5035:5035
+      - 10101
+      - 10102
+      - 10103
     hostname: om3
     command: ["ozone","om"]
   scm1:

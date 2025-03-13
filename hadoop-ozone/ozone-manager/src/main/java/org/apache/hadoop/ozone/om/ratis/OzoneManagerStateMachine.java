@@ -25,6 +25,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -37,6 +38,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
+import org.apache.hadoop.ozone.om.bucket.server.OzoneBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
@@ -95,6 +97,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final boolean isTracingEnabled;
   private final AtomicInteger statePausedCount = new AtomicInteger(0);
   private final String threadPrefix;
+  private final OffsetDateTime createdAt = OffsetDateTime.now();
 
   /** The last {@link TermIndex} received from {@link #notifyTermIndexUpdated(long, long)}. */
   private volatile TermIndex lastNotifiedTermIndex = TermIndex.valueOf(0, RaftLog.INVALID_LOG_INDEX);
@@ -103,6 +106,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
   private final NettyMetrics nettyMetrics;
 
+  private final OzoneBucket ozoneBucket;
   public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer,
       boolean isTracingEnabled) throws IOException {
     this.isTracingEnabled = isTracingEnabled;
@@ -124,6 +128,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     this.installSnapshotExecutor =
         HadoopExecutors.newSingleThreadExecutor(installSnapshotThreadFactory);
     this.nettyMetrics = NettyMetrics.create();
+    this.ozoneBucket = new OzoneBucket(ozoneManager, ozoneManager.getConfiguration());
   }
 
   /**
@@ -132,11 +137,14 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @Override
   public void initialize(RaftServer server, RaftGroupId id,
       RaftStorage raftStorage) throws IOException {
+    LOG.error("Initializing state machine for server {}. LS state: {}. PeerId: {}", server, getLifeCycleState().name(), server.getId());
+    LOG.error("Created at: {}", createdAt);
     getLifeCycle().startAndTransition(() -> {
       super.initialize(server, id, raftStorage);
       storage.init(raftStorage);
       LOG.info("{}: initialize {} with {}", getId(), id, getLastAppliedTermIndex());
     });
+    ozoneBucket.start("");
   }
 
   @Override

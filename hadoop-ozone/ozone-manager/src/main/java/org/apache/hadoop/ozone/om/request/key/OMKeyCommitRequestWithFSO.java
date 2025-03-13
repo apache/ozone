@@ -228,6 +228,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex);
+//      omKeyInfo.setWriteUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       // If bucket versioning is turned on during the update, between key
       // creation and key commit, old versions will be just overwritten and

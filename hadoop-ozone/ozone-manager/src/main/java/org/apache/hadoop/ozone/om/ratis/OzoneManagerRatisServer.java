@@ -173,6 +173,7 @@ public final class OzoneManagerRatisServer {
     this.server = RaftServer.newBuilder()
         .setServerId(this.raftPeerId)
         .setGroup(this.raftGroup)
+//        .setStateMachineRegistry()
         .setProperties(serverProperties)
         .setParameters(parameters)
         .setStateMachine(omStateMachine)
@@ -324,6 +325,7 @@ public final class OzoneManagerRatisServer {
   private RaftClientReply submitRequestToRatisImpl(
       RaftClientRequest raftClientRequest) throws ServiceException {
     try {
+//      server.getGroupInfo()
       return server.submitClientRequestAsync(raftClientRequest)
           .get();
     } catch (ExecutionException | IOException ex) {
@@ -609,6 +611,7 @@ public final class OzoneManagerRatisServer {
    */
   private OzoneManagerStateMachine getStateMachine(ConfigurationSource conf)
       throws IOException {
+//    LOG.error("Get ozone manager state machine");
     return new OzoneManagerStateMachine(this,
         TracingUtil.isTracingEnabled(conf));
   }
