@@ -17,23 +17,12 @@
 
 package org.apache.hadoop.ozone.debug.replicas;
 
-import org.apache.hadoop.hdds.cli.DebugSubcommand;
-import org.apache.hadoop.ozone.debug.replicas.chunk.ChunkKeyHandler;
-import org.kohsuke.MetaInfServices;
-import picocli.CommandLine;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 
 /**
- * Replicas debug related commands.
+ * Functional interface for implementing a key verifier.
  */
-@CommandLine.Command(
-    name = "replicas",
-    description = "Debug commands for replica-related issues, retrieving replica information from the OM and " +
-            "performing checks over the network against a running cluster.",
-    subcommands = {
-        ChunkKeyHandler.class,
-        ReplicasVerify.class
-    }
-)
-@MetaInfServices(DebugSubcommand.class)
-public class ReplicasDebug implements DebugSubcommand {
+@FunctionalInterface
+public interface ReplicaVerifier {
+  void verifyKey(OzoneKeyDetails keyDetails);
 }
