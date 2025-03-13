@@ -22,8 +22,10 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 
 /**
  * Class to correct over replicated QuasiClosed Stuck Ratis containers.
@@ -50,7 +52,7 @@ public class QuasiClosedStuckOverReplicationHandler implements UnhealthyReplicat
 
     int pendingDelete = 0;
     for (ContainerReplicaOp op : pendingOps) {
-      if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
+      if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
         pendingDelete++;
       }
     }

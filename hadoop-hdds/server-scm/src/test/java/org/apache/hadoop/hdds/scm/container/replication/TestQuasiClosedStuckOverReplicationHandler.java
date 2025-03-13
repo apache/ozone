@@ -59,6 +59,8 @@ public class TestQuasiClosedStuckOverReplicationHandler {
   private ReplicationManagerMetrics metrics;
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
   private QuasiClosedStuckOverReplicationHandler handler;
+  private UUID origin1 = UUID.randomUUID();
+  private UUID origin2 = UUID.randomUUID();
 
   @BeforeEach
   void setup() throws NodeNotFoundException,
@@ -95,12 +97,12 @@ public class TestQuasiClosedStuckOverReplicationHandler {
 
   @Test
   public void testReturnsZeroIfNotOverReplicated() throws IOException {
-    UUID origin = UUID.randomUUID();
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
         StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED,
-        Pair.of(origin, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin, HddsProtos.NodeOperationalState.IN_SERVICE));
+        Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE),
+        Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE),
+        Pair.of(origin2, HddsProtos.NodeOperationalState.IN_SERVICE),
+        Pair.of(origin2, HddsProtos.NodeOperationalState.IN_SERVICE));
 
     int count = handler.processAndSendCommands(replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1);
     assertEquals(0, count);
@@ -108,11 +110,14 @@ public class TestQuasiClosedStuckOverReplicationHandler {
 
   @Test
   public void testNoCommandsScheduledIfPendingOps() throws IOException {
-    UUID origin = UUID.randomUUID();
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
         StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED,
-        Pair.of(origin, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin, HddsProtos.NodeOperationalState.IN_SERVICE));
+        Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE),
+        Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE),
+        Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE),
+        Pair.of(origin2, HddsProtos.NodeOperationalState.IN_SERVICE),
+        Pair.of(origin2, HddsProtos.NodeOperationalState.IN_SERVICE),
+        Pair.of(origin2, HddsProtos.NodeOperationalState.IN_SERVICE));
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
     pendingOps.add(ContainerReplicaOp.create(
         ContainerReplicaOp.PendingOpType.DELETE, MockDatanodeDetails.randomDatanodeDetails(), 0));
@@ -123,13 +128,13 @@ public class TestQuasiClosedStuckOverReplicationHandler {
 
   @Test
   public void testCommandScheduledForOverReplicatedContainer() throws IOException {
-    UUID origin = UUID.randomUUID();
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
         StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED,
-        Pair.of(origin, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin, HddsProtos.NodeOperationalState.IN_SERVICE));
+        Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE),
+        Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE),
+        Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE),
+        Pair.of(origin2, HddsProtos.NodeOperationalState.IN_SERVICE),
+        Pair.of(origin2, HddsProtos.NodeOperationalState.IN_SERVICE));
 
     int count = handler.processAndSendCommands(replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1);
     assertEquals(1, count);
@@ -139,8 +144,6 @@ public class TestQuasiClosedStuckOverReplicationHandler {
 
   @Test
   public void testOverloadedExceptionContinuesAndThrows() throws NotLeaderException, CommandTargetOverloadedException {
-    UUID origin1 = UUID.randomUUID();
-    UUID origin2 = UUID.randomUUID();
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
         StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED,
         Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE),
