@@ -63,8 +63,21 @@ public class QuasiClosedStuckOverReplicationHandler implements UnhealthyReplicat
       return 0;
     }
 
+    // Filter out any STALE replicas, as they may go dead soon. If so, we don't want to remove other healthy replicas
+    // instead of them, as they could result in under replication.
+    Set<ContainerReplica> healthyReplicas = replicas.stream()
+        .filter(replica -> {
+          try {
+            return replicationManager.getNodeStatus(
+                replica.getDatanodeDetails()).getHealth() == HddsProtos.NodeState.HEALTHY;
+          } catch (NodeNotFoundException e) {
+            return false;
+          }
+        })
+        .collect(Collectors.toSet());
+
     QuasiClosedStuckReplicaCount replicaCount =
-        new QuasiClosedStuckReplicaCount(replicas, remainingMaintenanceRedundancy);
+        new QuasiClosedStuckReplicaCount(healthyReplicas, remainingMaintenanceRedundancy);
 
     List<QuasiClosedStuckReplicaCount.MisReplicatedOrigin> misReplicatedOrigins
         = replicaCount.getOverReplicatedOrigins();
