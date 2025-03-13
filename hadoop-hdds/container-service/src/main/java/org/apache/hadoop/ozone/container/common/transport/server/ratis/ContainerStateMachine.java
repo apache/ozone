@@ -896,7 +896,7 @@ public class ContainerStateMachine extends BaseStateMachine {
    */
   @Override
   public CompletableFuture<Void> flush(long index) {
-    final SortedMap<Long, WriteFutures> head = writeChunkFutureMap.headMap(index + 1);
+    final SortedMap<Long, WriteFutures> head = writeChunkFutureMap.headMap(index, true);
     if (head.isEmpty()) {
       return CompletableFuture.completedFuture(null);
     }
