@@ -37,7 +37,7 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(
     name = "compact",
-    description = "CLI to compact a column-family in the DB. while the service is offline." +
+    description = "CLI to compact a column-family in the DB. while the service is offline. \n" +
         "Note: If om.db is compacted with this tool then it will negatively impact " +
         "the Ozone Manager's efficient snapshot diff.",
     mixinStandardHelpOptions = true,
