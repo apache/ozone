@@ -95,7 +95,7 @@ public class TestContainerUtils {
     assertWriteRead(tempDir, id1);
 
     // Add certificate serial  id.
-    id1.setCertSerialId("" + RandomUtils.nextLong());
+    id1.setCertSerialId(String.valueOf(RandomUtils.secure().randomLong()));
     assertWriteRead(tempDir, id1);
 
     // Read should return an empty value if file doesn't exist

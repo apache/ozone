@@ -3040,7 +3040,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public String getRpcPort() {
-    return "" + omRpcAddress.getPort();
+    return String.valueOf(omRpcAddress.getPort());
   }
 
   private static List<List<String>> getRatisRolesException(String exceptionString) {
