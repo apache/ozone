@@ -651,18 +651,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.om.user.max.volume</name>
-    <value>1024</value>
-    <tag>OM, MANAGEMENT</tag>
-    <description>
-      The maximum number of volumes a user can have on a cluster.Increasing or
-      decreasing this number has no real impact on ozone cluster. This is
-      defined only for operational purposes. Only an administrator can create a
-      volume, once a volume is created there are no restrictions on the number
-      of buckets or keys inside each bucket a user can create.
-    </description>
-  </property>
-  <property>
     <name>ozone.om.db.dirs</name>
     <value/>
     <tag>OZONE, OM, STORAGE, PERFORMANCE</tag>
