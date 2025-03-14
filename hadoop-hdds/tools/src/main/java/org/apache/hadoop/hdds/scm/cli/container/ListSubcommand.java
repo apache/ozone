@@ -21,6 +21,7 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import com.fasterxml.jackson.databind.SequenceWriter;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.base.Strings;
@@ -89,13 +90,6 @@ public class ListSubcommand extends ScmSubcommand {
     WRITER = mapper.writerWithDefaultPrettyPrinter();
   }
 
-
-  private void outputContainerInfo(ContainerInfo containerInfo)
-      throws IOException {
-    // Print container report info.
-    System.out.println(WRITER.writeValueAsString(containerInfo));
-  }
-
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     if (!Strings.isNullOrEmpty(replication) && type == null) {
@@ -114,44 +108,56 @@ public class ListSubcommand extends ScmSubcommand {
         .getInt(ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT,
             ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT_DEFAULT);
 
-    ContainerListResult containerListAndTotalCount;
-
-    if (!all) {
-      if (count > maxCountAllowed) {
-        System.err.printf("Attempting to list the first %d records of containers." +
-            " However it exceeds the cluster's current limit of %d. The results will be capped at the" +
-            " maximum allowed count.%n", count, ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT_DEFAULT);
-        count = maxCountAllowed;
-      }
-      containerListAndTotalCount = scmClient.listContainer(startId, count, state, type, repConfig);
-      for (ContainerInfo container : containerListAndTotalCount.getContainerInfoList()) {
-        outputContainerInfo(container);
-      }
-
-      if (containerListAndTotalCount.getTotalCount() > count) {
-        System.err.printf("Displaying %d out of %d containers. " +
-                        "Container list has more containers.%n",
-                count, containerListAndTotalCount.getTotalCount());
-      }
-    } else {
-      // Batch size is either count passed through cli or maxCountAllowed
-      int batchSize = (count > 0) ? count : maxCountAllowed;
-      long currentStartId = startId;
-      int fetchedCount;
-
-      do {
-        // Fetch containers in batches of 'batchSize'
-        containerListAndTotalCount = scmClient.listContainer(currentStartId, batchSize, state, type, repConfig);
-        fetchedCount = containerListAndTotalCount.getContainerInfoList().size();
-
-        for (ContainerInfo container : containerListAndTotalCount.getContainerInfoList()) {
-          outputContainerInfo(container);
+    // Use SequenceWriter to output JSON array format for all cases
+    try (SequenceWriter sequenceWriter = WRITER.writeValues(System.out)) {
+      sequenceWriter.init(true); // Initialize as a JSON array
+      
+      if (!all) {
+        // Regular listing with count limit
+        if (count > maxCountAllowed) {
+          System.err.printf("Attempting to list the first %d records of containers." +
+              " However it exceeds the cluster's current limit of %d. The results will be capped at the" +
+              " maximum allowed count.%n", count, maxCountAllowed);
+          count = maxCountAllowed;
         }
-
-        if (fetchedCount > 0) {
-          currentStartId = containerListAndTotalCount.getContainerInfoList().get(fetchedCount - 1).getContainerID() + 1;
+        
+        ContainerListResult containerListResult = 
+            scmClient.listContainer(startId, count, state, type, repConfig);
+        
+        // Write all containers in the result to the JSON array
+        for (ContainerInfo container : containerListResult.getContainerInfoList()) {
+          sequenceWriter.write(container);
         }
-      } while (fetchedCount > 0);
+        
+        if (containerListResult.getTotalCount() > count) {
+          System.err.printf("Displaying %d out of %d containers. " +
+                         "Container list has more containers.%n",
+                 count, containerListResult.getTotalCount());
+        }
+      } else {
+        // List all containers by fetching in batches
+        int batchSize = (count > 0) ? count : maxCountAllowed;
+        long currentStartId = startId;
+        int fetchedCount;
+        
+        do {
+          // Fetch containers in batches of 'batchSize'
+          ContainerListResult containerListResult = 
+              scmClient.listContainer(currentStartId, batchSize, state, type, repConfig);
+          fetchedCount = containerListResult.getContainerInfoList().size();
+          
+          // Write containers directly to the SequenceWriter
+          for (ContainerInfo container : containerListResult.getContainerInfoList()) {
+            sequenceWriter.write(container);
+          }
+          
+          if (fetchedCount > 0) {
+            currentStartId =
+                containerListResult.getContainerInfoList().get(fetchedCount - 1).getContainerID() + 1;
+          }
+        } while (fetchedCount > 0);
+      }
     }
+    System.out.println(); // Add final newline
   }
 }
