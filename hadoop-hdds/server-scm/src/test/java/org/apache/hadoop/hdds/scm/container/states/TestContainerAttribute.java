@@ -59,12 +59,7 @@ public class TestContainerAttribute {
     assertThat(containerAttribute.get(key1)).containsKey(id);
 
     // Adding it again should fail.
-    try {
-      containerAttribute.addNonExisting(key1, info);
-      fail();
-    } catch (IllegalStateException e) {
-      e.printStackTrace(System.out);
-    }
+    assertThrows(IllegalStateException.class, () -> containerAttribute.addNonExisting(key1, info));
   }
 
   @Test
