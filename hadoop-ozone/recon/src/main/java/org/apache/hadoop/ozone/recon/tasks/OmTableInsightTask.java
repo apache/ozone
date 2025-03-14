@@ -25,7 +25,6 @@ import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Iterators;
 import com.google.inject.Inject;
 import java.io.IOException;
 import java.sql.Timestamp;
@@ -126,12 +125,7 @@ public class OmTableInsightTask implements ReconOmTask {
                 details.getRight());
           }
         } else {
-          try (
-              TableIterator<String, ? extends Table.KeyValue<String, ?>> rawTableIterator
-                  = table.getRawTable().iterator()) {
-            long count = Iterators.size(rawTableIterator);
-            objectCountMap.put(getTableCountKeyFromTable(tableName), count);
-          }
+          objectCountMap.put(getTableCountKeyFromTable(tableName), table.getExactKeyCount());
         }
       } catch (IOException ioEx) {
         LOG.error("Unable to populate Table Count in Recon DB.", ioEx);
