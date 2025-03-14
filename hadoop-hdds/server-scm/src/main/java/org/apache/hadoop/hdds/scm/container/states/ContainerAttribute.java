@@ -97,15 +97,12 @@ public class ContainerAttribute<T extends Enum<T>> {
   }
 
   /**
-   * Removes a container for the given id.
-   *
-   * @param key - key to identify the set.
-   * @param value - Container ID
+   * Remove a container for the given id.
    * @return the info if there was a mapping for the id; otherwise, return null
    */
-  public ContainerInfo remove(T key, ContainerID value) {
-    Objects.requireNonNull(value, "value == null");
-    return get(key).remove(value);
+  public ContainerInfo remove(T key, ContainerID id) {
+    Objects.requireNonNull(id, "id == null");
+    return get(key).remove(id);
   }
 
   /** Remove an existing {@link ContainerInfo}. */
@@ -118,12 +115,12 @@ public class ContainerAttribute<T extends Enum<T>> {
   NavigableMap<ContainerID, ContainerInfo> get(T attribute) {
     Objects.requireNonNull(attribute, "attribute == null");
 
-    final NavigableMap<ContainerID, ContainerInfo> set = attributeMap.get(attribute);
-    if (set == null) {
+    final NavigableMap<ContainerID, ContainerInfo> map = attributeMap.get(attribute);
+    if (map == null) {
       throw new IllegalStateException("Attribute not found: " + attribute
           + " (" + attributeClass.getSimpleName() + ")");
     }
-    return set;
+    return map;
   }
 
   /**
