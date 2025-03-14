@@ -31,7 +31,8 @@ import picocli.CommandLine;
         FSORepairTool.class,
         SnapshotRepair.class,
         TransactionInfoRepair.class,
-        QuotaRepair.class
+        QuotaRepair.class,
+        RocksDBManualCompaction.class
     },
     description = "Operational tool to repair OM.")
 @MetaInfServices(RepairSubcommand.class)
