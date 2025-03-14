@@ -37,7 +37,7 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(
     name = "compact",
-    description = "CLI to compact a column-family in the DB. while the service is offline. \n" +
+    description = "CLI to compact a column-family in the DB while the service is offline.\n" +
         "Note: If om.db is compacted with this tool then it will negatively impact " +
         "the Ozone Manager's efficient snapshot diff.",
     mixinStandardHelpOptions = true,
@@ -81,7 +81,7 @@ public class RocksDBManualCompaction extends RepairTool {
     } catch (RocksDBException exception) {
       error("Exception: " + exception);
       String errorMsg = "Failed to compact RocksDB for the given path: " + dbPath +
-          ", column-family:" + columnFamilyName;
+          ", column family: " + columnFamilyName;
       throw new IOException(errorMsg, exception);
     } finally {
       IOUtils.closeQuietly(cfHandleList);
