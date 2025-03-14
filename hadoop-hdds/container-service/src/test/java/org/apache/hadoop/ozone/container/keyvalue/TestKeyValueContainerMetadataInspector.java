@@ -44,7 +44,7 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.log4j.PatternLayout;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.zookeeper.common.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * Tests for {@link KeyValueContainerMetadataInspector}.
