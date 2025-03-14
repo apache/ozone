@@ -179,8 +179,7 @@
     "expectation": { "underReplicated": 1, "underReplicatedQueue": 1, "overReplicated": 0, "overReplicatedQueue":  0, "quasiClosedStuck": 1, "unhealthy": 0 },
     "checkCommands": [],
     "commands": [
-      { "type": "replicateContainerCommand"}
-    ]
+      { "type": "replicateContainerCommand", "datanode": "d4|d5" }]
   },
   { "description": "Quasi-Closed stuck one origin over replicated", "containerState": "QUASI_CLOSED", "replicationConfig": "RATIS:THREE", "sequenceId": 10,
     "replicas": [
@@ -192,7 +191,7 @@
     "expectation": { "underReplicated": 0, "underReplicatedQueue": 0, "overReplicated": 1, "overReplicatedQueue":  1, "quasiClosedStuck": 1, "unhealthy": 0 },
     "checkCommands": [],
     "commands": [
-      { "type": "deleteContainerCommand" }
+      { "type": "deleteContainerCommand", "datanode": "d1|d2|d3|d4" }
     ]
   },
   { "description": "Quasi-Closed stuck two origins over replicated", "containerState": "QUASI_CLOSED", "replicationConfig": "RATIS:THREE", "sequenceId": 10,
@@ -207,8 +206,8 @@
     "expectation": { "underReplicated": 0, "underReplicatedQueue": 0, "overReplicated": 1, "overReplicatedQueue":  1, "quasiClosedStuck": 1, "unhealthy": 0 },
     "checkCommands": [],
     "commands": [
-      { "type": "deleteContainerCommand" },
-      { "type": "deleteContainerCommand" }
+      { "type": "deleteContainerCommand", "datanode": "d1|d2|d3" },
+      { "type": "deleteContainerCommand", "datanode": "d4|d5|d6" }
     ]
   },
   { "description": "Quasi-Closed stuck two origins not over replicated with maintenance", "containerState": "QUASI_CLOSED", "replicationConfig": "RATIS:THREE", "sequenceId": 10,
@@ -250,7 +249,7 @@
     "expectation": { "underReplicated": 0, "underReplicatedQueue": 0, "overReplicated": 1, "overReplicatedQueue":  1, "quasiClosedStuck": 1, "unhealthy": 0 },
     "checkCommands": [],
     "commands": [
-      { "type": "deleteContainerCommand" }
+      { "type": "deleteContainerCommand", "datanode": "d1|d2|d3" }
     ]
   },
   { "description": "Quasi-Closed stuck two origins over replicated with stale", "containerState": "QUASI_CLOSED", "replicationConfig": "RATIS:THREE", "sequenceId": 10,
