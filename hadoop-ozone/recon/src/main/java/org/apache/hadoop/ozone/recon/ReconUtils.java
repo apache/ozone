@@ -63,6 +63,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -555,6 +556,7 @@ public class ReconUtils {
             }
           } catch (NumberFormatException nfEx) {
             log.warn("Unknown file found in Recon DB dir : {}", fileName);
+            FileUtils.deleteQuietly(snapshotFile);
           }
         }
       }

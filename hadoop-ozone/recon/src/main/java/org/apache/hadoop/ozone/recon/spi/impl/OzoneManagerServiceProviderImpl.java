@@ -408,7 +408,6 @@ public class OzoneManagerServiceProviderImpl
       // Untar the checkpoint file.
       Path untarredDbDir = Paths.get(omSnapshotDBParentDir.getAbsolutePath(), snapshotFileName);
       reconUtils.untarCheckpointFile(targetFile, untarredDbDir);
-      FileUtils.deleteQuietly(targetFile);
 
       // Validate the presence of required SST files
       File[] sstFiles = untarredDbDir.toFile().listFiles((dir, name) -> name.endsWith(".sst"));
@@ -430,6 +429,8 @@ public class OzoneManagerServiceProviderImpl
       LOG.error("Unable to obtain Ozone Manager DB Snapshot. ", e);
       reconContext.updateHealthStatus(new AtomicBoolean(false));
       reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
+    } finally {
+      FileUtils.deleteQuietly(targetFile);
     }
     return null;
   }
