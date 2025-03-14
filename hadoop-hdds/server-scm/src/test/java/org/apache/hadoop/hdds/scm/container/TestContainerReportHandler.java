@@ -142,7 +142,6 @@ public class TestContainerReportHandler {
 
     doAnswer(invocation -> {
       containerStateManager.updateContainerReplica(
-          ((ContainerID)invocation.getArguments()[0]),
           (ContainerReplica) invocation.getArguments()[1]);
       return null;
     }).when(containerManager).updateContainerReplica(
@@ -150,7 +149,6 @@ public class TestContainerReportHandler {
 
     doAnswer(invocation -> {
       containerStateManager.removeContainerReplica(
-          ((ContainerID)invocation.getArguments()[0]),
           (ContainerReplica) invocation.getArguments()[1]);
       return null;
     }).when(containerManager).removeContainerReplica(
@@ -265,8 +263,7 @@ public class TestContainerReportHandler {
     Map<DatanodeDetails, Integer> replicaMap = replicas.stream()
             .collect(Collectors.toMap(ContainerReplica::getDatanodeDetails,
                     ContainerReplica::getReplicaIndex));
-    replicas.forEach(r -> containerStateManager.updateContainerReplica(
-                    container.containerID(), r));
+    replicas.forEach(containerStateManager::updateContainerReplica);
     testReplicaIndexUpdate(container, datanodeOne, 0, replicaMap);
     testReplicaIndexUpdate(container, datanodeOne, 6, replicaMap);
     replicaMap.put(datanodeOne, 2);
@@ -300,14 +297,12 @@ public class TestContainerReportHandler {
     getReplicas(containerOne.containerID(),
         ContainerReplicaProto.State.CLOSED,
         datanodeOne, datanodeTwo, datanodeThree)
-        .forEach(r -> containerStateManager.updateContainerReplica(
-            containerOne.containerID(), r));
+        .forEach(containerStateManager::updateContainerReplica);
 
     getReplicas(containerTwo.containerID(),
         ContainerReplicaProto.State.CLOSED,
         datanodeOne, datanodeTwo, datanodeThree)
-        .forEach(r -> containerStateManager.updateContainerReplica(
-            containerTwo.containerID(), r));
+        .forEach(containerStateManager::updateContainerReplica);
 
 
     // SCM expects both containerOne and containerTwo to be in all the three
@@ -359,14 +354,12 @@ public class TestContainerReportHandler {
     getReplicas(containerOne.containerID(),
         ContainerReplicaProto.State.CLOSED,
         datanodeOne, datanodeTwo, datanodeThree)
-        .forEach(r -> containerStateManager.updateContainerReplica(
-            containerOne.containerID(), r));
+        .forEach(containerStateManager::updateContainerReplica);
 
     getReplicas(containerTwo.containerID(),
         ContainerReplicaProto.State.CLOSED,
         datanodeOne, datanodeTwo, datanodeThree)
-        .forEach(r -> containerStateManager.updateContainerReplica(
-            containerTwo.containerID(), r));
+        .forEach(containerStateManager::updateContainerReplica);
 
 
     // SCM expects both containerOne and containerTwo to be in all the three
@@ -438,14 +431,8 @@ public class TestContainerReportHandler {
     containerStateManager.addContainer(containerOne.getProtobuf());
     containerStateManager.addContainer(containerTwo.getProtobuf());
 
-    containerOneReplicas.forEach(r ->
-        containerStateManager.updateContainerReplica(
-        containerTwo.containerID(), r));
-
-    containerTwoReplicas.forEach(r ->
-        containerStateManager.updateContainerReplica(
-        containerTwo.containerID(), r));
-
+    containerOneReplicas.forEach(containerStateManager::updateContainerReplica);
+    containerTwoReplicas.forEach(containerStateManager::updateContainerReplica);
 
     final ContainerReportsProto containerReport = getContainerReportsProto(
         containerOne.containerID(), ContainerReplicaProto.State.CLOSED,
@@ -655,7 +642,7 @@ public class TestContainerReportHandler {
             container.getSequenceId(),
             dns.toArray(new DatanodeDetails[0]));
     for (ContainerReplica r : replicas) {
-      containerStateManager.updateContainerReplica(container.containerID(), r);
+      containerStateManager.updateContainerReplica(r);
     }
 
     // Tell NodeManager that each DN hosts a replica of this container
@@ -725,14 +712,8 @@ public class TestContainerReportHandler {
     containerStateManager.addContainer(containerOne.getProtobuf());
     containerStateManager.addContainer(containerTwo.getProtobuf());
 
-    containerOneReplicas.forEach(r ->
-        containerStateManager.updateContainerReplica(
-        containerTwo.containerID(), r));
-
-    containerTwoReplicas.forEach(r ->
-        containerStateManager.updateContainerReplica(
-        containerTwo.containerID(), r));
-
+    containerOneReplicas.forEach(containerStateManager::updateContainerReplica);
+    containerTwoReplicas.forEach(containerStateManager::updateContainerReplica);
 
     final ContainerReportsProto containerReport = getContainerReportsProto(
         containerOne.containerID(), ContainerReplicaProto.State.QUASI_CLOSED,
@@ -795,14 +776,8 @@ public class TestContainerReportHandler {
     containerStateManager.addContainer(containerOne.getProtobuf());
     containerStateManager.addContainer(containerTwo.getProtobuf());
 
-    containerOneReplicas.forEach(r ->
-        containerStateManager.updateContainerReplica(
-        containerTwo.containerID(), r));
-
-    containerTwoReplicas.forEach(r ->
-        containerStateManager.updateContainerReplica(
-        containerTwo.containerID(), r));
-
+    containerOneReplicas.forEach(containerStateManager::updateContainerReplica);
+    containerTwoReplicas.forEach(containerStateManager::updateContainerReplica);
 
     final ContainerReportsProto containerReport = getContainerReportsProto(
         containerOne.containerID(), ContainerReplicaProto.State.CLOSED,

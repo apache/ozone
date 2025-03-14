@@ -69,7 +69,6 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.common.statemachine.StateMachine;
 import org.apache.ratis.util.AutoCloseableLock;
-import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -416,8 +415,8 @@ public final class ContainerStateManagerImpl
   }
 
   @Override
-  public void updateContainerReplica(final ContainerID id,
-                                     final ContainerReplica replica) {
+  public void updateContainerReplica(final ContainerReplica replica) {
+    final ContainerID id = replica.getContainerID();
     try (AutoCloseableLock ignored = writeLock(id)) {
       containers.updateContainerReplica(replica);
       // Clear any pending additions for this replica as we have now seen it.
@@ -427,10 +426,8 @@ public final class ContainerStateManagerImpl
   }
 
   @Override
-  public void removeContainerReplica(final ContainerID id,
-                                     final ContainerReplica replica) {
-    //TODO remove ContainerID parameter
-    Preconditions.assertEquals(id, replica.getContainerID(), "containerID");
+  public void removeContainerReplica(final ContainerReplica replica) {
+    final ContainerID id = replica.getContainerID();
     try (AutoCloseableLock ignored = writeLock(id)) {
       containers.removeContainerReplica(id, replica.getDatanodeDetails().getID());
       // Remove any pending delete replication operations for the deleted

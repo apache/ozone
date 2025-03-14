@@ -349,43 +349,43 @@ public class TestContainerStateManagerIntegration {
         .setContainerState(ContainerReplicaProto.State.OPEN)
         .setDatanodeDetails(dn2)
         .build();
-    containerStateManager.updateContainerReplica(id, replicaOne);
-    containerStateManager.updateContainerReplica(id, replicaTwo);
+    containerStateManager.updateContainerReplica(replicaOne);
+    containerStateManager.updateContainerReplica(replicaTwo);
     replicaSet = containerStateManager.getContainerReplicas(id);
     assertEquals(2, replicaSet.size());
     assertThat(replicaSet).contains(replicaOne);
     assertThat(replicaSet).contains(replicaTwo);
 
     // Test 3: Remove one replica node and then test
-    containerStateManager.removeContainerReplica(id, replicaOne);
+    containerStateManager.removeContainerReplica(replicaOne);
     replicaSet = containerStateManager.getContainerReplicas(id);
     assertEquals(1, replicaSet.size());
     assertThat(replicaSet).doesNotContain(replicaOne);
     assertThat(replicaSet).contains(replicaTwo);
 
     // Test 3: Remove second replica node and then test
-    containerStateManager.removeContainerReplica(id, replicaTwo);
+    containerStateManager.removeContainerReplica(replicaTwo);
     replicaSet = containerStateManager.getContainerReplicas(id);
     assertEquals(0, replicaSet.size());
     assertThat(replicaSet).doesNotContain(replicaOne);
     assertThat(replicaSet).doesNotContain(replicaTwo);
 
     // Test 4: Re-insert dn1
-    containerStateManager.updateContainerReplica(id, replicaOne);
+    containerStateManager.updateContainerReplica(replicaOne);
     replicaSet = containerStateManager.getContainerReplicas(id);
     assertEquals(1, replicaSet.size());
     assertThat(replicaSet).contains(replicaOne);
     assertThat(replicaSet).doesNotContain(replicaTwo);
 
     // Re-insert dn2
-    containerStateManager.updateContainerReplica(id, replicaTwo);
+    containerStateManager.updateContainerReplica(replicaTwo);
     replicaSet = containerStateManager.getContainerReplicas(id);
     assertEquals(2, replicaSet.size());
     assertThat(replicaSet).contains(replicaOne);
     assertThat(replicaSet).contains(replicaTwo);
 
     // Re-insert dn1
-    containerStateManager.updateContainerReplica(id, replicaOne);
+    containerStateManager.updateContainerReplica(replicaOne);
     replicaSet = containerStateManager.getContainerReplicas(id);
     assertEquals(2, replicaSet.size());
     assertThat(replicaSet).contains(replicaOne);
