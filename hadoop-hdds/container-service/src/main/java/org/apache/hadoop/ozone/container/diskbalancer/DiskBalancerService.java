@@ -103,6 +103,8 @@ public class DiskBalancerService extends BackgroundService {
   private final File diskBalancerInfoFile;
 
   private DiskBalancerServiceMetrics metrics;
+  private long queueSize;
+  private long bytesToMove;
 
   public DiskBalancerService(OzoneContainer ozoneContainer,
       long serviceCheckInterval, long serviceCheckTimeout, TimeUnit timeUnit,
@@ -352,6 +354,8 @@ public class DiskBalancerService extends BackgroundService {
     if (queue.isEmpty()) {
       metrics.incrIdleLoopNoAvailableVolumePairCount();
     }
+    queueSize = queue.size();
+    bytesToMove = calculateBytesToMove();
     return queue;
   }
 
@@ -505,7 +509,50 @@ public class DiskBalancerService extends BackgroundService {
 
   public DiskBalancerInfo getDiskBalancerInfo() {
     return new DiskBalancerInfo(shouldRun, threshold, bandwidthInMB,
-        parallelThread, version, metrics.getSuccessCount(), metrics.getFailureCount());
+        parallelThread, version, metrics.getSuccessCount(),
+        metrics.getFailureCount(), bytesToMove);
+  }
+
+  private long calculateBytesToMove() {
+    long bytesPendingToMove = 0;
+
+    if (queueSize == 0) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("No available Volume pair to perform move.");
+      }
+      return bytesPendingToMove;
+    }
+
+    long totalUsedSpace = 0;
+    long totalCapacity = 0;
+
+    for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())) {
+      totalUsedSpace += volume.getCurrentUsage().getUsedSpace();
+      totalCapacity += volume.getCurrentUsage().getCapacity();
+    }
+
+    if (totalCapacity == 0) {
+      return 0;
+    }
+
+    double datanodeUtilization = (double) totalUsedSpace / totalCapacity;
+
+    double thresholdFraction = threshold / 100.0;
+    double upperLimit = datanodeUtilization + thresholdFraction;
+
+    // Calculate excess data in overused volumes
+    for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())) {
+      long usedSpace = volume.getCurrentUsage().getUsedSpace();
+      long capacity = volume.getCurrentUsage().getCapacity();
+      double volumeUtilization = (double) usedSpace / capacity;
+
+      // Consider only volumes exceeding the upper threshold
+      if (volumeUtilization > upperLimit) {
+        long excessData = usedSpace - (long) (upperLimit * capacity);
+        bytesPendingToMove += excessData;
+      }
+    }
+    return bytesPendingToMove;
   }
 
   private Path getDiskBalancerTmpDir(HddsVolume hddsVolume) {
@@ -532,6 +579,14 @@ public class DiskBalancerService extends BackgroundService {
 
   public VolumeChoosingPolicy getVolumeChoosingPolicy() {
     return volumeChoosingPolicy;
+  }
+
+  public long getBytesToMove() {
+    return calculateBytesToMove();
+  }
+
+  public void setQueueSize(long queueSize) {
+    this.queueSize = queueSize;
   }
 
   @Override
