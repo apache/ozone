@@ -550,7 +550,7 @@ public class TestReplicationManagerScenarios {
   public static class ExpectedCommands {
     private SCMCommandProto.Type type;
     private String datanode;
-    private Set<DatanodeDetails> expectedDatanodes = new HashSet<>();
+    private Set<DatanodeDetails> expectedDatanodes;
 
     public void setDatanode(String datanode) {
       this.datanode = datanode;
