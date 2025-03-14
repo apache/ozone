@@ -26,9 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -573,7 +571,7 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
-    public Builder setAcls(Supplier<List<OzoneAcl>> listOfAcls) {
+    public Builder setAclsSupplier(Supplier<List<OzoneAcl>> listOfAcls) {
       if (listOfAcls != null) {
         this.acls = () -> {
           if (listOfAcls.get() != null) {
@@ -773,7 +771,7 @@ public final class OmKeyInfo extends WithParentObjectId
         .addAllTags(KeyValueUtil.getFromProtobuf(keyInfo.getTagsList()))
         .setFileEncryptionInfo(keyInfo.hasFileEncryptionInfo() ?
             OMPBHelper.convert(keyInfo.getFileEncryptionInfo()) : null)
-        .setAcls(() -> OzoneAclUtil.fromProtobuf(keyInfo.getAclsList()));
+        .setAclsSupplier(() -> OzoneAclUtil.fromProtobuf(keyInfo.getAclsList()));
     if (keyInfo.hasObjectID()) {
       builder.setObjectID(keyInfo.getObjectID());
     }
@@ -895,7 +893,7 @@ public final class OmKeyInfo extends WithParentObjectId
         .setDataSize(dataSize)
         .setReplicationConfig(replicationConfig)
         .setFileEncryptionInfo(encInfo)
-        .setAcls(() -> Lists.newArrayList(prevAcl.get()))
+        .setAclsSupplier(() -> Lists.newArrayList(prevAcl.get()))
         .setFileName(fileName)
         .setFile(isFile);
 
