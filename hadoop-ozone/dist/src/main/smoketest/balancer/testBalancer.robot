@@ -145,7 +145,7 @@ Close All Containers
 
 All container is closed
     ${output} =         Execute           ozone admin container list --state OPEN
-                        Should Be Equal   ${output}   []
+                        Should Be Equal   ${output}   [ ]
 
 Get Datanode Ozone Used Bytes Info
     [arguments]             ${uuid}
