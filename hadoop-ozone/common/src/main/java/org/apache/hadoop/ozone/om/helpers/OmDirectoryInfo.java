@@ -17,10 +17,12 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Supplier;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
@@ -28,6 +30,7 @@ import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DirectoryInfo;
+import org.apache.ratis.util.MemoizedSupplier;
 
 /**
  * This class represents the directory information by keeping each component
@@ -52,7 +55,7 @@ public class OmDirectoryInfo extends WithParentObjectId
   private final long creationTime;
   private final long modificationTime;
 
-  private final List<OzoneAcl> acls;
+  private final Supplier<List<OzoneAcl>> acls;
 
   public OmDirectoryInfo(Builder builder) {
     super(builder);
@@ -82,11 +85,11 @@ public class OmDirectoryInfo extends WithParentObjectId
     private long creationTime;
     private long modificationTime;
 
-    private final List<OzoneAcl> acls;
+    private Supplier<List<OzoneAcl>> acls;
 
     public Builder() {
       //Default values
-      this.acls = new LinkedList<>();
+      this.acls = MemoizedSupplier.valueOf(LinkedList::new);
     }
 
     @Override
@@ -129,14 +132,27 @@ public class OmDirectoryInfo extends WithParentObjectId
 
     public Builder setAcls(List<OzoneAcl> listOfAcls) {
       if (listOfAcls != null) {
-        this.acls.addAll(listOfAcls);
+        this.acls = MemoizedSupplier.valueOf(() -> {
+          this.acls.get().addAll(listOfAcls);
+          return this.acls.get();
+        });
+      }
+      return this;
+    }
+
+    public Builder setAcls(Supplier<List<OzoneAcl>> listOfAcls) {
+      if (listOfAcls != null) {
+        this.acls = MemoizedSupplier.valueOf(() -> {
+          this.acls.get().addAll(listOfAcls.get());
+          return this.acls.get();
+        });
       }
       return this;
     }
 
     public Builder addAcl(OzoneAcl ozoneAcl) {
       if (ozoneAcl != null) {
-        this.acls.add(ozoneAcl);
+        return setAcls(Collections.singletonList(ozoneAcl));
       }
       return this;
     }
@@ -184,7 +200,7 @@ public class OmDirectoryInfo extends WithParentObjectId
   }
 
   public List<OzoneAcl> getAcls() {
-    return acls;
+    return acls.get();
   }
 
   /**
@@ -203,7 +219,7 @@ public class OmDirectoryInfo extends WithParentObjectId
       pib.setOwnerName(owner);
     }
     if (acls != null) {
-      pib.addAllAcls(OzoneAclUtil.toProtobuf(acls));
+      pib.addAllAcls(OzoneAclUtil.toProtobuf(acls.get()));
     }
     return pib.build();
   }
@@ -218,7 +234,7 @@ public class OmDirectoryInfo extends WithParentObjectId
             .setName(dirInfo.getName())
             .setCreationTime(dirInfo.getCreationTime())
             .setModificationTime(dirInfo.getModificationTime())
-            .setAcls(OzoneAclUtil.fromProtobuf(dirInfo.getAclsList()));
+            .setAcls(() -> OzoneAclUtil.fromProtobuf(dirInfo.getAclsList()));
     if (dirInfo.getMetadataList() != null) {
       opib.addAllMetadata(KeyValueUtil
               .getFromProtobuf(dirInfo.getMetadataList()));

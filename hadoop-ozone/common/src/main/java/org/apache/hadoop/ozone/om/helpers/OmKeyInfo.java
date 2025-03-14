@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,6 +26,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileChecksum;
@@ -44,6 +49,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocationList;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.util.MemoizedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -99,7 +105,7 @@ public final class OmKeyInfo extends WithParentObjectId
   /**
    * ACL Information.
    */
-  private final CopyOnWriteArrayList<OzoneAcl> acls;
+  private AtomicReference<Supplier<List<OzoneAcl>>> acls;
 
   /**
    * Used for S3 tags.
@@ -125,7 +131,7 @@ public final class OmKeyInfo extends WithParentObjectId
     this.modificationTime = b.modificationTime;
     this.replicationConfig = b.replicationConfig;
     this.encInfo = b.encInfo;
-    this.acls = new CopyOnWriteArrayList<>(b.acls);
+    this.acls = new AtomicReference<>(MemoizedSupplier.valueOf(() -> new CopyOnWriteArrayList<>(b.acls.get())));
     this.fileChecksum = b.fileChecksum;
     this.fileName = b.fileName;
     this.isFile = b.isFile;
@@ -411,19 +417,19 @@ public final class OmKeyInfo extends WithParentObjectId
   }
 
   public List<OzoneAcl> getAcls() {
-    return ImmutableList.copyOf(acls);
+    return ImmutableList.copyOf(acls.get().get());
   }
 
   public boolean addAcl(OzoneAcl acl) {
-    return OzoneAclUtil.addAcl(acls, acl);
+    return OzoneAclUtil.addAcl(acls.get().get(), acl);
   }
 
   public boolean removeAcl(OzoneAcl acl) {
-    return OzoneAclUtil.removeAcl(acls, acl);
+    return OzoneAclUtil.removeAcl(acls.get().get(), acl);
   }
 
   public boolean setAcls(List<OzoneAcl> newAcls) {
-    return OzoneAclUtil.setAcl(acls, newAcls);
+    return OzoneAclUtil.setAcl(acls.get().get(), newAcls);
   }
 
   public void setReplicationConfig(ReplicationConfig repConfig) {
@@ -468,7 +474,7 @@ public final class OmKeyInfo extends WithParentObjectId
     private long modificationTime;
     private ReplicationConfig replicationConfig;
     private FileEncryptionInfo encInfo;
-    private final List<OzoneAcl> acls = new ArrayList<>();
+    private Supplier<List<OzoneAcl>> acls = ArrayList::new;
     // not persisted to DB. FileName will be the last element in path keyName.
     private String fileName;
     private FileChecksum fileChecksum;
@@ -559,14 +565,22 @@ public final class OmKeyInfo extends WithParentObjectId
 
     public Builder setAcls(List<OzoneAcl> listOfAcls) {
       if (listOfAcls != null) {
-        this.acls.addAll(listOfAcls);
+        this.acls = () -> {
+          this.acls.get().addAll(listOfAcls);
+          return acls.get();
+        };
       }
       return this;
     }
 
-    public Builder addAcl(OzoneAcl ozoneAcl) {
-      if (ozoneAcl != null) {
-        this.acls.add(ozoneAcl);
+    public Builder setAcls(Supplier<List<OzoneAcl>> listOfAcls) {
+      if (listOfAcls != null) {
+        this.acls = () -> {
+          if (listOfAcls.get() != null) {
+            this.acls.get().addAll(listOfAcls.get());
+          }
+          return acls.get();
+        };
       }
       return this;
     }
@@ -706,7 +720,7 @@ public final class OmKeyInfo extends WithParentObjectId
         .setModificationTime(modificationTime)
         .addAllMetadata(KeyValueUtil.toProtobuf(getMetadata()))
         .addAllTags(KeyValueUtil.toProtobuf(getTags()))
-        .addAllAcls(OzoneAclUtil.toProtobuf(acls))
+        .addAllAcls(OzoneAclUtil.toProtobuf(acls.get().get()))
         .setObjectID(getObjectID())
         .setUpdateID(getUpdateID())
         .setParentID(getParentObjectID());
@@ -759,7 +773,7 @@ public final class OmKeyInfo extends WithParentObjectId
         .addAllTags(KeyValueUtil.getFromProtobuf(keyInfo.getTagsList()))
         .setFileEncryptionInfo(keyInfo.hasFileEncryptionInfo() ?
             OMPBHelper.convert(keyInfo.getFileEncryptionInfo()) : null)
-        .setAcls(OzoneAclUtil.fromProtobuf(keyInfo.getAclsList()));
+        .setAcls(() -> OzoneAclUtil.fromProtobuf(keyInfo.getAclsList()));
     if (keyInfo.hasObjectID()) {
       builder.setObjectID(keyInfo.getObjectID());
     }
@@ -867,6 +881,10 @@ public final class OmKeyInfo extends WithParentObjectId
    */
   @Override
   public OmKeyInfo copyObject() {
+
+    Supplier<List<OzoneAcl>> prevAcl =
+        this.acls.getAndUpdate(current ->
+            MemoizedSupplier.valueOf(() -> new CopyOnWriteArrayList<>(current.get())));
     OmKeyInfo.Builder builder = new OmKeyInfo.Builder(this)
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -877,7 +895,7 @@ public final class OmKeyInfo extends WithParentObjectId
         .setDataSize(dataSize)
         .setReplicationConfig(replicationConfig)
         .setFileEncryptionInfo(encInfo)
-        .setAcls(acls)
+        .setAcls(() -> Lists.newArrayList(prevAcl.get()))
         .setFileName(fileName)
         .setFile(isFile);
 
