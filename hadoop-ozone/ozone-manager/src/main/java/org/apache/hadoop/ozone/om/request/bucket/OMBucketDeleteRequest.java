@@ -74,6 +74,23 @@ public class OMBucketDeleteRequest extends OMClientRequest {
   }
 
   @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    OMRequest omRequest = super.preExecute(ozoneManager);
+
+    final DeleteBucketRequest deleteBucketRequest =
+        omRequest.getDeleteBucketRequest();
+    final String volumeName = deleteBucketRequest.getVolumeName();
+    final String bucketName = deleteBucketRequest.getBucketName();
+    // check Acl
+    if (ozoneManager.getAclsEnabled()) {
+      checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
+          OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.DELETE,
+          volumeName, bucketName, null);
+    }
+    return getOmRequest();
+  }
+
+  @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     final long transactionLogIndex = context.getIndex();
     OMMetrics omMetrics = ozoneManager.getMetrics();
@@ -101,13 +118,6 @@ public class OMBucketDeleteRequest extends OMClientRequest {
     boolean success = true;
     OMClientResponse omClientResponse = null;
     try {
-      // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.DELETE,
-            volumeName, bucketName, null);
-      }
-
       // acquire lock
       mergeOmLockDetails(
           omMetadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName));
