@@ -26,6 +26,7 @@ import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.client.OMBlockPrefetchClient;
 import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
@@ -112,6 +113,7 @@ public final class OmTestManagers {
     ScmClient scmClient = new ScmClient(scmBlockClient, containerClient, conf);
     ScmTopologyClient scmTopologyClient =
         new ScmTopologyClient(scmBlockClient);
+    OMBlockPrefetchClient omBlockPrefetchClient = new OMBlockPrefetchClient(scmBlockClient);
     HddsWhiteboxTestUtils.setInternalState(om,
         "scmClient", scmClient);
     HddsWhiteboxTestUtils.setInternalState(keyManager,
@@ -120,6 +122,8 @@ public final class OmTestManagers {
         "secretManager", mock(OzoneBlockTokenSecretManager.class));
     HddsWhiteboxTestUtils.setInternalState(om,
         "scmTopologyClient", scmTopologyClient);
+    HddsWhiteboxTestUtils.setInternalState(om,
+        "omBlockPrefetchClient", omBlockPrefetchClient);
 
     om.start();
     waitFor(() -> om.getOmRatisServer().checkLeaderStatus() == RaftServerStatus.LEADER_AND_READY,
