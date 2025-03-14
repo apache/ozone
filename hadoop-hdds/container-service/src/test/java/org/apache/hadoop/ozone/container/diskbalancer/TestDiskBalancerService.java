@@ -94,6 +94,7 @@ public class TestDiskBalancerService {
   public void cleanup() throws IOException {
     BlockUtils.shutdownCache(conf);
     FileUtils.deleteDirectory(testRoot);
+    volumeSet.shutdown();
   }
 
   @ContainerTestVersionInfo.ContainerTest
