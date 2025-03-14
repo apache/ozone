@@ -146,7 +146,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
     ContainerManager cm = cluster.getStorageContainerManager()
         .getContainerManager();
     LambdaTestUtils.await(5000, 500,
-        () -> cm.getContainer(new ContainerID(containerID)).getState()
+        () -> cm.getContainer(ContainerID.valueOf(containerID)).getState()
             != HddsProtos.LifeCycleState.OPEN);
   }
 

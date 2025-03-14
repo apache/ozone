@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om;
 import static com.google.common.collect.Lists.newLinkedList;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_CACHE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
-import static org.apache.hadoop.ozone.TestDataUtil.createKey;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.params.provider.Arguments.of;
 
@@ -34,8 +33,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -373,14 +370,10 @@ public abstract class TestListKeys implements NonHATests.TestCase {
 
   private static void createAndAssertKeys(OzoneBucket ozoneBucket, List<String> keys)
       throws Exception {
-    int length = 10;
-    byte[] input = new byte[length];
-    Arrays.fill(input, (byte) 96);
     for (String key : keys) {
-      createKey(ozoneBucket, key,
-          ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.THREE), input);
+      byte[] input = TestDataUtil.createStringKey(ozoneBucket, key, 10);
       // Read the key with given key name.
-      readkey(ozoneBucket, key, length, input);
+      readkey(ozoneBucket, key, 10, input);
     }
   }
 

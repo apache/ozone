@@ -17,12 +17,13 @@
 
 package org.apache.hadoop.ozone.admin.scm;
 
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -73,7 +74,7 @@ public class ResetDeletedBlockRetryCountSubcommand extends ScmSubcommand {
       count = client.resetDeletedBlockRetryCount(new ArrayList<>());
     } else if (group.fileName != null) {
       List<Long> txIDs;
-      try (InputStream in = new FileInputStream(group.fileName);
+      try (InputStream in = Files.newInputStream(Paths.get(group.fileName));
            Reader fileReader = new InputStreamReader(in,
                StandardCharsets.UTF_8)) {
         DeletedBlocksTransactionInfoWrapper[] txns = JsonUtils.readFromReader(fileReader,

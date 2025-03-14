@@ -345,9 +345,7 @@ public class UpgradeTask {
       result.setBackupContainerFilePath(bakFile.getAbsolutePath());
 
       // gen new v3 container data file
-      ContainerDataYaml.createContainerFile(
-          ContainerProtos.ContainerType.KeyValueContainer,
-          copyContainerData, originContainerFile);
+      ContainerDataYaml.createContainerFile(copyContainerData, originContainerFile);
 
       result.setNewContainerData(copyContainerData);
       result.setNewContainerFilePath(originContainerFile.getAbsolutePath());

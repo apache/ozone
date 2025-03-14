@@ -29,6 +29,8 @@ import javax.sql.DataSource;
 import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class used to create tables that are required for tracking containers.
@@ -38,6 +40,8 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
 
   public static final String UNHEALTHY_CONTAINERS_TABLE_NAME =
       "UNHEALTHY_CONTAINERS";
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ContainerSchemaDefinition.class);
 
   /**
    * ENUM describing the allowed container states which can be stored in the
@@ -68,6 +72,7 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
     Connection conn = dataSource.getConnection();
     dslContext = DSL.using(conn);
     if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
+      LOG.info("UNHEALTHY_CONTAINERS is missing creating new one.");
       createUnhealthyContainersTable();
     }
   }

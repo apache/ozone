@@ -260,6 +260,6 @@ public class TestContainerPlacement {
         .setDatanodeDetails(node)
         .build();
     containerManager.getContainerStateManager()
-        .updateContainerReplica(cont.containerID(), replica);
+        .updateContainerReplica(replica);
   }
 }

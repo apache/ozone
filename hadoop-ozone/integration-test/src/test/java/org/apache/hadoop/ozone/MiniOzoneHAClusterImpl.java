@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
@@ -86,7 +87,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       List<HddsDatanodeService> hddsDatanodes,
       String clusterPath,
       ReconServer reconServer) {
-    super(conf, scmConfigurator, hddsDatanodes, reconServer);
+    super(conf, scmConfigurator, hddsDatanodes, reconServer, emptyList());
     this.omhaService = omhaService;
     this.scmhaService = scmhaService;
     this.clusterMetaPath = clusterPath;

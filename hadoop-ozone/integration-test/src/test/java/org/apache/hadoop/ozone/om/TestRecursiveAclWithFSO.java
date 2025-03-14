@@ -33,6 +33,7 @@ import java.util.UUID;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -329,12 +330,11 @@ public abstract class TestRecursiveAclWithFSO implements NonHATests.TestCase {
 
   private void createKeys(ObjectStore objectStore, OzoneBucket ozoneBucket,
       List<String> keys) throws Exception {
-    int length = 10;
+
     String aclWorldAll = "world::a";
-    byte[] input = new byte[length];
-    Arrays.fill(input, (byte) 96);
+
     for (String key : keys) {
-      createKey(ozoneBucket, key, input);
+      TestDataUtil.createStringKey(ozoneBucket, key, 10);
       setKeyAcl(objectStore, ozoneBucket.getVolumeName(), ozoneBucket.getName(),
           key, aclWorldAll);
     }

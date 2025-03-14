@@ -74,6 +74,14 @@ public class ReconTaskStatusUpdater {
     this.reconTaskStatus.setIsCurrentTaskRunning(isCurrentTaskRunning);
   }
 
+  public Long getLastUpdatedSeqNumber() {
+    return this.reconTaskStatus.getLastUpdatedSeqNumber();
+  }
+
+  public String getTaskName() {
+    return this.taskName;
+  }
+
   /**
    * Helper function to update TASK_STATUS table with task start values.
    * Set the isCurrentTaskRunning as true, update the timestamp.

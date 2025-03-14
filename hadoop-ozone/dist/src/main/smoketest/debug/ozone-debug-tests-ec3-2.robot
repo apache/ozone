@@ -44,13 +44,13 @@ Create EC key
 *** Test Cases ***
 0 data block
     Create EC key     1000    0
-    ${directory} =                      Execute read-replicas CLI tool
+    ${directory} =                      Execute replicas verify checksums CLI tool
     ${count_files} =                    Count Files In Directory    ${directory}
     Should Be Equal As Integers         ${count_files}     1
 
 1 data block
     Create EC key     1048576    1
-    ${directory} =                      Execute read-replicas CLI tool
+    ${directory} =                      Execute replicas verify checksums CLI tool
     ${count_files} =                    Count Files In Directory    ${directory}
     Should Be Equal As Integers         ${count_files}     6
     ${sum_size} =                       Evaluate     1048576 * 3
@@ -58,7 +58,7 @@ Create EC key
 
 2 data blocks
     Create EC key     1048576    2
-    ${directory} =                      Execute read-replicas CLI tool
+    ${directory} =                      Execute replicas verify checksums CLI tool
     ${sum_size} =                       Evaluate     1048576 * 4
     ${count_files} =                    Count Files In Directory    ${directory}
     Should Be Equal As Integers         ${count_files}     6
@@ -66,7 +66,7 @@ Create EC key
 
 3 data blocks
     Create EC key     1048576    3
-    ${directory} =                      Execute read-replicas CLI tool
+    ${directory} =                      Execute replicas verify checksums CLI tool
     ${sum_size} =                       Evaluate     1048576 * 5
     ${count_files} =                    Count Files In Directory    ${directory}
     Should Be Equal As Integers         ${count_files}     6
@@ -74,7 +74,7 @@ Create EC key
     
 3 data blocks and partial stripe
     Create EC key     1000000    4
-    ${directory} =                      Execute read-replicas CLI tool
+    ${directory} =                      Execute replicas verify checksums CLI tool
     ${count_files} =                    Count Files In Directory    ${directory}
     ${sum_size} =                       Evaluate     1048576 * 5
     ${sum_size_last_stripe} =           Evaluate     ((1000000 * 4) % 1048576) * 3
@@ -84,7 +84,7 @@ Create EC key
 
 4 data blocks and partial stripe
     Create EC key     1000000    5
-    ${directory} =                      Execute read-replicas CLI tool
+    ${directory} =                      Execute replicas verify checksums CLI tool
     ${count_files} =                    Count Files In Directory    ${directory}
     ${sum_size} =                       Evaluate     1048576 * 5
     ${sum_size_last_stripe} =           Evaluate     1048576 * 3 + ((1000000 * 5) % 1048576)
@@ -94,7 +94,7 @@ Create EC key
 
 6 data blocks
     Create EC key     1048576    6
-    ${directory} =                      Execute read-replicas CLI tool
+    ${directory} =                      Execute replicas verify checksums CLI tool
     ${count_files} =                    Count Files In Directory    ${directory}
     ${sum_size} =                       Evaluate     1048576 * 5
     Should Be Equal As Integers         ${count_files}     11

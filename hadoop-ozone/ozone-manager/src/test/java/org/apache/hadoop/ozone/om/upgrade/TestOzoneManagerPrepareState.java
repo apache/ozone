@@ -22,10 +22,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Random;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -205,8 +206,8 @@ public class TestOzoneManagerPrepareState {
     if (!mkdirs) {
       throw new IOException("Unable to create marker file directory.");
     }
-    try (FileOutputStream stream =
-            new FileOutputStream(markerFile)) {
+    try (OutputStream stream =
+             Files.newOutputStream(markerFile.toPath())) {
       stream.write(bytes);
     }
   }
@@ -216,7 +217,7 @@ public class TestOzoneManagerPrepareState {
     File prepareMarkerFile = prepareState.getPrepareMarkerFile();
     byte[] data = new byte[(int) prepareMarkerFile.length()];
 
-    try (FileInputStream stream = new FileInputStream(prepareMarkerFile)) {
+    try (InputStream stream = Files.newInputStream(prepareMarkerFile.toPath())) {
       stream.read(data);
       index = Long.parseLong(new String(data, Charset.defaultCharset()));
     }

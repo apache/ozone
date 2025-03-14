@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -29,9 +30,9 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.HashSet;
@@ -87,7 +88,7 @@ class TestContainerImporter {
     KeyValueContainer container = new KeyValueContainer(containerData, conf);
     ContainerController controllerMock = mock(ContainerController.class);
     // create containerImporter object
-    ContainerSet containerSet = new ContainerSet(0);
+    ContainerSet containerSet = newContainerSet(0);
     containerSet.addContainer(container);
     MutableVolumeSet volumeSet = new MutableVolumeSet("test", conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
@@ -118,7 +119,7 @@ class TestContainerImporter {
           return container;
         });
     // create containerImporter object
-    ContainerSet containerSet = new ContainerSet(0);
+    ContainerSet containerSet = newContainerSet(0);
     MutableVolumeSet volumeSet = new MutableVolumeSet("test", conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     ContainerImporter containerImporter = new ContainerImporter(conf,
@@ -157,7 +158,7 @@ class TestContainerImporter {
     doNothing().when(containerData).setChecksumTo0ByteArray();
     // create containerImporter object
     ContainerController controllerMock = mock(ContainerController.class);
-    ContainerSet containerSet = new ContainerSet(0);
+    ContainerSet containerSet = newContainerSet(0);
     MutableVolumeSet volumeSet = new MutableVolumeSet("test", conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     ContainerImporter containerImporter = spy(new ContainerImporter(conf,
@@ -185,12 +186,10 @@ class TestContainerImporter {
   private File containerTarFile(
       long containerId, ContainerData containerData) throws IOException {
     File yamlFile = new File(tempDir, "container.yaml");
-    ContainerDataYaml.createContainerFile(
-        ContainerProtos.ContainerType.KeyValueContainer, containerData,
-        yamlFile);
+    ContainerDataYaml.createContainerFile(containerData, yamlFile);
     File tarFile = new File(tempDir,
         ContainerUtils.getContainerTarName(containerId));
-    try (FileOutputStream output = new FileOutputStream(tarFile)) {
+    try (OutputStream output = Files.newOutputStream(tarFile.toPath())) {
       ArchiveOutputStream<TarArchiveEntry> archive = new TarArchiveOutputStream(output);
       TarArchiveEntry entry = archive.createArchiveEntry(yamlFile,
           "container.yaml");

@@ -74,7 +74,6 @@ public class RDBStore implements DBStore {
   private final long maxDbUpdatesSizeThreshold;
   private final ManagedDBOptions dbOptions;
   private final ManagedStatistics statistics;
-  private final String threadNamePrefix;
 
   @SuppressWarnings("parameternumber")
   public RDBStore(File dbFile, ManagedDBOptions dbOptions, ManagedStatistics statistics,
@@ -83,11 +82,10 @@ public class RDBStore implements DBStore {
                   String dbJmxBeanName, boolean enableCompactionDag,
                   long maxDbUpdatesSizeThreshold,
                   boolean createCheckpointDirs,
-                  ConfigurationSource configuration, String threadNamePrefix,
+                  ConfigurationSource configuration,
                   boolean enableRocksDBMetrics)
 
       throws IOException {
-    this.threadNamePrefix = threadNamePrefix;
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
     Preconditions.checkNotNull(families);
     Preconditions.checkArgument(!families.isEmpty());
@@ -306,8 +304,7 @@ public class RDBStore implements DBStore {
   public <K, V> Table<K, V> getTable(String name,
       Class<K> keyType, Class<V> valueType,
       TableCache.CacheType cacheType) throws IOException {
-    return new TypedTable<>(getTable(name), codecRegistry, keyType,
-        valueType, cacheType, threadNamePrefix);
+    return new TypedTable<>(getTable(name), codecRegistry, keyType, valueType, cacheType);
   }
 
   @Override

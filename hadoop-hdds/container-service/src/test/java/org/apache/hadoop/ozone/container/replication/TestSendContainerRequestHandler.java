@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -62,11 +63,11 @@ class TestSendContainerRequestHandler {
   void testReceiveDataForExistingContainer() throws Exception {
     long containerId = 1;
     // create containerImporter
-    ContainerSet containerSet = new ContainerSet(0);
+    ContainerSet containerSet = newContainerSet(0);
     MutableVolumeSet volumeSet = new MutableVolumeSet("test", conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     ContainerImporter containerImporter = new ContainerImporter(conf,
-        new ContainerSet(0), mock(ContainerController.class), volumeSet);
+        newContainerSet(0), mock(ContainerController.class), volumeSet);
     KeyValueContainerData containerData = new KeyValueContainerData(containerId,
         ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test");
     // add container to container set
