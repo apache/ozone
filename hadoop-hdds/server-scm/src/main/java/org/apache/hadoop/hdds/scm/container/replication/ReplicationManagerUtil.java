@@ -78,7 +78,7 @@ public final class ReplicationManagerUtil {
     // Ensure that target datanodes have enough space to hold a complete
     // container.
     final long dataSizeRequired =
-        Math.max(container.getUsedBytes(), defaultContainerSize);
+        Math.max(container.getUsedBytes(), defaultContainerSize * 2);
 
     int mutableRequiredNodes = requiredNodes;
     while (mutableRequiredNodes > 0) {
