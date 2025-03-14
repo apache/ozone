@@ -68,8 +68,10 @@ import org.slf4j.LoggerFactory;
  * select a container that belongs to user1, with Ratis replication which can
  * make 3 copies of data. The fact that we will look for open containers by
  * default and if we cannot find them we will add new containers.
- *
+ * <p>
  * All the calls are idempotent.
+ * <p>
+ * This class is NOT thread-safe.
  */
 public class ContainerStateMap {
   private static final Logger LOG =
@@ -167,9 +169,23 @@ public class ContainerStateMap {
       return entry == null ? null : entry.removeReplica(datanodeID);
     }
   }
-
+  /**
+   * Map {@link LifeCycleState} to {@link ContainerInfo}.
+   * Note that a {@link ContainerInfo} can only exists in at most one of the {@link LifeCycleState}s.
+   */
   private final ContainerAttribute<LifeCycleState> lifeCycleStateMap = new ContainerAttribute<>(LifeCycleState.class);
+  /**
+   * Map {@link ReplicationType} to {@link ContainerInfo}.
+   * Note that a {@link ContainerInfo} can only exists in at most one of the {@link ReplicationType}s.
+   */
   private final ContainerAttribute<ReplicationType> typeMap = new ContainerAttribute<>(ReplicationType.class);
+  /**
+   * Map {@link ContainerID} to ({@link ContainerInfo} and {@link ContainerReplica}).
+   * Note that the following sets are exactly the same
+   * 1. The {@link ContainerInfo} in this map.
+   * 2. The {@link ContainerInfo} in the union of all the states in {@link #lifeCycleStateMap}.
+   * 2. The {@link ContainerInfo} in the union of all the types in {@link #typeMap}.
+   */
   private final ContainerMap containerMap = new ContainerMap();
 
   /**
@@ -191,9 +207,8 @@ public class ContainerStateMap {
   public void addContainer(final ContainerInfo info) {
     Objects.requireNonNull(info, "info == null");
     if (containerMap.addIfAbsent(info)) {
-      final ContainerID id = info.containerID();
-      lifeCycleStateMap.insert(info.getState(), id);
-      typeMap.insert(info.getReplicationType(), id);
+      lifeCycleStateMap.addNonExisting(info.getState(), info);
+      typeMap.addNonExisting(info.getReplicationType(), info);
       LOG.trace("Added {}", info);
     }
   }
@@ -211,8 +226,8 @@ public class ContainerStateMap {
     Objects.requireNonNull(id, "id == null");
     final ContainerInfo info = containerMap.remove(id);
     if (info != null) {
-      lifeCycleStateMap.remove(info.getState(), id);
-      typeMap.remove(info.getReplicationType(), id);
+      lifeCycleStateMap.removeExisting(info.getState(), info);
+      typeMap.removeExisting(info.getReplicationType(), info);
       LOG.trace("Removed {}", info);
     }
   }
@@ -291,22 +306,17 @@ public class ContainerStateMap {
    */
   public List<ContainerInfo> getContainerInfos(LifeCycleState state, ContainerID start, int count) {
     Preconditions.assertTrue(count >= 0, "count < 0");
-    return lifeCycleStateMap.tailSet(state, start).stream()
-        .map(this::getContainerInfo)
+    return lifeCycleStateMap.tailMap(state, start).values().stream()
         .limit(count)
         .collect(Collectors.toList());
   }
 
   public List<ContainerInfo> getContainerInfos(LifeCycleState state) {
-    return lifeCycleStateMap.getCollection(state).stream()
-        .map(this::getContainerInfo)
-        .collect(Collectors.toList());
+    return lifeCycleStateMap.getCollection(state);
   }
 
   public List<ContainerInfo> getContainerInfos(ReplicationType type) {
-    return typeMap.getCollection(type).stream()
-        .map(this::getContainerInfo)
-        .collect(Collectors.toList());
+    return typeMap.getCollection(type);
   }
 
   /** @return the number of containers for the given state. */
