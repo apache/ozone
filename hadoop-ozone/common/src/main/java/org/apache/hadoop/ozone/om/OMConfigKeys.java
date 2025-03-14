@@ -622,4 +622,16 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_MAX_BUCKET =
       "ozone.om.max.buckets";
   public static final int OZONE_OM_MAX_BUCKET_DEFAULT = 100000;
+
+  public static final String OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY = "ozone.om.edekcacheloader.initial.delay.ms";
+
+  public static final int OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_DEFAULT = 3000;
+
+  public static final String OZONE_OM_EDEKCACHELOADER_INTERVAL_MS_KEY = "ozone.om.edekcacheloader.interval.ms";
+
+  public static final int OZONE_OM_EDEKCACHELOADER_INTERVAL_MS_DEFAULT = 1000;
+
+  public static final String OZONE_OM_EDEKCACHELOADER_MAX_RETRIES_KEY =
+      "ozone.om.edekcacheloader.max-retries";
+  public static final int OZONE_OM_EDEKCACHELOADER_MAX_RETRIES_DEFAULT = 10;
 }
