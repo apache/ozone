@@ -77,11 +77,6 @@ public class ListSubcommand extends ScmSubcommand {
       description = "Container replication (ONE, THREE for Ratis, " +
           "rs-6-3-1024k for EC)")
   private String replication;
-  
-  @Option(names = {"--json"},
-      description = "Output the entire list in JSON array format",
-      defaultValue = "false")
-  private boolean jsonFormat;
 
   private static final ObjectWriter WRITER;
 
@@ -93,12 +88,6 @@ public class ListSubcommand extends ScmSubcommand {
     mapper
         .setVisibility(PropertyAccessor.GETTER, JsonAutoDetect.Visibility.NONE);
     WRITER = mapper.writerWithDefaultPrettyPrinter();
-  }
-
-
-  private void outputContainerInfo(ContainerInfo containerInfo) throws IOException {
-    // Original behavior - just print the container JSON
-    System.out.println(WRITER.writeValueAsString(containerInfo));
   }
 
   @Override
@@ -119,81 +108,56 @@ public class ListSubcommand extends ScmSubcommand {
         .getInt(ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT,
             ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT_DEFAULT);
 
-    ContainerListResult containerListAndTotalCount;
-
-    if (!all) {
-      if (count > maxCountAllowed) {
-        System.err.printf("Attempting to list the first %d records of containers." +
-            " However it exceeds the cluster's current limit of %d. The results will be capped at the" +
-            " maximum allowed count.%n", count, ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT_DEFAULT);
-        count = maxCountAllowed;
-      }
-      containerListAndTotalCount = scmClient.listContainer(startId, count, state, type, repConfig);
+    // Use SequenceWriter to output JSON array format for all cases
+    try (SequenceWriter sequenceWriter = WRITER.writeValues(System.out)) {
+      sequenceWriter.init(true); // Initialize as a JSON array
       
-      if (jsonFormat) {
-        // JSON array format using SequenceWriter directly
-        try (SequenceWriter sequenceWriter = WRITER.writeValues(System.out)) {
-          sequenceWriter.init(true); // Initialize as a JSON array
-          sequenceWriter.writeAll(containerListAndTotalCount.getContainerInfoList());
+      if (!all) {
+        // Regular listing with count limit
+        if (count > maxCountAllowed) {
+          System.err.printf("Attempting to list the first %d records of containers." +
+              " However it exceeds the cluster's current limit of %d. The results will be capped at the" +
+              " maximum allowed count.%n", count, maxCountAllowed);
+          count = maxCountAllowed;
         }
-        System.out.println(); // Add final newline
+        
+        ContainerListResult containerListResult = 
+            scmClient.listContainer(startId, count, state, type, repConfig);
+        
+        // Write all containers in the result to the JSON array
+        for (ContainerInfo container : containerListResult.getContainerInfoList()) {
+          sequenceWriter.write(container);
+        }
+        
+        if (containerListResult.getTotalCount() > count) {
+          System.err.printf("Displaying %d out of %d containers. " +
+                         "Container list has more containers.%n",
+                 count, containerListResult.getTotalCount());
+        }
       } else {
-        // Original format - one JSON object per line
-        for (ContainerInfo container : containerListAndTotalCount.getContainerInfoList()) {
-          outputContainerInfo(container);
-        }
-      }
-
-      if (containerListAndTotalCount.getTotalCount() > count) {
-        System.err.printf("Displaying %d out of %d containers. " +
-                        "Container list has more containers.%n",
-                count, containerListAndTotalCount.getTotalCount());
-      }
-    } else {
-      // Batch size is either count passed through cli or maxCountAllowed
-      int batchSize = (count > 0) ? count : maxCountAllowed;
-      long currentStartId = startId;
-      int fetchedCount;
-      
-      if (jsonFormat) {
-        // For JSON array format, use SequenceWriter to stream containers as we fetch them
-        try (SequenceWriter sequenceWriter = WRITER.writeValues(System.out)) {
-          sequenceWriter.init(true); // Initialize as a JSON array
-          
-          do {
-            // Fetch containers in batches of 'batchSize'
-            containerListAndTotalCount = scmClient.listContainer(currentStartId, batchSize, state, type, repConfig);
-            fetchedCount = containerListAndTotalCount.getContainerInfoList().size();
-            
-            // Write containers directly to the SequenceWriter
-            for (ContainerInfo container : containerListAndTotalCount.getContainerInfoList()) {
-              sequenceWriter.write(container);
-            }
-            
-            if (fetchedCount > 0) {
-              currentStartId =
-                  containerListAndTotalCount.getContainerInfoList().get(fetchedCount - 1).getContainerID() + 1;
-            }
-          } while (fetchedCount > 0);
-        }
-        System.out.println(); // Add final newline
-      } else {
-        // Original format - one JSON object per line
+        // List all containers by fetching in batches
+        int batchSize = (count > 0) ? count : maxCountAllowed;
+        long currentStartId = startId;
+        int fetchedCount;
+        
         do {
           // Fetch containers in batches of 'batchSize'
-          containerListAndTotalCount = scmClient.listContainer(currentStartId, batchSize, state, type, repConfig);
-          fetchedCount = containerListAndTotalCount.getContainerInfoList().size();
-
-          for (ContainerInfo container : containerListAndTotalCount.getContainerInfoList()) {
-            outputContainerInfo(container);
+          ContainerListResult containerListResult = 
+              scmClient.listContainer(currentStartId, batchSize, state, type, repConfig);
+          fetchedCount = containerListResult.getContainerInfoList().size();
+          
+          // Write containers directly to the SequenceWriter
+          for (ContainerInfo container : containerListResult.getContainerInfoList()) {
+            sequenceWriter.write(container);
           }
-
+          
           if (fetchedCount > 0) {
             currentStartId =
-                containerListAndTotalCount.getContainerInfoList().get(fetchedCount - 1).getContainerID() + 1;
+                containerListResult.getContainerInfoList().get(fetchedCount - 1).getContainerID() + 1;
           }
         } while (fetchedCount > 0);
       }
     }
+    System.out.println(); // Add final newline
   }
 }
