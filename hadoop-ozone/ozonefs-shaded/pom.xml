@@ -27,6 +27,9 @@
   <properties>
     <!-- no tests in this module so far -->
     <maven.test.skip>true</maven.test.skip>
+    <ozone.shaded.native.prefix>org_apache_hadoop_ozone_shaded</ozone.shaded.native.prefix>
+    <!-- refer to ratis thirdparty ratis.thirdparty.shaded.native.prefix -->
+    <ratis.thirdparty.shaded.native.prefix>org_apache_ratis_thirdparty_</ratis.thirdparty.shaded.native.prefix>
     <shaded.prefix>org.apache.hadoop.ozone.shaded</shaded.prefix>
   </properties>
 
@@ -34,6 +37,30 @@
     <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-resolver-dns-native-macos</artifactId>
+      <classifier>osx-x86_64</classifier>
+    </dependency>
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-tcnative-boringssl-static</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-transport-native-epoll</artifactId>
+      <classifier>linux-aarch_64</classifier>
+    </dependency>
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-transport-native-epoll</artifactId>
+      <classifier>linux-x86_64</classifier>
+    </dependency>
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-transport-native-kqueue</artifactId>
+      <classifier>osx-x86_64</classifier>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -129,7 +156,26 @@
                     <!-- Hadoop env provides these dependencies.
                          To prevent conflicts, remove them from Ozone release package.-->
                     <exclude>javax/annotation/**</exclude>
-                    <exclude>mozilla/public-suffix-list.txt</exclude>
+                    <!-- Filter ratis thirdparty shaded netty_tcnative libs -->
+                    <exclude>META-INF/native/liborg_apache_ratis_thirdparty_netty_resolver_dns_native_macos_x86_64.jnilib</exclude>
+                    <exclude>META-INF/native/liborg_apache_ratis_thirdparty_netty_tcnative_linux_aarch_64.so</exclude>
+                    <exclude>META-INF/native/liborg_apache_ratis_thirdparty_netty_tcnative_linux_x86_64.so</exclude>
+                    <exclude>META-INF/native/liborg_apache_ratis_thirdparty_netty_tcnative_osx_aarch_64.jnilib</exclude>
+                    <exclude>META-INF/native/liborg_apache_ratis_thirdparty_netty_tcnative_osx_x86_64.jnilib</exclude>
+                    <exclude>META-INF/native/liborg_apache_ratis_thirdparty_netty_transport_native_epoll_aarch_64.so</exclude>
+                    <exclude>META-INF/native/liborg_apache_ratis_thirdparty_netty_transport_native_epoll_x86_64.so</exclude>
+                    <exclude>META-INF/native/liborg_apache_ratis_thirdparty_netty_transport_native_kqueue_x86_64.jnilib</exclude>
+                    <exclude>META-INF/native/org_apache_ratis_thirdparty_netty_tcnative_windows_x86_64.dll</exclude>
+                    <!-- Filter unshaded netty_tcnative libs -->
+                    <exclude>META-INF/native/libnetty_resolver_dns_native_macos_x86_64.jnilib</exclude>
+                    <exclude>META-INF/native/libnetty_tcnative_linux_aarch_64.so</exclude>
+                    <exclude>META-INF/native/libnetty_tcnative_linux_x86_64.so</exclude>
+                    <exclude>META-INF/native/libnetty_tcnative_osx_aarch_64.jnilib</exclude>
+                    <exclude>META-INF/native/libnetty_tcnative_osx_x86_64.jnilib</exclude>
+                    <exclude>META-INF/native/libnetty_transport_native_epoll_aarch_64.so</exclude>
+                    <exclude>META-INF/native/libnetty_transport_native_epoll_x86_64.so</exclude>
+                    <exclude>META-INF/native/libnetty_transport_native_kqueue_x86_64.jnilib</exclude>
+                    <exclude>META-INF/native/netty_tcnative_windows_x86_64.dll</exclude>
                   </excludes>
                 </filter>
               </filters>
@@ -171,10 +217,6 @@
                 <relocation>
                   <pattern>org.apache.ratis</pattern>
                   <shadedPattern>${shaded.prefix}.org.apache.ratis</shadedPattern>
-                  <!-- thirdparty netty will use native library and cannot be relocated -->
-                  <excludes>
-                    <exclude>org.apache.ratis.thirdparty.io.netty.**</exclude>
-                  </excludes>
                 </relocation>
                 <relocation>
                   <pattern>com</pattern>
@@ -258,6 +300,87 @@
                   <shadedPattern>${shaded.prefix}.okhttp3</shadedPattern>
                 </relocation>
               </relocations>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>${maven-dependency-plugin.version}</version>
+        <executions>
+          <execution>
+            <id>unpack-dependencies</id>
+            <goals>
+              <goal>unpack-dependencies</goal>
+            </goals>
+            <phase>validate</phase>
+            <configuration>
+              <includeGroupIds>io.netty</includeGroupIds>
+              <includes>**/META-INF/native/*</includes>
+              <includeArtifactIds>netty-resolver-dns-native-macos,
+                netty-tcnative-boringssl-static,
+                netty-transport-native-epoll,
+                netty-transport-native-kqueue</includeArtifactIds>
+              <outputDirectory>${project.build.directory}/classes/</outputDirectory>
+              <overWriteReleases>true</overWriteReleases>
+              <overWriteSnapshots>true</overWriteSnapshots>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- The native libraries need to be named in the same way we relocate the Netty classes via the shade-plugin -->
+      <!-- We shaded ratis thirdparty, so the dynamic library name here includes both ratis thirdparty shaded and ozone shaded-->
+      <plugin>
+        <groupId>com.coderplus.maven.plugins</groupId>
+        <artifactId>copy-rename-maven-plugin</artifactId>
+        <version>${copy-rename-maven-plugin.version}</version>
+        <executions>
+          <execution>
+            <id>rename-file</id>
+            <goals>
+              <goal>rename</goal>
+            </goals>
+            <phase>generate-sources</phase>
+            <configuration>
+              <fileSets>
+                <fileSet>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_resolver_dns_native_macos_x86_64.jnilib</sourceFile>
+                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_${ratis.thirdparty.shaded.native.prefix}netty_resolver_dns_native_macos_x86_64.jnilib</destinationFile>
+                </fileSet>
+                <fileSet>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_transport_native_epoll_aarch_64.so</sourceFile>
+                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_${ratis.thirdparty.shaded.native.prefix}netty_transport_native_epoll_aarch_64.so</destinationFile>
+                </fileSet>
+                <fileSet>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_transport_native_epoll_x86_64.so</sourceFile>
+                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_${ratis.thirdparty.shaded.native.prefix}netty_transport_native_epoll_x86_64.so</destinationFile>
+                </fileSet>
+                <fileSet>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_transport_native_kqueue_x86_64.jnilib</sourceFile>
+                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_${ratis.thirdparty.shaded.native.prefix}netty_transport_native_kqueue_x86_64.jnilib</destinationFile>
+                </fileSet>
+                <fileSet>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_tcnative_linux_aarch_64.so</sourceFile>
+                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_${ratis.thirdparty.shaded.native.prefix}netty_tcnative_linux_aarch_64.so</destinationFile>
+                </fileSet>
+                <fileSet>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_tcnative_linux_x86_64.so</sourceFile>
+                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_${ratis.thirdparty.shaded.native.prefix}netty_tcnative_linux_x86_64.so</destinationFile>
+                </fileSet>
+                <fileSet>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_tcnative_osx_aarch_64.jnilib</sourceFile>
+                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_${ratis.thirdparty.shaded.native.prefix}netty_tcnative_osx_aarch_64.jnilib</destinationFile>
+                </fileSet>
+                <fileSet>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/libnetty_tcnative_osx_x86_64.jnilib</sourceFile>
+                  <destinationFile>${project.build.directory}/classes/META-INF/native/lib${ozone.shaded.native.prefix}_${ratis.thirdparty.shaded.native.prefix}libnetty_tcnative_osx_x86_64.jnilib</destinationFile>
+                </fileSet>
+                <fileSet>
+                  <sourceFile>${project.build.directory}/classes/META-INF/native/netty_tcnative_windows_x86_64.dll</sourceFile>
+                  <destinationFile>${project.build.directory}/classes/META-INF/native/${ozone.shaded.native.prefix}_${ratis.thirdparty.shaded.native.prefix}netty_tcnative_windows_x86_64.dll</destinationFile>
+                </fileSet>
+              </fileSets>
             </configuration>
           </execution>
         </executions>
