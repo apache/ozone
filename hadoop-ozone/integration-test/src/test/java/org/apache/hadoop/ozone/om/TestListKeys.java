@@ -127,7 +127,7 @@ public abstract class TestListKeys implements NonHATests.TestCase {
    */
   private static void buildNameSpaceTree(OzoneBucket ozoneBucket)
       throws Exception {
-    LinkedList<String> keys = new LinkedList<>();
+    List<String> keys = new LinkedList<>();
     keys.add("a1/b1/c1111.tx");
     keys.add("a1/b1/c1222.tx");
     keys.add("a1/b1/c1333.tx");
@@ -357,7 +357,7 @@ public abstract class TestListKeys implements NonHATests.TestCase {
       assertEquals(expectedReplication, ozoneKey.getReplicationConfig());
       keyLists.add(ozoneKey.getName());
     }
-    LinkedList outputKeysList = new LinkedList(keyLists);
+    List outputKeysList = new LinkedList(keyLists);
     System.out.println("BEGIN:::keyPrefix---> " + keyPrefix + ":::---> " +
         startKey);
     for (String key : keys) {

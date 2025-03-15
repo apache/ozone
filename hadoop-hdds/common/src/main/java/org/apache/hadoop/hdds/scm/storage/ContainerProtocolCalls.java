@@ -807,7 +807,7 @@ public final class ContainerProtocolCalls  {
     return Collections.unmodifiableList(validators);
   }
 
-  public static HashMap<DatanodeDetails, GetBlockResponseProto>
+  public static Map<DatanodeDetails, GetBlockResponseProto>
       getBlockFromAllNodes(
       XceiverClientSpi xceiverClient,
       DatanodeBlockID datanodeBlockID,
@@ -816,7 +816,7 @@ public final class ContainerProtocolCalls  {
     GetBlockRequestProto.Builder readBlockRequest = GetBlockRequestProto
             .newBuilder()
             .setBlockID(datanodeBlockID);
-    HashMap<DatanodeDetails, GetBlockResponseProto> datanodeToResponseMap
+    Map<DatanodeDetails, GetBlockResponseProto> datanodeToResponseMap
             = new HashMap<>();
     String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
     ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto
@@ -842,11 +842,11 @@ public final class ContainerProtocolCalls  {
     return datanodeToResponseMap;
   }
 
-  public static HashMap<DatanodeDetails, ReadContainerResponseProto>
+  public static Map<DatanodeDetails, ReadContainerResponseProto>
       readContainerFromAllNodes(XceiverClientSpi client, long containerID,
       String encodedToken) throws IOException, InterruptedException {
     String id = client.getPipeline().getFirstNode().getUuidString();
-    HashMap<DatanodeDetails, ReadContainerResponseProto> datanodeToResponseMap
+    Map<DatanodeDetails, ReadContainerResponseProto> datanodeToResponseMap
         = new HashMap<>();
     ContainerCommandRequestProto.Builder request =
         ContainerCommandRequestProto.newBuilder();

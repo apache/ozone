@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.util;
 
 import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Wrapper class for Radix tree node representing Ozone prefix path segment
@@ -38,7 +39,7 @@ public class RadixNode<T> {
     return children.isEmpty();
   }
 
-  public HashMap<String, RadixNode> getChildren() {
+  public Map<String, RadixNode> getChildren() {
     return children;
   }
 
@@ -50,7 +51,7 @@ public class RadixNode<T> {
     return value;
   }
 
-  private HashMap<String, RadixNode> children;
+  private Map<String, RadixNode> children;
 
   private String name;
 

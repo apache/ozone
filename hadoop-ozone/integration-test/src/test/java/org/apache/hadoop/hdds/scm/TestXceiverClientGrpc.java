@@ -113,7 +113,7 @@ public class TestXceiverClientGrpc {
   @Test
   @Timeout(5)
   public void testGetBlockRetryAlNodes() {
-    final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
+    final List<DatanodeDetails> allDNs = new ArrayList<>(dns);
     assertThat(allDNs.size()).isGreaterThan(1);
     try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
       @Override
@@ -134,7 +134,7 @@ public class TestXceiverClientGrpc {
   @Test
   @Timeout(5)
   public void testReadChunkRetryAllNodes() {
-    final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
+    final List<DatanodeDetails> allDNs = new ArrayList<>(dns);
     assertThat(allDNs.size()).isGreaterThan(1);
     try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
       @Override

@@ -46,6 +46,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
@@ -811,7 +812,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     }
 
     // Put volume and bucket pairs into a set to avoid duplicates.
-    HashSet<Pair<String, String>> volumeBucketSet = new HashSet<>();
+    Set<Pair<String, String>> volumeBucketSet = new HashSet<>();
     List<KeyInfo> keys = resp.getListKeysResponse().getKeyInfoList();
     for (KeyInfo key : keys) {
       if (key.hasVolumeName() && key.hasBucketName()) {
@@ -884,7 +885,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     // Add the volume and bucket pairs to a set to avoid duplicates.
     List<RepeatedKeyInfo> repeatedKeys =
         resp.getListTrashResponse().getDeletedKeysList();
-    HashSet<Pair<String, String>> volumeBucketSet = new HashSet<>();
+    Set<Pair<String, String>> volumeBucketSet = new HashSet<>();
 
     for (RepeatedKeyInfo repeatedKey : repeatedKeys) {
       for (KeyInfo key : repeatedKey.getKeyInfoList()) {
@@ -1317,7 +1318,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     // Add the volume and bucket pairs to a set to avoid duplicate entries.
     List<OzoneFileStatusProto> statuses =
         resp.getListStatusResponse().getStatusesList();
-    HashSet<Pair<String, String>> volumeBucketSet = new HashSet<>();
+    Set<Pair<String, String>> volumeBucketSet = new HashSet<>();
 
     for (OzoneFileStatusProto status : statuses) {
       KeyInfo keyInfo = status.getKeyInfo();

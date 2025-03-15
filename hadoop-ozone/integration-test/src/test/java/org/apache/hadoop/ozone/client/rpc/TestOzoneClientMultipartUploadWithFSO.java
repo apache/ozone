@@ -408,7 +408,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
 
     // We have not uploaded any parts, but passing some list it should throw
     // error.
-    TreeMap<Integer, String> partsMap = new TreeMap<>();
+    Map<Integer, String> partsMap = new TreeMap<>();
     partsMap.put(1, UUID.randomUUID().toString());
 
     OzoneTestUtils.expectOmException(OMException.ResultCodes.INVALID_PART,
@@ -424,7 +424,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     uploadPart(bucket, keyName, uploadID, 1, "data".getBytes(UTF_8));
 
     // passing with an incorrect part name, should throw INVALID_PART error.
-    TreeMap<Integer, String> partsMap = new TreeMap<>();
+    Map<Integer, String> partsMap = new TreeMap<>();
     partsMap.put(1, UUID.randomUUID().toString());
 
     OzoneTestUtils.expectOmException(OMException.ResultCodes.INVALID_PART,
@@ -439,7 +439,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     uploadPart(bucket, keyName, uploadID, 1, "data".getBytes(UTF_8));
 
     // passing with an incorrect part number, should throw INVALID_PART error.
-    TreeMap<Integer, String> partsMap = new TreeMap<>();
+    Map<Integer, String> partsMap = new TreeMap<>();
     partsMap.put(3, "random");
 
     OzoneTestUtils.expectOmException(OMException.ResultCodes.INVALID_PART,

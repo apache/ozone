@@ -50,7 +50,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
   public static final Factory FACTORY = new Factory();
   // a map of node's network name to Node for quick search and keep
   // the insert order
-  private HashMap<String, Node> childrenMap =
+  private Map<String, Node> childrenMap =
       new LinkedHashMap<String, Node>();
   // number of descendant leaves under this node
   private int numOfLeaves;
@@ -72,7 +72,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
    * protobuf deserialization.
    */
   protected InnerNodeImpl(String name, String location, int level, int cost,
-                          HashMap<String, Node> childrenMap, int numOfLeaves) {
+                          Map<String, Node> childrenMap, int numOfLeaves) {
     super(name, location, null, level, cost);
     this.childrenMap = childrenMap;
     this.numOfLeaves = numOfLeaves;
@@ -87,7 +87,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
     private String location;
     private int cost;
     private int level;
-    private HashMap<String, Node> childrenMap = new LinkedHashMap<>();
+    private Map<String, Node> childrenMap = new LinkedHashMap<>();
     private int numOfLeaves;
 
     public Builder setName(String name) {
@@ -112,7 +112,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
 
     public Builder setChildrenMap(
         List<HddsProtos.ChildrenMap> childrenMapList) {
-      HashMap<String, Node> newChildrenMap = new LinkedHashMap<>();
+      Map<String, Node> newChildrenMap = new LinkedHashMap<>();
       for (HddsProtos.ChildrenMap childrenMapProto :
           childrenMapList) {
         String networkName = childrenMapProto.hasNetworkName() ?
@@ -148,7 +148,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
   }
 
   /** @return a map of node's network name to Node. */
-  public HashMap<String, Node> getChildrenMap() {
+  public Map<String, Node> getChildrenMap() {
     return childrenMap;
   }
 
@@ -582,7 +582,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
       genToExclude = genToReturn;
     }
     // ancestorToExclude to ancestorToReturn map
-    HashMap<Node, Node> ancestorMap = new HashMap<>();
+    Map<Node, Node> ancestorMap = new HashMap<>();
     for (Node node: nodes) {
       Node ancestorToExclude = node.getAncestor(genToExclude);
       Node ancestorToReturn = node.getAncestor(genToReturn);
@@ -596,7 +596,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
       ancestorMap.put(ancestorToExclude, ancestorToReturn);
     }
     // ancestorToReturn to exclude node count map
-    HashMap<Node, Integer> countMap = new HashMap<>();
+    Map<Node, Integer> countMap = new HashMap<>();
     for (Map.Entry<Node, Node> entry : ancestorMap.entrySet()) {
       countMap.compute(entry.getValue(),
           (key, n) -> (n == null ? 0 : n) + entry.getKey().getNumOfLeaves());
@@ -675,7 +675,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
   /** Get how many leaf nodes are covered by the excludedScopes(no overlap). */
   private Map<String, Integer> getExcludedScopeNodeCount(
       List<String> excludedScopes) {
-    HashMap<String, Integer> nodeCounts = new HashMap<>();
+    Map<String, Integer> nodeCounts = new HashMap<>();
     if (excludedScopes == null || excludedScopes.isEmpty()) {
       return nodeCounts;
     }

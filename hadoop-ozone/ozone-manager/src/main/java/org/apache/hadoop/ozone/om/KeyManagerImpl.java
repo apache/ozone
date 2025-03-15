@@ -1545,7 +1545,7 @@ public class KeyManagerImpl implements KeyManager {
   private void listStatusFindKeyInTableCache(
       Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> cacheIter,
       String keyArgs, String startCacheKey, boolean recursive,
-      TreeMap<String, OzoneFileStatus> cacheKeyMap) throws IOException {
+      Map<String, OzoneFileStatus> cacheKeyMap) throws IOException {
 
     Map<String, OmKeyInfo> remainingKeys = new HashMap<>();
     // extract the /volume/buck/ prefix from the startCacheKey
@@ -1678,7 +1678,7 @@ public class KeyManagerImpl implements KeyManager {
     }
 
     // A map sorted by OmKey to combine results from TableCache and DB.
-    TreeMap<String, OzoneFileStatus> cacheKeyMap = new TreeMap<>();
+    Map<String, OzoneFileStatus> cacheKeyMap = new TreeMap<>();
 
     if (Strings.isNullOrEmpty(startKey)) {
       OzoneFileStatus fileStatus = getFileStatus(args, clientAddress);
@@ -1753,7 +1753,7 @@ public class KeyManagerImpl implements KeyManager {
   private TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
       getIteratorForKeyInTableCache(
       boolean recursive, String startKey, String volumeName, String bucketName,
-      TreeMap<String, OzoneFileStatus> cacheKeyMap, String keyArgs,
+      Map<String, OzoneFileStatus> cacheKeyMap, String keyArgs,
       Table<String, OmKeyInfo> keyTable) throws IOException {
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator;
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
@@ -1770,7 +1770,7 @@ public class KeyManagerImpl implements KeyManager {
   @SuppressWarnings("parameternumber")
   private void findKeyInDbWithIterator(boolean recursive, String startKey,
       long numEntries, String volumeName, String bucketName, String keyName,
-      TreeMap<String, OzoneFileStatus> cacheKeyMap, String keyArgs,
+      Map<String, OzoneFileStatus> cacheKeyMap, String keyArgs,
       Table<String, OmKeyInfo> keyTable,
       TableIterator<String,
           ? extends Table.KeyValue<String, OmKeyInfo>> iterator)

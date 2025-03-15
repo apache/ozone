@@ -65,7 +65,7 @@ class TestSstFileSetReader {
       .map(i -> String.format("%c", i))
       .collect(Collectors.joining(""));
 
-  private String createRandomSSTFile(TreeMap<String, Integer> keys)
+  private String createRandomSSTFile(Map<String, Integer> keys)
       throws RocksDBException {
     File file = new File(tempDir, "tmp_sst_file" + fileCounter.incrementAndGet() + ".sst");
 
@@ -98,9 +98,9 @@ class TestSstFileSetReader {
       int numberOfFiles) throws RocksDBException, IOException {
     List<String> files = new ArrayList<>();
     int numberOfKeysPerFile = 1000;
-    TreeMap<String, Integer> keys =
+    SortedMap<String, Integer> keys =
         new TreeMap<>(createKeys(0, numberOfKeysPerFile * numberOfFiles));
-    List<TreeMap<String, Integer>> fileKeysList =
+    List<SortedMap<String, Integer>> fileKeysList =
         IntStream.range(0, numberOfFiles)
             .mapToObj(i -> new TreeMap<String, Integer>())
             .collect(Collectors.toList());
@@ -109,7 +109,7 @@ class TestSstFileSetReader {
       fileKeysList.get(cnt % numberOfFiles).put(kv.getKey(), kv.getValue());
       cnt += 1;
     }
-    for (TreeMap<String, Integer> fileKeys : fileKeysList) {
+    for (SortedMap<String, Integer> fileKeys : fileKeysList) {
       String tmpSSTFile = createRandomSSTFile(fileKeys);
       files.add(tmpSSTFile);
     }

@@ -313,7 +313,7 @@ public class OzoneContainer {
   public void buildContainerSet() throws IOException {
     Iterator<StorageVolume> volumeSetIterator = volumeSet.getVolumesList()
         .iterator();
-    ArrayList<Thread> volumeThreads = new ArrayList<>();
+    List<Thread> volumeThreads = new ArrayList<>();
     long startTime = System.currentTimeMillis();
 
     // Load container inspectors that may be triggered at startup based on

@@ -99,7 +99,7 @@ public final class OmKeyInfo extends WithParentObjectId
   /**
    * ACL Information.
    */
-  private final CopyOnWriteArrayList<OzoneAcl> acls;
+  private final List<OzoneAcl> acls;
 
   /**
    * Used for S3 tags.

@@ -147,7 +147,6 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
       String threadNamePrefix, List<BlockingQueue<Q>> workQueues) {
     List<ThreadPoolExecutor> executors = new ArrayList<>();
     for (int i = 0; i < workQueues.size(); ++i) {
-      LinkedBlockingQueue<Runnable> poolQueue = new LinkedBlockingQueue<>(1);
       ThreadFactory threadFactory = new ThreadFactoryBuilder()
           .setDaemon(true)
           .setNameFormat(threadNamePrefix
@@ -159,7 +158,7 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
           1,
           0,
           TimeUnit.SECONDS,
-          poolQueue,
+          new LinkedBlockingQueue<>(1),
           threadFactory));
     }
     return executors;

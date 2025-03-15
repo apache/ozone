@@ -145,7 +145,7 @@ public class TestHddsUtils {
     addresses = getSCMAddressForDatanodes(conf);
     assertEquals(3, addresses.size());
     it = addresses.iterator();
-    HashMap<String, Integer> expected1 = new HashMap<>(hostsAndPorts);
+    Map<String, Integer> expected1 = new HashMap<>(hostsAndPorts);
     while (it.hasNext()) {
       InetSocketAddress current = it.next();
       assertTrue(expected1.remove(current.getHostName(),
@@ -159,7 +159,7 @@ public class TestHddsUtils {
     addresses = getSCMAddressForDatanodes(conf);
     assertEquals(3, addresses.size());
     it = addresses.iterator();
-    HashMap<String, Integer> expected2 = new HashMap<>(hostsAndPorts);
+    Map<String, Integer> expected2 = new HashMap<>(hostsAndPorts);
     while (it.hasNext()) {
       InetSocketAddress current = it.next();
       assertTrue(expected2.remove(current.getHostName(),

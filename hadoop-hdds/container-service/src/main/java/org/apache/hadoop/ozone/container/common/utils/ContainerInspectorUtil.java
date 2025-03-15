@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.common.utils;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerInspector;
@@ -32,8 +33,8 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
  */
 public final class ContainerInspectorUtil {
 
-  private static final EnumMap<ContainerProtos.ContainerType,
-          List<ContainerInspector>> INSPECTORS =
+  private static final Map<ContainerProtos.ContainerType,
+            List<ContainerInspector>> INSPECTORS =
       new EnumMap<>(ContainerProtos.ContainerType.class);
 
   static {

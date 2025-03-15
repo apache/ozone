@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.om;
 
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 
@@ -27,16 +27,16 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
  */
 public class PendingKeysDeletion {
 
-  private HashMap<String, RepeatedOmKeyInfo> keysToModify;
+  private Map<String, RepeatedOmKeyInfo> keysToModify;
   private List<BlockGroup> keyBlocksList;
 
   public PendingKeysDeletion(List<BlockGroup> keyBlocksList,
-       HashMap<String, RepeatedOmKeyInfo> keysToModify) {
+       Map<String, RepeatedOmKeyInfo> keysToModify) {
     this.keysToModify = keysToModify;
     this.keyBlocksList = keyBlocksList;
   }
 
-  public HashMap<String, RepeatedOmKeyInfo> getKeysToModify() {
+  public Map<String, RepeatedOmKeyInfo> getKeysToModify() {
     return keysToModify;
   }
 

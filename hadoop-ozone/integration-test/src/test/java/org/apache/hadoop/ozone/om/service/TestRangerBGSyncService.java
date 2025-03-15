@@ -543,7 +543,7 @@ public class TestRangerBGSyncService {
         .build();
     accessController.updateRole(userRole.getId().get(), updatedRole);
 
-    HashSet<String> userSet = new HashSet<>();
+    Set<String> userSet = new HashSet<>();
     userSet.add(USER_ALICE_SHORT);
     userSet.add(USER_BOB_SHORT);
 

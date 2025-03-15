@@ -51,6 +51,8 @@ public final class OnDemandContainerDataScanner {
   private final ContainerController containerController;
   private final DataTransferThrottler throttler;
   private final Canceler canceler;
+
+  @SuppressWarnings("PMD.LooseCoupling")
   private final ConcurrentHashMap
       .KeySetView<Long, Boolean> containerRescheduleCheckSet;
   private final OnDemandScannerMetrics metrics;

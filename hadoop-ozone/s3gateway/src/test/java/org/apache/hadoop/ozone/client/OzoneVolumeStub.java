@@ -39,7 +39,7 @@ public final class OzoneVolumeStub extends OzoneVolume {
 
   private final Map<String, OzoneBucket> buckets = new HashMap<>();
 
-  private final ArrayList<OzoneAcl> aclList = new ArrayList<>();
+  private final List<OzoneAcl> aclList = new ArrayList<>();
 
   public static Builder newBuilder() {
     return new Builder();
@@ -175,7 +175,7 @@ public final class OzoneVolumeStub extends OzoneVolume {
 
   @Override
   public List<OzoneAcl> getAcls() {
-    return (List<OzoneAcl>)aclList.clone();
+    return new ArrayList<>(aclList);
   }
 
   @Override

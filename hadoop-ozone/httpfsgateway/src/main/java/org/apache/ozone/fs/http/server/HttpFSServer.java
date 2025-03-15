@@ -96,6 +96,7 @@ import org.slf4j.MDC;
  */
 @Path(HttpFSConstants.SERVICE_VERSION)
 @InterfaceAudience.Private
+@SuppressWarnings("PMD.LooseCoupling")
 public class HttpFSServer {
 
   enum AccessMode {

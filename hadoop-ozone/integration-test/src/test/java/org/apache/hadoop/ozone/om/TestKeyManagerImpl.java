@@ -1075,8 +1075,8 @@ public class TestKeyManagerImpl {
   @Test
   public void testListStatusWithDeletedEntriesInCache() throws Exception {
     String prefixKey = "key-";
-    TreeSet<String> existKeySet = new TreeSet<>();
-    TreeSet<String> deletedKeySet = new TreeSet<>();
+    Set<String> existKeySet = new TreeSet<>();
+    Set<String> deletedKeySet = new TreeSet<>();
 
     for (int i = 1; i <= 100; i++) {
       if (i % 2 == 0) {
@@ -1111,7 +1111,7 @@ public class TestKeyManagerImpl {
     // Should only get entries that are not marked as deleted.
     assertEquals(50, fileStatuses.size());
     // Verify result
-    TreeSet<String> expectedKeys = new TreeSet<>();
+    Set<String> expectedKeys = new TreeSet<>();
     for (OzoneFileStatus fileStatus : fileStatuses) {
       String keyName = fileStatus.getKeyInfo().getKeyName();
       expectedKeys.add(keyName);

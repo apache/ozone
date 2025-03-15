@@ -33,6 +33,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.EnumMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
@@ -162,7 +163,7 @@ public class TestUpgradeFinalizerActions {
     VERSION_3(3);
 
     private int layoutVersion;
-    private EnumMap<UpgradeActionType, UpgradeAction> actions =
+    private Map<UpgradeActionType, UpgradeAction> actions =
         new EnumMap<>(UpgradeActionType.class);
 
     MockLayoutFeature(final int layoutVersion) {

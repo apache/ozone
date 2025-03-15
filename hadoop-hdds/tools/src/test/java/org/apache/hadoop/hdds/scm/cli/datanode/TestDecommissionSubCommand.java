@@ -31,6 +31,7 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
@@ -124,7 +125,7 @@ public class TestDecommissionSubCommand {
   public void testErrorsReportedWhenDecommissioning() throws IOException  {
     when(scmClient.decommissionNodes(anyList(), anyBoolean()))
         .thenAnswer(invocation -> {
-          ArrayList<DatanodeAdminError> e = new ArrayList<>();
+          List<DatanodeAdminError> e = new ArrayList<>();
           e.add(new DatanodeAdminError("host1", "host1 error"));
           return e;
         });

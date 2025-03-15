@@ -23,6 +23,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -39,7 +40,7 @@ public class FindSourceGreedy implements FindSourceStrategy {
   private static final Logger LOG =
       LoggerFactory.getLogger(FindSourceGreedy.class);
   private Map<DatanodeDetails, Long> sizeLeavingNode;
-  private PriorityQueue<DatanodeUsageInfo> potentialSources;
+  private Queue<DatanodeUsageInfo> potentialSources;
   private NodeManager nodeManager;
   private ContainerBalancerConfiguration config;
   private Double lowerLimit;

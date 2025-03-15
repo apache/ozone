@@ -563,7 +563,7 @@ public class TestContainerBalancerDatanodeNodeLimit {
   }
 
   public static List<DatanodeUsageInfo> getUnBalancedNodes(@Nonnull ContainerBalancerTask task) {
-    ArrayList<DatanodeUsageInfo> result = new ArrayList<>();
+    List<DatanodeUsageInfo> result = new ArrayList<>();
     result.addAll(task.getOverUtilizedNodes());
     result.addAll(task.getUnderUtilizedNodes());
     return result;

@@ -284,7 +284,7 @@ public class DeletedBlockLogImpl
       throws IOException {
     lock.lock();
     try {
-      ArrayList<DeletedBlocksTransaction> txsToBeAdded = new ArrayList<>();
+      List<DeletedBlocksTransaction> txsToBeAdded = new ArrayList<>();
       for (Map.Entry< Long, List< Long > > entry :
           containerBlocksMap.entrySet()) {
         long nextTXID = sequenceIdGen.getNextId(DEL_TXN_ID);
@@ -405,7 +405,7 @@ public class DeletedBlockLogImpl
             getSCMDeletedBlockTransactionStatusManager()
                 .getCommandStatusByTxId(dnList.stream().
                 map(DatanodeDetails::getUuid).collect(Collectors.toSet()));
-        ArrayList<Long> txIDs = new ArrayList<>();
+        List<Long> txIDs = new ArrayList<>();
         metrics.setNumBlockDeletionTransactionDataNodes(dnList.size());
         Table.KeyValue<Long, DeletedBlocksTransaction> keyValue = null;
         // Here takes block replica count as the threshold to avoid the case

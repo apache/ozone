@@ -311,7 +311,7 @@ public class TestTypedRDBTableStore {
         }
       }
 
-      ArrayList<Long> epochs = new ArrayList<>();
+      List<Long> epochs = new ArrayList<>();
       for (long i = 0; i <= 5L; i++) {
         epochs.add(i);
       }

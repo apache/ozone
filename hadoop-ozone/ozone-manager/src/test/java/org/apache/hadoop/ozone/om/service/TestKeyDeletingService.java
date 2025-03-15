@@ -812,6 +812,7 @@ class TestKeyDeletingService extends OzoneTestBase {
         numBlocks, 0);
   }
 
+  @SuppressWarnings("PMD.LooseCoupling")
   private OmKeyArgs createAndCommitKey(String volumeName,
       String bucketName, String keyName, int numBlocks, int numUncommitted)
       throws IOException {

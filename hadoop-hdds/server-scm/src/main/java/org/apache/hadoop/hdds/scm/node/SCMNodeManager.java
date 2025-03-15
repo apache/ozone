@@ -1519,7 +1519,7 @@ public class SCMNodeManager implements NodeManager {
 
   @Override
   public Collection<DatanodeDetails> getPeerList(DatanodeDetails dn) {
-    HashSet<DatanodeDetails> dns = new HashSet<>();
+    Set<DatanodeDetails> dns = new HashSet<>();
     Preconditions.checkNotNull(dn);
     Set<PipelineID> pipelines =
         nodeStateManager.getPipelineByDnID(dn.getUuid());

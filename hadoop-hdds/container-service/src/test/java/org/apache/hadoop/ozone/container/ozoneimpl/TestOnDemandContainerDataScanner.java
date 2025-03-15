@@ -34,7 +34,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.Duration;
-import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -161,7 +161,7 @@ public class TestOnDemandContainerDataScanner extends
   @Override
   public void testScannerMetrics() throws Exception {
     OnDemandContainerDataScanner.init(conf, controller);
-    ArrayList<Optional<Future<?>>> resultFutureList = Lists.newArrayList();
+    List<Optional<Future<?>>> resultFutureList = Lists.newArrayList();
     resultFutureList.add(OnDemandContainerDataScanner.scanContainer(
         corruptData));
     resultFutureList.add(
@@ -300,7 +300,7 @@ public class TestOnDemandContainerDataScanner extends
   }
 
   private void waitOnScannerToFinish(
-      ArrayList<Optional<Future<?>>> resultFutureList)
+      List<Optional<Future<?>>> resultFutureList)
       throws ExecutionException, InterruptedException {
     for (Optional<Future<?>> future : resultFutureList) {
       if (future.isPresent()) {

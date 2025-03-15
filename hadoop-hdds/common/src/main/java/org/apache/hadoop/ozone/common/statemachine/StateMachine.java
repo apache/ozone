@@ -32,7 +32,7 @@ import java.util.Set;
  */
 public class StateMachine<STATE extends Enum<?>, EVENT extends Enum<?>> {
   private final STATE initialState;
-  private final ImmutableSet<STATE> finalStates;
+  private final Set<STATE> finalStates;
 
   private final LoadingCache<EVENT, Map<STATE, STATE>> transitions =
       CacheBuilder.newBuilder().build(

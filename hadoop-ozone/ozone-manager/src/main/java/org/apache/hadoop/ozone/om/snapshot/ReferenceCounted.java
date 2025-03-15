@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import com.google.common.base.Preconditions;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -35,7 +36,7 @@ public class ReferenceCounted<T>
   /**
    * A map of thread IDs holding the reference of the object and its count.
    */
-  private final ConcurrentHashMap<Long, Long> threadMap;
+  private final Map<Long, Long> threadMap;
 
   /**
    * Sum of reference counts from all threads.

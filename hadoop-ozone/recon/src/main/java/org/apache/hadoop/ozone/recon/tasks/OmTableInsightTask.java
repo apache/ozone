@@ -295,8 +295,8 @@ public class OmTableInsightTask implements ReconOmTask {
    *
    * @return The count map containing the counts for each table.
    */
-  public HashMap<String, Long> initializeCountMap() {
-    HashMap<String, Long> objCountMap = new HashMap<>(tables.size());
+  public Map<String, Long> initializeCountMap() {
+    Map<String, Long> objCountMap = new HashMap<>(tables.size());
     for (String tableName : tables) {
       String key = getTableCountKeyFromTable(tableName);
       objCountMap.put(key, getValueForKey(key));
@@ -310,10 +310,10 @@ public class OmTableInsightTask implements ReconOmTask {
    *
    * @return The size map containing the size counts for each table.
    */
-  public HashMap<String, Long> initializeSizeMap(boolean replicated) {
+  public Map<String, Long> initializeSizeMap(boolean replicated) {
     String tableName;
     OmTableHandler tableHandler;
-    HashMap<String, Long> sizeCountMap = new HashMap<>();
+    Map<String, Long> sizeCountMap = new HashMap<>();
     for (Map.Entry<String, OmTableHandler> entry : tableHandlers.entrySet()) {
       tableName = entry.getKey();
       tableHandler = entry.getValue();
@@ -356,17 +356,17 @@ public class OmTableInsightTask implements ReconOmTask {
   }
 
   @VisibleForTesting
-  public void setObjectCountMap(HashMap<String, Long> objectCountMap) {
+  public void setObjectCountMap(Map<String, Long> objectCountMap) {
     this.objectCountMap = objectCountMap;
   }
 
   @VisibleForTesting
-  public void setUnReplicatedSizeMap(HashMap<String, Long> unReplicatedSizeMap) {
+  public void setUnReplicatedSizeMap(Map<String, Long> unReplicatedSizeMap) {
     this.unReplicatedSizeMap = unReplicatedSizeMap;
   }
 
   @VisibleForTesting
-  public void setReplicatedSizeMap(HashMap<String, Long> replicatedSizeMap) {
+  public void setReplicatedSizeMap(Map<String, Long> replicatedSizeMap) {
     this.replicatedSizeMap = replicatedSizeMap;
   }
 }

@@ -48,7 +48,7 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
   }
 
   private final String name;
-  private final CopyOnWriteArrayList<OzoneAcl> acls;
+  private final List<OzoneAcl> acls;
 
   private OmPrefixInfo(Builder b) {
     super(b);
