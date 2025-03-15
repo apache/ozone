@@ -1648,15 +1648,6 @@
   </property>
 
   <property>
-    <name>hdds.scm.safemode.pipeline-availability.check</name>
-    <value>true</value>
-    <tag>HDDS,SCM,OPERATION</tag>
-    <description>
-      Boolean value to enable pipeline availability check during SCM safe mode.
-    </description>
-  </property>
-
-  <property>
     <name>hdds.scm.safemode.healthy.pipeline.pct</name>
     <value>0.10</value>
     <tag>HDDS,SCM,OPERATION</tag>

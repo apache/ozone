@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.safemode;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -75,13 +74,8 @@ public final class SafeModeRuleFactory {
 
     preCheckRules.add(datanodeRule);
 
-    // TODO: Move isRuleEnabled check to the Rule implementation. (HDDS-11799)
-    if (config.getBoolean(
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK_DEFAULT)
-        && pipelineManager != null) {
-
-      safeModeRules.add(new HealthyPipelineSafeModeRule(eventQueue, pipelineManager, 
+    if (pipelineManager != null) {
+      safeModeRules.add(new HealthyPipelineSafeModeRule(eventQueue, pipelineManager,
           safeModeManager, config, scmContext));
       safeModeRules.add(new OneReplicaPipelineSafeModeRule(eventQueue, pipelineManager,
           safeModeManager, config));
