@@ -515,7 +515,7 @@ public final class OzoneManagerRatisUtils {
 
   public static OzoneManagerProtocolProtos.OMResponse submitRequest(
       OzoneManager om, OMRequest omRequest, ClientId clientId, long callId) throws ServiceException {
-    return om.getOmGateway().submitInternal(omRequest, clientId, callId);
+    return om.getOmExecutionFlow().submitInternal(omRequest, clientId, callId);
   }
 
   public static OzoneManagerProtocolProtos.OMResponse createErrorResponse(

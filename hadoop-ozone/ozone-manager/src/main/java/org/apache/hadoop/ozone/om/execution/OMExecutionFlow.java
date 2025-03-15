@@ -35,13 +35,13 @@ import org.slf4j.LoggerFactory;
 /**
  * entry for execution flow for write request.
  */
-public class OMGateway {
-  private static final Logger LOG = LoggerFactory.getLogger(OMGateway.class);
+public class OMExecutionFlow {
+  private static final Logger LOG = LoggerFactory.getLogger(OMExecutionFlow.class);
 
   private final OzoneManager ozoneManager;
   private final OMPerformanceMetrics perfMetrics;
 
-  public OMGateway(OzoneManager om) throws IOException {
+  public OMExecutionFlow(OzoneManager om) {
     this.ozoneManager = om;
     this.perfMetrics = ozoneManager.getPerfMetrics();
   }

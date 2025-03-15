@@ -172,7 +172,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       }
 
       this.lastRequestToSubmit = request;
-      return ozoneManager.getOmGateway().submit(request);
+      return ozoneManager.getOmExecutionFlow().submit(request);
     } finally {
       OzoneManager.setS3Auth(null);
     }
