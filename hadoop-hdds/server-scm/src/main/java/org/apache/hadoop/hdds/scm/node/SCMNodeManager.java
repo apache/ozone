@@ -436,7 +436,7 @@ public class SCMNodeManager implements NodeManager {
       // Update datanode if it is registered but the ip or hostname changes
       try {
         final DatanodeInfo oldNode = nodeStateManager.getNode(datanodeDetails);
-        if (updateDnsToUuidMap(oldNode.getHostName(), oldNode.getIpAddress(),
+        if (updateDnsToDnIdMap(oldNode.getHostName(), oldNode.getIpAddress(),
             hostName, ipAddress, dnId)) {
           LOG.info("Updating datanode {} from {} to {}",
                   datanodeDetails.getUuidString(),
@@ -485,7 +485,7 @@ public class SCMNodeManager implements NodeManager {
     }
   }
 
-  private synchronized void removeFromDnsToUuidMap(DatanodeID datanodeID, String address) {
+  private synchronized void removeFromDnsToDnIdMap(DatanodeID datanodeID, String address) {
     if (address != null) {
       Set<DatanodeID> dnSet = dnsToDnIdMap.get(address);
       if (dnSet != null && dnSet.remove(datanodeID) && dnSet.isEmpty()) {
@@ -494,7 +494,7 @@ public class SCMNodeManager implements NodeManager {
     }
   }
 
-  private boolean updateDnsToUuidMap(
+  private boolean updateDnsToDnIdMap(
       String oldHostName, String oldIpAddress,
       String newHostName, String newIpAddress,
       DatanodeID datanodeID) {
@@ -503,11 +503,11 @@ public class SCMNodeManager implements NodeManager {
     if (ipChanged || hostNameChanged) {
       synchronized (this) {
         if (ipChanged) {
-          removeFromDnsToUuidMap(datanodeID, oldIpAddress);
+          removeFromDnsToDnIdMap(datanodeID, oldIpAddress);
           addToDnsToDnIdMap(datanodeID, newIpAddress);
         }
         if (hostNameChanged) {
-          removeFromDnsToUuidMap(datanodeID, oldHostName);
+          removeFromDnsToDnIdMap(datanodeID, oldHostName);
           addToDnsToDnIdMap(datanodeID, newHostName);
         }
       }
@@ -1740,13 +1740,12 @@ public class SCMNodeManager implements NodeManager {
 
     datanodeIDS.forEach(datanodeID -> {
       try {
-        allNodes.forEach(node -> {
-          if (node.getID().getID().equals(datanodeID.getID())) {
-            results.add(node);
-          }
-        });
+        List<DatanodeDetails> datanodeDetails = allNodes.stream().
+            filter(node -> node.getID().getID().equals(datanodeID.getID())).
+            collect(Collectors.toList());
+        results.addAll(datanodeDetails);
       } catch (Exception e) {
-        LOG.warn("Cannot find node for uuid {}", datanodeID);
+        LOG.warn("Error find node for DataNode ID {}", datanodeID);
       }
     });
     return results;
@@ -1851,7 +1850,7 @@ public class SCMNodeManager implements NodeManager {
           clusterMap.remove(datanodeDetails);
         }
         nodeStateManager.removeNode(datanodeDetails);
-        removeFromDnsToUuidMap(datanodeDetails.getID(), datanodeDetails.getIpAddress());
+        removeFromDnsToDnIdMap(datanodeDetails.getID(), datanodeDetails.getIpAddress());
         final List<SCMCommand<?>> cmdList = getCommandQueue(datanodeDetails.getUuid());
         LOG.info("Clearing command queue of size {} for DN {}", cmdList.size(), datanodeDetails);
       } else {
