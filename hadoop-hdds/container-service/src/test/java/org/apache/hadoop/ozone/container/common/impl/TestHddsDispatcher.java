@@ -252,9 +252,9 @@ public class TestHddsDispatcher {
     HddsVolume.Builder volumeBuilder =
         new HddsVolume.Builder(testDirPath).datanodeUuid(dd.getUuidString())
             .conf(conf).usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
-    // state of cluster : available (140) > 100  ,datanode volume
+    // state of cluster : available (160) > 100  ,datanode volume
     // utilisation threshold not yet reached. container creates are successful.
-    AtomicLong usedSpace = new AtomicLong(360);
+    AtomicLong usedSpace = new AtomicLong(340);
     SpaceUsageSource spaceUsage = MockSpaceUsageSource.of(500, usedSpace);
 
     SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(
@@ -268,6 +268,7 @@ public class TestHddsDispatcher {
       ContainerSet containerSet = newContainerSet();
       StateContext context = ContainerTestUtils.getMockContext(dd, conf);
       // create a 50 byte container
+      // available (160) > 100 (min free space) + 50 (container size)
       KeyValueContainerData containerData = new KeyValueContainerData(1L,
           layoutVersion,
           50, UUID.randomUUID().toString(),
