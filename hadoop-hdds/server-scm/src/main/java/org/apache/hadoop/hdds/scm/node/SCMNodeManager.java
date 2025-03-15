@@ -152,6 +152,7 @@ public class SCMNodeManager implements NodeManager {
    * Constructs SCM machine Manager.
    */
   public SCMNodeManager(
+
       OzoneConfiguration conf,
       SCMStorageConfig scmStorageConfig,
       EventPublisher eventPublisher,
@@ -1741,7 +1742,7 @@ public class SCMNodeManager implements NodeManager {
     datanodeIDS.forEach(datanodeID -> {
       try {
         List<DatanodeDetails> datanodeDetails = allNodes.stream().
-            filter(node -> node.getID().getID().equals(datanodeID.getID())).
+            filter(node -> node.getID().equals(datanodeID)).
             collect(Collectors.toList());
         results.addAll(datanodeDetails);
       } catch (Exception e) {
