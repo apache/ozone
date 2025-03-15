@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.replication;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyInt;
@@ -36,6 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -43,6 +45,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -328,6 +331,9 @@ public final class ReplicationTestUtil {
               List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
               long metadataSizeRequired, long dataSizeRequired)
               throws SCMException {
+        long containerSize = (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+            ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+        assertEquals(containerSize * 2, dataSizeRequired);
         if (nodesRequiredToChoose > 1) {
           throw new IllegalArgumentException("Only one node is allowed");
         }
@@ -356,6 +362,9 @@ public final class ReplicationTestUtil {
               List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
               long metadataSizeRequired, long dataSizeRequired)
               throws SCMException {
+        long containerSize = (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+            ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+        assertEquals(containerSize * 2, dataSizeRequired);
         throw new SCMException("No nodes available",
                 FAILED_TO_FIND_SUITABLE_NODE);
       }
@@ -383,6 +392,9 @@ public final class ReplicationTestUtil {
           List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
           long metadataSizeRequired, long dataSizeRequired)
           throws SCMException {
+        long containerSize = (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+            ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+        assertEquals(containerSize * 2, dataSizeRequired);
         if (nodesRequiredToChoose >= throwWhenThisOrMoreNodesRequested) {
           throw new SCMException("No nodes available",
               FAILED_TO_FIND_SUITABLE_NODE);
