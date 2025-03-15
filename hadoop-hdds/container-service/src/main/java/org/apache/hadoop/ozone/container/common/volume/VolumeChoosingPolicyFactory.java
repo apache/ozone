@@ -52,15 +52,12 @@ public final class VolumeChoosingPolicyFactory {
    * @param conf Configuration
    * @return The shared VolumeChoosingPolicy instance
    */
-  public static VolumeChoosingPolicy getSharedPolicy(ConfigurationSource conf) {
+  public static VolumeChoosingPolicy getSharedPolicy(ConfigurationSource conf)
+      throws InstantiationException, IllegalAccessException {
     if (policyInstance == null) {
       synchronized (VolumeChoosingPolicyFactory.class) {
         if (policyInstance == null) {
-          try {
-            policyInstance = getPolicy(conf);
-          } catch (Exception e) {
-            throw new RuntimeException("Failed to create VolumeChoosingPolicy", e);
-          }
+          policyInstance = getPolicy(conf);
         }
       }
     }

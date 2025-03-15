@@ -282,6 +282,21 @@ public class TestKeyValueHandler {
       DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
       StateContext context = ContainerTestUtils.getMockContext(
           datanodeDetails, conf);
+
+      //Set a class which is not of sub class of VolumeChoosingPolicy
+      conf.set(HDDS_DATANODE_VOLUME_CHOOSING_POLICY,
+          "org.apache.hadoop.ozone.container.common.impl.HddsDispatcher");
+      RuntimeException exception = assertThrows(RuntimeException.class,
+          () -> new KeyValueHandler(conf, context.getParent().getDatanodeDetails().getUuidString(), cset, volumeSet,
+              metrics, c -> {
+              }));
+
+      assertThat(exception).hasMessageEndingWith(
+          "class org.apache.hadoop.ozone.container.common.impl.HddsDispatcher " +
+              "not org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy");
+
+      conf.set(HDDS_DATANODE_VOLUME_CHOOSING_POLICY,
+          "org.apache.hadoop.ozone.container.common.volume.CapacityVolumeChoosingPolicy");
       KeyValueHandler keyValueHandler = new KeyValueHandler(conf,
           context.getParent().getDatanodeDetails().getUuidString(), cset,
           volumeSet, metrics, c -> {
@@ -297,17 +312,6 @@ public class TestKeyValueHandler {
           metrics, c -> { });
       assertEquals(ContainerLayoutVersion.FILE_PER_BLOCK,
           conf.getEnum(OZONE_SCM_CONTAINER_LAYOUT_KEY, ContainerLayoutVersion.FILE_PER_CHUNK));
-
-      //Set a class which is not of sub class of VolumeChoosingPolicy
-      conf.set(HDDS_DATANODE_VOLUME_CHOOSING_POLICY,
-          "org.apache.hadoop.ozone.container.common.impl.HddsDispatcher");
-      RuntimeException exception = assertThrows(RuntimeException.class,
-          () -> new KeyValueHandler(conf, context.getParent().getDatanodeDetails().getUuidString(), cset, volumeSet,
-              metrics, c -> { }));
-
-      assertThat(exception).hasMessageEndingWith(
-          "class org.apache.hadoop.ozone.container.common.impl.HddsDispatcher " +
-              "not org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy");
     } finally {
       volumeSet.shutdown();
       FileUtil.fullyDelete(datanodeDir);
