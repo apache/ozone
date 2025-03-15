@@ -42,19 +42,25 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Compress/uncompress KeyValueContainer data to a tar archive.
  */
 public class TarContainerPacker
     implements ContainerPacker<KeyValueContainerData> {
+  private static final Logger LOG = LoggerFactory.getLogger(TarContainerPacker.class);
 
   static final String CHUNKS_DIR_NAME = OzoneConsts.STORAGE_DIR_CHUNKS;
 
@@ -95,6 +101,13 @@ public class TarContainerPacker
       Files.createDirectories(destContainerDir);
     }
     if (FileUtils.isEmptyDirectory(destContainerDir.toFile())) {
+      // Before the atomic move, the destination dir is empty and doesn't have a metadata directory.
+      // Writing the .container file will fail as the metadata dir doesn't exist.
+      // So we instead save the container file to the containerUntarDir.
+      Path containerMetadataPath = Paths.get(container.getContainerData().getMetadataPath());
+      Path tempContainerMetadataPath = Paths.get(containerUntarDir.toString(),
+          containerMetadataPath.getName(containerMetadataPath.getNameCount() - 1).toString());
+      persistCustomContainerState(container, descriptorFileContent, State.RECOVERING, tempContainerMetadataPath);
       Files.move(containerUntarDir, destContainerDir,
               StandardCopyOption.ATOMIC_MOVE,
               StandardCopyOption.REPLACE_EXISTING);
@@ -106,6 +119,20 @@ public class TarContainerPacker
           CONTAINER_ALREADY_EXISTS);
     }
     return descriptorFileContent;
+  }
+
+  private void persistCustomContainerState(Container<KeyValueContainerData> container, byte[] descriptorContent,
+      ContainerProtos.ContainerDataProto.State state, Path containerMetadataPath) throws IOException {
+    if (descriptorContent == null) {
+      LOG.warn("Skipping persisting of custom state. Container descriptor is null for container {}",
+          container.getContainerData().getContainerID());
+      return;
+    }
+
+    KeyValueContainerData originalContainerData =
+        (KeyValueContainerData) ContainerDataYaml.readContainer(descriptorContent);
+    container.getContainerData().setState(state);
+    container.update(originalContainerData.getMetadata(), true, containerMetadataPath.toString());
   }
 
   private void extractEntry(ArchiveEntry entry, InputStream input, long size,
