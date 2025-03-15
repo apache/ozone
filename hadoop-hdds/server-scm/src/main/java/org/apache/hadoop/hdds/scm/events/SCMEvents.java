@@ -212,6 +212,10 @@ public final class SCMEvents {
       new TypedEvent<>(CommandStatusReportHandler.DeleteBlockStatus.class,
           "Delete_Block_Status");
 
+  public static final TypedEvent<DatanodeDetails>
+      REPLICATION_MANAGER_NOTIFY =
+      new TypedEvent<>(DatanodeDetails.class, "Replication_Manager_Notify");
+
   /**
    * Private Ctor. Never Constructed.
    */
