@@ -1745,7 +1745,7 @@ public class SCMNodeManager implements NodeManager {
             results.add(node);
           }
         });
-      } catch(Exception e) {
+      } catch (Exception e) {
         LOG.warn("Cannot find node for uuid {}", datanodeID);
       }
     });
