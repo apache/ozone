@@ -2396,6 +2396,10 @@
               {
                 "name": "AddScm",
                 "integer": 15
+              },
+              {
+                "name": "GetClusterTree",
+                "integer": 16
               }
             ]
           },
@@ -2663,6 +2667,12 @@
                 "name": "addScmRequestProto",
                 "type": "hadoop.hdds.AddScmRequestProto",
                 "optional": true
+              },
+              {
+                "id": 16,
+                "name": "getClusterTreeRequest",
+                "type": "GetClusterTreeRequestProto",
+                "optional": true
               }
             ]
           },
@@ -2745,6 +2755,12 @@
                 "id": 15,
                 "name": "addScmResponse",
                 "type": "hadoop.hdds.AddScmResponseProto",
+                "optional": true
+              },
+              {
+                "id": 16,
+                "name": "getClusterTreeResponse",
+                "type": "GetClusterTreeResponseProto",
                 "optional": true
               }
             ]
@@ -2945,6 +2961,20 @@
                 "name": "node",
                 "type": "DatanodeDetailsProto",
                 "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "GetClusterTreeRequestProto"
+          },
+          {
+            "name": "GetClusterTreeResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "clusterTree",
+                "type": "InnerNode",
+                "required": true
               }
             ]
           }
