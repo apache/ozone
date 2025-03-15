@@ -75,7 +75,7 @@ public class ContainerImporter {
     this.controller = controller;
     this.volumeSet = volumeSet;
     try {
-      volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
+      volumeChoosingPolicy = VolumeChoosingPolicyFactory.getSharedPolicy(conf);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
