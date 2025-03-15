@@ -188,6 +188,15 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   long getEstimatedKeyCount() throws IOException;
 
   /**
+   * Returns the exact key count of this Table.
+   * @return Exact key count of this Table
+   * @throws IOException on failure
+   */
+  default long getExactKeyCount() throws IOException {
+    return getEstimatedKeyCount();
+  }
+
+  /**
    * Add entry to the table cache.
    *
    * If the cacheKey already exists, it will override the entry.
