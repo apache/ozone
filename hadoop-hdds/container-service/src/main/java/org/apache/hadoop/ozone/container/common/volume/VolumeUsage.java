@@ -185,7 +185,7 @@ public class VolumeUsage {
                                              long requiredSpace,
                                              long volumeFreeSpaceToSpare) {
     return (volumeAvailableSpace - volumeCommittedBytesCount) >
-        Math.max(requiredSpace, volumeFreeSpaceToSpare);
+        (requiredSpace + volumeFreeSpaceToSpare);
   }
 
   private static long getReserved(ConfigurationSource conf, String rootDir,
