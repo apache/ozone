@@ -49,3 +49,4 @@ execute_robot_test ${SCM} freon
 execute_robot_test ${SCM} -v USERNAME:httpfs httpfs
 
 execute_robot_test ${SCM} omha/om-roles.robot
+execute_robot_test ${SCM} --exclude pre-finalized-snapshot-tests snapshot
