@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 
 import com.google.inject.Inject;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -34,8 +35,13 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -47,6 +53,7 @@ import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.tasks.util.ParallelTableIteratorOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,6 +68,9 @@ public class ContainerKeyMapperTask implements ReconOmTask {
 
   private ReconContainerMetadataManager reconContainerMetadataManager;
   private final long containerKeyFlushToDBMaxThreshold;
+  private final int maxKeysInMemory;
+  private final int maxIterators;
+  private final int maxWorkers;
 
   @Inject
   public ContainerKeyMapperTask(ReconContainerMetadataManager
@@ -73,6 +83,15 @@ public class ContainerKeyMapperTask implements ReconOmTask {
         ReconServerConfigKeys.
             OZONE_RECON_CONTAINER_KEY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT
     );
+    this.maxKeysInMemory = configuration.getInt(
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY,
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY_DEFAULT);
+    this.maxIterators = configuration.getInt(
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS,
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS_DEFAULT);
+    this.maxWorkers = configuration.getInt(
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_WORKERS,
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_WORKERS_DEFAULT);
   }
 
   /**
@@ -81,21 +100,21 @@ public class ContainerKeyMapperTask implements ReconOmTask {
    */
   @Override
   public TaskResult reprocess(OMMetadataManager omMetadataManager) {
-    long omKeyCount = 0;
+    AtomicLong omKeyCount = new AtomicLong(0);
 
     // In-memory maps for fast look up and batch write
     // (container, key) -> count
-    Map<ContainerKeyPrefix, Integer> containerKeyMap = new HashMap<>();
+    Map<ContainerKeyPrefix, Integer> containerKeyMap = new ConcurrentHashMap<>();
     // containerId -> key count
-    Map<Long, Long> containerKeyCountMap = new HashMap<>();
+    Map<Long, Long> containerKeyCountMap = new ConcurrentHashMap<>();
     try {
       LOG.debug("Starting a 'reprocess' run of ContainerKeyMapperTask.");
       Instant start = Instant.now();
-
       // initialize new container DB
       reconContainerMetadataManager
               .reinitWithNewContainerDataFromOm(new HashMap<>());
 
+      ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
       // loop over both key table and file table
       for (BucketLayout layout : Arrays.asList(BucketLayout.LEGACY,
           BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
@@ -104,22 +123,36 @@ public class ContainerKeyMapperTask implements ReconOmTask {
         // configured batch threshold.
         // containerKeyCountMap can be flushed at the end since the number
         // of containers in a cluster will not have significant memory overhead.
-        Table<String, OmKeyInfo> omKeyInfoTable =
-            omMetadataManager.getKeyTable(layout);
-        try (
-            TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-                keyIter = omKeyInfoTable.iterator()) {
-          while (keyIter.hasNext()) {
-            Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
-            OmKeyInfo omKeyInfo = kv.getValue();
-            handleKeyReprocess(kv.getKey(), omKeyInfo, containerKeyMap,
-                containerKeyCountMap);
-            if (!checkAndCallFlushToDB(containerKeyMap)) {
-              LOG.error("Unable to flush containerKey information to the DB");
-              return buildTaskResult(false);
+        Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable(layout);
+        Function<Table.KeyValue<String, OmKeyInfo>, Void> kvOperation = kv -> {
+          try {
+            try {
+              lock.readLock().lock();
+              handleKeyReprocess(kv.getKey(), kv.getValue(), containerKeyMap,
+                  containerKeyCountMap);
+            } finally {
+              lock.readLock().unlock();
             }
-            omKeyCount++;
+            omKeyCount.incrementAndGet();
+            if (containerKeyMap.size() >= containerKeyFlushToDBMaxThreshold) {
+              try {
+                lock.writeLock().lock();
+                if (!checkAndCallFlushToDB(containerKeyMap)) {
+                  throw new UncheckedIOException(new IOException("Unable to flush containerKey information to the DB"));
+                }
+              } finally {
+                lock.writeLock().unlock();
+              }
+            }
+            return null;
+          } catch (IOException e) {
+            throw new UncheckedIOException(e);
           }
+        };
+        try (ParallelTableIteratorOperation<String, OmKeyInfo> keyIter =
+                 new ParallelTableIteratorOperation<>(omMetadataManager, omKeyInfoTable,
+                     StringCodec.get(), maxIterators, maxWorkers, maxKeysInMemory, containerKeyFlushToDBMaxThreshold)) {
+          keyIter.performTaskOnTableVals(this.getTaskName(), null, null, kvOperation);
         }
       }
 
@@ -137,9 +170,8 @@ public class ContainerKeyMapperTask implements ReconOmTask {
       long duration = Duration.between(start, end).toMillis();
       LOG.debug("It took me {} seconds to process {} keys.",
           (double) duration / 1000.0, omKeyCount);
-    } catch (IOException ioEx) {
-      LOG.error("Unable to populate Container Key data in Recon DB. ",
-          ioEx);
+    } catch (Exception ex) {
+      LOG.error("Unable to populate Container Key data in Recon DB. ", ex);
       return buildTaskResult(false);
     }
     return buildTaskResult(true);
@@ -163,7 +195,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
     return true;
   }
 
-  private boolean checkAndCallFlushToDB(
+  private synchronized boolean checkAndCallFlushToDB(
       Map<ContainerKeyPrefix, Integer> containerKeyMap) {
     // if containerKeyMap more than entries, flush to DB and clear the map
     if (null != containerKeyMap && containerKeyMap.size() >=
@@ -458,7 +490,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
                                       containerKeyMap,
                                   Map<Long, Long> containerKeyCountMap)
       throws IOException {
-    long containerCountToIncrement = 0;
+    AtomicLong containerCountToIncrement = new AtomicLong(0);
     for (OmKeyLocationInfoGroup omKeyLocationInfoGroup : omKeyInfo
         .getKeyLocationVersions()) {
       long keyVersion = omKeyLocationInfoGroup.getVersion();
@@ -478,22 +510,19 @@ public class ContainerKeyMapperTask implements ReconOmTask {
           // if it exists, update the count of keys for the given containerID
           // else, increment the count of containers and initialize keyCount
           long keyCount;
-          if (containerKeyCountMap.containsKey(containerId)) {
-            keyCount = containerKeyCountMap.get(containerId);
-          } else {
-            containerCountToIncrement++;
-            keyCount = 0;
-          }
-
-          // increment the count and update containerKeyCount.
-          containerKeyCountMap.put(containerId, ++keyCount);
+          containerKeyCountMap.compute(containerId, (k, v) -> {
+            if (v == null) {
+              containerCountToIncrement.incrementAndGet();
+              return 1L;
+            }
+            return v + 1L;
+          });
         }
       }
     }
 
-    if (containerCountToIncrement > 0) {
-      reconContainerMetadataManager
-          .incrementContainerCountBy(containerCountToIncrement);
+    if (containerCountToIncrement.get() > 0) {
+      reconContainerMetadataManager.incrementContainerCountBy(containerCountToIncrement.get());
     }
   }
 

@@ -140,7 +140,7 @@ public class TestNSSummaryTaskWithLegacyOBSLayout {
     nSSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
         reconNamespaceSummaryManager,
         reconOMMetadataManager, ozoneConfiguration,
-        nsSummaryFlushToDBMaxThreshold);
+        nsSummaryFlushToDBMaxThreshold, 1, 1, 10);
   }
 
   /**

@@ -25,9 +25,7 @@ import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Iterators;
 import com.google.inject.Inject;
-import java.io.IOException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -36,11 +34,15 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.tuple.Triple;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.tasks.util.ParallelTableIteratorOperation;
 import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.jooq.Configuration;
@@ -63,7 +65,9 @@ public class OmTableInsightTask implements ReconOmTask {
   private Map<String, Long> objectCountMap;
   private Map<String, Long> unReplicatedSizeMap;
   private Map<String, Long> replicatedSizeMap;
-
+  private final int maxKeysInMemory;
+  private final int maxIterators;
+  private final int maxWorkers;
 
   @Inject
   public OmTableInsightTask(GlobalStatsDao globalStatsDao,
@@ -78,6 +82,15 @@ public class OmTableInsightTask implements ReconOmTask {
     tableHandlers.put(OPEN_KEY_TABLE, new OpenKeysInsightHandler());
     tableHandlers.put(OPEN_FILE_TABLE, new OpenKeysInsightHandler());
     tableHandlers.put(DELETED_TABLE, new DeletedKeysInsightHandler());
+    this.maxKeysInMemory = reconOMMetadataManager.getOzoneConfiguration().getInt(
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY,
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY_DEFAULT);
+    this.maxIterators = reconOMMetadataManager.getOzoneConfiguration().getInt(
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS,
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS_DEFAULT);
+    this.maxWorkers = reconOMMetadataManager.getOzoneConfiguration().getInt(
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_WORKERS,
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_WORKERS_DEFAULT);
   }
 
   /**
@@ -111,23 +124,34 @@ public class OmTableInsightTask implements ReconOmTask {
     init();
     for (String tableName : tables) {
       Table table = omMetadataManager.getTable(tableName);
-
-      try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator
-               = table.iterator()) {
+      try {
         if (tableHandlers.containsKey(tableName)) {
-          Triple<Long, Long, Long> details =
-              tableHandlers.get(tableName).getTableSizeAndCount(iterator);
-          objectCountMap.put(getTableCountKeyFromTable(tableName),
-              details.getLeft());
-          unReplicatedSizeMap.put(
-              getUnReplicatedSizeKeyFromTable(tableName), details.getMiddle());
-          replicatedSizeMap.put(getReplicatedSizeKeyFromTable(tableName),
-              details.getRight());
+          try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator
+                   = table.iterator()) {
+            Triple<Long, Long, Long> details =
+                tableHandlers.get(tableName).getTableSizeAndCount(iterator);
+            objectCountMap.put(getTableCountKeyFromTable(tableName),
+                details.getLeft());
+            unReplicatedSizeMap.put(
+                getUnReplicatedSizeKeyFromTable(tableName), details.getMiddle());
+            replicatedSizeMap.put(getReplicatedSizeKeyFromTable(tableName),
+                details.getRight());
+          }
         } else {
-          long count = Iterators.size(iterator);
-          objectCountMap.put(getTableCountKeyFromTable(tableName), count);
+          AtomicLong count = new AtomicLong(0);
+          try (ParallelTableIteratorOperation<String, byte[]> parallelTableIteratorOperation =
+                   new ParallelTableIteratorOperation<>(omMetadataManager,
+                       omMetadataManager.getStore().getTable(tableName, String.class, byte[].class),
+                       StringCodec.get(), maxIterators, maxWorkers, maxKeysInMemory, 1000000)) {
+            parallelTableIteratorOperation.performTaskOnTableVals(this.getTaskName(), null, null,
+                kv -> {
+                count.incrementAndGet();
+                return null;
+              });
+          }
+          objectCountMap.put(getTableCountKeyFromTable(tableName), count.get());
         }
-      } catch (IOException ioEx) {
+      } catch (Exception ioEx) {
         LOG.error("Unable to populate Table Count in Recon DB.", ioEx);
         return buildTaskResult(false);
       }

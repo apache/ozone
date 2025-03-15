@@ -134,7 +134,7 @@ public class TestNSSummaryTaskWithOBS {
     nSSummaryTaskWithOBS = new NSSummaryTaskWithOBS(
         reconNamespaceSummaryManager,
         reconOMMetadataManager,
-        nsSummaryFlushToDBMaxThreshold);
+        nsSummaryFlushToDBMaxThreshold, 1, 1, 10);
   }
 
   /**

@@ -152,7 +152,7 @@ public class TestNSSummaryTaskWithFSO {
         OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, 3);
     nSSummaryTaskWithFso = new NSSummaryTaskWithFSO(
         reconNamespaceSummaryManager, reconOMMetadataManager,
-         nsSummaryFlushToDBMaxThreshold);
+         nsSummaryFlushToDBMaxThreshold, 1, 1, 10);
   }
 
   /**
@@ -600,7 +600,8 @@ public class TestNSSummaryTaskWithFSO {
 
       // Mock the flushAndCommitNSToDB method to fail on the last flush
       NSSummaryTaskWithFSO taskSpy = Mockito.spy(task);
-      Mockito.doReturn(true).doReturn(true).doReturn(false).when(taskSpy).flushAndCommitNSToDB(Mockito.anyMap());
+      Mockito.doReturn(true).doReturn(true).doReturn(false).when(taskSpy).flushAndCommitNSToDB(Mockito.anyMap(),
+          Mockito.anyInt());
 
       // Call the method under test
       Pair<Integer, Boolean> result1 = taskSpy.processWithFSO(events, 0);
@@ -611,7 +612,7 @@ public class TestNSSummaryTaskWithFSO {
 
       // Verify interactions
       Mockito.verify(mockIterator, Mockito.times(3)).next();
-      Mockito.verify(taskSpy, Mockito.times(1)).flushAndCommitNSToDB(Mockito.anyMap());
+      Mockito.verify(taskSpy, Mockito.times(1)).flushAndCommitNSToDB(Mockito.anyMap(), Mockito.anyInt());
     }
   }
 

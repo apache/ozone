@@ -147,7 +147,7 @@ public class TestNSSummaryTaskWithLegacy {
         OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, 10);
     nSSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
         reconNamespaceSummaryManager,
-        reconOMMetadataManager, omConfiguration, nsSummaryFlushToDBMaxThreshold);
+        reconOMMetadataManager, omConfiguration, nsSummaryFlushToDBMaxThreshold, 1, 1, 10);
   }
 
   /**
