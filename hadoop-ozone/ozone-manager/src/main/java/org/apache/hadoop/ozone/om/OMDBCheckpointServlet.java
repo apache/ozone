@@ -39,6 +39,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -48,6 +49,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -167,9 +169,14 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       // Files to be excluded from tarball
       Map<String, Map<Path, Path>> sstFilesToExclude = normalizeExcludeList(toExcludeList,
           checkpoint.getCheckpointLocation(), sstBackupDir);
+      boolean logTotals = false;
+      if (sstFilesToExclude.isEmpty()) {
+        logTotals = true;
+      }
+
       boolean completed = getFilesForArchive(checkpoint, copyFiles,
           hardLinkFiles, sstFilesToExclude, includeSnapshotData(request),
-          excludedList, sstBackupDir, compactionLogDir);
+          excludedList, sstBackupDir, compactionLogDir, logTotals);
       Map<Path, Path> flatCopyFiles = copyFiles.values().stream().flatMap(map -> map.entrySet().stream())
           .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
       writeFilesToArchive(flatCopyFiles, hardLinkFiles, archiveOutputStream,
@@ -270,18 +277,23 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   private boolean getFilesForArchive(DBCheckpoint checkpoint,
-                                  Map<String, Map<Path, Path>> copyFiles,
-                                  Map<Path, Path> hardLinkFiles,
-                                  Map<String, Map<Path, Path>> sstFilesToExclude,
-                                  boolean includeSnapshotData,
-                                  List<String> excluded,
-                                  DirectoryData sstBackupDir,
-                                  DirectoryData compactionLogDir)
+      Map<String, Map<Path, Path>> copyFiles,
+      Map<Path, Path> hardLinkFiles,
+      Map<String, Map<Path, Path>> sstFilesToExclude,
+      boolean includeSnapshotData,
+      List<String> excluded,
+      DirectoryData sstBackupDir,
+      DirectoryData compactionLogDir,
+      boolean logTotals)
       throws IOException {
 
     maxTotalSstSize = getConf().getLong(
         OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY,
         OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT);
+
+    AtomicLong totalSize = new AtomicLong(0L);
+    AtomicInteger totalFiles = new AtomicInteger(0);
+    int totalSnapshots = 0;
 
     // Tarball limits are not implemented for processes that don't
     // include snapshots.  Currently, this is just for recon.
@@ -292,6 +304,29 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     AtomicLong copySize = new AtomicLong(0L);
     // Get the active fs files.
     Path dir = checkpoint.getCheckpointLocation();
+
+    // Log estimated total data transferred on first request.
+    if (logTotals) {
+      try {
+        estimateTotals(dir, totalFiles, totalSize);
+        if (includeSnapshotData) {
+          Set<Path> snapshotPaths = getSnapshotDirs(checkpoint, false);
+          totalSnapshots = snapshotPaths.size();
+          for (Path snapshotDir: snapshotPaths) {
+            estimateTotals(snapshotDir, totalFiles, totalSize);
+          }
+        }
+        LOG.info("Transfer estimates to Checkpoint Tarball Stream - " +
+                "Estimated Data size: {} MB, " +
+                "Estimated number of SST files: {}, " +
+                "Estimated number of Snapshots: {}",
+            totalSize.get() / (1024 * 1024), totalFiles.get(), totalSnapshots);
+      } catch (Exception e) {
+        LOG.error("Could not determine estimated size of transfer to " +
+            "Checkpoint Tarball Stream", e);
+      }
+    }
+
     if (!processDir(dir, copyFiles, hardLinkFiles, sstFilesToExclude,
         new HashSet<>(), excluded, copySize, null)) {
       return false;
@@ -302,7 +337,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
 
     // Get the snapshot files.
-    Set<Path> snapshotPaths = waitForSnapshotDirs(checkpoint);
+    Set<Path> snapshotPaths = getSnapshotDirs(checkpoint, true);
     Path snapshotDir = getSnapshotDir();
     if (!processDir(snapshotDir, copyFiles, hardLinkFiles, sstFilesToExclude,
         snapshotPaths, excluded, copySize, null)) {
@@ -320,16 +355,44 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         hardLinkFiles, sstFilesToExclude,
         new HashSet<>(), excluded, copySize,
         compactionLogDir.getOriginalDir().toPath());
+  }
 
+  private void estimateTotals(Path dir,
+     AtomicInteger totalFiles,
+     AtomicLong totalSize) throws IOException {
+    List<Path> subDirs = new ArrayList<>();
+    Stream<Path> paths = Files.list(dir);
+    totalFiles.addAndGet(paths
+        .filter(p -> {
+          File f = p.toFile();
+          if (f.isDirectory()) {
+            subDirs.add(p);
+            return false;
+          }
+          return f.getName().toLowerCase().endsWith(".sst");
+        })
+        .map(f -> {
+          try {
+            totalSize.addAndGet(Files.size(f));
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+          return f.toString();
+        }).collect(Collectors.toList()).size());
+
+    for (Path p: subDirs) {
+      estimateTotals(p, totalFiles, totalSize);
+    }
   }
 
   /**
    * The snapshotInfo table may contain a snapshot that
    * doesn't yet exist on the fs, so wait a few seconds for it.
    * @param checkpoint Checkpoint containing snapshot entries expected.
+   * @param waitForDir Wait for dir to exist on fs.
    * @return Set of expected snapshot dirs.
    */
-  private Set<Path> waitForSnapshotDirs(DBCheckpoint checkpoint)
+  private Set<Path> getSnapshotDirs(DBCheckpoint checkpoint, boolean waitForDir)
       throws IOException {
 
     OzoneConfiguration conf = getConf();
@@ -348,7 +411,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       while (iterator.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> entry = iterator.next();
         Path path = Paths.get(getSnapshotPath(conf, entry.getValue()));
-        waitForDirToExist(path);
+        if (waitForDir) {
+          waitForDirToExist(path);
+        }
         snapshotPaths.add(path);
       }
     } finally {
@@ -552,6 +617,10 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         e.getKey().getFileName().toString().toLowerCase().endsWith(".sst")).
         collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
+    long bytesWritten = 0L;
+    int filesWritten = 0;
+    long lastLoggedTime = System.currentTimeMillis();
+
     // Go through each of the files to be copied and add to archive.
     for (Map.Entry<Path, Path> entry : filteredCopyFiles.entrySet()) {
       Path file = entry.getValue();
@@ -570,7 +639,18 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
           fixedFile = f.toString();
         }
       }
-      includeFile(entry.getKey().toFile(), fixedFile, archiveOutputStream);
+      Path f = entry.getKey();
+      if (!f.toFile().isDirectory()) {
+        bytesWritten += Files.size(f);
+        filesWritten++;
+      }
+      includeFile(f.toFile(), fixedFile, archiveOutputStream);
+      // Log progress every 30 seconds
+      if (System.currentTimeMillis() - lastLoggedTime >= 30000) {
+        LOG.info("Transferred {} KB, #files {} to checkpoint tarball stream...",
+            bytesWritten / (1024), filesWritten);
+        lastLoggedTime = System.currentTimeMillis();
+      }
     }
 
     if (completed) {
@@ -594,7 +674,11 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       }
       // Mark tarball completed.
       includeRatisSnapshotCompleteFlag(archiveOutputStream);
+      LOG.info("Completed checkpoint tarball transfer.");
     }
+    LOG.info("Completed transfer of {} KB, #files {} " +
+            "to checkpoint tarball stream.",
+        bytesWritten / (1024), filesWritten);
   }
 
   @Nonnull
