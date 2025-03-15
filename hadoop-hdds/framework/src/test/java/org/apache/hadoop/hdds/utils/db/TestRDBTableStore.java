@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.protobuf.ByteString;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -41,6 +42,7 @@ import java.util.Set;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.junit.jupiter.api.AfterEach;
@@ -68,7 +70,8 @@ public class TestRDBTableStore {
           "First", "Second", "Third",
           "Fourth", "Fifth",
           "Sixth", "Seventh",
-          "Eighth", "Ninth");
+          "Eighth", "Ninth",
+          "Ten");
   private final List<String> prefixedFamilies = Arrays.asList(
       "PrefixFirst",
       "PrefixTwo", "PrefixThree",
@@ -301,6 +304,19 @@ public class TestRDBTableStore {
 
       //then
       assertNull(testTable.get(key));
+    }
+  }
+
+  @Test
+  public void putGetTypedTableCodec() throws Exception {
+    try (Table<String, String> testTable = rdbStore.getTable("Ten", String.class, String.class)) {
+      testTable.put("test1", "123");
+      assertFalse(testTable.isEmpty());
+      assertEquals("123", testTable.get("test1"));
+    }
+    try (Table<String, ByteString> testTable = rdbStore.getTable("Ten",
+        StringCodec.get(), ByteStringCodec.get(), TableCache.CacheType.NO_CACHE)) {
+      assertEquals("123", testTable.get("test1").toStringUtf8());
     }
   }
 

@@ -301,6 +301,12 @@ public class RDBStore implements DBStore {
   }
 
   @Override
+  public <K, V> TypedTable<K, V> getTable(
+      String name, Codec<K> keyCodec, Codec<V> valueCodec, TableCache.CacheType cacheType) throws IOException {
+    return new TypedTable<>(getTable(name), keyCodec, valueCodec, cacheType);
+  }
+
+  @Override
   public <K, V> Table<K, V> getTable(String name,
       Class<K> keyType, Class<V> valueType,
       TableCache.CacheType cacheType) throws IOException {
