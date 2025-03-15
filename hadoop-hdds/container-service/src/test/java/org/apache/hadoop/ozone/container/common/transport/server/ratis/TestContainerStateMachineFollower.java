@@ -17,9 +17,12 @@
 
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
+import org.apache.ozone.test.tag.Flaky;
+
 /**
  * Test class to ContainerStateMachine class for follower.
  */
+@Flaky("HDDS-12602")
 public class TestContainerStateMachineFollower extends TestContainerStateMachine {
   public TestContainerStateMachineFollower() {
     super(false);
