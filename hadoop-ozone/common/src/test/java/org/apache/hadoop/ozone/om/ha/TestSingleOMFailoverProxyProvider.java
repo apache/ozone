@@ -38,6 +38,7 @@ import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
+import org.apache.hadoop.ozone.om.exceptions.OMNodeIdMismatchException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -130,6 +131,32 @@ public class TestSingleOMFailoverProxyProvider {
         () -> proxy.submitRequest(null, null));
 
     // Fail immediately for OMNotLeaderException
+    assertThat(serviceException).hasCauseInstanceOf(RemoteException.class);
+    assertThat(logCapturer.getOutput()).contains(getRetryProxyDebugMsg(NODE_ID_BASE_STR + "1"));
+    assertThat(logCapturer.getOutput()).doesNotContain(getRetryProxyDebugMsg(NODE_ID_BASE_STR + "2"));
+    assertThat(logCapturer.getOutput()).doesNotContain(getRetryProxyDebugMsg(NODE_ID_BASE_STR + "3"));
+  }
+
+  @Test
+  public void testNodeIdMismatchExceptionNoFailover() {
+    OMNodeIdMismatchException omNodeIdMismatchException = new OMNodeIdMismatchException("Wrong OM node ID");
+    testException = new RemoteException(omNodeIdMismatchException.getClass().getName(),
+        omNodeIdMismatchException.getMessage());
+
+    GenericTestUtils.setLogLevel(SingleOMFailoverProxyProviderBase.LOG, Level.DEBUG);
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
+        .captureLogs(SingleOMFailoverProxyProviderBase.LOG);
+
+    MockSingleFailoverProxyProvider singleFailoverProxyProvider = MOCK_PROVIDERS.get(NODE_ID_BASE_STR + "1");
+
+    OzoneManagerProtocolPB proxy = (OzoneManagerProtocolPB) RetryProxy
+        .create(OzoneManagerProtocolPB.class, singleFailoverProxyProvider,
+            singleFailoverProxyProvider.getRetryPolicy(MAX_ATTEMPTS));
+
+    ServiceException serviceException = assertThrows(ServiceException.class,
+        () -> proxy.submitRequest(null, null));
+
+    // Fail immediately for OMNodeIdException
     assertThat(serviceException).hasCauseInstanceOf(RemoteException.class);
     assertThat(logCapturer.getOutput()).contains(getRetryProxyDebugMsg(NODE_ID_BASE_STR + "1"));
     assertThat(logCapturer.getOutput()).doesNotContain(getRetryProxyDebugMsg(NODE_ID_BASE_STR + "2"));
