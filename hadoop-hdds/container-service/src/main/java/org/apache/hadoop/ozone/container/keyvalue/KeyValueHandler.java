@@ -175,7 +175,7 @@ public class KeyValueHandler extends Handler {
     chunkManager = ChunkManagerFactory.createChunkManager(config, blockManager,
         volSet);
     try {
-      volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
+      volumeChoosingPolicy = VolumeChoosingPolicyFactory.getSharedPolicy(conf);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

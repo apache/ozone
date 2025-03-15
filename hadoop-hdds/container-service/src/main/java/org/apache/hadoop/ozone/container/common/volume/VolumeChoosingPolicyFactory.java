@@ -32,6 +32,8 @@ public final class VolumeChoosingPolicyFactory {
   private static final Class<? extends VolumeChoosingPolicy>
       DEFAULT_VOLUME_CHOOSING_POLICY = CapacityVolumeChoosingPolicy.class;
 
+  private static volatile VolumeChoosingPolicy policyInstance;
+
   private VolumeChoosingPolicyFactory() {
   }
 
@@ -40,5 +42,28 @@ public final class VolumeChoosingPolicyFactory {
     return conf.getClass(HDDS_DATANODE_VOLUME_CHOOSING_POLICY,
             DEFAULT_VOLUME_CHOOSING_POLICY, VolumeChoosingPolicy.class)
         .newInstance();
+  }
+
+  /**
+   * Get a shared singleton instance of VolumeChoosingPolicy.
+   * This method ensures that only one instance of VolumeChoosingPolicy
+   * is created and shared across the application.
+   *
+   * @param conf Configuration
+   * @return The shared VolumeChoosingPolicy instance
+   */
+  public static VolumeChoosingPolicy getSharedPolicy(ConfigurationSource conf) {
+    if (policyInstance == null) {
+      synchronized (VolumeChoosingPolicyFactory.class) {
+        if (policyInstance == null) {
+          try {
+            policyInstance = getPolicy(conf);
+          } catch (Exception e) {
+            throw new RuntimeException("Failed to create VolumeChoosingPolicy", e);
+          }
+        }
+      }
+    }
+    return policyInstance;
   }
 }
