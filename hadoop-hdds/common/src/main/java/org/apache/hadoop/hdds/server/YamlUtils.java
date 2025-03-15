@@ -55,7 +55,8 @@ public final class YamlUtils {
   }
 
   public static void dump(Yaml yaml, Object data, File file, Logger log) throws IOException {
-    try (OutputStream out = new AtomicFileOutputStream(file);
+    File tempFile = File.createTempFile("temp", "yaml", file.getParentFile());
+    try (OutputStream out = new AtomicFileOutputStream(file, tempFile);
          OutputStreamWriter writer = new OutputStreamWriter(out, StandardCharsets.UTF_8)) {
       yaml.dump(data, writer);
     } catch (IOException e) {
