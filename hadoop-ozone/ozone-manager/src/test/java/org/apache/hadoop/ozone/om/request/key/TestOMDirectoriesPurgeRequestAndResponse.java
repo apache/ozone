@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -29,6 +32,7 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -52,7 +56,6 @@ import org.junit.jupiter.api.Test;
  * Tests {@link OMKeyPurgeRequest} and {@link OMKeyPurgeResponse}.
  */
 public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
-
   private int numKeys = 10;
 
   /**
@@ -185,6 +188,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
 
   @Test
   public void testValidateAndUpdateCacheCheckQuota() throws Exception {
+    keyManager.start(getOzoneConfiguration());
     // Create and Delete keys. The keys should be moved to DeletedKeys table
     List<OmKeyInfo> deletedKeyInfos = createAndDeleteKeys(1, null);
     // The keys should be present in the DeletedKeys table before purging
@@ -216,6 +220,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
 
   @Test
   public void testValidateAndUpdateCacheSnapshotLastTransactionInfoUpdated() throws Exception {
+    keyManager.start(getOzoneConfiguration());
     // Create and Delete keys. The keys should be moved to DeletedKeys table
     List<OmKeyInfo> deletedKeyInfos = createAndDeleteKeys(1, null);
     // The keys should be present in the DeletedKeys table before purging
@@ -260,7 +265,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     performBatchOperationCommit(omClientResponse);
 
     // The keys should exist in the DeletedKeys table after dir delete
-    validateDeletedKeys(rcOmSnapshot.get().getMetadataManager(), deletedKeyNames);
+    validateDeletedKeys(rcOmSnapshot.get().getMetadataManager(), deletedKeyNames, true);
     snapshotInfoOnDisk = omMetadataManager.getSnapshotInfoTable().getSkipCache(snapshotInfo.getTableKey());
     assertEquals(snapshotInfo, snapshotInfoOnDisk);
     rcOmSnapshot.close();
@@ -269,6 +274,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
   @Test
   public void testValidateAndUpdateCacheQuotaBucketRecreated()
       throws Exception {
+    keyManager.start(getOzoneConfiguration());
     // Create and Delete keys. The keys should be moved to DeletedKeys table
     List<OmKeyInfo> deletedKeyInfos = createAndDeleteKeys(1, null);
     // The keys should be present in the DeletedKeys table before purging
@@ -343,9 +349,22 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
 
   private void validateDeletedKeys(OMMetadataManager omMetadataManager,
       List<String> deletedKeyNames) throws IOException {
+    validateDeletedKeys(omMetadataManager, deletedKeyNames, false);
+  }
+
+  private void validateDeletedKeys(OMMetadataManager omMetadataManager,
+      List<String> deletedKeyNames, boolean isSnapshot) throws IOException {
     for (String deletedKey : deletedKeyNames) {
       assertTrue(omMetadataManager.getDeletedTable().isExist(
           deletedKey));
     }
+    // If it's deleted from a snapshot, it doesn't affect fileTable.
+    long expectedUncompactedDeletes = isSnapshot ? 0 : deletedKeyNames.size();
+    assertEquals(expectedUncompactedDeletes,
+        ((TypedTable)this.omMetadataManager.getTable(FILE_TABLE)).getUncompactedDeletes().get());
+    assertEquals(0,
+        ((TypedTable)this.omMetadataManager.getTable(DELETED_DIR_TABLE)).getUncompactedDeletes().get());
+    assertEquals(0,
+        ((TypedTable)this.omMetadataManager.getTable(DIRECTORY_TABLE)).getUncompactedDeletes().get());
   }
 }
