@@ -115,10 +115,12 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
   }
 
 
+  @Override
   public BlockID getBlockID() {
     return blockID;
   }
 
+  @Override
   public long getLength() {
     return blockLength;
   }
