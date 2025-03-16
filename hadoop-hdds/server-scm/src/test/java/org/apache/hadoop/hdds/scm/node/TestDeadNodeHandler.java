@@ -232,7 +232,7 @@ public class TestDeadNodeHandler {
     assertFalse(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
 
-    verify(publisher).fireEvent(SCMEvents.REPLICATION_MANAGER_NOTIFY, datanode1);
+    verify(publisher, times(0)).fireEvent(SCMEvents.REPLICATION_MANAGER_NOTIFY, datanode1);
 
     clearInvocations(publisher);
 
