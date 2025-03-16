@@ -61,7 +61,7 @@ env:
   RATIS_REPO: ${{ github.event.inputs.ratis-repo }}
   RATIS_VERSION: ${{ github.event.inputs.ratis-ref }}
   JAVA_VERSION: ${{ github.event.inputs.java-version }}
-run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0}#{1}[{2}]-{3}x{4}', inputs.test-class, inputs.test-name, inputs.ref, inputs.splits, inputs.iterations) || '' }}
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0}#{1}[{2}]-{3}x{4}-java{5}', inputs.test-class, inputs.test-name, inputs.ref, inputs.splits, inputs.iterations, inputs.java-version) || '' }}
 jobs:
   prepare-job:
     runs-on: ubuntu-24.04
