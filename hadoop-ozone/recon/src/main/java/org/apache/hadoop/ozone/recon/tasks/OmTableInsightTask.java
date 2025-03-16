@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.jooq.Configuration;
@@ -172,7 +173,7 @@ public class OmTableInsightTask implements ReconOmTask {
     String tableName;
     OMDBUpdateEvent<String, Object> omdbUpdateEvent;
     // Process each update event
-    long startTime = System.currentTimeMillis();
+    long startTime = Time.monotonicNow();
     while (eventIterator.hasNext()) {
       omdbUpdateEvent = eventIterator.next();
       tableName = omdbUpdateEvent.getTable();
@@ -215,7 +216,7 @@ public class OmTableInsightTask implements ReconOmTask {
       writeDataToDB(replicatedSizeMap);
     }
     LOG.debug("{} successfully processed in {} milliseconds",
-        getTaskName(), (System.currentTimeMillis() - startTime));
+        getTaskName(), (Time.monotonicNow() - startTime));
     return buildTaskResult(true);
   }
 

@@ -63,6 +63,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTrans
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -185,7 +186,7 @@ public class BaseFreonGenerator implements FreonSubcommand {
     while (!completed.get()) {
       long counter = attemptCounter.getAndIncrement();
       if (timebase) {
-        if (System.currentTimeMillis()
+        if (Time.monotonicNow()
             > startTime + TimeUnit.SECONDS.toMillis(durationInSecond)) {
           completed.set(true);
           break;
@@ -344,7 +345,7 @@ public class BaseFreonGenerator implements FreonSubcommand {
         freonCommand.isInteractive(), realTimeStatusSupplier());
     progressBar.start();
 
-    startTime = System.currentTimeMillis();
+    startTime = Time.monotonicNow();
   }
 
   public Supplier<String> realTimeStatusSupplier() {
@@ -376,7 +377,7 @@ public class BaseFreonGenerator implements FreonSubcommand {
 
     List<String> messages = new LinkedList<>();
     messages.add("Total execution time (sec): " +
-        Math.round((System.currentTimeMillis() - startTime) / 1000.0));
+        Math.round((Time.monotonicNow() - startTime) / 1000.0));
     messages.add("Failures: " + failureCounter.get());
     messages.add("Successful executions: " + successCounter.get());
     if (failureCounter.get() > 0) {

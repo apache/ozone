@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
+import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -112,7 +113,7 @@ public class TestMultipartUploadWithCopy {
     // Make sure DELAY_MS has passed, otherwise
     //  afterSourceKeyModificationTimeStr will be in the future
     //  and thus invalid
-    long currentTime = System.currentTimeMillis();
+    long currentTime = Time.monotonicNow();
     long sleepMs = sourceKeyLastModificationTime + DELAY_MS - currentTime;
     if (sleepMs > 0) {
       Thread.sleep(sleepMs);

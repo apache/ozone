@@ -27,6 +27,7 @@ import java.util.function.Supplier;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -297,7 +298,7 @@ class RDBTable implements Table<byte[], byte[]> {
       int count, boolean sequential, byte[] prefix,
       MetadataKeyFilters.MetadataKeyFilter... filters)
       throws IOException, IllegalArgumentException {
-    long start = System.currentTimeMillis();
+    long start = Time.monotonicNow();
 
     if (count < 0) {
       throw new IllegalArgumentException(
@@ -342,7 +343,7 @@ class RDBTable implements Table<byte[], byte[]> {
         }
       }
     } finally {
-      long end = System.currentTimeMillis();
+      long end = Time.monotonicNow();
       long timeConsumed = end - start;
       if (LOG.isDebugEnabled()) {
         if (filters != null) {

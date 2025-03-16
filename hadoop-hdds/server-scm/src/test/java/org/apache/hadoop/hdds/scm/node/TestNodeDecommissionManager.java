@@ -56,6 +56,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -380,7 +381,7 @@ public class TestNodeDecommissionManager {
     List<DatanodeDetails> dns = generateDatanodes();
 
     long maintenanceEnd =
-        (System.currentTimeMillis() / 1000L) + (100 * 60L * 60L);
+        (Time.monotonicNow() / 1000L) + (100 * 60L * 60L);
 
     // Put 1 node into entering_maintenance, 1 node into decommissioning
     // and 1 node into in_maintenance.

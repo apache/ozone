@@ -94,6 +94,7 @@ import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
+import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.Timer;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.slf4j.Logger;
@@ -314,7 +315,7 @@ public class OzoneContainer {
     Iterator<StorageVolume> volumeSetIterator = volumeSet.getVolumesList()
         .iterator();
     ArrayList<Thread> volumeThreads = new ArrayList<>();
-    long startTime = System.currentTimeMillis();
+    long startTime = Time.monotonicNow();
 
     // Load container inspectors that may be triggered at startup based on
     // system properties set. These can inspect and possibly repair
@@ -356,7 +357,7 @@ public class OzoneContainer {
     ContainerInspectorUtil.unload();
 
     LOG.info("Build ContainerSet costs {}s",
-        (System.currentTimeMillis() - startTime) / 1000);
+        (Time.monotonicNow() - startTime) / 1000);
   }
 
   /**

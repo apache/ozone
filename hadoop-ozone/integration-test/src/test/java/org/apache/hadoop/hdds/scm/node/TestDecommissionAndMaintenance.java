@@ -79,6 +79,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -613,7 +614,7 @@ public class TestDecommissionAndMaintenance {
     scmClient.startMaintenanceNodes(Arrays.asList(getDNHostAndPort(dn)), 0, true);
     waitForDnToReachPersistedOpState(dn, IN_MAINTENANCE);
 
-    long newEndTime = System.currentTimeMillis() / 1000 + 5;
+    long newEndTime = Time.monotonicNow() / 1000 + 5;
     // Update the maintenance end time via NM manually. As the current
     // decommission interface only allows us to specify hours from now as the
     // end time, that is not really suitable for a test like this.
@@ -628,7 +629,7 @@ public class TestDecommissionAndMaintenance {
     cluster.shutdownHddsDatanode(dn);
     waitForDnToReachHealthState(nm, dn, DEAD);
 
-    newEndTime = System.currentTimeMillis() / 1000 + 5;
+    newEndTime = Time.monotonicNow() / 1000 + 5;
     nm.setNodeOperationalState(dn, IN_MAINTENANCE, newEndTime);
     waitForDnToReachOpState(nm, dn, IN_SERVICE);
     // Ensure there are 3 replicas not including the dead node, indicating a new
