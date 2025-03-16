@@ -28,9 +28,9 @@ import static org.mockito.Mockito.when;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -48,12 +48,12 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.hadoop.util.DiskChecker;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
@@ -94,6 +94,7 @@ public class TestDiskBalancerService {
   public void cleanup() throws IOException {
     BlockUtils.shutdownCache(conf);
     FileUtils.deleteDirectory(testRoot);
+    volumeSet.shutdown();
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -179,84 +180,65 @@ public class TestDiskBalancerService {
         threadCount);
   }
 
-  static List<Integer> createVolumeSet() {
-    List<Integer> params = new ArrayList<>();
-    for (int i = 0; i < 4; i++) {
-      params.add(i);
-    }
-    return params;
+  public static Stream<Arguments> values() {
+    return Stream.of(
+        Arguments.arguments(0, 0, 0),
+        Arguments.arguments(1, 0, 0),
+        Arguments.arguments(1, 50, 0),
+        Arguments.arguments(2, 0, 0),
+        Arguments.arguments(2, 10, 0),
+        Arguments.arguments(2, 50, 40), // one disk is 50% above average, the other disk is 50% below average
+        Arguments.arguments(3, 0, 0),
+        Arguments.arguments(3, 10, 0),
+        Arguments.arguments(4, 0, 0),
+        Arguments.arguments(4, 50, 40) // two disks are 50% above average, the other two disks are 50% below average
+    );
   }
 
   @ParameterizedTest
-  @MethodSource("createVolumeSet")
-  public void testCalculateBytesToMove(Integer i) throws IOException {
-    try {
-      conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
-          generateVolumeLocation(testRoot.getAbsolutePath(), i));
-      volumeSet = new MutableVolumeSet(datanodeUuid, scmId, conf, null,
-          StorageVolume.VolumeType.DATA_VOLUME, null);
-      createDbInstancesForTestIfNeeded(volumeSet, scmId, scmId, conf);
-
-      double num1 = 0.02;
-      List<StorageVolume> volumes = new ArrayList<>();
-
-      for (StorageVolume volume : volumeSet.getVolumesList()) {
-        volume.incrementUsedSpace((long) (volume.getCurrentUsage().getCapacity() * num1));
-        volumes.add(volume);
-        num1 = 0.8;
-      }
-
-      ContainerSet containerSet = new ContainerSet(1000);
-      ContainerMetrics metrics = ContainerMetrics.create(conf);
-      KeyValueHandler keyValueHandler =
-          new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
-              metrics, c -> {
-          });
-      DiskBalancerServiceTestImpl svc =
-          getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1);
-      svc.setShouldRun(true);
-      svc.setThreshold(10);
-      svc.setQueueSize(2);
-
-      long expectedBytesToMove = calculateExpectedBytesToMove(volumes, svc.getDiskBalancerInfo().getThreshold());
-
-      assertEquals(expectedBytesToMove, svc.getBytesToMove(),
-          "The calculated bytes to move should match the expected reduction to meet the threshold.");
-    } catch (DiskChecker.DiskOutOfSpaceException e) {
-      assertEquals(0, i, "No storage locations configured");
+  @MethodSource("values")
+  public void testCalculateBytesToMove(int volumeCount, int deltaUsagePercent,
+      long expectedBytesToMovePercent) throws IOException {
+    if (volumeCount == 0) {
+      assertEquals(expectedBytesToMovePercent, 0);
+      return;
     }
-  }
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
+        generateVolumeLocation(testRoot.getAbsolutePath(), volumeCount));
+    volumeSet = new MutableVolumeSet(datanodeUuid, scmId, conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
+    createDbInstancesForTestIfNeeded(volumeSet, scmId, scmId, conf);
 
-  private long calculateExpectedBytesToMove(List<StorageVolume> volumes, double threshold) {
-    long bytesPendingToMove = 0;
+    double avgUtilization = 0.5;
+    int totalOverUtilisedVolumes = 0;
 
-    long totalUsedSpace = 0;
-    long totalCapacity = 0;
-
-    for (StorageVolume volume : volumes) {
-      totalUsedSpace += volume.getCurrentUsage().getUsedSpace();
-      totalCapacity += volume.getCurrentUsage().getCapacity();
-    }
-
-    if (totalCapacity == 0) {
-      return 0;
-    }
-
-    double datanodeUtilization = (double) totalUsedSpace / totalCapacity;
-    double thresholdFraction = threshold / 100.0;
-    double upperLimit = datanodeUtilization + thresholdFraction;
-
-    for (StorageVolume volume : volumes) {
-      long usedSpace = volume.getCurrentUsage().getUsedSpace();
-      long capacity = volume.getCurrentUsage().getCapacity();
-      double volumeUtilization = (double) usedSpace / capacity;
-
-      if (volumeUtilization > upperLimit) {
-        long excessData = usedSpace - (long) (upperLimit * capacity);
-        bytesPendingToMove += excessData;
+    List<StorageVolume> volumes = volumeSet.getVolumesList();
+    for (int i = 0; i < volumes.size(); i++) {
+      StorageVolume vol = volumes.get(i);
+      long totalCapacityPerVolume = vol.getCurrentUsage().getCapacity();
+      if (i % 2 == 0) {
+        vol.incrementUsedSpace((long) (totalCapacityPerVolume * (avgUtilization + deltaUsagePercent / 100.0)));
+        totalOverUtilisedVolumes++;
+      } else {
+        vol.incrementUsedSpace((long) (totalCapacityPerVolume * (avgUtilization - deltaUsagePercent / 100.0)));
       }
     }
-    return bytesPendingToMove;
+
+    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    KeyValueHandler keyValueHandler =
+        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
+            metrics, c -> {
+        });
+    DiskBalancerServiceTestImpl svc =
+        getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1);
+    svc.setQueueSize(volumeCount);
+
+    long totalCapacity = volumes.get(0).getCurrentUsage().getCapacity();
+    long expectedBytesToMove = (long) Math.ceil(
+        (totalCapacity * expectedBytesToMovePercent) / 100.0 * totalOverUtilisedVolumes);
+
+    assertEquals(Math.abs(expectedBytesToMove - svc.calculateBytesToMove(volumeSet)) <= 1, true);
   }
 
   private OzoneContainer mockDependencies(ContainerSet containerSet,

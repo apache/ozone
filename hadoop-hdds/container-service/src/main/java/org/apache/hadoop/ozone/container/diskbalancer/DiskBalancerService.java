@@ -355,7 +355,7 @@ public class DiskBalancerService extends BackgroundService {
       metrics.incrIdleLoopNoAvailableVolumePairCount();
     }
     queueSize = queue.size();
-    bytesToMove = calculateBytesToMove();
+    bytesToMove = calculateBytesToMove(volumeSet);
     return queue;
   }
 
@@ -513,7 +513,7 @@ public class DiskBalancerService extends BackgroundService {
         metrics.getFailureCount(), bytesToMove);
   }
 
-  private long calculateBytesToMove() {
+  public long calculateBytesToMove(MutableVolumeSet inputVolumeSet) {
     long bytesPendingToMove = 0;
 
     if (queueSize == 0) {
@@ -526,7 +526,7 @@ public class DiskBalancerService extends BackgroundService {
     long totalUsedSpace = 0;
     long totalCapacity = 0;
 
-    for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())) {
+    for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(inputVolumeSet.getVolumesList())) {
       totalUsedSpace += volume.getCurrentUsage().getUsedSpace();
       totalCapacity += volume.getCurrentUsage().getCapacity();
     }
@@ -541,7 +541,7 @@ public class DiskBalancerService extends BackgroundService {
     double upperLimit = datanodeUtilization + thresholdFraction;
 
     // Calculate excess data in overused volumes
-    for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())) {
+    for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(inputVolumeSet.getVolumesList())) {
       long usedSpace = volume.getCurrentUsage().getUsedSpace();
       long capacity = volume.getCurrentUsage().getCapacity();
       double volumeUtilization = (double) usedSpace / capacity;
@@ -579,10 +579,6 @@ public class DiskBalancerService extends BackgroundService {
 
   public VolumeChoosingPolicy getVolumeChoosingPolicy() {
     return volumeChoosingPolicy;
-  }
-
-  public long getBytesToMove() {
-    return calculateBytesToMove();
   }
 
   public void setQueueSize(long queueSize) {
