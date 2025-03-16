@@ -648,6 +648,10 @@ public class SCMNodeManager implements NodeManager {
       DatanodeDetails datanode,
       NodeOperationalState oldState,
       NodeOperationalState newState) {
+    if (!scmContext.isLeader()) {
+      return;
+    }
+
     if (oldState != newState) {
       // Notify when a node is entering maintenance, decommissioning or back to service
       if (newState == NodeOperationalState.ENTERING_MAINTENANCE

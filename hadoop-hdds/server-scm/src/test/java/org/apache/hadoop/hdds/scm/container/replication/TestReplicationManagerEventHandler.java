@@ -15,17 +15,22 @@
  * limitations under the License.
  */
 
-
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Test the ReplicationManagerEventHandler class.
@@ -34,19 +39,34 @@ public class TestReplicationManagerEventHandler {
   private ReplicationManager replicationManager;
   private ReplicationManagerEventHandler replicationManagerEventHandler;
   private EventPublisher publisher;
+  private SCMContext scmContext;
 
   @BeforeEach
   public void setUp() {
     replicationManager = mock(ReplicationManager.class);
     publisher = mock(EventPublisher.class);
-    replicationManagerEventHandler = new ReplicationManagerEventHandler(replicationManager);
+    scmContext = mock(SCMContext.class);
+    replicationManagerEventHandler = new ReplicationManagerEventHandler(replicationManager, scmContext);
   }
 
-  @Test
-  public void testReplicationManagerEventHandler() {
+  private static Stream<Arguments> testData() {
+    return Stream.of(
+      Arguments.of(true, false, true),
+      Arguments.of(false, true, false),
+      Arguments.of(true, true, false),
+      Arguments.of(false, false, false)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("testData")
+  public void testReplicationManagerEventHandler(boolean isLeaderReady, boolean isInSafeMode,
+      boolean isExpectedToNotify) {
+    when(scmContext.isLeaderReady()).thenReturn(isLeaderReady);
+    when(scmContext.isInSafeMode()).thenReturn(isInSafeMode);
     DatanodeDetails dataNodeDetails = MockDatanodeDetails.randomDatanodeDetails();
     replicationManagerEventHandler.onMessage(dataNodeDetails, publisher);
 
-    verify(replicationManager).notifyNodeStateChange();
+    verify(replicationManager, times(isExpectedToNotify ? 1 : 0)).notifyNodeStateChange();
   }
 }

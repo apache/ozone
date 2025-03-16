@@ -2043,23 +2043,23 @@ public class TestSCMNodeManager {
   private static Stream<Arguments> nodeStateTransitions() {
     return Stream.of(
         // start decommissioning or entering maintenance
-        Arguments.of(HddsProtos.NodeOperationalState.IN_SERVICE, 
+        Arguments.of(HddsProtos.NodeOperationalState.IN_SERVICE,
                     HddsProtos.NodeOperationalState.DECOMMISSIONING, true),
-        Arguments.of(HddsProtos.NodeOperationalState.IN_SERVICE, 
+        Arguments.of(HddsProtos.NodeOperationalState.IN_SERVICE,
                     HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE, true),
         // back to service (DataNodeAdminMonitor abort workflow, maintenance end time expired or node is dead)
-        Arguments.of(HddsProtos.NodeOperationalState.DECOMMISSIONING, 
+        Arguments.of(HddsProtos.NodeOperationalState.DECOMMISSIONING,
                     HddsProtos.NodeOperationalState.IN_SERVICE, true),
-        Arguments.of(HddsProtos.NodeOperationalState.DECOMMISSIONED, 
+        Arguments.of(HddsProtos.NodeOperationalState.DECOMMISSIONED,
                     HddsProtos.NodeOperationalState.IN_SERVICE, true),
-        Arguments.of(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE, 
+        Arguments.of(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
                     HddsProtos.NodeOperationalState.IN_SERVICE, true),
-        Arguments.of(HddsProtos.NodeOperationalState.IN_MAINTENANCE, 
+        Arguments.of(HddsProtos.NodeOperationalState.IN_MAINTENANCE,
                     HddsProtos.NodeOperationalState.IN_SERVICE, true),
         // there is no under/over replicated containers on the node, completed the admin workflow
-        Arguments.of(HddsProtos.NodeOperationalState.DECOMMISSIONING, 
+        Arguments.of(HddsProtos.NodeOperationalState.DECOMMISSIONING,
                     HddsProtos.NodeOperationalState.DECOMMISSIONED, false),
-        Arguments.of(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE, 
+        Arguments.of(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
                     HddsProtos.NodeOperationalState.IN_MAINTENANCE, false)
     );
   }

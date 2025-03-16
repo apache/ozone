@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.slf4j.Logger;
@@ -31,14 +32,20 @@ public class ReplicationManagerEventHandler implements EventHandler<DatanodeDeta
   private static final Logger LOG = LoggerFactory.getLogger(ReplicationManagerEventHandler.class);
 
   private final ReplicationManager replicationManager;
+  private final SCMContext scmContext;
 
-  public ReplicationManagerEventHandler(ReplicationManager replicationManager) {
+  public ReplicationManagerEventHandler(ReplicationManager replicationManager, SCMContext scmContext) {
     this.replicationManager = replicationManager;
+    this.scmContext = scmContext;
   }
 
   @Override
   public void onMessage(DatanodeDetails datanodeDetails, EventPublisher eventPublisher) {
-    LOG.info("ReplicationManagerEventHandler received event for datanode: {}", datanodeDetails);
+    if (!scmContext.isLeaderReady() || scmContext.isInSafeMode()) {
+      // same condition in ReplicationManager
+      return;
+    }
+    LOG.debug("ReplicationManagerEventHandler received event for datanode: {}", datanodeDetails);
     replicationManager.notifyNodeStateChange();
   }
 }
