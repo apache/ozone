@@ -497,7 +497,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         new PipelineActionHandler(pipelineManager, scmContext);
 
     ReplicationManagerEventHandler replicationManagerEventHandler =
-        new ReplicationManagerEventHandler(replicationManager);
+        new ReplicationManagerEventHandler(replicationManager, scmContext);
 
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.RETRIABLE_DATANODE_COMMAND, scmNodeManager);

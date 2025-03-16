@@ -1492,16 +1492,21 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       return false;
     }
 
+    if (!isThreadWaiting()) {
+      LOG.debug("Replication monitor is running, not need to wake it up");
+      return false;
+    }
+
     // Only wake up the thread if there's no active replication work
     // This prevents creating a new replication queue over and over
     // when multiple nodes change state in quick succession
     if (getQueue().isEmpty()) {
-      LOG.info("Waking up replication monitor due to node state change");
+      LOG.debug("Waking up replication monitor due to node state change");
       // Notify the replication monitor thread to wake up
       notify();
       return true;
     } else {
-      LOG.info("Replication queue is not empty, not waking up replication monitor");
+      LOG.debug("Replication queue is not empty, not waking up replication monitor");
       return false;
     }
   }
