@@ -50,7 +50,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.management.ObjectName;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
@@ -182,8 +182,8 @@ public class SCMNodeManager implements NodeManager {
     this.clusterMap = networkTopology;
     this.nodeResolver = nodeResolver;
     this.useHostname = conf.getBoolean(
-        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
-        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+        HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
+        HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
     this.numPipelinesPerMetadataVolume =
         conf.getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME,
             ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME_DEFAULT);
@@ -533,7 +533,7 @@ public class SCMNodeManager implements NodeManager {
    * @return SCMheartbeat response.
    */
   @Override
-  public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
+  public List<SCMCommand<?>> processHeartbeat(DatanodeDetails datanodeDetails,
                                            CommandQueueReportProto queueReport) {
     Preconditions.checkNotNull(datanodeDetails, "Heartbeat is missing " +
         "DatanodeDetails.");
@@ -550,7 +550,7 @@ public class SCMNodeManager implements NodeManager {
     try {
       Map<SCMCommandProto.Type, Integer> summary =
           commandQueue.getDatanodeCommandSummary(datanodeDetails.getUuid());
-      List<SCMCommand> commands =
+      List<SCMCommand<?>> commands =
           commandQueue.getCommand(datanodeDetails.getUuid());
 
       // Update the SCMCommand of deleteBlocksCommand Status
@@ -1259,7 +1259,7 @@ public class SCMNodeManager implements NodeManager {
   }
 
   private void nodeUsageStatistics(Map<String, String> nodeStatics) {
-    if (nodeStateManager.getAllNodes().size() < 1) {
+    if (nodeStateManager.getAllNodes().isEmpty()) {
       return;
     }
     float[] usages = new float[nodeStateManager.getAllNodes().size()];
@@ -1310,7 +1310,7 @@ public class SCMNodeManager implements NodeManager {
   }
 
   private void nodeSpaceStatistics(Map<String, String> nodeStatics) {
-    if (nodeStateManager.getAllNodes().size() < 1) {
+    if (nodeStateManager.getAllNodes().isEmpty()) {
       return;
     }
     long capacityByte = 0;
@@ -1635,7 +1635,7 @@ public class SCMNodeManager implements NodeManager {
   }
 
   @Override
-  public void addDatanodeCommand(UUID dnId, SCMCommand command) {
+  public void addDatanodeCommand(UUID dnId, SCMCommand<?> command) {
     writeLock().lock();
     try {
       this.commandQueue.addCommand(dnId, command);
@@ -1678,7 +1678,7 @@ public class SCMNodeManager implements NodeManager {
   }
 
   @Override
-  public List<SCMCommand> getCommandQueue(UUID dnID) {
+  public List<SCMCommand<?>> getCommandQueue(UUID dnID) {
     // Getting the queue actually clears it and returns the commands, so this
     // is a write operation and not a read as the method name suggests.
     writeLock().lock();
@@ -1846,7 +1846,7 @@ public class SCMNodeManager implements NodeManager {
         }
         nodeStateManager.removeNode(datanodeDetails);
         removeFromDnsToUuidMap(datanodeDetails.getUuid(), datanodeDetails.getIpAddress());
-        final List<SCMCommand> cmdList = getCommandQueue(datanodeDetails.getUuid());
+        final List<SCMCommand<?>> cmdList = getCommandQueue(datanodeDetails.getUuid());
         LOG.info("Clearing command queue of size {} for DN {}", cmdList.size(), datanodeDetails);
       } else {
         LOG.warn("Node not decommissioned or dead, cannot remove: {}", datanodeDetails);

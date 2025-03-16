@@ -43,9 +43,9 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmInfo;
@@ -419,29 +419,16 @@ public final class HAUtils {
     long waitDuration =
         conf.getTimeDuration(OZONE_SCM_CA_LIST_RETRY_INTERVAL,
             OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT, TimeUnit.SECONDS);
-    Collection<String> scmNodes = SCMHAUtils.getSCMNodeIds(conf);
+    Collection<String> scmNodes = HddsUtils.getSCMNodeIds(conf);
     SCMSecurityProtocolClientSideTranslatorPB scmSecurityProtocolClient =
         HddsServerUtil.getScmSecurityClient(conf);
-    if (!SCMHAUtils.isSCMHAEnabled(conf)) {
-      List<String> caCertPemList = new ArrayList<>();
-      SCMGetCertResponseProto scmGetCertResponseProto =
-          scmSecurityProtocolClient.getCACert();
-      if (scmGetCertResponseProto.hasX509Certificate()) {
-        caCertPemList.add(scmGetCertResponseProto.getX509Certificate());
-      }
-      if (scmGetCertResponseProto.hasX509RootCACertificate()) {
-        caCertPemList.add(scmGetCertResponseProto.getX509RootCACertificate());
-      }
-      return OzoneSecurityUtil.convertToX509(caCertPemList);
+    int expectedCount = scmNodes.size() + 1;
+    if (scmNodes.size() > 1) {
+      return OzoneSecurityUtil.convertToX509(getCAListWithRetry(() -> waitForCACerts(
+          scmSecurityProtocolClient::listCACertificate,
+          expectedCount), waitDuration));
     } else {
-      int expectedCount = scmNodes.size() + 1;
-      if (scmNodes.size() > 1) {
-        return OzoneSecurityUtil.convertToX509(getCAListWithRetry(() -> waitForCACerts(
-            scmSecurityProtocolClient::listCACertificate,
-            expectedCount), waitDuration));
-      } else {
-        return OzoneSecurityUtil.convertToX509(scmSecurityProtocolClient.listCACertificate());
-      }
+      return OzoneSecurityUtil.convertToX509(scmSecurityProtocolClient.listCACertificate());
     }
   }
 

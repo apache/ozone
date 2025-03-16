@@ -1490,11 +1490,14 @@ public class KeyValueHandler extends Handler {
         Math.min(endIndex, chunkInfo.getLen()) - adjustedChunkOffset;
     return Pair.of(adjustedChunkOffset, adjustedChunkLen);
   }
+
+  @Override
   public void addFinalizedBlock(Container container, long localID) {
     KeyValueContainer keyValueContainer = (KeyValueContainer)container;
     keyValueContainer.getContainerData().addToFinalizedBlockSet(localID);
   }
 
+  @Override
   public boolean isFinalizedBlockExist(Container container, long localID) {
     KeyValueContainer keyValueContainer = (KeyValueContainer)container;
     return keyValueContainer.getContainerData().isFinalizedBlockExist(localID);

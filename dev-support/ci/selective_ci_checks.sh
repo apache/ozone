@@ -199,6 +199,7 @@ function run_all_tests_if_environment_files_changed() {
     )
     local ignore_array=(
         "^dev-support/ci/pr_title_check"
+        "^dev-support/ci/find_test_class_project"
     )
     filter_changed_files
 
@@ -418,6 +419,26 @@ function check_needs_findbugs() {
     start_end::group_end
 }
 
+function check_needs_pmd() {
+    start_end::group_start "Check if pmd is needed"
+    local pattern_array=(
+        "^hadoop-ozone/dev-support/checks/pmd.sh"
+        "pom.xml"
+        "src/..../java"
+        "pmd-ruleset.xml"
+    )
+    local ignore_array=(
+        "^hadoop-ozone/dist"
+    )
+    filter_changed_files
+
+    if [[ ${match_count} != "0" ]]; then
+        add_basic_check pmd
+    fi
+
+    start_end::group_end
+}
+
 function check_needs_native() {
     start_end::group_start "Check if native is needed"
     local pattern_array=(
@@ -458,6 +479,7 @@ function get_count_misc_files() {
     start_end::group_start "Count misc. files"
     local pattern_array=(
         "^dev-support/ci/pr_title_check"
+        "^dev-support/ci/find_test_class_project"
         "^.github"
         "^hadoop-hdds/dev-support/checkstyle"
         "^hadoop-ozone/dev-support/checks"
@@ -467,6 +489,7 @@ function get_count_misc_files() {
         "\.txt$"
         "\.md$"
         "findbugsExcludeFile.xml"
+        "pmd-ruleset.xml"
         "/NOTICE$"
         "^hadoop-ozone/dist/src/main/compose/common/grafana/dashboards"
     )
@@ -584,6 +607,7 @@ check_needs_bats
 check_needs_checkstyle
 check_needs_docs
 check_needs_findbugs
+check_needs_pmd
 check_needs_native
 calculate_test_types_to_run
 set_outputs

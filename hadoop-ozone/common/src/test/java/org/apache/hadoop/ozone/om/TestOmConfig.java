@@ -17,13 +17,15 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 class TestOmConfig {
 
@@ -49,6 +51,44 @@ class TestOmConfig {
 
     assertThat(subject.getMaxListSize())
         .isEqualTo(OmConfig.Defaults.SERVER_LIST_MAX_SIZE);
+  }
+
+  @Test
+  void throwsOnInvalidMaxUserVolume() {
+    MutableConfigurationSource conf = new OzoneConfiguration();
+    conf.setInt(OmConfig.Keys.USER_MAX_VOLUME, 0);
+
+    assertThrows(IllegalArgumentException.class, () -> conf.getObject(OmConfig.class));
+  }
+
+  @Test
+  void testCopy() {
+    MutableConfigurationSource conf = new OzoneConfiguration();
+    OmConfig original = conf.getObject(OmConfig.class);
+
+    OmConfig subject = original.copy();
+
+    assertConfigEquals(original, subject);
+  }
+
+  @Test
+  void testSetFrom() {
+    MutableConfigurationSource conf = new OzoneConfiguration();
+    OmConfig subject = conf.getObject(OmConfig.class);
+    OmConfig updated = conf.getObject(OmConfig.class);
+    updated.setFileSystemPathEnabled(!updated.isFileSystemPathEnabled());
+    updated.setMaxListSize(updated.getMaxListSize() + 1);
+    updated.setMaxUserVolumeCount(updated.getMaxUserVolumeCount() + 1);
+
+    subject.setFrom(updated);
+
+    assertConfigEquals(updated, subject);
+  }
+
+  private static void assertConfigEquals(OmConfig expected, OmConfig actual) {
+    assertEquals(expected.getMaxListSize(), actual.getMaxListSize());
+    assertEquals(expected.isFileSystemPathEnabled(), actual.isFileSystemPathEnabled());
+    assertEquals(expected.getMaxUserVolumeCount(), actual.getMaxUserVolumeCount());
   }
 
 }

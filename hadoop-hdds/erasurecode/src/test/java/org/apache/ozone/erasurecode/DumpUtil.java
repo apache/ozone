@@ -72,8 +72,8 @@ public final class DumpUtil {
   public static void dumpChunks(String header, ECChunk[] chunks) {
     System.out.println();
     System.out.println(header);
-    for (int i = 0; i < chunks.length; i++) {
-      dumpChunk(chunks[i]);
+    for (ECChunk chunk : chunks) {
+      dumpChunk(chunk);
     }
     System.out.println();
   }

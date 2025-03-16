@@ -49,8 +49,8 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
-import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
@@ -335,7 +335,7 @@ public final class ContainerTestUtils {
   }
 
   private static final ContainerController EMPTY_CONTAINER_CONTROLLER
-      = new ContainerController(new ContainerSet(1000), Collections.emptyMap());
+      = new ContainerController(ContainerImplTestUtils.newContainerSet(), Collections.emptyMap());
 
   public static ContainerController getEmptyContainerController() {
     return EMPTY_CONTAINER_CONTROLLER;

@@ -39,6 +39,7 @@ class TestCopyContainerResponseStream
         getContainerId(), getBufferSize());
   }
 
+  @Override
   protected ByteString verifyPart(CopyContainerResponseProto response,
       int expectedOffset, int size) {
     assertEquals(getContainerId(), response.getContainerID());

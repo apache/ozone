@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.conf;
 
+import static org.apache.hadoop.hdds.conf.ConfigurationReflectionUtil.getFullKey;
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -133,17 +135,7 @@ public class ConfigFileGenerator extends AbstractProcessor {
 
           Config configAnnotation = element.getAnnotation(Config.class);
 
-          if (configAnnotation.key().startsWith(configGroup.prefix())) {
-            String msg = String.format(
-                "@%s(key = \"%s\") should not duplicate prefix from @%s(\"%s\")",
-                Config.class.getSimpleName(), configAnnotation.key(),
-                ConfigGroup.class.getSimpleName(), configGroup.prefix());
-            processingEnv.getMessager().printMessage(Kind.ERROR, msg, element);
-            continue;
-          }
-
-          String key = configGroup.prefix() + "."
-              + configAnnotation.key();
+          String key = getFullKey(configGroup, configAnnotation);
 
           appender.addConfig(key,
               configAnnotation.defaultValue(),

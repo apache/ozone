@@ -18,8 +18,8 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import jakarta.annotation.Nonnull;
-import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -117,7 +117,7 @@ public class ContainerImporter {
       KeyValueContainerData containerData;
       TarContainerPacker packer = getPacker(compression);
 
-      try (FileInputStream input = new FileInputStream(tarFilePath.toFile())) {
+      try (InputStream input = Files.newInputStream(tarFilePath)) {
         byte[] containerDescriptorYaml =
             packer.unpackContainerDescriptor(input);
         containerData = getKeyValueContainerData(containerDescriptorYaml);
@@ -125,7 +125,7 @@ public class ContainerImporter {
       ContainerUtils.verifyChecksum(containerData, conf);
       containerData.setVolume(targetVolume);
 
-      try (FileInputStream input = new FileInputStream(tarFilePath.toFile())) {
+      try (InputStream input = Files.newInputStream(tarFilePath)) {
         Container container = controller.importContainer(
             containerData, input, packer);
         containerSet.addContainerByOverwriteMissingContainer(container);

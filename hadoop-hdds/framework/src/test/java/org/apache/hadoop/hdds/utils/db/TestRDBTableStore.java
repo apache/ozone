@@ -214,13 +214,13 @@ public class TestRDBTableStore {
     try (Table testTable = rdbStore.getTable("Ninth")) {
 
       // Write keys to the table
-      for (int x = 0; x < keys.size(); x++) {
-        testTable.put(keys.get(x), val);
+      for (byte[] key : keys) {
+        testTable.put(key, val);
       }
 
       // All keys should exist at this point
-      for (int x = 0; x < keys.size(); x++) {
-        assertNotNull(testTable.get(keys.get(x)));
+      for (byte[] key : keys) {
+        assertNotNull(testTable.get(key));
       }
 
       // Delete a range of keys: [10th, 20th), zero-indexed

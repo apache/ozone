@@ -47,7 +47,7 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
   }
 
   @Override
-  public void handle(SCMCommand command, OzoneContainer container,
+  public void handle(SCMCommand<?> command, OzoneContainer container,
       StateContext context, SCMConnectionManager connectionManager) {
     ReconstructECContainersCommand ecContainersCommand =
         (ReconstructECContainersCommand) command;

@@ -108,7 +108,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private final Map<ContainerType, Handler> handlers;
   private final ConfigurationSource conf;
   private final ContainerSet containerSet;
-  private final VolumeSet volumeSet;
   private final StateContext context;
   private final float containerCloseThreshold;
   private final ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics;
@@ -130,7 +129,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       TokenVerifier tokenVerifier) {
     this.conf = config;
     this.containerSet = contSet;
-    this.volumeSet = volumes;
     this.context = context;
     this.handlers = handlers;
     this.metrics = metrics;

@@ -133,7 +133,8 @@ public class TestChunkInputStream {
   @Test
   public void testFullChunkRead() throws Exception {
     byte[] b = new byte[CHUNK_SIZE];
-    chunkStream.read(b, 0, CHUNK_SIZE);
+    int bytesRead = chunkStream.read(b, 0, CHUNK_SIZE);
+    assertEquals(CHUNK_SIZE, bytesRead, "Expected to read full chunk size");
     matchWithInputData(b, 0, CHUNK_SIZE);
   }
 
@@ -142,7 +143,8 @@ public class TestChunkInputStream {
     int len = CHUNK_SIZE / 2;
     byte[] b = new byte[len];
 
-    chunkStream.read(b, 0, len);
+    int bytesRead = chunkStream.read(b, 0, len);
+    assertEquals(len, bytesRead, "Expected to read half chunk size");
 
     matchWithInputData(b, 0, len);
 
@@ -169,7 +171,8 @@ public class TestChunkInputStream {
     // copying chunk data from index 20 to 59 into the buffers (checksum
     // boundaries).
     byte[] b = new byte[30];
-    chunkStream.read(b, 0, 30);
+    int bytesRead = chunkStream.read(b, 0, 30);
+    assertEquals(30, bytesRead, "Expected to read 30 bytes");
     matchWithInputData(b, 25, 30);
     matchWithInputData(chunkStream.getReadByteBuffers(), 20, 40);
 
@@ -194,7 +197,8 @@ public class TestChunkInputStream {
     // released and hence chunkPosition updated with current position of chunk.
     seekAndVerify(25);
     b = new byte[15];
-    chunkStream.read(b, 0, 15);
+    int bytesRead2 = chunkStream.read(b, 0, 15);
+    assertEquals(15, bytesRead2, "Expected to read 15 bytes");
     matchWithInputData(b, 25, 15);
     assertEquals(40, chunkStream.getChunkPosition());
   }
@@ -204,19 +208,22 @@ public class TestChunkInputStream {
     // Seek to a position and read data
     seekAndVerify(50);
     byte[] b1 = new byte[20];
-    chunkStream.read(b1, 0, 20);
+    int bytesRead1 = chunkStream.read(b1, 0, 20);
+    assertEquals(20, bytesRead1, "Expected to read 20 bytes");
     matchWithInputData(b1, 50, 20);
 
     // Next read should start from the position of the last read + 1 i.e. 70
     byte[] b2 = new byte[20];
-    chunkStream.read(b2, 0, 20);
+    int bytesRead2 = chunkStream.read(b2, 0, 20);
+    assertEquals(20, bytesRead2, "Expected to read 20 bytes");
     matchWithInputData(b2, 70, 20);
   }
 
   @Test
   public void testUnbuffered() throws Exception {
     byte[] b1 = new byte[20];
-    chunkStream.read(b1, 0, 20);
+    int bytesRead = chunkStream.read(b1, 0, 20);
+    assertEquals(20, bytesRead, "Expected to read 20 bytes");
     matchWithInputData(b1, 0, 20);
 
     chunkStream.unbuffer();
@@ -225,7 +232,8 @@ public class TestChunkInputStream {
 
     // Next read should start from the position of the last read + 1 i.e. 20
     byte[] b2 = new byte[20];
-    chunkStream.read(b2, 0, 20);
+    int bytesRead2 = chunkStream.read(b2, 0, 20);
+    assertEquals(20, bytesRead2, "Expected to read 20 bytes");
     matchWithInputData(b2, 20, 20);
   }
 
