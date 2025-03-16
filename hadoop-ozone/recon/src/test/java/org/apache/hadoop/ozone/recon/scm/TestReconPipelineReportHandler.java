@@ -62,8 +62,7 @@ public class TestReconPipelineReportHandler {
     OzoneConfiguration configuration = new OzoneConfiguration();
 
     ReconPipelineReportHandler handler =
-        new ReconPipelineReportHandler(new ReconSafeModeManager(),
-            reconPipelineManagerMock, SCMContext.emptyContext(),
+        new ReconPipelineReportHandler(reconPipelineManagerMock, SCMContext.emptyContext(),
             configuration, scmServiceProviderMock);
 
     EventPublisher eventPublisherMock = mock(EventPublisher.class);

@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.safemode.SafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -49,16 +48,13 @@ public class PipelineReportHandler implements
   private static final Logger LOGGER = LoggerFactory.getLogger(
       PipelineReportHandler.class);
   private final PipelineManager pipelineManager;
-  private final SafeModeManager scmSafeModeManager;
   private final SCMContext scmContext;
   private final SCMPipelineMetrics metrics;
 
-  public PipelineReportHandler(SafeModeManager scmSafeModeManager,
-                               PipelineManager pipelineManager,
+  public PipelineReportHandler(PipelineManager pipelineManager,
                                SCMContext scmContext,
                                ConfigurationSource conf) {
     Preconditions.checkNotNull(pipelineManager);
-    this.scmSafeModeManager = scmSafeModeManager;
     this.pipelineManager = pipelineManager;
     this.scmContext = scmContext;
     this.metrics = SCMPipelineMetrics.create();
