@@ -168,7 +168,8 @@ abstract class TestContainerStateMachine {
         .setCmdType(ContainerProtos.Type.WriteChunk).setWriteChunk(
             ContainerProtos.WriteChunkRequestProto.newBuilder().setData(ByteString.copyFromUtf8(content))
                 .setBlockID(
-                    ContainerProtos.DatanodeBlockID.newBuilder().setContainerID(containerId).setLocalID(localId).build()).build())
+                    ContainerProtos.DatanodeBlockID.newBuilder().setContainerID(containerId)
+                        .setLocalID(localId).build()).build())
         .setContainerID(containerId)
         .setDatanodeUuid(UUID.randomUUID().toString()).build());
   }
@@ -177,7 +178,8 @@ abstract class TestContainerStateMachine {
     when(context.getLogProto()).thenReturn(ContainerProtos.ContainerCommandRequestProto.newBuilder()
         .setCmdType(ContainerProtos.Type.WriteChunk).setWriteChunk(
             ContainerProtos.WriteChunkRequestProto.newBuilder().setBlockID(
-                ContainerProtos.DatanodeBlockID.newBuilder().setContainerID(containerId).setLocalID(localId).build()).build())
+                ContainerProtos.DatanodeBlockID.newBuilder().setContainerID(containerId)
+                    .setLocalID(localId).build()).build())
         .setContainerID(containerId)
         .setDatanodeUuid(UUID.randomUUID().toString()).build());
   }
