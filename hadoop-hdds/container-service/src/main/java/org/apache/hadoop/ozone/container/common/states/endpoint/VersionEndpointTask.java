@@ -24,7 +24,6 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -87,11 +86,6 @@ public class VersionEndpointTask implements
 
           // Check HddsVolumes
           checkVolumeSet(ozoneContainer.getVolumeSet(), scmId, clusterId);
-
-          DatanodeLayoutStorage layoutStorage
-              = new DatanodeLayoutStorage(configuration);
-          layoutStorage.setClusterId(clusterId);
-          layoutStorage.persistCurrentState();
 
           // Start the container services after getting the version information
           ozoneContainer.start(clusterId);
