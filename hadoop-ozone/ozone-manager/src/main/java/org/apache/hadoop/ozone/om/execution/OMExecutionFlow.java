@@ -46,13 +46,6 @@ public class OMExecutionFlow {
     this.perfMetrics = ozoneManager.getPerfMetrics();
   }
 
-  public void start() {
-    // TODO: with pre-ratis execution flow, this is required to manage flow
-  }
-
-  public void stop() {
-  }
-
   /**
    * External request handling.
    * 
