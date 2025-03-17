@@ -106,8 +106,7 @@ public final class IOUtils {
 
   /** Write {@code properties} to the file at {@code path}, truncating any existing content. */
   public static void writePropertiesToFile(File file, Properties properties) throws IOException {
-    File tempFile = File.createTempFile("temp", "properties", file.getParentFile());
-    try (OutputStream out = new AtomicFileOutputStream(file, tempFile)) {
+    try (OutputStream out = new AtomicFileOutputStream(file)) {
       properties.store(out, null);
     }
   }
