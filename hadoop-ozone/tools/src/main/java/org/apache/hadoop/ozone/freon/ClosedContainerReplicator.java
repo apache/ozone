@@ -211,7 +211,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
           volumeSet, dbVolumeSet, false, LOG);
 
       for (StorageVolume volume : volumeSet.getVolumesList()) {
-        StorageVolumeUtil.checkVolume(volume, scmID, clusterID, conf, LOG, dbVolumeSet);
+        StorageVolumeUtil.checkVolume(volume, clusterID, LOG, dbVolumeSet);
       }
     }
 

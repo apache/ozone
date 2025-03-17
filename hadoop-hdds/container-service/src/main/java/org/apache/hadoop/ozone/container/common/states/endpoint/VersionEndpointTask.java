@@ -17,18 +17,13 @@
 
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.BindException;
+import java.util.Objects;
 import java.util.concurrent.Callable;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
-import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
-import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
@@ -43,22 +38,15 @@ public class VersionEndpointTask implements
   public static final Logger LOG = LoggerFactory.getLogger(VersionEndpointTask
       .class);
   private final EndpointStateMachine rpcEndPoint;
-  private final ConfigurationSource configuration;
   private final OzoneContainer ozoneContainer;
 
   public VersionEndpointTask(EndpointStateMachine rpcEndPoint,
-      ConfigurationSource conf, OzoneContainer container) {
+      OzoneContainer container) {
     this.rpcEndPoint = rpcEndPoint;
-    this.configuration = conf;
     this.ozoneContainer = container;
   }
 
-  /**
-   * Computes a result, or throws an exception if unable to do so.
-   *
-   * @return computed result
-   * @throws Exception if unable to compute a result
-   */
+  /** Get version information from SCM, start {@link OzoneContainer}. */
   @Override
   public EndpointStateMachine.EndPointStates call() throws Exception {
     rpcEndPoint.lock();
@@ -73,29 +61,11 @@ public class VersionEndpointTask implements
         rpcEndPoint.setVersion(response);
 
         if (!rpcEndPoint.isPassive()) {
-          // If end point is passive, datanode does not need to check volumes.
-          String scmId = response.getValue(OzoneConsts.SCM_ID);
-          String clusterId = response.getValue(OzoneConsts.CLUSTER_ID);
-
-          Preconditions.checkNotNull(scmId,
-              "Reply from SCM: scmId cannot be null");
-          Preconditions.checkNotNull(clusterId,
+          String clusterId = Objects.requireNonNull(response.getValue(OzoneConsts.CLUSTER_ID),
               "Reply from SCM: clusterId cannot be null");
-
-          // Check DbVolumes, format DbVolume at first register time.
-          checkVolumeSet(ozoneContainer.getDbVolumeSet(), scmId, clusterId);
-
-          // Check HddsVolumes
-          checkVolumeSet(ozoneContainer.getVolumeSet(), scmId, clusterId);
-
-          DatanodeLayoutStorage layoutStorage
-              = new DatanodeLayoutStorage(configuration);
-          layoutStorage.setClusterId(clusterId);
-          layoutStorage.persistCurrentState();
-
-          // Start the container services after getting the version information
           ozoneContainer.start(clusterId);
         }
+
         EndpointStateMachine.EndPointStates nextState =
             rpcEndPoint.getState().getNextState();
         rpcEndPoint.setState(nextState);
@@ -112,33 +82,5 @@ public class VersionEndpointTask implements
       rpcEndPoint.unlock();
     }
     return rpcEndPoint.getState();
-  }
-
-  private void checkVolumeSet(MutableVolumeSet volumeSet,
-      String scmId, String clusterId) throws DiskOutOfSpaceException {
-    if (volumeSet == null) {
-      return;
-    }
-
-    volumeSet.writeLock();
-    try {
-      // If version file does not exist
-      // create version file and also set scm ID or cluster ID.
-      for (StorageVolume volume : volumeSet.getVolumeMap().values()) {
-        boolean result = StorageVolumeUtil.checkVolume(volume,
-            scmId, clusterId, configuration, LOG,
-            ozoneContainer.getDbVolumeSet());
-        if (!result) {
-          volumeSet.failVolume(volume.getStorageDir().getPath());
-        }
-      }
-      if (volumeSet.getVolumesList().isEmpty()) {
-        // All volumes are in inconsistent state
-        throw new DiskOutOfSpaceException(
-            "All configured Volumes are in Inconsistent State");
-      }
-    } finally {
-      volumeSet.writeUnlock();
-    }
   }
 }

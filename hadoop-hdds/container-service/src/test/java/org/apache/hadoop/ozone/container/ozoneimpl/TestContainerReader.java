@@ -109,8 +109,7 @@ public class TestContainerReader {
     hddsVolume = new HddsVolume.Builder(volumeDir
         .getAbsolutePath()).conf(conf).datanodeUuid(datanodeId
         .toString()).clusterID(clusterId).build();
-    StorageVolumeUtil.checkVolume(hddsVolume, clusterId, clusterId, conf,
-        null, null);
+    StorageVolumeUtil.checkVolume(hddsVolume, clusterId, null, null);
 
     volumeSet = mock(MutableVolumeSet.class);
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
@@ -277,8 +276,7 @@ public class TestContainerReader {
     hddsVolume1 = new HddsVolume.Builder(volumeDir1
         .getAbsolutePath()).conf(conf).datanodeUuid(datanode
         .toString()).clusterID(clusterId).build();
-    StorageVolumeUtil.checkVolume(hddsVolume1, clusterId, clusterId, conf,
-        null, null);
+    StorageVolumeUtil.checkVolume(hddsVolume1, clusterId, null, null);
     volumeChoosingPolicy1 = mock(RoundRobinVolumeChoosingPolicy.class);
     when(volumeChoosingPolicy1.chooseVolume(anyList(), anyLong()))
         .thenReturn(hddsVolume1);
@@ -327,8 +325,7 @@ public class TestContainerReader {
     hddsVolume1 = new HddsVolume.Builder(volumeDir1
         .getAbsolutePath()).conf(conf).datanodeUuid(datanode
         .toString()).clusterID(clusterId).build();
-    StorageVolumeUtil.checkVolume(hddsVolume1, clusterId, clusterId, conf,
-        null, null);
+    StorageVolumeUtil.checkVolume(hddsVolume1, clusterId, null, null);
     volumeChoosingPolicy1 = mock(RoundRobinVolumeChoosingPolicy.class);
     when(volumeChoosingPolicy1.chooseVolume(anyList(), anyLong()))
         .thenReturn(hddsVolume1);
@@ -383,10 +380,9 @@ public class TestContainerReader {
         new MutableVolumeSet(datanodeId.toString(), clusterId, conf, null,
             StorageVolume.VolumeType.DATA_VOLUME, null);
     for (StorageVolume v : volumeSets.getVolumesList()) {
-      StorageVolumeUtil.checkVolume(v, clusterId, clusterId, conf,
-          null, null);
+      StorageVolumeUtil.checkVolume(v, clusterId, null, null);
     }
-    createDbInstancesForTestIfNeeded(volumeSets, clusterId, clusterId, conf);
+    createDbInstancesForTestIfNeeded(volumeSets, clusterId, conf);
     ContainerCache cache = ContainerCache.getInstance(conf);
     cache.shutdownCache();
 

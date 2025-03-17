@@ -25,7 +25,6 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion;
@@ -184,16 +183,10 @@ public final class StorageVolumeUtil {
    * <volume>/hdds/<cluster-id>} as a symlink pointing to {@code <volume
    * >/hdds/<scm-id>} when SCM HA is finalized.
    *
-   * @param volume
-   * @param scmId
-   * @param clusterId
-   * @param conf
-   * @param logger
-   * @param dbVolumeSet
    * @return true - if volume is in consistent state, otherwise false.
    */
-  public static boolean checkVolume(StorageVolume volume, String scmId,
-      String clusterId, ConfigurationSource conf, Logger logger,
+  public static boolean checkVolume(StorageVolume volume,
+      String clusterId, Logger logger,
       MutableVolumeSet dbVolumeSet) {
     File volumeRoot = volume.getStorageDir();
     String volumeRootPath = volumeRoot.getPath();

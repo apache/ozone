@@ -157,8 +157,7 @@ public class TestEndPoint {
       OzoneContainer ozoneContainer = new OzoneContainer(dnDetails,
           ozoneConf, ContainerTestUtils.getMockContext(dnDetails, ozoneConf));
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
-      VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
-          ozoneConf, ozoneContainer);
+      VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint, ozoneContainer);
       EndpointStateMachine.EndPointStates newState = versionTask.call();
 
       // if version call worked the endpoint should automatically move to the
@@ -200,8 +199,7 @@ public class TestEndPoint {
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
 
       // versionTask.call() cleans the tmp dir and removes container from DB
-      VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
-          ozoneConf, ozoneContainer);
+      VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint, ozoneContainer);
       EndpointStateMachine.EndPointStates newState = versionTask.call();
 
       assertEquals(EndpointStateMachine.EndPointStates.REGISTER, newState);
@@ -232,8 +230,7 @@ public class TestEndPoint {
       OzoneContainer ozoneContainer = new OzoneContainer(dnDetails, ozoneConf,
           ContainerTestUtils.getMockContext(dnDetails, ozoneConf));
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
-      VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
-          ozoneConf, ozoneContainer);
+      VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint, ozoneContainer);
       EndpointStateMachine.EndPointStates newState = versionTask.call();
 
       // if version call worked the endpoint should automatically move to the
@@ -275,8 +272,7 @@ public class TestEndPoint {
       OzoneContainer ozoneContainer = new OzoneContainer(dnDetails, ozoneConf,
           ContainerTestUtils.getMockContext(dnDetails, ozoneConf));
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
-      VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
-          ozoneConf, ozoneContainer);
+      VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint, ozoneContainer);
       versionTask.call();
 
       // After the version call, the datanode layout file should
@@ -329,8 +325,7 @@ public class TestEndPoint {
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       OzoneContainer ozoneContainer = new OzoneContainer(datanodeDetails,
           conf, ContainerTestUtils.getMockContext(datanodeDetails, ozoneConf));
-      VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
-          conf, ozoneContainer);
+      VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint, ozoneContainer);
       EndpointStateMachine.EndPointStates newState = versionTask.call();
 
       // This version call did NOT work, so endpoint should remain in the same
@@ -356,8 +351,7 @@ public class TestEndPoint {
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       OzoneContainer ozoneContainer = new OzoneContainer(datanodeDetails, conf,
           ContainerTestUtils.getMockContext(datanodeDetails, ozoneConf));
-      VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
-          conf, ozoneContainer);
+      VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint, ozoneContainer);
 
       scmServerImpl.setRpcResponseDelay(1500);
       long start = Time.monotonicNow();
@@ -654,7 +648,7 @@ public class TestEndPoint {
 
     MutableVolumeSet volumeSet = ozoneContainer.getVolumeSet();
     ContainerTestUtils.createDbInstancesForTestIfNeeded(volumeSet,
-        clusterId, clusterId, conf);
+        clusterId, conf);
     // VolumeSet for this test, contains only 1 volume
     assertEquals(1, volumeSet.getVolumesList().size());
     StorageVolume volume = volumeSet.getVolumesList().get(0);

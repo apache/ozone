@@ -97,7 +97,7 @@ public class TestOzoneContainer {
     commitSpaceMap = new HashMap<>();
     volumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(),
         clusterId, conf, null, StorageVolume.VolumeType.DATA_VOLUME, null);
-    createDbInstancesForTestIfNeeded(volumeSet, clusterId, clusterId, conf);
+    createDbInstancesForTestIfNeeded(volumeSet, clusterId, conf);
     volumeChoosingPolicy = new RoundRobinVolumeChoosingPolicy();
   }
 

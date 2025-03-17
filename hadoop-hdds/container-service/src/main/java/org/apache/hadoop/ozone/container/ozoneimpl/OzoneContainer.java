@@ -65,6 +65,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.HddsDatanodeService;
+import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -81,6 +82,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSp
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -484,6 +486,17 @@ public class OzoneContainer {
       return;
     }
 
+    // Check DbVolumes, format DbVolume at first register time.
+    checkVolumeSet(getDbVolumeSet(), clusterId);
+
+    // Check HddsVolumes
+    checkVolumeSet(getVolumeSet(), clusterId);
+
+    DatanodeLayoutStorage layoutStorage
+        = new DatanodeLayoutStorage(config);
+    layoutStorage.setClusterId(clusterId);
+    layoutStorage.persistCurrentState();
+
     buildContainerSet();
 
     // Start background volume checks, which will begin after the configured
@@ -657,4 +670,29 @@ public class OzoneContainer {
     }
   }
 
+
+  private void checkVolumeSet(MutableVolumeSet volumeSet, String clusterId)
+      throws DiskOutOfSpaceException {
+    if (volumeSet == null) {
+      return;
+    }
+
+    volumeSet.writeLock();
+    try {
+      // If version file does not exist
+      // create version file and also set scm ID or cluster ID.
+      for (StorageVolume volume : volumeSet.getVolumeMap().values()) {
+        if (!StorageVolumeUtil.checkVolume(volume, clusterId, LOG, getDbVolumeSet())) {
+          volumeSet.failVolume(volume.getStorageDir().getPath());
+        }
+      }
+      if (volumeSet.getVolumesList().isEmpty()) {
+        // All volumes are in inconsistent state
+        throw new DiskOutOfSpaceException(
+            "All configured Volumes are in Inconsistent State");
+      }
+    } finally {
+      volumeSet.writeUnlock();
+    }
+  }
 }

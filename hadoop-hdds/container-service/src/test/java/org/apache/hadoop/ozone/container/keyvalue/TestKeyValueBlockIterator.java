@@ -109,7 +109,7 @@ public class TestKeyValueBlockIterator {
     conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testRoot.getAbsolutePath());
     volumeSet = new MutableVolumeSet(datanodeID, clusterID, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
-    createDbInstancesForTestIfNeeded(volumeSet, clusterID, clusterID, conf);
+    createDbInstancesForTestIfNeeded(volumeSet, clusterID, conf);
 
     containerData = new KeyValueContainerData(105L,
         layout,
