@@ -53,7 +53,6 @@ public class TestStreamBlockInputStream {
   private static final int CHUNK_SIZE = 100;
   private static final int BYTES_PER_CHECKSUM = 20;
   private static final Random RANDOM = new Random();
-  private static final AtomicLong CONTAINER_ID = new AtomicLong();
   private DummyStreamBlockInputStream blockStream;
   private byte[] blockData;
   private List<ChunkInfo> chunks;
