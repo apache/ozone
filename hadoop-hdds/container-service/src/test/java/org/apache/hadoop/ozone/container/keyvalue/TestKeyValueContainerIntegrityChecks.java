@@ -91,7 +91,7 @@ public class TestKeyValueContainerIntegrityChecks {
     containerLayoutTestInfo.updateConfig(conf);
     volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), clusterID,
         conf, null, StorageVolume.VolumeType.DATA_VOLUME, null);
-    createDbInstancesForTestIfNeeded(volumeSet, clusterID, conf);
+    createDbInstancesForTestIfNeeded(volumeSet, clusterID, clusterID, conf);
     chunkManager = containerLayoutTestInfo.createChunkManager(true, null);
   }
 

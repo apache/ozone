@@ -158,7 +158,9 @@ public class TestContainerPersistence {
     // Initialize volume directories.
     for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(
         volumeSet.getVolumesList())) {
-      assertTrue(StorageVolumeUtil.checkVolume(volume, SCM_ID, null, null));
+      boolean success = StorageVolumeUtil.checkVolume(volume, SCM_ID, SCM_ID,
+          conf, null, null);
+      assertTrue(success);
     }
     blockManager = new BlockManagerImpl(conf);
     chunkManager = ChunkManagerFactory.createChunkManager(conf, blockManager,

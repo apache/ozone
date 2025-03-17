@@ -191,7 +191,7 @@ public final class ContainerTestUtils {
   }
 
   public static void createDbInstancesForTestIfNeeded(
-      MutableVolumeSet hddsVolumeSet, String clusterID,
+      MutableVolumeSet hddsVolumeSet, String scmID, String clusterID,
       ConfigurationSource conf) {
     DatanodeConfiguration dc = conf.getObject(DatanodeConfiguration.class);
     if (!dc.getContainerSchemaV3Enabled()) {
@@ -200,7 +200,8 @@ public final class ContainerTestUtils {
 
     for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(
         hddsVolumeSet.getVolumesList())) {
-      StorageVolumeUtil.checkVolume(volume, clusterID, null, null);
+      StorageVolumeUtil.checkVolume(volume, scmID, clusterID, conf,
+          null, null);
     }
   }
 

@@ -116,7 +116,8 @@ public class TestUpgradeManager {
     final List<HddsVolume> volumes = new ArrayList<>();
     for (StorageVolume storageVolume : volumeSet.getVolumesList()) {
       HddsVolume hddsVolume = (HddsVolume) storageVolume;
-      StorageVolumeUtil.checkVolume(hddsVolume, SCM_ID, null, null);
+      StorageVolumeUtil.checkVolume(hddsVolume, SCM_ID, SCM_ID, CONF, null,
+          null);
       volumes.add(hddsVolume);
     }
 

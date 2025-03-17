@@ -121,7 +121,8 @@ public class RunningDatanodeState implements DatanodeState {
       EndpointStateMachine endpoint) {
     switch (endpoint.getState()) {
       case GETVERSION:
-        return new VersionEndpointTask(endpoint, context.getParent().getContainer());
+        return new VersionEndpointTask(endpoint, conf,
+            context.getParent().getContainer());
       case REGISTER:
         return RegisterEndpointTask.newBuilder()
             .setConfig(conf)

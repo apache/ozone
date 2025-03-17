@@ -128,7 +128,8 @@ public final class UpgradeTestHelper {
       throws Exception {
     try (EndpointStateMachine esm = ContainerTestUtils.createEndpoint(conf,
         address, 1000)) {
-      VersionEndpointTask vet = new VersionEndpointTask(esm, container);
+      VersionEndpointTask vet = new VersionEndpointTask(esm, conf,
+          container);
       esm.setState(EndpointStateMachine.EndPointStates.GETVERSION);
       vet.call();
     }

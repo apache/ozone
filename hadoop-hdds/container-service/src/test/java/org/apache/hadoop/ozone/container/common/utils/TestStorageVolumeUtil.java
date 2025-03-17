@@ -83,15 +83,21 @@ public class TestStorageVolumeUtil {
         .thenReturn(Collections.singletonList(dbVolume));
 
     // check the dbVolume first for hddsVolume to use
-    assertTrue(StorageVolumeUtil.checkVolume(dbVolume, CLUSTER_ID, null, null));
+    boolean res = StorageVolumeUtil.checkVolume(dbVolume, CLUSTER_ID,
+        CLUSTER_ID, CONF, null, null);
+    assertTrue(res);
 
     // checkVolume for the 1st time: rootFiles.length == 1
-    assertTrue(StorageVolumeUtil.checkVolume(spyHddsVolume, CLUSTER_ID, null, dbVolumeSet));
+    res = StorageVolumeUtil.checkVolume(spyHddsVolume, CLUSTER_ID,
+        CLUSTER_ID, CONF, null, dbVolumeSet);
+    assertTrue(res);
     // createDbStore called as expected
     verify(spyHddsVolume, times(1)).createDbStore(dbVolumeSet);
 
     // checkVolume for the 2nd time: rootFiles.length == 2
-    assertTrue(StorageVolumeUtil.checkVolume(spyHddsVolume, CLUSTER_ID, LOG, dbVolumeSet));
+    res = StorageVolumeUtil.checkVolume(spyHddsVolume, CLUSTER_ID,
+        CLUSTER_ID, CONF, LOG, dbVolumeSet);
+    assertTrue(res);
 
     // should only call createDbStore once, so no dup db instance
     verify(spyHddsVolume, times(1)).createDbStore(dbVolumeSet);

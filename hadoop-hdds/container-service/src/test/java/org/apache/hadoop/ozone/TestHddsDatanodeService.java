@@ -128,7 +128,8 @@ public class TestHddsDatanodeService {
     assertInstanceOf(HddsVolume.class, volume);
     HddsVolume hddsVolume = (HddsVolume) volume;
 
-    StorageVolumeUtil.checkVolume(hddsVolume, clusterId, LOG, null);
+    StorageVolumeUtil.checkVolume(hddsVolume, clusterId,
+        clusterId, conf, LOG, null);
     // Create a container and move it under the tmp delete dir.
     KeyValueContainer container = ContainerTestUtils
         .addContainerToDeletedDir(

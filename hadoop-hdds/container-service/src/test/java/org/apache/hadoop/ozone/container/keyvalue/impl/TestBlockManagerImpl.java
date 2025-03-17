@@ -90,7 +90,8 @@ public class TestBlockManagerImpl {
         .conf(config)
         .datanodeUuid(datanodeId.toString())
         .build();
-    StorageVolumeUtil.checkVolume(hddsVolume, scmId, null, null);
+    StorageVolumeUtil.checkVolume(hddsVolume, scmId, scmId, config,
+        null, null);
 
     volumeSet = mock(MutableVolumeSet.class);
 

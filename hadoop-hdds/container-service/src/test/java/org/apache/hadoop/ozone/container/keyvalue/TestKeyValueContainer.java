@@ -143,7 +143,8 @@ public class TestKeyValueContainer {
     hddsVolumes.add(new HddsVolume.Builder(folder.toString())
         .conf(CONF).datanodeUuid(datanodeId
             .toString()).build());
-    StorageVolumeUtil.checkVolume(hddsVolumes.get(0), scmId, null, null);
+    StorageVolumeUtil.checkVolume(hddsVolumes.get(0), scmId, scmId, CONF,
+        null, null);
 
     volumeSet = mock(MutableVolumeSet.class);
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
@@ -225,7 +226,7 @@ public class TestKeyValueContainer {
             .toFile().getAbsolutePath();
     HddsVolume newVolume = new HddsVolume.Builder(volumeDirPath)
         .conf(CONF).datanodeUuid(datanodeId.toString()).build();
-    StorageVolumeUtil.checkVolume(newVolume, scmId, null, null);
+    StorageVolumeUtil.checkVolume(newVolume, scmId, scmId, CONF, null, null);
     hddsVolumes.add(newVolume);
 
     // Override the class, so that the first time we call it, it throws
@@ -815,7 +816,7 @@ public class TestKeyValueContainer {
             .getAbsolutePath();
     HddsVolume newVolume = new HddsVolume.Builder(volumeDirPath)
         .conf(CONF).datanodeUuid(datanodeId.toString()).build();
-    StorageVolumeUtil.checkVolume(newVolume, scmId, null, null);
+    StorageVolumeUtil.checkVolume(newVolume, scmId, scmId, CONF, null, null);
     List<HddsVolume> volumeList = new ArrayList<>();
     HddsVolume hddsVolume = hddsVolumes.get(0);
     volumeList.add(hddsVolume);
@@ -1035,7 +1036,7 @@ public class TestKeyValueContainer {
     HddsVolume hddsVolume1 = new HddsVolume.Builder(dir1)
         .conf(conf).datanodeUuid(datanodeId.toString()).build();
     conf.setBoolean(CONTAINER_SCHEMA_V3_ENABLED, schemaV3Enabled);
-    StorageVolumeUtil.checkVolume(hddsVolume1, scmId, null, null);
+    StorageVolumeUtil.checkVolume(hddsVolume1, scmId, scmId, conf, null, null);
     hddsVolumes.clear();
     hddsVolumes.add(hddsVolume1);
 
@@ -1079,7 +1080,7 @@ public class TestKeyValueContainer {
     final String dir2 = dir + (schemaV3Enabled ? "/v2" : "/v3");
     HddsVolume hddsVolume2 = new HddsVolume.Builder(dir2)
         .conf(conf).datanodeUuid(datanodeId.toString()).build();
-    StorageVolumeUtil.checkVolume(hddsVolume2, scmId, null, null);
+    StorageVolumeUtil.checkVolume(hddsVolume2, scmId, scmId, conf, null, null);
     hddsVolumes.clear();
     hddsVolumes.add(hddsVolume2);
 
