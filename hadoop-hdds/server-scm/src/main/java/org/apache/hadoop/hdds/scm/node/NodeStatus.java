@@ -22,7 +22,6 @@ import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Set;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.util.Time;
 
 /**
  * This class is used to capture the current status of a datanode. This
@@ -124,7 +123,7 @@ public class NodeStatus implements Comparable<NodeStatus> {
     if (0 == opStateExpiryEpochSeconds) {
       return false;
     }
-    return Time.monotonicNow() / 1000 >= opStateExpiryEpochSeconds;
+    return System.currentTimeMillis() / 1000 >= opStateExpiryEpochSeconds;
   }
 
   public boolean isInService() {
