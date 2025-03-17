@@ -100,6 +100,11 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
+  public long getExactKeyCount() throws IOException {
+    return table.getExactKeyCount();
+  }
+
+  @Override
   public boolean isExist(KEY key) throws IOException {
     return table.isExist(key);
   }
