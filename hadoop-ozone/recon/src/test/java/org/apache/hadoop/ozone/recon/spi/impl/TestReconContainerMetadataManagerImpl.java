@@ -365,8 +365,8 @@ public class TestReconContainerMetadataManagerImpl {
         reconContainerMetadataManager.getContainers(-1, 0L);
     assertEquals(2, containerMap.size());
 
-    assertEquals(3, containerMap.get(containerId).getNumberOfKeys());
-    assertEquals(3, containerMap.get(nextContainerId).getNumberOfKeys());
+    assertEquals(2, containerMap.get(containerId).getNumberOfKeys());
+    assertEquals(1, containerMap.get(nextContainerId).getNumberOfKeys());
 
     // test if limit works
     containerMap = reconContainerMetadataManager.getContainers(
