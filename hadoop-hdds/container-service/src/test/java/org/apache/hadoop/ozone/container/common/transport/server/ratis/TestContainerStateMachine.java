@@ -123,6 +123,9 @@ abstract class TestContainerStateMachine {
     RaftProtos.LogEntryProto entry = mock(RaftProtos.LogEntryProto.class);
     when(entry.getTerm()).thenReturn(1L);
     when(entry.getIndex()).thenReturn(1L);
+    RaftProtos.LogEntryProto entryNext = mock(RaftProtos.LogEntryProto.class);
+    when(entryNext.getTerm()).thenReturn(1L);
+    when(entryNext.getIndex()).thenReturn(2L);
     TransactionContext trx = mock(TransactionContext.class);
     ContainerStateMachine.Context context = mock(ContainerStateMachine.Context.class);
     when(trx.getStateMachineContext()).thenReturn(context);
@@ -167,7 +170,7 @@ abstract class TestContainerStateMachine {
                     ContainerProtos.DatanodeBlockID.newBuilder().setContainerID(2).setLocalID(1).build()).build())
         .setContainerID(2)
         .setDatanodeUuid(UUID.randomUUID().toString()).build());
-    stateMachine.write(entry, trx).exceptionally(throwableSetter).get();
+    stateMachine.write(entryNext, trx).exceptionally(throwableSetter).get();
     verify(dispatcher, times(0)).dispatch(any(ContainerProtos.ContainerCommandRequestProto.class),
         any(DispatcherContext.class));
     assertInstanceOf(StorageContainerException.class, throwable.get());
