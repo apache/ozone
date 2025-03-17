@@ -279,10 +279,7 @@ abstract class TestContainerStateMachine {
 
     setUpMockRequestProto(context);
     AtomicReference<Throwable> throwable = new AtomicReference<>(null);
-    Function<Throwable, ? extends Message> throwableSetter = t -> {
-      throwable.set(t);
-      return null;
-    };
+    Function<Throwable, ? extends Message> throwableSetter = getThrowableSetter(throwable);
     Field writeChunkWaitMaxNs = stateMachine.getClass().getDeclaredField("writeChunkWaitMaxNs");
     writeChunkWaitMaxNs.setAccessible(true);
     writeChunkWaitMaxNs.set(stateMachine, 1000_000_000);
