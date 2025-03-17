@@ -123,12 +123,15 @@ abstract class TestContainerStateMachine {
     RaftProtos.LogEntryProto entry = mock(RaftProtos.LogEntryProto.class);
     when(entry.getTerm()).thenReturn(1L);
     when(entry.getIndex()).thenReturn(1L);
+    RaftProtos.LogEntryProto entryNext = mock(RaftProtos.LogEntryProto.class);
+    when(entryNext.getTerm()).thenReturn(1L);
+    when(entryNext.getIndex()).thenReturn(2L);
     TransactionContext trx = mock(TransactionContext.class);
     ContainerStateMachine.Context context = mock(ContainerStateMachine.Context.class);
     when(trx.getStateMachineContext()).thenReturn(context);
 
     setUpMockDispatcherReturn(failWithException);
-    setUpMockRequestProtoReturn(context, "Test Data", 1, 1);
+    setUpMockRequestProto(context);
 
     AtomicReference<Throwable> throwable = new AtomicReference<>(null);
     Function<Throwable, ? extends Message> throwableSetter = getThrowableSetter(throwable);
@@ -141,9 +144,14 @@ abstract class TestContainerStateMachine {
     assertResults(failWithException, throwable);
 
     // Writing data to another container(containerId 2) should also fail.
-    setUpMockRequestProtoReturn(context, "Test Data", 2, 1);
-
-    stateMachine.write(entry, trx).exceptionally(throwableSetter).get();
+    when(context.getRequestProto()).thenReturn(ContainerProtos.ContainerCommandRequestProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.WriteChunk).setWriteChunk(
+            ContainerProtos.WriteChunkRequestProto.newBuilder().setData(ByteString.copyFromUtf8("Test Data"))
+                .setBlockID(
+                    ContainerProtos.DatanodeBlockID.newBuilder().setContainerID(2).setLocalID(1).build()).build())
+        .setContainerID(2)
+        .setDatanodeUuid(UUID.randomUUID().toString()).build());
+    stateMachine.write(entryNext, trx).exceptionally(throwableSetter).get();
     verify(dispatcher, times(0)).dispatch(any(ContainerProtos.ContainerCommandRequestProto.class),
         any(DispatcherContext.class));
     assertInstanceOf(StorageContainerException.class, throwable.get());
@@ -162,33 +170,22 @@ abstract class TestContainerStateMachine {
     }
   }
 
-  public final void setUpMockRequestProtoReturn(ContainerStateMachine.Context context, String content,
-                                                int containerId, int localId) {
+  public final void setUpMockRequestProto(ContainerStateMachine.Context context) {
     when(context.getRequestProto()).thenReturn(ContainerProtos.ContainerCommandRequestProto.newBuilder()
         .setCmdType(ContainerProtos.Type.WriteChunk).setWriteChunk(
-            ContainerProtos.WriteChunkRequestProto.newBuilder().setData(ByteString.copyFromUtf8(content))
+            ContainerProtos.WriteChunkRequestProto.newBuilder().setData(ByteString.copyFromUtf8("Test Data"))
                 .setBlockID(
-                    ContainerProtos.DatanodeBlockID.newBuilder().setContainerID(containerId)
-                        .setLocalID(localId).build()).build())
-        .setContainerID(containerId)
-        .setDatanodeUuid(UUID.randomUUID().toString()).build());
-  }
-
-  public final void setUpMockLogProtoReturn(ContainerStateMachine.Context context, int containerId, int localId) {
-    when(context.getLogProto()).thenReturn(ContainerProtos.ContainerCommandRequestProto.newBuilder()
-        .setCmdType(ContainerProtos.Type.WriteChunk).setWriteChunk(
-            ContainerProtos.WriteChunkRequestProto.newBuilder().setBlockID(
-                ContainerProtos.DatanodeBlockID.newBuilder().setContainerID(containerId)
-                    .setLocalID(localId).build()).build())
-        .setContainerID(containerId)
+                    ContainerProtos.DatanodeBlockID.newBuilder().setContainerID(1).setLocalID(1).build()).build())
+        .setContainerID(1)
         .setDatanodeUuid(UUID.randomUUID().toString()).build());
   }
 
   public final Function<Throwable, ? extends Message> getThrowableSetter(AtomicReference<Throwable> throwable) {
-    return t -> {
+    Function<Throwable, ? extends Message> throwableSetter = t -> {
       throwable.set(t);
       return null;
     };
+    return throwableSetter;
   }
 
   public final void assertResults(boolean failWithException, AtomicReference<Throwable> throwable) {
@@ -215,8 +212,12 @@ abstract class TestContainerStateMachine {
 
     setUpMockDispatcherReturn(failWithException);
     // Failing apply transaction on congtainer 1.
-    setUpMockLogProtoReturn(context, 1, 1);
-
+    when(context.getLogProto()).thenReturn(ContainerProtos.ContainerCommandRequestProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.WriteChunk).setWriteChunk(
+            ContainerProtos.WriteChunkRequestProto.newBuilder().setBlockID(
+                ContainerProtos.DatanodeBlockID.newBuilder().setContainerID(1).setLocalID(1).build()).build())
+        .setContainerID(1)
+        .setDatanodeUuid(UUID.randomUUID().toString()).build());
     AtomicReference<Throwable> throwable = new AtomicReference<>(null);
     Function<Throwable, ? extends Message> throwableSetter = getThrowableSetter(throwable);
     //apply transaction will fail because of runtime exception thrown by dispatcher, which marks the first
@@ -237,7 +238,12 @@ abstract class TestContainerStateMachine {
 
     // Another apply transaction on a different container 2 shouldn't fail because the previous apply transaction
     // failure was only on container 1.
-    setUpMockLogProtoReturn(context, 2, 1);
+    when(context.getLogProto()).thenReturn(ContainerProtos.ContainerCommandRequestProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.WriteChunk).setWriteChunk(
+            ContainerProtos.WriteChunkRequestProto.newBuilder().setBlockID(
+                ContainerProtos.DatanodeBlockID.newBuilder().setContainerID(2).setLocalID(1).build()).build())
+        .setContainerID(2)
+        .setDatanodeUuid(UUID.randomUUID().toString()).build());
 
     reset(dispatcher);
     throwable.set(null);
@@ -274,9 +280,12 @@ abstract class TestContainerStateMachine {
       return null;
     }).when(dispatcher).dispatch(any(), any());
 
-    setUpMockRequestProtoReturn(context, "Test Data", 1, 1);
+    setUpMockRequestProto(context);
     AtomicReference<Throwable> throwable = new AtomicReference<>(null);
-    Function<Throwable, ? extends Message> throwableSetter = getThrowableSetter(throwable);
+    Function<Throwable, ? extends Message> throwableSetter = t -> {
+      throwable.set(t);
+      return null;
+    };
     Field writeChunkWaitMaxNs = stateMachine.getClass().getDeclaredField("writeChunkWaitMaxNs");
     writeChunkWaitMaxNs.setAccessible(true);
     writeChunkWaitMaxNs.set(stateMachine, 1000_000_000);

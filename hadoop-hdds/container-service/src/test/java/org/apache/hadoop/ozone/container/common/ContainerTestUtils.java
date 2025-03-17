@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common;
 
+import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -46,6 +47,7 @@ import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -349,5 +351,14 @@ public final class ContainerTestUtils {
     return XceiverServerRatis.newXceiverServerRatis(null, dn, conf,
         getNoopContainerDispatcher(), getEmptyContainerController(),
         null, null);
+  }
+
+  /** Initialize {@link DatanodeLayoutStorage}.  Normally this is done during {@link HddsDatanodeService} start,
+   * have to do the same for tests that create {@link OzoneContainer} manually. */
+  public static void initializeDatanodeLayout(ConfigurationSource conf, DatanodeDetails dn) throws IOException {
+    DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf, dn.getUuidString());
+    if (layoutStorage.getState() != INITIALIZED) {
+      layoutStorage.initialize();
+    }
   }
 }

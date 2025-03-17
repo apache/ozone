@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.utils.db.cache.FullTableCache;
 import org.apache.hadoop.hdds.utils.db.cache.PartialTableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
+import org.apache.hadoop.hdds.utils.db.cache.TableNoCache;
 import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.function.CheckedBiFunction;
 
@@ -88,19 +89,27 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
    */
   TypedTable(RDBTable rawTable, CodecRegistry codecRegistry, Class<KEY> keyType, Class<VALUE> valueType,
       CacheType cacheType) throws IOException {
+    this(rawTable, codecRegistry.getCodecFromClass(keyType), codecRegistry.getCodecFromClass(valueType),
+        cacheType);
+  }
+
+  /**
+   * Create an TypedTable from the raw table with specified cache type.
+   *
+   * @param rawTable The underlying (untyped) table in RocksDB.
+   * @param keyCodec The key codec.
+   * @param valueCodec The value codec.
+   * @param cacheType How to cache the entries?
+   * @throws IOException
+   */
+  public TypedTable(
+      RDBTable rawTable, Codec<KEY> keyCodec, Codec<VALUE> valueCodec, CacheType cacheType) throws IOException {
     this.rawTable = Objects.requireNonNull(rawTable, "rawTable==null");
-    Objects.requireNonNull(codecRegistry, "codecRegistry == null");
+    this.keyCodec = Objects.requireNonNull(keyCodec, "keyCodec == null");
+    this.valueCodec = Objects.requireNonNull(valueCodec, "valueCodec == null");
 
-    Objects.requireNonNull(keyType, "keyType == null");
-    this.keyCodec = codecRegistry.getCodecFromClass(keyType);
-    Objects.requireNonNull(keyCodec, "keyCodec == null");
-
-    Objects.requireNonNull(valueType, "valueType == null");
-    this.valueCodec = codecRegistry.getCodecFromClass(valueType);
-    Objects.requireNonNull(valueCodec, "valueCodec == null");
-
-    this.info = getClassSimpleName(getClass()) + "-" + getName()
-        + "(" + getClassSimpleName(keyType) + "->" + getClassSimpleName(valueType) + ")";
+    this.info = getClassSimpleName(getClass()) + "-" + getName() + "(" + getClassSimpleName(keyCodec.getTypeClass())
+        + "->" + getClassSimpleName(valueCodec.getTypeClass()) + ")";
 
     this.supportCodecBuffer = keyCodec.supportCodecBuffer()
         && valueCodec.supportCodecBuffer();
@@ -109,8 +118,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     if (cacheType == CacheType.FULL_CACHE) {
       cache = new FullTableCache<>(threadNamePrefix);
       //fill cache
-      try (TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> tableIterator =
-              iterator()) {
+      try (TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> tableIterator = iterator()) {
 
         while (tableIterator.hasNext()) {
           KeyValue< KEY, VALUE > kv = tableIterator.next();
@@ -122,8 +130,10 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
               CacheValue.get(EPOCH_DEFAULT, kv.getValue()));
         }
       }
-    } else {
+    } else if (cacheType == CacheType.PARTIAL_CACHE) {
       cache = new PartialTableCache<>(threadNamePrefix);
+    } else {
+      cache = TableNoCache.instance();
     }
   }
 
