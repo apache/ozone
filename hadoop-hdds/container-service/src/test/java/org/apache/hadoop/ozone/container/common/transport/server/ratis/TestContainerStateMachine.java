@@ -126,39 +126,20 @@ abstract class TestContainerStateMachine {
     TransactionContext trx = mock(TransactionContext.class);
     ContainerStateMachine.Context context = mock(ContainerStateMachine.Context.class);
     when(trx.getStateMachineContext()).thenReturn(context);
-    if (failWithException) {
-      when(dispatcher.dispatch(any(), any())).thenThrow(new RuntimeException());
-    } else {
-      when(dispatcher.dispatch(any(), any())).thenReturn(ContainerProtos.ContainerCommandResponseProto
-          .newBuilder().setCmdType(ContainerProtos.Type.WriteChunk)
-          .setResult(ContainerProtos.Result.CONTAINER_INTERNAL_ERROR)
-          .build());
-    }
 
-    when(context.getRequestProto()).thenReturn(ContainerProtos.ContainerCommandRequestProto.newBuilder()
-        .setCmdType(ContainerProtos.Type.WriteChunk).setWriteChunk(
-            ContainerProtos.WriteChunkRequestProto.newBuilder().setData(ByteString.copyFromUtf8("Test Data"))
-                .setBlockID(
-                    ContainerProtos.DatanodeBlockID.newBuilder().setContainerID(1).setLocalID(1).build()).build())
-        .setContainerID(1)
-        .setDatanodeUuid(UUID.randomUUID().toString()).build());
+    setUpMockDispatcherReturn(failWithException);
+    setUpMockRequestProto(context);
+
     AtomicReference<Throwable> throwable = new AtomicReference<>(null);
-    Function<Throwable, ? extends Message> throwableSetter = t -> {
-      throwable.set(t);
-      return null;
-    };
+    Function<Throwable, ? extends Message> throwableSetter = getThrowableSetter(throwable);
+
     stateMachine.write(entry, trx).exceptionally(throwableSetter).get();
     verify(dispatcher, times(1)).dispatch(any(ContainerProtos.ContainerCommandRequestProto.class),
         any(DispatcherContext.class));
     reset(dispatcher);
     assertNotNull(throwable.get());
-    if (failWithException) {
-      assertInstanceOf(RuntimeException.class, throwable.get());
-    } else {
-      assertInstanceOf(StorageContainerException.class, throwable.get());
-      StorageContainerException sce = (StorageContainerException) throwable.get();
-      assertEquals(ContainerProtos.Result.CONTAINER_INTERNAL_ERROR, sce.getResult());
-    }
+    assertResults(failWithException, throwable);
+
     // Writing data to another container(containerId 2) should also fail.
     when(context.getRequestProto()).thenReturn(ContainerProtos.ContainerCommandRequestProto.newBuilder()
         .setCmdType(ContainerProtos.Type.WriteChunk).setWriteChunk(
@@ -175,6 +156,45 @@ abstract class TestContainerStateMachine {
     assertEquals(ContainerProtos.Result.CONTAINER_UNHEALTHY, sce.getResult());
   }
 
+  public final void setUpMockDispatcherReturn(boolean failWithException) {
+    if (failWithException) {
+      when(dispatcher.dispatch(any(), any())).thenThrow(new RuntimeException());
+    } else {
+      when(dispatcher.dispatch(any(), any())).thenReturn(ContainerProtos.ContainerCommandResponseProto
+          .newBuilder().setCmdType(ContainerProtos.Type.WriteChunk)
+          .setResult(ContainerProtos.Result.CONTAINER_INTERNAL_ERROR)
+          .build());
+    }
+  }
+
+  public final void setUpMockRequestProto(ContainerStateMachine.Context context) {
+    when(context.getRequestProto()).thenReturn(ContainerProtos.ContainerCommandRequestProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.WriteChunk).setWriteChunk(
+            ContainerProtos.WriteChunkRequestProto.newBuilder().setData(ByteString.copyFromUtf8("Test Data"))
+                .setBlockID(
+                    ContainerProtos.DatanodeBlockID.newBuilder().setContainerID(1).setLocalID(1).build()).build())
+        .setContainerID(1)
+        .setDatanodeUuid(UUID.randomUUID().toString()).build());
+  }
+
+  public final Function<Throwable, ? extends Message> getThrowableSetter(AtomicReference<Throwable> throwable) {
+    Function<Throwable, ? extends Message> throwableSetter = t -> {
+      throwable.set(t);
+      return null;
+    };
+    return throwableSetter;
+  }
+
+  public final void assertResults(boolean failWithException, AtomicReference<Throwable> throwable) {
+    if (failWithException) {
+      assertInstanceOf(RuntimeException.class, throwable.get());
+    } else {
+      assertInstanceOf(StorageContainerException.class, throwable.get());
+      StorageContainerException sce = (StorageContainerException) throwable.get();
+      assertEquals(ContainerProtos.Result.CONTAINER_INTERNAL_ERROR, sce.getResult());
+    }
+  }
+
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   public void testApplyTransactionFailure(boolean failWithException) throws ExecutionException,
@@ -186,14 +206,8 @@ abstract class TestContainerStateMachine {
     ContainerStateMachine.Context context = mock(ContainerStateMachine.Context.class);
     when(trx.getLogEntry()).thenReturn(entry);
     when(trx.getStateMachineContext()).thenReturn(context);
-    if (failWithException) {
-      when(dispatcher.dispatch(any(), any())).thenThrow(new RuntimeException());
-    } else {
-      when(dispatcher.dispatch(any(), any())).thenReturn(ContainerProtos.ContainerCommandResponseProto
-          .newBuilder().setCmdType(ContainerProtos.Type.WriteChunk)
-          .setResult(ContainerProtos.Result.CONTAINER_INTERNAL_ERROR)
-          .build());
-    }
+
+    setUpMockDispatcherReturn(failWithException);
     // Failing apply transaction on congtainer 1.
     when(context.getLogProto()).thenReturn(ContainerProtos.ContainerCommandRequestProto.newBuilder()
         .setCmdType(ContainerProtos.Type.WriteChunk).setWriteChunk(
@@ -202,10 +216,7 @@ abstract class TestContainerStateMachine {
         .setContainerID(1)
         .setDatanodeUuid(UUID.randomUUID().toString()).build());
     AtomicReference<Throwable> throwable = new AtomicReference<>(null);
-    Function<Throwable, ? extends Message> throwableSetter = t -> {
-      throwable.set(t);
-      return null;
-    };
+    Function<Throwable, ? extends Message> throwableSetter = getThrowableSetter(throwable);
     //apply transaction will fail because of runtime exception thrown by dispatcher, which marks the first
     // failure on container 1.
     stateMachine.applyTransaction(trx).exceptionally(throwableSetter).get();
@@ -213,13 +224,7 @@ abstract class TestContainerStateMachine {
         any(DispatcherContext.class));
     reset(dispatcher);
     assertNotNull(throwable.get());
-    if (failWithException) {
-      assertInstanceOf(RuntimeException.class, throwable.get());
-    } else {
-      assertInstanceOf(StorageContainerException.class, throwable.get());
-      StorageContainerException sce = (StorageContainerException) throwable.get();
-      assertEquals(ContainerProtos.Result.CONTAINER_INTERNAL_ERROR, sce.getResult());
-    }
+    assertResults(failWithException, throwable);
     // Another apply transaction on same container 1 should fail because the previous apply transaction failed.
     stateMachine.applyTransaction(trx).exceptionally(throwableSetter).get();
     verify(dispatcher, times(0)).dispatch(any(ContainerProtos.ContainerCommandRequestProto.class),
@@ -272,13 +277,7 @@ abstract class TestContainerStateMachine {
       return null;
     }).when(dispatcher).dispatch(any(), any());
 
-    when(context.getRequestProto()).thenReturn(ContainerProtos.ContainerCommandRequestProto.newBuilder()
-        .setCmdType(ContainerProtos.Type.WriteChunk).setWriteChunk(
-            ContainerProtos.WriteChunkRequestProto.newBuilder().setData(ByteString.copyFromUtf8("Test Data"))
-                .setBlockID(
-                    ContainerProtos.DatanodeBlockID.newBuilder().setContainerID(1).setLocalID(1).build()).build())
-        .setContainerID(1)
-        .setDatanodeUuid(UUID.randomUUID().toString()).build());
+    setUpMockRequestProto(context);
     AtomicReference<Throwable> throwable = new AtomicReference<>(null);
     Function<Throwable, ? extends Message> throwableSetter = t -> {
       throwable.set(t);
