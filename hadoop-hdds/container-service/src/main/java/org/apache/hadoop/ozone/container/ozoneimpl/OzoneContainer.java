@@ -671,28 +671,28 @@ public class OzoneContainer {
   }
 
 
-  private void checkVolumeSet(MutableVolumeSet volumeSet, String clusterId)
+  private void checkVolumeSet(MutableVolumeSet set, String clusterId)
       throws DiskOutOfSpaceException {
-    if (volumeSet == null) {
+    if (set == null) {
       return;
     }
 
-    volumeSet.writeLock();
+    set.writeLock();
     try {
       // If version file does not exist
       // create version file and also set scm ID or cluster ID.
-      for (StorageVolume volume : volumeSet.getVolumeMap().values()) {
+      for (StorageVolume volume : set.getVolumeMap().values()) {
         if (!StorageVolumeUtil.checkVolume(volume, clusterId, LOG, getDbVolumeSet())) {
-          volumeSet.failVolume(volume.getStorageDir().getPath());
+          set.failVolume(volume.getStorageDir().getPath());
         }
       }
-      if (volumeSet.getVolumesList().isEmpty()) {
+      if (set.getVolumesList().isEmpty()) {
         // All volumes are in inconsistent state
         throw new DiskOutOfSpaceException(
             "All configured Volumes are in Inconsistent State");
       }
     } finally {
-      volumeSet.writeUnlock();
+      set.writeUnlock();
     }
   }
 }
