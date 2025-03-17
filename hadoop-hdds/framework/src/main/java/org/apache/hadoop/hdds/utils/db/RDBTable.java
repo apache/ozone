@@ -246,6 +246,17 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
+  public long getExactKeyCount() throws IOException {
+    try (TableIterator<byte[], KeyValue<byte[], byte[]>> iterator = iterator()) {
+      int keyCount = 0;
+      for (iterator.seekToFirst(); iterator.hasNext(); iterator.next()) {
+        keyCount++;
+      }
+      return keyCount;
+    }
+  }
+
+  @Override
   public List<KeyValue<byte[], byte[]>> getRangeKVs(byte[] startKey,
       int count, byte[] prefix,
       MetadataKeyFilters.MetadataKeyFilter... filters)

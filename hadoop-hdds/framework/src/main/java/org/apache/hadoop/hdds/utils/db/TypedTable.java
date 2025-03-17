@@ -456,25 +456,12 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     return rawTable.getEstimatedKeyCount();
   }
 
-  /**
-   * Returns the exact key count of column family.
-   *
-   * @return keyCount
-   * @throws IOException
-   */
   @Override
   public long getExactKeyCount() throws IOException {
     if (cache.getCacheType() == CacheType.FULL_CACHE) {
       return cache.size();
     }
-    try (TableIterator<byte[], KeyValue<byte[], byte[]>> iterator
-             = rawTable.iterator()) {
-      int keyCount = 0;
-      for (iterator.seekToFirst(); iterator.hasNext(); iterator.next()) {
-        keyCount++;
-      }
-      return keyCount;
-    }
+    return rawTable.getExactKeyCount();
   }
 
   @Override
