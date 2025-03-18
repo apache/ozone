@@ -61,7 +61,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -264,14 +263,7 @@ public class TestKeyManagerImpl {
     HddsWhiteboxTestUtils.setInternalState(om,
         "scmClient", scmClient);
   }
-  private static void mockBlockClient() {
-    ScmClient scmClient = new ScmClient(mockScmBlockLocationProtocol, null,
-        conf);
-    HddsWhiteboxTestUtils.setInternalState(keyManager,
-        "scmClient", scmClient);
-    HddsWhiteboxTestUtils.setInternalState(om,
-        "scmClient", scmClient);
-  }
+
   private static void createBucket(String volumeName, String bucketName,
                                    boolean isVersionEnabled)
       throws IOException {
