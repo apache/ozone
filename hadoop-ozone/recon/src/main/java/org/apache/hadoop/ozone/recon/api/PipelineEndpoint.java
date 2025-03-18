@@ -46,6 +46,7 @@ import org.slf4j.LoggerFactory;
  */
 @Path("/pipelines")
 @Produces(MediaType.APPLICATION_JSON)
+@SuppressWarnings("PMD.LooseCoupling")
 public class PipelineEndpoint {
 
   private static final Logger LOG =

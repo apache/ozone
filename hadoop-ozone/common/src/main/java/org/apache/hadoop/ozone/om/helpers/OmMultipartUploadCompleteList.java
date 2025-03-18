@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Part;
  */
 public class OmMultipartUploadCompleteList {
 
-  private final LinkedHashMap<Integer, String> multipartMap;
+  private final Map<Integer, String> multipartMap;
 
   /**
    * Construct OmMultipartUploadCompleteList which holds multipart map which

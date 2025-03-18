@@ -40,7 +40,7 @@ public final class BucketArgs {
   /**
    * ACL Information.
    */
-  private final ImmutableList<OzoneAcl> acls;
+  private final List<OzoneAcl> acls;
   /**
    * Bucket Version flag.
    */

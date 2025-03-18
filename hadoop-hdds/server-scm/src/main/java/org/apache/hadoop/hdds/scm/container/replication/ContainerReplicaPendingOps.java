@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
  * be an entry in this class mapping ContainerID to a list of the pending
  * operations.
  */
+@SuppressWarnings("PMD.LooseCoupling")
 public class ContainerReplicaPendingOps {
 
   private static final int RATIS_COUNTER_INDEX = 0;

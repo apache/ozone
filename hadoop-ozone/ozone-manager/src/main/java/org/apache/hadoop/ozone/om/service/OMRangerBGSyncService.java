@@ -103,7 +103,7 @@ public class OMRangerBGSyncService extends BackgroundService {
   static class BGRole {
     private final String name;
     private String id;
-    private final HashSet<String> userSet;
+    private final Set<String> userSet;
 
     BGRole(String n) {
       this.name = n;
@@ -122,7 +122,7 @@ public class OMRangerBGSyncService extends BackgroundService {
       userSet.add(userPrincipal);
     }
 
-    public HashSet<String> getUserSet() {
+    public Set<String> getUserSet() {
       return userSet;
     }
 
@@ -183,7 +183,7 @@ public class OMRangerBGSyncService extends BackgroundService {
   // in Ranger. If not, the default policy will be (re)created.
   //
   // Maps from policy name to PolicyInfo (tenant name and policy type) in Ranger
-  private final HashMap<String, PolicyInfo> mtRangerPoliciesToBeCreated =
+  private final Map<String, PolicyInfo> mtRangerPoliciesToBeCreated =
       new HashMap<>();
 
   // We will track all the policies in Ranger here. After we have
@@ -191,14 +191,14 @@ public class OMRangerBGSyncService extends BackgroundService {
   // be left with policies that we need to delete.
   //
   // Maps from policy name to policy ID in Ranger
-  private final HashMap<String, String> mtRangerPoliciesToBeDeleted =
+  private final Map<String, String> mtRangerPoliciesToBeDeleted =
       new HashMap<>();
 
   // This map will keep all the Multi-Tenancy related roles from Ranger.
-  private final HashMap<String, BGRole> mtRangerRoles = new HashMap<>();
+  private final Map<String, BGRole> mtRangerRoles = new HashMap<>();
 
   // Keep OM DB mapping of Roles -> list of user principals.
-  private final HashMap<String, HashSet<String>> mtOMDBRoles = new HashMap<>();
+  private final Map<String, Set<String>> mtOMDBRoles = new HashMap<>();
 
   public OMRangerBGSyncService(OzoneManager ozoneManager,
       OMMultiTenantManager omMultiTenantManager,
@@ -753,7 +753,7 @@ public class OMRangerBGSyncService extends BackgroundService {
       mtOMDBRoles.put(roleName, new HashSet<>(
           Collections.singletonList(userPrincipal)));
     } else {
-      final HashSet<String> usersInTheRole = mtOMDBRoles.get(roleName);
+      final Set<String> usersInTheRole = mtOMDBRoles.get(roleName);
       usersInTheRole.add(userPrincipal);
     }
   }
@@ -761,13 +761,13 @@ public class OMRangerBGSyncService extends BackgroundService {
   private void processAllRolesFromOMDB() throws IOException {
     // Lets First make sure that all the Roles in OM DB are present in Ranger
     // as well as the corresponding userlist matches matches.
-    for (Map.Entry<String, HashSet<String>> entry : mtOMDBRoles.entrySet()) {
+    for (Map.Entry<String, Set<String>> entry : mtOMDBRoles.entrySet()) {
       final String roleName = entry.getKey();
       boolean pushRoleToRanger = false;
       if (mtRangerRoles.containsKey(roleName)) {
-        final HashSet<String> rangerUserList =
+        final Set<String> rangerUserList =
             mtRangerRoles.get(roleName).getUserSet();
-        final HashSet<String> userSet = entry.getValue();
+        final Set<String> userSet = entry.getValue();
         for (String userPrincipal : userSet) {
           if (rangerUserList.contains(userPrincipal)) {
             rangerUserList.remove(userPrincipal);
@@ -836,7 +836,7 @@ public class OMRangerBGSyncService extends BackgroundService {
   }
 
   private void pushOMDBRoleToRanger(String roleName) throws IOException {
-    final HashSet<String> omDBUserList = mtOMDBRoles.get(roleName);
+    final Set<String> omDBUserList = mtOMDBRoles.get(roleName);
     withWriteLock(() -> {
       try {
         Role existingRole = accessController.getRole(roleName);

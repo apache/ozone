@@ -69,7 +69,7 @@ public class MutableVolumeSet implements VolumeSet {
   /**
    * Maintains a list of active volumes per StorageType.
    */
-  private EnumMap<StorageType, List<StorageVolume>> volumeStateMap;
+  private Map<StorageType, List<StorageVolume>> volumeStateMap;
 
   /**
    * A Reentrant Read Write Lock to synchronize volume operations in VolumeSet.

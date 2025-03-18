@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -52,10 +51,10 @@ public class SnapshotChainManager {
       LoggerFactory.getLogger(SnapshotChainManager.class);
 
   private final Map<UUID, SnapshotChainInfo> globalSnapshotChain;
-  private final ConcurrentMap<String, LinkedHashMap<UUID, SnapshotChainInfo>>
+  private final Map<String, Map<UUID, SnapshotChainInfo>>
       snapshotChainByPath;
-  private final ConcurrentMap<String, UUID> latestSnapshotIdByPath;
-  private final ConcurrentMap<UUID, String> snapshotIdToTableKey;
+  private final Map<String, UUID> latestSnapshotIdByPath;
+  private final Map<UUID, String> snapshotIdToTableKey;
   private UUID latestGlobalSnapshotId;
   private final boolean snapshotChainCorrupted;
   private UUID oldestGlobalSnapshotId;
@@ -573,7 +572,7 @@ public class SnapshotChainManager {
     return snapshotIdToTableKey.get(snapshotId);
   }
 
-  public LinkedHashMap<UUID, SnapshotChainInfo> getSnapshotChainPath(
+  public Map<UUID, SnapshotChainInfo> getSnapshotChainPath(
       String path) throws IOException {
     validateSnapshotChain();
     return snapshotChainByPath.get(path);
@@ -587,8 +586,7 @@ public class SnapshotChainManager {
   }
 
   @VisibleForTesting
-  public Map<String,
-      LinkedHashMap<UUID, SnapshotChainInfo>> getSnapshotChainByPath()
+  public Map<String, Map<UUID, SnapshotChainInfo>> getSnapshotChainByPath()
       throws IOException {
     validateSnapshotChain();
     return snapshotChainByPath;

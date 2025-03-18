@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.multitenant;
 
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -29,7 +30,7 @@ public class CachedTenantState {
   private final String tenantUserRoleName;
   private final String tenantAdminRoleName;
   // accessId -> userPrincipal and isAdmin flag
-  private final HashMap<String, CachedAccessIdInfo> accessIdInfoMap;
+  private final Map<String, CachedAccessIdInfo> accessIdInfoMap;
 
   public String getTenantUserRoleName() {
     return tenantUserRoleName;
@@ -98,7 +99,7 @@ public class CachedTenantState {
     return tenantId;
   }
 
-  public HashMap<String, CachedAccessIdInfo> getAccessIdInfoMap() {
+  public Map<String, CachedAccessIdInfo> getAccessIdInfoMap() {
     return accessIdInfoMap;
   }
 

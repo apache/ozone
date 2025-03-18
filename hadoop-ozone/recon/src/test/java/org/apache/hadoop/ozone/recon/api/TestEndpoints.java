@@ -203,7 +203,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private ReconPipelineManager reconPipelineManager;
   private List<HddsProtos.Node> nodes = getNodeDetails(2);
   private Map<String, List<ContainerID>> containerOnDecom = getContainersOnDecomNodes();
-  private ArrayList<String> metrics = getMetrics();
+  private List<String> metrics = getMetrics();
 
   public TestEndpoints() {
     super();
@@ -1449,8 +1449,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     return containerMap;
   }
 
-  private ArrayList<String> getMetrics() {
-    ArrayList<String> result = new ArrayList<>();
+  private List<String> getMetrics() {
+    List<String> result = new ArrayList<>();
     // no nodes decommissioning
     result.add("{  \"beans\" : [ {    " +
         "\"name\" : \"Hadoop:service=StorageContainerManager,name=NodeDecommissionMetrics\",    " +

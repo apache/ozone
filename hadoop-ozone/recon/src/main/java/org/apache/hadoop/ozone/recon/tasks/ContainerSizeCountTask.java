@@ -56,7 +56,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
   private final long interval;
   private ContainerCountBySizeDao containerCountBySizeDao;
   private DSLContext dslContext;
-  private HashMap<ContainerID, Long> processedContainers = new HashMap<>();
+  private Map<ContainerID, Long> processedContainers = new HashMap<>();
   private ReadWriteLock lock = new ReentrantReadWriteLock(true);
   private final ReconTaskStatusUpdater taskStatusUpdater;
 

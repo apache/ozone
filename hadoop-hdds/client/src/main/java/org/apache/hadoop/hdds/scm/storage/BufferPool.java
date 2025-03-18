@@ -49,7 +49,8 @@ public class BufferPool {
   private final int capacity;
   private final Function<ByteBuffer, ByteString> byteStringConversion;
 
-  private final LinkedList<ChunkBuffer> allocated = new LinkedList<>();
+  private final List<ChunkBuffer> allocated = new LinkedList<>();
+  @SuppressWarnings("PMD.LooseCoupling")
   private final LinkedList<ChunkBuffer> released = new LinkedList<>();
   private ChunkBuffer currentBuffer = null;
   private final Lock lock = new ReentrantLock();

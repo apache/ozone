@@ -46,7 +46,7 @@ class TestOzoneAcls {
 
   @Test
   void testAclParse() {
-    HashMap<String, Boolean> testMatrix;
+    Map<String, Boolean> testMatrix;
     testMatrix = new HashMap<>();
 
     testMatrix.put("user:bilbo:r", Boolean.TRUE);

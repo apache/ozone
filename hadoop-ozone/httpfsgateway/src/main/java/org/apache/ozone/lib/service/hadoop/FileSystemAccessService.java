@@ -150,7 +150,7 @@ public class FileSystemAccessService extends BaseService
 
   private AtomicInteger unmanagedFileSystems = new AtomicInteger();
 
-  private ConcurrentHashMap<String, CachedFileSystem> fsCache =
+  private Map<String, CachedFileSystem> fsCache =
       new ConcurrentHashMap<String, CachedFileSystem>();
 
   private long purgeTimeout;

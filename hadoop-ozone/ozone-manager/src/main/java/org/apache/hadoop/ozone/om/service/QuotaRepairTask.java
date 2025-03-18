@@ -502,7 +502,7 @@ public class QuotaRepairTask {
       bucketCountDiffMap.clear();
       for (OzoneManagerProtocolProtos.BucketQuotaCount quotaCount : builder.getBucketCountList()) {
         String bucketKey = metadataManager.getBucketKey(quotaCount.getVolName(), quotaCount.getBucketName());
-        ConcurrentHashMap<String, Long> diffCountMap = new ConcurrentHashMap<>();
+        Map<String, Long> diffCountMap = new ConcurrentHashMap<>();
         diffCountMap.put("DiffUsedBytes", quotaCount.getDiffUsedBytes());
         diffCountMap.put("DiffUsedNamespace", quotaCount.getDiffUsedNamespace());
         bucketCountDiffMap.put(bucketKey, diffCountMap);

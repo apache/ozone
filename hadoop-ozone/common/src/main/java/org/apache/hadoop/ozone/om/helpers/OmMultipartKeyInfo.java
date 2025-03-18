@@ -99,7 +99,7 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
       this.sorted = Collections.unmodifiableList(sorted);
     }
 
-    PartKeyInfoMap(SortedMap<Integer, PartKeyInfo> sorted) {
+    PartKeyInfoMap(Map<Integer, PartKeyInfo> sorted) {
       this(new ArrayList<>(sorted.values()));
     }
 
@@ -229,7 +229,7 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
     private String uploadID;
     private long creationTime;
     private ReplicationConfig replicationConfig;
-    private final TreeMap<Integer, PartKeyInfo> partKeyInfoList;
+    private final Map<Integer, PartKeyInfo> partKeyInfoList;
     private long parentID;
 
     public Builder() {

@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -61,7 +62,7 @@ public class TestECBlockOutputStreamEntry {
         .build();
     try (XceiverClientManager manager =
         new XceiverClientManager(new OzoneConfiguration())) {
-      HashSet<XceiverClientSpi> clients = new HashSet<>();
+      Set<XceiverClientSpi> clients = new HashSet<>();
       final ECBlockOutputStreamEntry.Builder b = new ECBlockOutputStreamEntry.Builder();
       b.setXceiverClientManager(manager)
           .setPipeline(anECPipeline);
@@ -99,7 +100,7 @@ public class TestECBlockOutputStreamEntry {
         .build();
     try (XceiverClientManager manager =
         new XceiverClientManager(new OzoneConfiguration())) {
-      HashSet<XceiverClientSpi> clients = new HashSet<>();
+      Set<XceiverClientSpi> clients = new HashSet<>();
       final ECBlockOutputStreamEntry.Builder b = new ECBlockOutputStreamEntry.Builder();
       b.setXceiverClientManager(manager)
           .setPipeline(anECPipeline);

@@ -209,7 +209,7 @@ public class NodeStateMap {
    * @return The list of nodes matching the given states
    */
   public List<UUID> getNodes(NodeOperationalState opState, NodeState health) {
-    ArrayList<UUID> nodes = new ArrayList<>();
+    List<UUID> nodes = new ArrayList<>();
     for (DatanodeInfo dn : filterNodes(opState, health)) {
       nodes.add(dn.getUuid());
     }

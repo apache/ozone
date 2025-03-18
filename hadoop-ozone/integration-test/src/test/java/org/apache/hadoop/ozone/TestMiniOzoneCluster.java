@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -141,7 +142,7 @@ public class TestMiniOzoneCluster {
       }
 
       //after the start the real port numbers should be available AND unique
-      HashSet<Integer> ports = new HashSet<Integer>();
+      Set<Integer> ports = new HashSet<Integer>();
       for (DatanodeStateMachine dsm : stateMachines) {
         int readPort = dsm.getContainer().getReadChannel().getIPCPort();
 
@@ -175,7 +176,7 @@ public class TestMiniOzoneCluster {
         DatanodeStateMachine sm3 = new DatanodeStateMachine(
             randomDatanodeDetails(), ozoneConf);
     ) {
-      HashSet<Integer> ports = new HashSet<Integer>();
+      Set<Integer> ports = new HashSet<Integer>();
       assertTrue(ports.add(sm1.getContainer().getReadChannel().getIPCPort()));
       assertFalse(ports.add(sm2.getContainer().getReadChannel().getIPCPort()));
       assertFalse(ports.add(sm3.getContainer().getReadChannel().getIPCPort()));

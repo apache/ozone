@@ -104,10 +104,10 @@ class Node2ContainerMap {
 
     // Conditions like Zero length containers should be handled by removeAll.
     Set<ContainerID> currentSet = dn2ContainerMap.get(datanodeID);
-    TreeSet<ContainerID> newObjects = new TreeSet<>(objects);
+    Set<ContainerID> newObjects = new TreeSet<>(objects);
     newObjects.removeAll(currentSet);
 
-    TreeSet<ContainerID> missingObjects = new TreeSet<>(currentSet);
+    Set<ContainerID> missingObjects = new TreeSet<>(currentSet);
     missingObjects.removeAll(objects);
 
     if (newObjects.isEmpty() && missingObjects.isEmpty()) {

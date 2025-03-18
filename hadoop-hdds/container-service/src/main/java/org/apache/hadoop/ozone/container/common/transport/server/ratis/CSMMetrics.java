@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
 import java.util.EnumMap;
+import java.util.Map;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
@@ -49,8 +50,8 @@ public class CSMMetrics {
   private @Metric MutableCounterLong numBytesCommittedCount;
 
   private @Metric MutableRate transactionLatencyMs;
-  private final EnumMap<Type, MutableRate> opsLatencyMs;
-  private final EnumMap<Type, MutableRate> opsQueueingDelay;
+  private final Map<Type, MutableRate> opsLatencyMs;
+  private final Map<Type, MutableRate> opsQueueingDelay;
   private MetricsRegistry registry = null;
 
   // Failure Metrics

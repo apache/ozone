@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Layout Version Manager containing generic method implementations.
  */
-@SuppressWarnings("visibilitymodifier")
+@SuppressWarnings({"visibilitymodifier", "PMD.LooseCoupling"})
 public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
     implements LayoutVersionManager, LayoutVersionManagerMXBean {
 

@@ -67,6 +67,7 @@ import org.json.simple.JSONObject;
  * FileSystem operation executors used by {@link HttpFSServer}.
  */
 @InterfaceAudience.Private
+@SuppressWarnings("PMD.LooseCoupling")
 public final class FSOperations {
 
   private static int bufferSize = 4096;

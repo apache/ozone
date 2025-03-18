@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
@@ -85,7 +86,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   private final ConfigurationSource conf;
   private int invocationCount;
   private final ThreadPoolExecutor executor;
-  private final LinkedBlockingQueue<DeleteCmdInfo> deleteCommandQueues;
+  private final Queue<DeleteCmdInfo> deleteCommandQueues;
   private final Daemon handlerThread;
   private final OzoneContainer ozoneContainer;
   private final BlockDeletingServiceMetrics blockDeleteMetrics;

@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.safemode;
 
 import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -39,7 +40,7 @@ public class DataNodeSafeModeRule extends
   private int requiredDns;
   private int registeredDns = 0;
   // Set to track registered DataNodes.
-  private HashSet<UUID> registeredDnSet;
+  private Set<UUID> registeredDnSet;
 
   public DataNodeSafeModeRule(EventQueue eventQueue,
       ConfigurationSource conf,

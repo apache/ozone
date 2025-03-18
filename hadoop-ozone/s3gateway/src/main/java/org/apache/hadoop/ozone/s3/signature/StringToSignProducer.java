@@ -91,7 +91,7 @@ public final class StringToSignProducer {
       SignatureInfo signatureInfo,
       String scheme,
       String method,
-      LowerCaseKeyStringMap headers,
+      Map<String, String> headers,
       Map<String, String> queryParams
   ) throws Exception {
     StringBuilder strToSign = new StringBuilder();

@@ -947,7 +947,7 @@ public class StateContext {
   }
 
   static class PipelineActionMap {
-    private final LinkedHashMap<PipelineKey, PipelineAction> map =
+    private final Map<PipelineKey, PipelineAction> map =
         new LinkedHashMap<>();
 
     synchronized int size() {

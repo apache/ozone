@@ -269,10 +269,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   public Map<DatanodeDetails, ContainerCommandResponseProto>
       sendCommandOnAllNodes(
       ContainerCommandRequestProto request) throws IOException {
-    HashMap<DatanodeDetails, ContainerCommandResponseProto>
+    Map<DatanodeDetails, ContainerCommandResponseProto>
             responseProtoHashMap = new HashMap<>();
     List<DatanodeDetails> datanodeList = pipeline.getNodes();
-    HashMap<DatanodeDetails, CompletableFuture<ContainerCommandResponseProto>>
+    Map<DatanodeDetails, CompletableFuture<ContainerCommandResponseProto>>
             futureHashMap = new HashMap<>();
     if (!request.hasVersion()) {
       ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto.newBuilder(request);

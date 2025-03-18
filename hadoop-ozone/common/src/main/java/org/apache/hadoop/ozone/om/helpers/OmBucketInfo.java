@@ -63,7 +63,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   /**
    * ACL Information (mutable).
    */
-  private final CopyOnWriteArrayList<OzoneAcl> acls;
+  private final List<OzoneAcl> acls;
   /**
    * Bucket Version flag.
    */

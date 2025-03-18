@@ -30,7 +30,6 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -541,7 +540,7 @@ public class BucketEndpoint extends EndpointBase {
         List<Grant> grants = S3Acl.ozoneNativeAclToS3Acl(acl);
         grantSet.addAll(grants);
       }
-      ArrayList<Grant> grantList = new ArrayList<>();
+      List<Grant> grantList = new ArrayList<>();
       grantList.addAll(grantSet);
       result.setAclList(
           new S3BucketAcl.AccessControlList(grantList));
@@ -690,7 +689,7 @@ public class BucketEndpoint extends EndpointBase {
         throw newError(NOT_IMPLEMENTED, part[0]);
       }
       // Build ACL on Bucket
-      EnumSet<IAccessAuthorizer.ACLType> aclsOnBucket = S3Acl.getOzoneAclOnBucketFromS3Permission(permission);
+      Set<IAccessAuthorizer.ACLType> aclsOnBucket = S3Acl.getOzoneAclOnBucketFromS3Permission(permission);
       OzoneAcl defaultOzoneAcl = new OzoneAcl(
           IAccessAuthorizer.ACLIdentityType.USER, part[1], OzoneAcl.AclScope.DEFAULT, aclsOnBucket
       );
@@ -721,7 +720,7 @@ public class BucketEndpoint extends EndpointBase {
         throw newError(NOT_IMPLEMENTED, part[0]);
       }
       // Build ACL on Volume
-      EnumSet<IAccessAuthorizer.ACLType> aclsOnVolume =
+      Set<IAccessAuthorizer.ACLType> aclsOnVolume =
           S3Acl.getOzoneAclOnVolumeFromS3Permission(permission);
       OzoneAcl accessOzoneAcl = new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, part[1], ACCESS, aclsOnVolume);
       ozoneAclList.add(accessOzoneAcl);

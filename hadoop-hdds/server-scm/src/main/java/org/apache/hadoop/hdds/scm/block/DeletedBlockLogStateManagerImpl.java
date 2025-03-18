@@ -19,8 +19,8 @@ package org.apache.hadoop.hdds.scm.block;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
@@ -153,7 +153,7 @@ public class DeletedBlockLogStateManagerImpl
   }
 
   @Override
-  public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs)
+  public void addTransactionsToDB(List<DeletedBlocksTransaction> txs)
       throws IOException {
     Map<ContainerID, Long> containerIdToTxnIdMap = new HashMap<>();
     for (DeletedBlocksTransaction tx : txs) {
@@ -166,7 +166,7 @@ public class DeletedBlockLogStateManagerImpl
   }
 
   @Override
-  public void removeTransactionsFromDB(ArrayList<Long> txIDs)
+  public void removeTransactionsFromDB(List<Long> txIDs)
       throws IOException {
     if (deletingTxIDs != null) {
       deletingTxIDs.addAll(txIDs);
@@ -178,7 +178,7 @@ public class DeletedBlockLogStateManagerImpl
 
   @Override
   public void increaseRetryCountOfTransactionInDB(
-      ArrayList<Long> txIDs) throws IOException {
+      List<Long> txIDs) throws IOException {
     for (Long txID : txIDs) {
       DeletedBlocksTransaction block =
           deletedTable.get(txID);
@@ -203,7 +203,7 @@ public class DeletedBlockLogStateManagerImpl
   }
 
   @Override
-  public int resetRetryCountOfTransactionInDB(ArrayList<Long> txIDs)
+  public int resetRetryCountOfTransactionInDB(List<Long> txIDs)
       throws IOException {
     Objects.requireNonNull(txIDs, "txIds cannot be null.");
     int resetCount = 0;

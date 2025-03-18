@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.helpers;
 import java.util.BitSet;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneAcl.AclScope;
@@ -61,7 +62,7 @@ final class OzoneAclStorage {
     List<IAccessAuthorizer.ACLType> aclTypeList = aclRights.stream()
         .mapToObj(a -> IAccessAuthorizer.ACLType.values()[a])
         .collect(Collectors.toList());
-    EnumSet<IAccessAuthorizer.ACLType> aclSet = EnumSet.copyOf(aclTypeList);
+    Set<IAccessAuthorizer.ACLType> aclSet = EnumSet.copyOf(aclTypeList);
     return new OzoneAcl(ACLIdentityType.valueOf(protoAcl.getType().name()),
         protoAcl.getName(), AclScope.valueOf(protoAcl.getAclScope().name()), aclSet);
   }

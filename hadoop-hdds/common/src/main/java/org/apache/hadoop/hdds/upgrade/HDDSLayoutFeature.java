@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.upgrade;
 
 import java.util.EnumMap;
+import java.util.Map;
 import java.util.Optional;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 
@@ -47,9 +48,9 @@ public enum HDDSLayoutFeature implements LayoutFeature {
 
   private int layoutVersion;
   private String description;
-  private EnumMap<UpgradeActionType, HDDSUpgradeAction> scmActions =
+  private Map<UpgradeActionType, HDDSUpgradeAction> scmActions =
       new EnumMap<>(UpgradeActionType.class);
-  private EnumMap<UpgradeActionType, HDDSUpgradeAction> datanodeActions =
+  private Map<UpgradeActionType, HDDSUpgradeAction> datanodeActions =
       new EnumMap<>(UpgradeActionType.class);
 
   HDDSLayoutFeature(final int layoutVersion, String description) {

@@ -26,6 +26,7 @@ import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.TreeMap;
@@ -173,7 +174,7 @@ public class OzoneListStatusHelper {
       }
     }
     String startKeyPrefix = getStartKeyPrefixIfPresent(args, startKey, volumeInfo, omBucketInfo);
-    TreeMap<String, OzoneFileStatus> map =
+    Map<String, OzoneFileStatus> map =
         getSortedEntries(numEntries,  prefixKey, dbPrefixKey, startKeyPrefix, omBucketInfo);
 
     return map.values().stream().filter(e -> e != null).collect(
@@ -218,7 +219,7 @@ public class OzoneListStatusHelper {
    *  every remove from the heap will give the smallest entry and return
    *  a treemap.
    */
-  private TreeMap<String, OzoneFileStatus> getSortedEntries(long numEntries,
+  private Map<String, OzoneFileStatus> getSortedEntries(long numEntries,
       String prefixKey, String dbPrefixKey, String startKeyPrefix,
       OmBucketInfo bucketInfo) throws IOException {
     String volumeName = bucketInfo.getVolumeName();
@@ -229,7 +230,7 @@ public class OzoneListStatusHelper {
             .map(DefaultReplicationConfig::getReplicationConfig)
             .orElse(omDefaultReplication);
 
-    TreeMap<String, OzoneFileStatus> map = new TreeMap<>();
+    Map<String, OzoneFileStatus> map = new TreeMap<>();
     try (
         ListIterator.MinHeapIterator heapIterator = new ListIterator.MinHeapIterator(
             metadataManager, dbPrefixKey, bucketLayout, startKeyPrefix,

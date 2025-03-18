@@ -33,6 +33,7 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
@@ -127,7 +128,7 @@ public class TestMaintenanceSubCommand {
   public void testErrorsReportedWhenEnteringMaintenance() throws IOException  {
     when(scmClient.startMaintenanceNodes(anyList(), anyInt(), anyBoolean()))
         .thenAnswer(invocation -> {
-          ArrayList<DatanodeAdminError> e = new ArrayList<>();
+          List<DatanodeAdminError> e = new ArrayList<>();
           e.add(new DatanodeAdminError("host1", "host1 error"));
           return e;
         });

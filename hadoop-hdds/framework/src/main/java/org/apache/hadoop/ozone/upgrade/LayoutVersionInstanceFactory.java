@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.PriorityQueue;
+import java.util.Queue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,7 +61,7 @@ public class LayoutVersionInstanceFactory<T> {
    * a single entry. On a regular component instance (finalized), there will
    * be a single request version associated with a request always.
    */
-  private final Map<String, PriorityQueue<VersionedInstance<T>>> instances =
+  private final Map<String, Queue<VersionedInstance<T>>> instances =
       new HashMap<>();
 
   /**
@@ -90,7 +91,7 @@ public class LayoutVersionInstanceFactory<T> {
     instances.computeIfAbsent(primaryKey, s ->
         new PriorityQueue<>(Comparator.comparingInt(o -> o.version)));
 
-    PriorityQueue<VersionedInstance<T>> versionedInstances =
+    Queue<VersionedInstance<T>> versionedInstances =
         instances.get(primaryKey);
     Optional<VersionedInstance<T>> existingInstance =
         versionedInstances.parallelStream()
@@ -160,7 +161,7 @@ public class LayoutVersionInstanceFactory<T> {
             key, lvm.getMetadataLayoutVersion()));
 
     String primaryKey = key.getKey();
-    PriorityQueue<VersionedInstance<T>> versionedInstances =
+    Queue<VersionedInstance<T>> versionedInstances =
         instances.get(primaryKey);
     if (versionedInstances == null || versionedInstances.isEmpty()) {
       throw new IllegalArgumentException(
@@ -186,12 +187,12 @@ public class LayoutVersionInstanceFactory<T> {
    * @param feature the feature to be finalized.
    */
   public void finalizeFeature(LayoutFeature feature) {
-    Iterator<Map.Entry<String, PriorityQueue<VersionedInstance<T>>>> iterator =
+    Iterator<Map.Entry<String, Queue<VersionedInstance<T>>>> iterator =
         instances.entrySet().iterator();
     while (iterator.hasNext()) {
-      Map.Entry<String, PriorityQueue<VersionedInstance<T>>> next =
+      Map.Entry<String, Queue<VersionedInstance<T>>> next =
           iterator.next();
-      PriorityQueue<VersionedInstance<T>> vInstances = next.getValue();
+      Queue<VersionedInstance<T>> vInstances = next.getValue();
       VersionedInstance<T> prevInstance = null;
       while (!vInstances.isEmpty() &&
           vInstances.peek().version < feature.layoutVersion()) {

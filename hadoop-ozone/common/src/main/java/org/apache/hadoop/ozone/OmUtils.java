@@ -386,9 +386,9 @@ public final class OmUtils {
   public static Collection<String> getDecommissionedNodeIds(
       ConfigurationSource conf,
       String decommissionedNodesKeyWithServiceIdSuffix) {
-    HashSet<String> serviceIds = new HashSet<>(
+    Set<String> serviceIds = new HashSet<>(
         conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY));
-    HashSet<String> decommissionedNodeIds = new HashSet<>(
+    Set<String> decommissionedNodeIds = new HashSet<>(
         conf.getTrimmedStringCollection(
             decommissionedNodesKeyWithServiceIdSuffix));
     // If only one serviceID is configured, also check property without prefix

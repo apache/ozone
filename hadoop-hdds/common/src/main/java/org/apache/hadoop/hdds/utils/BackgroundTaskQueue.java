@@ -19,13 +19,14 @@ package org.apache.hadoop.hdds.utils;
 
 import java.util.Comparator;
 import java.util.PriorityQueue;
+import java.util.Queue;
 
 /**
  * A priority queue that stores a number of {@link BackgroundTask}.
  */
 public class BackgroundTaskQueue {
 
-  private final PriorityQueue<BackgroundTask> tasks;
+  private final Queue<BackgroundTask> tasks;
 
   public BackgroundTaskQueue() {
     tasks = new PriorityQueue<>(

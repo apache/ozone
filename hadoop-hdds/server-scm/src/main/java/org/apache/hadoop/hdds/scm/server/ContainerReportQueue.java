@@ -48,7 +48,7 @@ public class ContainerReportQueue
    * i.e. report execution from multiple datanode will be executed in same
    * order as added to queue.
    */
-  private LinkedBlockingQueue<String> orderingQueue
+  private BlockingQueue<String> orderingQueue
       = new LinkedBlockingQueue<>();
   private Map<String, List<ContainerReport>> dataMap = new HashMap<>();
 
@@ -123,7 +123,7 @@ public class ContainerReportQueue
   }
 
   private void addReport(ContainerReport val, String uuidString) {
-    ArrayList<ContainerReport> dataList = new ArrayList<>();
+    List<ContainerReport> dataList = new ArrayList<>();
     dataList.add(val);
     ++capacity;
     dataMap.put(uuidString, dataList);

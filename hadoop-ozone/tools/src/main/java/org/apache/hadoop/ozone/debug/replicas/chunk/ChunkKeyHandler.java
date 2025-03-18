@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -73,7 +74,7 @@ public class ChunkKeyHandler extends KeyHandler {
       String keyName = address.getKeyName();
       List<ContainerProtos.ChunkInfo> tempchunks;
       List<ChunkDetails> chunkDetailsList = new ArrayList<>();
-      HashSet<String> chunkPaths = new HashSet<>();
+      Set<String> chunkPaths = new HashSet<>();
       OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
           .setBucketName(bucketName).setKeyName(keyName).build();
       OmKeyInfo keyInfo = ozoneManagerClient.lookupKey(keyArgs);

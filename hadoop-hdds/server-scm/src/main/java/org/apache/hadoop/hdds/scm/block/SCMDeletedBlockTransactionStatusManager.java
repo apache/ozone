@@ -368,7 +368,7 @@ public class SCMDeletedBlockTransactionStatusManager {
 
   public void incrementRetryCount(List<Long> txIDs, long maxRetry)
       throws IOException {
-    ArrayList<Long> txIDsToUpdate = new ArrayList<>();
+    List<Long> txIDsToUpdate = new ArrayList<>();
     for (Long txID : txIDs) {
       int currentCount =
           transactionToRetryCountMap.getOrDefault(txID, 0);
@@ -458,7 +458,7 @@ public class SCMDeletedBlockTransactionStatusManager {
   public void commitTransactions(
       List<DeleteBlockTransactionResult> transactionResults, UUID dnId) {
 
-    ArrayList<Long> txIDsToBeDeleted = new ArrayList<>();
+    List<Long> txIDsToBeDeleted = new ArrayList<>();
     Set<UUID> dnsWithCommittedTxn;
     for (DeleteBlockTransactionResult transactionResult :
         transactionResults) {

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.keyvalue.impl;
 import com.google.common.util.concurrent.Striped;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
@@ -34,7 +35,7 @@ import org.slf4j.LoggerFactory;
  */
 public class MappedBufferManager {
 
-  private static ConcurrentHashMap<String, WeakReference<ByteBuffer>> mappedBuffers =
+  private static Map<String, WeakReference<ByteBuffer>> mappedBuffers =
       new ConcurrentHashMap<String, WeakReference<ByteBuffer>>();
   private static final Logger LOG = LoggerFactory.getLogger(MappedBufferManager.class);
   private final Semaphore semaphore;
@@ -57,10 +58,9 @@ public class MappedBufferManager {
         CompletableFuture.runAsync(() -> {
           int p = 0;
           try {
-            for (String key : mappedBuffers.keySet()) {
-              ByteBuffer buf = mappedBuffers.get(key).get();
-              if (buf == null) {
-                mappedBuffers.remove(key);
+            for (Map.Entry<String, WeakReference<ByteBuffer>> entry : mappedBuffers.entrySet()) {
+              if (entry.getValue() == null) {
+                mappedBuffers.remove(entry.getKey());
                 p++;
               }
             }

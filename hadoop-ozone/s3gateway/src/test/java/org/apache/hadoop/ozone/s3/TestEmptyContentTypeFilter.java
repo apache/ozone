@@ -21,6 +21,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Vector;
 import org.apache.hadoop.ozone.s3.EmptyContentTypeFilter.EnumerationWrapper;
 import org.junit.jupiter.api.Test;
@@ -32,14 +34,14 @@ public class TestEmptyContentTypeFilter {
 
   @Test
   public void enumerationWithContentType() {
-    Vector<String> values = new Vector<>();
+    List<String> values = new Vector<>();
     values.add("Content-Type");
     values.add("1");
     values.add("2");
     values.add("Content-Type");
 
     final EnumerationWrapper enumerationWrapper =
-        new EnumerationWrapper(values.elements());
+        new EnumerationWrapper(Collections.enumeration(values));
 
     assertTrue(enumerationWrapper.hasMoreElements());
     assertEquals("1", enumerationWrapper.nextElement());
@@ -50,11 +52,11 @@ public class TestEmptyContentTypeFilter {
 
   @Test
   public void enumerationWithOneContentType() {
-    Vector<String> values = new Vector<>();
+    List<String> values = new Vector<>();
     values.add("Content-Type");
 
     final EnumerationWrapper enumerationWrapper =
-        new EnumerationWrapper(values.elements());
+        new EnumerationWrapper(Collections.enumeration(values));
 
     assertFalse(enumerationWrapper.hasMoreElements());
   }

@@ -31,6 +31,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -73,7 +74,7 @@ public class TestRootCaRotationPoller {
     //Given the root ca poller that knows a set of root ca certificates
     X509Certificate knownCert = generateX509Cert(
         LocalDateTime.now(), Duration.ofSeconds(50));
-    HashSet<X509Certificate> knownCerts = new HashSet<>();
+    Set<X509Certificate> knownCerts = new HashSet<>();
     knownCerts.add(knownCert);
     List<String> certsFromScm = new ArrayList<>();
     certsFromScm.add(CertificateCodec.getPEMEncodedString(knownCert));
@@ -107,7 +108,7 @@ public class TestRootCaRotationPoller {
         LocalDateTime.now(), Duration.ofSeconds(50));
     X509Certificate newRootCa = generateX509Cert(
         LocalDateTime.now(), Duration.ofSeconds(50));
-    HashSet<X509Certificate> knownCerts = new HashSet<>();
+    Set<X509Certificate> knownCerts = new HashSet<>();
     knownCerts.add(knownCert);
     List<String> certsFromScm = new ArrayList<>();
     certsFromScm.add(CertificateCodec.getPEMEncodedString(knownCert));
@@ -140,7 +141,7 @@ public class TestRootCaRotationPoller {
         LocalDateTime.now(), Duration.ofSeconds(50));
     X509Certificate newRootCa = generateX509Cert(
         LocalDateTime.now(), Duration.ofSeconds(50));
-    HashSet<X509Certificate> knownCerts = new HashSet<>();
+    Set<X509Certificate> knownCerts = new HashSet<>();
     knownCerts.add(knownCert);
     List<String> certsFromScm = new ArrayList<>();
     certsFromScm.add(CertificateCodec.getPEMEncodedString(knownCert));

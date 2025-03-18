@@ -151,7 +151,7 @@ public class TestSnapshotChain {
     UUID snapshotID2 = UUID.randomUUID();
     UUID snapshotID3 = UUID.randomUUID();
 
-    ArrayList<UUID> snapshotIDs = new ArrayList<>();
+    List<UUID> snapshotIDs = new ArrayList<>();
     snapshotIDs.add(snapshotID1);
     snapshotIDs.add(snapshotID2);
     snapshotIDs.add(snapshotID3);
@@ -215,7 +215,7 @@ public class TestSnapshotChain {
     UUID snapshotID2 = UUID.randomUUID();
     UUID snapshotID3 = UUID.randomUUID();
 
-    ArrayList<UUID> snapshotIDs = new ArrayList<>();
+    List<UUID> snapshotIDs = new ArrayList<>();
     snapshotIDs.add(snapshotID1);
     snapshotIDs.add(snapshotID2);
     snapshotIDs.add(snapshotID3);
