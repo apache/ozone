@@ -447,7 +447,7 @@ public class TestReplicationManagerScenarios {
     public ContainerReplica buildContainerReplica() {
       createDatanodeDetails();
       createOrigin();
-      NODE_STATUS_MAP.put(datanodeDetails, new NodeStatus(operationalState, healthState));
+      NODE_STATUS_MAP.put(datanodeDetails, NodeStatus.valueOf(operationalState, healthState));
       datanodeDetails.setPersistedOpState(operationalState);
 
       ContainerReplica.ContainerReplicaBuilder builder = new ContainerReplica.ContainerReplicaBuilder();

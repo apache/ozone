@@ -146,8 +146,7 @@ public class NodeStateMap {
       lock.writeLock().lock();
       DatanodeInfo dn = getNodeInfoUnsafe(nodeId);
       NodeStatus oldStatus = dn.getNodeStatus();
-      NodeStatus newStatus = new NodeStatus(
-          oldStatus.getOperationalState(), newHealth);
+      NodeStatus newStatus = NodeStatus.valueOf(oldStatus.getOperationalState(), newHealth);
       dn.setNodeStatus(newStatus);
       return newStatus;
     } finally {
@@ -170,8 +169,7 @@ public class NodeStateMap {
       lock.writeLock().lock();
       DatanodeInfo dn = getNodeInfoUnsafe(nodeId);
       NodeStatus oldStatus = dn.getNodeStatus();
-      NodeStatus newStatus = new NodeStatus(
-          newOpState, oldStatus.getHealth(), opStateExpiryEpochSeconds);
+      NodeStatus newStatus = NodeStatus.valueOf(newOpState, oldStatus.getHealth(), opStateExpiryEpochSeconds);
       dn.setNodeStatus(newStatus);
       return newStatus;
     } finally {
@@ -440,7 +438,7 @@ public class NodeStateMap {
   private List<DatanodeInfo> filterNodes(
       NodeOperationalState opState, NodeState health) {
     if (opState != null && health != null) {
-      return filterNodes(matching(new NodeStatus(opState, health)));
+      return filterNodes(matching(NodeStatus.valueOf(opState, health)));
     }
     if (opState != null) {
       return filterNodes(matching(opState));

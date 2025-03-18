@@ -81,7 +81,7 @@ public class TestNodeStateMap {
     NodeStatus status = NodeStatus.inServiceHealthy();
     map.addNode(dn, status, null);
 
-    NodeStatus expectedStatus = new NodeStatus(
+    NodeStatus expectedStatus = NodeStatus.valueOf(
         NodeOperationalState.DECOMMISSIONING,
         NodeState.HEALTHY, 999);
     NodeStatus returnedStatus = map.updateNodeOperationalState(
@@ -166,7 +166,7 @@ public class TestNodeStateMap {
       NodeOperationalState opState, NodeState health
   )
       throws NodeAlreadyExistsException {
-    NodeStatus status = new NodeStatus(opState, health);
+    NodeStatus status = NodeStatus.valueOf(opState, health);
     map.addNode(dn, status, null);
   }
 
