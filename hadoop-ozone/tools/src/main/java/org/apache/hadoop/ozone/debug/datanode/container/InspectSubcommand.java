@@ -44,7 +44,7 @@ public class InspectSubcommand extends AbstractSubcommand implements Callable<Vo
   private ContainerCommands parent;
 
   @Override
-  public Void call() throws IOException {
+  public Void call() throws IOException, IllegalAccessException, InstantiationException {
     final OzoneConfiguration conf = getOzoneConf();
     parent.loadContainersFromVolumes();
 

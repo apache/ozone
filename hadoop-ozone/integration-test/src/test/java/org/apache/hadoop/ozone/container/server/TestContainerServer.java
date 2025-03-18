@@ -58,6 +58,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGrpc;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
@@ -66,6 +67,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverSe
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.ratis.rpc.RpcType;
@@ -84,17 +86,19 @@ public class TestContainerServer {
   private static Path testDir;
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
   private static CertificateClient caClient;
+  private static VolumeChoosingPolicy volumeChoosingPolicy;
   @TempDir
   private Path tempDir;
 
   @BeforeAll
-  public static void setup() {
+  public static void setup() throws Exception {
     DefaultMetricsSystem.setMiniClusterMode(true);
     CONF.set(HddsConfigKeys.HDDS_METADATA_DIR_NAME, testDir.toString());
     CONF.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, false);
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     caClient = new DNCertificateClient(new SecurityConfig(CONF), null,
         dn, null, null, null);
+    volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(CONF);
   }
 
   @AfterAll
@@ -204,7 +208,7 @@ public class TestContainerServer {
       handlers.put(containerType,
           Handler.getHandlerForContainerType(containerType, conf,
               dd.getUuid().toString(),
-              containerSet, volumeSet, metrics,
+              containerSet, volumeSet, volumeChoosingPolicy, metrics,
               c -> {
               }));
     }
