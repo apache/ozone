@@ -82,6 +82,7 @@ public class MetadataCheck implements ReplicaVerifier {
         return;
       }
 
+      String blockId = null;
       boolean allReplicasHaveBlock = true;
       for (OmKeyLocationInfo keyLocation : keyLocations) {
         Pipeline keyPipeline = keyLocation.getPipeline();
@@ -96,6 +97,7 @@ public class MetadataCheck implements ReplicaVerifier {
               ContainerProtocolCalls.getBlockFromAllNodes(xceiverClient,
                   keyLocation.getBlockID().getDatanodeBlockIDProtobuf(), keyLocation.getToken());
 
+          blockId = keyLocation.getBlockID().toString();
           int totalExpectedReplicas = responses.size();
           int availableReplicas = 0;
 
@@ -115,9 +117,9 @@ public class MetadataCheck implements ReplicaVerifier {
       }
 
       if (allReplicasHaveBlock) {
-        printJsonResult(keyDetails, "BLOCK_EXISTS", null, true, result);
+        printJsonResult(keyDetails, "BLOCK_EXISTS", blockId, true, result);
       } else {
-        printJsonResult(keyDetails, "MISSING_REPLICAS", null, false, result);
+        printJsonResult(keyDetails, "MISSING_REPLICAS", blockId, false, result);
       }
 
     } catch (IOException | InterruptedException e) {
@@ -132,9 +134,7 @@ public class MetadataCheck implements ReplicaVerifier {
   private void printJsonResult(OzoneKeyDetails keyParts, String status, String blockId,
                                boolean pass, ObjectNode result) {
     result.put("key", keyParts.getVolumeName() + "/" + keyParts.getBucketName() + "/" + keyParts.getName());
-    if (blockId != null) {
-      result.put("blockID", blockId);
-    }
+    result.put("blockID", blockId);
     result.put("status", status);
     result.put("pass", pass);
 
