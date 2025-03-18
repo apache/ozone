@@ -157,7 +157,7 @@ public final class ContainerLogger {
   public static void logReconciled(ContainerData containerData, long oldDataChecksum, DatanodeDetails peer) {
     if (containerData.getDataChecksum() == oldDataChecksum) {
       LOG.info(getMessage(containerData, "Container reconciled with peer " + peer.toString() +
-          ". No change in checksum. Current checksum is " + checksumToString(containerData.getDataChecksum())));
+          ". No change in checksum."));
     } else {
       LOG.warn(getMessage(containerData, "Container reconciled with peer " + peer.toString() +
           ". Checksum updated from " + checksumToString(oldDataChecksum) + " to "

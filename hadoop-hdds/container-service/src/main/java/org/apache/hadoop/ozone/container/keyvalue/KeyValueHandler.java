@@ -25,6 +25,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CHUNK_FILE_INCONSISTENCY;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CLOSED_CONTAINER_IO;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_ALREADY_EXISTS;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_CHECKSUM_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_UNHEALTHY;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DELETE_ON_NON_EMPTY_CONTAINER;
@@ -1503,9 +1504,8 @@ public class KeyValueHandler extends Handler {
       // Try creating the checksum info from RocksDB metadata if it is not present.
       checksumInfo = createContainerMerkleTree(container);
       if (checksumInfo == null) {
-        LOG.error("Failed to reconcile container {} as checksum info is not available",
-            containerData.getContainerID());
-        return;
+        throw new StorageContainerException("Failed to reconcile container " + containerData.getContainerID()
+            + " as checksum info is not available", CONTAINER_CHECKSUM_ERROR);
       }
       oldDataChecksum = checksumInfo.getContainerMerkleTree().getDataChecksum();
     }
@@ -1529,7 +1529,7 @@ public class KeyValueHandler extends Handler {
         // Handle missing blocks
         for (ContainerProtos.BlockMerkleTree missingBlock : diffReport.getMissingBlocks()) {
           try {
-            handleMissingBlock(kvContainer, containerData, tokenHelper, xceiverClient, missingBlock);
+            handleMissingBlock(kvContainer, tokenHelper, xceiverClient, missingBlock);
           } catch (IOException e) {
             LOG.error("Error while reconciling missing block for block {} in container {}", missingBlock.getBlockID(),
                 containerData.getContainerID(), e);
@@ -1539,7 +1539,7 @@ public class KeyValueHandler extends Handler {
         // Handle missing chunks
         for (Map.Entry<Long, List<ContainerProtos.ChunkMerkleTree>> entry : diffReport.getMissingChunks().entrySet()) {
           try {
-            reconcileChunksPerBlock(kvContainer, containerData, tokenHelper, xceiverClient, entry.getKey(),
+            reconcileChunksPerBlock(kvContainer, tokenHelper, xceiverClient, entry.getKey(),
                 entry.getValue());
           } catch (IOException e) {
             LOG.error("Error while reconciling missing chunk for block {} in container {}", entry.getKey(),
@@ -1550,26 +1550,27 @@ public class KeyValueHandler extends Handler {
         // Handle corrupt chunks
         for (Map.Entry<Long, List<ContainerProtos.ChunkMerkleTree>> entry : diffReport.getCorruptChunks().entrySet()) {
           try {
-            reconcileChunksPerBlock(kvContainer, containerData, tokenHelper, xceiverClient, entry.getKey(),
+            reconcileChunksPerBlock(kvContainer, tokenHelper, xceiverClient, entry.getKey(),
                 entry.getValue());
           } catch (IOException e) {
             LOG.error("Error while reconciling corrupt chunk for block {} in container {}", entry.getKey(),
                     containerData.getContainerID(), e);
           }
         }
-        // Update checksum based on RocksDB metadata
+        // Update checksum based on RocksDB metadata, The read chunk validates the checksum of the data
+        // we read. So we can update the checksum only based on the RocksDB metadata.
         ContainerProtos.ContainerChecksumInfo updatedChecksumInfo = updateContainerChecksum(containerData);
         dataChecksum = updatedChecksumInfo.getContainerMerkleTree().getDataChecksum();
 
         long duration = Duration.between(start, Instant.now()).toMillis();
         if (dataChecksum == oldDataChecksum) {
           metrics.incContainerReconciledWithoutChanges();
-          LOG.info("Container {} reconciled without changes, Current checksum {}. Time taken {} ms",
-              containerData.getContainerID(), checksumToString(dataChecksum), duration);
+          LOG.info("Container {} reconciled with peer {}. No change in checksum. Current checksum {}. Time taken {} ms",
+              containerData.getContainerID(), peer.toString(), checksumToString(dataChecksum), duration);
         } else {
           metrics.incContainerReconciledWithChanges();
-          LOG.warn("Container {} reconciled, Checksum updated from {} to {}. Time taken {} ms",
-              containerData.getContainerID(), checksumToString(oldDataChecksum),
+          LOG.warn("Container {} reconciled with peer {}. Checksum updated from {} to {}. Time taken {} ms",
+              containerData.getContainerID(), peer.toString(), checksumToString(oldDataChecksum),
               checksumToString(dataChecksum), duration);
         }
         ContainerLogger.logReconciled(container.getContainerData(), oldDataChecksum, peer);
@@ -1583,7 +1584,10 @@ public class KeyValueHandler extends Handler {
     sendICR(container);
   }
 
-  // Return the entire tree instead of just the checksum
+  /**
+   * Updates the container merkle tree based on the RocksDb's block metadata and returns the updated checksum info.
+   * @param containerData - Container data for which the container merkle tree needs to be updated.
+   */
   private ContainerProtos.ContainerChecksumInfo updateContainerChecksum(KeyValueContainerData containerData)
       throws IOException {
     ContainerMerkleTreeWriter merkleTree = new ContainerMerkleTreeWriter();
@@ -1606,14 +1610,15 @@ public class KeyValueHandler extends Handler {
    * Handle missing block. It reads the missing block data from the peer datanode and writes it to the local container.
    * If the block write fails, the block commit sequence id is not updated.
    */
-  private void handleMissingBlock(KeyValueContainer container, ContainerData containerData, TokenHelper tokenHelper,
+  private void handleMissingBlock(KeyValueContainer container, TokenHelper tokenHelper,
                                   XceiverClientSpi xceiverClient, ContainerProtos.BlockMerkleTree missingBlock)
           throws IOException {
+    ContainerData containerData = container.getContainerData();
     BlockID blockID = new BlockID(containerData.getContainerID(), missingBlock.getBlockID());
     // The length of the block is not known, so instead of passing the default block length we pass 0. As the length
     // is not used to validate the token for getBlock call.
     Token<OzoneBlockTokenIdentifier> blockToken = tokenHelper.getBlockToken(blockID, 0L);
-    // TODO: Re-use the blockResponse for the same block again.
+    // TODO: Re-use the blockResponse for the same block again. https://issues.apache.org/jira/browse/HDDS-12623
     ContainerProtos.GetBlockResponseProto blockResponse = ContainerProtocolCalls.getBlock(xceiverClient, blockID,
         blockToken, new HashMap<>());
     ContainerProtos.BlockData peerBlockData = blockResponse.getBlockData();
@@ -1622,7 +1627,7 @@ public class KeyValueHandler extends Handler {
     // Check the local bcsId with the one from the bcsId from the peer datanode.
     long maxBcsId = Math.max(peerBlockData.getBlockID().getBlockCommitSequenceId(), bcsId);
     List<ContainerProtos.ChunkInfo> peerChunksList = peerBlockData.getChunksList();
-    List<ContainerProtos.ChunkInfo> successfullChunksList = new ArrayList<>();
+    List<ContainerProtos.ChunkInfo> successfulChunksList = new ArrayList<>();
     // Update BcsId only if all chunks are successfully written.
     boolean overwriteBcsId = true;
 
@@ -1634,7 +1639,7 @@ public class KeyValueHandler extends Handler {
         ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
         chunkInfo.addMetadata(OzoneConsts.CHUNK_OVERWRITE, "true");
         writeChunkForClosedContainer(chunkInfo, blockID, chunkBuffer, container);
-        successfullChunksList.add(chunkInfoProto);
+        successfulChunksList.add(chunkInfoProto);
       } catch (IOException ex) {
         overwriteBcsId = false;
         LOG.error("Error while reconciling missing block {} for offset {} in container {}",
@@ -1643,7 +1648,7 @@ public class KeyValueHandler extends Handler {
     }
 
     BlockData putBlockData = BlockData.getFromProtoBuf(peerBlockData);
-    putBlockData.setChunks(successfullChunksList);
+    putBlockData.setChunks(successfulChunksList);
     putBlockForClosedContainer(container, putBlockData, maxBcsId, overwriteBcsId);
   }
 
@@ -1667,15 +1672,17 @@ public class KeyValueHandler extends Handler {
    * datanode and writes it to the local container. If the chunk write fails, the block commit sequence
    * id is not updated.
    */
-  private void reconcileChunksPerBlock(KeyValueContainer container, ContainerData containerData,
-                                       TokenHelper tokenHelper, XceiverClientSpi xceiverClient, long blockId,
+  private void reconcileChunksPerBlock(KeyValueContainer container, TokenHelper tokenHelper,
+                                       XceiverClientSpi xceiverClient, long blockId,
                                        List<ContainerProtos.ChunkMerkleTree> chunkList) throws IOException {
+    ContainerData containerData = container.getContainerData();
     Set<Long> offsets = chunkList.stream().map(ContainerProtos.ChunkMerkleTree::getOffset)
         .collect(Collectors.toSet());
     BlockID blockID = new BlockID(containerData.getContainerID(), blockId);
     // The length of the block is not known, so instead of passing the default block length we pass 0. As the length
     // is not used to validate the token for getBlock call.
     Token<OzoneBlockTokenIdentifier> blockToken = tokenHelper.getBlockToken(blockID, 0L);
+    // TODO: Re-use the blockResponse for the same block again. https://issues.apache.org/jira/browse/HDDS-12623
     ContainerProtos.GetBlockResponseProto blockResponse = ContainerProtocolCalls.getBlock(xceiverClient, blockID,
         blockToken, new HashMap<>());
     ContainerProtos.BlockData peerBlockData = blockResponse.getBlockData();
