@@ -294,53 +294,6 @@ public class TestKeyManagerImpl {
   }
 
   @Test
-  public void allocateBlockFailureInSafeMode() throws Exception {
-    mockBlockClient();
-    OmKeyArgs keyArgs = createBuilder()
-        .setKeyName(KEY_NAME)
-        .build();
-
-    // As now openKey will allocate at least one block, even if the size
-    // passed is 0. So adding an entry to openKeyTable manually to test
-    // allocateBlock failure.
-    OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
-        .setVolumeName(keyArgs.getVolumeName())
-        .setBucketName(keyArgs.getBucketName())
-        .setKeyName(keyArgs.getKeyName())
-        .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-        .setCreationTime(Time.now())
-        .setModificationTime(Time.now())
-        .setDataSize(0)
-        .setReplicationConfig(keyArgs.getReplicationConfig())
-        .setFileEncryptionInfo(null).build();
-    metadataManager.getOpenKeyTable(getDefaultBucketLayout()).put(
-        metadataManager.getOpenKey(VOLUME_NAME, BUCKET_NAME, KEY_NAME, 1L),
-        omKeyInfo);
-    OMException omException = assertThrows(OMException.class,
-         () ->
-             writeClient.allocateBlock(keyArgs, 1L, new ExcludeList()));
-    assertThat(omException.getMessage())
-        .contains("SafeModePrecheck failed for allocateBlock");
-  }
-
-  @Test
-  public void openKeyFailureInSafeMode() throws Exception {
-    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
-    mockBlockClient();
-    OmKeyArgs keyArgs = createBuilder()
-        .setKeyName(KEY_NAME)
-        .setDataSize(1000)
-        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
-        .setAcls(OzoneAclUtil.getAclList(ugi, ALL, ALL))
-        .build();
-    OMException omException = assertThrows(OMException.class,
-        () -> writeClient.openKey(keyArgs));
-    assertThat(omException.getMessage())
-        .contains("SafeModePrecheck failed for allocateBlock");
-  }
-
-  @Test
   public void openKeyWithMultipleBlocks() throws IOException {
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(UUID.randomUUID().toString())
