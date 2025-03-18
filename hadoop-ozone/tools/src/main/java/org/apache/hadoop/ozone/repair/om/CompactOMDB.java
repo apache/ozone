@@ -69,6 +69,7 @@ public class CompactOMDB extends RepairTool {
                    UserGroupInformation.getCurrentUser(), omNodeDetails)) {
         omAdminProtocolClient.compactOMDB(columnFamilyName);
         info("Compaction request issued for om.db of om node: %s, column-family: %s.", nodeId, columnFamilyName);
+        info("Please check role logs of %s for completion status.", nodeId);
       } catch (IOException ex) {
         error("Couldn't compact column %s. \nException: %s", columnFamilyName, ex);
       }

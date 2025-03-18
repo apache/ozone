@@ -44,7 +44,7 @@ public class CompactDBService {
     return CompletableFuture.supplyAsync(() -> {
       try {
         return compactAsync(columnFamily);
-      } catch (IOException e) {
+      } catch (Exception e) {
         LOG.warn("Failed to compact column family: {}", columnFamily, e);
       }
       return null;
