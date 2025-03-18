@@ -1665,4 +1665,122 @@ public class TestContainerEndpoint {
     assertEquals(1, containerDiscrepancyInfoList.size());
     assertEquals(2, containerDiscrepancyInfoList.get(0).getContainerID());
   }
+
+  /**
+   * Helper method that creates duplicate FSO file keys – two keys having the same file
+   * name but under different directories. It creates the necessary volume, bucket, and
+   * directory entries, and then writes two keys using writeKeyToOm.
+   */
+  private void setUpDuplicateFSOFileKeys() throws IOException {
+    // Ensure the volume exists.
+    String volumeKey = reconOMMetadataManager.getVolumeKey(VOLUME_NAME);
+    OmVolumeArgs volArgs = OmVolumeArgs.newBuilder()
+        .setVolume(VOLUME_NAME)
+        .setAdminName("TestUser")
+        .setOwnerName("TestUser")
+        .setObjectID(VOL_OBJECT_ID)
+        .build();
+    reconOMMetadataManager.getVolumeTable().put(volumeKey, volArgs);
+
+    // Ensure the bucket exists.
+    OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(VOLUME_NAME)
+        .setBucketName(BUCKET_NAME)
+        .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .setObjectID(BUCKET_OBJECT_ID)
+        .build();
+    String bucketKey = reconOMMetadataManager.getBucketKey(VOLUME_NAME, BUCKET_NAME);
+    reconOMMetadataManager.getBucketTable().put(bucketKey, bucketInfo);
+
+    // Create two directories: "dirA" and "dirB" with unique object IDs.
+    // For a top-level directory in a bucket, the parent's object id is the bucket's id.
+    OmDirectoryInfo dirA = OmDirectoryInfo.newBuilder()
+        .setName("dirA")
+        .setParentObjectID(BUCKET_OBJECT_ID)
+        .setUpdateID(1L)
+        .setObjectID(5L)   // Unique object id for dirA.
+        .build();
+    OmDirectoryInfo dirB = OmDirectoryInfo.newBuilder()
+        .setName("dirB")
+        .setParentObjectID(BUCKET_OBJECT_ID)
+        .setUpdateID(1L)
+        .setObjectID(6L)   // Unique object id for dirB.
+        .build();
+    // Build DB directory keys. (The third parameter is used to form a unique key.)
+    String dirKeyA = reconOMMetadataManager.getOzonePathKey(VOL_OBJECT_ID, BUCKET_OBJECT_ID, 5L, "dirA");
+    String dirKeyB = reconOMMetadataManager.getOzonePathKey(VOL_OBJECT_ID, BUCKET_OBJECT_ID, 6L, "dirB");
+    reconOMMetadataManager.getDirectoryTable().put(dirKeyA, dirA);
+    reconOMMetadataManager.getDirectoryTable().put(dirKeyB, dirB);
+
+    // Use a common OmKeyLocationInfoGroup.
+    OmKeyLocationInfoGroup locationInfoGroup = getLocationInfoGroup1();
+
+    // Write two FSO keys with the same file name ("dupFile") but in different directories.
+    // The file name stored in OM is the full path (e.g., "dirA/dupFile" vs. "dirB/dupFile").
+    writeKeyToOm(reconOMMetadataManager,
+        "dupFileKey1",           // internal key name for the first key
+        BUCKET_NAME,
+        VOLUME_NAME,
+        "dupFileKey1",          // full file path for the first key
+        100L,                    // object id (example)
+        5L,                      // parent's object id for dirA (same as dirA's object id)
+        BUCKET_OBJECT_ID,
+        VOL_OBJECT_ID,
+        Collections.singletonList(locationInfoGroup),
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        KEY_ONE_SIZE);
+
+    writeKeyToOm(reconOMMetadataManager,
+        "dupFileKey1",           // internal key name for the second key
+        BUCKET_NAME,
+        VOLUME_NAME,
+        "dupFileKey1",          // full file path for the second key
+        100L,
+        6L,                      // parent's object id for dirB
+        BUCKET_OBJECT_ID,
+        VOL_OBJECT_ID,
+        Collections.singletonList(locationInfoGroup),
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        KEY_ONE_SIZE);
+  }
+
+  /**
+   * Test method that sets up two duplicate FSO file keys (same file name but in different directories)
+   * and then verifies that the ContainerEndpoint returns two distinct key records.
+   */
+  @Test
+  public void testDuplicateFSOKeysForContainerEndpoint() throws IOException {
+    // Set up duplicate FSO file keys.
+    setUpDuplicateFSOFileKeys();
+    NSSummaryTaskWithFSO nSSummaryTaskWithFso =
+        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
+            reconOMMetadataManager, 10);
+    nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
+    // Reprocess the container key mappings so that the new keys are loaded.
+    reprocessContainerKeyMapper();
+
+    // Assume that FSO keys are mapped to container ID 20L (as in previous tests for FSO).
+    Response response = containerEndpoint.getKeysForContainer(20L, -1, "");
+    KeysResponse keysResponse = (KeysResponse) response.getEntity();
+    Collection<KeyMetadata> keyMetadataList = keysResponse.getKeys();
+
+    // We expect two distinct keys.
+    assertEquals(2, keysResponse.getTotalCount());
+    assertEquals(2, keyMetadataList.size());
+
+    for (KeyMetadata km : keyMetadataList) {
+      String completePath = km.getCompletePath();
+      assertNotNull(completePath);
+      // Verify that the complete path reflects either directory "dirA" or "dirB"
+      if (completePath.contains("dirA")) {
+        assertEquals(VOLUME_NAME + "/" + BUCKET_NAME + "/dirA/dupFileKey1", completePath);
+      } else if (completePath.contains("dirB")) {
+        assertEquals(VOLUME_NAME + "/" + BUCKET_NAME + "/dirB/dupFileKey1", completePath);
+      } else {
+        throw new AssertionError("Unexpected complete path: " + completePath);
+      }
+    }
+  }
+
+
 }
