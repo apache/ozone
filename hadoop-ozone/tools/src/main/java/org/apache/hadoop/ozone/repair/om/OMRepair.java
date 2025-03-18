@@ -32,7 +32,7 @@ import picocli.CommandLine;
         SnapshotRepair.class,
         TransactionInfoRepair.class,
         QuotaRepair.class,
-        RocksDBManualCompaction.class
+        CompactOMDB.class
     },
     description = "Operational tool to repair OM.")
 @MetaInfServices(RepairSubcommand.class)

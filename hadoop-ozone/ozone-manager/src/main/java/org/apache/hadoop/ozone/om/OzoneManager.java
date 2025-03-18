@@ -5032,7 +5032,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  @Override
   public void compactOMDB(String columnFamily) throws IOException {
     checkAdminUserPrivilege("compact column family " + columnFamily);
     new CompactDBService(this).compact(columnFamily);
