@@ -177,11 +177,7 @@ public class DatanodeStateMachine implements Closeable {
     connectionManager = new SCMConnectionManager(conf);
     context = new StateContext(this.conf, DatanodeStates.getInitState(), this,
         threadNamePrefix);
-    try {
-      volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+    volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
     // OzoneContainer instance is used in a non-thread safe way by the context
     // past to its constructor, so we much synchronize its access. See
     // HDDS-3116 for more details.

@@ -185,7 +185,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
   }
 
   private void initializeReplicationSupervisor(
-      ConfigurationSource conf, int queueSize) throws IOException, IllegalAccessException, InstantiationException {
+      ConfigurationSource conf, int queueSize) throws IOException {
     String scmID = UUID.randomUUID().toString();
     String clusterID = UUID.randomUUID().toString();
     String fakeDatanodeUuid = datanode;

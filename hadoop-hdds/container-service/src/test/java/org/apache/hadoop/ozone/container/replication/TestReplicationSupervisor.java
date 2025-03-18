@@ -291,7 +291,7 @@ public class TestReplicationSupervisor {
 
   @ContainerLayoutTestInfo.ContainerTest
   public void testDownloadAndImportReplicatorFailure(ContainerLayoutVersion layout,
-      @TempDir File tempFile) throws IOException, InstantiationException, IllegalAccessException {
+      @TempDir File tempFile) throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
 
     ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()

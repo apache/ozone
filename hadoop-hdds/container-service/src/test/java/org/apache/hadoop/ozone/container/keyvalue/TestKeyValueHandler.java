@@ -97,7 +97,7 @@ public class TestKeyValueHandler {
   private VolumeChoosingPolicy volumeChoosingPolicy;
 
   @BeforeEach
-  public void setup() throws StorageContainerException, IllegalAccessException, InstantiationException {
+  public void setup() throws StorageContainerException {
     // Create mock HddsDispatcher and KeyValueHandler.
     handler = mock(KeyValueHandler.class);
 

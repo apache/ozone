@@ -131,7 +131,7 @@ public final class ContainerTestUtils {
 
   public static OzoneContainer getOzoneContainer(
       DatanodeDetails datanodeDetails, OzoneConfiguration conf)
-      throws IOException, InstantiationException, IllegalAccessException {
+      throws IOException {
     StateContext context = getMockContext(datanodeDetails, conf);
     VolumeChoosingPolicy volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
     return new OzoneContainer(datanodeDetails, conf, context, volumeChoosingPolicy);

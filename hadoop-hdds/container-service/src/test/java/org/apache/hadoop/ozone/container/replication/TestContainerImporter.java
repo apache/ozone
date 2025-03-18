@@ -77,7 +77,7 @@ class TestContainerImporter {
   private VolumeChoosingPolicy volumeChoosingPolicy;
 
   @BeforeEach
-  void setup() throws Exception {
+  void setup() {
     conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, tempDir.getAbsolutePath());
     volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);

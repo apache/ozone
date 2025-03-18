@@ -91,7 +91,7 @@ public class TestContainerServer {
   private Path tempDir;
 
   @BeforeAll
-  public static void setup() throws Exception {
+  public static void setup() {
     DefaultMetricsSystem.setMiniClusterMode(true);
     CONF.set(HddsConfigKeys.HDDS_METADATA_DIR_NAME, testDir.toString());
     CONF.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, false);

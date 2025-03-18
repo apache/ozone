@@ -81,7 +81,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
   private VolumeChoosingPolicy volumeChoosingPolicy;
 
   @BeforeEach
-  public void init() throws Exception {
+  public void init() {
     mockIcrSender = mock(IncrementalReportSender.class);
     volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(new OzoneConfiguration());
   }

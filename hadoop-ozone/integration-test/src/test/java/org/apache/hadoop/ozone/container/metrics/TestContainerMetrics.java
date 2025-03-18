@@ -91,7 +91,7 @@ public class TestContainerMetrics {
   private static VolumeChoosingPolicy volumeChoosingPolicy;
 
   @BeforeAll
-  public static void setup() throws Exception {
+  public static void setup() {
     DefaultMetricsSystem.setMiniClusterMode(true);
     CONF.setInt(HddsConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY,
         DFS_METRICS_PERCENTILES_INTERVALS);

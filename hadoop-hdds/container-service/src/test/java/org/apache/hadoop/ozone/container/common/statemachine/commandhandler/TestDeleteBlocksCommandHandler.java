@@ -298,7 +298,7 @@ public class TestDeleteBlocksCommandHandler {
 
   @Test
   public void testDeleteBlockCommandHandleWhenDeleteCommandQueuesFull()
-      throws IOException, IllegalAccessException, InstantiationException {
+      throws IOException {
     int blockDeleteQueueLimit = 5;
     // Setting up the test environment
     OzoneConfiguration configuration = new OzoneConfiguration();

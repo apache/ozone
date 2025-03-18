@@ -97,7 +97,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
@@ -121,8 +121,8 @@ public class TestHddsDispatcher {
       c -> {
       };
 
-  @BeforeEach
-  public void setUp() throws Exception {
+  @BeforeAll
+  public static void init() {
     volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(new OzoneConfiguration());
   }
 

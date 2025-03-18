@@ -83,7 +83,7 @@ public class ContainerCommands extends AbstractSubcommand {
 
   private ContainerController controller;
 
-  public void loadContainersFromVolumes() throws IOException, IllegalAccessException, InstantiationException {
+  public void loadContainersFromVolumes() throws IOException {
     OzoneConfiguration conf = getOzoneConf();
 
     ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);

@@ -132,7 +132,7 @@ public class TestBlockDeletingService {
   private MutableVolumeSet volumeSet;
 
   @BeforeEach
-  public void init() throws Exception {
+  public void init() throws IOException {
     CodecBuffer.enableLeakDetection();
     scmId = UUID.randomUUID().toString();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
