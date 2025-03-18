@@ -65,6 +65,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.HddsDatanodeService;
+import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -486,6 +487,11 @@ public class OzoneContainer {
       LOG.info("Ignore. OzoneContainer already started.");
       return;
     }
+
+    DatanodeLayoutStorage layoutStorage
+        = new DatanodeLayoutStorage(config);
+    layoutStorage.setClusterId(clusterId);
+    layoutStorage.persistCurrentState();
 
     buildContainerSet();
 
