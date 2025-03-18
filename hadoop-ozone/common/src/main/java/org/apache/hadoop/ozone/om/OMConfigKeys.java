@@ -623,7 +623,8 @@ public final class OMConfigKeys {
       "ozone.om.max.buckets";
   public static final int OZONE_OM_MAX_BUCKET_DEFAULT = 100000;
 
-  public static final String OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY = "ozone.om.edekcacheloader.initial.delay.ms";
+  public static final String OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY =
+      "ozone.om.edekcacheloader.initial.delay.ms";
 
   public static final int OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_DEFAULT = 3000;
 
