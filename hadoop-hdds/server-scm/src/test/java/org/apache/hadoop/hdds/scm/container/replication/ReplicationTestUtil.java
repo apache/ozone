@@ -35,7 +35,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -55,6 +54,7 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacem
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -334,7 +334,7 @@ public final class ReplicationTestUtil {
               throws SCMException {
         long containerSize = (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
-        assertEquals(HddsUtils.requiredReplicationSpace(containerSize), dataSizeRequired);
+        assertEquals(HddsServerUtil.requiredReplicationSpace(containerSize), dataSizeRequired);
         if (nodesRequiredToChoose > 1) {
           throw new IllegalArgumentException("Only one node is allowed");
         }
@@ -365,7 +365,7 @@ public final class ReplicationTestUtil {
               throws SCMException {
         long containerSize = (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
-        assertEquals(HddsUtils.requiredReplicationSpace(containerSize), dataSizeRequired);
+        assertEquals(HddsServerUtil.requiredReplicationSpace(containerSize), dataSizeRequired);
         throw new SCMException("No nodes available",
                 FAILED_TO_FIND_SUITABLE_NODE);
       }
@@ -395,7 +395,7 @@ public final class ReplicationTestUtil {
           throws SCMException {
         long containerSize = (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
-        assertEquals(HddsUtils.requiredReplicationSpace(containerSize), dataSizeRequired);
+        assertEquals(HddsServerUtil.requiredReplicationSpace(containerSize), dataSizeRequired);
         if (nodesRequiredToChoose >= throwWhenThisOrMoreNodesRequested) {
           throw new SCMException("No nodes available",
               FAILED_TO_FIND_SUITABLE_NODE);
