@@ -377,8 +377,8 @@ public class NodeStateManager implements Runnable, Closeable {
     return getNode(datanodeDetails.getID());
   }
 
-  public DatanodeInfo getNode(DatanodeID uuid) throws NodeNotFoundException {
-    return nodeStateMap.getNodeInfo(uuid);
+  public DatanodeInfo getNode(DatanodeID datanodeID) throws NodeNotFoundException {
+    return nodeStateMap.getNodeInfo(datanodeID);
   }
 
   /**
@@ -713,14 +713,14 @@ public class NodeStateManager implements Runnable, Closeable {
    * synchronization or side effects.
    * @return - set of containerIDs
    */
-  public Set<ContainerID> getContainers(DatanodeID uuid)
+  public Set<ContainerID> getContainers(DatanodeID datanodeID)
       throws NodeNotFoundException {
-    return nodeStateMap.getContainers(uuid);
+    return nodeStateMap.getContainers(datanodeID);
   }
 
-  public int getContainerCount(DatanodeID uuid)
+  public int getContainerCount(DatanodeID datanodeID)
       throws NodeNotFoundException {
-    return nodeStateMap.getContainerCount(uuid);
+    return nodeStateMap.getContainerCount(datanodeID);
   }
 
   /**
