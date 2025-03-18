@@ -21,7 +21,6 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -703,9 +702,11 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
         = omMetadataManager.getDeletedTable().getRangeKVs(null, 100, deletedKey);
     assertThat(rangeKVs.size()).isGreaterThan(0);
-    assertEquals(1, rangeKVs.get(0).getValue().getOmKeyInfoList().size());
-    assertFalse(rangeKVs.get(0).getKey().endsWith(rangeKVs.get(0).getValue().getOmKeyInfoList().get(0).getObjectID()
-        + ""));
+    Table.KeyValue<String, RepeatedOmKeyInfo> keyValue = rangeKVs.get(0);
+    String key = keyValue.getKey();
+    List<OmKeyInfo> omKeyInfoList = keyValue.getValue().getOmKeyInfoList();
+    assertEquals(1, omKeyInfoList.size());
+    assertThat(key).doesNotEndWith(String.valueOf(omKeyInfoList.get(0).getObjectID()));
   }
 
   /**

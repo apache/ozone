@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.apache.ozone.test.MetricsAsserts.assertCounter;
 import static org.apache.ozone.test.MetricsAsserts.getDoubleGauge;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
@@ -45,7 +46,6 @@ import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
@@ -182,7 +182,7 @@ public class TestCSMMetrics {
 
     final ContainerDispatcher dispatcher = new TestContainerDispatcher();
     return XceiverServerRatis.newXceiverServerRatis(null, dn, conf, dispatcher,
-        new ContainerController(new ContainerSet(1000), Maps.newHashMap()),
+        new ContainerController(newContainerSet(), Maps.newHashMap()),
         null, null);
   }
 

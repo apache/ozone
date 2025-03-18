@@ -19,6 +19,9 @@ package org.apache.hadoop.ozone.s3.signature;
 
 import static java.time.temporal.ChronoUnit.SECONDS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_UNSIGNED_PAYLOAD_TRAILER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.UnsupportedEncodingException;
@@ -40,10 +43,10 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.MultivaluedMap;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor.LowerCaseKeyStringMap;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
-import org.apache.hadoop.util.StringUtils;
 import org.apache.kerby.util.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,14 +56,12 @@ import org.slf4j.LoggerFactory;
  */
 public final class StringToSignProducer {
 
-  public static final String X_AMZ_CONTENT_SHA256 = "x-amz-content-sha256";
   public static final String X_AMAZ_DATE = "x-amz-date";
   private static final Logger LOG =
       LoggerFactory.getLogger(StringToSignProducer.class);
   private static final Charset UTF_8 = StandardCharsets.UTF_8;
   private static final String NEWLINE = "\n";
   public static final String HOST = "host";
-  private static final String UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
   /**
    * Seconds in a week, which is the max expiration time Sig-v4 accepts.
    */
@@ -109,15 +110,15 @@ public final class StringToSignProducer {
 
     // If the absolute path is empty, use a forward slash (/)
     String uri = signatureInfo.getUnfilteredURI();
-    uri = (!uri.trim().isEmpty()) ? uri : "/";
+    uri = StringUtils.isNotBlank(uri) ? uri : "/";
     // Encode URI and preserve forward slashes
-    strToSign.append(signatureInfo.getAlgorithm() + NEWLINE);
+    strToSign.append(signatureInfo.getAlgorithm()).append(NEWLINE);
     if (signatureInfo.getDateTime() == null) {
       LOG.error("DateTime Header not found.");
       throw S3_AUTHINFO_CREATION_ERROR;
     }
-    strToSign.append(signatureInfo.getDateTime() + NEWLINE);
-    strToSign.append(credentialScope + NEWLINE);
+    strToSign.append(signatureInfo.getDateTime()).append(NEWLINE);
+    strToSign.append(credentialScope).append(NEWLINE);
 
     String canonicalRequest = buildCanonicalRequest(
         scheme,
@@ -174,7 +175,7 @@ public final class StringToSignProducer {
 
     StringBuilder canonicalHeaders = new StringBuilder();
 
-    for (String header : StringUtils.getStringCollection(signedHeaders, ";")) {
+    for (String header : StringUtils.split(signedHeaders, ';')) {
       canonicalHeaders.append(header.toLowerCase());
       canonicalHeaders.append(":");
       if (headers.containsKey(header)) {
@@ -201,8 +202,9 @@ public final class StringToSignProducer {
         unsignedPayload);
 
     String payloadHash;
-    if (UNSIGNED_PAYLOAD.equals(
-        headers.get(X_AMZ_CONTENT_SHA256)) || unsignedPayload) {
+    if (UNSIGNED_PAYLOAD.equals(headers.get(X_AMZ_CONTENT_SHA256)) ||
+        STREAMING_UNSIGNED_PAYLOAD_TRAILER.equals(headers.get(X_AMZ_CONTENT_SHA256)) ||
+        unsignedPayload) {
       payloadHash = UNSIGNED_PAYLOAD;
     } else {
       // According to AWS Sig V4 documentation

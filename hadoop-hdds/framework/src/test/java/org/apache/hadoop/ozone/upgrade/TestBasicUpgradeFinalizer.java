@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.upgrade;
 
 import static org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_1;
 import static org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_3;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.ALREADY_FINALIZED;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.ALREADY_FINALIZED;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.FINALIZATION_DONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -41,7 +41,7 @@ import java.util.concurrent.Future;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints;
 import org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizerActions.MockLayoutVersionManager;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.slf4j.Logger;
@@ -123,14 +123,14 @@ public class TestBasicUpgradeFinalizer {
 
     // The first finalize call should block until the executor is unpaused.
     Future<?> firstFinalizeFuture = runFinalization(finalizer,
-        UpgradeFinalizer.Status.STARTING_FINALIZATION);
+        UpgradeFinalization.Status.STARTING_FINALIZATION);
     // Wait for finalization to pause at the halting point.
     pauseLatch.await();
 
     Future<?> secondFinalizeFuture = runFinalization(finalizer,
-        UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS);
+        UpgradeFinalization.Status.FINALIZATION_IN_PROGRESS);
     Future<?> finalizeQueryFuture = runFinalizationQuery(finalizer,
-        UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS);
+        UpgradeFinalization.Status.FINALIZATION_IN_PROGRESS);
 
     // While finalization is paused, the two following requests should have
     // reported it is in progress.
@@ -146,7 +146,7 @@ public class TestBasicUpgradeFinalizer {
     List<Future<?>> finalizeFutures = new ArrayList<>();
     for (int i = 0; i < 10; i++) {
       finalizeFutures.add(runFinalizationQuery(finalizer,
-          UpgradeFinalizer.Status.FINALIZATION_DONE));
+          UpgradeFinalization.Status.FINALIZATION_DONE));
     }
 
     // Wait for all queries to complete.
@@ -157,7 +157,7 @@ public class TestBasicUpgradeFinalizer {
 
   private Future<?> runFinalization(
       BasicUpgradeFinalizer<Object, MockLayoutVersionManager> finalizer,
-      UpgradeFinalizer.Status expectedStatus) {
+      UpgradeFinalization.Status expectedStatus) {
     return Executors.newSingleThreadExecutor().submit(() -> {
       try {
         StatusAndMessages result = finalizer.finalize("test", new Object());
@@ -171,7 +171,7 @@ public class TestBasicUpgradeFinalizer {
   }
 
   private Future<?> runFinalizationQuery(UpgradeFinalizer<Object> finalizer,
-      UpgradeFinalizer.Status expectedStatus) {
+      UpgradeFinalization.Status expectedStatus) {
     return Executors.newSingleThreadExecutor().submit(() -> {
       assertEquals(expectedStatus, finalizer.getStatus());
     });

@@ -47,8 +47,7 @@ public class TestGetScmRatisRolesSubcommand {
     result.add("bigdata-ozone-online32:9894:LEADER:e428ca07-b2a3-4756-bf9b-a4abb033c7d1:100.3.192.89");
     result.add("bigdata-ozone-online30:9894:FOLLOWER:41f90734-b3ee-4284-ad96-40a286654952:100.3.196.51");
 
-    when(client.getScmRatisRoles()).thenAnswer(invocation -> result);
-    when(client.isScmRatisEnable()).thenAnswer(invocation -> true);
+    when(client.getScmRoles()).thenAnswer(invocation -> result);
 
     try (GenericTestUtils.SystemOutCapturer capture =
         new GenericTestUtils.SystemOutCapturer()) {
@@ -62,24 +61,4 @@ public class TestGetScmRatisRolesSubcommand {
     }
   }
 
-  @Test
-  public void testGetScmStandAloneRoles() throws Exception {
-
-    GetScmRatisRolesSubcommand cmd = new GetScmRatisRolesSubcommand();
-    ScmClient client = mock(ScmClient.class);
-    CommandLine c = new CommandLine(cmd);
-    c.parseArgs("--table");
-
-    List<String> result = new ArrayList<>();
-    result.add("bigdata-ozone-online31:9894");
-
-    when(client.getScmRatisRoles()).thenAnswer(invocation -> result);
-    when(client.isScmRatisEnable()).thenAnswer(invocation -> false);
-
-    try (GenericTestUtils.SystemOutCapturer capture =
-        new GenericTestUtils.SystemOutCapturer()) {
-      cmd.execute(client);
-      assertThat(capture.getOutput()).contains("| bigdata-ozone-online31 | 9894 |");
-    }
-  }
 }

@@ -27,11 +27,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.io.BufferedInputStream;
 import java.io.EOFException;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
 import java.util.UUID;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -287,7 +287,7 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
   public void testSequenceFileReaderSync() throws IOException {
     File srcfile = new File("src/test/resources/testSequenceFile");
     Path path = new Path("/" + RandomStringUtils.randomAlphanumeric(5));
-    InputStream input = new BufferedInputStream(new FileInputStream(srcfile));
+    InputStream input = new BufferedInputStream(Files.newInputStream(srcfile.toPath()));
 
     // Upload test SequenceFile file
     FSDataOutputStream output = fs.create(path);
@@ -309,7 +309,7 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
   public void testSequenceFileReaderSyncEC() throws IOException {
     File srcfile = new File("src/test/resources/testSequenceFile");
     Path path = new Path("/" + RandomStringUtils.randomAlphanumeric(5));
-    InputStream input = new BufferedInputStream(new FileInputStream(srcfile));
+    InputStream input = new BufferedInputStream(Files.newInputStream(srcfile.toPath()));
 
     // Upload test SequenceFile file
     FSDataOutputStream output = ecFs.create(path);

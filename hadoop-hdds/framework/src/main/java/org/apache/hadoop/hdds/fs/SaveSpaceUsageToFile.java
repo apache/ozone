@@ -22,7 +22,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
@@ -109,7 +108,7 @@ public class SaveSpaceUsageToFile implements SpaceUsagePersistence {
     long used = source.getUsedSpace();
     if (used > 0) {
       Instant now = Instant.now();
-      try (OutputStream fileOutput = new FileOutputStream(file);
+      try (OutputStream fileOutput = Files.newOutputStream(file.toPath());
            Writer out = new OutputStreamWriter(fileOutput, UTF_8)) {
         // time is written last, so that truncated writes won't be valid.
         out.write(used + " " + now.toEpochMilli());

@@ -28,7 +28,6 @@ import picocli.CommandLine;
         name = "ldb",
         subcommands = {
             DBScanner.class,
-            DropTable.class,
             ListTables.class,
             ValueSchema.class,
             Checkpoint.class,

@@ -46,16 +46,16 @@ public class SafeModeCheckSubcommand extends ScmSubcommand {
     // Output data list
     if (execReturn) {
       System.out.println("SCM is in safe mode.");
-      if (verbose) {
-        for (Map.Entry<String, Pair<Boolean, String>> entry :
-            scmClient.getSafeModeRuleStatuses().entrySet()) {
-          Pair<Boolean, String> value = entry.getValue();
-          System.out.printf("validated:%s, %s, %s%n",
-              value.getLeft(), entry.getKey(), value.getRight());
-        }
-      }
     } else {
       System.out.println("SCM is out of safe mode.");
+    }
+    if (verbose) {
+      for (Map.Entry<String, Pair<Boolean, String>> entry :
+          scmClient.getSafeModeRuleStatuses().entrySet()) {
+        Pair<Boolean, String> value = entry.getValue();
+        System.out.printf("validated:%s, %s, %s%n",
+            value.getLeft(), entry.getKey(), value.getRight());
+      }
     }
   }
 }

@@ -61,13 +61,14 @@ import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.slf4j.event.Level.DEBUG;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -952,9 +953,9 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     assertEquals(3, bucketAcls.size());
     assertTrue(bucketAcls.contains(currentUserAcl));
     assertTrue(bucketAcls.contains(currentUserPrimaryGroupAcl));
-    assertTrue(bucketAcls.get(2).getName().equals(userAcl1.getName()));
-    assertTrue(bucketAcls.get(2).getAclList().equals(userAcl1.getAclList()));
-    assertTrue(bucketAcls.get(2).getAclScope().equals(ACCESS));
+    assertEquals(userAcl1.getName(), bucketAcls.get(2).getName());
+    assertEquals(userAcl1.getAclList(), bucketAcls.get(2).getAclList());
+    assertEquals(ACCESS, bucketAcls.get(2).getAclScope());
 
     // link bucket
     OzoneAcl userAcl2 = new OzoneAcl(USER, "test-link", DEFAULT, READ);
@@ -970,9 +971,9 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     assertTrue(linkBucketAcls.contains(currentUserPrimaryGroupAcl));
     assertTrue(linkBucketAcls.contains(userAcl2));
     assertTrue(linkBucketAcls.contains(OzoneAcl.LINK_BUCKET_DEFAULT_ACL));
-    assertTrue(linkBucketAcls.get(4).getName().equals(userAcl1.getName()));
-    assertTrue(linkBucketAcls.get(4).getAclList().equals(userAcl1.getAclList()));
-    assertTrue(linkBucketAcls.get(4).getAclScope().equals(ACCESS));
+    assertEquals(userAcl1.getName(), linkBucketAcls.get(4).getName());
+    assertEquals(userAcl1.getAclList(), linkBucketAcls.get(4).getAclList());
+    assertEquals(ACCESS, linkBucketAcls.get(4).getAclScope());
   }
 
   @Test
@@ -1083,8 +1084,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    String value = "sample value";
-    int valueLength = value.getBytes(UTF_8).length;
+    byte[] value = "sample value".getBytes(UTF_8);
+    int valueLength = value.length;
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -1092,7 +1093,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     // create a three replica file
     String keyName1 = "key1";
-    TestDataUtil.createKey(bucket, keyName1, THREE, RATIS, value);
+    TestDataUtil.createKey(bucket, keyName1, ReplicationConfig
+        .fromTypeAndFactor(RATIS, THREE), value);
 
     // create a EC replica file
     String keyName2 = "key2";
@@ -1103,7 +1105,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     String dirName = "dir1";
     bucket.createDirectory(dirName);
     String keyName3 = "key3";
-    TestDataUtil.createKey(bucket, keyName3, THREE, RATIS, value);
+    TestDataUtil.createKey(bucket, keyName3, ReplicationConfig
+        .fromTypeAndFactor(RATIS, THREE), value);
 
     // delete files and directory
     output.reset();
@@ -1113,7 +1116,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     // create keys for deleteKeys case
     String keyName4 = "key4";
-    TestDataUtil.createKey(bucket, dirName + "/" + keyName4, THREE, RATIS, value);
+    TestDataUtil.createKey(bucket, dirName + "/" + keyName4,
+        ReplicationConfig.fromTypeAndFactor(RATIS, THREE), value);
 
     String keyName5 = "key5";
     TestDataUtil.createKey(bucket, dirName + "/" + keyName5, replicationConfig, value);
@@ -4951,7 +4955,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     final byte[] data = new byte[8 * chunkSize];
     ThreadLocalRandom.current().nextBytes(data);
     final File file = new File(dir.toString(), "data");
-    try (FileOutputStream out = new FileOutputStream(file)) {
+    try (OutputStream out = Files.newOutputStream(file.toPath())) {
       out.write(data);
     }
 

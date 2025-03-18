@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.impl;
 
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -81,7 +82,7 @@ public class TestContainerDeletionChoosingPolicy {
     conf.set(
         ScmConfigKeys.OZONE_SCM_KEY_VALUE_CONTAINER_DELETION_CHOOSING_POLICY,
         RandomContainerDeletionChoosingPolicy.class.getName());
-    containerSet = new ContainerSet(1000);
+    containerSet = newContainerSet();
 
     int numContainers = 10;
     for (int i = 0; i < numContainers; i++) {
@@ -142,7 +143,7 @@ public class TestContainerDeletionChoosingPolicy {
     conf.set(
         ScmConfigKeys.OZONE_SCM_KEY_VALUE_CONTAINER_DELETION_CHOOSING_POLICY,
         TopNOrderedContainerDeletionChoosingPolicy.class.getName());
-    containerSet = new ContainerSet(1000);
+    containerSet = newContainerSet();
 
     int numContainers = 10;
     Random random = new Random();

@@ -18,6 +18,7 @@
 package org.apache.ozone.fs.http.server;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -36,7 +37,7 @@ import org.slf4j.LoggerFactory;
  * </code> implementation that is wired in HttpFSServer's WAR
  * <code>WEB-INF/web.xml</code>.
  * <p>
- * It provides acces to the server context via the singleton {@link #get}.
+ * It provides access to the server context via the singleton {@link #get}.
  * <p>
  * All the configuration is loaded from configuration properties prefixed
  * with <code>httpfs.</code>.
@@ -56,8 +57,8 @@ public class HttpFSServerWebApp extends ServerWebApp {
    */
   public static final String CONF_ADMIN_GROUP = "admin.group";
 
-  private static HttpFSServerWebApp server;
-  private static HttpFSServerMetrics metrics;
+  private static final AtomicReference<HttpFSServerWebApp> SERVER = new AtomicReference<>();
+  private static final AtomicReference<HttpFSServerMetrics> METRICS = new AtomicReference<>();
 
   private String adminGroup;
 
@@ -80,13 +81,12 @@ public class HttpFSServerWebApp extends ServerWebApp {
    */
   @Override
   public void init() throws ServerException {
-    if (server != null) {
+    if (!SERVER.compareAndSet(null, this)) {
       throw new RuntimeException("HttpFSServer server already initialized");
     }
-    server = this;
     super.init();
     adminGroup = getConfig().get(getPrefixedName(CONF_ADMIN_GROUP), "admin");
-    LOG.info("Connects to Namenode [{}]",
+    LOG.info("Connects to FileSystem [{}]",
              get().get(FileSystemAccess.class).getFileSystemConfiguration().
                get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY));
     setMetrics(getConfig());
@@ -97,7 +97,8 @@ public class HttpFSServerWebApp extends ServerWebApp {
    */
   @Override
   public void destroy() {
-    server = null;
+    SERVER.set(null);
+    HttpFSServerMetrics metrics = METRICS.getAndSet(null);
     if (metrics != null) {
       metrics.shutdown();
     }
@@ -106,11 +107,11 @@ public class HttpFSServerWebApp extends ServerWebApp {
 
   private static void setMetrics(Configuration config) {
     LOG.info("Initializing HttpFSServerMetrics");
-    metrics = HttpFSServerMetrics.create(config, "HttpFSServer");
+    METRICS.updateAndGet(prev -> prev != null ? prev : HttpFSServerMetrics.create(config, "HttpFSServer"));
     JvmPauseMonitor pauseMonitor = new JvmPauseMonitor();
     pauseMonitor.init(config);
     pauseMonitor.start();
-    metrics.getJvmMetrics().setPauseMonitor(pauseMonitor);
+    METRICS.get().getJvmMetrics().setPauseMonitor(pauseMonitor);
     FSOperations.setBufferSize(config);
     DefaultMetricsSystem.initialize("HttpFSServer");
   }
@@ -121,7 +122,7 @@ public class HttpFSServerWebApp extends ServerWebApp {
    * @return the HttpFSServer server singleton.
    */
   public static HttpFSServerWebApp get() {
-    return server;
+    return SERVER.get();
   }
 
   /**
@@ -129,7 +130,7 @@ public class HttpFSServerWebApp extends ServerWebApp {
    * @return the HttpFSServerMetrics singleton.
    */
   public static HttpFSServerMetrics getMetrics() {
-    return metrics;
+    return METRICS.get();
   }
 
   /**

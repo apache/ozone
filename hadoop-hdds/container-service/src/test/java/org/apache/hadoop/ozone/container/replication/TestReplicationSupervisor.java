@@ -25,6 +25,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.LOW;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.NORMAL;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status.DONE;
 import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.fromSources;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -125,7 +126,7 @@ public class TestReplicationSupervisor {
   @BeforeEach
   public void setUp() throws Exception {
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
-    set = new ContainerSet(1000);
+    set = newContainerSet();
     DatanodeStateMachine stateMachine = mock(DatanodeStateMachine.class);
     context = new StateContext(
         new OzoneConfiguration(),

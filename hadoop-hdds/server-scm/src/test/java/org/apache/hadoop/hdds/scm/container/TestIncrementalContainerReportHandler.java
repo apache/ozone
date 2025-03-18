@@ -155,8 +155,7 @@ public class TestIncrementalContainerReportHandler {
 
     doAnswer(invocation -> {
       containerStateManager
-          .removeContainerReplica(((ContainerID)invocation
-                  .getArguments()[0]),
+          .removeContainerReplica(
               (ContainerReplica)invocation.getArguments()[1]);
       return null;
     }).when(containerManager).removeContainerReplica(
@@ -175,8 +174,7 @@ public class TestIncrementalContainerReportHandler {
 
     doAnswer(invocation -> {
       containerStateManager
-          .updateContainerReplica(((ContainerID)invocation
-                  .getArguments()[0]),
+          .updateContainerReplica(
               (ContainerReplica) invocation.getArguments()[1]);
       return null;
     }).when(containerManager).updateContainerReplica(
@@ -213,8 +211,7 @@ public class TestIncrementalContainerReportHandler {
         datanodeOne, datanodeTwo, datanodeThree);
 
     containerStateManager.addContainer(container.getProtobuf());
-    containerReplicas.forEach(r -> containerStateManager.updateContainerReplica(
-        container.containerID(), r));
+    containerReplicas.forEach(containerStateManager::updateContainerReplica);
 
     final IncrementalContainerReportProto containerReport =
         getIncrementalContainerReportProto(container.containerID(),
@@ -331,7 +328,7 @@ public class TestIncrementalContainerReportHandler {
             container.getSequenceId(),
             dns.toArray(new DatanodeDetails[0]));
     for (ContainerReplica r : replicas) {
-      containerStateManager.updateContainerReplica(container.containerID(), r);
+      containerStateManager.updateContainerReplica(r);
     }
 
     // Tell NodeManager that each DN hosts a replica of this container
@@ -359,9 +356,7 @@ public class TestIncrementalContainerReportHandler {
         datanodeOne, datanodeTwo, datanodeThree);
 
     containerStateManager.addContainer(container.getProtobuf());
-    containerReplicas.forEach(r -> containerStateManager.updateContainerReplica(
-        container.containerID(), r));
-
+    containerReplicas.forEach(containerStateManager::updateContainerReplica);
 
     final IncrementalContainerReportProto containerReport =
         getIncrementalContainerReportProto(container.containerID(),
@@ -396,8 +391,7 @@ public class TestIncrementalContainerReportHandler {
         datanodeThree));
 
     containerStateManager.addContainer(container.getProtobuf());
-    containerReplicas.forEach(r -> containerStateManager.updateContainerReplica(
-        container.containerID(), r));
+    containerReplicas.forEach(containerStateManager::updateContainerReplica);
 
     final IncrementalContainerReportProto containerReport =
         getIncrementalContainerReportProto(container.containerID(),
@@ -440,8 +434,7 @@ public class TestIncrementalContainerReportHandler {
         datanodeThree));
 
     containerStateManager.addContainer(container.getProtobuf());
-    containerReplicas.forEach(r -> containerStateManager.updateContainerReplica(
-        container.containerID(), r));
+    containerReplicas.forEach(containerStateManager::updateContainerReplica);
 
     // Generate incremental container report with replica in CLOSED state with intentional lower bcsId
     final IncrementalContainerReportProto containerReport =
@@ -489,8 +482,7 @@ public class TestIncrementalContainerReportHandler {
         datanodeOne, datanodeTwo, datanodeThree);
 
     containerStateManager.addContainer(container.getProtobuf());
-    containerReplicas.forEach(r -> containerStateManager.updateContainerReplica(
-        container.containerID(), r));
+    containerReplicas.forEach(containerStateManager::updateContainerReplica);
 
     final IncrementalContainerReportProto containerReport =
         getIncrementalContainerReportProto(container.containerID(),
@@ -523,7 +515,7 @@ public class TestIncrementalContainerReportHandler {
 
     containerStateManager.addContainer(container.getProtobuf());
     containerReplicas.forEach(r -> {
-      containerStateManager.updateContainerReplica(container.containerID(), r);
+      containerStateManager.updateContainerReplica(r);
 
       assertDoesNotThrow(() -> nodeManager.addContainer(r.getDatanodeDetails(), container.containerID()),
           "Node should be found");
@@ -727,8 +719,7 @@ public class TestIncrementalContainerReportHandler {
     Map<DatanodeDetails, Integer> replicaMap = replicas.stream()
             .collect(Collectors.toMap(ContainerReplica::getDatanodeDetails,
                     ContainerReplica::getReplicaIndex));
-    replicas.forEach(r -> containerStateManager.updateContainerReplica(
-            container.containerID(), r));
+    replicas.forEach(containerStateManager::updateContainerReplica);
     testReplicaIndexUpdate(container, dns.get(0), 0, replicaMap);
     testReplicaIndexUpdate(container, dns.get(0), 6, replicaMap);
     replicaMap.put(dns.get(0), 2);

@@ -31,7 +31,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -112,7 +111,7 @@ public class TestTriggerDBSyncEndpoint {
         .getCheckpoint(true);
     File tarFile = createTarFile(checkpoint.getCheckpointLocation());
     HttpURLConnection httpURLConnectionMock = mock(HttpURLConnection.class);
-    try (InputStream inputStream = new FileInputStream(tarFile)) {
+    try (InputStream inputStream = Files.newInputStream(tarFile.toPath())) {
       when(httpURLConnectionMock.getInputStream()).thenReturn(inputStream);
     }
     when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
