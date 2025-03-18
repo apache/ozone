@@ -115,7 +115,6 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.Dispatche
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
@@ -155,15 +154,18 @@ public class KeyValueHandler extends Handler {
                          String datanodeId,
                          ContainerSet contSet,
                          VolumeSet volSet,
+                         VolumeChoosingPolicy volumeChoosingPolicy,
                          ContainerMetrics metrics,
                          IncrementalReportSender<Container> icrSender) {
-    this(config, datanodeId, contSet, volSet, metrics, icrSender, Clock.systemUTC());
+    this(config, datanodeId, contSet, volSet, volumeChoosingPolicy, metrics, icrSender, Clock.systemUTC());
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public KeyValueHandler(ConfigurationSource config,
                          String datanodeId,
                          ContainerSet contSet,
                          VolumeSet volSet,
+                         VolumeChoosingPolicy volumeChoosingPolicy,
                          ContainerMetrics metrics,
                          IncrementalReportSender<Container> icrSender,
                          Clock clock) {
@@ -174,11 +176,7 @@ public class KeyValueHandler extends Handler {
         DatanodeConfiguration.class).isChunkDataValidationCheck();
     chunkManager = ChunkManagerFactory.createChunkManager(config, blockManager,
         volSet);
-    try {
-      volumeChoosingPolicy = VolumeChoosingPolicyFactory.getSharedPolicy(conf);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+    this.volumeChoosingPolicy = volumeChoosingPolicy;
 
     maxContainerSize = (long) config.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
@@ -214,11 +212,6 @@ public class KeyValueHandler extends Handler {
       OzoneConfiguration.of(conf).set(ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY,
           DEFAULT_LAYOUT.name());
     }
-  }
-
-  @VisibleForTesting
-  public VolumeChoosingPolicy getVolumeChoosingPolicyForTesting() {
-    return volumeChoosingPolicy;
   }
 
   @Override

@@ -67,15 +67,17 @@ public abstract class Handler {
     this.icrSender = icrSender;
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public static Handler getHandlerForContainerType(
       final ContainerType containerType, final ConfigurationSource config,
       final String datanodeId, final ContainerSet contSet,
-      final VolumeSet volumeSet, final ContainerMetrics metrics,
+      final VolumeSet volumeSet, final VolumeChoosingPolicy volumeChoosingPolicy,
+      final ContainerMetrics metrics,
       IncrementalReportSender<Container> icrSender) {
     switch (containerType) {
     case KeyValueContainer:
       return new KeyValueHandler(config,
-          datanodeId, contSet, volumeSet, metrics,
+          datanodeId, contSet, volumeSet, volumeChoosingPolicy, metrics,
           icrSender);
     default:
       throw new IllegalArgumentException("Handler for ContainerType: " +
