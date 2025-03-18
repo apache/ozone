@@ -80,6 +80,8 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
       // 4. vol2 + vol2: 25%, result is vol2
       // So we have a total of 75% chances to choose vol1, which meets our
       // expectation.
+
+      // avoid lock contention and stores the index of the next volume to be returned in each thread.
       ThreadLocalRandom random = ThreadLocalRandom.current();
       int firstIndex = random.nextInt(count);
       int secondIndex = random.nextInt(count);
