@@ -69,8 +69,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_READ_THREADPOOL_D
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_READ_THREADPOOL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT;
@@ -438,9 +436,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final ReplicationConfigValidator replicationConfigValidator;
 
   private boolean allowListAllVolumes;
-  // Adding parameters needed for VolumeRequests here, so that during request
-  // execution, we can get from ozoneManager.
-  private final long maxUserVolumeCount;
 
   private int minMultipartUploadPartSize = OzoneConsts.OM_MULTIPART_MIN_SIZE;
 
@@ -549,10 +544,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.threadPrefix = omNodeDetails.threadNamePrefix();
     loginOMUserIfSecurityEnabled(conf);
     setInstanceVariablesFromConf();
-    this.maxUserVolumeCount = conf.getInt(OZONE_OM_USER_MAX_VOLUME,
-        OZONE_OM_USER_MAX_VOLUME_DEFAULT);
-    Preconditions.checkArgument(this.maxUserVolumeCount > 0,
-        OZONE_OM_USER_MAX_VOLUME + " value should be greater than zero");
 
     if (omStorage.getState() != StorageState.INITIALIZED) {
       throw new OMException("OM not initialized, current OM storage state: "
@@ -3040,7 +3031,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public String getRpcPort() {
-    return "" + omRpcAddress.getPort();
+    return String.valueOf(omRpcAddress.getPort());
   }
 
   private static List<List<String>> getRatisRolesException(String exceptionString) {
@@ -4206,7 +4197,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @return maxUserVolumeCount
    */
   public long getMaxUserVolumeCount() {
-    return maxUserVolumeCount;
+    return config.getMaxUserVolumeCount();
   }
   /**
    * Return true, if the current OM node is leader and in ready state to

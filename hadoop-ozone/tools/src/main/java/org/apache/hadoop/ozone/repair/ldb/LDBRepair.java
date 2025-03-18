@@ -15,22 +15,21 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.audit.parser.common;
+package org.apache.hadoop.ozone.repair.ldb;
+
+import org.apache.hadoop.hdds.cli.RepairSubcommand;
+import org.kohsuke.MetaInfServices;
+import picocli.CommandLine;
 
 /**
- * Constants used for ozone audit parser.
+ * Ozone Repair CLI for ldb.
  */
-public final class ParserConsts {
-
-  private ParserConsts() {
-    //Never constructed
-  }
-
-  public static final String DRIVER = "org.sqlite.JDBC";
-  public static final String CONNECTION_PREFIX = "jdbc:sqlite:";
-  public static final String DATE_REGEX = "^\\d{4}-\\d{2}-\\d{2}.*$";
-  public static final String PROPS_FILE = "commands.properties";
-  public static final String INSERT_AUDITS = "insertAuditEntry";
-  public static final String CREATE_AUDIT_TABLE = "createAuditTable";
+@CommandLine.Command(name = "ldb",
+    subcommands = {
+        RocksDBManualCompaction.class
+    },
+    description = "Operational tool to repair ldb.")
+@MetaInfServices(RepairSubcommand.class)
+public class LDBRepair implements RepairSubcommand {
 
 }

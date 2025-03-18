@@ -428,7 +428,7 @@ public class MockNodeManager implements NodeManager {
     } else if (deadNodes.contains(dd)) {
       return NodeStatus.inServiceDead();
     } else {
-      throw new NodeNotFoundException();
+      throw new NodeNotFoundException(dd.getID());
     }
   }
 
@@ -640,7 +640,7 @@ public class MockNodeManager implements NodeManager {
     try {
       node2ContainerMap.setContainersForDatanode(uuid.getUuid(), containerIds);
     } catch (SCMException e) {
-      throw new NodeNotFoundException(e.getMessage());
+      throw new NodeNotFoundException(uuid.getID());
     }
   }
 

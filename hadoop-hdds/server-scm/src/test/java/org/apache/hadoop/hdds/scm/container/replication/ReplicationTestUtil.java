@@ -504,9 +504,29 @@ public final class ReplicationTestUtil {
    * @param commandsSent Set to add the command to rather than sending it.
    */
   public static void mockRMSendThrottledDeleteCommand(ReplicationManager mock,
-      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
+                                                      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
+      throws NotLeaderException, CommandTargetOverloadedException {
+    mockRMSendThrottledDeleteCommand(mock, commandsSent, new AtomicBoolean(false));
+  }
+
+  /**
+   * Given a Mockito mock of ReplicationManager, this method will mock the
+   * sendThrottledDeleteCommand method so that it adds the command created to
+   * the commandsSent set.
+   * @param mock Mock of ReplicationManager
+   * @param commandsSent Set to add the command to rather than sending it.
+   * @param throwOverloaded If the atomic boolean is true, throw a
+   *                        CommandTargetOverloadedException and set the boolean
+   *                        to false, instead of creating the replicate command.
+   */
+  public static void mockRMSendThrottledDeleteCommand(ReplicationManager mock,
+      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent, AtomicBoolean throwOverloaded)
       throws NotLeaderException, CommandTargetOverloadedException {
     doAnswer((Answer<Void>) invocationOnMock -> {
+      if (throwOverloaded.get()) {
+        throwOverloaded.set(false);
+        throw new CommandTargetOverloadedException("Overloaded");
+      }
       ContainerInfo containerInfo = invocationOnMock.getArgument(0);
       int replicaIndex = invocationOnMock.getArgument(1);
       DatanodeDetails target = invocationOnMock.getArgument(2);

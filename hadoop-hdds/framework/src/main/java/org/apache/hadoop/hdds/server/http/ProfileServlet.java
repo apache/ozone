@@ -37,6 +37,7 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -162,7 +163,7 @@ public class ProfileServlet extends HttpServlet {
 
     // in case if it is not set correctly used fallback from mxbean which is
     // implementation specific
-    if (pidStr == null || pidStr.trim().isEmpty()) {
+    if (StringUtils.isBlank(pidStr)) {
       String name = ManagementFactory.getRuntimeMXBean().getName();
       if (name != null) {
         int idx = name.indexOf("@");
@@ -217,7 +218,7 @@ public class ProfileServlet extends HttpServlet {
   protected void doGet(final HttpServletRequest req,
       final HttpServletResponse resp) throws IOException {
     // make sure async profiler home is set
-    if (asyncProfilerHome == null || asyncProfilerHome.trim().isEmpty()) {
+    if (StringUtils.isBlank(asyncProfilerHome)) {
       resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
       setResponseHeader(resp);
       resp.getWriter().write("ASYNC_PROFILER_HOME env is not set.");
@@ -272,7 +273,7 @@ public class ProfileServlet extends HttpServlet {
             cmd.add("-e");
             cmd.add(event.getInternalName());
             cmd.add("-d");
-            cmd.add("" + duration);
+            cmd.add(String.valueOf(duration));
             cmd.add("-o");
             cmd.add(output.name().toLowerCase());
             cmd.add("-f");
@@ -469,7 +470,7 @@ public class ProfileServlet extends HttpServlet {
     String asyncProfilerHome = System.getenv(ASYNC_PROFILER_HOME_ENV);
     // if ENV is not set, see if -Dasync.profiler
     // .home=/path/to/async/profiler/home is set
-    if (asyncProfilerHome == null || asyncProfilerHome.trim().isEmpty()) {
+    if (StringUtils.isBlank(asyncProfilerHome)) {
       asyncProfilerHome =
           System.getProperty(ASYNC_PROFILER_HOME_SYSTEM_PROPERTY);
     }

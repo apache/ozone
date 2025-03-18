@@ -15,40 +15,45 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.audit.parser.handler;
+package org.apache.hadoop.ozone.debug.audit.parser.handler;
 
+import java.sql.SQLException;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.ozone.audit.parser.AuditParser;
-import org.apache.hadoop.ozone.audit.parser.common.DatabaseHelper;
+import org.apache.hadoop.ozone.debug.audit.parser.AuditParser;
+import org.apache.hadoop.ozone.debug.audit.parser.common.DatabaseHelper;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
 
 /**
- * Load command handler for ozone audit parser.
+ * Custom query command handler for ozone audit parser.
+ * The query must be enclosed within double quotes.
  */
-@Command(name = "load",
-    aliases = "l",
-    description = "Load ozone audit log files.\n\n" +
-        "To load an audit log to database:\n" +
-        "ozone auditparser <path to db file> load <logs>\n",
+@Command(name = "query",
+    aliases = "q",
+    description = "Execute custom query.\n\n" +
+        "To run a custom read-only query on the audit logs loaded to the database:\n" +
+        "ozone debug auditparser <path to db file> query <query>\n",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class LoadCommandHandler implements Callable<Void> {
+public class QueryCommandHandler implements Callable<Void> {
 
-  @Parameters(arity = "1..1", description = "Audit Log file(s)")
-  private String logs;
+  @Parameters(arity = "1..1", description = "Custom query enclosed within " +
+      "double quotes.")
+  private String query;
 
   @ParentCommand
   private AuditParser auditParser;
 
   @Override
   public Void call() throws Exception {
-    if (DatabaseHelper.setup(auditParser.getDatabase(), logs)) {
-      System.out.println(logs + " has been loaded successfully");
-    } else {
-      System.out.println("Failed to load " + logs);
+    try {
+      System.out.println(
+          DatabaseHelper.executeCustomQuery(auditParser.getDatabase(), query)
+      );
+    } catch (SQLException ex) {
+      System.err.println(ex.getMessage());
     }
     return null;
   }

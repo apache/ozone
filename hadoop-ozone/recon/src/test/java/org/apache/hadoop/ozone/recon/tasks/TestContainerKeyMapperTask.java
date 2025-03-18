@@ -132,10 +132,10 @@ public class TestContainerKeyMapperTask {
         VOLUME_NAME,
         Collections.singletonList(omKeyLocationInfoGroup));
 
-    ContainerKeyMapperTask containerKeyMapperTask =
-        new ContainerKeyMapperTask(reconContainerMetadataManager,
+    ContainerKeyMapperTaskOBS containerKeyMapperTaskOBS =
+        new ContainerKeyMapperTaskOBS(reconContainerMetadataManager,
             omConfiguration);
-    containerKeyMapperTask.reprocess(reconOMMetadataManager);
+    containerKeyMapperTaskOBS.reprocess(reconOMMetadataManager);
 
     keyPrefixesForContainer =
         reconContainerMetadataManager.getKeyPrefixesForContainer(1);
@@ -205,10 +205,10 @@ public class TestContainerKeyMapperTask {
         KEY_ONE_SIZE);
 
     // Reprocess container key mappings
-    ContainerKeyMapperTask containerKeyMapperTask =
-        new ContainerKeyMapperTask(reconContainerMetadataManager,
+    ContainerKeyMapperTaskFSO containerKeyMapperTaskFSO =
+        new ContainerKeyMapperTaskFSO(reconContainerMetadataManager,
             omConfiguration);
-    containerKeyMapperTask.reprocess(reconOMMetadataManager);
+    containerKeyMapperTaskFSO.reprocess(reconOMMetadataManager);
 
     // Check the key prefixes for container 1
     keyPrefixesForContainer =
@@ -314,10 +314,10 @@ public class TestContainerKeyMapperTask {
           add(keyEvent2);
         }}, 0L);
 
-    ContainerKeyMapperTask containerKeyMapperTask =
-        new ContainerKeyMapperTask(reconContainerMetadataManager,
+    ContainerKeyMapperTaskOBS containerKeyMapperTaskOBS =
+        new ContainerKeyMapperTaskOBS(reconContainerMetadataManager,
             omConfiguration);
-    containerKeyMapperTask.reprocess(reconOMMetadataManager);
+    containerKeyMapperTaskOBS.reprocess(reconOMMetadataManager);
 
     keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(1);
@@ -336,7 +336,7 @@ public class TestContainerKeyMapperTask {
     assertEquals(1, reconContainerMetadataManager.getKeyCountForContainer(3L));
 
     // Process PUT & DELETE event.
-    containerKeyMapperTask.process(omUpdateEventBatch, Collections.emptyMap());
+    containerKeyMapperTaskOBS.process(omUpdateEventBatch, Collections.emptyMap());
 
     keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(1);
@@ -384,8 +384,8 @@ public class TestContainerKeyMapperTask {
         new OmKeyLocationInfoGroup(0L, omKeyLocationInfoList);
 
     // Reprocess container key mappings
-    ContainerKeyMapperTask containerKeyMapperTask =
-        new ContainerKeyMapperTask(reconContainerMetadataManager,
+    ContainerKeyMapperTaskFSO containerKeyMapperTaskFSO =
+        new ContainerKeyMapperTaskFSO(reconContainerMetadataManager,
             omConfiguration);
 
     String bucket = BUCKET_NAME;
@@ -427,7 +427,7 @@ public class TestContainerKeyMapperTask {
         }, 0L);
 
     // Process PUT event for both the keys
-    containerKeyMapperTask.process(omUpdateEventBatch, Collections.emptyMap());
+    containerKeyMapperTaskFSO.process(omUpdateEventBatch, Collections.emptyMap());
 
     keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(1);
@@ -460,7 +460,7 @@ public class TestContainerKeyMapperTask {
         }, 0L);
 
     // Process DELETE event for key2
-    containerKeyMapperTask.process(omUpdateEventBatch2, Collections.emptyMap());
+    containerKeyMapperTaskFSO.process(omUpdateEventBatch2, Collections.emptyMap());
 
     keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(1);
