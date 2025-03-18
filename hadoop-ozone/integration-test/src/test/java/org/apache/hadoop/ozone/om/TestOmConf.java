@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
@@ -37,13 +38,13 @@ public class TestOmConf {
     final OzoneConfiguration conf = new OzoneConfiguration();
     final OzoneManagerRatisServerConfig ratisConf = conf.getObject(
         OzoneManagerRatisServerConfig.class);
-    assertEquals(0, ratisConf.getLogAppenderWaitTimeMin(),
+    assertEquals(1, ratisConf.getLogAppenderWaitTimeMin(),
         "getLogAppenderWaitTimeMin");
-    assertWaitTimeMin(TimeDuration.ZERO, conf);
-
-    ratisConf.setLogAppenderWaitTimeMin(1);
-    conf.setFromObject(ratisConf);
     assertWaitTimeMin(TimeDuration.ONE_MILLISECOND, conf);
+
+    ratisConf.setLogAppenderWaitTimeMin(2);
+    conf.setFromObject(ratisConf);
+    assertWaitTimeMin(TimeDuration.valueOf(2, TimeUnit.MILLISECONDS), conf);
 
   }
 
