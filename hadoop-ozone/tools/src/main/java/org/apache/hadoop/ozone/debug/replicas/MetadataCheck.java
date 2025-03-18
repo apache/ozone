@@ -82,6 +82,7 @@ public class MetadataCheck implements ReplicaVerifier {
         return;
       }
 
+      boolean allReplicasHaveBlock = true;
       for (OmKeyLocationInfo keyLocation : keyLocations) {
         Pipeline keyPipeline = keyLocation.getPipeline();
         boolean isECKey = keyPipeline.getReplicationConfig().getReplicationType() == HddsProtos.ReplicationType.EC;
@@ -95,24 +96,34 @@ public class MetadataCheck implements ReplicaVerifier {
               ContainerProtocolCalls.getBlockFromAllNodes(xceiverClient,
                   keyLocation.getBlockID().getDatanodeBlockIDProtobuf(), keyLocation.getToken());
 
+          int totalExpectedReplicas = responses.size();
+          int availableReplicas = 0;
+
           for (Map.Entry<DatanodeDetails, ContainerProtos.GetBlockResponseProto> entry : responses.entrySet()) {
             if (entry.getValue() != null && entry.getValue().hasBlockData()) {
-              printJsonResult(keyDetails, "BLOCK_EXISTS", keyLocation.getBlockID().toString(), true, result);
-              return;
+              availableReplicas++;
             }
           }
+
+          if (availableReplicas < totalExpectedReplicas || totalExpectedReplicas == 0) {
+            allReplicasHaveBlock = false;
+          }
+
         } finally {
           xceiverClientManager.releaseClientForReadData(xceiverClient, false);
         }
       }
+
+      if (allReplicasHaveBlock) {
+        printJsonResult(keyDetails, "BLOCK_EXISTS", null, true, result);
+      } else {
+        printJsonResult(keyDetails, "MISSING_REPLICAS", null, false, result);
+      }
+
     } catch (IOException | InterruptedException e) {
       log.error("Error checking block existence for key {}: {}", keyDetails.getName(), e.getMessage());
       printJsonError(keyDetails, e.getMessage(), false, result);
-      return;
     }
-
-    printJsonResult(keyDetails, "MISSING", null, false, result);
-    log.info("All blocks do not exist for key {}", keyDetails.getName());
   }
 
   /**
