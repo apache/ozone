@@ -215,7 +215,7 @@
     <description>
       The class name of the policy for choosing volumes in the list of directories.
       Defaults to org.apache.hadoop.ozone.container.common.volume.CapacityVolumeChoosingPolicy.
-      This volume choosing policy randomly chooses volume with remaining space to satisfy the size constraints.
+      This volume choosing policy randomly chooses two volumes with remaining space and then picks the one with lower utilization.
     </description>
   </property>
   <property>
