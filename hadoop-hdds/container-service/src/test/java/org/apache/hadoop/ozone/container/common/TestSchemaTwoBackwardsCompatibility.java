@@ -58,11 +58,9 @@ import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
-import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
@@ -107,7 +105,6 @@ public class TestSchemaTwoBackwardsCompatibility {
   private ContainerSet containerSet;
   private KeyValueHandler keyValueHandler;
   private OzoneContainer ozoneContainer;
-  private VolumeChoosingPolicy volumeChoosingPolicy;
   private static final int BLOCKS_PER_CONTAINER = 6;
   private static final int CHUNKS_PER_BLOCK = 2;
   private static final int DELETE_TXNS_PER_CONTAINER = 2;
@@ -130,14 +127,13 @@ public class TestSchemaTwoBackwardsCompatibility {
 
     volumeSet = new MutableVolumeSet(datanodeUuid, clusterID, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
-    volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
 
     blockManager = new BlockManagerImpl(conf);
     chunkManager = new FilePerBlockStrategy(true, blockManager);
 
     containerSet = newContainerSet();
     keyValueHandler = new KeyValueHandler(conf, datanodeUuid,
-        containerSet, volumeSet, volumeChoosingPolicy, ContainerMetrics.create(conf), c -> { });
+        containerSet, volumeSet, ContainerMetrics.create(conf), c -> { });
     ozoneContainer = mock(OzoneContainer.class);
     when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
     when(ozoneContainer.getWriteChannel()).thenReturn(null);

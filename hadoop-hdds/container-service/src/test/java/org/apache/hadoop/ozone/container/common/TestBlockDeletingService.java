@@ -84,12 +84,10 @@ import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
-import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -124,7 +122,6 @@ public class TestBlockDeletingService {
   private String scmId;
   private String datanodeUuid;
   private final OzoneConfiguration conf = new OzoneConfiguration();
-  private VolumeChoosingPolicy volumeChoosingPolicy;
 
   private ContainerLayoutVersion layout;
   private String schemaVersion;
@@ -141,7 +138,6 @@ public class TestBlockDeletingService {
     volumeSet = new MutableVolumeSet(datanodeUuid, scmId, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     createDbInstancesForTestIfNeeded(volumeSet, scmId, scmId, conf);
-    volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
   }
 
   @AfterEach
@@ -474,7 +470,7 @@ public class TestBlockDeletingService {
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
-            volumeChoosingPolicy, metrics, c -> {
+            metrics, c -> {
         });
     OzoneContainer ozoneContainer =
         mockDependencies(containerSet, keyValueHandler);
@@ -543,7 +539,7 @@ public class TestBlockDeletingService {
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
-            volumeChoosingPolicy, metrics, c -> {
+            metrics, c -> {
         });
     BlockDeletingServiceTestImpl svc =
         getBlockDeletingService(containerSet, conf, keyValueHandler);
@@ -672,7 +668,7 @@ public class TestBlockDeletingService {
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
-            volumeChoosingPolicy, metrics, c -> {
+            metrics, c -> {
         });
     BlockDeletingServiceTestImpl svc =
         getBlockDeletingService(containerSet, conf, keyValueHandler);
@@ -778,7 +774,7 @@ public class TestBlockDeletingService {
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
-            volumeChoosingPolicy, metrics, c -> {
+            metrics, c -> {
         });
     BlockDeletingServiceTestImpl service =
         getBlockDeletingService(containerSet, conf, keyValueHandler);
@@ -808,7 +804,7 @@ public class TestBlockDeletingService {
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
-            volumeChoosingPolicy, metrics, c -> {
+            metrics, c -> {
         });
     // set timeout value as 1ns to trigger timeout behavior
     long timeout  = 1;
@@ -915,7 +911,7 @@ public class TestBlockDeletingService {
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
-            volumeChoosingPolicy, metrics, c -> {
+            metrics, c -> {
         });
     BlockDeletingServiceTestImpl service =
         getBlockDeletingService(containerSet, conf, keyValueHandler);
@@ -974,7 +970,7 @@ public class TestBlockDeletingService {
         chunksPerBlock);
     KeyValueHandler keyValueHandler =
         new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
-            volumeChoosingPolicy, ContainerMetrics.create(conf), c -> {
+            ContainerMetrics.create(conf), c -> {
         });
     BlockDeletingServiceTestImpl service =
         getBlockDeletingService(containerSet, conf, keyValueHandler);
@@ -1033,7 +1029,7 @@ public class TestBlockDeletingService {
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
-            volumeChoosingPolicy, metrics, c -> {
+            metrics, c -> {
         });
     int containerCount = 5;
     int blocksPerContainer = 3;

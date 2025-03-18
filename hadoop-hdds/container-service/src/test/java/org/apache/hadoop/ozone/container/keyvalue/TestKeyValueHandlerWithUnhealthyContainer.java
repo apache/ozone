@@ -50,12 +50,10 @@ import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -78,12 +76,9 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
 
   private IncrementalReportSender<Container> mockIcrSender;
 
-  private VolumeChoosingPolicy volumeChoosingPolicy;
-
   @BeforeEach
   public void init() {
     mockIcrSender = mock(IncrementalReportSender.class);
-    volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(new OzoneConfiguration());
   }
 
   @Test
@@ -260,7 +255,6 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
         stateMachine.getDatanodeDetails().getUuidString(),
         mock(ContainerSet.class),
         mock(MutableVolumeSet.class),
-        volumeChoosingPolicy,
         mock(ContainerMetrics.class), mockIcrSender);
   }
 

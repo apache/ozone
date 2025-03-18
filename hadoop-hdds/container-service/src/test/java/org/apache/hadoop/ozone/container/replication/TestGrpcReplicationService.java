@@ -52,12 +52,10 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
-import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
-import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
@@ -126,12 +124,11 @@ class TestGrpcReplicationService {
     MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
     when(volumeSet.getVolumesList()).thenReturn(Collections.singletonList(
         new HddsVolume.Builder(testDir).conf(conf).build()));
-    VolumeChoosingPolicy volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     Handler containerHandler =
         new KeyValueHandler(conf, datanode.getUuidString(), containerSet,
-            volumeSet, volumeChoosingPolicy, metrics, c -> {
+            volumeSet, metrics, c -> {
         });
 
     containerController = new ContainerController(containerSet,

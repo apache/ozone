@@ -115,6 +115,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.Dispatche
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
@@ -154,10 +155,9 @@ public class KeyValueHandler extends Handler {
                          String datanodeId,
                          ContainerSet contSet,
                          VolumeSet volSet,
-                         VolumeChoosingPolicy volumeChoosingPolicy,
                          ContainerMetrics metrics,
                          IncrementalReportSender<Container> icrSender) {
-    this(config, datanodeId, contSet, volSet, volumeChoosingPolicy, metrics, icrSender, Clock.systemUTC());
+    this(config, datanodeId, contSet, volSet, null, metrics, icrSender, Clock.systemUTC());
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -176,7 +176,8 @@ public class KeyValueHandler extends Handler {
         DatanodeConfiguration.class).isChunkDataValidationCheck();
     chunkManager = ChunkManagerFactory.createChunkManager(config, blockManager,
         volSet);
-    this.volumeChoosingPolicy = volumeChoosingPolicy;
+    this.volumeChoosingPolicy = volumeChoosingPolicy != null ? volumeChoosingPolicy
+        : VolumeChoosingPolicyFactory.getPolicy(config);
 
     maxContainerSize = (long) config.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,

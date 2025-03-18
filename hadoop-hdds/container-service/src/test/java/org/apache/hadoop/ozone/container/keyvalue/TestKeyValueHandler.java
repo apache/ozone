@@ -61,14 +61,12 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
-import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
@@ -94,8 +92,6 @@ public class TestKeyValueHandler {
   private HddsDispatcher dispatcher;
   private KeyValueHandler handler;
 
-  private VolumeChoosingPolicy volumeChoosingPolicy;
-
   @BeforeEach
   public void setup() throws StorageContainerException {
     // Create mock HddsDispatcher and KeyValueHandler.
@@ -113,8 +109,6 @@ public class TestKeyValueHandler {
         mock(ContainerMetrics.class),
         mock(TokenVerifier.class)
     );
-
-    volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(new OzoneConfiguration());
   }
 
   /**
@@ -289,7 +283,7 @@ public class TestKeyValueHandler {
       // Ensures that KeyValueHandler falls back to FILE_PER_BLOCK.
       conf.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, "FILE_PER_CHUNK");
       new KeyValueHandler(conf, context.getParent().getDatanodeDetails().getUuidString(), cset, volumeSet,
-          volumeChoosingPolicy, metrics, c -> { });
+          metrics, c -> { });
       assertEquals(ContainerLayoutVersion.FILE_PER_BLOCK,
           conf.getEnum(OZONE_SCM_CONTAINER_LAYOUT_KEY, ContainerLayoutVersion.FILE_PER_CHUNK));
     } finally {
@@ -376,7 +370,7 @@ public class TestKeyValueHandler {
       final AtomicInteger icrReceived = new AtomicInteger(0);
 
       final KeyValueHandler kvHandler = new KeyValueHandler(conf,
-          datanodeId, containerSet, volumeSet, volumeChoosingPolicy, metrics,
+          datanodeId, containerSet, volumeSet, metrics,
           c -> icrReceived.incrementAndGet());
       kvHandler.setClusterID(clusterId);
 
@@ -477,7 +471,7 @@ public class TestKeyValueHandler {
     final AtomicInteger icrReceived = new AtomicInteger(0);
 
     final KeyValueHandler kvHandler = new KeyValueHandler(conf,
-        datanodeId, containerSet, volumeSet, volumeChoosingPolicy, metrics,
+        datanodeId, containerSet, volumeSet, null, metrics,
         c -> icrReceived.incrementAndGet(), clock);
     kvHandler.setClusterID(clusterId);
 

@@ -54,10 +54,8 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
-import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
@@ -92,7 +90,6 @@ import org.yaml.snakeyaml.Yaml;
  */
 public class TestSchemaOneBackwardsCompatibility {
   private OzoneConfiguration conf;
-  private VolumeChoosingPolicy volumeChoosingPolicy;
 
   private File metadataDir;
   private File containerFile;
@@ -132,7 +129,6 @@ public class TestSchemaOneBackwardsCompatibility {
         metadataDir.getAbsolutePath());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         metadataDir.getAbsolutePath());
-    volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
   }
 
   @AfterEach
@@ -283,7 +279,7 @@ public class TestSchemaOneBackwardsCompatibility {
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
-            volumeChoosingPolicy, metrics, c -> {
+            metrics, c -> {
         });
     long initialTotalSpace = newKvData().getBytesUsed();
     long blockSpace = initialTotalSpace / TestDB.KEY_COUNT;
@@ -356,7 +352,7 @@ public class TestSchemaOneBackwardsCompatibility {
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
-            volumeChoosingPolicy, metrics, c -> {
+            metrics, c -> {
         });
     KeyValueContainerData cData = newKvData();
     try (DBHandle refCountedDB = BlockUtils.getDB(cData, conf)) {

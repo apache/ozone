@@ -310,7 +310,7 @@ public class TestContainerPersistence {
     AtomicInteger icrReceived = new AtomicInteger(0);
 
     KeyValueHandler kvHandler = new KeyValueHandler(conf,
-        datanodeId, containerSet, volumeSet, volumeChoosingPolicy, metrics,
+        datanodeId, containerSet, volumeSet, metrics,
         c -> icrReceived.incrementAndGet());
 
     Exception exception = assertThrows(
