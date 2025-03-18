@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.node.states;
 
+import org.apache.hadoop.hdds.protocol.DatanodeID;
+
 /**
  * This exception represents that there is already a node added to NodeStateMap
  * with same UUID.
@@ -34,12 +36,8 @@ public class NodeAlreadyExistsException extends NodeException {
   /**
    * Constructs an {@code NodeAlreadyExistsException} with the specified
    * detail message.
-   *
-   * @param message
-   *        The detail message (which is saved for later retrieval
-   *        by the {@link #getMessage()} method)
    */
-  public NodeAlreadyExistsException(String message) {
-    super(message);
+  public NodeAlreadyExistsException(DatanodeID datanodeID) {
+    super("Datanode " + datanodeID + " already exists");
   }
 }

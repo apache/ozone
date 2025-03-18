@@ -80,7 +80,7 @@ public class NodeStateMap {
     try {
       final DatanodeID id = datanodeDetails.getID();
       if (nodeMap.containsKey(id)) {
-        throw new NodeAlreadyExistsException("Node UUID: " + id);
+        throw new NodeAlreadyExistsException(id);
       }
       nodeMap.put(id, new DatanodeInfo(datanodeDetails, nodeStatus,
           layoutInfo));

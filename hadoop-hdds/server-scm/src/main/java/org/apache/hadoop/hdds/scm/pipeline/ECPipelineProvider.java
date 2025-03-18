@@ -97,6 +97,16 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
     return createPipelineInternal(replicationConfig, nodes, dnIndexes);
   }
 
+  static final Comparator<NodeStatus> CREATE_FOR_READ_COMPARATOR = (left, right) -> {
+    final int healthy = Boolean.compare(right.isHealthy(), left.isHealthy());
+    if (healthy != 0) {
+      return healthy;
+    }
+    final int dead = Boolean.compare(left.isDead(), right.isDead());
+    return dead != 0 ? dead : left.getOperationalState().compareTo(right.getOperationalState());
+  };
+
+
   @Override
   public Pipeline createForRead(
       ECReplicationConfig replicationConfig,
@@ -115,11 +125,11 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
           nodeStatusMap.put(dn, nodeStatus);
         }
       } catch (NodeNotFoundException e) {
-        LOG.error("Node not found", e);
+        LOG.error("Failed to getNodeStatus for {}", dn, e);
       }
     }
 
-    dns.sort(Comparator.comparing(nodeStatusMap::get));
+    dns.sort(Comparator.comparing(nodeStatusMap::get, CREATE_FOR_READ_COMPARATOR));
 
     return createPipelineInternal(replicationConfig, dns, map);
   }

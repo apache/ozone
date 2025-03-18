@@ -43,7 +43,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
  * <p>
  * This class is value-based.
  */
-public final class NodeStatus implements Comparable<NodeStatus> {
+public final class NodeStatus {
   /** For the {@link NodeStatus} objects with {@link #opStateExpiryEpochSeconds} == 0. */
   private static final Map<NodeOperationalState, Map<NodeState, NodeStatus>> CONSTANT_MAP;
   static {
@@ -55,7 +55,7 @@ public final class NodeStatus implements Comparable<NodeStatus> {
       }
       map.put(op, healthMap);
     }
-    CONSTANT_MAP = map;
+    CONSTANT_MAP = Collections.unmodifiableMap(map);
   }
 
   /** @return a {@link NodeStatus} object with {@link #opStateExpiryEpochSeconds} == 0. */
@@ -242,17 +242,5 @@ public final class NodeStatus implements Comparable<NodeStatus> {
   public String toString() {
     return "OperationalState: " + operationalState
         + "(expiry: " + opStateExpiryEpochSeconds + "s), Health: " + health;
-  }
-
-  @Override
-  public int compareTo(NodeStatus o) {
-    int order = Boolean.compare(o.isHealthy(), isHealthy());
-    if (order == 0) {
-      order = Boolean.compare(isDead(), o.isDead());
-    }
-    if (order == 0) {
-      order = operationalState.compareTo(o.operationalState);
-    }
-    return order;
   }
 }
