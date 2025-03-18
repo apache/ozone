@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -78,7 +79,7 @@ public final class ReplicationManagerUtil {
     // Ensure that target datanodes have enough space to hold a complete
     // container.
     final long dataSizeRequired =
-        Math.max(container.getUsedBytes(), defaultContainerSize * 2);
+        Math.max(container.getUsedBytes(), HddsUtils.requiredReplicationSpace(defaultContainerSize));
 
     int mutableRequiredNodes = requiredNodes;
     while (mutableRequiredNodes > 0) {

@@ -26,6 +26,7 @@ import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -149,7 +150,7 @@ public class ContainerImporter {
     // Choose volume that can hold both container in tmp and dest directory
     return volumeChoosingPolicy.chooseVolume(
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
-        containerSize * 2);
+        HddsUtils.requiredReplicationSpace(containerSize));
   }
 
   public static Path getUntarDirectory(HddsVolume hddsVolume)

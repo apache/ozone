@@ -724,6 +724,11 @@ public final class HddsUtils {
     return exception instanceof InvalidProtocolBufferException;
   }
 
+  public static long requiredReplicationSpace(long defaultContainerSize) {
+    // During container import it requires double the container size to hold container in tmp and dest directory
+    return 2 * defaultContainerSize;
+  }
+
   /**
    * Remove binary data from request {@code msg}.  (May be incomplete, feel
    * free to add any missing cleanups.)
