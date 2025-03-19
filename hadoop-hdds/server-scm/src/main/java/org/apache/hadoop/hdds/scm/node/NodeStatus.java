@@ -45,7 +45,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
  */
 public final class NodeStatus {
   /** For the {@link NodeStatus} objects with {@link #opStateExpiryEpochSeconds} == 0. */
-  private static final Map<NodeOperationalState, Map<NodeState, NodeStatus>> CONSTANT_MAP;
+  private static final Map<NodeOperationalState, Map<NodeState, NodeStatus>> CONSTANTS;
   static {
     final Map<NodeOperationalState, Map<NodeState, NodeStatus>> map = new EnumMap<>(NodeOperationalState.class);
     for (NodeOperationalState op : NodeOperationalState.values()) {
@@ -55,16 +55,20 @@ public final class NodeStatus {
       }
       map.put(op, Collections.unmodifiableMap(healthMap));
     }
-    CONSTANT_MAP = Collections.unmodifiableMap(map);
+    CONSTANTS = Collections.unmodifiableMap(map);
   }
 
   /** @return a {@link NodeStatus} object with {@link #opStateExpiryEpochSeconds} == 0. */
   public static NodeStatus valueOf(NodeOperationalState op, NodeState health) {
-    return CONSTANT_MAP.get(op).get(health);
+    Objects.requireNonNull(op, "op == null");
+    Objects.requireNonNull(health, "health == null");
+    return CONSTANTS.get(op).get(health);
   }
 
   /** @return a {@link NodeStatus} object. */
   public static NodeStatus valueOf(NodeOperationalState op, NodeState health, long opExpiryEpochSeconds) {
+    Objects.requireNonNull(op, "op == null");
+    Objects.requireNonNull(health, "health == null");
     return opExpiryEpochSeconds == 0 ? valueOf(op, health)
         : new NodeStatus(health, op, opExpiryEpochSeconds);
   }
