@@ -58,19 +58,6 @@ public class OMExecutionFlow {
     return submitExecutionToRatis(omRequest);
   }
 
-  /**
-   * Internal request to be directly executed.
-   * 
-   * @param omRequest the request
-   * @param clientId clientId of request
-   * @param callId callId of request
-   * @return the response of execution
-   * @throws ServiceException the exception on execution
-   */
-  public OMResponse submitInternal(OMRequest omRequest, ClientId clientId, long callId) throws ServiceException {
-    return ozoneManager.getOmRatisServer().submitRequest(omRequest, clientId, callId);
-  }
-
   private OMResponse submitExecutionToRatis(OMRequest request) throws ServiceException {
     // 1. create client request and preExecute
     OMClientRequest omClientRequest = null;
