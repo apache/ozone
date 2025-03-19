@@ -1736,10 +1736,10 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       client.createDirectory(volumeName, bucketName, directoryName2);
       assertEquals(2L, getBucketUsedNamespace(volumeName, bucketName));
 
-      if (layout != BucketLayout.OBJECT_STORE) {
-        handleNonOBSDelete(volumeName, bucketName, directoryName1, directoryName2);
+      if (layout == BucketLayout.LEGACY) {
+        handleLegacyBucketDelete(volumeName, bucketName, directoryName1, directoryName2);
       } else {
-        handleOBSDelete(client, volumeName, bucketName, directoryName1, directoryName2);
+        handleNonLegacyBucketDelete(client, volumeName, bucketName, directoryName1, directoryName2);
       }
 
       String multiComponentsDir = "dir1/dir2/dir3/dir4";
@@ -1751,7 +1751,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     }
   }
 
-  private void handleNonOBSDelete(String volumeName, String bucketName, String dir1, String dir2) throws IOException {
+  private void handleLegacyBucketDelete(String volumeName, String bucketName, String dir1, String dir2)
+      throws IOException {
     String rootPath = String.format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName);
     cluster.getConf().set(FS_DEFAULT_NAME_KEY, rootPath);
     FileSystem fs = FileSystem.get(cluster.getConf());
@@ -1765,8 +1766,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     assertEquals(0L, getBucketUsedNamespace(volumeName, bucketName));
   }
 
-  private void handleOBSDelete(RpcClient client, String volumeName, String bucketName, String dir1, String dir2)
-      throws IOException {
+  private void handleNonLegacyBucketDelete(RpcClient client, String volumeName, String bucketName, String dir1,
+      String dir2) throws IOException {
     client.deleteKey(volumeName, bucketName, OzoneFSUtils.addTrailingSlashIfNeeded(dir1), false);
     assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
     client.deleteKey(volumeName, bucketName, OzoneFSUtils.addTrailingSlashIfNeeded(dir2), false);
