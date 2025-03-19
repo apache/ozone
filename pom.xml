@@ -1778,6 +1778,11 @@
             <includeTests>true</includeTests>
           </configuration>
         </plugin>
+        <plugin>
+          <groupId>com.coderplus.maven.plugins</groupId>
+          <artifactId>copy-rename-maven-plugin</artifactId>
+          <version>${copy-rename-maven-plugin.version}</version>
+        </plugin>
       </plugins>
     </pluginManagement>
 
