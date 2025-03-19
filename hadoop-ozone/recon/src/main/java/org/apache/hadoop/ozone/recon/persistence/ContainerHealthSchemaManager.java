@@ -121,30 +121,33 @@ public class ContainerHealthSchemaManager {
 
   public void insertUnhealthyContainerRecords(List<UnhealthyContainers> recs) {
     if (LOG.isDebugEnabled()) {
-      recs.forEach(rec -> {
-        LOG.debug("rec.getContainerId() : {}, rec.getContainerState(): {} ", rec.getContainerId(),
-            rec.getContainerState());
-      });
+      recs.forEach(rec -> LOG.debug("rec.getContainerId() : {}, rec.getContainerState(): {}",
+          rec.getContainerId(), rec.getContainerState()));
     }
 
     try (Connection connection = containerSchemaDefinition.getDataSource().getConnection()) {
       connection.setAutoCommit(false); // Turn off auto-commit for transactional control
-      for (UnhealthyContainers rec : recs) {
-        try {
-          unhealthyContainersDao.insert(rec);
-        } catch (DataAccessException dataAccessException) {
-          // Log the error and just update other fields of the existing record
-          // in case of ConstraintViolationException being actually thrown.
-          unhealthyContainersDao.update(rec);
-          LOG.debug("Error while inserting unhealthy container record: {}", rec,
-              dataAccessException);
+      try {
+        for (UnhealthyContainers rec : recs) {
+          try {
+            unhealthyContainersDao.insert(rec);
+          } catch (DataAccessException dataAccessException) {
+            // Log the error and update the existing record if ConstraintViolationException occurs
+            unhealthyContainersDao.update(rec);
+            LOG.debug("Error while inserting unhealthy container record: {}", rec, dataAccessException);
+          }
         }
+        connection.commit(); // Commit all inserted/updated records
+      } catch (Exception innerException) {
+        connection.rollback(); // Rollback transaction if an error occurs inside processing
+        LOG.error("Transaction rolled back due to error", innerException);
+        throw innerException;
+      } finally {
+        connection.setAutoCommit(true); // Reset auto-commit before the connection is auto-closed
       }
-      // Commit all the records inserted and updated.
-      connection.commit();
     } catch (Exception e) {
-      LOG.error("Failed to get connection over {} ", UNHEALTHY_CONTAINERS_TABLE_NAME, e);
-      throw new RuntimeException("Recon failed to insert " + recs.size() + " num of unhealthy container records.", e);
+      LOG.error("Failed to insert records into {} ", UNHEALTHY_CONTAINERS_TABLE_NAME, e);
+      throw new RuntimeException("Recon failed to insert " + recs.size() + " unhealthy container records.", e);
     }
   }
 
