@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -32,6 +33,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.De
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMNodeInfo;
+
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
 
 /**
  * This class is the server-side translator that forwards requests received on
@@ -89,6 +93,9 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
     }
 
     try {
+      if (!ozoneManager.isAdmin(getRemoteUser())) {
+        throw new OMException("Only administrators are authorized to perform decommission.", PERMISSION_DENIED);
+      }
       omRatisServer.removeOMFromRatisRing(decommNode);
     } catch (IOException ex) {
       return DecommissionOMResponse.newBuilder()
