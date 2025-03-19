@@ -37,6 +37,3 @@ github:
     squash_commit_message: PR_TITLE
     merge:   false
     rebase:  false
-  features:
-    # Enable discussions
-    discussions: true
