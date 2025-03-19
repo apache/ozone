@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.utils;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DATA_DIR_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL;
@@ -45,8 +44,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB
 import com.google.common.base.Strings;
 import com.google.protobuf.BlockingService;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
@@ -404,16 +403,10 @@ public final class HddsServerUtil {
     return rawLocations;
   }
 
-  public static Collection<String> getDatanodeStorageDirs(
-      ConfigurationSource conf) {
-    Collection<String> rawLocations = conf.getTrimmedStringCollection(
-        HDDS_DATANODE_DIR_KEY);
+  public static Collection<String> getDatanodeStorageDirs(ConfigurationSource conf) {
+    Collection<String> rawLocations = conf.getTrimmedStringCollection(HDDS_DATANODE_DIR_KEY);
     if (rawLocations.isEmpty()) {
-      rawLocations = conf.getTrimmedStringCollection(HDDS_DATANODE_DATA_DIR_KEY);
-    }
-    if (rawLocations.isEmpty()) {
-      throw new IllegalArgumentException("No location configured in either "
-          + HDDS_DATANODE_DIR_KEY + " or " + HDDS_DATANODE_DATA_DIR_KEY);
+      throw new IllegalArgumentException("No location configured in " + HDDS_DATANODE_DIR_KEY);
     }
     return rawLocations;
   }
@@ -633,7 +626,7 @@ public final class HddsServerUtil {
     ArchiveEntry archiveEntry =
         archiveOutputStream.createArchiveEntry(file, entryName);
     archiveOutputStream.putArchiveEntry(archiveEntry);
-    try (FileInputStream fis = new FileInputStream(file)) {
+    try (InputStream fis = Files.newInputStream(file.toPath())) {
       IOUtils.copy(fis, archiveOutputStream);
       archiveOutputStream.flush();
     } finally {

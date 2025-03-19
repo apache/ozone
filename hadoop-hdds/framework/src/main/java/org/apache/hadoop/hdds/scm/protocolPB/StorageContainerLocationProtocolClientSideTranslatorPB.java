@@ -137,8 +137,8 @@ import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
 import org.apache.hadoop.security.token.Token;
 
@@ -1118,7 +1118,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
     UpgradeFinalizationStatus status = response.getStatus();
     return new StatusAndMessages(
-        UpgradeFinalizer.Status.valueOf(status.getStatus().name()),
+        UpgradeFinalization.Status.valueOf(status.getStatus().name()),
         status.getMessagesList());
   }
 
@@ -1141,7 +1141,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
     UpgradeFinalizationStatus status = response.getStatus();
     return new StatusAndMessages(
-        UpgradeFinalizer.Status.valueOf(status.getStatus().name()),
+        UpgradeFinalization.Status.valueOf(status.getStatus().name()),
         status.getMessagesList());
   }
 

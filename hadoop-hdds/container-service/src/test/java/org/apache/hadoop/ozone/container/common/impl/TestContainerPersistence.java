@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getChunk;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getData;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.setDataChecksum;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -151,7 +152,7 @@ public class TestContainerPersistence {
 
   @BeforeEach
   public void setupPaths() throws IOException {
-    containerSet = new ContainerSet(1000);
+    containerSet = newContainerSet();
     volumeSet = new MutableVolumeSet(DATANODE_UUID, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     // Initialize volume directories.

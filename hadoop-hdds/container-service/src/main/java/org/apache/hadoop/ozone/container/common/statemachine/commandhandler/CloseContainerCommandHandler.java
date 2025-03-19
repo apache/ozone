@@ -84,7 +84,7 @@ public class CloseContainerCommandHandler implements CommandHandler {
    * @param connectionManager - The SCMs that we are talking to.
    */
   @Override
-  public void handle(SCMCommand command, OzoneContainer ozoneContainer,
+  public void handle(SCMCommand<?> command, OzoneContainer ozoneContainer,
       StateContext context, SCMConnectionManager connectionManager) {
     queuedCount.incrementAndGet();
     CompletableFuture.runAsync(() -> {

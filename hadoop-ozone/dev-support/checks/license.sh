@@ -59,7 +59,7 @@ grep '(' ${src} \
     -e "(CDDL\>" -e ' CDDL '\
     -e "(EDL\>" -e "Eclipse Distribution ${L}" \
     -e "(EPL\>" -e "Eclipse Public ${L}" \
-    -e "(MIT)" -e "\<MIT ${L}" \
+    -e "(MIT)" -e "(MIT-0)" -e "\<MIT ${L}" \
     -e "Modified BSD\>" \
     -e "New BSD ${L}" \
     -e "Public Domain" \

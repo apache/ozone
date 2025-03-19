@@ -465,7 +465,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(deletedDirTable, 0);
     assertTableRowCount(keyTable, 0);
     assertTrue(volume.getBucket(bucketName).getUsedNamespace() >= 0);
-    assertTrue(volume.getBucket(bucketName).getUsedBytes() == 0);
+    assertEquals(0, volume.getBucket(bucketName).getUsedBytes());
   }
 
   @Test

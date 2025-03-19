@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.JsonTestUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -511,7 +512,7 @@ public class TestKeyValueContainerMetadataInspector
     String output = capturer.getOutput();
     capturer.clearOutput();
     // Check if the output is effectively empty
-    if (output.trim().isEmpty()) {
+    if (StringUtils.isBlank(output)) {
       return null;
     }
     return JsonTestUtils.readTree(output);

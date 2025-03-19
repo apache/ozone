@@ -27,10 +27,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -94,7 +95,7 @@ public class TestContainerUtils {
     assertWriteRead(tempDir, id1);
 
     // Add certificate serial  id.
-    id1.setCertSerialId("" + RandomUtils.nextLong());
+    id1.setCertSerialId(String.valueOf(RandomUtils.secure().randomLong()));
     assertWriteRead(tempDir, id1);
 
     // Read should return an empty value if file doesn't exist
@@ -110,7 +111,7 @@ public class TestContainerUtils {
 
     // Test upgrade scenario - protobuf file instead of yaml
     File protoFile = new File(tempDir, "valid-proto.id");
-    try (FileOutputStream out = new FileOutputStream(protoFile)) {
+    try (OutputStream out = Files.newOutputStream(protoFile.toPath())) {
       HddsProtos.DatanodeDetailsProto proto = id1.getProtoBufMessage();
       proto.writeTo(out);
     }
@@ -137,7 +138,7 @@ public class TestContainerUtils {
     DatanodeDetails id = randomDatanodeDetails();
     ContainerUtils.writeDatanodeDetailsTo(id, malformedFile, conf);
 
-    try (FileOutputStream out = new FileOutputStream(malformedFile)) {
+    try (OutputStream out = Files.newOutputStream(malformedFile.toPath())) {
       out.write("malformed".getBytes(StandardCharsets.UTF_8));
     }
   }

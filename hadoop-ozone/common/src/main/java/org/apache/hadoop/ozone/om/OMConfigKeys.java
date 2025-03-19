@@ -112,9 +112,6 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_VOLUME_LISTALL_ALLOWED =
       "ozone.om.volume.listall.allowed";
   public static final boolean OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT = true;
-  public static final String OZONE_OM_USER_MAX_VOLUME =
-      "ozone.om.user.max.volume";
-  public static final int OZONE_OM_USER_MAX_VOLUME_DEFAULT = 1024;
 
   public static final String OZONE_KEY_DELETING_LIMIT_PER_TASK =
       "ozone.key.deleting.limit.per.task";

@@ -127,7 +127,7 @@ public class SimpleMockNodeManager implements NodeManager {
       throws NodeNotFoundException {
     DatanodeInfo dni = nodeMap.get(dn.getUuid());
     if (dni == null) {
-      throw new NodeNotFoundException();
+      throw new NodeNotFoundException(dn.getID());
     }
     dni.setNodeStatus(
         new NodeStatus(
@@ -269,7 +269,7 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public void addDatanodeCommand(UUID dnId, SCMCommand command) {
+  public void addDatanodeCommand(UUID dnId, SCMCommand<?> command) {
   }
 
   /**
@@ -341,7 +341,7 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public List<SCMCommand> getCommandQueue(UUID dnID) {
+  public List<SCMCommand<?>> getCommandQueue(UUID dnID) {
     return null;
   }
 
@@ -426,7 +426,7 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
+  public List<SCMCommand<?>> processHeartbeat(DatanodeDetails datanodeDetails,
       CommandQueueReportProto commandQueueReportProto) {
     return null;
   }

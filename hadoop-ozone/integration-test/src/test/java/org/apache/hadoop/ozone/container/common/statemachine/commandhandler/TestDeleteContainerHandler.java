@@ -243,7 +243,8 @@ public class TestDeleteContainerHandler {
                 contains("Files still part of the container on delete"),
         500,
         5 * 2000);
-    assertTrue(!isContainerDeleted(hddsDatanodeService, containerId.getId()));
+
+    assertFalse(isContainerDeleted(hddsDatanodeService, containerId.getId()));
     assertThat(beforeDeleteFailedCount).isLessThan(metrics.getContainerDeleteFailedNonEmpty());
     // Send the delete command. It should pass with force flag.
     // Deleting a non-empty container should pass on the DN when the force flag
@@ -439,8 +440,8 @@ public class TestDeleteContainerHandler {
                 contains("the container is not empty with blockCount"),
         500,
         5 * 2000);
-    assertTrue(!isContainerDeleted(hddsDatanodeService,
-        containerId.getId()));
+
+    assertFalse(isContainerDeleted(hddsDatanodeService, containerId.getId()));
     assertThat(containerDeleteFailedNonEmptyBlockDB)
         .isLessThan(metrics.getContainerDeleteFailedNonEmpty());
 

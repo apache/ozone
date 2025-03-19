@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
+import org.apache.hadoop.hdds.scm.container.states.ContainerStateMap;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
@@ -53,10 +54,15 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.slf4j.event.Level;
 
 /**
  * Tests to verify the functionality of ContainerManager.
@@ -71,6 +77,12 @@ public class TestContainerManagerImpl {
   private SequenceIdGenerator sequenceIdGen;
   private NodeManager nodeManager;
   private ContainerReplicaPendingOps pendingOpsMock;
+
+  @BeforeAll
+  static void init() {
+    // Print container state transition logs
+    GenericTestUtils.setLogLevel(ContainerStateMap.getLogger(), Level.TRACE);
+  }
 
   @BeforeEach
   void setUp() throws Exception {
@@ -131,9 +143,12 @@ public class TestContainerManagerImpl {
     assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(cid).getState());
   }
 
-  @Test
-  void testTransitionDeletingToClosedState() throws IOException, InvalidStateTransitionException {
-    // allocate OPEN Ratis and Ec containers, and do a series of state changes to transition them to DELETING
+  @ParameterizedTest
+  @EnumSource(value = HddsProtos.LifeCycleState.class,
+      names = {"DELETING", "DELETED"})
+  void testTransitionDeletingOrDeletedToClosedState(HddsProtos.LifeCycleState desiredState)
+      throws IOException, InvalidStateTransitionException {
+    // Allocate OPEN Ratis and Ec containers, and do a series of state changes to transition them to DELETING / DELETED
     final ContainerInfo container = containerManager.allocateContainer(
         RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), "admin");
@@ -162,29 +177,39 @@ public class TestContainerManagerImpl {
     assertEquals(LifeCycleState.DELETING, containerManager.getContainer(cid).getState());
     assertEquals(LifeCycleState.DELETING, containerManager.getContainer(ecCid).getState());
 
-    // DELETING -> CLOSED
-    containerManager.transitionDeletingToClosedState(cid);
-    containerManager.transitionDeletingToClosedState(ecCid);
+    if (desiredState == LifeCycleState.DELETED) {
+      // DELETING -> DELETED
+      containerManager.updateContainerState(cid, HddsProtos.LifeCycleEvent.CLEANUP);
+      containerManager.updateContainerState(ecCid, HddsProtos.LifeCycleEvent.CLEANUP);
+      assertEquals(LifeCycleState.DELETED, containerManager.getContainer(cid).getState());
+      assertEquals(LifeCycleState.DELETED, containerManager.getContainer(ecCid).getState());
+    }
+
+    // DELETING / DELETED -> CLOSED
+    containerManager.transitionDeletingOrDeletedToClosedState(cid);
+    containerManager.transitionDeletingOrDeletedToClosedState(ecCid);
     // the containers should be back in CLOSED state now
     assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(cid).getState());
     assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(ecCid).getState());
   }
 
   @Test
-  void testTransitionDeletingToClosedStateAllowsOnlyDeletingContainers() throws IOException {
+  void testTransitionContainerToClosedStateAllowOnlyDeletingOrDeletedContainers() throws IOException {
+    // Negative test for Ratis/EC container OPEN -> CLOSED transition
+
     // test for RATIS container
     final ContainerInfo container = containerManager.allocateContainer(
         RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), "admin");
     final ContainerID cid = container.containerID();
     assertEquals(LifeCycleState.OPEN, containerManager.getContainer(cid).getState());
-    assertThrows(IOException.class, () -> containerManager.transitionDeletingToClosedState(cid));
+    assertThrows(IOException.class, () -> containerManager.transitionDeletingOrDeletedToClosedState(cid));
 
     // test for EC container
     final ContainerInfo ecContainer = containerManager.allocateContainer(new ECReplicationConfig(3, 2), "admin");
     final ContainerID ecCid = ecContainer.containerID();
     assertEquals(LifeCycleState.OPEN, containerManager.getContainer(ecCid).getState());
-    assertThrows(IOException.class, () -> containerManager.transitionDeletingToClosedState(ecCid));
+    assertThrows(IOException.class, () -> containerManager.transitionDeletingOrDeletedToClosedState(ecCid));
   }
 
   @Test

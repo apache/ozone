@@ -28,9 +28,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintStream;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -544,13 +547,13 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
       String jsonName =
           new SimpleDateFormat("yyyyMMddHHmmss").format(Time.now()) + ".json";
       String jsonPath = jsonDir + "/" + jsonName;
-      try (FileOutputStream os = new FileOutputStream(jsonPath)) {
+      try (OutputStream os = Files.newOutputStream(Paths.get(jsonPath))) {
         ObjectMapper mapper = new ObjectMapper();
         mapper.setVisibility(PropertyAccessor.FIELD,
             JsonAutoDetect.Visibility.ANY);
         ObjectWriter writer = mapper.writerWithDefaultPrettyPrinter();
         writer.writeValue(os, jobInfo);
-      } catch (FileNotFoundException e) {
+      } catch (FileNotFoundException | NoSuchFileException e) {
         out.println("Json File could not be created for the path: " + jsonPath);
         out.println(e);
       } catch (IOException e) {
