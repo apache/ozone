@@ -110,7 +110,7 @@ public class TestReplicationManagerUtil {
                   HddsProtos.NodeState.HEALTHY);
             }
           }
-          throw new NodeNotFoundException(dn.getUuidString());
+          throw new NodeNotFoundException(dn.getID());
         });
 
     ReplicationManagerUtil.ExcludedAndUsedNodes excludedAndUsedNodes =
@@ -194,7 +194,7 @@ public class TestReplicationManagerUtil {
                   HddsProtos.NodeState.HEALTHY);
             }
           }
-          throw new NodeNotFoundException(dn.getUuidString());
+          throw new NodeNotFoundException(dn.getID());
         });
 
     ReplicationManagerUtil.ExcludedAndUsedNodes excludedAndUsedNodes =

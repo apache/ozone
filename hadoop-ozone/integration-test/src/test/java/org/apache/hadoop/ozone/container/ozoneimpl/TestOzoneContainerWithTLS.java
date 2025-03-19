@@ -313,6 +313,7 @@ public class TestOzoneContainerWithTLS {
       MutableVolumeSet volumeSet = container.getVolumeSet();
       StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
           .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempFolder.toFile()));
+      ContainerTestUtils.initializeDatanodeLayout(conf, dn);
       container.start(clusterID);
     } catch (Throwable e) {
       if (container != null) {

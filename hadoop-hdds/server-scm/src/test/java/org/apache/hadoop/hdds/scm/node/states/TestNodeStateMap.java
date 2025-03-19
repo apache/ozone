@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
@@ -56,8 +57,8 @@ public class TestNodeStateMap {
     DatanodeDetails dn = generateDatanode();
     NodeStatus status = NodeStatus.inServiceHealthy();
     map.addNode(dn, status, null);
-    assertEquals(dn, map.getNodeInfo(dn.getUuid()));
-    assertEquals(status, map.getNodeStatus(dn.getUuid()));
+    assertEquals(dn, map.getNodeInfo(dn.getID()));
+    assertEquals(status, map.getNodeStatus(dn.getID()));
   }
 
   @Test
@@ -69,9 +70,9 @@ public class TestNodeStateMap {
 
     NodeStatus expectedStatus = NodeStatus.inServiceStale();
     NodeStatus returnedStatus =
-        map.updateNodeHealthState(dn.getUuid(), expectedStatus.getHealth());
+        map.updateNodeHealthState(dn.getID(), expectedStatus.getHealth());
     assertEquals(expectedStatus, returnedStatus);
-    assertEquals(returnedStatus, map.getNodeStatus(dn.getUuid()));
+    assertEquals(returnedStatus, map.getNodeStatus(dn.getID()));
   }
 
   @Test
@@ -85,9 +86,9 @@ public class TestNodeStateMap {
         NodeOperationalState.DECOMMISSIONING,
         NodeState.HEALTHY, 999);
     NodeStatus returnedStatus = map.updateNodeOperationalState(
-        dn.getUuid(), expectedStatus.getOperationalState(), 999);
+        dn.getID(), expectedStatus.getOperationalState(), 999);
     assertEquals(expectedStatus, returnedStatus);
-    assertEquals(returnedStatus, map.getNodeStatus(dn.getUuid()));
+    assertEquals(returnedStatus, map.getNodeStatus(dn.getID()));
     assertEquals(999, returnedStatus.getOpStateExpiryEpochSeconds());
   }
 
@@ -107,7 +108,7 @@ public class TestNodeStateMap {
     assertEquals(1, nodes.size());
     assertEquals(1, map.getNodeCount(requestedState));
     assertEquals(nodeCount, map.getTotalNodeCount());
-    assertEquals(nodeCount, map.getAllNodes().size());
+    assertEquals(nodeCount, map.getNodeCount());
     assertEquals(nodeCount, map.getAllDatanodeInfos().size());
 
     // Checks for the getNodeCount(opstate, health) method
@@ -130,11 +131,11 @@ public class TestNodeStateMap {
 
     map.addNode(datanodeDetails, NodeStatus.inServiceHealthy(), null);
 
-    UUID dnUuid = datanodeDetails.getUuid();
+    DatanodeID id = datanodeDetails.getID();
 
-    map.addContainer(dnUuid, ContainerID.valueOf(1L));
-    map.addContainer(dnUuid, ContainerID.valueOf(2L));
-    map.addContainer(dnUuid, ContainerID.valueOf(3L));
+    map.addContainer(id, ContainerID.valueOf(1L));
+    map.addContainer(id, ContainerID.valueOf(2L));
+    map.addContainer(id, ContainerID.valueOf(3L));
 
     CountDownLatch elementRemoved = new CountDownLatch(1);
     CountDownLatch loopStarted = new CountDownLatch(1);
@@ -142,7 +143,7 @@ public class TestNodeStateMap {
     new Thread(() -> {
       try {
         loopStarted.await();
-        map.removeContainer(dnUuid, ContainerID.valueOf(1L));
+        map.removeContainer(id, ContainerID.valueOf(1L));
         elementRemoved.countDown();
       } catch (Exception e) {
         e.printStackTrace();
@@ -151,7 +152,7 @@ public class TestNodeStateMap {
     }).start();
 
     boolean first = true;
-    for (ContainerID key : map.getContainers(dnUuid)) {
+    for (ContainerID key : map.getContainers(id)) {
       if (first) {
         loopStarted.countDown();
         elementRemoved.await();
