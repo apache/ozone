@@ -53,7 +53,7 @@ public final class NodeStatus {
       for (NodeState health : NodeState.values()) {
         healthMap.put(health, new NodeStatus(health, op, 0));
       }
-      map.put(op, healthMap);
+      map.put(op, Collections.unmodifiableMap(healthMap));
     }
     CONSTANT_MAP = Collections.unmodifiableMap(map);
   }
