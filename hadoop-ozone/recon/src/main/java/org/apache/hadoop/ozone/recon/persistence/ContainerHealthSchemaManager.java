@@ -136,7 +136,7 @@ public class ContainerHealthSchemaManager {
           // Log the error and just update other fields of the existing record
           // in case of ConstraintViolationException being actually thrown.
           unhealthyContainersDao.update(rec);
-          LOG.error("Error while inserting unhealthy container record: {}", rec,
+          LOG.debug("Error while inserting unhealthy container record: {}", rec,
               dataAccessException);
         }
       }
