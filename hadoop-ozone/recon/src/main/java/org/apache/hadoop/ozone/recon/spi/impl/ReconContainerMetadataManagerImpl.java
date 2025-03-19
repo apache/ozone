@@ -343,7 +343,7 @@ public class ReconContainerMetadataManagerImpl
   public Map<ContainerKeyPrefix, Integer> getKeyPrefixesForContainer(
       long containerId) throws IOException {
     // set the default startKeyPrefix to empty string
-    return getKeyPrefixesForContainer(containerId, StringUtils.EMPTY);
+    return getKeyPrefixesForContainer(containerId, StringUtils.EMPTY, 1000);
   }
 
   /**
@@ -357,7 +357,7 @@ public class ReconContainerMetadataManagerImpl
    */
   @Override
   public Map<ContainerKeyPrefix, Integer> getKeyPrefixesForContainer(
-      long containerId, String prevKeyPrefix) throws IOException {
+      long containerId, String prevKeyPrefix, int limit) throws IOException {
 
     Map<ContainerKeyPrefix, Integer> prefixes = new LinkedHashMap<>();
     try (TableIterator<ContainerKeyPrefix,
@@ -384,7 +384,7 @@ public class ReconContainerMetadataManagerImpl
         return prefixes;
       }
 
-      while (containerIterator.hasNext()) {
+      while (containerIterator.hasNext() && prefixes.size() < limit) {
         KeyValue<ContainerKeyPrefix, Integer> keyValue =
             containerIterator.next();
         ContainerKeyPrefix containerKeyPrefix = keyValue.getKey();
