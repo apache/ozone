@@ -300,34 +300,14 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
 
     AtomicLong copySize = new AtomicLong(0L);
-    // Get the active fs files.
-    Path dir = checkpoint.getCheckpointLocation();
 
     // Log estimated total data transferred on first request.
     if (sstFilesToExclude.isEmpty()) {
-      try {
-        Counters.PathCounters counters = Counters.longPathCounters();
-        CountingPathVisitor visitor = new CountingPathVisitor(
-            counters, SST_FILE_FILTER, TRUE);
-        Files.walkFileTree(dir, visitor);
-        int totalSnapshots = 0;
-        if (includeSnapshotData) {
-          Set<Path> snapshotPaths = getSnapshotDirs(checkpoint, false);
-          totalSnapshots = snapshotPaths.size();
-          for (Path snapshotDir: snapshotPaths) {
-            Files.walkFileTree(snapshotDir, visitor);
-          }
-        }
-        LOG.info("Estimates for Checkpoint Tarball Stream - " +
-                "Data size: {} KB, " + "SST files: {}{}",
-            counters.getByteCounter().get() / (1024),
-            counters.getFileCounter().get(),
-            (includeSnapshotData ? ", snapshots: " + totalSnapshots : ""));
-      } catch (Exception e) {
-        LOG.error("Could not estimate size of transfer to Checkpoint Tarball Stream.", e);
-      }
+      logTotals(checkpoint, includeSnapshotData);
     }
 
+    // Get the active fs files.
+    Path dir = checkpoint.getCheckpointLocation();
     if (!processDir(dir, copyFiles, hardLinkFiles, sstFilesToExclude,
         new HashSet<>(), excluded, copySize, null)) {
       return false;
@@ -356,6 +336,30 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         hardLinkFiles, sstFilesToExclude,
         new HashSet<>(), excluded, copySize,
         compactionLogDir.getOriginalDir().toPath());
+  }
+
+  private void logTotals(
+      DBCheckpoint checkpoint, boolean includeSnapshotData) {
+    try {
+      Counters.PathCounters counters = Counters.longPathCounters();
+      CountingPathVisitor visitor = new CountingPathVisitor(
+          counters, SST_FILE_FILTER, TRUE);
+      Files.walkFileTree(checkpoint.getCheckpointLocation(), visitor);
+      int totalSnapshots = 0;
+      if (includeSnapshotData) {
+        Set<Path> snapshotPaths = getSnapshotDirs(checkpoint, false);
+        totalSnapshots = snapshotPaths.size();
+        for (Path snapshotDir: snapshotPaths) {
+          Files.walkFileTree(snapshotDir, visitor);
+        }
+      }
+      LOG.info("Estimates for Checkpoint Tarball Stream - Data size: {} KB, " + "SST files: {}{}",
+          counters.getByteCounter().get() / (1024),
+          counters.getFileCounter().get(),
+          (includeSnapshotData ? ", snapshots: " + totalSnapshots : ""));
+    } catch (Exception e) {
+      LOG.error("Could not estimate size of transfer to Checkpoint Tarball Stream.", e);
+    }
   }
 
   /**
