@@ -38,7 +38,7 @@ import picocli.CommandLine;
 )
 public class CompactOMDB extends RepairTool {
 
-  @CommandLine.Option(names = {"--column_family", "--column-family", "--cf"},
+  @CommandLine.Option(names = {"--column-family", "--column_family", "--cf"},
       required = true,
       description = "Column family name")
   private String columnFamilyName;

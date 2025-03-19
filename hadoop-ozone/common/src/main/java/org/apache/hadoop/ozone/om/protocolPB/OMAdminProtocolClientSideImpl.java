@@ -226,15 +226,15 @@ public final class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
       throw ProtobufHelper.getRemoteException(e);
     }
     if (!response.getSuccess()) {
-      throwException("Request to compact" + columnFamily +
-          ", sent to " + omPrintInfo + " failed with error: " +
+      throwException("Request to compact \'" + columnFamily +
+          "\', sent to " + omPrintInfo + " failed with error: " +
           response.getErrorMsg());
     }
   }
 
   private void throwException(String errorMsg)
       throws IOException {
-    throw new IOException("Failed to Decommission OM. Error: " + errorMsg);
+    throw new IOException("Request Failed. Error: " + errorMsg);
   }
 
   @Override
