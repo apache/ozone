@@ -22,7 +22,6 @@ Test Timeout        5 minutes
 *** Test Cases ***
 Picks up command line options
     Pass Execution If    '%{HDDS_DN_OPTS}' == ''    Command-line option required for process check
-    ${processes} =    List Processes    proc_datanode
-    Pass Execution If    '${processes}' == ''    Process not found
+    ${processes} =    List All Processes
     Should Contain    ${processes}   %{HDDS_DN_OPTS}
     Should Contain    ${processes}   %{HADOOP_OPTS}

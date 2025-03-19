@@ -22,7 +22,6 @@ Test Timeout        5 minutes
 *** Test Cases ***
 Picks up command line options
     Pass Execution If    '%{HDFS_STORAGECONTAINERMANAGER_OPTS}' == ''    Command-line option required for process check
-    ${processes} =    List Processes    proc_scm
-    Pass Execution If    '${processes}' == ''    Process not found
+    ${processes} =    List All Processes
     Should Contain    ${processes}   %{HDFS_STORAGECONTAINERMANAGER_OPTS}
     Should Contain    ${processes}   %{HADOOP_OPTS}

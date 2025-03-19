@@ -22,6 +22,5 @@ Test Timeout        5 minutes
 *** Test Cases ***
 Picks up command line options
     Pass Execution If    '%{HADOOP_OPTS}' == ''    Command-line option required for process check
-    ${processes} =    List Processes    proc_recon
-    Pass Execution If    '${processes}' == ''    Process not found
+    ${processes} =    List All Processes
     Should Contain    ${processes}   %{HADOOP_OPTS}

@@ -22,8 +22,7 @@ Test Timeout        5 minutes
 *** Test Cases ***
 Picks up command line options
     Pass Execution If    '%{HDFS_OM_OPTS}' == ''    Command-line option required for process check
-    ${processes} =    List Processes    proc_om
-    Pass Execution If    '${processes}' == ''    Process not found
+    ${processes} =    List All Processes
     Should Contain    ${processes}   %{HDFS_OM_OPTS}
     Should Contain    ${processes}   %{HADOOP_OPTS}
 
