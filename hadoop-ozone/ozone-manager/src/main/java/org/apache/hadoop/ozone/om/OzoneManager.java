@@ -717,7 +717,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omS3gGrpcServer = getOmS3gGrpcServer(configuration);
     }
 
-    // init om gateway for request
+    // init om execution flow for request
     omExecutionFlow = new OMExecutionFlow(this);
 
     ShutdownHookManager.get().addShutdownHook(this::saveOmMetrics,

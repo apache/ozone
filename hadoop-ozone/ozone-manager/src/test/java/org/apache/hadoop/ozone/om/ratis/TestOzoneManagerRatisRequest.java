@@ -110,8 +110,8 @@ public class TestOzoneManagerRatisRequest {
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
-    OMExecutionFlow omGateway = new OMExecutionFlow(ozoneManager);
-    when(ozoneManager.getOmExecutionFlow()).thenReturn(omGateway);
+    OMExecutionFlow omExecutionFlow = new OMExecutionFlow(ozoneManager);
+    when(ozoneManager.getOmExecutionFlow()).thenReturn(omExecutionFlow);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     final OmConfig omConfig = ozoneConfiguration.getObject(OmConfig.class);
     when(ozoneManager.getConfig()).thenReturn(omConfig);
