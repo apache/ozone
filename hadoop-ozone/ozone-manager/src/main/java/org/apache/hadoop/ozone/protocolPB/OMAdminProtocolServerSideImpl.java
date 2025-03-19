@@ -108,6 +108,15 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
   public CompactResponse compactDB(RpcController controller, CompactRequest compactRequest)
       throws ServiceException {
     try {
+      boolean tableExists = (ozoneManager.getMetadataManager().getStore().
+          getTable(compactRequest.getColumnFamily()) != null);
+      if (!tableExists) {
+        return CompactResponse.newBuilder()
+            .setSuccess(false)
+            .setErrorMsg("Failed to compact column family: " + compactRequest.getColumnFamily() +
+                ". Column family does not exist.")
+            .build();
+      }
       ozoneManager.compactOMDB(compactRequest.getColumnFamily());
     } catch (Exception ex) {
       return CompactResponse.newBuilder()
