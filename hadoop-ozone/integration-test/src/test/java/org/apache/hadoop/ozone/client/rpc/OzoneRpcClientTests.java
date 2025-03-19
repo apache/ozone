@@ -1698,7 +1698,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @ParameterizedTest
   @MethodSource("bucketLayoutsWithEnablePaths")
   public void testBucketUsedNamespace(BucketLayout layout, boolean enablePaths) throws IOException {
-    cluster.getConf().setBoolean(OmConfig.Keys.ENABLE_FILESYSTEM_PATHS, enablePaths);
+    cluster.getOzoneManager().getConfig().setFileSystemPathEnabled(enablePaths);
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String value = "sample value";
