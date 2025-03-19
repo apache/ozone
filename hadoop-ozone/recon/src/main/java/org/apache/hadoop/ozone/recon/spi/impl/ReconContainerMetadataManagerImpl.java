@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
@@ -343,7 +344,8 @@ public class ReconContainerMetadataManagerImpl
   public Map<ContainerKeyPrefix, Integer> getKeyPrefixesForContainer(
       long containerId) throws IOException {
     // set the default startKeyPrefix to empty string
-    return getKeyPrefixesForContainer(containerId, StringUtils.EMPTY, 1000);
+    return getKeyPrefixesForContainer(containerId, StringUtils.EMPTY,
+        Integer.parseInt(ReconConstants.DEFAULT_FETCH_COUNT));
   }
 
   /**
