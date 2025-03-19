@@ -55,7 +55,7 @@ public class ContainerDatanodeDatabase {
         "container_state TEXT NOT NULL," +
         "bcsid INTEGER NOT NULL," +
         "error_message TEXT," +
-        "UNIQUE (datanode_id , container_id ,container_state, timestamp)"  +
+        "PRIMARY KEY (datanode_id, container_id, container_state, bcsid)"  +
         ");";
 
     try (Connection connection = getConnection();
