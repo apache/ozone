@@ -23,7 +23,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCHED_BLOCKS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCH_MAX_BLOCKS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCH_MAX_BLOCKS_DEFAULT;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,8 +31,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -71,7 +68,6 @@ public class OMBlockPrefetchClient {
   private int maxBlocks;
   private boolean useHostname;
   private DNSToSwitchMapping dnsToSwitchMapping;
-  private ScheduledExecutorService prefetchExecutor;
   private final Map<ReplicationConfig, ConcurrentLinkedDeque<ExpiringAllocatedBlock>> blockQueueMap =
       new ConcurrentHashMap<>();
   private long expiryDuration;
@@ -155,25 +151,10 @@ public class OMBlockPrefetchClient {
     dnsToSwitchMapping =
         ((newInstance instanceof CachedDNSToSwitchMapping) ? newInstance
             : new CachedDNSToSwitchMapping(newInstance));
-
-    prefetchExecutor = Executors.newSingleThreadScheduledExecutor(
-        new ThreadFactoryBuilder().setNameFormat("BlockPrefetchThread-%d").setDaemon(true).build()
-    );
     metrics = OMBlockPrefetchMetrics.register();
   }
 
   public void stop() {
-    if (prefetchExecutor != null) {
-      prefetchExecutor.shutdown();
-      try {
-        if (!prefetchExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
-          prefetchExecutor.shutdownNow();
-        }
-      } catch (InterruptedException e) {
-        LOG.error("Interrupted while shutting down prefetch executor service.", e);
-        Thread.currentThread().interrupt();
-      }
-    }
     OMBlockPrefetchMetrics.unregister();
   }
 
@@ -230,23 +211,23 @@ public class OMBlockPrefetchClient {
 
       // If there aren't enough blocks in the cache, we make an RPC call to SCM and prefetch additional batch max + the
       // requested blocks in the same call, avoiding a separate prefetchBlocks call to SCM.
-      int overAllocateBlocks = (remainingBlocks > 0) ? blocksToFetch(queue.size(), ADDITIONAL_BLOCKS_MAX) : 0;
-      List<AllocatedBlock> newBlocks =
-          scmBlockLocationProtocol.allocateBlock(scmBlockSize, remainingBlocks + overAllocateBlocks, replicationConfig,
-              serviceID, excludeList, clientMachine);
-      long expiryTime = System.currentTimeMillis() + expiryDuration;
-      int newBlocksSize = newBlocks.size();
-      allocatedBlocks.addAll(newBlocks.subList(0, remainingBlocks));
-
-      if (overAllocateBlocks > 0) {
-        for (AllocatedBlock block : newBlocks.subList(remainingBlocks, newBlocksSize)) {
-          queue.offer(new ExpiringAllocatedBlock(block, expiryTime));
-        }
-        LOG.info("Prefetched {} blocks for replication config {}.", newBlocksSize, replicationConfig);
-        PARALLEL_ADDITIONAL_BLOCKS.addAndGet(-overAllocateBlocks);
-      }
-
       if (remainingBlocks > 0) {
+        int overAllocateBlocks = blocksToFetch(queue.size(), ADDITIONAL_BLOCKS_MAX);
+        List<AllocatedBlock> newBlocks =
+            scmBlockLocationProtocol.allocateBlock(scmBlockSize, remainingBlocks + overAllocateBlocks,
+                replicationConfig, serviceID, excludeList, clientMachine);
+        long expiryTime = System.currentTimeMillis() + expiryDuration;
+        int newBlocksSize = newBlocks.size();
+        allocatedBlocks.addAll(newBlocks.subList(0, remainingBlocks));
+
+        if (overAllocateBlocks > 0) {
+          for (AllocatedBlock block : newBlocks.subList(remainingBlocks, newBlocksSize)) {
+            queue.offer(new ExpiringAllocatedBlock(block, expiryTime));
+          }
+          LOG.info("Prefetched {} blocks for replication config {}.", newBlocksSize, replicationConfig);
+          PARALLEL_ADDITIONAL_BLOCKS.addAndGet(-overAllocateBlocks);
+        }
+
         metrics.incrementCacheMisses();
       } else {
         metrics.incrementCacheHits();
