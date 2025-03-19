@@ -241,6 +241,11 @@ public class ContainerEndpoint {
       for (ContainerKeyPrefix containerKeyPrefix : containerKeyPrefixMap
           .keySet()) {
 
+        // break the for loop if limit has been reached
+        if (keyMetadataMap.size() == limit) {
+          break;
+        }
+
         // Directly calling getSkipCache() on the Key/FileTable table
         // instead of iterating since only full keys are supported now. We will
         // try to get the OmKeyInfo object by searching the KEY_TABLE table with
@@ -265,10 +270,7 @@ public class ContainerEndpoint {
           List<ContainerBlockMetadata> blockIds =
               getBlocks(matchedKeys, containerID);
 
-          String ozoneKey = omMetadataManager.getOzoneKey(
-              omKeyInfo.getVolumeName(),
-              omKeyInfo.getBucketName(),
-              omKeyInfo.getKeyName());
+          String ozoneKey = containerKeyPrefix.getKeyPrefix();
           lastKey = ozoneKey;
           if (keyMetadataMap.containsKey(ozoneKey)) {
             keyMetadataMap.get(ozoneKey).getVersions()
@@ -277,10 +279,6 @@ public class ContainerEndpoint {
             keyMetadataMap.get(ozoneKey).getBlockIds()
                 .put(containerKeyPrefix.getKeyVersion(), blockIds);
           } else {
-            // break the for loop if limit has been reached
-            if (keyMetadataMap.size() == limit) {
-              break;
-            }
             KeyMetadata keyMetadata = new KeyMetadata();
             keyMetadata.setBucket(omKeyInfo.getBucketName());
             keyMetadata.setVolume(omKeyInfo.getVolumeName());
