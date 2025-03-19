@@ -324,8 +324,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
             counters.getFileCounter().get(),
             (includeSnapshotData ? ", snapshots: " + totalSnapshots : ""));
       } catch (Exception e) {
-        LOG.error("Could not determine estimated size of transfer to " +
-            "Checkpoint Tarball Stream", e);
+        LOG.error("Could not estimate size of transfer to Checkpoint Tarball Stream.", e);
       }
     }
 
