@@ -1698,6 +1698,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @ParameterizedTest
   @MethodSource("bucketLayoutsWithEnablePaths")
   public void testBucketUsedNamespace(BucketLayout layout, boolean enablePaths) throws IOException {
+    boolean originalEnablePaths = cluster.getOzoneManager().getConfig().isFileSystemPathEnabled();
     cluster.getOzoneManager().getConfig().setFileSystemPathEnabled(enablePaths);
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -1748,6 +1749,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
           getBucketUsedNamespace(volumeName, bucketName));
     } finally {
       client.close();
+      cluster.getOzoneManager().getConfig().setFileSystemPathEnabled(originalEnablePaths);
     }
   }
 
