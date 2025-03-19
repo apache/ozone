@@ -620,18 +620,20 @@ public final class HddsServerUtil {
     }
   }
 
-  public static void includeFile(File file, String entryName,
+  public static long includeFile(File file, String entryName,
                                  ArchiveOutputStream archiveOutputStream)
       throws IOException {
     ArchiveEntry archiveEntry =
         archiveOutputStream.createArchiveEntry(file, entryName);
     archiveOutputStream.putArchiveEntry(archiveEntry);
+    long bytesWritten;
     try (InputStream fis = Files.newInputStream(file.toPath())) {
-      IOUtils.copy(fis, archiveOutputStream);
+      bytesWritten = IOUtils.copy(fis, archiveOutputStream);
       archiveOutputStream.flush();
     } finally {
       archiveOutputStream.closeArchiveEntry();
     }
+    return bytesWritten;
   }
 
   // Mark tarball completed.
