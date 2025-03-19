@@ -130,7 +130,7 @@ public class SimpleMockNodeManager implements NodeManager {
       throw new NodeNotFoundException(dn.getID());
     }
     dni.setNodeStatus(
-        new NodeStatus(
+        NodeStatus.valueOf(
             newState, dni.getNodeStatus().getHealth(), opStateExpiryEpocSec));
   }
 

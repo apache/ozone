@@ -338,11 +338,9 @@ public class NodeStateManager implements Runnable, Closeable {
       LOG.info("Updating nodeOperationalState on registration as the " +
               "datanode has a persisted state of {} and expiry of {}",
           dnOpState, dn.getPersistedOpStateExpiryEpochSec());
-      return new NodeStatus(dnOpState, state,
-          dn.getPersistedOpStateExpiryEpochSec());
+      return NodeStatus.valueOf(dnOpState, state, dn.getPersistedOpStateExpiryEpochSec());
     } else {
-      return new NodeStatus(
-          NodeOperationalState.IN_SERVICE, state);
+      return NodeStatus.valueOf(NodeOperationalState.IN_SERVICE, state);
     }
   }
 

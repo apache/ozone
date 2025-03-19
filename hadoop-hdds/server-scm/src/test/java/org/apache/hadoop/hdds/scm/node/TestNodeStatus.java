@@ -40,27 +40,27 @@ class TestNodeStatus {
   @ParameterizedTest
   @EnumSource
   void readOnly(HddsProtos.NodeOperationalState state) {
-    assertEquals(0, new NodeStatus(state, HEALTHY)
-        .compareTo(new NodeStatus(state, HEALTHY_READONLY)));
+    assertEquals(0, NodeStatus.valueOf(state, HEALTHY)
+        .compareTo(NodeStatus.valueOf(state, HEALTHY_READONLY)));
   }
 
   @Test
   void healthyFirst() {
     assertThat(0).isGreaterThan(inServiceHealthy().compareTo(inServiceStale()));
     assertThat(0).isLessThan(inServiceDead().compareTo(inServiceHealthy()));
-    assertThat(0).isGreaterThan(new NodeStatus(ENTERING_MAINTENANCE, HEALTHY).compareTo(
+    assertThat(0).isGreaterThan(NodeStatus.valueOf(ENTERING_MAINTENANCE, HEALTHY).compareTo(
         inServiceStale()
     ));
     assertThat(0).isLessThan(inServiceStale().compareTo(
-        new NodeStatus(DECOMMISSIONING, HEALTHY)
+        NodeStatus.valueOf(DECOMMISSIONING, HEALTHY)
     ));
   }
 
   @Test
   void inServiceFirst() {
     assertThat(0).isGreaterThan(inServiceHealthy().compareTo(
-        new NodeStatus(ENTERING_MAINTENANCE, HEALTHY)));
-    assertThat(0).isLessThan(new NodeStatus(DECOMMISSIONING, HEALTHY).compareTo(
+        NodeStatus.valueOf(ENTERING_MAINTENANCE, HEALTHY)));
+    assertThat(0).isLessThan(NodeStatus.valueOf(DECOMMISSIONING, HEALTHY).compareTo(
         inServiceHealthy()
     ));
   }

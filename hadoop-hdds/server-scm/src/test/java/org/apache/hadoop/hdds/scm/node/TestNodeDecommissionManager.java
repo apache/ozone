@@ -1044,7 +1044,7 @@ public class TestNodeDecommissionManager {
     }
     for (DatanodeDetails datanode : dns) {
       if (datanode.equals(dn)) {
-        return new NodeStatus(datanode.getPersistedOpState(), HddsProtos.NodeState.HEALTHY);
+        return NodeStatus.valueOf(datanode.getPersistedOpState(), HddsProtos.NodeState.HEALTHY);
       }
     }
     return null;
