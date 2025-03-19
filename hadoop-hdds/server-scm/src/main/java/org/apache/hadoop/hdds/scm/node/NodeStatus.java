@@ -244,7 +244,8 @@ public final class NodeStatus {
 
   @Override
   public String toString() {
-    return "OperationalState: " + operationalState
-        + "(expiry: " + opStateExpiryEpochSeconds + "s), Health: " + health;
+    final String expiry = opStateExpiryEpochSeconds == 0 ? "no expiry"
+        : "expiry: " + opStateExpiryEpochSeconds + "s";
+    return operationalState + "(" + expiry + ")-" + health;
   }
 }
