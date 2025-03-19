@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.rpc;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Collections.singletonMap;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
@@ -36,6 +37,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PARTIAL_RENAME;
@@ -100,6 +102,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec;
@@ -198,6 +201,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -1598,6 +1602,14 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     );
   }
 
+  static Stream<Arguments> bucketLayoutsWithEnablePaths() {
+    return bucketLayouts()
+        .flatMap(layout -> Stream.of(
+            Arguments.of(layout, true),
+            Arguments.of(layout, false)
+        ));
+  }
+
   @ParameterizedTest
   @MethodSource("bucketLayouts")
   void bucketUsedBytesOverWrite(BucketLayout bucketLayout)
@@ -1683,8 +1695,10 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   @ParameterizedTest
-  @MethodSource("bucketLayouts")
-  public void testBucketUsedNamespace(BucketLayout layout) throws IOException {
+  @MethodSource("bucketLayoutsWithEnablePaths")
+  public void testBucketUsedNamespace(BucketLayout layout, boolean enablePaths) throws IOException {
+    boolean originalEnablePaths = cluster.getOzoneManager().getConfig().isFileSystemPathEnabled();
+    cluster.getOzoneManager().getConfig().setFileSystemPathEnabled(enablePaths);
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String value = "sample value";
@@ -1721,12 +1735,12 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       // Test create a directory twice will not increase usedNamespace twice
       client.createDirectory(volumeName, bucketName, directoryName2);
       assertEquals(2L, getBucketUsedNamespace(volumeName, bucketName));
-      client.deleteKey(volumeName, bucketName,
-          OzoneFSUtils.addTrailingSlashIfNeeded(directoryName1), false);
-      assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
-      client.deleteKey(volumeName, bucketName,
-          OzoneFSUtils.addTrailingSlashIfNeeded(directoryName2), false);
-      assertEquals(0L, getBucketUsedNamespace(volumeName, bucketName));
+
+      if (layout == BucketLayout.LEGACY) {
+        handleLegacyBucketDelete(volumeName, bucketName, directoryName1, directoryName2);
+      } else {
+        handleNonLegacyBucketDelete(client, volumeName, bucketName, directoryName1, directoryName2);
+      }
 
       String multiComponentsDir = "dir1/dir2/dir3/dir4";
       client.createDirectory(volumeName, bucketName, multiComponentsDir);
@@ -1734,7 +1748,31 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
           getBucketUsedNamespace(volumeName, bucketName));
     } finally {
       client.close();
+      cluster.getOzoneManager().getConfig().setFileSystemPathEnabled(originalEnablePaths);
     }
+  }
+
+  private void handleLegacyBucketDelete(String volumeName, String bucketName, String dir1, String dir2)
+      throws IOException {
+    String rootPath = String.format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName);
+    cluster.getConf().set(FS_DEFAULT_NAME_KEY, rootPath);
+    FileSystem fs = FileSystem.get(cluster.getConf());
+
+    org.apache.hadoop.fs.Path dir1Path = new org.apache.hadoop.fs.Path(OZONE_URI_DELIMITER, dir1);
+    org.apache.hadoop.fs.Path dir2Path = new org.apache.hadoop.fs.Path(OZONE_URI_DELIMITER, dir2);
+
+    fs.delete(dir1Path, false);
+    assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
+    fs.delete(dir2Path, false);
+    assertEquals(0L, getBucketUsedNamespace(volumeName, bucketName));
+  }
+
+  private void handleNonLegacyBucketDelete(RpcClient client, String volumeName, String bucketName, String dir1,
+      String dir2) throws IOException {
+    client.deleteKey(volumeName, bucketName, OzoneFSUtils.addTrailingSlashIfNeeded(dir1), false);
+    assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
+    client.deleteKey(volumeName, bucketName, OzoneFSUtils.addTrailingSlashIfNeeded(dir2), false);
+    assertEquals(0L, getBucketUsedNamespace(volumeName, bucketName));
   }
 
   @ParameterizedTest
