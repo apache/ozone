@@ -174,6 +174,7 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
 
       // Read more data to get the data till the next checksum boundary.
       readDataLen = BYTES_PER_CHECKSUM / 2;
+      readDataFromBlock(block0Stream, readDataLen);
       // There should be one buffer and the buffer should not be released as
       // there is data pending to be read from the buffer
       checkBufferSizeAndCapacity(block0Stream.getCachedBuffers());
