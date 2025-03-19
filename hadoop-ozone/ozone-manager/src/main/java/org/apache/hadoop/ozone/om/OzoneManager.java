@@ -4569,14 +4569,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Provide ACLType of ALL which is default acl rights for user and group.
     List<OzoneAcl> listOfAcls = new ArrayList<>();
     //User ACL
-    listOfAcls.add(new OzoneAcl(ACLIdentityType.USER,
+    listOfAcls.add(OzoneAcl.of(ACLIdentityType.USER,
         userName, ACCESS, ACLType.ALL));
     //Group ACLs of the User
     List<String> userGroups = Arrays.asList(UserGroupInformation
         .createRemoteUser(userName).getGroupNames());
 
     userGroups.forEach((group) -> listOfAcls.add(
-        new OzoneAcl(ACLIdentityType.GROUP, group, ACCESS, ACLType.ALL)));
+        OzoneAcl.of(ACLIdentityType.GROUP, group, ACCESS, ACLType.ALL)));
 
     // Add ACLs
     for (OzoneAcl ozoneAcl : listOfAcls) {
