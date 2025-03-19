@@ -45,7 +45,7 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
       CapacityVolumeChoosingPolicy.class);
 
   @Override
-  public HddsVolume chooseVolume(List<HddsVolume> volumes,
+  public synchronized HddsVolume chooseVolume(List<HddsVolume> volumes,
       long maxContainerSize) throws IOException {
 
     // No volumes available to choose from
