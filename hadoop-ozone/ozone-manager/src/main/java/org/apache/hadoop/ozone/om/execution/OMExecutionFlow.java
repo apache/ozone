@@ -28,15 +28,11 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.ratis.protocol.ClientId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * entry for execution flow for write request.
  */
 public class OMExecutionFlow {
-  private static final Logger LOG = LoggerFactory.getLogger(OMExecutionFlow.class);
 
   private final OzoneManager ozoneManager;
   private final OMPerformanceMetrics perfMetrics;
