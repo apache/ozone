@@ -303,7 +303,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
     // Log estimated total data transferred on first request.
     if (sstFilesToExclude.isEmpty()) {
-      logTotals(checkpoint, includeSnapshotData);
+      logEstimatedTarballSize(checkpoint, includeSnapshotData);
     }
 
     // Get the active fs files.
@@ -338,7 +338,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         compactionLogDir.getOriginalDir().toPath());
   }
 
-  private void logTotals(
+  private void logEstimatedTarballSize(
       DBCheckpoint checkpoint, boolean includeSnapshotData) {
     try {
       Counters.PathCounters counters = Counters.longPathCounters();
