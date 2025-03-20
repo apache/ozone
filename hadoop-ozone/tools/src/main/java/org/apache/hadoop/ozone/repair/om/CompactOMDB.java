@@ -32,7 +32,7 @@ import picocli.CommandLine;
 @CommandLine.Command(
     name = "compact",
     description = "CLI to compact a column family in the om.db. " +
-        "The compaction happens asynchronously.",
+        "The compaction happens asynchronously. Requires admin privileges.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
