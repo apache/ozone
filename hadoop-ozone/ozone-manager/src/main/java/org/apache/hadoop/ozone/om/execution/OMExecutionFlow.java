@@ -21,9 +21,13 @@ import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.ipc.ProcessingDetails;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
+import org.apache.hadoop.ozone.om.lock.OmLockOpr;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -36,10 +40,12 @@ public class OMExecutionFlow {
 
   private final OzoneManager ozoneManager;
   private final OMPerformanceMetrics perfMetrics;
+  private final OmLockOpr omLockOpr;
 
   public OMExecutionFlow(OzoneManager om) {
     this.ozoneManager = om;
     this.perfMetrics = ozoneManager.getPerfMetrics();
+    this.omLockOpr = new OmLockOpr();
   }
 
   /**
@@ -72,11 +78,36 @@ public class OMExecutionFlow {
       return OzoneManagerRatisUtils.createErrorResponse(request, ex);
     }
 
-    // 2. submit request to ratis
-    OMResponse response = ozoneManager.getOmRatisServer().submitRequest(requestToSubmit);
-    if (!response.getSuccess()) {
-      omClientRequest.handleRequestFailure(ozoneManager);
+    // 2. lock and submit request to ratis
+    OmLockOpr.OmLockInfo lockInfo = null;
+    try {
+      lockInfo = omClientRequest.lock(ozoneManager, omLockOpr);
+      OMResponse response = ozoneManager.getOmRatisServer().submitRequest(requestToSubmit);
+      if (!response.getSuccess()) {
+        omClientRequest.handleRequestFailure(ozoneManager);
+      }
+      return response;
+    } catch (IOException e) {
+      throw new ServiceException(e.getMessage(), e);
+    }  finally {
+      performUnlock(omClientRequest, omLockOpr, lockInfo);
     }
-    return response;
+  }
+
+  private static void performUnlock(
+      OMClientRequest omClientRequest, OmLockOpr omLockOpr, OmLockOpr.OmLockInfo lockInfo) {
+    if (null == lockInfo) {
+      return;
+    }
+    omClientRequest.unlock(omLockOpr, lockInfo);
+    Server.Call call = Server.getCurCall().get();
+    if (null != call) {
+      call.getProcessingDetails().add(ProcessingDetails.Timing.LOCKWAIT,
+          lockInfo.getWaitLockNanos(), TimeUnit.NANOSECONDS);
+      call.getProcessingDetails().add(ProcessingDetails.Timing.LOCKSHARED,
+          lockInfo.getReadLockNanos(), TimeUnit.NANOSECONDS);
+      call.getProcessingDetails().add(ProcessingDetails.Timing.LOCKEXCLUSIVE,
+          lockInfo.getWriteLockNanos(), TimeUnit.NANOSECONDS);
+    }
   }
 }
