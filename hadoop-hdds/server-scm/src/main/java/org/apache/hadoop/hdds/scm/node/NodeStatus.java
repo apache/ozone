@@ -43,9 +43,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
  * <p>
  * This class is value-based.
  */
-public final class NodeStatus implements Comparable<NodeStatus> {
+public final class NodeStatus {
   /** For the {@link NodeStatus} objects with {@link #opStateExpiryEpochSeconds} == 0. */
-  private static final Map<NodeOperationalState, Map<NodeState, NodeStatus>> CONSTANT_MAP;
+  private static final Map<NodeOperationalState, Map<NodeState, NodeStatus>> CONSTANTS;
   static {
     final Map<NodeOperationalState, Map<NodeState, NodeStatus>> map = new EnumMap<>(NodeOperationalState.class);
     for (NodeOperationalState op : NodeOperationalState.values()) {
@@ -53,19 +53,21 @@ public final class NodeStatus implements Comparable<NodeStatus> {
       for (NodeState health : NodeState.values()) {
         healthMap.put(health, new NodeStatus(health, op, 0));
       }
-      map.put(op, healthMap);
+      map.put(op, Collections.unmodifiableMap(healthMap));
     }
-    CONSTANT_MAP = map;
+    CONSTANTS = Collections.unmodifiableMap(map);
   }
 
   /** @return a {@link NodeStatus} object with {@link #opStateExpiryEpochSeconds} == 0. */
   public static NodeStatus valueOf(NodeOperationalState op, NodeState health) {
-    return CONSTANT_MAP.get(op).get(health);
+    return valueOf(op, health, 0);
   }
 
   /** @return a {@link NodeStatus} object. */
   public static NodeStatus valueOf(NodeOperationalState op, NodeState health, long opExpiryEpochSeconds) {
-    return opExpiryEpochSeconds == 0 ? valueOf(op, health)
+    Objects.requireNonNull(op, "op == null");
+    Objects.requireNonNull(health, "health == null");
+    return opExpiryEpochSeconds == 0 ? CONSTANTS.get(op).get(health)
         : new NodeStatus(health, op, opExpiryEpochSeconds);
   }
 
@@ -250,19 +252,8 @@ public final class NodeStatus implements Comparable<NodeStatus> {
 
   @Override
   public String toString() {
-    return "OperationalState: " + operationalState
-        + "(expiry: " + opStateExpiryEpochSeconds + "s), Health: " + health;
-  }
-
-  @Override
-  public int compareTo(NodeStatus o) {
-    int order = Boolean.compare(o.isHealthy(), isHealthy());
-    if (order == 0) {
-      order = Boolean.compare(isDead(), o.isDead());
-    }
-    if (order == 0) {
-      order = operationalState.compareTo(o.operationalState);
-    }
-    return order;
+    final String expiry = opStateExpiryEpochSeconds == 0 ? "no expiry"
+        : "expiry: " + opStateExpiryEpochSeconds + "s";
+    return operationalState + "(" + expiry + ")-" + health;
   }
 }

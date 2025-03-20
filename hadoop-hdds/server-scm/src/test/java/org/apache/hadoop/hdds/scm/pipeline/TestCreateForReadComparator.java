@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.node;
+package org.apache.hadoop.hdds.scm.pipeline;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
@@ -27,40 +27,52 @@ import static org.apache.hadoop.hdds.scm.node.NodeStatus.inServiceStale;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.util.Comparator;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 /**
- * Tests for {@link NodeStatus}.
+ * Tests for {@link ECPipelineProvider#CREATE_FOR_READ_COMPARATOR}.
  */
-class TestNodeStatus {
+class TestCreateForReadComparator {
+  private final Comparator<NodeStatus> comparator = ECPipelineProvider.CREATE_FOR_READ_COMPARATOR;
+
+  int compare(NodeStatus left, NodeStatus right) {
+    return comparator.compare(left, right);
+  }
 
   @ParameterizedTest
   @EnumSource
   void readOnly(HddsProtos.NodeOperationalState state) {
-    assertEquals(0, NodeStatus.valueOf(state, HEALTHY)
-        .compareTo(NodeStatus.valueOf(state, HEALTHY_READONLY)));
+    assertEquals(0, compare(
+        NodeStatus.valueOf(state, HEALTHY),
+        NodeStatus.valueOf(state, HEALTHY_READONLY)));
   }
 
   @Test
   void healthyFirst() {
-    assertThat(0).isGreaterThan(inServiceHealthy().compareTo(inServiceStale()));
-    assertThat(0).isLessThan(inServiceDead().compareTo(inServiceHealthy()));
-    assertThat(0).isGreaterThan(NodeStatus.valueOf(ENTERING_MAINTENANCE, HEALTHY).compareTo(
+    assertThat(0).isGreaterThan(compare(inServiceHealthy(), inServiceStale()));
+    assertThat(0).isLessThan(compare(inServiceDead(), inServiceHealthy()));
+    assertThat(0).isGreaterThan(compare(
+        NodeStatus.valueOf(ENTERING_MAINTENANCE, HEALTHY),
         inServiceStale()
     ));
-    assertThat(0).isLessThan(inServiceStale().compareTo(
+    assertThat(0).isLessThan(compare(
+        inServiceStale(),
         NodeStatus.valueOf(DECOMMISSIONING, HEALTHY)
     ));
   }
 
   @Test
   void inServiceFirst() {
-    assertThat(0).isGreaterThan(inServiceHealthy().compareTo(
+    assertThat(0).isGreaterThan(compare(
+        inServiceHealthy(),
         NodeStatus.valueOf(ENTERING_MAINTENANCE, HEALTHY)));
-    assertThat(0).isLessThan(NodeStatus.valueOf(DECOMMISSIONING, HEALTHY).compareTo(
+    assertThat(0).isLessThan(compare(
+        NodeStatus.valueOf(DECOMMISSIONING, HEALTHY),
         inServiceHealthy()
     ));
   }
