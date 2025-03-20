@@ -554,8 +554,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
     return length;
   }
 
-  @VisibleForTesting
-  synchronized int getChunkIndex() {
+  public synchronized int getChunkIndex() {
     return chunkIndex;
   }
 
@@ -618,7 +617,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
     refreshBlockInfo(cause);
   }
 
-  @VisibleForTesting
   public synchronized List<ChunkInputStream> getChunkStreams() {
     return chunkStreams;
   }

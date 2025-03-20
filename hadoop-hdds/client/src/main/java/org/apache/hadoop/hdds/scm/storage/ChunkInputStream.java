@@ -727,7 +727,7 @@ public class ChunkInputStream extends InputStream
     return chunkInfo.getChunkName();
   }
 
-  protected long getLength() {
+  public long getLength() {
     return length;
   }
 
@@ -746,5 +746,9 @@ public class ChunkInputStream extends InputStream
   @VisibleForTesting
   public ByteBuffer[] getCachedBuffers() {
     return BufferUtils.getReadOnlyByteBuffers(buffers);
+  }
+
+  public ChunkInfo getChunkInfo() {
+    return chunkInfo;
   }
 }

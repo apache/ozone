@@ -65,7 +65,7 @@ public class DNContainerOperationClient implements AutoCloseable {
   }
 
   @Nonnull
-  private static XceiverClientManager createClientManager(
+  public static XceiverClientManager createClientManager(
       ConfigurationSource conf, CertificateClient certificateClient)
       throws IOException {
     ClientTrustManager trustManager = null;

@@ -53,6 +53,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
@@ -81,6 +82,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -88,6 +90,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -628,12 +631,19 @@ public class TestKeyValueHandler {
         DatanodeDetails datanode = datanodes.get(i);
         KeyValueContainer container = containers.get(i);
 
-        Pipeline pipeline = mock(Pipeline.class);
+        Pipeline pipeline = Pipeline.newBuilder()
+            .setNodes(ImmutableList.of(datanode))
+            .setId(PipelineID.valueOf(datanode.getUuid()))
+            .setState(Pipeline.PipelineState.CLOSED)
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.ONE)).build();
         XceiverClientSpi client = mock(XceiverClientSpi.class);
 
         dnClientMock.when(() -> DNContainerOperationClient.createSingleNodePipeline(datanode)).thenReturn(pipeline);
         when(xceiverClientManager.acquireClient(pipeline)).thenReturn(client);
+        when(xceiverClientManager.acquireClientForReadData(pipeline)).thenReturn(client);
         doNothing().when(xceiverClientManager).releaseClient(eq(client), anyBoolean());
+        doNothing().when(xceiverClientManager).releaseClientForReadData(eq(client), anyBoolean());
         when(client.getPipeline()).thenReturn(pipeline);
 
         // Mock checksum info
@@ -644,6 +654,11 @@ public class TestKeyValueHandler {
         containerProtocolMock.when(() -> ContainerProtocolCalls.getBlock(eq(client), any(), any(), anyMap()))
             .thenAnswer(inv -> ContainerProtos.GetBlockResponseProto.newBuilder()
                 .setBlockData(kvHandler.getBlockManager().getBlock(container, inv.getArgument(1)).getProtoBufMessage())
+                .build());
+
+        containerProtocolMock.when(() -> ContainerProtocolCalls.getBlock(eq(client), any(), any(), any(), anyMap()))
+            .thenAnswer(inv -> ContainerProtos.GetBlockResponseProto.newBuilder()
+                .setBlockData(kvHandler.getBlockManager().getBlock(container, inv.getArgument(2)).getProtoBufMessage())
                 .build());
 
         // Mock readChunk

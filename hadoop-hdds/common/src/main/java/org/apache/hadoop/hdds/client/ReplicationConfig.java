@@ -112,6 +112,12 @@ public interface ReplicationConfig {
       return ((ReplicatedReplicationConfig) replicationConfig)
           .getReplicationFactor();
     }
+
+    if (replicationConfig instanceof  StandaloneReplicationConfig) {
+      return ((StandaloneReplicationConfig) replicationConfig)
+          .getReplicationFactor();
+    }
+
     throw new UnsupportedOperationException(
         "Replication configuration of type "
             + replicationConfig.getReplicationType()
