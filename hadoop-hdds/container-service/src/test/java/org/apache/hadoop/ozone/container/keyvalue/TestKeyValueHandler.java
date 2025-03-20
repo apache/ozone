@@ -640,9 +640,7 @@ public class TestKeyValueHandler {
         XceiverClientSpi client = mock(XceiverClientSpi.class);
 
         dnClientMock.when(() -> DNContainerOperationClient.createSingleNodePipeline(datanode)).thenReturn(pipeline);
-        when(xceiverClientManager.acquireClient(pipeline)).thenReturn(client);
         when(xceiverClientManager.acquireClientForReadData(pipeline)).thenReturn(client);
-        doNothing().when(xceiverClientManager).releaseClient(eq(client), anyBoolean());
         doNothing().when(xceiverClientManager).releaseClientForReadData(eq(client), anyBoolean());
         when(client.getPipeline()).thenReturn(pipeline);
 
@@ -651,11 +649,6 @@ public class TestKeyValueHandler {
             .thenReturn(checksumManager.read(container.getContainerData()).get());
 
         // Mock getBlock
-        containerProtocolMock.when(() -> ContainerProtocolCalls.getBlock(eq(client), any(), any(), anyMap()))
-            .thenAnswer(inv -> ContainerProtos.GetBlockResponseProto.newBuilder()
-                .setBlockData(kvHandler.getBlockManager().getBlock(container, inv.getArgument(1)).getProtoBufMessage())
-                .build());
-
         containerProtocolMock.when(() -> ContainerProtocolCalls.getBlock(eq(client), any(), any(), any(), anyMap()))
             .thenAnswer(inv -> ContainerProtos.GetBlockResponseProto.newBuilder()
                 .setBlockData(kvHandler.getBlockManager().getBlock(container, inv.getArgument(2)).getProtoBufMessage())
