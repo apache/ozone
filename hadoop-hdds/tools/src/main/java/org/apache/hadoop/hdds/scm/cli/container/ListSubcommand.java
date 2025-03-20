@@ -27,7 +27,6 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.base.Strings;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.PrintStream;
 import java.util.List;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -135,7 +134,7 @@ public class ListSubcommand extends ScmSubcommand {
 
       writeContainers(sequenceWriter, containerListResult.getContainerInfoList());
 
-
+      closeStream(sequenceWriter);
       if (containerListResult.getTotalCount() > count) {
         System.err.printf("Displaying %d out of %d containers. " +
                 "Container list has more containers.%n",
@@ -145,6 +144,7 @@ public class ListSubcommand extends ScmSubcommand {
       // List all containers by fetching in batches
       int batchSize = (count > 0) ? count : maxCountAllowed;
       listAllContainers(scmClient, sequenceWriter, batchSize, repConfig);
+      closeStream(sequenceWriter);
     }
   }
 
@@ -187,7 +187,7 @@ public class ListSubcommand extends ScmSubcommand {
 
     private final OutputStream delegate;
 
-    public NonClosingOutputStream(OutputStream delegate) {
+    NonClosingOutputStream(OutputStream delegate) {
       this.delegate = delegate;
     }
 
