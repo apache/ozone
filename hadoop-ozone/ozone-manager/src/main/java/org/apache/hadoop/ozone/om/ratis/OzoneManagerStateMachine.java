@@ -160,7 +160,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   public void notifyLeaderChanged(RaftGroupMemberId groupMemberId,
                                   RaftPeerId newLeaderId) {
     RaftPeerId currentPeerId = groupMemberId.getPeerId();
-    if (newLeaderId.equals(currentPeerId)){
+    if (newLeaderId.equals(currentPeerId)) {
       // warmup cache
       ozoneManager.initializeEdekCache(ozoneManager.getConfiguration());
     }
