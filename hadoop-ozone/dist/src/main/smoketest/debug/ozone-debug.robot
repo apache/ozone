@@ -19,8 +19,8 @@ Library             Collections
 Resource            ../lib/os.robot
 
 *** Keywords ***
-Execute read-replicas CLI tool
-    Execute                         ozone debug -Dozone.network.topology.aware.read=true read-replicas --output-dir ${TEMP_DIR} o3://om/${VOLUME}/${BUCKET}/${TESTFILE}
+Execute replicas verify checksums CLI tool
+    Execute                         ozone debug -Dozone.network.topology.aware.read=true replicas verify --checksums --output-dir ${TEMP_DIR} o3://om/${VOLUME}/${BUCKET}/${TESTFILE}
     ${directory} =                  Execute     ls -d ${TEMP_DIR}/${VOLUME}_${BUCKET}_${TESTFILE}_*/ | tail -n 1
     Directory Should Exist          ${directory}
     File Should Exist               ${directory}/${TESTFILE}_manifest

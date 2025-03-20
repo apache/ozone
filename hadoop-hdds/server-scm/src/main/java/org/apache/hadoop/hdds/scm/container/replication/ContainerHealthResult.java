@@ -40,7 +40,7 @@ public class ContainerHealthResult {
 
   private final ContainerInfo containerInfo;
   private final HealthState healthState;
-  private final List<SCMCommand> commands = new ArrayList<>();
+  private final List<SCMCommand<?>> commands = new ArrayList<>();
 
   public ContainerHealthResult(ContainerInfo containerInfo,
       HealthState healthState) {
@@ -52,11 +52,11 @@ public class ContainerHealthResult {
     return healthState;
   }
 
-  public void addCommand(SCMCommand command) {
+  public void addCommand(SCMCommand<?> command) {
     commands.add(command);
   }
 
-  public List<SCMCommand> getCommands() {
+  public List<SCMCommand<?>> getCommands() {
     return commands;
   }
 

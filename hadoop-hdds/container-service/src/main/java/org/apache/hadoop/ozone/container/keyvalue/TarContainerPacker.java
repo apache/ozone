@@ -305,7 +305,7 @@ public class TarContainerPacker
           descriptorFileContent = readEntry(archiveInput, size);
         } else {
           throw new IllegalArgumentException(
-              "Unknown entry in the tar file: " + "" + name);
+              "Unknown entry in the tar file: " + name);
         }
         entry = archiveInput.getNextEntry();
       }

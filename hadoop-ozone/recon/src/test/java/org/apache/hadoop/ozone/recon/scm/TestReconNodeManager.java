@@ -174,7 +174,7 @@ public class TestReconNodeManager {
             .getOpStateExpiryEpochSeconds());
 
     // Upon processing the heartbeat, the illegal command should be filtered out
-    List<SCMCommand> returnedCmds =
+    List<SCMCommand<?>> returnedCmds =
         reconNodeManager.processHeartbeat(datanodeDetails);
     assertEquals(1, returnedCmds.size());
     assertEquals(SCMCommandProto.Type.reregisterCommand,
@@ -272,7 +272,7 @@ public class TestReconNodeManager {
 
     datanodeDetails.setHostName("hostname2");
     // Upon processing the heartbeat, the illegal command should be filtered out
-    List<SCMCommand> returnedCmds =
+    List<SCMCommand<?>> returnedCmds =
         reconNodeManager.processHeartbeat(datanodeDetails);
     assertEquals(1, returnedCmds.size());
     assertEquals(SCMCommandProto.Type.reregisterCommand,

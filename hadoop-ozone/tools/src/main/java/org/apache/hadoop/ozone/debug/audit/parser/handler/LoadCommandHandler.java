@@ -15,45 +15,40 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.audit.parser.handler;
+package org.apache.hadoop.ozone.debug.audit.parser.handler;
 
-import java.sql.SQLException;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.ozone.audit.parser.AuditParser;
-import org.apache.hadoop.ozone.audit.parser.common.DatabaseHelper;
+import org.apache.hadoop.ozone.debug.audit.parser.AuditParser;
+import org.apache.hadoop.ozone.debug.audit.parser.common.DatabaseHelper;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
 
 /**
- * Custom query command handler for ozone audit parser.
- * The query must be enclosed within double quotes.
+ * Load command handler for ozone audit parser.
  */
-@Command(name = "query",
-    aliases = "q",
-    description = "Execute custom query.\n\n" +
-        "To run a custom read-only query:\n" +
-        "ozone auditparser <path to db file> query <query>\n",
+@Command(name = "load",
+    aliases = "l",
+    description = "Load ozone audit log files.\n\n" +
+        "To load an audit log to database:\n" +
+        "ozone debug auditparser <path to db file> load <logs>\n",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class QueryCommandHandler implements Callable<Void> {
+public class LoadCommandHandler implements Callable<Void> {
 
-  @Parameters(arity = "1..1", description = "Custom query enclosed within " +
-      "double quotes.")
-  private String query;
+  @Parameters(arity = "1..1", description = "Audit Log file(s)")
+  private String logs;
 
   @ParentCommand
   private AuditParser auditParser;
 
   @Override
   public Void call() throws Exception {
-    try {
-      System.out.println(
-          DatabaseHelper.executeCustomQuery(auditParser.getDatabase(), query)
-      );
-    } catch (SQLException ex) {
-      System.err.println(ex.getMessage());
+    if (DatabaseHelper.setup(auditParser.getDatabase(), logs)) {
+      System.out.println(logs + " has been loaded successfully");
+    } else {
+      System.out.println("Failed to load " + logs);
     }
     return null;
   }

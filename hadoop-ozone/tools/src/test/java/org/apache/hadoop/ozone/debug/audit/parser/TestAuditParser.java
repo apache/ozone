@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.audit.parser;
+package org.apache.hadoop.ozone.debug.audit.parser;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -107,7 +107,7 @@ public class TestAuditParser {
   private static void execute(String[] args, String msg) {
     List<String> arguments = new ArrayList(Arrays.asList(args));
     LOG.info("Executing shell command with args {}", arguments);
-    CommandLine cmd = parserTool.getCmd();
+    CommandLine cmd = new CommandLine(parserTool);
 
     IExceptionHandler2<List<Object>> exceptionHandler =
         new IExceptionHandler2<List<Object>>() {
@@ -200,10 +200,8 @@ public class TestAuditParser {
   public void testHelp() throws Exception {
     String[] args = new String[]{"--help"};
     execute(args,
-        "Usage: ozone auditparser [-hV] [--verbose] " +
-            "[-conf=<configurationPath>]\n" +
-            "                         [-D=<String=String>]... <database> " +
-            "[COMMAND]");
+        "Usage: auditparser [-hV] <database> [COMMAND]\n" +
+            "Shell parser for Ozone Audit Logs");
   }
 
   private static File getRandomTempDir() throws IOException {

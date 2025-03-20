@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.audit.parser.model;
+package org.apache.hadoop.ozone.debug.audit.parser.model;
 
 /**
  * POJO used for ozone audit parser tool.

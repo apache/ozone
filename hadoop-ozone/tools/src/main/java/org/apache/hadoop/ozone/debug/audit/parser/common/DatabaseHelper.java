@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.audit.parser.common;
+package org.apache.hadoop.ozone.debug.audit.parser.common;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -37,7 +37,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.ozone.audit.parser.model.AuditEntry;
+import org.apache.hadoop.ozone.debug.audit.parser.model.AuditEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -23,29 +23,15 @@ import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_K
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD;
-import static org.apache.hadoop.hdds.server.http.HttpConfig.getHttpPolicy;
-import static org.apache.hadoop.hdds.server.http.HttpServer2.HTTPS_SCHEME;
-import static org.apache.hadoop.hdds.server.http.HttpServer2.HTTP_SCHEME;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTPS_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_ADDRESS_KEY;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.anyHostWithFreePort;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
 
-import com.amazonaws.ClientConfiguration;
-import com.amazonaws.auth.AWSCredentialsProvider;
-import com.amazonaws.auth.AWSStaticCredentialsProvider;
-import com.amazonaws.auth.BasicAWSCredentials;
-import com.amazonaws.client.builder.AwsClientBuilder;
-import com.amazonaws.regions.Regions;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import java.io.File;
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -82,7 +68,6 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.CodecTestUtil;
@@ -98,19 +83,11 @@ import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ConfigurationProvider;
 import org.apache.hadoop.ozone.recon.ReconServer;
-import org.apache.hadoop.ozone.s3.Gateway;
-import org.apache.hadoop.ozone.s3.OzoneClientCache;
-import org.apache.hadoop.ozone.s3.OzoneConfigurationHolder;
-import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.recon.schema.ReconSqlDbConfig;
 import org.apache.ozone.test.GenericTestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
-import software.amazon.awssdk.regions.Region;
-import software.amazon.awssdk.services.s3.S3Client;
 
 /**
  * MiniOzoneCluster creates a complete in-process Ozone cluster suitable for
@@ -135,7 +112,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   private OzoneManager ozoneManager;
   private final List<HddsDatanodeService> hddsDatanodes;
   private ReconServer reconServer;
-  private Gateway s3g;
+  private final List<Service> services;
 
   // Timeout for the cluster to be ready
   private int waitForClusterToBeReadyTimeout = 120000; // 2 min
@@ -151,15 +128,14 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       OzoneManager ozoneManager,
       StorageContainerManager scm,
       List<HddsDatanodeService> hddsDatanodes,
-      ReconServer reconServer,
-      Gateway s3g) {
+      ReconServer reconServer, List<Service> services) {
     this.conf = conf;
     this.ozoneManager = ozoneManager;
     this.scm = scm;
     this.hddsDatanodes = hddsDatanodes;
     this.reconServer = reconServer;
     this.scmConfigurator = scmConfigurator;
-    this.s3g = s3g;
+    this.services = services;
   }
 
   /**
@@ -169,11 +145,12 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
    * OzoneManagers and StorageContainerManagers.
    */
   MiniOzoneClusterImpl(OzoneConfiguration conf, SCMConfigurator scmConfigurator,
-      List<HddsDatanodeService> hddsDatanodes, ReconServer reconServer) {
+      List<HddsDatanodeService> hddsDatanodes, ReconServer reconServer, List<Service> services) {
     this.scmConfigurator = scmConfigurator;
     this.conf = conf;
     this.hddsDatanodes = hddsDatanodes;
     this.reconServer = reconServer;
+    this.services = services;
   }
 
   public SCMConfigurator getSCMConfigurator() {
@@ -284,11 +261,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   }
 
   @Override
-  public Gateway getS3G() {
-    return this.s3g;
-  }
-
-  @Override
   public int getHddsDatanodeIndex(DatanodeDetails dn) throws IOException {
     for (HddsDatanodeService service : hddsDatanodes) {
       if (service.getDatanodeDetails().equals(dn)) {
@@ -304,91 +276,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     OzoneClient client = createClient();
     clients.add(client);
     return client;
-  }
-
-  @Override
-  public AmazonS3 newS3Client() {
-    // TODO: Parameterize tests between Virtual host style and Path style
-    return createS3Client(true);
-  }
-
-  @Override
-  public S3Client newS3ClientV2() throws Exception {
-    return createS3ClientV2(true);
-  }
-
-  public AmazonS3 createS3Client(boolean enablePathStyle) {
-    final String accessKey = "user";
-    final String secretKey = "password";
-    final Regions region = Regions.DEFAULT_REGION;
-
-    final String protocol;
-    final HttpConfig.Policy webPolicy = getHttpPolicy(conf);
-    String host;
-
-    if (webPolicy.isHttpsEnabled()) {
-      // TODO: Currently HTTPS is disabled in the test, we can add HTTPS
-      //  integration in the future
-      protocol = HTTPS_SCHEME;
-      host = conf.get(OZONE_S3G_HTTPS_ADDRESS_KEY);
-    } else {
-      protocol = HTTP_SCHEME;
-      host = conf.get(OZONE_S3G_HTTP_ADDRESS_KEY);
-    }
-
-    String endpoint = protocol + "://" + host;
-
-    AWSCredentialsProvider credentials = new AWSStaticCredentialsProvider(
-        new BasicAWSCredentials(accessKey, secretKey)
-    );
-
-
-    ClientConfiguration clientConfiguration = new ClientConfiguration();
-    LOG.info("S3 Endpoint is {}", endpoint);
-
-    return AmazonS3ClientBuilder.standard()
-        .withPathStyleAccessEnabled(enablePathStyle)
-        .withEndpointConfiguration(
-            new AwsClientBuilder.EndpointConfiguration(
-                endpoint, region.getName()
-            )
-        )
-        .withClientConfiguration(clientConfiguration)
-        .withCredentials(credentials)
-        .build();
-  }
-
-  public S3Client createS3ClientV2(boolean enablePathStyle) throws Exception {
-    final String accessKey = "user";
-    final String secretKey = "password";
-    final Region region = Region.US_EAST_1;
-
-    final String protocol;
-    final HttpConfig.Policy webPolicy = getHttpPolicy(conf);
-    String host;
-
-    if (webPolicy.isHttpsEnabled()) {
-      // TODO: Currently HTTPS is disabled in the test, we can add HTTPS
-      //  integration in the future
-      protocol = HTTPS_SCHEME;
-      host = conf.get(OZONE_S3G_HTTPS_ADDRESS_KEY);
-    } else {
-      protocol = HTTP_SCHEME;
-      host = conf.get(OZONE_S3G_HTTP_ADDRESS_KEY);
-    }
-
-    String endpoint = protocol + "://" + host;
-
-    LOG.info("S3 Endpoint is {}", endpoint);
-
-    AwsBasicCredentials credentials = AwsBasicCredentials.create(accessKey, secretKey);
-
-    return S3Client.builder()
-        .region(region)
-        .endpointOverride(new URI(endpoint))
-        .credentialsProvider(StaticCredentialsProvider.create(credentials))
-        .forcePathStyle(enablePathStyle)
-        .build();
   }
 
   protected OzoneClient createClient() throws IOException {
@@ -524,7 +411,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     stopDatanodes(hddsDatanodes);
     stopSCM(scm);
     stopRecon(reconServer);
-    stopS3G(s3g);
+    stopServices(services);
   }
 
   private void startHddsDatanode(HddsDatanodeService datanode) {
@@ -564,21 +451,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     stopRecon(reconServer);
   }
 
-  @Override
-  public void startS3G() {
-    s3g = new Gateway();
-    s3g.execute(NO_ARGS);
-  }
-
-  @Override
-  public void restartS3G() {
-    stopS3G(s3g);
-    startS3G();
-  }
-
-  @Override
-  public void stopS3G() {
-    stopS3G(s3g);
+  public void startServices() throws Exception {
+    for (Service service : services) {
+      service.start(getConf());
+    }
   }
 
   private CertificateClient getCAClient() {
@@ -635,16 +511,18 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     }
   }
 
-  private static void stopS3G(Gateway s3g) {
-    try {
-      if (s3g != null) {
-        LOG.info("Stopping S3G");
-        // TODO (HDDS-11539): Remove this workaround once the @PreDestroy issue is fixed
-        OzoneClientCache.closeClient();
-        s3g.stop();
+  private static void stopServices(List<Service> services) {
+    // stop in reverse order
+    List<Service> reverse = new ArrayList<>(services);
+    Collections.reverse(reverse);
+
+    for (Service service : reverse) {
+      try {
+        service.stop();
+        LOG.info("Stopped {}", service);
+      } catch (Exception e) {
+        LOG.error("Error stopping {}", service, e);
       }
-    } catch (Exception e) {
-      LOG.error("Exception while shutting down S3 Gateway.", e);
     }
   }
 
@@ -671,23 +549,22 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       OzoneManager om = null;
       ReconServer reconServer = null;
       List<HddsDatanodeService> hddsDatanodes = Collections.emptyList();
-      Gateway s3g = null;
       try {
         scm = createAndStartSingleSCM();
         om = createAndStartSingleOM();
-        s3g = createS3G();
         reconServer = createRecon();
         hddsDatanodes = createHddsDatanodes();
 
         MiniOzoneClusterImpl cluster = new MiniOzoneClusterImpl(conf,
             scmConfigurator, om, scm,
-            hddsDatanodes, reconServer, s3g);
+            hddsDatanodes, reconServer, getServices());
 
         cluster.setCAClient(certClient);
         cluster.setSecretKeyClient(secretKeyClient);
         if (startDataNodes) {
           cluster.startHddsDatanodes();
         }
+        cluster.startServices();
 
         prepareForNextBuild();
         return cluster;
@@ -696,9 +573,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         if (includeRecon) {
           stopRecon(reconServer);
         }
-        if (includeS3G) {
-          stopS3G(s3g);
-        }
+        stopServices(getServices());
         if (startDataNodes) {
           stopDatanodes(hddsDatanodes);
         }
@@ -867,16 +742,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       return reconServer;
     }
 
-    protected Gateway createS3G() {
-      Gateway s3g = null;
-      if (includeS3G) {
-        configureS3G();
-        s3g = new Gateway();
-        s3g.execute(NO_ARGS);
-      }
-      return s3g;
-    }
-
     /**
      * Creates HddsDatanodeService(s) instance.
      *
@@ -941,15 +806,5 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
       ConfigurationProvider.setConfiguration(conf);
     }
-
-    private void configureS3G() {
-      OzoneConfigurationHolder.resetConfiguration();
-
-      conf.set(S3GatewayConfigKeys.OZONE_S3G_HTTP_ADDRESS_KEY,  localhostWithFreePort());
-      conf.set(S3GatewayConfigKeys.OZONE_S3G_HTTPS_ADDRESS_KEY, localhostWithFreePort());
-
-      OzoneConfigurationHolder.setConfiguration(conf);
-    }
-
   }
 }
