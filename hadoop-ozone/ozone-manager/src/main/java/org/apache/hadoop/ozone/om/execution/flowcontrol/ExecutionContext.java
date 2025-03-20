@@ -31,12 +31,6 @@ public final class ExecutionContext {
       // termIndex will be null for pre-ratis execution case which is before ratis transaction
       termIndex = TermIndex.valueOf(-1, index);
     }
-    if (index == -1) {
-      // during upgrade case before finalization, index will be -1 as returned by indexGenerator
-      // for this, it will make use of termIndex's index for execution similar to previous behavior
-      // and after finalization of feature, index generator will return initialized value > 0
-      index = termIndex.getIndex();
-    }
     this.index = index;
     this.termIndex = termIndex;
   }

@@ -35,11 +35,11 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 /**
- * Tests Index generator changes.
+ * Tests Index manager changes.
  */
-public class TestIndexGenerator {
+public class TestIndexManager {
   @Test
-  public void testIndexGenerator() throws Exception {
+  public void testIndexManager() throws Exception {
     OzoneManager om = mock(OzoneManager.class);
     OMMetadataManager metaManager = mock(OMMetadataManager.class);
     when(om.getMetadataManager()).thenReturn(metaManager);
@@ -50,18 +50,18 @@ public class TestIndexGenerator {
     when(metaManager.getTransactionInfoTable()).thenReturn(txInfoTable);
     TransactionInfo txInfo = TransactionInfo.valueOf(-1, 100);
     when(txInfoTable.get(anyString())).thenReturn(txInfo);
-    IndexGenerator indexGenerator = new IndexGenerator(om);
-    assertEquals(indexGenerator.nextIndex(), 101);
+    IndexManager indexManager = new IndexManager(om);
+    assertEquals(indexManager.nextIndex(), 101);
 
     // save index and verify after change leader, for next index
     BatchOperation batchOpr = mock(BatchOperation.class);
-    indexGenerator.saveIndex(batchOpr, 102);
-    indexGenerator.onLeaderChange();
-    assertEquals(indexGenerator.nextIndex(), 103);
+    indexManager.saveIndex(batchOpr, 102);
+    indexManager.onLeaderChange();
+    assertEquals(indexManager.nextIndex(), 103);
   }
 
   @Test
-  public void testUpgradeIndexGenerator() throws Exception {
+  public void testUpgradeIndexManager() throws Exception {
     OzoneManager om = mock(OzoneManager.class);
     OMMetadataManager metaManager = mock(OMMetadataManager.class);
     when(om.getMetadataManager()).thenReturn(metaManager);
@@ -77,28 +77,28 @@ public class TestIndexGenerator {
     TransactionInfo txInfo = TransactionInfo.valueOf(-1, 110);
     when(txInfoTable.get(anyString())).thenReturn(null).thenReturn(txInfo);
     when(txInfoTable.getSkipCache(anyString())).thenReturn(txInfo);
-    IndexGenerator indexGenerator = new IndexGenerator(om);
-    assertEquals(indexGenerator.nextIndex(), -1);
+    IndexManager indexManager = new IndexManager(om);
+    assertEquals(indexManager.nextIndex(), -1);
 
-    indexGenerator.saveIndex(batchOpr, 114);
-    indexGenerator.onLeaderChange();
-    assertEquals(indexGenerator.nextIndex(), -1);
+    indexManager.saveIndex(batchOpr, 114);
+    indexManager.onLeaderChange();
+    assertEquals(indexManager.nextIndex(), -1);
     
     // check ExecutionContext behavior
-    ExecutionContext executionContext = ExecutionContext.of(indexGenerator.nextIndex(), txInfo.getTermIndex());
+    ExecutionContext executionContext = ExecutionContext.of(indexManager.nextIndex(), txInfo.getTermIndex());
     assertEquals(executionContext.getIndex(), txInfo.getTermIndex().getIndex());
     
 
     // save index and verify after change leader, for next index
-    indexGenerator.finalizeIndexGeneratorFeature();
-    assertEquals(indexGenerator.nextIndex(), 111);
+    indexManager.finalizeFeature();
+    assertEquals(indexManager.nextIndex(), 111);
 
     // save index and verify after change leader, for next index
-    indexGenerator.saveIndex(batchOpr, 114);
-    indexGenerator.onLeaderChange();
-    assertEquals(indexGenerator.nextIndex(), 115);
+    indexManager.saveIndex(batchOpr, 114);
+    indexManager.onLeaderChange();
+    assertEquals(indexManager.nextIndex(), 115);
 
-    executionContext = ExecutionContext.of(indexGenerator.nextIndex(), txInfo.getTermIndex());
+    executionContext = ExecutionContext.of(indexManager.nextIndex(), txInfo.getTermIndex());
     assertEquals(executionContext.getIndex(), 116);
   }
 }

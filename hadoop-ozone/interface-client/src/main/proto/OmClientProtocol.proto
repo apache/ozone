@@ -303,6 +303,7 @@ message OMRequest {
   optional GetObjectTaggingRequest          getObjectTaggingRequest        = 140;
   optional PutObjectTaggingRequest          putObjectTaggingRequest        = 141;
   optional DeleteObjectTaggingRequest       deleteObjectTaggingRequest     = 142;
+  optional ExecutionControlRequest          executionControlRequest        = 143;
 }
 
 message OMResponse {
@@ -2298,6 +2299,10 @@ message DeleteObjectTaggingRequest {
 }
 
 message DeleteObjectTaggingResponse {
+}
+
+message ExecutionControlRequest {
+  required uint64 index = 1;
 }
 
 /**

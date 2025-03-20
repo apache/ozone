@@ -23,7 +23,7 @@ import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON
 import org.apache.hadoop.ozone.om.OzoneManager;
 
 /**
- * initialize om managed index generator to provide index for further request handling.
+ * initialize om managed index manager to provide index for further request handling.
  */
 @UpgradeActionOm(type = ON_FINALIZE, feature = MANAGED_INDEX)
 public class OmManagedIndexUpgradeAction implements OmUpgradeAction {
@@ -31,8 +31,8 @@ public class OmManagedIndexUpgradeAction implements OmUpgradeAction {
   public void execute(OzoneManager arg) throws Exception {
     // Prepare ensures the db and ratis at reached to a checkpoint where all changes are flushed
     // And no further operation is allowed
-    // At this point, IndexGenerator finialize will re-init index from ratis index and this will be starting point
+    // At this point, IndexManager finialize will re-init index from ratis index and this will be starting point
     // for index generation for further request as used by object and other operation
-    arg.getOmRatisServer().getOmStateMachine().finalizeIndexGenerator();
+    arg.getOmRatisServer().getOmStateMachine().finalizeIndexFeature();
   }
 }

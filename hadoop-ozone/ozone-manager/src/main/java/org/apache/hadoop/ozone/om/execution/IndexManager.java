@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 /**
  * Manages indexes for request handling and persist.
  */
-public final class IndexGenerator {
+public final class IndexManager {
   public static final String OM_INDEX_KEY = "#OMINDEX";
 
   private final AtomicLong index = new AtomicLong();
@@ -37,7 +37,7 @@ public final class IndexGenerator {
   private final OzoneManager ozoneManager;
   private final AtomicBoolean enabled = new AtomicBoolean(true);
 
-  public IndexGenerator(OzoneManager ozoneManager) throws IOException {
+  public IndexManager(OzoneManager ozoneManager) throws IOException {
     this.ozoneManager = ozoneManager;
     initialize();
   }
@@ -63,7 +63,7 @@ public final class IndexGenerator {
     commitIndex.set(initIndex);
   }
 
-  public void finalizeIndexGeneratorFeature() throws IOException {
+  public void finalizeFeature() throws IOException {
     if (enabled.get()) {
       return;
     }

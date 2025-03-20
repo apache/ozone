@@ -21,13 +21,16 @@ import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
+import java.util.function.Supplier;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.ratis.protocol.ClientId;
 
 /**
  * entry for execution flow for write request.
@@ -36,10 +39,25 @@ public class OMExecutionFlow {
 
   private final OzoneManager ozoneManager;
   private final OMPerformanceMetrics perfMetrics;
+  private final Supplier<Long> indexGenerator;
 
-  public OMExecutionFlow(OzoneManager om) {
+  public OMExecutionFlow(OzoneManager om) throws IOException {
     this.ozoneManager = om;
     this.perfMetrics = ozoneManager.getPerfMetrics();
+    indexGenerator = om.getOmRatisServer().getOmStateMachine().getIndexManager()::nextIndex;
+  }
+
+  /**
+   * Internal request handling with defined clientId and callId.
+   *
+   * @param omRequest the request
+   * @param clientId the clientId
+   * @param callId the callId
+   * @return OMResponse the response of execution
+   * @throws ServiceException the exception on execution
+   */
+  public OMResponse submitInternal(OMRequest omRequest, ClientId clientId, long callId) throws ServiceException {
+    return ozoneManager.getOmRatisServer().submitRequest(updateControlRequest(omRequest), clientId, callId);
   }
 
   /**
@@ -57,7 +75,7 @@ public class OMExecutionFlow {
   private OMResponse submitExecutionToRatis(OMRequest request) throws ServiceException {
     // 1. create client request and preExecute
     OMClientRequest omClientRequest = null;
-    final OMRequest requestToSubmit;
+    OMRequest requestToSubmit;
     try {
       omClientRequest = OzoneManagerRatisUtils.createClientRequest(request, ozoneManager);
       assert (omClientRequest != null);
@@ -73,10 +91,18 @@ public class OMExecutionFlow {
     }
 
     // 2. submit request to ratis
+    requestToSubmit = updateControlRequest(requestToSubmit);
     OMResponse response = ozoneManager.getOmRatisServer().submitRequest(requestToSubmit);
     if (!response.getSuccess()) {
       omClientRequest.handleRequestFailure(ozoneManager);
     }
     return response;
+  }
+
+  private OMRequest updateControlRequest(OMRequest requestToSubmit) {
+    OzoneManagerProtocolProtos.ExecutionControlRequest controlRequest =
+        OzoneManagerProtocolProtos.ExecutionControlRequest.newBuilder().setIndex(indexGenerator.get()).build();
+    requestToSubmit = requestToSubmit.toBuilder().setExecutionControlRequest(controlRequest).build();
+    return requestToSubmit;
   }
 }
