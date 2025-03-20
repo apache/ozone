@@ -78,7 +78,7 @@ abstract class TestContainerStateMachine {
       .setNameFormat("ChunkWriter-" + i + "-%d")
       .build())).collect(Collectors.toList());
   private final boolean isLeader;
-  private final String CONTAINER_DATA = "Test Data";
+  private static final String CONTAINER_DATA = "Test Data";
 
   TestContainerStateMachine(boolean isLeader) {
     this.isLeader = isLeader;
