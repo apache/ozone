@@ -48,6 +48,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.Archiver;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
 import org.apache.ozone.test.SpyInputStream;
@@ -391,12 +392,10 @@ public class TestTarContainerPacker {
   private File packContainerWithSingleFile(File file, String entryName)
       throws Exception {
     File targetFile = TEMP_DIR.resolve("container.tar").toFile();
-    try (OutputStream output = newOutputStream(targetFile.toPath());
-         OutputStream compressed = packer.compress(output);
-         TarArchiveOutputStream archive =
-             new TarArchiveOutputStream(compressed)) {
+    Path path = targetFile.toPath();
+    try (TarArchiveOutputStream archive = new TarArchiveOutputStream(packer.compress(newOutputStream(path)))) {
       archive.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
-      TarContainerPacker.includeFile(file, entryName, archive);
+      Archiver.includeFile(file, entryName, archive);
     }
     return targetFile;
   }
