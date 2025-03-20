@@ -173,13 +173,18 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           // another.
           if (nextSnapshot != null &&
               nextSnapshot.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
+            LOG.info("Skipping Snapshot Deletion processing for : {}", snapInfo.getTableKey());
             continue;
           }
 
           // nextSnapshot = null means entries would be moved to AOS.
           if (nextSnapshot == null) {
+            LOG.info("Snapshot: {} entries will be moved to AOS.", snapInfo.getTableKey());
             waitForKeyDeletingService();
             waitForDirDeletingService();
+          } else {
+            LOG.info("Snapshot: {} entries will be moved to next active snapshot: {}",
+                snapInfo.getTableKey(), nextSnapshot.getTableKey());
           }
           try (ReferenceCounted<OmSnapshot> snapshot = omSnapshotManager.getSnapshot(
               snapInfo.getVolumeName(), snapInfo.getBucketName(), snapInfo.getName())) {
