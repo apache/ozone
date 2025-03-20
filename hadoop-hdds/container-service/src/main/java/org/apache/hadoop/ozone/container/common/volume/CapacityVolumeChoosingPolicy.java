@@ -22,7 +22,7 @@ import static org.apache.hadoop.ozone.container.common.volume.VolumeChoosingUtil
 
 import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.Random;
 import java.util.stream.Collectors;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
@@ -44,6 +44,8 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
   public static final Logger LOG = LoggerFactory.getLogger(
       CapacityVolumeChoosingPolicy.class);
 
+  // Stores the index of the next volume to be returned.
+  private final Random random = new Random();
   @Override
   public synchronized HddsVolume chooseVolume(List<HddsVolume> volumes,
       long maxContainerSize) throws IOException {
@@ -80,9 +82,6 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
       // 4. vol2 + vol2: 25%, result is vol2
       // So we have a total of 75% chances to choose vol1, which meets our
       // expectation.
-
-      // avoid lock contention and stores the index of the next volume to be returned in each thread.
-      ThreadLocalRandom random = ThreadLocalRandom.current();
       int firstIndex = random.nextInt(count);
       int secondIndex = random.nextInt(count);
 
