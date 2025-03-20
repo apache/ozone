@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone;
 
-import com.amazonaws.services.s3.AmazonS3;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
@@ -34,7 +34,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ReconServer;
-import org.apache.hadoop.ozone.s3.Gateway;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
@@ -147,24 +146,12 @@ public interface MiniOzoneCluster extends AutoCloseable {
   ReconServer getReconServer();
 
   /**
-   * Returns a {@link Gateway} instance.
-   *
-   * @return {@link Gateway} instance if it is initialized, otherwise null.
-   */
-  Gateway getS3G();
-
-  /**
    * Returns an {@link OzoneClient} to access the {@link MiniOzoneCluster}.
    * The caller is responsible for closing the client after use.
    *
    * @return {@link OzoneClient}
    */
   OzoneClient newClient() throws IOException;
-
-  /**
-   * Returns an {@link AmazonS3} to access the {@link MiniOzoneCluster}.
-   */
-  AmazonS3 newS3Client();
 
   /**
    * Returns StorageContainerLocationClient to communicate with
@@ -232,21 +219,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
   void stopRecon();
 
   /**
-   * Start S3G.
-   */
-  void startS3G();
-
-  /**
-   * Restart S3G.
-   */
-  void restartS3G();
-
-  /**
-   * Stop S3G.
-   */
-  void stopS3G();
-
-  /**
    * Shutdown the MiniOzoneCluster and delete the storage dirs.
    */
   void shutdown();
@@ -301,13 +273,13 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected String omId = UUID.randomUUID().toString();
 
     protected boolean includeRecon = false;
-    protected boolean includeS3G = false;
 
     protected int numOfDatanodes = 3;
     protected boolean  startDataNodes = true;
     protected CertificateClient certClient;
     protected SecretKeyClient secretKeyClient;
     protected DatanodeFactory dnFactory = UniformDatanodesFactory.newBuilder().build();
+    private final List<Service> services = new ArrayList<>();
 
     protected Builder(OzoneConfiguration conf) {
       this.conf = conf;
@@ -384,9 +356,13 @@ public interface MiniOzoneCluster extends AutoCloseable {
       return this;
     }
 
-    public Builder includeS3G(boolean include) {
-      this.includeS3G = include;
+    public Builder addService(Service service) {
+      services.add(service);
       return this;
+    }
+
+    public List<Service> getServices() {
+      return services;
     }
 
     /**
@@ -402,5 +378,11 @@ public interface MiniOzoneCluster extends AutoCloseable {
    */
   interface DatanodeFactory extends CheckedFunction<OzoneConfiguration, OzoneConfiguration, IOException> {
     // marker
+  }
+
+  /** Service to manage as part of the mini cluster. */
+  interface Service {
+    void start(OzoneConfiguration conf) throws Exception;
+    void stop() throws Exception;
   }
 }

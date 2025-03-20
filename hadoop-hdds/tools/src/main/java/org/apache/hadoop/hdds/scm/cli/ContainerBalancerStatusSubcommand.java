@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -69,7 +70,9 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
       System.out.println("ContainerBalancer is Running.");
 
       if (verbose) {
-        System.out.printf("Started at: %s %s%n", dateTime.toLocalDate(), dateTime.toLocalTime());
+        System.out.printf("Started at: %s %s%n",
+            dateTime.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE),
+            dateTime.toLocalTime().format(DateTimeFormatter.ISO_LOCAL_TIME));
         Duration balancingDuration = Duration.between(startedAtInstant, OffsetDateTime.now());
         System.out.printf("Balancing duration: %s%n%n", getPrettyDuration(balancingDuration));
         System.out.println(getConfigurationPrettyString(balancerStatusInfo.getConfiguration()));

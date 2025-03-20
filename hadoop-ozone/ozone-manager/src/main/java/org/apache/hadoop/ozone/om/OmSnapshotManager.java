@@ -42,7 +42,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager.getSnapshotRootPath;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
-import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getOzonePathKeyForFso;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -499,8 +498,7 @@ public final class OmSnapshotManager implements AutoCloseable {
       String bucketName, BatchOperation batchOperation) throws IOException {
 
     // Range delete start key (inclusive)
-    final String keyPrefix = getOzonePathKeyForFso(omMetadataManager,
-        volumeName, bucketName);
+    final String keyPrefix = omMetadataManager.getBucketKeyPrefixFSO(volumeName, bucketName);
 
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
          iter = omMetadataManager.getDeletedDirTable().iterator(keyPrefix)) {
@@ -554,26 +552,6 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   /**
-   * Helper method to do deleteRange on a table, including endKey.
-   * TODO: Do remove this method, it is not used anywhere. Need to check if
-   *       deleteRange causes RocksDB corruption.
-   * TODO: Move this into {@link Table} ?
-   * @param table Table
-   * @param beginKey begin key
-   * @param endKey end key
-   */
-  private static void deleteRangeInclusive(
-      Table<String, ?> table, String beginKey, String endKey)
-      throws IOException {
-
-    if (endKey != null) {
-      table.deleteRange(beginKey, endKey);
-      // Remove range end key itself
-      table.delete(endKey);
-    }
-  }
-
-  /**
    * Helper method to delete DB keys in the snapshot scope (bucket)
    * from active DB's deletedTable.
    * @param omMetadataManager OMMetadataManager instance
@@ -586,7 +564,7 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     // Range delete start key (inclusive)
     final String keyPrefix =
-        omMetadataManager.getOzoneKey(volumeName, bucketName, "");
+        omMetadataManager.getBucketKeyPrefix(volumeName, bucketName);
 
     try (TableIterator<String,
         ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>

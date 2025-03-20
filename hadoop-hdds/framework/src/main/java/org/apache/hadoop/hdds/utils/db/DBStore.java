@@ -74,6 +74,19 @@ public interface DBStore extends Closeable, BatchOperationHandler {
       TableCache.CacheType cacheType) throws IOException;
 
   /**
+   * Gets table store with implict key/value conversion.
+   *
+   * @param name - table name
+   * @param keyCodec - key codec
+   * @param valueCodec - value codec
+   * @param cacheType - cache type
+   * @return - Table Store
+   * @throws IOException
+   */
+  <KEY, VALUE> TypedTable<KEY, VALUE> getTable(
+      String name, Codec<KEY> keyCodec, Codec<VALUE> valueCodec, TableCache.CacheType cacheType) throws IOException;
+
+  /**
    * Lists the Known list of Tables in a DB.
    *
    * @return List of Tables, in case of Rocks DB and LevelDB we will return at

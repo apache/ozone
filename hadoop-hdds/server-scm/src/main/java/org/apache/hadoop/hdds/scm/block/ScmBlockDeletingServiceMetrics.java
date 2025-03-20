@@ -329,25 +329,17 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
 
   @Override
   public String toString() {
-    StringBuffer buffer = new StringBuffer();
-    buffer.append("numBlockDeletionTransactionCreated = "
-        + numBlockDeletionTransactionCreated.value()).append("\t")
-        .append("numBlockDeletionTransactionCompleted = "
-            + numBlockDeletionTransactionCompleted.value()).append("\t")
-        .append("numBlockDeletionCommandSent = "
-            + numBlockDeletionCommandSent.value()).append("\t")
-        .append("numBlockDeletionCommandSuccess = "
-            + numBlockDeletionCommandSuccess.value()).append("\t")
-        .append("numBlockDeletionCommandFailure = "
-            + numBlockDeletionCommandFailure.value()).append("\t")
-        .append("numBlockDeletionTransactionSent = "
-            + numBlockDeletionTransactionSent.value()).append("\t")
-        .append("numBlockDeletionTransactionSuccess = "
-            + numBlockDeletionTransactionSuccess.value()).append("\t")
-        .append("numBlockDeletionTransactionFailure = "
-            + numBlockDeletionTransactionFailure.value()).append("\t")
-        .append("numDeletionCommandsPerDatanode = "
-            + numCommandsDatanode);
+    StringBuilder buffer = new StringBuilder()
+        .append("numBlockDeletionTransactionCreated = ").append(numBlockDeletionTransactionCreated.value()).append("\t")
+        .append("numBlockDeletionTransactionCompleted = ")
+        .append(numBlockDeletionTransactionCompleted.value()).append("\t")
+        .append("numBlockDeletionCommandSent = ").append(numBlockDeletionCommandSent.value()).append("\t")
+        .append("numBlockDeletionCommandSuccess = ").append(numBlockDeletionCommandSuccess.value()).append("\t")
+        .append("numBlockDeletionCommandFailure = ").append(numBlockDeletionCommandFailure.value()).append("\t")
+        .append("numBlockDeletionTransactionSent = ").append(numBlockDeletionTransactionSent.value()).append("\t")
+        .append("numBlockDeletionTransactionSuccess = ").append(numBlockDeletionTransactionSuccess.value()).append("\t")
+        .append("numBlockDeletionTransactionFailure = ").append(numBlockDeletionTransactionFailure.value()).append("\t")
+        .append("numDeletionCommandsPerDatanode = ").append(numCommandsDatanode);
     return buffer.toString();
   }
 }

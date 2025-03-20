@@ -182,7 +182,8 @@ public class TestBackgroundContainerMetadataScanner extends
     GenericTestUtils.waitFor(() -> metrics.getNumScanIterations() >= 1, 1000,
         5000);
     // Volume health should have been checked.
-    verify(vol, atLeastOnce()).isFailed();
+    // TODO: remove the mock return value asseration after we upgrade to spotbugs 4.8 up
+    assertFalse(verify(vol, atLeastOnce()).isFailed());
     // Scanner should not have shutdown when it encountered the failed volume.
     assertTrue(scanner.isAlive());
 

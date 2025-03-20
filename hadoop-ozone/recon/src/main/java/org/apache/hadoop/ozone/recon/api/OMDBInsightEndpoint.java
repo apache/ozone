@@ -78,8 +78,8 @@ import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
-import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
+import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
+import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -993,7 +993,7 @@ public class OMDBInsightEndpoint {
 
 
     // This API supports startPrefix from bucket level.
-    if (startPrefix == null || startPrefix.length() == 0) {
+    if (startPrefix == null || startPrefix.isEmpty()) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
     String[] names = startPrefix.split(OM_KEY_PREFIX);

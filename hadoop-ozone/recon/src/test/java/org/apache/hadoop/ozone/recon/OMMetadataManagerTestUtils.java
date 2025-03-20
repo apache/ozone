@@ -396,11 +396,11 @@ public final class OMMetadataManagerTestUtils {
                                          String bucketName,
                                          String volName) throws IOException {
     List<OmKeyInfo> infos = new ArrayList<>();
-    for (int i = 0; i < keyNames.size(); i++) {
+    for (String keyName : keyNames) {
       infos.add(new OmKeyInfo.Builder()
           .setBucketName(bucketName)
           .setVolumeName(volName)
-          .setKeyName(keyNames.get(i))
+          .setKeyName(keyName)
           .setDataSize(100L)
           .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
           .build());

@@ -129,7 +129,7 @@ public class OMHANodeDetails {
       Collection<String> omNodeIds = OmUtils.getActiveOMNodeIds(conf,
           serviceId);
 
-      if (omNodeIds.size() == 0) {
+      if (omNodeIds.isEmpty()) {
         throwConfException("Configuration does not have any value set for %s " +
             "for the service %s. List of OM Node ID's should be specified " +
             "for an OM service", OZONE_OM_NODES_KEY, serviceId);

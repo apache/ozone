@@ -81,7 +81,7 @@ public class TestOmRatisSnapshotProvider {
             false, connectionFactory);
 
     sb = new StringBuilder();
-    sb.append("--" + MULTIPART_FORM_DATA_BOUNDARY + CR_NL);
+    sb.append("--").append(MULTIPART_FORM_DATA_BOUNDARY).append(CR_NL);
     sb.append(CONTENT_DISPOSITION);
   }
 
@@ -105,7 +105,7 @@ public class TestOmRatisSnapshotProvider {
 
     omRatisSnapshotProvider.downloadSnapshot(leaderNodeId, targetFile);
 
-    sb.append("--" + MULTIPART_FORM_DATA_BOUNDARY + "--" + CR_NL);
+    sb.append("--").append(MULTIPART_FORM_DATA_BOUNDARY).append("--").append(CR_NL);
     assertEquals(sb.toString(),
         new String(outputStream.toByteArray(), StandardCharsets.UTF_8));
   }
@@ -123,7 +123,7 @@ public class TestOmRatisSnapshotProvider {
     OmRatisSnapshotProvider.writeFormData(connection, sstFiles);
 
     sb.append(fileName).append(CR_NL);
-    sb.append("--" + MULTIPART_FORM_DATA_BOUNDARY + "--" + CR_NL);
+    sb.append("--").append(MULTIPART_FORM_DATA_BOUNDARY).append("--").append(CR_NL);
     assertEquals(sb.toString(),
         new String(outputStream.toByteArray(), StandardCharsets.UTF_8));
   }
@@ -136,7 +136,7 @@ public class TestOmRatisSnapshotProvider {
 
     OmRatisSnapshotProvider.writeFormData(connection, new ArrayList<>());
 
-    sb.append("--" + MULTIPART_FORM_DATA_BOUNDARY + "--" + CR_NL);
+    sb.append("--").append(MULTIPART_FORM_DATA_BOUNDARY).append("--").append(CR_NL);
     assertEquals(sb.toString(),
         new String(outputStream.toByteArray(), StandardCharsets.UTF_8));
   }

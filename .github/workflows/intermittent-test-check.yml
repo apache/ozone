@@ -48,6 +48,10 @@ on:
         description: Ratis ref (branch, tag or commit SHA)
         default: ''
         required: false
+      java-version:
+        description: Java version to use
+        default: '21'
+        required: true
 env:
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
   TEST_CLASS: ${{ github.event.inputs.test-class}}
@@ -56,7 +60,8 @@ env:
   FAIL_FAST: ${{ github.event.inputs.fail-fast }}
   RATIS_REPO: ${{ github.event.inputs.ratis-repo }}
   RATIS_VERSION: ${{ github.event.inputs.ratis-ref }}
-run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0}#{1}[{2}]-{3}x{4}', inputs.test-class, inputs.test-name, inputs.ref, inputs.splits, inputs.iterations) || '' }}
+  JAVA_VERSION: ${{ github.event.inputs.java-version }}
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0}#{1}[{2}]-{3}x{4}-java{5}', inputs.test-class, inputs.test-name, inputs.ref, inputs.splits, inputs.iterations, inputs.java-version) || '' }}
 jobs:
   prepare-job:
     runs-on: ubuntu-24.04
@@ -112,7 +117,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: 8
+          java-version: ${{ github.event.inputs.java-version }}
       - name: Build (most) of Ozone
         run: |
           args="-DskipRecon -DskipShade -Dmaven.javadoc.skip=true"
@@ -176,7 +181,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: 8
+          java-version: ${{ github.event.inputs.java-version }}
       - name: Execute tests
         run: |
           if [[ -e "${{ steps.download-ozone-repo.outputs.download-path }}" ]]; then

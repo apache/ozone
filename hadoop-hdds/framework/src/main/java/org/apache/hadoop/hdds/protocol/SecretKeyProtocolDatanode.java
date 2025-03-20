@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.protocol;
 
-import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -28,7 +28,7 @@ import org.apache.hadoop.security.KerberosInfo;
  */
 @KerberosInfo(
     serverPrincipal = HDDS_SCM_KERBEROS_PRINCIPAL_KEY,
-    clientPrincipal = DFS_DATANODE_KERBEROS_PRINCIPAL_KEY
+    clientPrincipal = HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY
 )
 @InterfaceAudience.Private
 public interface SecretKeyProtocolDatanode extends SecretKeyProtocol {

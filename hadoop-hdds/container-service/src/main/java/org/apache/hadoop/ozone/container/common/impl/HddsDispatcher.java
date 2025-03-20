@@ -103,7 +103,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private final Map<ContainerType, Handler> handlers;
   private final ConfigurationSource conf;
   private final ContainerSet containerSet;
-  private final VolumeSet volumeSet;
   private final StateContext context;
   private final float containerCloseThreshold;
   private final ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics;
@@ -125,7 +124,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       TokenVerifier tokenVerifier) {
     this.conf = config;
     this.containerSet = contSet;
-    this.volumeSet = volumes;
     this.context = context;
     this.handlers = handlers;
     this.metrics = metrics;
@@ -621,13 +619,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     if (isOpen) {
       HddsVolume volume = container.getContainerData().getVolume();
       SpaceUsageSource usage = volume.getCurrentUsage();
-      long volumeCapacity = usage.getCapacity();
-      long volumeFreeSpaceToSpare =
-          freeSpaceCalculator.get(volumeCapacity);
-      long volumeFree = usage.getAvailable();
-      long volumeCommitted = volume.getCommittedBytes();
-      long volumeAvailable = volumeFree - volumeCommitted;
-      return (volumeAvailable <= volumeFreeSpaceToSpare);
+      long volumeFreeSpaceToSpare = freeSpaceCalculator.get(usage.getCapacity());
+      return !VolumeUsage.hasVolumeEnoughSpace(usage.getAvailable(), volume.getCommittedBytes(), 0,
+          volumeFreeSpaceToSpare);
     }
     return false;
   }

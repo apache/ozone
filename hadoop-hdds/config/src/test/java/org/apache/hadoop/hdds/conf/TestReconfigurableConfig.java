@@ -31,7 +31,7 @@ class TestReconfigurableConfig {
     ConfigurationExample subject = new InMemoryConfiguration()
         .getObject(ConfigurationExample.class);
 
-    subject.reconfigureProperty("ozone.scm.client.dynamic", "updated");
+    subject.reconfigureProperty("ozone.test.config.dynamic", "updated");
 
     assertEquals("updated", subject.getDynamic());
   }

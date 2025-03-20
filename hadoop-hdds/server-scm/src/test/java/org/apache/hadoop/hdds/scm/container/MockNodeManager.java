@@ -102,8 +102,7 @@ public class MockNodeManager implements NodeManager {
   private final List<DatanodeDetails> deadNodes;
   private final Map<DatanodeDetails, SCMNodeStat> nodeMetricMap;
   private final SCMNodeStat aggregateStat;
-  private boolean safemode;
-  private final Map<UUID, List<SCMCommand>> commandMap;
+  private final Map<UUID, List<SCMCommand<?>>> commandMap;
   private Node2PipelineMap node2PipelineMap;
   private final Node2ContainerMap node2ContainerMap;
   private NetworkTopology clusterMap;
@@ -142,7 +141,6 @@ public class MockNodeManager implements NodeManager {
         populateNodeMetric(dd, x);
       }
     }
-    safemode = false;
     this.commandMap = new HashMap<>();
     numHealthyDisksPerDatanode = 1;
     numRaftLogDisksPerDatanode = 1;
@@ -169,7 +167,6 @@ public class MockNodeManager implements NodeManager {
           "be empty");
     }
 
-    safemode = false;
     this.commandMap = new HashMap<>();
     numHealthyDisksPerDatanode = 1;
     numRaftLogDisksPerDatanode = 1;
@@ -205,7 +202,6 @@ public class MockNodeManager implements NodeManager {
           " empty");
     }
 
-    safemode = false;
     this.commandMap = new HashMap<>();
     numHealthyDisksPerDatanode = 1;
     numRaftLogDisksPerDatanode = 1;
@@ -241,15 +237,6 @@ public class MockNodeManager implements NodeManager {
     }
 
   }
-
-  /**
-   * Sets the safe mode value.
-   * @param safemode boolean
-   */
-  public void setSafemode(boolean safemode) {
-    this.safemode = safemode;
-  }
-
 
   /**
    * Gets all Live Datanodes that is currently communicating with SCM.
@@ -441,7 +428,7 @@ public class MockNodeManager implements NodeManager {
     } else if (deadNodes.contains(dd)) {
       return NodeStatus.inServiceDead();
     } else {
-      throw new NodeNotFoundException();
+      throw new NodeNotFoundException(dd.getID());
     }
   }
 
@@ -546,13 +533,13 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public void addDatanodeCommand(UUID dnId, SCMCommand command) {
+  public void addDatanodeCommand(UUID dnId, SCMCommand<?> command) {
     if (commandMap.containsKey(dnId)) {
-      List<SCMCommand> commandList = commandMap.get(dnId);
+      List<SCMCommand<?>> commandList = commandMap.get(dnId);
       Preconditions.checkNotNull(commandList);
       commandList.add(command);
     } else {
-      List<SCMCommand> commandList = new LinkedList<>();
+      List<SCMCommand<?>> commandList = new LinkedList<>();
       commandList.add(command);
       commandMap.put(dnId, commandList);
     }
@@ -653,7 +640,7 @@ public class MockNodeManager implements NodeManager {
     try {
       node2ContainerMap.setContainersForDatanode(uuid.getUuid(), containerIds);
     } catch (SCMException e) {
-      throw new NodeNotFoundException(e.getMessage());
+      throw new NodeNotFoundException(uuid.getID());
     }
   }
 
@@ -669,7 +656,7 @@ public class MockNodeManager implements NodeManager {
 
   // Returns the number of commands that is queued to this node manager.
   public int getCommandCount(DatanodeDetails dd) {
-    List<SCMCommand> list = commandMap.get(dd.getUuid());
+    List<SCMCommand<?>> list = commandMap.get(dd.getUuid());
     return (list == null) ? 0 : list.size();
   }
 
@@ -773,7 +760,7 @@ public class MockNodeManager implements NodeManager {
    * @return SCMheartbeat response list
    */
   @Override
-  public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
+  public List<SCMCommand<?>> processHeartbeat(DatanodeDetails datanodeDetails,
       CommandQueueReportProto commandQueueReportProto) {
     return null;
   }
@@ -860,7 +847,7 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public List<SCMCommand> getCommandQueue(UUID dnID) {
+  public List<SCMCommand<?>> getCommandQueue(UUID dnID) {
     return null;
   }
 

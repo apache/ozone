@@ -43,7 +43,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
@@ -158,8 +157,7 @@ public class TestDeletedBlocksTxnShell {
         getContainerManager().getContainerStateManager();
     containerStateManager.addContainer(container.getProtobuf());
     for (ContainerReplica replica: replicaSet) {
-      containerStateManager.updateContainerReplica(
-          ContainerID.valueOf(cid), replica);
+      containerStateManager.updateContainerReplica(replica);
     }
   }
 

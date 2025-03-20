@@ -177,7 +177,7 @@ public class TestReportSubCommand {
       if (i != start) {
         sb.append(", ");
       }
-      sb.append("#" + i);
+      sb.append("#").append(i);
     }
     return sb.toString();
   }

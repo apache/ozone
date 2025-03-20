@@ -235,18 +235,6 @@ public class OzoneDelegationTokenSecretManager
   }
 
   /**
-   * Stores given identifier in token store.
-   */
-  private void addToTokenStore(OzoneTokenIdentifier identifier,
-      byte[] password, long renewTime)
-      throws IOException {
-    TokenInfo tokenInfo = new TokenInfo(renewTime, password,
-        identifier.getTrackingId());
-    currentTokens.put(identifier, tokenInfo);
-    store.storeToken(identifier, tokenInfo.getRenewDate());
-  }
-
-  /**
    * Updates issue date, master key id and sequence number for identifier.
    *
    * @param identifier the identifier to validate
