@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
@@ -40,6 +41,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -62,6 +64,7 @@ public class TestKeyValueContainerMarkUnhealthy {
   private String scmId = UUID.randomUUID().toString();
   private VolumeSet volumeSet;
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
+  private MinFreeSpaceCalculator freeSpaceCalculator;
   private KeyValueContainerData keyValueContainerData;
   private KeyValueContainer keyValueContainer;
   private UUID datanodeId;
@@ -87,7 +90,8 @@ public class TestKeyValueContainerMarkUnhealthy {
 
     volumeSet = mock(MutableVolumeSet.class);
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
-    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+    freeSpaceCalculator = mock(MinFreeSpaceCalculator.class);
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), any(MinFreeSpaceCalculator.class)))
         .thenReturn(hddsVolume);
 
     keyValueContainerData = new KeyValueContainerData(1L,
@@ -153,7 +157,7 @@ public class TestKeyValueContainerMarkUnhealthy {
     initTestData(layoutVersion);
     // We need to create the container so the compact-on-close operation
     // does not NPE.
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, freeSpaceCalculator, scmId);
     keyValueContainer.close();
     keyValueContainer.markContainerUnhealthy();
     assertThat(keyValueContainerData.getState()).isEqualTo(UNHEALTHY);
@@ -167,7 +171,7 @@ public class TestKeyValueContainerMarkUnhealthy {
     initTestData(layoutVersion);
     // We need to create the container so the sync-on-quasi-close operation
     // does not NPE.
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, freeSpaceCalculator, scmId);
     keyValueContainer.quasiClose();
     keyValueContainer.markContainerUnhealthy();
     assertThat(keyValueContainerData.getState()).isEqualTo(UNHEALTHY);

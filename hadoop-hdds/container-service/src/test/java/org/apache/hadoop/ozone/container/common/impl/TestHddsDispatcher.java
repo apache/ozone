@@ -89,6 +89,7 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -140,7 +141,7 @@ public class TestHddsDispatcher {
       StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
           .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
       container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
-          scmId.toString());
+          new MinFreeSpaceCalculator(conf), scmId.toString());
       containerSet.addContainer(container);
       ContainerMetrics metrics = ContainerMetrics.create(conf);
       Map<ContainerType, Handler> handlers = Maps.newHashMap();
@@ -277,7 +278,7 @@ public class TestHddsDispatcher {
       StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
           .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
       container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
-          scmId.toString());
+          new MinFreeSpaceCalculator(conf), scmId.toString());
       containerSet.addContainer(container);
       ContainerMetrics metrics = ContainerMetrics.create(conf);
       Map<ContainerType, Handler> handlers = Maps.newHashMap();
@@ -311,7 +312,8 @@ public class TestHddsDispatcher {
       StorageContainerException scException =
           assertThrows(StorageContainerException.class,
               () -> container2.create(volumeSet,
-                  new RoundRobinVolumeChoosingPolicy(), scmId.toString()));
+                  new RoundRobinVolumeChoosingPolicy(), new MinFreeSpaceCalculator(conf),
+                  scmId.toString()));
       assertEquals("Container creation failed, due to disk out of space",
           scException.getMessage());
     } finally {

@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -74,6 +75,7 @@ public class TestOzoneContainer {
   private String clusterId = UUID.randomUUID().toString();
   private MutableVolumeSet volumeSet;
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
+  private MinFreeSpaceCalculator freeSpaceCalculator;
   private KeyValueContainerData keyValueContainerData;
   private KeyValueContainer keyValueContainer;
   private final DatanodeDetails datanodeDetails = createDatanodeDetails();
@@ -99,6 +101,7 @@ public class TestOzoneContainer {
         clusterId, conf, null, StorageVolume.VolumeType.DATA_VOLUME, null);
     createDbInstancesForTestIfNeeded(volumeSet, clusterId, clusterId, conf);
     volumeChoosingPolicy = new RoundRobinVolumeChoosingPolicy();
+    freeSpaceCalculator = new MinFreeSpaceCalculator(conf);
   }
 
   @AfterEach
@@ -139,7 +142,7 @@ public class TestOzoneContainer {
       containerDatas.add(keyValueContainerData);
       keyValueContainer = new KeyValueContainer(
           keyValueContainerData, conf);
-      keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
+      keyValueContainer.create(volumeSet, volumeChoosingPolicy, freeSpaceCalculator, clusterId);
       myVolume = keyValueContainer.getContainerData().getVolume();
 
       freeBytes = addBlocks(keyValueContainer, 2, 3);
@@ -243,7 +246,7 @@ public class TestOzoneContainer {
     StorageContainerException e = assertThrows(
         StorageContainerException.class,
         () -> keyValueContainer.
-            create(volumeSet, volumeChoosingPolicy, clusterId)
+            create(volumeSet, volumeChoosingPolicy, freeSpaceCalculator, clusterId)
     );
     assertEquals(DISK_OUT_OF_SPACE, e.getResult());
   }

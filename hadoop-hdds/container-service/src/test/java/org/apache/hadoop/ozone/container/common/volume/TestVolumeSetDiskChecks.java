@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -307,14 +308,16 @@ public class TestVolumeSetDiskChecks {
     StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
         .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
     container.create(volumeSet,
-        new RoundRobinVolumeChoosingPolicy(), UUID.randomUUID().toString());
+        new RoundRobinVolumeChoosingPolicy(), new MinFreeSpaceCalculator(conf),
+            UUID.randomUUID().toString());
     conSet.addContainer(container);
 
     KeyValueContainer container1 = new KeyValueContainer(data1, conf);
     StorageVolumeUtil.getHddsVolumesList(volumeSet1.getVolumesList())
         .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
     container1.create(volumeSet1,
-        new RoundRobinVolumeChoosingPolicy(), UUID.randomUUID().toString());
+            new RoundRobinVolumeChoosingPolicy(), new MinFreeSpaceCalculator(conf),
+            UUID.randomUUID().toString());
     conSet.addContainer(container1);
     DatanodeStateMachine datanodeStateMachineMock =
         mock(DatanodeStateMachine.class);

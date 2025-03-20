@@ -88,6 +88,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -181,7 +182,7 @@ public class TestBlockDeletingService {
     data.setSchemaVersion(schemaVersion);
     KeyValueContainer container = new KeyValueContainer(data, conf);
     container.create(volumeSet,
-        new RoundRobinVolumeChoosingPolicy(), scmId);
+        new RoundRobinVolumeChoosingPolicy(), new MinFreeSpaceCalculator(conf), scmId);
     containerSet.addContainer(container);
     data = (KeyValueContainerData) containerSet.getContainer(
         containerID).getContainerData();

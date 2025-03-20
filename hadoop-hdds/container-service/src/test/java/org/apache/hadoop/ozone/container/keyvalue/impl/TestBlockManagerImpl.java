@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContain
 import static org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl.FULL_CHUNK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -45,6 +46,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -64,6 +66,7 @@ public class TestBlockManagerImpl {
   private String scmId = UUID.randomUUID().toString();
   private VolumeSet volumeSet;
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
+  private MinFreeSpaceCalculator freeSpaceCalculator;
   private KeyValueContainerData keyValueContainerData;
   private KeyValueContainer keyValueContainer;
   private BlockData blockData;
@@ -96,7 +99,8 @@ public class TestBlockManagerImpl {
     volumeSet = mock(MutableVolumeSet.class);
 
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
-    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+    freeSpaceCalculator = mock(MinFreeSpaceCalculator.class);
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), any(MinFreeSpaceCalculator.class)))
         .thenReturn(hddsVolume);
 
     keyValueContainerData = new KeyValueContainerData(1L,
@@ -107,7 +111,7 @@ public class TestBlockManagerImpl {
     keyValueContainer = new KeyValueContainer(
         keyValueContainerData, config);
 
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, freeSpaceCalculator, scmId);
 
     // Creating BlockData
     blockID = new BlockID(1L, 1L);

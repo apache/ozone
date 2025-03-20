@@ -34,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
@@ -84,6 +85,7 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
@@ -107,6 +109,7 @@ public class TestKeyValueContainer {
   private String scmId = UUID.randomUUID().toString();
   private VolumeSet volumeSet;
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
+  private MinFreeSpaceCalculator freeSpaceCalculator;
   private KeyValueContainerData keyValueContainerData;
   private KeyValueContainer keyValueContainer;
   private UUID datanodeId;
@@ -148,12 +151,13 @@ public class TestKeyValueContainer {
 
     volumeSet = mock(MutableVolumeSet.class);
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
+    freeSpaceCalculator = mock(MinFreeSpaceCalculator.class);
     when(volumeSet.getVolumesList())
         .thenAnswer(i -> hddsVolumes.stream()
             .map(v -> (StorageVolume) v)
             .collect(Collectors.toList()));
     when(volumeChoosingPolicy
-        .chooseVolume(anyList(), anyLong())).thenAnswer(
+        .chooseVolume(anyList(), anyLong(), any(MinFreeSpaceCalculator.class))).thenAnswer(
             invocation -> {
               List<HddsVolume> volumes = invocation.getArgument(0);
               return volumes.get(0);
@@ -365,7 +369,7 @@ public class TestKeyValueContainer {
       KeyValueContainer container = new KeyValueContainer(containerData, CONF);
 
       HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
-          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
+          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1, freeSpaceCalculator);
 
       container.populatePathFields(scmId, containerVolume);
       try (InputStream fis = Files.newInputStream(folderToExport.toPath())) {
@@ -406,7 +410,7 @@ public class TestKeyValueContainer {
       container = new KeyValueContainer(containerData, CONF);
 
       containerVolume = volumeChoosingPolicy.chooseVolume(
-          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
+          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1, freeSpaceCalculator);
       container.populatePathFields(scmId, containerVolume);
       KeyValueContainer finalContainer1 = container;
       assertThrows(IOException.class, () -> {
@@ -439,7 +443,7 @@ public class TestKeyValueContainer {
    * Create the container on disk.
    */
   private void createContainer() throws StorageContainerException {
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, freeSpaceCalculator, scmId);
     keyValueContainerData = keyValueContainer.getContainerData();
   }
 
@@ -538,9 +542,9 @@ public class TestKeyValueContainer {
   public void testDuplicateContainer(ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
 
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, freeSpaceCalculator, scmId);
     StorageContainerException exception = assertThrows(StorageContainerException.class, () ->
-        keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId));
+        keyValueContainer.create(volumeSet, volumeChoosingPolicy, freeSpaceCalculator, scmId));
     assertEquals(ContainerProtos.Result.CONTAINER_ALREADY_EXISTS, exception.getResult());
     assertThat(exception).hasMessage("Container creation failed because ContainerFile already exists");
   }
@@ -550,11 +554,11 @@ public class TestKeyValueContainer {
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
     reset(volumeChoosingPolicy);
-    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), any(MinFreeSpaceCalculator.class)))
         .thenThrow(DiskChecker.DiskOutOfSpaceException.class);
 
     StorageContainerException exception = assertThrows(StorageContainerException.class, () ->
-        keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId));
+        keyValueContainer.create(volumeSet, volumeChoosingPolicy, freeSpaceCalculator, scmId));
     assertEquals(ContainerProtos.Result.DISK_OUT_OF_SPACE, exception.getResult());
     assertThat(exception).hasMessage("Container creation failed, due to disk out of space");
   }
@@ -566,7 +570,7 @@ public class TestKeyValueContainer {
     closeContainer();
     keyValueContainer = new KeyValueContainer(
         keyValueContainerData, CONF);
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, freeSpaceCalculator, scmId);
     KeyValueContainerUtil.removeContainer(
         keyValueContainer.getContainerData(), CONF);
     keyValueContainer.delete();
@@ -593,7 +597,7 @@ public class TestKeyValueContainer {
   public void testCloseContainer(ContainerTestVersionInfo versionInfo)
       throws Exception {
     init(versionInfo);
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, freeSpaceCalculator, scmId);
     keyValueContainer.close();
 
     keyValueContainerData = keyValueContainer
@@ -615,7 +619,7 @@ public class TestKeyValueContainer {
   public void testReportOfUnhealthyContainer(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, freeSpaceCalculator, scmId);
     assertNotNull(keyValueContainer.getContainerReport());
     keyValueContainer.markContainerUnhealthy();
     File containerFile = keyValueContainer.getContainerFile();
@@ -631,7 +635,7 @@ public class TestKeyValueContainer {
   public void testUpdateContainer(ContainerTestVersionInfo versionInfo)
       throws Exception {
     init(versionInfo);
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, freeSpaceCalculator, scmId);
     Map<String, String> metadata = new HashMap<>();
     metadata.put(OzoneConsts.VOLUME, OzoneConsts.OZONE);
     metadata.put(OzoneConsts.OWNER, OzoneConsts.OZONE_SIMPLE_HDFS_USER);
@@ -660,7 +664,7 @@ public class TestKeyValueContainer {
 
     StorageContainerException exception = assertThrows(StorageContainerException.class, () -> {
       keyValueContainer = new KeyValueContainer(keyValueContainerData, CONF);
-      keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+      keyValueContainer.create(volumeSet, volumeChoosingPolicy, freeSpaceCalculator, scmId);
       Map<String, String> metadata = new HashMap<>();
       metadata.put(OzoneConsts.VOLUME, OzoneConsts.OZONE);
       keyValueContainer.update(metadata, false);
@@ -679,7 +683,7 @@ public class TestKeyValueContainer {
     closeContainer();
     keyValueContainer = new KeyValueContainer(
         keyValueContainerData, CONF);
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, freeSpaceCalculator, scmId);
 
     try (DBHandle db = BlockUtils.getDB(keyValueContainerData, CONF)) {
       RDBStore store = (RDBStore) db.getStore().getStore();
@@ -733,7 +737,7 @@ public class TestKeyValueContainer {
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
     // Create Container 1
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, freeSpaceCalculator, scmId);
 
     DatanodeDBProfile outProfile1;
     try (DBHandle db1 =
@@ -754,7 +758,7 @@ public class TestKeyValueContainer {
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         datanodeId.toString());
     keyValueContainer = new KeyValueContainer(keyValueContainerData, otherConf);
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, freeSpaceCalculator, scmId);
 
     DatanodeDBProfile outProfile2;
     try (DBHandle db2 =
@@ -834,7 +838,7 @@ public class TestKeyValueContainer {
     List<File> exportFiles = new ArrayList<>();
     for (HddsVolume volume: volumeList) {
       reset(volumeChoosingPolicy);
-      when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+      when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), any(MinFreeSpaceCalculator.class)))
           .thenReturn(volume);
       for (int index = 0; index < count; index++, containerId++) {
         // Create new container
@@ -842,7 +846,7 @@ public class TestKeyValueContainer {
             (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
             datanodeId.toString());
         container = new KeyValueContainer(containerData, CONF);
-        container.create(volumeSet, volumeChoosingPolicy, scmId);
+        container.create(volumeSet, volumeChoosingPolicy, freeSpaceCalculator, scmId);
         containerData = container.getContainerData();
         containerData.setState(ContainerProtos.ContainerDataProto.State.CLOSED);
         populate(container, numberOfKeysToWrite);
@@ -944,7 +948,7 @@ public class TestKeyValueContainer {
       KeyValueContainer container = new KeyValueContainer(containerData, CONF);
 
       HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
-          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
+          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1, freeSpaceCalculator);
 
       container.populatePathFields(scmId, containerVolume);
       try (InputStream fis = Files.newInputStream(folderToExport.toPath())) {
@@ -992,7 +996,7 @@ public class TestKeyValueContainer {
       KeyValueContainer container = new KeyValueContainer(containerData, CONF);
 
       HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
-          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
+          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1, freeSpaceCalculator);
 
       container.populatePathFields(scmId, containerVolume);
       try (InputStream fis = Files.newInputStream(folderToExport.toPath())) {
@@ -1047,7 +1051,7 @@ public class TestKeyValueContainer {
         ContainerTestHelper.CONTAINER_MAX_SIZE, UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
     KeyValueContainer container = new KeyValueContainer(data, conf);
-    container.create(volumeSet, volumeChoosingPolicy, scmId);
+    container.create(volumeSet, volumeChoosingPolicy, freeSpaceCalculator, scmId);
     long pendingDeleteBlockCount = 20;
     try (DBHandle meta = BlockUtils.getDB(data, conf)) {
       Table<String, Long> metadataTable = meta.getStore().getMetadataTable();

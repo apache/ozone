@@ -81,6 +81,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -117,6 +118,7 @@ public class TestContainerPersistence {
   private static String hddsPath;
   private static OzoneConfiguration conf;
   private static VolumeChoosingPolicy volumeChoosingPolicy;
+  private static MinFreeSpaceCalculator freeSpaceCalculator;
 
   private ContainerSet containerSet;
   private MutableVolumeSet volumeSet;
@@ -143,6 +145,7 @@ public class TestContainerPersistence {
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, hddsPath);
     conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, hddsPath);
     volumeChoosingPolicy = new RoundRobinVolumeChoosingPolicy();
+    freeSpaceCalculator = new MinFreeSpaceCalculator(conf);
   }
 
   @AfterAll
@@ -204,7 +207,7 @@ public class TestContainerPersistence {
     data.addMetadata("VOLUME", "shire");
     data.addMetadata("owner)", "bilbo");
     KeyValueContainer container = new KeyValueContainer(data, conf);
-    container.create(volumeSet, volumeChoosingPolicy, SCM_ID);
+    container.create(volumeSet, volumeChoosingPolicy, freeSpaceCalculator, SCM_ID);
     commitBytesBefore = container.getContainerData()
         .getVolume().getCommittedBytes();
     cSet.addContainer(container);

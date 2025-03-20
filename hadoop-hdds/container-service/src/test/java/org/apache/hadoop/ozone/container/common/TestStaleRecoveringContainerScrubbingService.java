@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
@@ -53,6 +54,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -79,6 +81,7 @@ public class TestStaleRecoveringContainerScrubbingService {
   private int containerIdNum = 0;
   private MutableVolumeSet volumeSet;
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
+  private MinFreeSpaceCalculator freeSpaceCalculator;
   private final TestClock testClock =
       new TestClock(Instant.now(), ZoneOffset.UTC);
 
@@ -105,7 +108,8 @@ public class TestStaleRecoveringContainerScrubbingService {
     volumeSet = mock(MutableVolumeSet.class);
 
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
-    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+    freeSpaceCalculator = mock(MinFreeSpaceCalculator.class);
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), any(MinFreeSpaceCalculator.class)))
         .thenReturn(hddsVolume);
   }
 
@@ -135,7 +139,7 @@ public class TestStaleRecoveringContainerScrubbingService {
           new KeyValueContainer(recoveringContainerData,
               conf);
       recoveringKeyValueContainer.create(
-          volumeSet, volumeChoosingPolicy, clusterID);
+          volumeSet, volumeChoosingPolicy, freeSpaceCalculator, clusterID);
       containerSet.addContainer(recoveringKeyValueContainer);
       createdIds.add((long) containerIdNum);
     }
