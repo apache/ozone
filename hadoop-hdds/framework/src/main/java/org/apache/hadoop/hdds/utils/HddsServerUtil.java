@@ -403,6 +403,11 @@ public final class HddsServerUtil {
     return rawLocations;
   }
 
+  public static long requiredReplicationSpace(long defaultContainerSize) {
+    // During container import it requires double the container size to hold container in tmp and dest directory
+    return 2 * defaultContainerSize;
+  }
+
   public static Collection<String> getDatanodeStorageDirs(ConfigurationSource conf) {
     Collection<String> rawLocations = conf.getTrimmedStringCollection(HDDS_DATANODE_DIR_KEY);
     if (rawLocations.isEmpty()) {
