@@ -34,7 +34,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -225,11 +224,10 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     HddsServerUtil.initializeMetrics(conf, "HddsDatanode");
     try {
       String hostname = HddsUtils.getHostName(conf);
-      String ip = InetAddress.getByName(hostname).getHostAddress();
       datanodeDetails = initializeDatanodeDetails();
       datanodeDetails.setHostName(hostname);
       serviceRuntimeInfo.setHostName(hostname);
-      datanodeDetails.setIpAddress(ip);
+      datanodeDetails.validateDatanodeIpAddress();
       datanodeDetails.setVersion(
           HddsVersionInfo.HDDS_VERSION_INFO.getVersion());
       datanodeDetails.setSetupTime(Time.now());
@@ -238,7 +236,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       TracingUtil.initTracing(
           "HddsDatanodeService." + datanodeDetails.getUuidString()
               .substring(0, 8), conf);
-      LOG.info("HddsDatanodeService host:{} ip:{}", hostname, ip);
+      LOG.info("HddsDatanodeService {}", datanodeDetails);
       // Authenticate Hdds Datanode service if security is enabled
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
         component = "dn-" + datanodeDetails.getUuidString();
