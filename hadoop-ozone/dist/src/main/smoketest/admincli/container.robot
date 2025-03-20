@@ -129,12 +129,22 @@ Check state filtering with JSON array format
                         Should Not Contain   ${states}   CLOSED
 
 Check count limit with JSON array format
+    ${output} =         Execute          ozone admin container create
+                        Should contain   ${output}   is created
+    ${output} =         Execute          ozone admin container create
+                        Should contain   ${output}   is created
+    ${output} =         Execute          ozone admin container create
+                        Should contain   ${output}   is created
+    ${output} =         Execute          ozone admin container create
+                        Should contain   ${output}   is created
+    ${output} =         Execute          ozone admin container create
+                        Should contain   ${output}   is created
     ${output} =         Execute          ozone admin container list --count 5
                         Should Start With   ${output}   [
                         Should Contain   ${output}   containerID
                         Should End With   ${output}   ]
     ${count} =          Execute          echo '${output}' | jq -r 'length'
-                        Should Be True   ${count} <= 5
+                        Should Be True   ${count} = 5
 
 Close container
     ${container} =      Execute          ozone admin container list --state OPEN | jq -r '.[] | select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
