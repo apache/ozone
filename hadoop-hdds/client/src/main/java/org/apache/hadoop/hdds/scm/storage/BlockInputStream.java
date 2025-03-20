@@ -112,6 +112,8 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   private final Function<BlockID, BlockLocationInfo> refreshFunction;
 
+  private BlockData blockData;
+
   public BlockInputStream(
       BlockLocationInfo blockInfo,
       Pipeline pipeline,
@@ -153,7 +155,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
       return;
     }
 
-    BlockData blockData = null;
     List<ChunkInfo> chunks = null;
     IOException catchEx = null;
     do {
@@ -554,8 +555,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
     return length;
   }
 
-  @VisibleForTesting
-  synchronized int getChunkIndex() {
+  public synchronized int getChunkIndex() {
     return chunkIndex;
   }
 
@@ -618,9 +618,12 @@ public class BlockInputStream extends BlockExtendedInputStream {
     refreshBlockInfo(cause);
   }
 
-  @VisibleForTesting
   public synchronized List<ChunkInputStream> getChunkStreams() {
     return chunkStreams;
+  }
+
+  public BlockData getStreamBlockData() {
+    return blockData;
   }
 
 }
