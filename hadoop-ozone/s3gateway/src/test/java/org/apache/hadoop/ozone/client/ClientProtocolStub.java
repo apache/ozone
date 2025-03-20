@@ -708,7 +708,13 @@ public class ClientProtocolStub implements ClientProtocol {
       String prevSnapshot, int maxListResult) throws IOException {
     return null;
   }
-  
+
+  @Override
+  public ListSnapshotResponse listSnapshot(String volumeName, String bucketName, String snapshotPrefix,
+       String prevSnapshot, int maxListResult, String omNodeId) throws IOException {
+    return null;
+  }
+
   @Override
   public void deleteSnapshot(String volumeName,
       String bucketName, String snapshotName)
@@ -719,6 +725,12 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public OzoneSnapshot getSnapshotInfo(String volumeName, String bucketName,
                                        String snapshotName) throws IOException {
+    return null;
+  }
+
+  @Override
+  public OzoneSnapshot getSnapshotInfo(String volumeName, String bucketName, String snapshotName,
+                                       String omNodeId) throws IOException {
     return null;
   }
 
@@ -742,6 +754,13 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public SnapshotDiffResponse snapshotDiff(String volumeName, String bucketName, String fromSnapshot,
+                                           String toSnapshot, String token, int pageSize, boolean forceFullDiff,
+                                           boolean disableNativeDiff, String omNodeId) throws IOException {
+    return null;
+  }
+
+  @Override
   public CancelSnapshotDiffResponse cancelSnapshotDiff(String volumeName,
                                                        String bucketName,
                                                        String fromSnapshot,
@@ -751,9 +770,26 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public CancelSnapshotDiffResponse cancelSnapshotDiff(String volumeName,
+                                                       String bucketName,
+                                                       String fromSnapshot,
+                                                       String toSnapshot,
+                                                       String omNodeId)
+      throws IOException {
+    return null;
+  }
+
+  @Override
   public List<OzoneSnapshotDiff> listSnapshotDiffJobs(
       String volumeName, String bucketName,
       String jobStatus, boolean listAll) {
+    return null;
+  }
+
+  @Override
+  public List<OzoneSnapshotDiff> listSnapshotDiffJobs(
+      String volumeName, String bucketName, String jobStatus,
+      boolean listAll, String omNodeId) {
     return null;
   }
 
