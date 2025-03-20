@@ -218,19 +218,13 @@ class TestOzoneAtRestEncryption {
   @Test
   public void testWarmupEDEKCacheOnStartup() throws Exception {
 
-    store.createVolume("volumename");
-    OzoneVolume volume = store.getVolume("volumename");
-    BucketArgs bucketArgs = BucketArgs.newBuilder()
-        .setBucketEncryptionKey(TEST_KEY).build();
-    volume.createBucket("bucketname", bucketArgs);
+    createVolumeAndBucket("vol", "buck", BucketLayout.OBJECT_STORE);
 
     @SuppressWarnings("unchecked") KMSClientProvider spy = getKMSClientProvider();
     assertTrue(spy.getEncKeyQueueSize(TEST_KEY) > 0);
 
-    conf.setInt(
-        OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY, 0);
+    conf.setInt(OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY, 0);
     cluster.restartOzoneManager();
-
 
     GenericTestUtils.waitFor(new BooleanSupplier() {
       @Override
@@ -243,8 +237,8 @@ class TestOzoneAtRestEncryption {
 
   private KMSClientProvider getKMSClientProvider() {
     LoadBalancingKMSClientProvider lbkmscp =
-        (LoadBalancingKMSClientProvider) Whitebox
-            .getInternalState(cluster.getOzoneManager().getKmsProvider(), "extension");
+        (LoadBalancingKMSClientProvider) Whitebox.getInternalState(
+            cluster.getOzoneManager().getKmsProvider(), "extension");
     assert lbkmscp.getProviders().length == 1;
     return lbkmscp.getProviders()[0];
   }

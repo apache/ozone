@@ -655,9 +655,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       kmsProvider = null;
       LOG.error("Fail to create Key Provider");
     }
-    if (isLeaderReady() && kmsProvider != null) {
-      initializeEdekCache(conf);
-    }
     if (secConfig.isSecurityEnabled()) {
       omComponent = OM_DAEMON + "-" + omId;
       HddsProtos.OzoneManagerDetailsProto omInfo =
@@ -741,7 +738,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omHostName = HddsUtils.getHostName(conf);
   }
 
-  private void initializeEdekCache(OzoneConfiguration conf) {
+  public void initializeEdekCache(OzoneConfiguration conf) {
     int edekCacheLoaderDelay =
         conf.getInt(OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY, OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_DEFAULT);
     int edekCacheLoaderInterval =
