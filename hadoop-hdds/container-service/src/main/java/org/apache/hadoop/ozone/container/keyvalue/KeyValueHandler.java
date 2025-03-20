@@ -1670,8 +1670,14 @@ public class KeyValueHandler extends Handler {
           blockInputStream.seek(chunkInfoProto.getOffset());
 
           // Read the chunk data from the BlockInputStream and write it to the container.
-          byte[] chunkData = new byte[(int) chunkInfoProto.getLen()];
-          blockInputStream.read(chunkData, 0, (int) chunkInfoProto.getLen());
+          int chunkLength = (int) chunkInfoProto.getLen();
+          byte[] chunkData = new byte[chunkLength];
+          int bytesRead = blockInputStream.read(chunkData, 0, chunkLength);
+          if (bytesRead != chunkLength) {
+            throw new IOException("Error while reading chunk data from block input stream. Expected length: " +
+                chunkLength + ", Actual length: " + bytesRead);
+          }
+
           ChunkBuffer chunkBuffer = ChunkBuffer.wrap(ByteBuffer.wrap(chunkData));
           ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
           chunkInfo.addMetadata(OzoneConsts.CHUNK_OVERWRITE, "true");
@@ -1733,7 +1739,9 @@ public class KeyValueHandler extends Handler {
       // Initialize the BlockInputStream. Initializes the blockData and ChunkInputStream for each chunk
       blockInputStream.initialize();
 
-      for (Long offset : offsetLengthMap.keySet()) {
+      for (Map.Entry<Long, Long> offsetLength : offsetLengthMap.entrySet()) {
+        Long offset = offsetLength.getKey();
+        Long length = offsetLength.getValue();
         try {
           // Seek to the offset of the chunk. Seek updates the chunkIndex in the BlockInputStream.
           blockInputStream.seek(offset);
@@ -1747,8 +1755,13 @@ public class KeyValueHandler extends Handler {
           verifyChunksLength(chunkInfoProto, localChunksMap.get(offset));
 
           // Read the chunk data from the block input stream and write it to the container.
-          byte[] chunkData = new byte[offsetLengthMap.get(offset).intValue()];
-          blockInputStream.read(chunkData, offset.intValue(), offsetLengthMap.get(offset).intValue());
+          byte[] chunkData = new byte[length.intValue()];
+          int bytesRead = blockInputStream.read(chunkData, 0, length.intValue());
+          if (bytesRead != length) {
+            throw new IOException("Error while reading chunk data from block input stream. Expected length: " +
+                length + ", Actual length: " + bytesRead);
+          }
+
           ChunkBuffer chunkBuffer = ChunkBuffer.wrap(ByteBuffer.wrap(chunkData));
           writeChunkForClosedContainer(chunkInfo, blockID, chunkBuffer, container);
           localChunksMap.put(chunkInfo.getOffset(), chunkInfoProto);
