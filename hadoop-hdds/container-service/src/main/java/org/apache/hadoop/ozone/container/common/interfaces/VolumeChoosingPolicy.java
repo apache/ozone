@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.List;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 
 /**
  * This interface specifies the policy for choosing volumes to store replicas.
@@ -37,9 +38,11 @@ public interface VolumeChoosingPolicy {
    * @param volumes - a list of available volumes.
    * @param maxContainerSize - the maximum size of the container for which a
    *                         volume is sought.
+   * @param freeSpaceCalculator - calculator for determining minimum free space
    * @return the chosen volume.
    * @throws IOException when disks are unavailable or are full.
    */
-  HddsVolume chooseVolume(List<HddsVolume> volumes, long maxContainerSize)
+  HddsVolume chooseVolume(List<HddsVolume> volumes, long maxContainerSize,
+      MinFreeSpaceCalculator freeSpaceCalculator)
       throws IOException;
 }

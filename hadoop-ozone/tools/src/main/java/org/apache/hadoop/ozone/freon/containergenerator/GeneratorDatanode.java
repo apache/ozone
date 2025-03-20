@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
@@ -114,6 +115,7 @@ public class GeneratorDatanode extends BaseGenerator {
   private BlockManagerImpl blockManager;
 
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
+  private MinFreeSpaceCalculator freeSpaceCalculator;
 
   private MutableVolumeSet volumeSet;
 
@@ -171,6 +173,7 @@ public class GeneratorDatanode extends BaseGenerator {
         StorageVolume.VolumeType.DATA_VOLUME, null);
 
     volumeChoosingPolicy = new RoundRobinVolumeChoosingPolicy();
+    freeSpaceCalculator = new MinFreeSpaceCalculator(config);
 
     final OzoneClientConfig ozoneClientConfig =
         config.getObject(OzoneClientConfig.class);
@@ -329,7 +332,7 @@ public class GeneratorDatanode extends BaseGenerator {
         new KeyValueContainer(keyValueContainerData, config);
 
     try {
-      keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+      keyValueContainer.create(volumeSet, volumeChoosingPolicy, freeSpaceCalculator, scmId);
     } catch (StorageContainerException ex) {
       throw new RuntimeException(ex);
     }

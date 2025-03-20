@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Predicate;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 
 /**
  * Filter for selecting volumes with enough space for a new container.
@@ -32,9 +33,12 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
   private final Map<HddsVolume, AvailableSpace> fullVolumes =
       new HashMap<>();
   private long mostAvailableSpace = Long.MIN_VALUE;
+  private final MinFreeSpaceCalculator freeSpaceCalculator;
 
-  AvailableSpaceFilter(long requiredSpace) {
+  AvailableSpaceFilter(long requiredSpace,
+      MinFreeSpaceCalculator freeSpaceCalculator) {
     this.requiredSpace = requiredSpace;
+    this.freeSpaceCalculator = freeSpaceCalculator;
   }
 
   @Override
@@ -44,8 +48,7 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
     long free = usage.getAvailable();
     long committed = vol.getCommittedBytes();
     long available = free - committed;
-    long volumeFreeSpaceToSpare =
-        new VolumeUsage.MinFreeSpaceCalculator(vol.getConf()).get(volumeCapacity);
+    long volumeFreeSpaceToSpare = freeSpaceCalculator.get(volumeCapacity);
     boolean hasEnoughSpace = VolumeUsage.hasVolumeEnoughSpace(free, committed,
         requiredSpace, volumeFreeSpaceToSpare);
 

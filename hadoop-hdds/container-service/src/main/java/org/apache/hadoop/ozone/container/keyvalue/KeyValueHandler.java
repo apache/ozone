@@ -117,6 +117,7 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
@@ -150,6 +151,7 @@ public class KeyValueHandler extends Handler {
   private final Striped<Lock> containerCreationLocks;
   private static FaultInjector injector;
   private final Clock clock;
+  private final MinFreeSpaceCalculator minFreeSpaceCalculator;
 
   public KeyValueHandler(ConfigurationSource config,
                          String datanodeId,
@@ -214,6 +216,7 @@ public class KeyValueHandler extends Handler {
       OzoneConfiguration.of(conf).set(ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY,
           DEFAULT_LAYOUT.name());
     }
+    this.minFreeSpaceCalculator = new MinFreeSpaceCalculator(conf);
   }
 
   @VisibleForTesting
@@ -427,7 +430,7 @@ public class KeyValueHandler extends Handler {
     containerIdLock.lock();
     try {
       if (containerSet.getContainer(containerID) == null) {
-        newContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
+        newContainer.create(volumeSet, volumeChoosingPolicy, minFreeSpaceCalculator, clusterId);
         if (RECOVERING == newContainer.getContainerState()) {
           created = containerSet.addContainerByOverwriteMissingContainer(newContainer);
         } else {

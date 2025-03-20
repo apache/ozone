@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,14 +43,16 @@ public class RoundRobinVolumeChoosingPolicy implements VolumeChoosingPolicy {
 
   @Override
   public HddsVolume chooseVolume(List<HddsVolume> volumes,
-      long maxContainerSize) throws IOException {
+      long maxContainerSize,
+      MinFreeSpaceCalculator freeSpaceCalculator) throws IOException {
 
     // No volumes available to choose from
     if (volumes.isEmpty()) {
       throw new DiskOutOfSpaceException("No more available volumes");
     }
 
-    AvailableSpaceFilter filter = new AvailableSpaceFilter(maxContainerSize);
+    AvailableSpaceFilter filter = new AvailableSpaceFilter(maxContainerSize,
+        freeSpaceCalculator);
 
     // since volumes could've been removed because of the failure
     // make sure we are not out of bounds

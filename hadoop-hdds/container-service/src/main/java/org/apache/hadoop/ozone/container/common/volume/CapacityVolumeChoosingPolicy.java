@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,14 +50,16 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
 
   @Override
   public HddsVolume chooseVolume(List<HddsVolume> volumes,
-      long maxContainerSize) throws IOException {
+      long maxContainerSize,
+      MinFreeSpaceCalculator freeSpaceCalculator) throws IOException {
 
     // No volumes available to choose from
     if (volumes.isEmpty()) {
       throw new DiskOutOfSpaceException("No more available volumes");
     }
 
-    AvailableSpaceFilter filter = new AvailableSpaceFilter(maxContainerSize);
+    AvailableSpaceFilter filter = new AvailableSpaceFilter(maxContainerSize,
+        freeSpaceCalculator);
 
     List<HddsVolume> volumesWithEnoughSpace = volumes.stream()
         .filter(filter)

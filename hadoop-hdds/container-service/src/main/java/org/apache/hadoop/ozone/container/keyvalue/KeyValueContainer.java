@@ -71,6 +71,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
@@ -138,8 +139,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
-  public void create(VolumeSet volumeSet, VolumeChoosingPolicy
-      volumeChoosingPolicy, String clusterId) throws StorageContainerException {
+  public void create(VolumeSet volumeSet, VolumeChoosingPolicy volumeChoosingPolicy,
+      MinFreeSpaceCalculator minFreeSpaceCalculator, String clusterId) throws StorageContainerException {
     Preconditions.checkNotNull(volumeChoosingPolicy, "VolumeChoosingPolicy " +
         "cannot be null");
     Preconditions.checkNotNull(volumeSet, "VolumeSet cannot be null");
@@ -155,7 +156,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       while (true) {
         HddsVolume containerVolume;
         try {
-          containerVolume = volumeChoosingPolicy.chooseVolume(volumes, maxSize);
+          containerVolume = volumeChoosingPolicy.chooseVolume(volumes, maxSize, minFreeSpaceCalculator);
         } catch (DiskOutOfSpaceException ex) {
           throw new StorageContainerException("Container creation failed, " +
               "due to disk out of space", ex, DISK_OUT_OF_SPACE);
