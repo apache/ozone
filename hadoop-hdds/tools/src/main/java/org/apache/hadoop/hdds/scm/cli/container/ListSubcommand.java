@@ -26,6 +26,9 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.base.Strings;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.util.List;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -41,7 +44,13 @@ import picocli.CommandLine.Help.Visibility;
 import picocli.CommandLine.Option;
 
 /**
- * This is the handler that process container list command.
+ * The ListSubcommand class represents a command to list containers in a structured way.
+ * It provides options to control how the list is generated, including specifying
+ * starting container ID, maximum number of containers to list, and other filtering criteria
+ * such as container state or replication type.
+ *
+ * This command connects to the SCM (Storage Container Manager) client to fetch the
+ * container details and outputs the result in a JSON format.
  */
 @Command(
     name = "list",
@@ -109,55 +118,102 @@ public class ListSubcommand extends ScmSubcommand {
             ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT_DEFAULT);
 
     // Use SequenceWriter to output JSON array format for all cases
-    try (SequenceWriter sequenceWriter = WRITER.writeValues(System.out)) {
-      sequenceWriter.init(true); // Initialize as a JSON array
-      
-      if (!all) {
-        // Regular listing with count limit
-        if (count > maxCountAllowed) {
-          System.err.printf("Attempting to list the first %d records of containers." +
-              " However it exceeds the cluster's current limit of %d. The results will be capped at the" +
-              " maximum allowed count.%n", count, maxCountAllowed);
-          count = maxCountAllowed;
-        }
-        
-        ContainerListResult containerListResult = 
-            scmClient.listContainer(startId, count, state, type, repConfig);
-        
-        // Write all containers in the result to the JSON array
-        for (ContainerInfo container : containerListResult.getContainerInfoList()) {
-          sequenceWriter.write(container);
-        }
-        
-        if (containerListResult.getTotalCount() > count) {
-          System.err.printf("Displaying %d out of %d containers. " +
-                         "Container list has more containers.%n",
-                 count, containerListResult.getTotalCount());
-        }
-      } else {
-        // List all containers by fetching in batches
-        int batchSize = (count > 0) ? count : maxCountAllowed;
-        long currentStartId = startId;
-        int fetchedCount;
-        
-        do {
-          // Fetch containers in batches of 'batchSize'
-          ContainerListResult containerListResult = 
-              scmClient.listContainer(currentStartId, batchSize, state, type, repConfig);
-          fetchedCount = containerListResult.getContainerInfoList().size();
-          
-          // Write containers directly to the SequenceWriter
-          for (ContainerInfo container : containerListResult.getContainerInfoList()) {
-            sequenceWriter.write(container);
-          }
-          
-          if (fetchedCount > 0) {
-            currentStartId =
-                containerListResult.getContainerInfoList().get(fetchedCount - 1).getContainerID() + 1;
-          }
-        } while (fetchedCount > 0);
+    SequenceWriter sequenceWriter = WRITER.writeValues(new NonClosingOutputStream(System.out));
+    sequenceWriter.init(true); // Initialize as a JSON array
+
+    if (!all) {
+      // Regular listing with count limit
+      if (count > maxCountAllowed) {
+        System.err.printf("Attempting to list the first %d records of containers." +
+            " However it exceeds the cluster's current limit of %d. The results will be capped at the" +
+            " maximum allowed count.%n", count, maxCountAllowed);
+        count = maxCountAllowed;
       }
+
+      ContainerListResult containerListResult =
+          scmClient.listContainer(startId, count, state, type, repConfig);
+
+      writeContainers(sequenceWriter, containerListResult.getContainerInfoList());
+
+
+      if (containerListResult.getTotalCount() > count) {
+        System.err.printf("Displaying %d out of %d containers. " +
+                "Container list has more containers.%n",
+            count, containerListResult.getTotalCount());
+      }
+    } else {
+      // List all containers by fetching in batches
+      int batchSize = (count > 0) ? count : maxCountAllowed;
+      listAllContainers(scmClient, sequenceWriter, batchSize, repConfig);
     }
-    System.out.println(); // Add final newline
+  }
+
+  private void writeContainers(SequenceWriter writer, List<ContainerInfo> containers)
+      throws IOException {
+    for (ContainerInfo container : containers) {
+      writer.write(container);
+    }
+  }
+
+  private void closeStream(SequenceWriter writer) throws IOException {
+    writer.flush();
+    writer.close();
+    // Add the final newline
+    System.out.println();
+  }
+
+  private void listAllContainers(ScmClient scmClient, SequenceWriter writer,
+                                 int batchSize, ReplicationConfig repConfig)
+      throws IOException {
+    long currentStartId = startId;
+    int fetchedCount;
+
+    do {
+      ContainerListResult result =
+          scmClient.listContainer(currentStartId, batchSize, state, type, repConfig);
+      fetchedCount = result.getContainerInfoList().size();
+
+      writeContainers(writer, result.getContainerInfoList());
+
+      if (fetchedCount > 0) {
+        currentStartId =
+            result.getContainerInfoList().get(fetchedCount - 1).getContainerID() + 1;
+      }
+    } while (fetchedCount > 0);
+  }
+
+
+  private static class NonClosingOutputStream extends OutputStream {
+
+    private final OutputStream delegate;
+
+    public NonClosingOutputStream(OutputStream delegate) {
+      this.delegate = delegate;
+    }
+
+    @Override
+    public void write(int b) throws IOException {
+      delegate.write(b);
+    }
+
+    @Override
+    public void write(byte[] b) throws IOException {
+      delegate.write(b);
+    }
+
+    @Override
+    public void write(byte[] b, int off, int len) throws IOException {
+      delegate.write(b, off, len);
+    }
+
+    @Override
+    public void flush() throws IOException {
+      delegate.flush();
+    }
+
+    @Override
+    public void close() {
+      // Ignore close to keep the underlying stream open
+    }
   }
 }
