@@ -60,16 +60,14 @@ public final class NodeStatus {
 
   /** @return a {@link NodeStatus} object with {@link #opStateExpiryEpochSeconds} == 0. */
   public static NodeStatus valueOf(NodeOperationalState op, NodeState health) {
-    Objects.requireNonNull(op, "op == null");
-    Objects.requireNonNull(health, "health == null");
-    return CONSTANTS.get(op).get(health);
+    return valueOf(op, health, 0);
   }
 
   /** @return a {@link NodeStatus} object. */
   public static NodeStatus valueOf(NodeOperationalState op, NodeState health, long opExpiryEpochSeconds) {
     Objects.requireNonNull(op, "op == null");
     Objects.requireNonNull(health, "health == null");
-    return opExpiryEpochSeconds == 0 ? valueOf(op, health)
+    return opExpiryEpochSeconds == 0 ? CONSTANTS.get(op).get(health)
         : new NodeStatus(health, op, opExpiryEpochSeconds);
   }
 

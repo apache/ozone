@@ -34,8 +34,7 @@ public class NodeAlreadyExistsException extends NodeException {
   }
 
   /**
-   * Constructs an {@code NodeAlreadyExistsException} with the specified
-   * detail message.
+   * Constructs an {@code NodeAlreadyExistsException} with the given {@link DatanodeID}.
    */
   public NodeAlreadyExistsException(DatanodeID datanodeID) {
     super("Datanode " + datanodeID + " already exists");
