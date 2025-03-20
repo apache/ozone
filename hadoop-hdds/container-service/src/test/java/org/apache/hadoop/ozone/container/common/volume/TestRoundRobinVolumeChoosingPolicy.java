@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.fs.MockSpaceUsageSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,12 +50,14 @@ public class TestRoundRobinVolumeChoosingPolicy {
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
   @TempDir
   private Path baseDir;
+  private MinFreeSpaceCalculator minFreeSpaceCalculator;
 
   @BeforeEach
   public void setup() throws Exception {
     String volume1 = baseDir + "disk1";
     String volume2 = baseDir + "disk2";
     policy = new RoundRobinVolumeChoosingPolicy();
+    minFreeSpaceCalculator = new MinFreeSpaceCalculator(CONF);
 
     // Use the exact capacity and availability specified in this test. Do not reserve space to prevent volumes from
     // filling up.
@@ -94,21 +97,21 @@ public class TestRoundRobinVolumeChoosingPolicy {
     assertEquals(200L, hddsVolume2.getCurrentUsage().getAvailable());
 
     // Test two rounds of round-robin choosing
-    assertEquals(hddsVolume1, policy.chooseVolume(volumes, 0));
-    assertEquals(hddsVolume2, policy.chooseVolume(volumes, 0));
-    assertEquals(hddsVolume1, policy.chooseVolume(volumes, 0));
-    assertEquals(hddsVolume2, policy.chooseVolume(volumes, 0));
+    assertEquals(hddsVolume1, policy.chooseVolume(volumes, 0, minFreeSpaceCalculator));
+    assertEquals(hddsVolume2, policy.chooseVolume(volumes, 0, minFreeSpaceCalculator));
+    assertEquals(hddsVolume1, policy.chooseVolume(volumes, 0, minFreeSpaceCalculator));
+    assertEquals(hddsVolume2, policy.chooseVolume(volumes, 0, minFreeSpaceCalculator));
 
     // The first volume has only 100L space, so the policy should
     // choose the second one in case we ask for more.
     assertEquals(hddsVolume2,
-        policy.chooseVolume(volumes, 120));
+        policy.chooseVolume(volumes, 120, minFreeSpaceCalculator));
   }
 
   @Test
   public void throwsDiskOutOfSpaceIfRequestMoreThanAvailable() {
     Exception e = assertThrows(DiskOutOfSpaceException.class,
-        () -> policy.chooseVolume(volumes, 300));
+        () -> policy.chooseVolume(volumes, 300, minFreeSpaceCalculator));
 
     String msg = e.getMessage();
     assertThat(msg).contains("No volumes have enough space for a new container.  " +

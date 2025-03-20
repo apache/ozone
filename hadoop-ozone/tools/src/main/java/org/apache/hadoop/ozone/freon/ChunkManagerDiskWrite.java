@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
@@ -112,6 +113,7 @@ public class ChunkManagerDiskWrite extends BaseFreonGenerator implements
 
       VolumeChoosingPolicy volumeChoicePolicy =
           new RoundRobinVolumeChoosingPolicy();
+      MinFreeSpaceCalculator freeSpaceCalculator = new MinFreeSpaceCalculator(ozoneConfiguration);
 
       final int threadCount = getThreadNo();
 
@@ -130,7 +132,7 @@ public class ChunkManagerDiskWrite extends BaseFreonGenerator implements
         KeyValueContainer keyValueContainer =
             new KeyValueContainer(keyValueContainerData, ozoneConfiguration);
 
-        keyValueContainer.create(volumeSet, volumeChoicePolicy, "scmid");
+        keyValueContainer.create(volumeSet, volumeChoicePolicy, freeSpaceCalculator, "scmid");
 
         containersPerThread.put(i, keyValueContainer);
       }

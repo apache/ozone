@@ -30,6 +30,7 @@ import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 
 /**
  * Interface for Container Operations.
@@ -102,7 +103,7 @@ public interface Container<CONTAINERDATA extends ContainerData> {
    * @throws StorageContainerException
    */
   void create(VolumeSet volumeSet, VolumeChoosingPolicy volumeChoosingPolicy,
-              String scmId) throws StorageContainerException;
+      MinFreeSpaceCalculator minFreeSpaceCalculator, String scmId) throws StorageContainerException;
 
   /**
    * Deletes the container.

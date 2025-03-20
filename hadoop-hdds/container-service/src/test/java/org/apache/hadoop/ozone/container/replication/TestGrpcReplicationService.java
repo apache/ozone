@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
@@ -143,7 +144,7 @@ class TestGrpcReplicationService {
     StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
         .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
     container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
-        "test-replication");
+        new MinFreeSpaceCalculator(conf), "test-replication");
     containerSet.addContainer(container);
     container.close();
 

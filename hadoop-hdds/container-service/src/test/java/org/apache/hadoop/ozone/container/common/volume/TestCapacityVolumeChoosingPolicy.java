@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.fs.MockSpaceUsageSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -113,7 +114,7 @@ public class TestCapacityVolumeChoosingPolicy {
 
     // Test 1000 rounds of volume choosing
     for (int i = 0; i < 1000; i++) {
-      HddsVolume volume = policy.chooseVolume(volumes, 0);
+      HddsVolume volume = policy.chooseVolume(volumes, 0, new MinFreeSpaceCalculator(CONF));
       chooseCount.put(volume, chooseCount.get(volume) + 1);
     }
 
@@ -124,7 +125,7 @@ public class TestCapacityVolumeChoosingPolicy {
   @Test
   public void throwsDiskOutOfSpaceIfRequestMoreThanAvailable() {
     Exception e = assertThrows(DiskOutOfSpaceException.class,
-        () -> policy.chooseVolume(volumes, 500));
+        () -> policy.chooseVolume(volumes, 500, new MinFreeSpaceCalculator(CONF)));
 
     String msg = e.getMessage();
     assertThat(msg)

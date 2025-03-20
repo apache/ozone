@@ -21,6 +21,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
@@ -43,6 +44,7 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -92,7 +94,9 @@ public abstract class AbstractTestChunkManager {
 
     RoundRobinVolumeChoosingPolicy volumeChoosingPolicy =
         mock(RoundRobinVolumeChoosingPolicy.class);
-    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+    MinFreeSpaceCalculator minFreeSpaceCalculator =
+        mock(MinFreeSpaceCalculator.class);
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), any(MinFreeSpaceCalculator.class)))
         .thenReturn(hddsVolume);
 
     keyValueContainerData = new KeyValueContainerData(1L,
@@ -103,7 +107,7 @@ public abstract class AbstractTestChunkManager {
     keyValueContainer = new KeyValueContainer(keyValueContainerData, config);
 
     keyValueContainer.create(volumeSet, volumeChoosingPolicy,
-        UUID.randomUUID().toString());
+        minFreeSpaceCalculator, UUID.randomUUID().toString());
 
     header = "my header".getBytes(UTF_8);
     byte[] bytes = "testing write chunks".getBytes(UTF_8);

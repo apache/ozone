@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
@@ -60,6 +61,7 @@ public class ContainerImporter {
   private final ContainerController controller;
   private final MutableVolumeSet volumeSet;
   private final VolumeChoosingPolicy volumeChoosingPolicy;
+  private final MinFreeSpaceCalculator minFreeSpaceCalculator;
   private final long containerSize;
 
   private final Set<Long> importContainerProgress
@@ -83,6 +85,7 @@ public class ContainerImporter {
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
     this.conf = conf;
+    this.minFreeSpaceCalculator = new MinFreeSpaceCalculator(conf);
   }
 
   public boolean isAllowedContainerImport(long containerID) {
@@ -149,7 +152,7 @@ public class ContainerImporter {
     // Choose volume that can hold both container in tmp and dest directory
     return volumeChoosingPolicy.chooseVolume(
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
-        containerSize * 2);
+        containerSize * 2, minFreeSpaceCalculator);
   }
 
   public static Path getUntarDirectory(HddsVolume hddsVolume)

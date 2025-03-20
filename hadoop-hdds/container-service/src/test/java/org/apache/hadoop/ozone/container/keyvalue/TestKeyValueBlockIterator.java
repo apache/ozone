@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
@@ -118,7 +119,7 @@ public class TestKeyValueBlockIterator {
     // Init the container.
     container = new KeyValueContainer(containerData, conf);
     container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
-        clusterID);
+        new MinFreeSpaceCalculator(conf), clusterID);
     db = BlockUtils.getDB(containerData, conf);
   }
 

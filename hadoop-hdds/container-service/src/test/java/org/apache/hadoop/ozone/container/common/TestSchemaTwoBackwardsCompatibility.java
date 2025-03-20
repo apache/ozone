@@ -61,6 +61,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
@@ -274,7 +275,7 @@ public class TestSchemaTwoBackwardsCompatibility {
     cData.setSchemaVersion(OzoneConsts.SCHEMA_V2);
     KeyValueContainer container = new KeyValueContainer(cData, conf);
     container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
-        clusterID);
+        new MinFreeSpaceCalculator(conf), clusterID);
 
     // populate with some blocks
     // metadata will be updated here, too

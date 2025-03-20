@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUti
 import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
@@ -60,6 +61,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage.MinFreeSpaceCalculator;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
@@ -85,6 +87,7 @@ public class TestUpgradeManager {
   private MutableVolumeSet volumeSet;
   private UUID datanodeId;
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
+  private MinFreeSpaceCalculator freeSpaceCalculator;
 
   private BlockManager blockManager;
   private FilePerBlockStrategy chunkManager;
@@ -126,8 +129,9 @@ public class TestUpgradeManager {
     when(datanodeDetails.getUuid()).thenReturn(datanodeId);
 
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
+    freeSpaceCalculator = mock(MinFreeSpaceCalculator.class);
     final AtomicInteger loopCount = new AtomicInteger(0);
-    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), any(MinFreeSpaceCalculator.class)))
         .thenAnswer(invocation -> {
           final int ii = loopCount.getAndIncrement() % volumes.size();
           return volumes.get(ii);
@@ -243,7 +247,7 @@ public class TestUpgradeManager {
       data.setSchemaVersion(OzoneConsts.SCHEMA_V2);
 
       KeyValueContainer container = new KeyValueContainer(data, CONF);
-      container.create(volumeSet, volumeChoosingPolicy, SCM_ID);
+      container.create(volumeSet, volumeChoosingPolicy, freeSpaceCalculator, SCM_ID);
 
       containerSet.addContainer(container);
       data = (KeyValueContainerData) containerSet.getContainer(containerId)
