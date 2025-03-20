@@ -675,9 +675,6 @@ public class ContainerEndpoint {
         // Invalid filter parameter value
         return Response.status(Response.Status.BAD_REQUEST).build();
       }
-    } catch (IOException ex) {
-      throw new WebApplicationException(ex,
-          Response.Status.INTERNAL_SERVER_ERROR);
     } catch (IllegalArgumentException e) {
       throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
     } catch (Exception ex) {
@@ -725,43 +722,44 @@ public class ContainerEndpoint {
       // Send back an empty response
       return Response.status(Response.Status.NOT_ACCEPTABLE).build();
     }
-    List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
-        new ArrayList<>();
-    try {
-      Map<Long, ContainerMetadata> omContainers =
-          reconContainerMetadataManager.getContainers(limit, prevKey);
+    if (limit <= 0) {
+      limit = Integer.MAX_VALUE;
+    }
+    long minContainerID = prevKey + 1;
+    Iterator<ContainerInfo> deletedStateSCMContainers = containerManager.getContainers().stream()
+        .filter(containerInfo -> containerInfo.getContainerID() >= minContainerID)
+        .filter(containerInfo -> containerInfo.getState() == HddsProtos.LifeCycleState.DELETED)
+        .sorted(Comparator.comparingLong(ContainerInfo::getContainerID)).iterator();
+    List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList;
+    try (SeekableIterator<Long, ContainerMetadata> omContainers =
+           reconContainerMetadataManager.getContainersIterator()) {
+      ContainerInfo scmContainerInfo = deletedStateSCMContainers.hasNext() ? deletedStateSCMContainers.next() : null;
+      ContainerMetadata containerMetadata = omContainers.hasNext() ? omContainers.next() : null;
+      List<ContainerMetadata> omContainersDeletedInSCM = new ArrayList<>();
+      while (containerMetadata != null && scmContainerInfo != null
+        && omContainersDeletedInSCM.size() < limit) {
+        Long omContainerID = containerMetadata.getContainerID();
+        Long scmContainerID = scmContainerInfo.getContainerID();
+        if (scmContainerID.equals(omContainerID)) {
+          omContainersDeletedInSCM.add(containerMetadata);
+          scmContainerInfo = deletedStateSCMContainers.hasNext() ? deletedStateSCMContainers.next() : null;
+          containerMetadata = omContainers.hasNext() ? omContainers.next() : null;
+        } else if (scmContainerID.compareTo(omContainerID) < 0) {
+          scmContainerInfo = deletedStateSCMContainers.hasNext() ? deletedStateSCMContainers.next() : null;
+        } else {
+          // Seek directly to scmContainerId iterating sequentially is very wasteful here.
+          omContainers.seek(scmContainerID);
+          containerMetadata = omContainers.hasNext() ? omContainers.next() : null;
+        }
+      }
 
-      List<Long> deletedStateSCMContainerIds =
-          containerManager.getContainers().stream()
-              .filter(containerInfo -> (containerInfo.getState() ==
-                  HddsProtos.LifeCycleState.DELETED))
-              .map(containerInfo -> containerInfo.getContainerID()).collect(
-                  Collectors.toList());
-
-      List<Map.Entry<Long, ContainerMetadata>>
-          omContainersDeletedInSCM =
-          omContainers.entrySet().stream().filter(containerMetadataEntry ->
-                  (deletedStateSCMContainerIds.contains(
-                      containerMetadataEntry.getKey())))
-              .collect(
-                  Collectors.toList());
-
-      omContainersDeletedInSCM.forEach(
-          containerMetadataEntry -> {
-            ContainerDiscrepancyInfo containerDiscrepancyInfo =
-                new ContainerDiscrepancyInfo();
-            containerDiscrepancyInfo.setContainerID(
-                containerMetadataEntry.getKey());
-            containerDiscrepancyInfo.setNumberOfKeys(
-                containerMetadataEntry.getValue().getNumberOfKeys());
-            containerDiscrepancyInfo.setPipelines(
-                containerMetadataEntry.getValue()
-                    .getPipelines());
-            containerDiscrepancyInfoList.add(containerDiscrepancyInfo);
-          });
-    } catch (IOException ex) {
-      throw new WebApplicationException(ex,
-          Response.Status.INTERNAL_SERVER_ERROR);
+      containerDiscrepancyInfoList = omContainersDeletedInSCM.stream().map(containerMetadataEntry -> {
+        ContainerDiscrepancyInfo containerDiscrepancyInfo = new ContainerDiscrepancyInfo();
+        containerDiscrepancyInfo.setContainerID(containerMetadataEntry.getContainerID());
+        containerDiscrepancyInfo.setNumberOfKeys(containerMetadataEntry.getNumberOfKeys());
+        containerDiscrepancyInfo.setPipelines(containerMetadataEntry.getPipelines());
+        return containerDiscrepancyInfo;
+      }).collect(Collectors.toList());
     } catch (IllegalArgumentException e) {
       throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
     } catch (Exception ex) {

@@ -1584,6 +1584,42 @@ public class TestContainerEndpoint {
   }
 
   @Test
+  public void testGetOmContainersDeletedInSCMPagination() throws Exception {
+    Map<Long, ContainerMetadata> omContainers = reconContainerMetadataManager.getContainers(-1, 0);
+    putContainerInfos(2);
+    List<ContainerInfo> scmContainers = reconContainerManager.getContainers();
+    assertEquals(omContainers.size(), scmContainers.size());
+    // Update container state of Container Id 2 to CLOSING to CLOSED
+    // and then to DELETED
+    updateContainerStateToDeleted(2);
+
+    assertContainerCount(HddsProtos.LifeCycleState.DELETED, 1);
+
+    List<ContainerInfo> deletedSCMContainers = reconContainerManager.getContainers(HddsProtos.LifeCycleState.DELETED);
+    assertEquals(1, deletedSCMContainers.size());
+
+    Response omContainersDeletedInSCMResponse =
+        containerEndpoint.getOmContainersDeletedInSCM(1, 0);
+    assertNotNull(omContainersDeletedInSCMResponse);
+
+    Map<String, Object> responseMap = (Map<String, Object>) omContainersDeletedInSCMResponse.getEntity();
+
+    // Fetch the ContainerDiscrepancyInfo list from the response
+    List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
+        (List<ContainerDiscrepancyInfo>) responseMap.get("containerDiscrepancyInfo");
+    assertEquals(1, containerDiscrepancyInfoList.size());
+    // Check the prevKey is set correct in the response
+    long responsePrevKey = (long) responseMap.get("lastKey");
+    assertEquals(containerDiscrepancyInfoList.get(containerDiscrepancyInfoList.size() - 1).getContainerID(),
+        responsePrevKey);
+    assertEquals(2, responsePrevKey);
+
+    assertEquals(omContainers.get(2L).getNumberOfKeys(), containerDiscrepancyInfoList.get(0).getNumberOfKeys());
+    assertEquals(1, containerDiscrepancyInfoList.size());
+  }
+
+
+  @Test
   public void testGetOmContainersDeletedInSCMLimitParam() throws Exception {
     Map<Long, ContainerMetadata> omContainers =
         reconContainerMetadataManager.getContainers(-1, 0);
