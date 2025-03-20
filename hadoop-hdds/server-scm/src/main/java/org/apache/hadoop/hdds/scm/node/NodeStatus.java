@@ -135,6 +135,16 @@ public final class NodeStatus implements Comparable<NodeStatus> {
     this.opStateExpiryEpochSeconds = opExpiryEpochSeconds;
   }
 
+  /** @return the status with the new health. */
+  public NodeStatus newNodeState(NodeState newHealth) {
+    return NodeStatus.valueOf(operationalState, newHealth, opStateExpiryEpochSeconds);
+  }
+
+  /** @return the status with the new op state and expiry epoch seconds. */
+  public NodeStatus newOperationalState(NodeOperationalState op, long opExpiryEpochSeconds) {
+    return NodeStatus.valueOf(op, health, opExpiryEpochSeconds);
+  }
+
   /** Is this node writeable ({@link NodeState#HEALTHY} and {@link NodeOperationalState#IN_SERVICE}) ? */
   public boolean isNodeWritable() {
     return health == HEALTHY && operationalState == IN_SERVICE;

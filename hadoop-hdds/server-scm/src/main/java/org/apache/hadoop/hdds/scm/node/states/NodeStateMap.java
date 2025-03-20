@@ -141,8 +141,7 @@ public class NodeStateMap {
     lock.writeLock().lock();
     try {
       DatanodeInfo dn = getNodeInfoUnsafe(nodeId);
-      NodeStatus oldStatus = dn.getNodeStatus();
-      NodeStatus newStatus = NodeStatus.valueOf(oldStatus.getOperationalState(), newHealth);
+      final NodeStatus newStatus = dn.getNodeStatus().newNodeState(newHealth);
       dn.setNodeStatus(newStatus);
       return newStatus;
     } finally {
@@ -164,8 +163,7 @@ public class NodeStateMap {
     lock.writeLock().lock();
     try {
       DatanodeInfo dn = getNodeInfoUnsafe(nodeId);
-      NodeStatus oldStatus = dn.getNodeStatus();
-      NodeStatus newStatus = NodeStatus.valueOf(newOpState, oldStatus.getHealth(), opStateExpiryEpochSeconds);
+      final NodeStatus newStatus = dn.getNodeStatus().newOperationalState(newOpState, opStateExpiryEpochSeconds);
       dn.setNodeStatus(newStatus);
       return newStatus;
     } finally {
@@ -389,7 +387,7 @@ public class NodeStateMap {
   private List<DatanodeInfo> filterNodes(
       NodeOperationalState opState, NodeState health) {
     if (opState != null && health != null) {
-      return filterNodes(matching(NodeStatus.valueOf(opState, health)));
+      return filterNodes(matching(opState, health));
     }
     if (opState != null) {
       return filterNodes(matching(opState));
@@ -428,6 +426,10 @@ public class NodeStateMap {
 
   private static Predicate<DatanodeInfo> matching(NodeStatus status) {
     return dn -> status.equals(dn.getNodeStatus());
+  }
+
+  private static Predicate<DatanodeInfo> matching(NodeOperationalState op, NodeState health) {
+    return dn -> matching(op).test(dn) && matching(health).test(dn);
   }
 
   private static Predicate<DatanodeInfo> matching(NodeOperationalState state) {
