@@ -107,7 +107,7 @@ List all containers according to count (batchSize)
                         Should End With   ${output}   ]
 
 List all containers from a particular container ID
-    ${output} =         Execute          ozone admin container list --all --start 1
+    ${output} =         Execute          ozone admin container list --all --start 2
                         Should contain   ${output}   OPEN
                         Should Start With   ${output}   [
                         Should End With   ${output}   ]
@@ -139,15 +139,12 @@ Check count limit with JSON array format
                         Should contain   ${output}   is created
     ${output} =         Execute          ozone admin container create
                         Should contain   ${output}   is created
-    ${output} =         Execute          ozone admin container list --count 5
-                        Should Start With   ${output}   [
-                        Should Contain   ${output}   containerID
-                        Should End With   ${output}   ]
+    ${output} =         Execute And Ignore Error          ozone admin container list --count 5 2> /dev/null # This logs to error that the list is incomplete
     ${count} =          Execute          echo '${output}' | jq -r 'length'
-                        Should Be True   ${count} = 5
+                        Should Be True   ${count} == 5
 
 Close container
-    ${container} =      Execute          ozone admin container list --state OPEN | jq -r '.[] | select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
+    ${container} =      Execute          ozone admin container list --state OPEN | jq -r '.[] | select(.replicationConfig.replicationFactor == "ONE") | .containerID' | head -1
                         Execute          ozone admin container close "${container}"
     ${output} =         Execute          ozone admin container info "${container}"
                         Should contain   ${output}   CLOS
