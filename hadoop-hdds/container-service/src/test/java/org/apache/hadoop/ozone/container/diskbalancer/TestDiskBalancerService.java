@@ -234,7 +234,7 @@ public class TestDiskBalancerService {
     DiskBalancerServiceTestImpl svc =
         getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1);
 
-    long totalCapacity = volumes.isEmpty()? 0 : volumes.get(0).getCurrentUsage().getCapacity();
+    long totalCapacity = volumes.isEmpty() ? 0 : volumes.get(0).getCurrentUsage().getCapacity();
     long expectedBytesToMove = (long) Math.ceil(
         (totalCapacity * expectedBytesToMovePercent) / 100.0 * totalOverUtilisedVolumes);
 
