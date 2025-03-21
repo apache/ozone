@@ -57,6 +57,7 @@ import org.slf4j.event.Level;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHA.createKey;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test for OM bootstrap process.
@@ -348,10 +349,17 @@ public class TestAddRemoveOzoneManager {
   @Test
   public void testDecommission() throws Exception {
     setupCluster(3);
-    user = UserGroupInformation.getCurrentUser();
 
-    // Stop the 3rd OM and decommission it
+    user = UserGroupInformation.createUserForTesting("user", new String[]{});
+    // Stop the 3rd OM and decommission it using non-privileged user
     String omNodeId3 = cluster.getOzoneManager(2).getOMNodeId();
+    cluster.stopOzoneManager(omNodeId3);
+    // decommission should fail
+    assertThrows(IOException.class, () -> decommissionOM(omNodeId3));
+
+    // Switch to admin user
+    user = UserGroupInformation.getCurrentUser();
+    // Stop the 3rd OM and decommission it
     cluster.stopOzoneManager(omNodeId3);
     decommissionOM(omNodeId3);
 
