@@ -214,16 +214,6 @@ public abstract class ContainerData {
         (state != oldState)) {
       releaseCommitSpace();
     }
-
-    /**
-     * commit space when container transitions (back) to Open.
-     * when? perhaps closing a container threw an exception
-     */
-    if ((state == ContainerDataProto.State.OPEN) &&
-        (state != oldState)) {
-      Preconditions.checkState(getMaxSize() > 0);
-      commitSpace();
-    }
   }
 
   /**
@@ -359,31 +349,6 @@ public abstract class ContainerData {
       getVolume().incCommittedBytes(0 - unused);
     }
     committedSpace = false;
-  }
-
-  /**
-   * add available space in the container to the committed space in the volume.
-   * available space is the number of bytes remaining till max capacity.
-   */
-  public void commitSpace() {
-    long unused = getMaxSize() - getBytesUsed();
-    ContainerDataProto.State myState = getState();
-    HddsVolume cVol;
-
-    //we don't expect duplicate calls
-    Preconditions.checkState(!committedSpace);
-
-    // Only Open Containers have Committed Space
-    if (myState != ContainerDataProto.State.OPEN) {
-      return;
-    }
-
-    // junit tests do not always set up volume
-    cVol = getVolume();
-    if (unused > 0 && (cVol != null)) {
-      cVol.incCommittedBytes(unused);
-      committedSpace = true;
-    }
   }
 
   /**

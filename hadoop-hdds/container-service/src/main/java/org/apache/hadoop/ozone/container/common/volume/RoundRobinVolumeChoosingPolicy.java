@@ -68,6 +68,7 @@ public class RoundRobinVolumeChoosingPolicy implements VolumeChoosingPolicy {
       if (hasEnoughSpace) {
         logIfSomeVolumesOutOfSpace(filter, LOG);
         nextVolumeIndex.compareAndSet(nextIndex, currentVolumeIndex);
+        volume.incCommittedBytes(maxContainerSize);
         return volume;
       }
 
