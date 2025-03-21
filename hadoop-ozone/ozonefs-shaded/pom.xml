@@ -27,10 +27,10 @@
   <properties>
     <!-- no tests in this module so far -->
     <maven.test.skip>true</maven.test.skip>
-    <ozone.shaded.native.prefix>org_apache_hadoop_ozone_shaded</ozone.shaded.native.prefix>
+    <ozone.shaded.native.prefix>org_apache_ozone_shaded</ozone.shaded.native.prefix>
     <!-- refer to ratis thirdparty ratis.thirdparty.shaded.native.prefix -->
     <ratis.thirdparty.shaded.native.prefix>org_apache_ratis_thirdparty_</ratis.thirdparty.shaded.native.prefix>
-    <shaded.prefix>org.apache.hadoop.ozone.shaded</shaded.prefix>
+    <shaded.prefix>org.apache.ozone.shaded</shaded.prefix>
   </properties>
 
   <dependencies>
