@@ -28,7 +28,9 @@ import static org.mockito.Mockito.when;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -37,6 +39,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
@@ -50,6 +53,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * This is a test class for DiskBalancerService.
@@ -89,6 +95,7 @@ public class TestDiskBalancerService {
   public void cleanup() throws IOException {
     BlockUtils.shutdownCache(conf);
     FileUtils.deleteDirectory(testRoot);
+    volumeSet.shutdown();
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -152,6 +159,10 @@ public class TestDiskBalancerService {
   }
 
   private String generateVolumeLocation(String base, int volumeCount) {
+    if (volumeCount == 0) {
+      return "";
+    }
+
     StringBuilder sb = new StringBuilder();
     for (int i = 0; i < volumeCount; i++) {
       sb.append(base + "/vol" + i);
@@ -168,6 +179,67 @@ public class TestDiskBalancerService {
         mockDependencies(containerSet, keyValueHandler, controller);
     return new DiskBalancerServiceTestImpl(ozoneContainer, 1000, config,
         threadCount);
+  }
+
+  public static Stream<Arguments> values() {
+    return Stream.of(
+        Arguments.arguments(0, 0, 0),
+        Arguments.arguments(1, 0, 0),
+        Arguments.arguments(1, 50, 0),
+        Arguments.arguments(2, 0, 0),
+        Arguments.arguments(2, 10, 0),
+        Arguments.arguments(2, 50, 40), // one disk is 50% above average, the other disk is 50% below average
+        Arguments.arguments(3, 0, 0),
+        Arguments.arguments(3, 10, 0),
+        Arguments.arguments(4, 0, 0),
+        Arguments.arguments(4, 50, 40) // two disks are 50% above average, the other two disks are 50% below average
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("values")
+  public void testCalculateBytesToMove(int volumeCount, int deltaUsagePercent,
+      long expectedBytesToMovePercent) throws IOException {
+    int updatedVolumeCount = volumeCount == 0 ? 1 : volumeCount;
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
+        generateVolumeLocation(testRoot.getAbsolutePath(), updatedVolumeCount));
+    volumeSet = new MutableVolumeSet(datanodeUuid, scmId, conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
+    createDbInstancesForTestIfNeeded(volumeSet, scmId, scmId, conf);
+    if (volumeCount == 0) {
+      volumeSet.failVolume(((HddsVolume) volumeSet.getVolumesList().get(0)).getHddsRootDir().getAbsolutePath());
+    }
+
+    double avgUtilization = 0.5;
+    int totalOverUtilisedVolumes = 0;
+
+    List<StorageVolume> volumes = volumeSet.getVolumesList();
+    for (int i = 0; i < volumes.size(); i++) {
+      StorageVolume vol = volumes.get(i);
+      long totalCapacityPerVolume = vol.getCurrentUsage().getCapacity();
+      if (i % 2 == 0) {
+        vol.incrementUsedSpace((long) (totalCapacityPerVolume * (avgUtilization + deltaUsagePercent / 100.0)));
+        totalOverUtilisedVolumes++;
+      } else {
+        vol.incrementUsedSpace((long) (totalCapacityPerVolume * (avgUtilization - deltaUsagePercent / 100.0)));
+      }
+    }
+
+    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    KeyValueHandler keyValueHandler =
+        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
+            metrics, c -> {
+        });
+    DiskBalancerServiceTestImpl svc =
+        getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1);
+
+    long totalCapacity = volumes.isEmpty() ? 0 : volumes.get(0).getCurrentUsage().getCapacity();
+    long expectedBytesToMove = (long) Math.ceil(
+        (totalCapacity * expectedBytesToMovePercent) / 100.0 * totalOverUtilisedVolumes);
+
+    // data precision loss due to double data involved in calculation
+    assertEquals(Math.abs(expectedBytesToMove - svc.calculateBytesToMove(volumeSet)) <= 1, true);
   }
 
   private OzoneContainer mockDependencies(ContainerSet containerSet,

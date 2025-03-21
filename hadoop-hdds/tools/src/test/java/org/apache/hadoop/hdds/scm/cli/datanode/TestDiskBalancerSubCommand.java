@@ -100,8 +100,8 @@ public class TestDiskBalancerSubCommand {
 
     statusCmd.execute(scmClient);
 
-    // 2 Headers + 10 results
-    assertEquals(12, newLineCount(outContent.toString(DEFAULT_ENCODING)));
+    // 2 Headers + 10 results + 1 note
+    assertEquals(13, newLineCount(outContent.toString(DEFAULT_ENCODING)));
   }
 
   @Test
