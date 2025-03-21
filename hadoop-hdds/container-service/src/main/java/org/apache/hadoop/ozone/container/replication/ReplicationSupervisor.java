@@ -554,4 +554,8 @@ public final class ReplicationSupervisor {
     MutableRate rate = opsLatencyMs.get(metricsName);
     return rate != null ? (long) rate.lastStat().total() : 0;
   }
+
+  public Set<AbstractReplicationTask> getInFlightTasks() {
+    return inFlight;
+  }
 }
