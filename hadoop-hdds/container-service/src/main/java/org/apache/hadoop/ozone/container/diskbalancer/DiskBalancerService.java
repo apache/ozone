@@ -103,7 +103,6 @@ public class DiskBalancerService extends BackgroundService {
   private final File diskBalancerInfoFile;
 
   private DiskBalancerServiceMetrics metrics;
-  private long queueSize;
   private long bytesToMove;
 
   public DiskBalancerService(OzoneContainer ozoneContainer,
@@ -353,9 +352,10 @@ public class DiskBalancerService extends BackgroundService {
 
     if (queue.isEmpty()) {
       metrics.incrIdleLoopNoAvailableVolumePairCount();
+    } else {
+      bytesToMove = calculateBytesToMove(volumeSet);
     }
-    queueSize = queue.size();
-    bytesToMove = calculateBytesToMove(volumeSet);
+
     return queue;
   }
 
@@ -515,14 +515,6 @@ public class DiskBalancerService extends BackgroundService {
 
   public long calculateBytesToMove(MutableVolumeSet inputVolumeSet) {
     long bytesPendingToMove = 0;
-
-    if (queueSize == 0) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("No available Volume pair to perform move.");
-      }
-      return bytesPendingToMove;
-    }
-
     long totalUsedSpace = 0;
     long totalCapacity = 0;
 
@@ -579,10 +571,6 @@ public class DiskBalancerService extends BackgroundService {
 
   public VolumeChoosingPolicy getVolumeChoosingPolicy() {
     return volumeChoosingPolicy;
-  }
-
-  public void setQueueSize(long queueSize) {
-    this.queueSize = queueSize;
   }
 
   @Override

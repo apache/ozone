@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
@@ -199,15 +200,15 @@ public class TestDiskBalancerService {
   @MethodSource("values")
   public void testCalculateBytesToMove(int volumeCount, int deltaUsagePercent,
       long expectedBytesToMovePercent) throws IOException {
-    if (volumeCount == 0) {
-      assertEquals(expectedBytesToMovePercent, 0);
-      return;
-    }
+    int updatedVolumeCount = volumeCount == 0 ? 1 : volumeCount;
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
-        generateVolumeLocation(testRoot.getAbsolutePath(), volumeCount));
+        generateVolumeLocation(testRoot.getAbsolutePath(), updatedVolumeCount));
     volumeSet = new MutableVolumeSet(datanodeUuid, scmId, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     createDbInstancesForTestIfNeeded(volumeSet, scmId, scmId, conf);
+    if (volumeCount == 0) {
+      volumeSet.failVolume(((HddsVolume) volumeSet.getVolumesList().get(0)).getHddsRootDir().getAbsolutePath());
+    }
 
     double avgUtilization = 0.5;
     int totalOverUtilisedVolumes = 0;
@@ -232,12 +233,12 @@ public class TestDiskBalancerService {
         });
     DiskBalancerServiceTestImpl svc =
         getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1);
-    svc.setQueueSize(volumeCount);
 
-    long totalCapacity = volumes.get(0).getCurrentUsage().getCapacity();
+    long totalCapacity = volumes.isEmpty()? 0 : volumes.get(0).getCurrentUsage().getCapacity();
     long expectedBytesToMove = (long) Math.ceil(
         (totalCapacity * expectedBytesToMovePercent) / 100.0 * totalOverUtilisedVolumes);
 
+    // data precision loss due to double data involved in calculation
     assertEquals(Math.abs(expectedBytesToMove - svc.calculateBytesToMove(volumeSet)) <= 1, true);
   }
 
