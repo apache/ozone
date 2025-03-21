@@ -166,7 +166,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           SnapshotInfo snapInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, chainManager, iterator.next());
           if (shouldIgnoreSnapshot(snapInfo)) {
             LOG.debug("Skipping Snapshot Deletion processing because " +
-                "the snapshot: {} is not active or DB changes are not flushed.", snapInfo.getTableKey());
+                "the snapshot is active or DB changes are not flushed: {}", snapInfo.getTableKey());
             continue;
           }
           LOG.info("Started Snapshot Deletion Processing for snapshot : {}", snapInfo.getTableKey());
