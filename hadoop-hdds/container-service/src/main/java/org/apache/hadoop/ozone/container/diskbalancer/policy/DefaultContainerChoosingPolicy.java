@@ -23,6 +23,8 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask;
+import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,16 +37,29 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
 
   @Override
   public ContainerData chooseContainer(OzoneContainer ozoneContainer,
-      HddsVolume hddsVolume, Set<Long> inProgressContainerIDs) {
+      HddsVolume hddsVolume, Set<Long> inProgressContainerIDs,
+      ReplicationSupervisor replicationSupervisor) {
     Iterator<Container<?>> itr = ozoneContainer.getController()
         .getContainers(hddsVolume);
     while (itr.hasNext()) {
       ContainerData containerData = itr.next().getContainerData();
-      if (!inProgressContainerIDs.contains(
-          containerData.getContainerID()) && containerData.isClosed()) {
+      long containerID = containerData.getContainerID();
+
+      if (!inPushModeContainers(containerID, replicationSupervisor) &&
+          !inProgressContainerIDs.contains(containerID) &&
+          containerData.isClosed() && !containerData.isEmpty()) {
         return containerData;
       }
     }
     return null;
+  }
+
+  private boolean inPushModeContainers(long containerID, ReplicationSupervisor replicationSupervisor) {
+    for (AbstractReplicationTask task : replicationSupervisor.getInFlightTasks()) {
+      if (task.getContainerId() == containerID) {
+        return true;
+      }
+    }
+    return false;
   }
 }
