@@ -62,6 +62,9 @@ public abstract class TestOzoneFileSystemMetrics implements NonHATests.TestCase 
 
   @BeforeAll
   void init() throws Exception {
+    cluster().getOzoneManager().getKeyManager().getDeletingService().suspend();
+    cluster().getOzoneManager().getKeyManager().getDirDeletingService().suspend();
+
     client = cluster().newClient();
 
     OmConfig omConfig = cluster().getOzoneManager().getConfig();
@@ -81,6 +84,8 @@ public abstract class TestOzoneFileSystemMetrics implements NonHATests.TestCase 
   void cleanup() {
     IOUtils.closeQuietly(client, fs);
     cluster().getOzoneManager().getConfig().setFrom(originalOmConfig);
+    cluster().getOzoneManager().getKeyManager().getDeletingService().resume();
+    cluster().getOzoneManager().getKeyManager().getDirDeletingService().resume();
   }
 
   @Test
