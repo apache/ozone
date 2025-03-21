@@ -1980,6 +1980,8 @@ message ListSnapshotDiffJobRequest {
   required string bucketName = 2;
   optional string jobStatus = 3;
   optional bool listAll = 4;
+  optional string prevSnapshotDiffJob = 5;
+  optional uint32 maxListResult = 6;
 }
 
 message DeleteSnapshotRequest {
@@ -2113,6 +2115,7 @@ message CancelSnapshotDiffResponse {
 
 message ListSnapshotDiffJobResponse {
   repeated SnapshotDiffJobProto snapshotDiffJob = 1;
+  optional string lastSnapshotDiffJob = 2;
 }
 
 message DeleteSnapshotResponse {
