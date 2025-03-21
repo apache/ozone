@@ -105,11 +105,6 @@ public class ContainerImporter {
             ContainerProtos.Result.CONTAINER_EXISTS);
       }
 
-      HddsVolume targetVolume = hddsVolume;
-      if (targetVolume == null) {
-        targetVolume = chooseNextVolume();
-      }
-
       KeyValueContainerData containerData;
       TarContainerPacker packer = getPacker(compression);
 
@@ -119,6 +114,13 @@ public class ContainerImporter {
         containerData = getKeyValueContainerData(containerDescriptorYaml);
       }
       ContainerUtils.verifyChecksum(containerData, conf);
+
+      HddsVolume targetVolume = hddsVolume;
+      if (targetVolume == null) {
+        targetVolume = chooseNextVolume();
+      }
+
+      containerData.setCommittedSpace(true);
       containerData.setVolume(targetVolume);
 
       try (InputStream input = Files.newInputStream(tarFilePath)) {

@@ -169,6 +169,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
           String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
           // Set volume before getContainerDBFile(), because we may need the
           // volume to deduce the db file.
+          containerData.setCommittedSpace(true);
           containerData.setVolume(containerVolume);
 
           long containerID = containerData.getContainerID();

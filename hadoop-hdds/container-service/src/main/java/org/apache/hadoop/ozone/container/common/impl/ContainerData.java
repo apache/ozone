@@ -352,6 +352,32 @@ public abstract class ContainerData {
   }
 
   /**
+   * add available space in the container to the committed space in the volume.
+   * available space is the number of bytes remaining till max capacity.
+   */
+  public void commitSpace() {
+    long unused = getMaxSize() - getBytesUsed();
+    ContainerDataProto.State myState = getState();
+    HddsVolume cVol;
+
+    if (committedSpace) {
+      return;
+    }
+
+    // Only Open Containers have Committed Space
+    if (myState != ContainerDataProto.State.OPEN) {
+      return;
+    }
+
+    // junit tests do not always set up volume
+    cVol = getVolume();
+    if (unused > 0 && (cVol != null)) {
+      cVol.incCommittedBytes(unused);
+      committedSpace = true;
+    }
+  }
+
+  /**
    * Get the number of bytes read from the container.
    * @return the number of bytes read from the container.
    */
@@ -434,6 +460,10 @@ public abstract class ContainerData {
    */
   public void setBytesUsed(long used) {
     this.bytesUsed.set(used);
+  }
+
+  public void setCommittedSpace(boolean committed) {
+    this.committedSpace = committed;
   }
 
   /**
