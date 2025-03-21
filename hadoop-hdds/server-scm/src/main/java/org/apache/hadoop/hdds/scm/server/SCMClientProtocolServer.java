@@ -1342,14 +1342,6 @@ public class SCMClientProtocolServer implements
   @Override
   public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerReport(
       int count, int clientVersion) throws IOException {
-    // check admin authorisation
-    try {
-      getScm().checkAdminAccess(getRemoteUser(), true);
-    } catch (IOException e) {
-      LOG.error("Authorization failed", e);
-      throw e;
-    }
-
     return scm.getDiskBalancerManager().getDiskBalancerReport(count,
         clientVersion);
   }
@@ -1359,14 +1351,6 @@ public class SCMClientProtocolServer implements
       Optional<List<String>> hosts,
       Optional<HddsProtos.DiskBalancerRunningStatus> status,
       int clientVersion) throws IOException {
-    // check admin authorisation
-    try {
-      getScm().checkAdminAccess(getRemoteUser(), true);
-    } catch (IOException e) {
-      LOG.error("Authorization failed", e);
-      throw e;
-    }
-
     return scm.getDiskBalancerManager().getDiskBalancerStatus(hosts, status,
         clientVersion);
   }
