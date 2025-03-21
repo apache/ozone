@@ -727,6 +727,11 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
    */
   public void bootstrapOzoneManager(String omNodeId,
       boolean updateConfigs, boolean force) throws Exception {
+    bootstrapOzoneManager(omNodeId, updateConfigs, force, false);
+  }
+
+  public void bootstrapOzoneManager(String omNodeId,
+      boolean updateConfigs, boolean force, boolean isListener) throws Exception {
 
     // Set testReloadConfigFlag to true so that
     // OzoneManager#reloadConfiguration does not reload config as it will
@@ -742,7 +747,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     while (true) {
       try {
         OzoneConfiguration newConf = addNewOMToConfig(omhaService.getServiceId(),
-            omNodeId);
+            omNodeId, isListener);
 
         if (updateConfigs) {
           updateOMConfigs(newConf);
@@ -783,8 +788,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
    * Set the configs for new OMs.
    */
   private OzoneConfiguration addNewOMToConfig(String omServiceId,
-      String omNodeId) {
-
+      String omNodeId, boolean isListener) {
     OzoneConfiguration newConf = new OzoneConfiguration(getConf());
     configureOMPorts(newConf, omServiceId, omNodeId);
 
@@ -792,6 +796,11 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
     newConf.set(omNodesKey, newConf.get(omNodesKey) + "," + omNodeId);
 
+    if (isListener) {
+      String listenerOmNodesKey = ConfUtils.addKeySuffixes(
+          OMConfigKeys.OZONE_OM_LISTENER_NODES_KEY, omServiceId);
+      newConf.set(listenerOmNodesKey, newConf.get(listenerOmNodesKey) + "," + omNodeId);
+    }
     return newConf;
   }
 
