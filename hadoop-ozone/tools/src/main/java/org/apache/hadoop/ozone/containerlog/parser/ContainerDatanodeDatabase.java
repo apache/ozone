@@ -171,8 +171,9 @@ public class ContainerDatanodeDatabase {
          PreparedStatement selectStmt = connection.prepareStatement(selectSQL);
          ResultSet resultSet = selectStmt.executeQuery();
          PreparedStatement insertStmt = connection.prepareStatement(insertSQL)) {
-      int batchSize = 1000;
+      
       int count = 0;
+      
       while (resultSet.next()) {
         long datanodeId = resultSet.getLong("datanode_id");
         long containerId = resultSet.getLong("container_id");
@@ -187,12 +188,13 @@ public class ContainerDatanodeDatabase {
 
         count++;
 
-        if (count % batchSize == 0) {
+        if (count % DBConsts.BATCH_SIZE == 0) {
           insertStmt.executeBatch();
+          count = 0;
         }
       }
 
-      if (count % batchSize != 0) {
+      if (count != 0) {
         insertStmt.executeBatch();
       }
     } catch (SQLException e) {
