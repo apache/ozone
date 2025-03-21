@@ -26,7 +26,7 @@ import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -105,6 +105,7 @@ public class TestSchemaTwoBackwardsCompatibility {
   private ContainerSet containerSet;
   private KeyValueHandler keyValueHandler;
   private OzoneContainer ozoneContainer;
+
   private static final int BLOCKS_PER_CONTAINER = 6;
   private static final int CHUNKS_PER_BLOCK = 2;
   private static final int DELETE_TXNS_PER_CONTAINER = 2;
