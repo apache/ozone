@@ -17,12 +17,16 @@
 
 package org.apache.hadoop.ozone.protocolPB;
 
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
+
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -91,6 +95,9 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
     }
 
     try {
+      if (!ozoneManager.isAdmin(getRemoteUser())) {
+        throw new OMException("Only administrators are authorized to perform decommission.", PERMISSION_DENIED);
+      }
       omRatisServer.removeOMFromRatisRing(decommNode);
     } catch (IOException ex) {
       return DecommissionOMResponse.newBuilder()
