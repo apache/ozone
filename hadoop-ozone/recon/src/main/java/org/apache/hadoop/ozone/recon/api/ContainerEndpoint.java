@@ -603,7 +603,7 @@ public class ContainerEndpoint {
           } else if (scmContainerID == null || omContainerID.compareTo(scmContainerID) < 0) {
             ContainerMetadata omContainer = omContainers.next();
             if (omContainer.getNumberOfKeys() > 0) {
-              notSCMContainers.add(omContainers.next());
+              notSCMContainers.add(omContainer);
             }
           } else {
             scmContainerInfo = scmNonDeletedContainers.hasNext() ? scmNonDeletedContainers.next() : null;
@@ -728,7 +728,10 @@ public class ContainerEndpoint {
         Long omContainerID = omContainers.peekNextKey();
         Long scmContainerID = scmContainerInfo.getContainerID();
         if (scmContainerID.equals(omContainerID)) {
-          omContainersDeletedInSCM.add(omContainers.next());
+          ContainerMetadata containerMetadata = omContainers.next();
+          if (containerMetadata.getNumberOfKeys() > 0) {
+            omContainersDeletedInSCM.add(omContainers.next());
+          }
           scmContainerInfo = deletedStateSCMContainers.hasNext() ? deletedStateSCMContainers.next() : null;
         } else if (scmContainerID.compareTo(omContainerID) < 0) {
           scmContainerInfo = deletedStateSCMContainers.hasNext() ? deletedStateSCMContainers.next() : null;
