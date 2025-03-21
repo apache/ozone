@@ -34,7 +34,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -97,6 +99,7 @@ import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStor
 import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
+import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.apache.hadoop.util.Timer;
@@ -141,6 +144,8 @@ public class OzoneContainer {
   private final ContainerMetrics metrics;
   private WitnessedContainerMetadataStore witnessedContainerMetadataStore;
 
+  private ReplicationSupervisor replicationSupervisor;
+
   enum InitializingStatus {
     UNINITIALIZED, INITIALIZING, INITIALIZED
   }
@@ -154,6 +159,7 @@ public class OzoneContainer {
    * @throws DiskOutOfSpaceException
    * @throws IOException
    */
+  @SuppressWarnings("checkstyle:methodlength")
   public OzoneContainer(HddsDatanodeService hddsDatanodeService,
       DatanodeDetails datanodeDetails, ConfigurationSource conf,
       StateContext context, CertificateClient certClient,
@@ -265,15 +271,24 @@ public class OzoneContainer {
             blockDeletingServiceWorkerSize, config,
             datanodeDetails.threadNamePrefix(),
             context.getParent().getReconfigurationHandler());
+    Clock clock = Clock.system(ZoneId.systemDefault());
 
     Duration diskBalancerSvcInterval = conf.getObject(
         DiskBalancerConfiguration.class).getDiskBalancerInterval();
     Duration diskBalancerSvcTimeout = conf.getObject(
         DiskBalancerConfiguration.class).getDiskBalancerTimeout();
+
+    replicationSupervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .datanodeConfig(dnConf)
+        .replicationConfig(conf.getObject(ReplicationConfig.class))
+        .clock(clock)
+        .build();
+
     diskBalancerService =
         new DiskBalancerService(this, diskBalancerSvcInterval.toMillis(),
             diskBalancerSvcTimeout.toMillis(), TimeUnit.MILLISECONDS, 1,
-            config);
+            config, replicationSupervisor);
 
     Duration recoveringContainerScrubbingSvcInterval =
         dnConf.getRecoveringContainerScrubInterval();
@@ -668,6 +683,10 @@ public class OzoneContainer {
 
   public ReplicationServer getReplicationServer() {
     return replicationServer;
+  }
+
+  public ReplicationSupervisor getReplicationSupervisor() {
+    return replicationSupervisor;
   }
 
   public void compactDb() {
