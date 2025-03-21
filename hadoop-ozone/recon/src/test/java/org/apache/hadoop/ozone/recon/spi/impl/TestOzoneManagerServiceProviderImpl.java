@@ -50,6 +50,7 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -491,8 +492,10 @@ public class TestOzoneManagerServiceProviderImpl {
     ozoneManagerServiceProvider.syncDataFromOM();
 
     ArgumentCaptor<String> taskNameCaptor = ArgumentCaptor.forClass(String.class);
-    verify(reconTaskStatusUpdaterManager).getTaskStatusUpdater(taskNameCaptor.capture());
-    assertEquals(OmSnapshotRequest.name(), taskNameCaptor.getValue());
+    verify(reconTaskStatusUpdaterManager, times(2)).getTaskStatusUpdater(taskNameCaptor.capture());
+    List<String> capturedValues = taskNameCaptor.getAllValues();
+    assertTrue(capturedValues.contains(OmSnapshotRequest.name()));
+    assertTrue(capturedValues.contains(OmDeltaRequest.name()));
     verify(reconTaskControllerMock, times(1))
         .reInitializeTasks(omMetadataManager, null);
     assertEquals(1, metrics.getNumSnapshotRequests());
@@ -524,8 +527,10 @@ public class TestOzoneManagerServiceProviderImpl {
 
     ArgumentCaptor<String> captor =
         ArgumentCaptor.forClass(String.class);
-    verify(reconTaskStatusUpdaterManager).getTaskStatusUpdater(captor.capture());
-    assertEquals(OmDeltaRequest.name(), captor.getValue());
+    verify(reconTaskStatusUpdaterManager, times(2)).getTaskStatusUpdater(captor.capture());
+    List<String> capturedValues = captor.getAllValues();
+    assertTrue(capturedValues.contains(OmSnapshotRequest.name()));
+    assertTrue(capturedValues.contains(OmDeltaRequest.name()));
 
     verify(reconTaskControllerMock, times(1))
         .consumeOMEvents(any(OMUpdateEventBatch.class),
@@ -559,8 +564,10 @@ public class TestOzoneManagerServiceProviderImpl {
 
     ArgumentCaptor<String> captor =
         ArgumentCaptor.forClass(String.class);
-    verify(reconTaskStatusUpdaterManager).getTaskStatusUpdater(captor.capture());
-    assertEquals(OmSnapshotRequest.name(), captor.getValue());
+    verify(reconTaskStatusUpdaterManager, times(2)).getTaskStatusUpdater(captor.capture());
+    List<String> capturedValues = captor.getAllValues();
+    assertTrue(capturedValues.contains(OmSnapshotRequest.name()));
+    assertTrue(capturedValues.contains(OmDeltaRequest.name()));
     verify(reconTaskControllerMock, times(1))
         .reInitializeTasks(omMetadataManager, null);
     assertEquals(1, metrics.getNumSnapshotRequests());
