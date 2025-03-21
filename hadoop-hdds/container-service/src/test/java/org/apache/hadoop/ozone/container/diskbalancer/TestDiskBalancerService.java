@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Timeout;
@@ -106,7 +107,7 @@ public class TestDiskBalancerService {
             metrics, c -> {
         });
     DiskBalancerServiceTestImpl svc =
-        getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1);
+        getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1, null);
 
     // Set a low bandwidth to delay job
     svc.setShouldRun(true);
@@ -143,7 +144,7 @@ public class TestDiskBalancerService {
             metrics, c -> {
         });
     DiskBalancerServiceTestImpl svc =
-        getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1);
+        getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1, null);
 
     assertTrue(svc.getContainerChoosingPolicy()
         instanceof DefaultContainerChoosingPolicy);
@@ -163,11 +164,11 @@ public class TestDiskBalancerService {
   private DiskBalancerServiceTestImpl getDiskBalancerService(
       ContainerSet containerSet, ConfigurationSource config,
       KeyValueHandler keyValueHandler, ContainerController controller,
-      int threadCount) throws IOException {
+      int threadCount, ReplicationSupervisor replicationSupervisor) throws IOException {
     OzoneContainer ozoneContainer =
         mockDependencies(containerSet, keyValueHandler, controller);
     return new DiskBalancerServiceTestImpl(ozoneContainer, 1000, config,
-        threadCount);
+        threadCount, replicationSupervisor);
   }
 
   private OzoneContainer mockDependencies(ContainerSet containerSet,
@@ -180,6 +181,8 @@ public class TestDiskBalancerService {
     when(dispatcher.getHandler(any())).thenReturn(keyValueHandler);
     when(ozoneContainer.getVolumeSet()).thenReturn(volumeSet);
     when(ozoneContainer.getController()).thenReturn(controller);
+    ReplicationSupervisor supervisor = mock(ReplicationSupervisor.class);
+    when(ozoneContainer.getReplicationSupervisor()).thenReturn((supervisor));
     return ozoneContainer;
   }
 
