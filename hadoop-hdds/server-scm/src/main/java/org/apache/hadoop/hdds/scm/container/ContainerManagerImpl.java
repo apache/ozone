@@ -31,6 +31,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Predicate;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -148,6 +149,28 @@ public class ContainerManagerImpl implements ContainerManager {
     scmContainerManagerMetrics.incNumListContainersOps();
     return containerStateManager.getContainerInfos(startID, count);
   }
+
+  @Override
+  public Iterator<ContainerInfo> getContainerInfoIterator(LifeCycleState state, ContainerID startID) {
+    return containerStateManager.getContainerInfoIterator(state, startID);
+  }
+
+  @Override
+  public Iterator<ContainerInfo> getContainerInfoIterator(ContainerID startID,
+                                                          Predicate<ContainerInfo> filter) {
+    return containerStateManager.getContainerInfoIterator(startID, filter);
+  }
+
+  @Override
+  public Iterator<ContainerInfo> getContainerInfoIterator(ContainerID startID) {
+    return getContainerInfoIterator(startID, (Predicate<ContainerInfo>)  null);
+  }
+
+  @Override
+  public Iterator<ContainerInfo> getContainerInfoIterator() {
+    return getContainerInfoIterator(ContainerID.MIN);
+  }
+
 
   @Override
   public List<ContainerInfo> getContainers(final LifeCycleState state) {

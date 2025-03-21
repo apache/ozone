@@ -25,4 +25,6 @@ import java.util.Iterator;
  */
 public interface SeekableIterator<K, E> extends ClosableIterator<E> {
   void seek(K position) throws IOException;
+
+  K peekNextKey();
 }
