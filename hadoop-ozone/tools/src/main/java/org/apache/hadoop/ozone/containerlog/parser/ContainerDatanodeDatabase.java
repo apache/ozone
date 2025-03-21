@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.containerlog.parser;
 
+import java.io.FileNotFoundException;
+import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -24,6 +26,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.stream.Collectors;
 import org.sqlite.SQLiteConfig;
 
 /**
@@ -32,32 +37,48 @@ import org.sqlite.SQLiteConfig;
 
 public class ContainerDatanodeDatabase {
 
+  private static Map<String, String> queries;
+
+  static {
+    loadProperties();
+  }
+
+  private static void loadProperties() {
+    Properties props = new Properties();
+    try (InputStream inputStream = ContainerDatanodeDatabase.class.getClassLoader()
+        .getResourceAsStream(DBConsts.PROPS_FILE)) {
+
+      if (inputStream != null) {
+        props.load(inputStream);
+        queries = props.entrySet().stream()
+            .collect(Collectors.toMap(
+                e -> e.getKey().toString(),
+                e -> e.getValue().toString()
+            ));
+      } else {
+        throw new FileNotFoundException("Property file '" + DBConsts.PROPS_FILE + "' not found.");
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+
   private static Connection getConnection() throws Exception {
-    Class.forName("org.sqlite.JDBC");
+    Class.forName(DBConsts.DRIVER);
 
     SQLiteConfig config = new SQLiteConfig();
 
     config.setJournalMode(SQLiteConfig.JournalMode.OFF);
-    config.setCacheSize(1000000);
+    config.setCacheSize(DBConsts.CACHE_SIZE);
     config.setLockingMode(SQLiteConfig.LockingMode.EXCLUSIVE);
     config.setSynchronous(SQLiteConfig.SynchronousMode.OFF);
     config.setTempStore(SQLiteConfig.TempStore.MEMORY);
 
-    return DriverManager.getConnection("jdbc:sqlite:" + "container_datanode.db", config.toProperties());
+    return DriverManager.getConnection(DBConsts.CONNECTION_PREFIX + DBConsts.DATABASE_NAME, config.toProperties());
   }
 
-
-  public  void createDatanodeContainerLogTable() {
-    String createTableSQL = "CREATE TABLE IF NOT EXISTS DatanodeContainerLogTable (" +
-        "datanode_id INTEGER NOT NULL," +
-        "container_id INTEGER NOT NULL," +
-        "timestamp TEXT NOT NULL," +
-        "container_state TEXT NOT NULL," +
-        "bcsid INTEGER NOT NULL," +
-        "error_message TEXT," +
-        "UNIQUE (datanode_id , container_id ,container_state, timestamp)"  +
-        ");";
-
+  public void createDatanodeContainerLogTable() {
+    String createTableSQL = queries.get("CREATE_DATANODE_CONTAINER_LOG_TABLE");
     try (Connection connection = getConnection();
          Statement stmt = connection.createStatement()) {
       stmt.execute(createTableSQL);
@@ -69,14 +90,7 @@ public class ContainerDatanodeDatabase {
   }
 
   public void createContainerLogTable() {
-    String createTableSQL = "CREATE TABLE IF NOT EXISTS ContainerLogTable (" +
-        "datanode_id INTEGER NOT NULL," +
-        "container_id INTEGER NOT NULL," +
-        "latest_state TEXT NOT NULL," +
-        "latest_bcsid INTEGER NOT NULL," +
-        "PRIMARY KEY (datanode_id, container_id)" +
-        ");";
-
+    String createTableSQL = queries.get("CREATE_CONTAINER_LOG_TABLE");
     try (Connection connection = getConnection();
          Statement stmt = connection.createStatement()) {
       stmt.execute(createTableSQL);
@@ -87,9 +101,7 @@ public class ContainerDatanodeDatabase {
     }
   }
 
-  public  void insertContainerDatanodeData(String key, List<DatanodeContainerInfo> transitionList) {
-
-
+  public void insertContainerDatanodeData(String key, List<DatanodeContainerInfo> transitionList) {
     String[] parts = key.split("#");
     if (parts.length != 2) {
       System.err.println("Invalid key format: " + key);
@@ -99,14 +111,11 @@ public class ContainerDatanodeDatabase {
     long containerId = Long.parseLong(parts[0]);
     long datanodeId = Long.parseLong(parts[1]);
 
-    String insertSQL = "INSERT OR REPLACE INTO DatanodeContainerLogTable " +
-        "(datanode_id, container_id, timestamp, container_state, bcsid, error_message) " +
-        "VALUES (?, ?, ?, ?, ?, ?)";
+    String insertSQL = queries.get("INSERT_DATANODE_CONTAINER_LOG");
 
     try (Connection connection = getConnection();
          PreparedStatement preparedStatement = connection.prepareStatement(insertSQL)) {
 
-      int batchSize = 1000;
       int count = 0;
 
       for (DatanodeContainerInfo info : transitionList) {
@@ -120,12 +129,13 @@ public class ContainerDatanodeDatabase {
 
         count++;
 
-        if (count % batchSize == 0) {
+        if (count % DBConsts.BATCH_SIZE == 0) {
           preparedStatement.executeBatch();
+          count = 0;
         }
       }
 
-      if (count % batchSize != 0) {
+      if (count != 0) {
         preparedStatement.executeBatch();
       }
     } catch (SQLException e) {
@@ -141,9 +151,7 @@ public class ContainerDatanodeDatabase {
   }
 
   public void createDatanodeContainerIndex() {
-    String createIndexSQL = "CREATE INDEX IF NOT EXISTS idx_datanode_container_timestamp " +
-        "ON DatanodeContainerLogTable (datanode_id, container_id, timestamp);";
-
+    String createIndexSQL = queries.get("CREATE_DATANODE_CONTAINER_INDEX");
     try (Connection connection = getConnection();
          Statement stmt = connection.createStatement()) {
       stmt.execute(createIndexSQL);
@@ -154,21 +162,10 @@ public class ContainerDatanodeDatabase {
     }
   }
 
-
   public void insertLatestContainerLogData() {
     createContainerLogTable();
-
-    String selectSQL = "SELECT datanode_id, container_id, container_state, bcsid, timestamp " +
-        "FROM DatanodeContainerLogTable " +
-        "WHERE (datanode_id, container_id, timestamp) IN (" +
-        "  SELECT datanode_id, container_id, MAX(timestamp) " +
-        "  FROM DatanodeContainerLogTable " +
-        "  GROUP BY datanode_id, container_id" +
-        ")";
-
-    String insertSQL = "INSERT OR REPLACE INTO ContainerLogTable " +
-        "(datanode_id, container_id, latest_state, latest_bcsid) " +
-        "VALUES (?, ?, ?, ?)";
+    String selectSQL = queries.get("SELECT_LATEST_CONTAINER_LOG");
+    String insertSQL = queries.get("INSERT_CONTAINER_LOG");
 
     try (Connection connection = getConnection();
          PreparedStatement selectStmt = connection.prepareStatement(selectSQL);
@@ -206,7 +203,7 @@ public class ContainerDatanodeDatabase {
   }
 
   public void dropTable(String tableName) throws SQLException {
-    String dropTableSQL = "DROP TABLE IF EXISTS " + tableName;
+    String dropTableSQL = queries.get("DROP_TABLE").replace("{table_name}", tableName);
     Connection connection = null;
     try {
       connection = getConnection();
@@ -220,7 +217,7 @@ public class ContainerDatanodeDatabase {
     }
   }
 
-  public  void closeConnection(Connection connection) {
+  public void closeConnection(Connection connection) {
     if (connection != null) {
       try {
         connection.close();
