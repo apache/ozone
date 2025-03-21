@@ -28,7 +28,8 @@ import picocli.CommandLine;
     name = "om",
     description = "Debug commands related to OM.",
     subcommands = {
-        PrefixParser.class
+        PrefixParser.class,
+        CompactionLogDagPrinter.class
     }
 )
 @MetaInfServices(DebugSubcommand.class)

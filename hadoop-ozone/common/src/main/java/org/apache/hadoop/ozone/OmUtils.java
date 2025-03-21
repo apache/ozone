@@ -273,6 +273,7 @@ public final class OmUtils {
     case TransferLeadership:
     case SetSafeMode:
     case PrintCompactionLogDag:
+      // deprecated by HDDS-12053, keeping it here for compatibility
     case GetSnapshotInfo:
     case GetObjectTagging:
     case GetQuotaRepairStatus:
