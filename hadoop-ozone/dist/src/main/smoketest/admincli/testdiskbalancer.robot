@@ -14,7 +14,7 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Smoketest ozone cluster startup
+Documentation       Test ozone admin datanode diskbalancer command
 Library             OperatingSystem
 Resource            ../commonlib.robot
 
