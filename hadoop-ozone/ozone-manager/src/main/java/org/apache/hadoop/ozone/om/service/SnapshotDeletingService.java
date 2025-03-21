@@ -165,6 +165,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
         while (iterator.hasNext() && snapshotLimit > 0 && remaining > 0) {
           SnapshotInfo snapInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, chainManager, iterator.next());
           if (shouldIgnoreSnapshot(snapInfo)) {
+            LOG.debug("Skipping Snapshot Deletion processing because " +
+                "the snapshot is active or DB changes are not flushed: {}", snapInfo.getTableKey());
             continue;
           }
           LOG.info("Started Snapshot Deletion Processing for snapshot : {}", snapInfo.getTableKey());
@@ -173,13 +175,19 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           // another.
           if (nextSnapshot != null &&
               nextSnapshot.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
+            LOG.info("Skipping Snapshot Deletion processing for : {} because the next snapshot is DELETED.",
+                snapInfo.getTableKey());
             continue;
           }
 
           // nextSnapshot = null means entries would be moved to AOS.
           if (nextSnapshot == null) {
+            LOG.info("Snapshot: {} entries will be moved to AOS.", snapInfo.getTableKey());
             waitForKeyDeletingService();
             waitForDirDeletingService();
+          } else {
+            LOG.info("Snapshot: {} entries will be moved to next active snapshot: {}",
+                snapInfo.getTableKey(), nextSnapshot.getTableKey());
           }
           try (ReferenceCounted<OmSnapshot> snapshot = omSnapshotManager.getSnapshot(
               snapInfo.getVolumeName(), snapInfo.getBucketName(), snapInfo.getName())) {
