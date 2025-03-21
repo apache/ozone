@@ -29,6 +29,7 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -639,23 +640,22 @@ public class ContainerEndpoint {
           }
         }
 
-        List<Pipeline> pipelines = new ArrayList<>();
         nonOMContainers.forEach(containerInfo -> {
           ContainerDiscrepancyInfo containerDiscrepancyInfo = new ContainerDiscrepancyInfo();
           containerDiscrepancyInfo.setContainerID(containerInfo.getContainerID());
           containerDiscrepancyInfo.setNumberOfKeys(0);
-          PipelineID pipelineID = null;
+
+          PipelineID pipelineID = containerInfo.getPipelineID();
           try {
-            pipelineID = containerInfo.getPipelineID();
             if (pipelineID != null) {
-              pipelines.add(pipelineManager.getPipeline(pipelineID));
+              Pipeline pipeline = pipelineManager.getPipeline(pipelineID);
+              containerDiscrepancyInfo.setPipelines(Collections.singletonList(pipeline));
             }
           } catch (PipelineNotFoundException e) {
             LOG.debug(
                 "Pipeline not found for container: {} and pipelineId: {}",
                 containerInfo, pipelineID, e);
           }
-          containerDiscrepancyInfo.setPipelines(pipelines);
           containerDiscrepancyInfo.setExistsAt("SCM");
           containerDiscrepancyInfoList.add(containerDiscrepancyInfo);
         });
@@ -730,7 +730,7 @@ public class ContainerEndpoint {
         if (scmContainerID.equals(omContainerID)) {
           ContainerMetadata containerMetadata = omContainers.next();
           if (containerMetadata.getNumberOfKeys() > 0) {
-            omContainersDeletedInSCM.add(omContainers.next());
+            omContainersDeletedInSCM.add(containerMetadata);
           }
           scmContainerInfo = deletedStateSCMContainers.hasNext() ? deletedStateSCMContainers.next() : null;
         } else if (scmContainerID.compareTo(omContainerID) < 0) {
