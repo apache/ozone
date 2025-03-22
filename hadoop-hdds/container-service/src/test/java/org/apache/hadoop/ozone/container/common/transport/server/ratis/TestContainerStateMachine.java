@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -31,7 +32,6 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -87,6 +87,8 @@ abstract class TestContainerStateMachine {
 
   @BeforeEach
   public void setup() throws IOException {
+    conf.setTimeDuration(HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL,
+        1000_000_000, TimeUnit.NANOSECONDS);
     dispatcher = mock(ContainerDispatcher.class);
     ContainerController controller = mock(ContainerController.class);
     XceiverServerRatis ratisServer = mock(XceiverServerRatis.class);
@@ -226,9 +228,6 @@ abstract class TestContainerStateMachine {
     setUpMockRequestProtoReturn(context, 1, 1);
     ThrowableCatcher catcher = new ThrowableCatcher();
 
-    Field writeChunkWaitMaxNs = stateMachine.getClass().getDeclaredField("writeChunkWaitMaxNs");
-    writeChunkWaitMaxNs.setAccessible(true);
-    writeChunkWaitMaxNs.set(stateMachine, 1000_000_000);
     CompletableFuture<Message> firstWrite = stateMachine.write(entry, trx);
     Thread.sleep(2000);
     CompletableFuture<Message> secondWrite = stateMachine.write(entryNext, trx);
