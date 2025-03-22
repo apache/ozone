@@ -20,6 +20,7 @@ package org.apache.ozone.test;
 import com.google.common.base.Preconditions;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeoutException;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -105,7 +106,7 @@ public final class LambdaTestUtils {
         "timeoutMillis must be >= 0");
     Preconditions.checkNotNull(timeoutHandler);
 
-    final long endTime = System.currentTimeMillis() + timeoutMillis;
+    final long endTime = Time.monotonicNow() + timeoutMillis;
     Throwable ex = null;
     boolean running = true;
     int iterations = 0;
@@ -126,7 +127,7 @@ public final class LambdaTestUtils {
         LOG.debug("await() iteration {}", iterations, e);
         ex = e;
       }
-      running = System.currentTimeMillis() < endTime;
+      running = Time.monotonicNow() < endTime;
       if (running) {
         int sleeptime = retry.call();
         if (sleeptime >= 0) {
