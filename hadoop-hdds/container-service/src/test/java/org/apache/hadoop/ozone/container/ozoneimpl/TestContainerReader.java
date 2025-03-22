@@ -237,10 +237,16 @@ public class TestContainerReader {
     thread.start();
     thread.join();
 
-    //recovering container should be marked unhealthy, so the count should be 3
-    assertEquals(UNHEALTHY, containerSet.getContainer(
-        recoveringContainerData.getContainerID()).getContainerState());
-    assertEquals(3, containerSet.containerCount());
+    // Ratis replicated recovering containers are deleted upon datanode startup
+    if (recoveringKeyValueContainer.getContainerData().getReplicaIndex() == 0) {
+      assertNull(containerSet.getContainer(recoveringContainerData.getContainerID()));
+      assertEquals(2, containerSet.containerCount());
+    } else {
+      //recovering container should be marked unhealthy, so the count should be 3
+      assertEquals(UNHEALTHY, containerSet.getContainer(
+          recoveringContainerData.getContainerID()).getContainerState());
+      assertEquals(3, containerSet.containerCount());
+    }
 
     for (int i = 0; i < 2; i++) {
       Container keyValueContainer = containerSet.getContainer(i);
