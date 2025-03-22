@@ -636,9 +636,34 @@ public class SCMNodeManager implements NodeManager {
       }
     }
     DatanodeDetails scmDnd = nodeStateManager.getNode(reportedDn);
+    NodeOperationalState oldPersistedOpState = scmDnd.getPersistedOpState();
+    NodeOperationalState newPersistedOpState = reportedDn.getPersistedOpState();
+
     scmDnd.setPersistedOpStateExpiryEpochSec(
         reportedDn.getPersistedOpStateExpiryEpochSec());
-    scmDnd.setPersistedOpState(reportedDn.getPersistedOpState());
+    scmDnd.setPersistedOpState(newPersistedOpState);
+
+    maybeNotifyReplicationManager(reportedDn, oldPersistedOpState, newPersistedOpState);
+  }
+
+  private void maybeNotifyReplicationManager(
+      DatanodeDetails datanode,
+      NodeOperationalState oldState,
+      NodeOperationalState newState) {
+    if (!scmContext.isLeader()) {
+      return;
+    }
+
+    if (oldState != newState) {
+      // Notify when a node is entering maintenance, decommissioning or back to service
+      if (newState == NodeOperationalState.ENTERING_MAINTENANCE
+          || newState == NodeOperationalState.DECOMMISSIONING
+          || newState == NodeOperationalState.IN_SERVICE) {
+        LOG.info("Notifying ReplicationManager of node state change for {}: {} -> {}",
+            datanode, oldState, newState);
+        scmNodeEventPublisher.fireEvent(SCMEvents.REPLICATION_MANAGER_NOTIFY, datanode);
+      }
+    }
   }
 
   @Override
