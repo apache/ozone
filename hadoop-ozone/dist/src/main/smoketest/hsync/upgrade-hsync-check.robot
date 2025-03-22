@@ -45,10 +45,10 @@ Freon DFSG
 Test HSync lease recover prior to finalization
     Create volume bucket and put key
     ${o3fs_path} =  Format FS URL          o3fs     ${VOLUME}    ${BUCKET}    ${KEY}
-    ${result} =     Execute and checkrc    ozone debug recover --path=${o3fs_path}    255
+    ${result} =     Execute and checkrc    ozone admin om lease recover --path=${o3fs_path}    255
                     Should contain  ${result}  It belongs to the layout feature HBASE_SUPPORT, whose layout version is 7
     ${ofs_path} =   Format FS URL          ofs      ${VOLUME}    ${BUCKET}    ${KEY}
-    ${result} =     Execute and checkrc    ozone debug recover --path=${ofs_path}    255
+    ${result} =     Execute and checkrc    ozone admin om lease recover --path=${ofs_path}    255
                     Should contain  ${result}  It belongs to the layout feature HBASE_SUPPORT, whose layout version is 7
 
 Generate key for o3fs by HSYNC prior to finalization

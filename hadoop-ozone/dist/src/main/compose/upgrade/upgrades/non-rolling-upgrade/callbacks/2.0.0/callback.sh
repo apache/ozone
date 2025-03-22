@@ -26,6 +26,6 @@ with_this_version_pre_finalized() {
 
 with_this_version_finalized() {
   execute_robot_test "$SCM" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/check-finalization.robot
-  execute_robot_test "$SCM" -N "${OUTPUT_NAME}-hsync" debug/ozone-debug-lease-recovery.robot
+  execute_robot_test "$SCM" -N "${OUTPUT_NAME}-hsync" admincli/lease-recovery.robot
   execute_robot_test "$SCM" -N "${OUTPUT_NAME}-freon-hsync" freon/hsync.robot
 }
