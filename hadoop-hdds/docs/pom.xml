@@ -22,8 +22,8 @@
   <artifactId>hdds-docs</artifactId>
   <version>2.1.0-SNAPSHOT</version>
   <packaging>jar</packaging>
-  <name>Apache Ozone/HDDS Documentation</name>
-  <description>Apache Ozone/HDDS Documentation</description>
+  <name>Apache Ozone Documentation</name>
+  <description>Apache Ozone Documentation</description>
 
   <properties>
     <!-- no testable code in this module -->
