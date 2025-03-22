@@ -200,14 +200,14 @@ class TestSCMConfiguration {
 
     final ScmRatisServerConfig scmRatisConfig = conf.getObject(
         ScmRatisServerConfig.class);
-    assertEquals(0, scmRatisConfig.getLogAppenderWaitTimeMin(),
+    assertEquals(1, scmRatisConfig.getLogAppenderWaitTimeMin(),
         "getLogAppenderWaitTimeMin");
 
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempDir.getPath());
 
     final RaftProperties p = RatisUtil.newRaftProperties(conf);
     final TimeDuration t = RaftServerConfigKeys.Log.Appender.waitTimeMin(p);
-    assertEquals(TimeDuration.ZERO, t,
+    assertEquals(TimeDuration.ONE_MILLISECOND, t,
         RaftServerConfigKeys.Log.Appender.WAIT_TIME_MIN_KEY);
   }
 
