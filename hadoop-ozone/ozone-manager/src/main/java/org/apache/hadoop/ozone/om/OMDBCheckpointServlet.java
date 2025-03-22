@@ -93,7 +93,6 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   private static final long serialVersionUID = 1L;
   private transient BootstrapStateHandler.Lock lock;
   private long maxTotalSstSize = 0;
-  private static final AtomicLong PAUSE_COUNTER = new AtomicLong(0);
 
   @Override
   public void init() throws ServletException {
@@ -650,8 +649,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       locks = Stream.of(
           om.getKeyManager().getDeletingService(),
           om.getKeyManager().getSnapshotSstFilteringService(),
-          om.getMetadataManager().getStore().getRocksDBCheckpointDiffer(),
-          om.getKeyManager().getSnapshotDeletingService()
+          om.getKeyManager().getSnapshotDeletingService(),
+          om.getKeyManager().getSnapshotDirectoryService(),
+          om.getMetadataManager().getStore().getRocksDBCheckpointDiffer()
       )
           .filter(Objects::nonNull)
           .map(BootstrapStateHandler::getBootstrapStateLock)

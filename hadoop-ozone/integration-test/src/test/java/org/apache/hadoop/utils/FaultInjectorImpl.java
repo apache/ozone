@@ -71,21 +71,25 @@ public class FaultInjectorImpl extends FaultInjector {
     init();
   }
 
+  @Override
   @VisibleForTesting
   public void setException(Throwable e) {
     ex = e;
   }
 
+  @Override
   @VisibleForTesting
   public Throwable getException() {
     return ex;
   }
 
+  @Override
   @VisibleForTesting
   public void setType(ContainerProtos.Type type) {
     this.type = type;
   }
 
+  @Override
   @VisibleForTesting
   public ContainerProtos.Type getType() {
     return type;

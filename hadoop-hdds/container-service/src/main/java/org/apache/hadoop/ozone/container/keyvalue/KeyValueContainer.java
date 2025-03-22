@@ -229,7 +229,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
           LOG.error("Exception attempting to create container {} on volume {}" +
               " remaining volumes to try {}", containerData.getContainerID(),
               containerVolume.getHddsRootDir(), volumes.size(), ex);
-          if (volumes.size() == 0) {
+          if (volumes.isEmpty()) {
             throw new StorageContainerException(
                 "Container creation failed. " + ex.getMessage(), ex,
                 CONTAINER_INTERNAL_ERROR);
@@ -294,8 +294,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     long containerId = containerData.getContainerID();
     try {
       tempContainerFile = createTempFile(containerFile);
-      ContainerDataYaml.createContainerFile(
-          ContainerType.KeyValueContainer, containerData, tempContainerFile);
+      ContainerDataYaml.createContainerFile(containerData, tempContainerFile);
 
       // NativeIO.renameTo is an atomic function. But it might fail if the
       // container file already exists. Hence, we handle the two cases

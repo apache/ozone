@@ -39,6 +39,7 @@ public abstract class OmKeyResponse extends OMClientResponse {
     this.bucketLayout = BucketLayout.DEFAULT;
   }
 
+  @Override
   public BucketLayout getBucketLayout() {
     return bucketLayout;
   }

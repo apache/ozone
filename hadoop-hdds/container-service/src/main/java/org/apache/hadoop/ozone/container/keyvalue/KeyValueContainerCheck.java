@@ -26,6 +26,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.file.NoSuchFileException;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -114,7 +115,7 @@ public class KeyValueContainerCheck {
           .getContainerFile(metadataPath, containerID);
       try {
         loadContainerData(containerFile);
-      } catch (FileNotFoundException ex) {
+      } catch (FileNotFoundException | NoSuchFileException ex) {
         return ScanResult.unhealthy(
             ScanResult.FailureType.MISSING_CONTAINER_FILE, containerFile, ex);
       } catch (IOException ex) {
@@ -354,7 +355,7 @@ public class KeyValueContainerCheck {
         // In EC, client may write empty putBlock in padding block nodes.
         // So, we need to make sure, chunk length > 0, before declaring
         // the missing chunk file.
-        if (block.getChunks().size() > 0 && block
+        if (!block.getChunks().isEmpty() && block
             .getChunks().get(0).getLen() > 0) {
           return ScanResult.unhealthy(ScanResult.FailureType.MISSING_CHUNK_FILE,
               chunkFile, new IOException("Missing chunk file " +

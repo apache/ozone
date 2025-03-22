@@ -505,7 +505,7 @@ public class TestHSync {
           // Verify hsync openKey gets committed eventually
           // Key without hsync is deleted
           GenericTestUtils.waitFor(() ->
-              0 == getOpenKeyInfo(BUCKET_LAYOUT).size(), 1000, 12000);
+              getOpenKeyInfo(BUCKET_LAYOUT).isEmpty(), 1000, 12000);
           // Verify only one key is still present in fileTable
           assertThat(1 == getKeyInfo(BUCKET_LAYOUT).size());
 
@@ -590,7 +590,7 @@ public class TestHSync {
         // Verify if DELETED_HSYNC_KEY metadata is added to openKey
         GenericTestUtils.waitFor(() -> {
           List<OmKeyInfo> omKeyInfo = getOpenKeyInfo(BUCKET_LAYOUT);
-          return omKeyInfo.size() > 0 && omKeyInfo.get(0).getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY);
+          return !omKeyInfo.isEmpty() && omKeyInfo.get(0).getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY);
         }, 1000, 12000);
 
         // Resume openKeyCleanupService
@@ -598,7 +598,7 @@ public class TestHSync {
 
         // Verify entry from openKey gets deleted eventually
         GenericTestUtils.waitFor(() ->
-            0 == getOpenKeyInfo(BUCKET_LAYOUT).size(), 1000, 12000);
+            getOpenKeyInfo(BUCKET_LAYOUT).isEmpty(), 1000, 12000);
       } catch (OMException ex) {
         assertEquals(OMException.ResultCodes.DIRECTORY_NOT_FOUND, ex.getResult());
       } finally {
@@ -1340,13 +1340,13 @@ public class TestHSync {
 
       // hsync call for overwritten hsync key, should fail
       OMException omException = assertThrows(OMException.class, () -> outputStream1.hsync());
-      assertTrue(omException.getResult() == OMException.ResultCodes.KEY_NOT_FOUND);
+      assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, omException.getResult());
       assertTrue(omException.getMessage().contains("already deleted/overwritten"));
 
       // allocate new block for overwritten hsync key, should fail
       IOException ioException = assertThrows(IOException.class, () -> outputStream1.write(newData));
       assertTrue(ioException.getCause() instanceof OMException);
-      assertTrue(((OMException)ioException.getCause()).getResult() == OMException.ResultCodes.KEY_NOT_FOUND);
+      assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ((OMException)ioException.getCause()).getResult());
       assertTrue(ioException.getMessage().contains("already deleted/overwritten"));
 
       // recover key will success since key is already committed by outputStream2
@@ -1378,7 +1378,7 @@ public class TestHSync {
       // Verify entry from openKey gets deleted eventually
       GenericTestUtils.waitFor(() -> {
         try {
-          return getAllOpenKeys(openKeyTable).size() == 0 && getAllDeletedKeys(deletedTable).size() == 2;
+          return getAllOpenKeys(openKeyTable).isEmpty() && getAllDeletedKeys(deletedTable).size() == 2;
         } catch (IOException e) {
           throw new RuntimeException(e);
         }
@@ -1508,7 +1508,7 @@ public class TestHSync {
 
       // close first hsync key should fail
       OMException omException = assertThrows(OMException.class, () -> outputStream1.close());
-      assertTrue(omException.getResult() == OMException.ResultCodes.KEY_NOT_FOUND);
+      assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, omException.getResult());
       assertTrue(omException.getMessage().contains("already deleted/overwritten"));
 
       // hsync/close second hsync key should success

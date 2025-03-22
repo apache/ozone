@@ -17,12 +17,12 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
-import static org.apache.hadoop.hdds.HddsUtils.preserveThreadName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 import static org.apache.hadoop.hdds.utils.HAUtils.getScmInfo;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
@@ -69,8 +69,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_READ_THREADPOOL_D
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_READ_THREADPOOL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT;
@@ -109,14 +107,12 @@ import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -310,8 +306,8 @@ import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
@@ -440,9 +436,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final ReplicationConfigValidator replicationConfigValidator;
 
   private boolean allowListAllVolumes;
-  // Adding parameters needed for VolumeRequests here, so that during request
-  // execution, we can get from ozoneManager.
-  private final long maxUserVolumeCount;
 
   private int minMultipartUploadPartSize = OzoneConsts.OM_MULTIPART_MIN_SIZE;
 
@@ -451,7 +444,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final int preallocateBlocksMax;
   private final boolean grpcBlockTokenEnabled;
   private final BucketLayout defaultBucketLayout;
-  private final ReplicationConfig defaultReplicationConfig;
+  private ReplicationConfig defaultReplicationConfig;
 
   private final boolean isS3MultiTenancyEnabled;
   private final boolean isStrictS3;
@@ -525,6 +518,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omId = omStorage.getOmId();
     reconfigurationHandler =
         new ReconfigurationHandler("OM", conf, this::checkAdminUserPrivilege)
+            .register(config)
             .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins)
             .register(OZONE_READONLY_ADMINISTRATORS,
                 this::reconfOzoneReadOnlyAdmins)
@@ -550,10 +544,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.threadPrefix = omNodeDetails.threadNamePrefix();
     loginOMUserIfSecurityEnabled(conf);
     setInstanceVariablesFromConf();
-    this.maxUserVolumeCount = conf.getInt(OZONE_OM_USER_MAX_VOLUME,
-        OZONE_OM_USER_MAX_VOLUME_DEFAULT);
-    Preconditions.checkArgument(this.maxUserVolumeCount > 0,
-        OZONE_OM_USER_MAX_VOLUME + " value should be greater than zero");
 
     if (omStorage.getState() != StorageState.INITIALIZED) {
       throw new OMException("OM not initialized, current OM storage state: "
@@ -606,7 +596,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     // Validates the default server-side replication configs.
-    this.defaultReplicationConfig = getDefaultReplicationConfig();
+    setReplicationFromConfig();
     InetSocketAddress omNodeRpcAddr = omNodeDetails.getRpcAddress();
     // Honor property 'hadoop.security.token.service.use_ip'
     omRpcAddressTxt = new Text(SecurityUtil.buildTokenService(omNodeRpcAddr));
@@ -1013,8 +1003,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         Files.createDirectories(parent.toPath());
       }
       try (BufferedWriter writer = new BufferedWriter(
-          new OutputStreamWriter(new FileOutputStream(
-              getTempMetricsStorageFile()), StandardCharsets.UTF_8))) {
+          new OutputStreamWriter(Files.newOutputStream(getTempMetricsStorageFile().toPath()), UTF_8))) {
         OmMetricsInfo metricsInfo = new OmMetricsInfo();
         metricsInfo.setNumKeys(metrics.getNumKeys());
         WRITER.writeValue(writer, metricsInfo);
@@ -1111,6 +1100,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
+  @Override
   public UUID refetchSecretKey() {
     secretKeyClient.refetchSecretKey();
     return secretKeyClient.getCurrentSecretKey().getId();
@@ -1310,7 +1300,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     final int readThreads = conf.getInt(OZONE_OM_READ_THREADPOOL_KEY,
         OZONE_OM_READ_THREADPOOL_DEFAULT);
 
-    RPC.Server rpcServer = preserveThreadName(() -> new RPC.Builder(conf)
+    RPC.Server rpcServer = new RPC.Builder(conf)
         .setProtocol(OzoneManagerProtocolPB.class)
         .setInstance(clientProtocolService)
         .setBindAddress(addr.getHostString())
@@ -1319,7 +1309,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setNumReaders(readThreads)
         .setVerbose(false)
         .setSecretManager(delegationTokenMgr)
-        .build());
+        .build();
 
     HddsServerUtil.addPBProtocol(conf, OMInterServiceProtocolPB.class,
         interOMProtocolService, rpcServer);
@@ -3041,7 +3031,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public String getRpcPort() {
-    return "" + omRpcAddress.getPort();
+    return String.valueOf(omRpcAddress.getPort());
   }
 
   private static List<List<String>> getRatisRolesException(String exceptionString) {
@@ -3087,6 +3077,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return omhaMetrics;
   }
 
+  @Override
   public String getRatisLogDirectory() {
     return  OzoneManagerRatisUtils.getOMRatisDirectory(configuration);
   }
@@ -3414,6 +3405,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * List tenants.
    */
+  @Override
   public TenantStateList listTenant() throws IOException {
 
     metrics.incNumTenantLists();
@@ -3468,6 +3460,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * Tenant get user info.
    */
+  @Override
   public TenantUserInfoValue tenantGetUserInfo(String userPrincipal)
       throws IOException {
 
@@ -3710,7 +3703,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public OmMultipartUploadList listMultipartUploads(String volumeName,
-      String bucketName, String prefix) throws IOException {
+      String bucketName,
+      String prefix, String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination)
+      throws IOException {
 
     ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
 
@@ -3719,17 +3714,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     metrics.incNumListMultipartUploads();
     try {
-      OmMultipartUploadList omMultipartUploadList =
-          keyManager.listMultipartUploads(bucket.realVolume(),
-              bucket.realBucket(), prefix);
-      AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction
-          .LIST_MULTIPART_UPLOADS, auditMap));
+      OmMultipartUploadList omMultipartUploadList = keyManager.listMultipartUploads(bucket.realVolume(),
+          bucket.realBucket(), prefix, keyMarker, uploadIdMarker, maxUploads, withPagination);
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.LIST_MULTIPART_UPLOADS, auditMap));
       return omMultipartUploadList;
 
     } catch (IOException ex) {
       metrics.incNumListMultipartUploadFails();
-      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction
-          .LIST_MULTIPART_UPLOADS, auditMap, ex));
+      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.LIST_MULTIPART_UPLOADS, auditMap, ex));
       throw ex;
     }
 
@@ -3767,6 +3759,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return listStatus(args, recursive, startKey, numEntries, false);
   }
 
+  @Override
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries, boolean allowPartialPrefixes)
       throws IOException {
@@ -4204,7 +4197,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @return maxUserVolumeCount
    */
   public long getMaxUserVolumeCount() {
-    return maxUserVolumeCount;
+    return config.getMaxUserVolumeCount();
   }
   /**
    * Return true, if the current OM node is leader and in ready state to
@@ -4475,18 +4468,22 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public ReplicationConfig getDefaultReplicationConfig() {
-    if (this.defaultReplicationConfig != null) {
-      return this.defaultReplicationConfig;
+    if (defaultReplicationConfig == null) {
+      setReplicationFromConfig();
     }
+    return defaultReplicationConfig;
+  }
 
+  public void setReplicationFromConfig() {
     final String replication = configuration.getTrimmed(
         OZONE_SERVER_DEFAULT_REPLICATION_KEY,
         OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT);
     final String type = configuration.getTrimmed(
         OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY,
         OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT);
-    return ReplicationConfig.parse(ReplicationType.valueOf(type),
+    defaultReplicationConfig = ReplicationConfig.parse(ReplicationType.valueOf(type),
         replication, configuration);
+    LOG.info("Set default replication in OM: {}/{} -> {}", type, replication, defaultReplicationConfig);
   }
 
   public BucketLayout getOMDefaultBucketLayout() {
@@ -4879,6 +4876,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         ozoneObj.getKeyName());
   }
 
+  @Override
   @SuppressWarnings("parameternumber")
   public SnapshotDiffResponse snapshotDiff(String volume,
                                            String bucket,
@@ -4896,6 +4894,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         fromSnapshot, toSnapshot, token, pageSize, forceFullDiff, disableNativeDiff);
   }
 
+  @Override
   public CancelSnapshotDiffResponse cancelSnapshotDiff(String volume,
                                                        String bucket,
                                                        String fromSnapshot,
@@ -4906,6 +4905,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         fromSnapshot, toSnapshot);
   }
 
+  @Override
   public List<SnapshotDiffJob> listSnapshotDiffJobs(String volume,
                                                     String bucket,
                                                     String jobStatus,
@@ -4920,6 +4920,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         jobStatus, listAll);
   }
 
+  @Override
   public String printCompactionLogDag(String fileNamePrefix,
                                       String graphType)
       throws IOException {

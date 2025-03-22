@@ -94,8 +94,10 @@ public interface InnerNode extends Node {
   @Override
   HddsProtos.NetworkNode toProtobuf(int clientVersion);
 
+  @Override
   boolean equals(Object o);
 
+  @Override
   int hashCode();
 
   static InnerNode fromProtobuf(

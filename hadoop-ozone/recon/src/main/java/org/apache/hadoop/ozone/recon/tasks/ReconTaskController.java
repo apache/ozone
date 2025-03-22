@@ -40,10 +40,14 @@ public interface ReconTaskController {
                        OMMetadataManager omMetadataManager);
 
   /**
-   * Pass on the handle to a new OM DB instance to the registered tasks.
-   * @param omMetadataManager OM Metadata Manager instance
+   * Reinitializes the registered Recon OM tasks with a new OM Metadata Manager instance.
+   *
+   * @param omMetadataManager the OM Metadata Manager instance to be used for reinitialization.
+   * @param reconOmTaskMap a map of Recon OM tasks, which we would like to reinitialize.
+   *                       If {@code reconOmTaskMap} is null, all registered Recon OM tasks
+   *                       will be reinitialized.
    */
-  void reInitializeTasks(ReconOMMetadataManager omMetadataManager);
+  void reInitializeTasks(ReconOMMetadataManager omMetadataManager, Map<String, ReconOmTask> reconOmTaskMap);
 
   /**
    * Get set of registered tasks.

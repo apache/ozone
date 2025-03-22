@@ -29,8 +29,8 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
+import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
+import org.apache.ozone.recon.schema.generated.tables.pojos.ReconTaskStatus;
 
 /**
  * Ship ReconTaskStatus table on persistent DB as a metrics.
@@ -63,6 +63,7 @@ public class ReconTaskStatusMetrics implements MetricsSource {
         .unregisterSource(SOURCE_NAME);
   }
 
+  @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
     List<ReconTaskStatus> rows = reconTaskStatusDao.findAll();
     rows.forEach((rts) -> {

@@ -63,7 +63,7 @@ import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -469,6 +469,7 @@ public class ContainerOperationClient implements ScmClient {
     return storageContainerLocationClient.getSafeModeRuleStatuses();
   }
 
+  @Override
   public boolean forceExitSafeMode() throws IOException {
     return storageContainerLocationClient.forceExitSafeMode();
   }
@@ -531,13 +532,8 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public List<String> getScmRatisRoles() throws IOException {
-    return storageContainerLocationClient.getScmInfo().getRatisPeerRoles();
-  }
-
-  @Override
-  public boolean isScmRatisEnable() throws IOException {
-    return storageContainerLocationClient.getScmInfo().getScmRatisEnabled();
+  public List<String> getScmRoles() throws IOException {
+    return storageContainerLocationClient.getScmInfo().getPeerRoles();
   }
 
   @Override

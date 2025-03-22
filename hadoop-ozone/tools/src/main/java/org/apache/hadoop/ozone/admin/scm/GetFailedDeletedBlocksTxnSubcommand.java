@@ -17,9 +17,11 @@
 
 package org.apache.hadoop.ozone.admin.scm;
 
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -80,7 +82,7 @@ public class GetFailedDeletedBlocksTxnSubcommand extends ScmSubcommand {
 
     String result = JsonUtils.toJsonStringWithDefaultPrettyPrinter(txns);
     if (fileName != null) {
-      try (FileOutputStream f = new FileOutputStream(fileName)) {
+      try (OutputStream f = Files.newOutputStream(Paths.get(fileName))) {
         f.write(result.getBytes(StandardCharsets.UTF_8));
       }
     } else {

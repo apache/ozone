@@ -44,6 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -79,7 +80,6 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -91,7 +91,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Test from the scmclient for decommission and maintenance.
  */
-@Flaky({"HDDS-6028", "HDDS-6049"})
 public class TestDecommissionAndMaintenance {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestDecommissionAndMaintenance.class);
@@ -833,7 +832,7 @@ public class TestDecommissionAndMaintenance {
       ReplicationConfig replicationConfig) throws IOException {
     for (int i = 0; i < keyCount; i++) {
       TestDataUtil.createKey(bucket, keyPrefix + i, replicationConfig,
-          "this is the content");
+          "this is the content".getBytes(StandardCharsets.UTF_8));
     }
   }
 

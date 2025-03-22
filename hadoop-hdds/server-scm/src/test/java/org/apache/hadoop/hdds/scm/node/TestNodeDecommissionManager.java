@@ -1040,7 +1040,7 @@ public class TestNodeDecommissionManager {
 
   private NodeStatus getNodeOpState(DatanodeDetails dn, List<DatanodeDetails> dns) throws NodeNotFoundException {
     if (dn.equals(dns.get(0))) {
-      throw new NodeNotFoundException();
+      throw new NodeNotFoundException(dn.getID());
     }
     for (DatanodeDetails datanode : dns) {
       if (datanode.equals(dn)) {

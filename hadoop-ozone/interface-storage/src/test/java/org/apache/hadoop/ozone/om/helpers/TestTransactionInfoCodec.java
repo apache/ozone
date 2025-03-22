@@ -47,6 +47,7 @@ public class TestTransactionInfoCodec
     assertEquals(transactionInfo, convertedTransactionInfo);
   }
 
+  @Override
   @Test
   public void testInvalidProtocolBuffer() {
     IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,

@@ -73,7 +73,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.security.token.TokenInfo;
 
@@ -310,6 +310,7 @@ public interface OzoneManagerProtocol
    * @throws IOException
    * @deprecated use {@link OzoneManagerProtocol#getKeyInfo} instead.
    */
+  @Override
   @Deprecated
   OmKeyInfo lookupKey(OmKeyArgs args) throws IOException;
 
@@ -322,6 +323,7 @@ public interface OzoneManagerProtocol
    * @return KeyInfoWithVolumeContext includes info that client uses to talk
    *         to containers and S3 volume context info if assumeS3Context is set.
    */
+  @Override
   KeyInfoWithVolumeContext getKeyInfo(OmKeyArgs args, boolean assumeS3Context)
       throws IOException;
 
@@ -498,7 +500,7 @@ public interface OzoneManagerProtocol
    * @throws OMException
    *            when finalization is already in progress.
    */
-  StatusAndMessages finalizeUpgrade(String upgradeClientID) throws IOException;
+  UpgradeFinalization.StatusAndMessages finalizeUpgrade(String upgradeClientID) throws IOException;
 
   /**
    * Queries the current status of finalization.
@@ -528,7 +530,7 @@ public interface OzoneManagerProtocol
    * @throws OMException
    *            if finalization is needed but not yet started
    */
-  StatusAndMessages queryUpgradeFinalizationProgress(
+  UpgradeFinalization.StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean takeover, boolean readonly
   ) throws IOException;
 
@@ -606,9 +608,12 @@ public interface OzoneManagerProtocol
 
   /**
    * List in-flight uploads.
+   * withPagination is for backward compatible as older listMultipartUploads does
+   * not support pagination.
    */
   OmMultipartUploadList listMultipartUploads(String volumeName,
-      String bucketName, String prefix) throws IOException;
+      String bucketName, String prefix,
+      String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination) throws IOException;
 
   /**
    * Gets s3Secret for given kerberos user.
@@ -949,6 +954,7 @@ public interface OzoneManagerProtocol
    *                     invalid arguments
    * @deprecated use {@link OzoneManagerProtocol#getKeyInfo} instead.
    */
+  @Override
   @Deprecated
   OmKeyInfo lookupFile(OmKeyArgs keyArgs) throws IOException;
 
@@ -963,6 +969,7 @@ public interface OzoneManagerProtocol
    * @param numEntries Number of entries to list from the start key
    * @return list of file status
    */
+  @Override
   List<OzoneFileStatus> listStatus(OmKeyArgs keyArgs, boolean recursive,
       String startKey, long numEntries) throws IOException;
 
@@ -979,6 +986,7 @@ public interface OzoneManagerProtocol
    *                             this is needed in context of ListKeys
    * @return list of file status
    */
+  @Override
   List<OzoneFileStatus> listStatus(OmKeyArgs keyArgs, boolean recursive,
                                    String startKey, long numEntries,
                                    boolean allowPartialPrefixes)
@@ -997,6 +1005,7 @@ public interface OzoneManagerProtocol
    *                             this is needed in context of ListKeys
    * @return list of file status
    */
+  @Override
   List<OzoneFileStatusLight> listStatusLight(OmKeyArgs keyArgs,
       boolean recursive, String startKey, long numEntries,
       boolean allowPartialPrefixes) throws IOException;
@@ -1148,6 +1157,7 @@ public interface OzoneManagerProtocol
    * @param args Key args
    * @return Tags associated with the key.
    */
+  @Override
   Map<String, String> getObjectTagging(OmKeyArgs args) throws IOException;
 
   /**

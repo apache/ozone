@@ -41,9 +41,8 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -273,7 +272,7 @@ public class TestKeyValueContainer {
         folder.toPath().resolve("export.tar")).toFile();
     TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
     //export the container
-    try (FileOutputStream fos = new FileOutputStream(exportTar)) {
+    try (OutputStream fos = Files.newOutputStream(exportTar.toPath())) {
       keyValueContainer.exportContainerData(fos, packer);
     }
 
@@ -282,7 +281,7 @@ public class TestKeyValueContainer {
     keyValueContainer.delete();
 
     // import container.
-    try (FileInputStream fis = new FileInputStream(exportTar)) {
+    try (InputStream fis = Files.newInputStream(exportTar.toPath())) {
       keyValueContainer.importContainerData(fis, packer);
     }
 
@@ -306,7 +305,7 @@ public class TestKeyValueContainer {
     File exportTar = Files.createFile(folder.toPath().resolve("export.tar")).toFile();
     TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
     //export the container
-    try (FileOutputStream fos = new FileOutputStream(exportTar)) {
+    try (OutputStream fos = Files.newOutputStream(exportTar.toPath())) {
       keyValueContainer.exportContainerData(fos, packer);
     }
 
@@ -315,7 +314,7 @@ public class TestKeyValueContainer {
     keyValueContainer.delete();
 
     // import container.
-    try (FileInputStream fis = new FileInputStream(exportTar)) {
+    try (InputStream fis = Files.newInputStream(exportTar.toPath())) {
       keyValueContainer.importContainerData(fis, packer);
     }
 
@@ -346,7 +345,7 @@ public class TestKeyValueContainer {
       TarContainerPacker packer = new TarContainerPacker(compr);
 
       //export the container
-      try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
+      try (OutputStream fos = Files.newOutputStream(folderToExport.toPath())) {
         keyValueContainer
             .exportContainerData(fos, packer);
       }
@@ -369,7 +368,7 @@ public class TestKeyValueContainer {
           StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
 
       container.populatePathFields(scmId, containerVolume);
-      try (FileInputStream fis = new FileInputStream(folderToExport)) {
+      try (InputStream fis = Files.newInputStream(folderToExport.toPath())) {
         container.importContainerData(fis, packer);
       }
 
@@ -390,7 +389,7 @@ public class TestKeyValueContainer {
       //Can't overwrite existing container
       KeyValueContainer finalContainer = container;
       assertThrows(IOException.class, () -> {
-        try (FileInputStream fis = new FileInputStream(folderToExport)) {
+        try (InputStream fis = Files.newInputStream(folderToExport.toPath())) {
           finalContainer.importContainerData(fis, packer);
         }
       }, "Container is imported twice. Previous files are overwritten");
@@ -412,7 +411,7 @@ public class TestKeyValueContainer {
       KeyValueContainer finalContainer1 = container;
       assertThrows(IOException.class, () -> {
         try {
-          FileInputStream fis = new FileInputStream(folderToExport);
+          InputStream fis = Files.newInputStream(folderToExport.toPath());
           fis.close();
           finalContainer1.importContainerData(fis, packer);
         } finally {
@@ -855,7 +854,7 @@ public class TestKeyValueContainer {
                   folder.toPath().resolve(containerId + "_exported.tar.gz")).toFile();
           TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
           //export the container
-          try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
+          try (OutputStream fos = Files.newOutputStream(folderToExport.toPath())) {
             container.exportContainerData(fos, packer);
           }
           exportFiles.add(folderToExport);
@@ -878,8 +877,8 @@ public class TestKeyValueContainer {
         containerData.setSchemaVersion(schemaVersion);
         container = new KeyValueContainer(containerData, CONF);
         container.populatePathFields(scmId, hddsVolume);
-        try (FileInputStream fis =
-                 new FileInputStream(exportFiles.get(index))) {
+        try (InputStream fis =
+                 Files.newInputStream(exportFiles.get(index).toPath())) {
           TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
           container.importContainerData(fis, packer);
           containerList.add(container);
@@ -925,7 +924,7 @@ public class TestKeyValueContainer {
       TarContainerPacker packer = new TarContainerPacker(compr);
 
       //export the container
-      try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
+      try (OutputStream fos = Files.newOutputStream(folderToExport.toPath())) {
         keyValueContainer
             .exportContainerData(fos, packer);
       }
@@ -948,7 +947,7 @@ public class TestKeyValueContainer {
           StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
 
       container.populatePathFields(scmId, containerVolume);
-      try (FileInputStream fis = new FileInputStream(folderToExport)) {
+      try (InputStream fis = Files.newInputStream(folderToExport.toPath())) {
         container.importContainerData(fis, packer);
       }
 
@@ -974,7 +973,7 @@ public class TestKeyValueContainer {
       TarContainerPacker packer = new TarContainerPacker(compr);
 
       //export the container
-      try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
+      try (OutputStream fos = Files.newOutputStream(folderToExport.toPath())) {
         keyValueContainer
             .exportContainerData(fos, packer);
       }
@@ -996,7 +995,7 @@ public class TestKeyValueContainer {
           StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
 
       container.populatePathFields(scmId, containerVolume);
-      try (FileInputStream fis = new FileInputStream(folderToExport)) {
+      try (InputStream fis = Files.newInputStream(folderToExport.toPath())) {
         container.importContainerData(fis, packer);
       }
 
@@ -1072,7 +1071,7 @@ public class TestKeyValueContainer {
     if (!file1.createNewFile()) {
       fail("Failed to create file " + file1.getAbsolutePath());
     }
-    try (FileOutputStream fos = new FileOutputStream(file1)) {
+    try (OutputStream fos = Files.newOutputStream(file1.toPath())) {
       container.exportContainerData(fos, packer);
     }
 
@@ -1088,7 +1087,7 @@ public class TestKeyValueContainer {
     // import container to new HddsVolume
     KeyValueContainer importedContainer = new KeyValueContainer(data, conf);
     importedContainer.populatePathFields(scmId, hddsVolume2);
-    try (FileInputStream fio = new FileInputStream(file1)) {
+    try (InputStream fio = Files.newInputStream(file1.toPath())) {
       importedContainer.importContainerData(fio, packer);
     }
 

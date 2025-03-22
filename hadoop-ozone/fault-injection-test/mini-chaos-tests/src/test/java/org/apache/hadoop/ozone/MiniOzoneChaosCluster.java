@@ -72,6 +72,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     OZONE_MANAGER,
     STORAGE_CONTAINER_MANAGER;
 
+    @Override
     public String toString() {
       switch (this) {
       case DATANODE:
@@ -407,11 +408,13 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     return scms;
   }
 
+  @Override
   public void shutdownStorageContainerManager(StorageContainerManager scm) {
     super.shutdownStorageContainerManager(scm);
     failedScmSet.add(scm);
   }
 
+  @Override
   public StorageContainerManager restartStorageContainerManager(
       StorageContainerManager scm, boolean waitForScm)
       throws IOException, TimeoutException, InterruptedException,

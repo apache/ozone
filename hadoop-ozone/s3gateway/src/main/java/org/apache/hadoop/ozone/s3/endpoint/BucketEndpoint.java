@@ -114,6 +114,9 @@ public class BucketEndpoint extends EndpointBase {
       @QueryParam("start-after") String startAfter,
       @QueryParam("uploads") String uploads,
       @QueryParam("acl") String aclMarker,
+      @QueryParam("key-marker") String keyMarker,
+      @QueryParam("upload-id-marker") String uploadIdMarker,
+      @DefaultValue("1000") @QueryParam("max-uploads") int maxUploads,
       @Context HttpHeaders hh) throws OS3Exception, IOException {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.GET_BUCKET;
@@ -136,7 +139,7 @@ public class BucketEndpoint extends EndpointBase {
 
       if (uploads != null) {
         s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
-        return listMultipartUploads(bucketName, prefix);
+        return listMultipartUploads(bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
       }
 
       if (prefix == null) {
@@ -326,9 +329,18 @@ public class BucketEndpoint extends EndpointBase {
   }
 
   public Response listMultipartUploads(
-      @PathParam("bucket") String bucketName,
-      @QueryParam("prefix") String prefix)
+      String bucketName,
+      String prefix,
+      String keyMarker,
+      String uploadIdMarker,
+      int maxUploads)
       throws OS3Exception, IOException {
+
+    if (maxUploads < 1 || maxUploads > 1000) {
+      throw newError(S3ErrorTable.INVALID_ARGUMENT, "max-uploads",
+          new Exception("max-uploads must be between 1 and 1000"));
+    }
+
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
 
@@ -336,10 +348,17 @@ public class BucketEndpoint extends EndpointBase {
 
     try {
       OzoneMultipartUploadList ozoneMultipartUploadList =
-          bucket.listMultipartUploads(prefix);
+          bucket.listMultipartUploads(prefix, keyMarker, uploadIdMarker, maxUploads);
 
       ListMultipartUploadsResult result = new ListMultipartUploadsResult();
       result.setBucket(bucketName);
+      result.setKeyMarker(keyMarker);
+      result.setUploadIdMarker(uploadIdMarker);
+      result.setNextKeyMarker(ozoneMultipartUploadList.getNextKeyMarker());
+      result.setPrefix(prefix);
+      result.setNextUploadIdMarker(ozoneMultipartUploadList.getNextUploadIdMarker());
+      result.setMaxUploads(maxUploads);
+      result.setTruncated(ozoneMultipartUploadList.isTruncated());
 
       ozoneMultipartUploadList.getUploads().forEach(upload -> result.addUpload(
           new ListMultipartUploadsResult.Upload(
@@ -486,7 +505,7 @@ public class BucketEndpoint extends EndpointBase {
 
     Map<String, String> auditMap = getAuditParameters();
     auditMap.put("failedDeletes", deleteKeys.toString());
-    if (result.getErrors().size() != 0) {
+    if (!result.getErrors().isEmpty()) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(s3GAction,
           auditMap, new Exception("MultiDelete Exception")));
     } else {
@@ -614,7 +633,7 @@ public class BucketEndpoint extends EndpointBase {
       List<OzoneAcl> aclsToRemoveOnVolume = new ArrayList<>();
       List<OzoneAcl> currentAclsOnVolume = volume.getAcls();
       // Remove input user/group's permission from Volume first
-      if (currentAclsOnVolume.size() > 0) {
+      if (!currentAclsOnVolume.isEmpty()) {
         for (OzoneAcl acl : acls) {
           if (acl.getAclScope() == ACCESS) {
             aclsToRemoveOnVolume.addAll(OzoneAclUtil.filterAclList(

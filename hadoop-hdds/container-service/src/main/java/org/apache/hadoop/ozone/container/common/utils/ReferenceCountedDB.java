@@ -64,6 +64,7 @@ public class ReferenceCountedDB extends DBHandle {
     }
   }
 
+  @Override
   public boolean cleanup() {
     if (getStore() != null && getStore().isClosed()
         || referenceCount.get() == 0) {
