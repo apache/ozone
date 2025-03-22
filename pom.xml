@@ -62,7 +62,7 @@
     <commons-text.version>1.12.0</commons-text.version>
     <commons-validator.version>1.6</commons-validator.version>
     <compile-testing.version>0.21.0</compile-testing.version>
-    <copy-rename-maven-plugin.version>1.0</copy-rename-maven-plugin.version>
+    <copy-rename-maven-plugin.version>1.0.1</copy-rename-maven-plugin.version>
     <curator.version>4.2.0</curator.version>
     <cyclonedx.version>2.9.1</cyclonedx.version>
     <!-- the version of Hadoop declared in the version resources; can be overridden
