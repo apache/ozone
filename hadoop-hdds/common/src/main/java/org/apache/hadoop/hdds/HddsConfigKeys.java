@@ -59,14 +59,6 @@ public final class HddsConfigKeys {
   public static final String HDDS_DATANODE_VOLUME_CHOOSING_POLICY =
       "hdds.datanode.volume.choosing.policy";
 
-  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE =
-      "hdds.datanode.volume.min.free.space";
-  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT =
-      "5GB";
-
-  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT =
-      "hdds.datanode.volume.min.free.space.percent";
-
   public static final String HDDS_DB_PROFILE = "hdds.db.profile";
 
   // Once a container usage crosses this threshold, it is eligible for

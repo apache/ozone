@@ -606,7 +606,7 @@ public class OzoneContainer {
             NodeReportProto.newBuilder();
 
     for (StorageLocationReport report : reports) {
-      nrb.addStorageReport(report.getProtoBufMessage(config));
+      nrb.addStorageReport(report.getProtoBufMessage());
     }
 
     StorageLocationReport[] metaReports = metaVolumeSet.getStorageReport();
