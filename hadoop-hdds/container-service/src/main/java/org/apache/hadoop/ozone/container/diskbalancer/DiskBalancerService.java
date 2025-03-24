@@ -300,7 +300,6 @@ public class DiskBalancerService extends BackgroundService {
     DiskBalancerReportProto.Builder builder =
         DiskBalancerReportProto.newBuilder();
     return builder.setIsRunning(shouldRun)
-        .setBalancedBytes(totalBalancedBytes.get())
         .setDiskBalancerConf(
             HddsProtos.DiskBalancerConfigurationProto.newBuilder()
                 .setThreshold(threshold)

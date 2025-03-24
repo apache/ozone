@@ -64,7 +64,7 @@ public class DiskBalancerStatusSubcommand extends ScmSubcommand {
 
     List<String> contentList = new ArrayList<>();
     contentList.add("Datanode");
-    contentList.add("VolumeDensity");
+    contentList.add("BalancedBytes");
     contentList.add("Status");
     contentList.add("Threshold(%)");
     contentList.add("BandwidthInMB");
@@ -80,7 +80,7 @@ public class DiskBalancerStatusSubcommand extends ScmSubcommand {
       long bytesToMoveMB = proto.getBytesToMove() / (1024 * 1024);
 
       contentList.add(proto.getNode().getHostName());
-      contentList.add(String.format("%.18f", proto.getCurrentVolumeDensitySum()));
+      contentList.add(String.valueOf(proto.getBalancedBytes()));
       contentList.add(proto.getRunningStatus().name());
       contentList.add(
           String.format("%.4f", proto.getDiskBalancerConf().getThreshold()));

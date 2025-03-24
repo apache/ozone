@@ -34,6 +34,7 @@ public class DiskBalancerStatus {
   private long successMoveCount;
   private long failureMoveCount;
   private long bytesToMove;
+  private long balancedBytes;
 
   public DiskBalancerStatus(DiskBalancerRunningStatus isRunning, DiskBalancerConfiguration conf,
       long successMoveCount, long failureMoveCount, long bytesToMove) {
@@ -62,5 +63,9 @@ public class DiskBalancerStatus {
 
   public long getBytesToMove() {
     return bytesToMove;
+  }
+
+  public long getBalancedBytes() {
+    return balancedBytes;
   }
 }
