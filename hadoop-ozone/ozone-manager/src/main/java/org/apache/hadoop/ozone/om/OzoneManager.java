@@ -271,6 +271,7 @@ import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.s3.S3SecretCacheProvider;
 import org.apache.hadoop.ozone.om.s3.S3SecretStoreProvider;
+import org.apache.hadoop.ozone.om.service.CompactDBService;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
@@ -995,7 +996,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * Class which schedule saving metrics to a file.
    */
-  private class ScheduleOMMetricsWriteTask extends TimerTask {
+  private final class ScheduleOMMetricsWriteTask extends TimerTask {
     @Override
     public void run() {
       saveOmMetrics();
@@ -5027,6 +5028,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (disabledFeatures.contains(feature.name())) {
       throw new OMException("Feature disabled: " + feature, OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
     }
+  }
+
+  public void compactOMDB(String columnFamily) throws IOException {
+    checkAdminUserPrivilege("compact column family " + columnFamily);
+    new CompactDBService(this).compact(columnFamily);
   }
 
   public OMExecutionFlow getOmExecutionFlow() {

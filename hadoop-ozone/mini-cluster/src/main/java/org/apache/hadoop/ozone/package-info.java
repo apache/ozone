@@ -15,27 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.repair.om;
-
-import org.apache.hadoop.hdds.cli.RepairSubcommand;
-import org.apache.hadoop.ozone.repair.TransactionInfoRepair;
-import org.apache.hadoop.ozone.repair.om.quota.QuotaRepair;
-import org.kohsuke.MetaInfServices;
-import picocli.CommandLine;
-
 /**
- * Ozone Repair CLI for OM.
+ * Mini cluster for running Ozone in a single JVM for tests.
  */
-@CommandLine.Command(name = "om",
-    subcommands = {
-        FSORepairTool.class,
-        SnapshotRepair.class,
-        TransactionInfoRepair.class,
-        QuotaRepair.class,
-        CompactOMDB.class
-    },
-    description = "Operational tool to repair OM.")
-@MetaInfServices(RepairSubcommand.class)
-public class OMRepair implements RepairSubcommand {
-
-}
+package org.apache.hadoop.ozone;
