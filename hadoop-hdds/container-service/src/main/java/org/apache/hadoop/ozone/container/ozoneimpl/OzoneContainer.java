@@ -34,9 +34,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
-import java.time.Clock;
 import java.time.Duration;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -275,19 +273,13 @@ public class OzoneContainer {
             blockDeletingServiceWorkerSize, config,
             datanodeDetails.threadNamePrefix(),
             context.getParent().getReconfigurationHandler());
-    Clock clock = Clock.system(ZoneId.systemDefault());
 
     Duration diskBalancerSvcInterval = conf.getObject(
         DiskBalancerConfiguration.class).getDiskBalancerInterval();
     Duration diskBalancerSvcTimeout = conf.getObject(
         DiskBalancerConfiguration.class).getDiskBalancerTimeout();
 
-    replicationSupervisor = ReplicationSupervisor.newBuilder()
-        .stateContext(context)
-        .datanodeConfig(dnConf)
-        .replicationConfig(conf.getObject(ReplicationConfig.class))
-        .clock(clock)
-        .build();
+    replicationSupervisor = hddsDatanodeService.getDatanodeStateMachine().getSupervisor();
 
     diskBalancerService =
         new DiskBalancerService(this, diskBalancerSvcInterval.toMillis(),
