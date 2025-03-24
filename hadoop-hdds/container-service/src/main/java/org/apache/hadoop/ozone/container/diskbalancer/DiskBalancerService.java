@@ -92,7 +92,6 @@ public class DiskBalancerService extends BackgroundService {
 
   private Map<DiskBalancerTask, Integer> inProgressTasks;
   private Set<Long> inProgressContainers;
-  private Set<Long> replicationContainerIDs;
 
   // Every time a container is decided to be moved from Vol A to Vol B,
   // the size will be deducted from Vol A and added to Vol B.
@@ -125,7 +124,6 @@ public class DiskBalancerService extends BackgroundService {
 
     inProgressTasks = new ConcurrentHashMap<>();
     inProgressContainers = ConcurrentHashMap.newKeySet();
-    replicationContainerIDs = ConcurrentHashMap.newKeySet();
     deltaSizes = new ConcurrentHashMap<>();
     volumeSet = ozoneContainer.getVolumeSet();
 
@@ -316,7 +314,8 @@ public class DiskBalancerService extends BackgroundService {
         .build();
   }
 
-  public Set<Long> getReplicationContainerIDs(ReplicationSupervisor supervisor) {
+  private Set<Long> getReplicationContainerIDs(ReplicationSupervisor supervisor) {
+    Set<Long> replicationContainerIDs = ConcurrentHashMap.newKeySet();
     for (AbstractReplicationTask task : supervisor.getInFlightTasks()) {
       replicationContainerIDs.add(task.getContainerId());
     }
