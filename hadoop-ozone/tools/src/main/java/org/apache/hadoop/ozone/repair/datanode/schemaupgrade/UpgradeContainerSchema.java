@@ -270,7 +270,7 @@ public class UpgradeContainerSchema extends RepairTool {
 
         // load DB store
         try {
-          hddsVolume.loadDbStore(false);
+          hddsVolume.loadDbStore(isDryRun());
           RawDB db = DatanodeStoreCache.getInstance().getDB(
               volumeDBPath.getAbsolutePath(), config);
           dataStore = (DatanodeStoreSchemaThreeImpl) db.getStore();
@@ -425,8 +425,10 @@ public class UpgradeContainerSchema extends RepairTool {
           String key = DatanodeSchemaThreeDBDefinition
               .getContainerKeyPrefix(containerData.getContainerID())
               + StringUtils.bytes2String(next.getKey());
-          targetTable
-              .put(FixedLengthStringCodec.string2Bytes(key), next.getValue());
+          if (!isDryRun()) {
+            targetTable
+                .put(FixedLengthStringCodec.string2Bytes(key), next.getValue());
+          }
         }
       }
       return count;
@@ -453,13 +455,17 @@ public class UpgradeContainerSchema extends RepairTool {
             keyValueContainerData.getContainerID() +
                 BACKUP_CONTAINER_DATA_FILE_SUFFIX);
 
-        // backup v2 container data file
-        NativeIO.renameTo(originContainerFile, bakFile);
+        if (isDryRun()) {
+          FileUtils.copyFile(originContainerFile, bakFile);
+        } else {
+          // backup v2 container data file
+          NativeIO.renameTo(originContainerFile, bakFile);
+
+          // gen new v3 container data file
+          ContainerDataYaml.createContainerFile(copyContainerData, originContainerFile);
+        }
+
         result.setBackupContainerFilePath(bakFile.getAbsolutePath());
-
-        // gen new v3 container data file
-        ContainerDataYaml.createContainerFile(copyContainerData, originContainerFile);
-
         result.setNewContainerData(copyContainerData);
         result.setNewContainerFilePath(originContainerFile.getAbsolutePath());
       }
