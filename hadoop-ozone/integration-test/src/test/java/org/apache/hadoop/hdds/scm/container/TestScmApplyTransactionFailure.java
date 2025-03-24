@@ -80,7 +80,7 @@ public abstract class TestScmApplyTransactionFailure implements HATests.TestCase
         InvalidPipelineStateException.class);
     assertThrows(ContainerNotFoundException.class,
         () -> containerManager.getContainer(
-            new ContainerID(containerInfo.getContainerID())));
+            ContainerID.valueOf(containerInfo.getContainerID())));
 
     // verify that SCMStateMachine is still functioning after the rejected
     // transaction.

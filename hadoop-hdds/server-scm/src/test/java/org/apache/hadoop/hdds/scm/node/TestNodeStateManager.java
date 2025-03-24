@@ -274,16 +274,16 @@ public class TestNodeStateManager {
     DatanodeDetails dn = generateDatanode();
     nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
 
-    nsm.addContainer(dn.getUuid(), ContainerID.valueOf(1));
-    nsm.addContainer(dn.getUuid(), ContainerID.valueOf(2));
+    nsm.addContainer(dn.getID(), ContainerID.valueOf(1));
+    nsm.addContainer(dn.getID(), ContainerID.valueOf(2));
 
-    Set<ContainerID> containerSet = nsm.getContainers(dn.getUuid());
+    Set<ContainerID> containerSet = nsm.getContainers(dn.getID());
     assertEquals(2, containerSet.size());
     assertThat(containerSet).contains(ContainerID.valueOf(1));
     assertThat(containerSet).contains(ContainerID.valueOf(2));
 
-    nsm.removeContainer(dn.getUuid(), ContainerID.valueOf(2));
-    containerSet = nsm.getContainers(dn.getUuid());
+    nsm.removeContainer(dn.getID(), ContainerID.valueOf(2));
+    containerSet = nsm.getContainers(dn.getID());
     assertEquals(1, containerSet.size());
     assertThat(containerSet).contains(ContainerID.valueOf(1));
     assertThat(containerSet).doesNotContain(ContainerID.valueOf(2));

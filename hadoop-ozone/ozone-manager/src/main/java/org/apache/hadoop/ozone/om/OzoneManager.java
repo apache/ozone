@@ -69,8 +69,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_READ_THREADPOOL_D
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_READ_THREADPOOL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT;
@@ -226,6 +224,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
+import org.apache.hadoop.ozone.om.execution.OMExecutionFlow;
 import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
 import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
@@ -272,6 +271,7 @@ import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.s3.S3SecretCacheProvider;
 import org.apache.hadoop.ozone.om.s3.S3SecretStoreProvider;
+import org.apache.hadoop.ozone.om.service.CompactDBService;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
@@ -422,6 +422,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private OzoneManagerProtocolServerSideTranslatorPB omServerProtocol;
 
   private OzoneManagerRatisServer omRatisServer;
+  private OMExecutionFlow omExecutionFlow;
   private OmRatisSnapshotProvider omRatisSnapshotProvider;
   private OMNodeDetails omNodeDetails;
   private final Map<String, OMNodeDetails> peerNodesMap;
@@ -438,9 +439,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final ReplicationConfigValidator replicationConfigValidator;
 
   private boolean allowListAllVolumes;
-  // Adding parameters needed for VolumeRequests here, so that during request
-  // execution, we can get from ozoneManager.
-  private final long maxUserVolumeCount;
 
   private int minMultipartUploadPartSize = OzoneConsts.OM_MULTIPART_MIN_SIZE;
 
@@ -549,10 +547,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.threadPrefix = omNodeDetails.threadNamePrefix();
     loginOMUserIfSecurityEnabled(conf);
     setInstanceVariablesFromConf();
-    this.maxUserVolumeCount = conf.getInt(OZONE_OM_USER_MAX_VOLUME,
-        OZONE_OM_USER_MAX_VOLUME_DEFAULT);
-    Preconditions.checkArgument(this.maxUserVolumeCount > 0,
-        OZONE_OM_USER_MAX_VOLUME + " value should be greater than zero");
 
     if (omStorage.getState() != StorageState.INITIALIZED) {
       throw new OMException("OM not initialized, current OM storage state: "
@@ -714,6 +708,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (isOmGrpcServerEnabled) {
       omS3gGrpcServer = getOmS3gGrpcServer(configuration);
     }
+
+    // init om execution flow for request
+    omExecutionFlow = new OMExecutionFlow(this);
+
     ShutdownHookManager.get().addShutdownHook(this::saveOmMetrics,
         SHUTDOWN_HOOK_PRIORITY);
 
@@ -998,7 +996,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * Class which schedule saving metrics to a file.
    */
-  private class ScheduleOMMetricsWriteTask extends TimerTask {
+  private final class ScheduleOMMetricsWriteTask extends TimerTask {
     @Override
     public void run() {
       saveOmMetrics();
@@ -3040,7 +3038,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public String getRpcPort() {
-    return "" + omRpcAddress.getPort();
+    return String.valueOf(omRpcAddress.getPort());
   }
 
   private static List<List<String>> getRatisRolesException(String exceptionString) {
@@ -4206,7 +4204,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @return maxUserVolumeCount
    */
   public long getMaxUserVolumeCount() {
-    return maxUserVolumeCount;
+    return config.getMaxUserVolumeCount();
   }
   /**
    * Return true, if the current OM node is leader and in ready state to
@@ -4578,14 +4576,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Provide ACLType of ALL which is default acl rights for user and group.
     List<OzoneAcl> listOfAcls = new ArrayList<>();
     //User ACL
-    listOfAcls.add(new OzoneAcl(ACLIdentityType.USER,
+    listOfAcls.add(OzoneAcl.of(ACLIdentityType.USER,
         userName, ACCESS, ACLType.ALL));
     //Group ACLs of the User
     List<String> userGroups = Arrays.asList(UserGroupInformation
         .createRemoteUser(userName).getGroupNames());
 
     userGroups.forEach((group) -> listOfAcls.add(
-        new OzoneAcl(ACLIdentityType.GROUP, group, ACCESS, ACLType.ALL)));
+        OzoneAcl.of(ACLIdentityType.GROUP, group, ACCESS, ACLType.ALL)));
 
     // Add ACLs
     for (OzoneAcl ozoneAcl : listOfAcls) {
@@ -5030,5 +5028,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (disabledFeatures.contains(feature.name())) {
       throw new OMException("Feature disabled: " + feature, OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
     }
+  }
+
+  public void compactOMDB(String columnFamily) throws IOException {
+    checkAdminUserPrivilege("compact column family " + columnFamily);
+    new CompactDBService(this).compact(columnFamily);
+  }
+
+  public OMExecutionFlow getOmExecutionFlow() {
+    return omExecutionFlow;
   }
 }

@@ -403,6 +403,11 @@ public final class HddsServerUtil {
     return rawLocations;
   }
 
+  public static long requiredReplicationSpace(long defaultContainerSize) {
+    // During container import it requires double the container size to hold container in tmp and dest directory
+    return 2 * defaultContainerSize;
+  }
+
   public static Collection<String> getDatanodeStorageDirs(ConfigurationSource conf) {
     Collection<String> rawLocations = conf.getTrimmedStringCollection(HDDS_DATANODE_DIR_KEY);
     if (rawLocations.isEmpty()) {
@@ -620,18 +625,20 @@ public final class HddsServerUtil {
     }
   }
 
-  public static void includeFile(File file, String entryName,
+  public static long includeFile(File file, String entryName,
                                  ArchiveOutputStream archiveOutputStream)
       throws IOException {
     ArchiveEntry archiveEntry =
         archiveOutputStream.createArchiveEntry(file, entryName);
     archiveOutputStream.putArchiveEntry(archiveEntry);
+    long bytesWritten;
     try (InputStream fis = Files.newInputStream(file.toPath())) {
-      IOUtils.copy(fis, archiveOutputStream);
+      bytesWritten = IOUtils.copy(fis, archiveOutputStream);
       archiveOutputStream.flush();
     } finally {
       archiveOutputStream.closeArchiveEntry();
     }
+    return bytesWritten;
   }
 
   // Mark tarball completed.

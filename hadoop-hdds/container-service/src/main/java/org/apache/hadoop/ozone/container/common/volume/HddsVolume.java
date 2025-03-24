@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.RawDB;
@@ -142,7 +141,6 @@ public class HddsVolume extends StorageVolume {
       volumeIOStats = null;
       volumeInfoMetrics = new VolumeInfoMetrics(b.getVolumeRootStr(), this);
     }
-
   }
 
   @Override
@@ -264,14 +262,13 @@ public class HddsVolume extends StorageVolume {
       throws Exception {
     VolumeCheckResult result = super.check(unused);
 
-    DatanodeConfiguration df = getConf().getObject(DatanodeConfiguration.class);
     if (isDbLoadFailure()) {
       LOG.warn("Volume {} failed to access RocksDB: RocksDB parent directory is null, " +
           "the volume might not have been loaded properly.", getStorageDir());
       return VolumeCheckResult.FAILED;
     }
     if (result != VolumeCheckResult.HEALTHY ||
-        !df.getContainerSchemaV3Enabled() || !isDbLoaded()) {
+        !getDatanodeConfig().getContainerSchemaV3Enabled() || !isDbLoaded()) {
       return result;
     }
 
@@ -303,6 +300,10 @@ public class HddsVolume extends StorageVolume {
    */
   public long getCommittedBytes() {
     return committedBytes.get();
+  }
+
+  public long getFreeSpaceToSpare(long volumeCapacity) {
+    return getDatanodeConfig().getMinFreeSpace(volumeCapacity);
   }
 
   public void setDbVolume(DbVolume dbVolume) {

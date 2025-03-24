@@ -65,7 +65,7 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
   }
 
   @Override
-  public void handle(SCMCommand command, OzoneContainer container,
+  public void handle(SCMCommand<?> command, OzoneContainer container,
       StateContext context, SCMConnectionManager connectionManager) {
 
     final ReplicateContainerCommand replicateCommand =

@@ -23,11 +23,11 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose;
+import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerStateInSCM;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -35,13 +35,14 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -53,15 +54,12 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Tests for container report handling with SCM High Availability.
  */
-@Flaky("HDDS-12535")
 public class TestContainerReportHandlingWithHA {
   private static final String VOLUME = "vol1";
   private static final String BUCKET = "bucket1";
@@ -99,6 +97,8 @@ public class TestContainerReportHandlingWithHA {
         ContainerID containerID = ContainerID.valueOf(keyLocation.getContainerID());
         waitForContainerClose(cluster, containerID.getId());
 
+        waitForContainerStateInAllSCMs(cluster, containerID, HddsProtos.LifeCycleState.CLOSED);
+
         // move the container to DELETING
         ContainerManager containerManager = cluster.getScmLeader().getContainerManager();
         containerManager.updateContainerState(containerID, HddsProtos.LifeCycleEvent.DELETE);
@@ -113,23 +113,8 @@ public class TestContainerReportHandlingWithHA {
         // restart a DN and wait for the container to get CLOSED in all SCMs
         HddsDatanodeService dn = cluster.getHddsDatanode(keyLocation.getPipeline().getFirstNode());
         cluster.restartHddsDatanode(dn.getDatanodeDetails(), false);
-        ContainerManager[] array = new ContainerManager[numSCM];
-        for (int i = 0; i < numSCM; i++) {
-          array[i] = cluster.getStorageContainerManager(i).getContainerManager();
-        }
-        GenericTestUtils.waitFor(() -> {
-          try {
-            for (ContainerManager manager : array) {
-              if (manager.getContainer(containerID).getState() != HddsProtos.LifeCycleState.CLOSED) {
-                return false;
-              }
-            }
-            return true;
-          } catch (ContainerNotFoundException e) {
-            fail(e);
-          }
-          return false;
-        }, 2000, 20000);
+
+        waitForContainerStateInAllSCMs(cluster, containerID, HddsProtos.LifeCycleState.CLOSED);
 
         assertEquals(HddsProtos.LifeCycleState.CLOSED, containerManager.getContainer(containerID).getState());
       }
@@ -174,6 +159,14 @@ public class TestContainerReportHandlingWithHA {
     try (OutputStream out = bucket.createKey(KEY, 0,
         RatisReplicationConfig.getInstance(THREE), emptyMap())) {
       out.write("Hello".getBytes(UTF_8));
+    }
+  }
+
+  private static void waitForContainerStateInAllSCMs(MiniOzoneHAClusterImpl cluster, ContainerID containerID,
+      HddsProtos.LifeCycleState desiredState)
+      throws TimeoutException, InterruptedException {
+    for (StorageContainerManager scm : cluster.getStorageContainerManagersList()) {
+      waitForContainerStateInSCM(scm, containerID, desiredState);
     }
   }
 

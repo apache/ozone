@@ -826,7 +826,7 @@ public class TestSCMContainerPlacementRackScatter {
     setup(datanodeCount);
 
     // DN 5 is out of service
-    dnInfos.get(5).setNodeStatus(new NodeStatus(DECOMMISSIONED, HEALTHY));
+    dnInfos.get(5).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONED, HEALTHY));
 
     // SCM should have detected that DN 5 is dead
     cluster.remove(datanodes.get(5));

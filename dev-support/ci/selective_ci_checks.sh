@@ -199,6 +199,7 @@ function run_all_tests_if_environment_files_changed() {
     )
     local ignore_array=(
         "^dev-support/ci/pr_title_check"
+        "^dev-support/ci/find_test_class_project"
     )
     filter_changed_files
 
@@ -260,6 +261,7 @@ function get_count_integration_files() {
         "^hadoop-ozone/dev-support/checks/integration.sh"
         "^hadoop-ozone/dev-support/checks/junit.sh"
         "^hadoop-ozone/integration-test"
+        "^hadoop-ozone/mini-cluster"
         "^hadoop-ozone/fault-injection-test/mini-chaos-tests"
         "src/test/java"
         "src/test/resources"
@@ -478,6 +480,7 @@ function get_count_misc_files() {
     start_end::group_start "Count misc. files"
     local pattern_array=(
         "^dev-support/ci/pr_title_check"
+        "^dev-support/ci/find_test_class_project"
         "^.github"
         "^hadoop-hdds/dev-support/checkstyle"
         "^hadoop-ozone/dev-support/checks"
@@ -487,6 +490,7 @@ function get_count_misc_files() {
         "\.txt$"
         "\.md$"
         "findbugsExcludeFile.xml"
+        "pmd-ruleset.xml"
         "/NOTICE$"
         "^hadoop-ozone/dist/src/main/compose/common/grafana/dashboards"
     )
