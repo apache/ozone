@@ -119,7 +119,7 @@ public class HddsVolume extends StorageVolume {
   private HddsVolume(Builder b) throws IOException {
     super(b);
 
-    if (!b.getFailedVolume() && getVolumeInfo().isPresent()) {
+    if (!b.getFailedVolume()) {
       this.setState(VolumeState.NOT_INITIALIZED);
       ConfigurationSource conf = getConf();
       int[] intervals = conf.getInts(OZONE_DATANODE_IO_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY);

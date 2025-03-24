@@ -36,8 +36,61 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Class that wraps the space df of the Datanode Volumes used by SCM
- * containers.
+ * Stores information about a disk/volume.
+ *
+ * Since we have a reserved space for each volume for other usage,
+ * let's clarify the space values a bit here:
+ * - used: hdds actual usage.
+ * - avail: remaining space for hdds usage.
+ * - reserved: total space for other usage.
+ * - capacity: total space for hdds usage.
+ * - other: space used by other service consuming the same volume.
+ * - fsAvail: reported remaining space from local fs.
+ * - fsUsed: reported total used space from local fs.
+ * - fsCapacity: reported total capacity from local fs.
+ * - minVolumeFreeSpace (mvfs) : determines the free space for closing
+     containers.This is like adding a few reserved bytes to reserved space.
+     Dn's will send close container action to SCM at this limit, and it is
+     configurable.
+
+ *
+ * <pre>
+ * {@code
+ * |----used----|   (avail)   |++mvfs++|++++reserved+++++++|
+ * |<-     capacity                  ->|
+ *              |     fsAvail      |-------other-----------|
+ * |<-                   fsCapacity                      ->|
+ * }</pre>
+ * <pre>
+ * What we could directly get from local fs:
+ *     fsCapacity, fsAvail, (fsUsed = fsCapacity - fsAvail)
+ * We could get from config:
+ *     reserved
+ * Get from cmd line:
+ *     used: from cmd 'du' (by default)
+ * Get from calculation:
+ *     capacity = fsCapacity - reserved
+ *     other = fsUsed - used
+ *
+ * The avail is the result we want from calculation.
+ * So, it could be:
+ * A) avail = capacity - used
+ * B) avail = fsAvail - Max(reserved - other, 0);
+ *
+ * To be Conservative, we could get min
+ *     avail = Max(Min(A, B), 0);
+ *
+ * If we have a dedicated disk for hdds and are not using the reserved space,
+ * then we should use DedicatedDiskSpaceUsage for
+ * `hdds.datanode.du.factory.classname`,
+ * Then it is much simpler, since we don't care about other usage:
+ * {@code
+ *  |----used----|             (avail)/fsAvail              |
+ *  |<-              capacity/fsCapacity                  ->|
+ * }
+ *
+ *  We have avail == fsAvail.
+ *  </pre>
  */
 public class VolumeUsage {
 
@@ -120,7 +173,7 @@ public class VolumeUsage {
     source.refreshNow();
   }
 
-  public long getReservedBytes() {
+  public long getReservedInBytes() {
     return reservedInBytes;
   }
 

@@ -69,11 +69,11 @@ public class TestReservedVolumeSpace {
     // Gets the total capacity reported by Ozone, which may be limited to less than the volume's real capacity by the
     // DU reserved configurations.
     long volumeCapacity = hddsVolume.getCurrentUsage().getCapacity();
-    VolumeUsage usage = hddsVolume.getVolumeInfo().get().getUsageForTesting();
+    VolumeUsage usage = hddsVolume.getVolumeInfo().get();
 
     // Gets the actual total capacity without accounting for DU reserved space configurations.
     long totalCapacity = usage.realUsage().getCapacity();
-    long reservedCapacity = usage.getReservedBytes();
+    long reservedCapacity = usage.getReservedInBytes();
 
     assertEquals(getExpectedDefaultReserved(hddsVolume), reservedCapacity);
     assertEquals(totalCapacity - reservedCapacity, volumeCapacity);
@@ -93,11 +93,11 @@ public class TestReservedVolumeSpace {
         HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT);
 
     long volumeCapacity = hddsVolume.getCurrentUsage().getCapacity();
-    VolumeUsage usage = hddsVolume.getVolumeInfo().get().getUsageForTesting();
+    VolumeUsage usage = hddsVolume.getVolumeInfo().get();
 
     //Gets the actual total capacity
     long totalCapacity = usage.realUsage().getCapacity();
-    long reservedCapacity = usage.getReservedBytes();
+    long reservedCapacity = usage.getReservedInBytes();
     long reservedCalculated = (long) Math.ceil(totalCapacity * percentage);
 
     assertEquals(reservedCalculated, reservedCapacity);
@@ -131,8 +131,8 @@ public class TestReservedVolumeSpace {
         temp.toString() + ":500B");
     HddsVolume hddsVolume = volumeBuilder.conf(conf).build();
 
-    VolumeUsage usage = hddsVolume.getVolumeInfo().get().getUsageForTesting();
-    long reservedFromVolume = usage.getReservedBytes();
+    VolumeUsage usage = hddsVolume.getVolumeInfo().get();
+    long reservedFromVolume = usage.getReservedInBytes();
     assertNotEquals(0, reservedFromVolume);
 
     long totalCapacity = usage.realUsage().getCapacity();
@@ -212,7 +212,7 @@ public class TestReservedVolumeSpace {
 
 
   private long getExpectedDefaultReserved(HddsVolume volume) {
-    long totalCapacity = volume.getVolumeInfo().get().getUsageForTesting().realUsage().getCapacity();
+    long totalCapacity = volume.getVolumeInfo().get().realUsage().getCapacity();
     return (long) Math.ceil(totalCapacity * HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT);
   }
 }

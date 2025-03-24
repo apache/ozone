@@ -277,7 +277,7 @@ public class MutableVolumeSet implements VolumeSet {
   }
 
   public void refreshAllVolumeUsage() {
-    volumeMap.forEach((k, v) -> v.refreshVolumeInfo());
+    volumeMap.forEach((k, v) -> v.refreshVolumeUsage());
   }
 
   /**
@@ -464,7 +464,7 @@ public class MutableVolumeSet implements VolumeSet {
       StorageVolume volume;
       for (Map.Entry<String, StorageVolume> entry : volumeMap.entrySet()) {
         volume = entry.getValue();
-        Optional<VolumeInfo> volumeInfo = volume.getVolumeInfo();
+        Optional<VolumeUsage> volumeInfo = volume.getVolumeInfo();
         long scmUsed = 0;
         long remaining = 0;
         long capacity = 0;
