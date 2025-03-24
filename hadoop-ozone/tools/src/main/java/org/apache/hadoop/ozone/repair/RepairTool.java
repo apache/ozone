@@ -54,10 +54,8 @@ public abstract class RepairTool extends AbstractSubcommand implements Callable<
   @Override
   public final Void call() throws Exception {
     final Component service = serviceToBeOffline();
-    if (!dryRun) {
-      if (service == null) { // offline tool
-        confirmUser();
-      }
+    if (!dryRun && service != null) { // offline tool
+      confirmUser();
     }
     if (isServiceStateOK()) {
       execute();

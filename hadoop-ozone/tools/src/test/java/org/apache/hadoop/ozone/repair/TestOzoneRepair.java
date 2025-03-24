@@ -23,6 +23,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.util.List;
@@ -92,6 +93,29 @@ public class TestOzoneRepair {
         assertSubcommandOptionRecursively(sub);
       }
     }
+  }
+
+  @Test
+  void testOzoneRepairWhenUserIsRemindedSystemUserAndDeclinesToProceed() throws Exception {
+    OzoneRepair ozoneRepair = new OzoneRepair();
+    System.setIn(new ByteArrayInputStream("N".getBytes(DEFAULT_ENCODING)));
+
+    int res = ozoneRepair.execute(new String[]{"om", "fso-tree", "--db", "/dev/null"});
+    assertThat(res).isNotEqualTo(CommandLine.ExitCode.OK);
+    assertThat(err.toString(DEFAULT_ENCODING)).contains("Aborting command.");
+    // prompt should contain the current user name as well
+    assertThat(err.toString(DEFAULT_ENCODING)).contains("ATTENTION: Running as user " + OZONE_USER);
+  }
+
+  @Test
+  void testOzoneRepairWhenUserIsRemindedSystemUserAndAgreesToProceed() throws Exception {
+    OzoneRepair ozoneRepair = new OzoneRepair();
+    System.setIn(new ByteArrayInputStream("y".getBytes(DEFAULT_ENCODING)));
+
+    ozoneRepair.execute(new String[]{"om", "fso-tree", "--db", "/dev/null"});
+    assertThat(out.toString(DEFAULT_ENCODING)).contains("Run as user: " + OZONE_USER);
+    // prompt should contain the current user name as well
+    assertThat(err.toString(DEFAULT_ENCODING)).contains("ATTENTION: Running as user " + OZONE_USER);
   }
 
   /** Arguments for which confirmation prompt should not be displayed. */
