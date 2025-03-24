@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.common.volume;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckParams;
@@ -90,7 +89,6 @@ public final class VolumeInfo {
   private static final Logger LOG = LoggerFactory.getLogger(VolumeInfo.class);
 
   private final String rootDir;
-  private final StorageType storageType;
 
   // Space usage calculator
   private final VolumeUsage usage;
@@ -102,16 +100,10 @@ public final class VolumeInfo {
     private final ConfigurationSource conf;
     private final String rootDir;
     private SpaceUsageCheckFactory usageCheckFactory;
-    private StorageType storageType;
 
     public Builder(String root, ConfigurationSource config) {
       this.rootDir = root;
       this.conf = config;
-    }
-
-    public Builder storageType(StorageType st) {
-      this.storageType = st;
-      return this;
     }
 
     public Builder usageCheckFactory(SpaceUsageCheckFactory factory) {
@@ -135,9 +127,6 @@ public final class VolumeInfo {
       LOG.error("Unable to create the volume root dir at : {}", root);
       throw new IOException("Unable to create the volume root dir at " + root);
     }
-
-    this.storageType = (b.storageType != null ?
-        b.storageType : StorageType.DEFAULT);
 
     SpaceUsageCheckFactory usageCheckFactory = b.usageCheckFactory;
     if (usageCheckFactory == null) {
@@ -171,10 +160,6 @@ public final class VolumeInfo {
 
   public String getRootDir() {
     return this.rootDir;
-  }
-
-  public StorageType getStorageType() {
-    return this.storageType;
   }
 
   /**

@@ -118,6 +118,7 @@ public abstract class StorageVolume
   private final ConfigurationSource conf;
   private final DatanodeConfiguration dnConf;
 
+  private final StorageType storageType;
   private final File storageDir;
   private String workingDirName;
   private File tmpDir;
@@ -139,12 +140,12 @@ public abstract class StorageVolume
   private int healthCheckFileSize;
 
   protected StorageVolume(Builder<?> b) throws IOException {
+    storageType = b.storageType;
     if (!b.failedVolume) {
       StorageLocation location = StorageLocation.parse(b.volumeRootStr);
       storageDir = new File(location.getUri().getPath(), b.storageDirStr);
       this.volumeInfo = Optional.of(
               new VolumeInfo.Builder(b.volumeRootStr, b.conf)
-          .storageType(b.storageType)
           .usageCheckFactory(b.usageCheckFactory)
           .build());
       this.volumeSet = b.volumeSet;
@@ -375,7 +376,7 @@ public abstract class StorageVolume
     private final String volumeRootStr;
     private String storageDirStr;
     private ConfigurationSource conf;
-    private StorageType storageType;
+    private StorageType storageType = StorageType.DEFAULT;
     private SpaceUsageCheckFactory usageCheckFactory;
     private VolumeSet volumeSet;
     private boolean failedVolume = false;
@@ -395,7 +396,7 @@ public abstract class StorageVolume
     }
 
     public T storageType(StorageType st) {
-      this.storageType = st;
+      this.storageType = Objects.requireNonNull(st, "storageType == null");
       return this.getThis();
     }
 
@@ -491,8 +492,7 @@ public abstract class StorageVolume
   }
 
   public StorageType getStorageType() {
-    return volumeInfo.map(VolumeInfo::getStorageType)
-            .orElse(StorageType.DEFAULT);
+    return storageType;
   }
 
   public String getStorageID() {
