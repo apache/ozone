@@ -195,7 +195,7 @@ public enum TestContainerCorruptions {
     }
   }
 
-  private static File getBlock(Container<?> container, long blockID) {
+  public static File getBlock(Container<?> container, long blockID) {
     File blockFile;
     File chunksDir = new File(container.getContainerData().getContainerPath(),
         "chunks");

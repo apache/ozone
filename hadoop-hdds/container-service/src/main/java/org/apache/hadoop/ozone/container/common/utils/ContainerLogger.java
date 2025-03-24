@@ -17,7 +17,10 @@
 
 package org.apache.hadoop.ozone.container.common.utils;
 
+import static org.apache.hadoop.hdds.HddsUtils.checksumToString;
+
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.apache.logging.log4j.LogManager;
@@ -145,6 +148,23 @@ public final class ContainerLogger {
     LOG.info(getMessage(containerData));
   }
 
+  /**
+   * Logged when a container is reconciled.
+   *
+   * @param containerData The container that was reconciled on this datanode.
+   * @param oldDataChecksum The old data checksum.
+   */
+  public static void logReconciled(ContainerData containerData, long oldDataChecksum, DatanodeDetails peer) {
+    if (containerData.getDataChecksum() == oldDataChecksum) {
+      LOG.info(getMessage(containerData, "Container reconciled with peer " + peer.toString() +
+          ". No change in checksum."));
+    } else {
+      LOG.warn(getMessage(containerData, "Container reconciled with peer " + peer.toString() +
+          ". Checksum updated from " + checksumToString(oldDataChecksum) + " to "
+          + checksumToString(containerData.getDataChecksum())));
+    }
+  }
+
   private static String getMessage(ContainerData containerData,
                                    String message) {
     return String.join(FIELD_SEPARATOR, getMessage(containerData), message);
@@ -155,6 +175,7 @@ public final class ContainerLogger {
         "ID=" + containerData.getContainerID(),
         "Index=" + containerData.getReplicaIndex(),
         "BCSID=" + containerData.getBlockCommitSequenceId(),
-        "State=" + containerData.getState());
+        "State=" + containerData.getState(),
+        "DataChecksum=" + checksumToString(containerData.getDataChecksum()));
   }
 }
