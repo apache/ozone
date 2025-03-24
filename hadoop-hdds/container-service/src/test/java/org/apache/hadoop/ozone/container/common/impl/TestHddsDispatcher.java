@@ -50,7 +50,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
@@ -245,16 +244,16 @@ public class TestHddsDispatcher {
       ContainerLayoutVersion layoutVersion) throws Exception {
     String testDirPath = testDir.getPath();
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setStorageSize(HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
+    conf.setStorageSize(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
         100.0, StorageUnit.BYTES);
     DatanodeDetails dd = randomDatanodeDetails();
 
     HddsVolume.Builder volumeBuilder =
         new HddsVolume.Builder(testDirPath).datanodeUuid(dd.getUuidString())
             .conf(conf).usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
-    // state of cluster : available (140) > 100  ,datanode volume
+    // state of cluster : available (160) > 100  ,datanode volume
     // utilisation threshold not yet reached. container creates are successful.
-    AtomicLong usedSpace = new AtomicLong(360);
+    AtomicLong usedSpace = new AtomicLong(340);
     SpaceUsageSource spaceUsage = MockSpaceUsageSource.of(500, usedSpace);
 
     SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(
@@ -268,6 +267,7 @@ public class TestHddsDispatcher {
       ContainerSet containerSet = newContainerSet();
       StateContext context = ContainerTestUtils.getMockContext(dd, conf);
       // create a 50 byte container
+      // available (160) > 100 (min free space) + 50 (container size)
       KeyValueContainerData containerData = new KeyValueContainerData(1L,
           layoutVersion,
           50, UUID.randomUUID().toString(),

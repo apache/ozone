@@ -131,8 +131,7 @@ public class TestECUnderReplicationHandler {
     nodeManager = new MockNodeManager(true, 10) {
       @Override
       public NodeStatus getNodeStatus(DatanodeDetails dd) {
-        return new NodeStatus(
-            dd.getPersistedOpState(), HddsProtos.NodeState.HEALTHY, 0);
+        return NodeStatus.valueOf(dd.getPersistedOpState(), HddsProtos.NodeState.HEALTHY);
       }
     };
     replicationManager = mock(ReplicationManager.class);
@@ -146,8 +145,7 @@ public class TestECUnderReplicationHandler {
     when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocation -> {
           DatanodeDetails dd = invocation.getArgument(0);
-          return new NodeStatus(dd.getPersistedOpState(),
-              HddsProtos.NodeState.HEALTHY, 0);
+          return NodeStatus.valueOf(dd.getPersistedOpState(), HddsProtos.NodeState.HEALTHY);
         });
 
     commandsSent = new HashSet<>();
@@ -392,11 +390,10 @@ public class TestECUnderReplicationHandler {
       @Override
       public NodeStatus getNodeStatus(DatanodeDetails dd) {
         if (dd.equals(deadMaintenance.getDatanodeDetails())) {
-          return new NodeStatus(dd.getPersistedOpState(),
+          return NodeStatus.valueOf(dd.getPersistedOpState(),
               HddsProtos.NodeState.DEAD);
         }
-        return new NodeStatus(
-            dd.getPersistedOpState(), HddsProtos.NodeState.HEALTHY, 0);
+        return NodeStatus.valueOf(dd.getPersistedOpState(), HddsProtos.NodeState.HEALTHY);
       }
     };
 

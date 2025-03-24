@@ -193,7 +193,7 @@ public class TestContainerPlacement {
       for (DatanodeDetails datanodeDetails : datanodes) {
         UUID dnId = datanodeDetails.getUuid();
         DatanodeInfo datanodeInfo = scmNodeManager.getNodeStateManager()
-            .getNode(dnId);
+            .getNode(datanodeDetails.getID());
         StorageContainerDatanodeProtocolProtos.StorageReportProto report =
             HddsTestUtils
                 .createStorageReport(dnId,
@@ -231,9 +231,8 @@ public class TestContainerPlacement {
             SCMTestUtils.getReplicationFactor(conf).getNumber()) {
           break;
         }
-        UUID dnId = datanodeDetails.getUuid();
         DatanodeInfo datanodeInfo = scmNodeManager.getNodeStateManager()
-            .getNode(dnId);
+            .getNode(datanodeDetails.getID());
         addReplica(container, datanodeInfo);
         replicaCount++;
       }

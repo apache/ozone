@@ -17,10 +17,10 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone-main</artifactId>
-    <version>2.0.0-SNAPSHOT</version>
+    <version>2.1.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone</artifactId>
-  <version>2.0.0-SNAPSHOT</version>
+  <version>2.1.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Apache Ozone</name>
   <description>Apache Ozone Project</description>
@@ -37,6 +37,7 @@
     <module>integration-test</module>
     <module>interface-client</module>
     <module>interface-storage</module>
+    <module>mini-cluster</module>
     <module>ozone-manager</module>
     <module>ozonefs</module>
     <module>ozonefs-common</module>
@@ -265,6 +266,11 @@
         <artifactId>ozone-manager</artifactId>
         <version>${ozone.version}</version>
         <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>ozone-mini-cluster</artifactId>
+        <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>

@@ -20,6 +20,7 @@ package org.apache.ozone.test;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
@@ -69,6 +70,7 @@ public abstract class ClusterForTests<C extends MiniOzoneCluster> {
     conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     conf.setBoolean(OZONE_FS_HSYNC_ENABLED, true);
     conf.setTimeDuration(OZONE_OM_LEASE_SOFT_LIMIT, 0, TimeUnit.SECONDS);
+    conf.setInt(OZONE_KEY_DELETING_LIMIT_PER_TASK, 0);
 
     return conf;
   }

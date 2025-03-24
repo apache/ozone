@@ -616,7 +616,7 @@ public class TestSCMContainerPlacementRackAware {
     setup(datanodeCount);
     // Set all the nodes to out of service
     for (DatanodeInfo dn : dnInfos) {
-      dn.setNodeStatus(new NodeStatus(DECOMMISSIONED, HEALTHY));
+      dn.setNodeStatus(NodeStatus.valueOf(DECOMMISSIONED, HEALTHY));
     }
 
     for (int i = 0; i < 10; i++) {
@@ -632,7 +632,7 @@ public class TestSCMContainerPlacementRackAware {
         // ok, as there is only 1 IN_SERVICE node and with the retry logic we
         // may never find it.
       }
-      dnInfos.get(index).setNodeStatus(new NodeStatus(DECOMMISSIONED, HEALTHY));
+      dnInfos.get(index).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONED, HEALTHY));
     }
   }
 

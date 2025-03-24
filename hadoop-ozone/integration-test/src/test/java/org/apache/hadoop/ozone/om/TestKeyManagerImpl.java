@@ -472,7 +472,7 @@ public class TestKeyManagerImpl {
         .setStoreType(OzoneObj.StoreType.OZONE)
         .build();
 
-    OzoneAcl ozAcl1 = new OzoneAcl(ACLIdentityType.USER, "user1",
+    OzoneAcl ozAcl1 = OzoneAcl.of(ACLIdentityType.USER, "user1",
         ACCESS, ACLType.READ);
     writeClient.addAcl(ozPrefix1, ozAcl1);
 
@@ -481,13 +481,13 @@ public class TestKeyManagerImpl {
     assertEquals(ozAcl1, ozAclGet.get(0));
 
     List<OzoneAcl> acls = new ArrayList<>();
-    OzoneAcl ozAcl2 = new OzoneAcl(ACLIdentityType.USER, "admin", ACCESS, ACLType.ALL);
+    OzoneAcl ozAcl2 = OzoneAcl.of(ACLIdentityType.USER, "admin", ACCESS, ACLType.ALL);
 
-    OzoneAcl ozAcl3 = new OzoneAcl(ACLIdentityType.GROUP, "dev", ACCESS, READ, WRITE);
+    OzoneAcl ozAcl3 = OzoneAcl.of(ACLIdentityType.GROUP, "dev", ACCESS, READ, WRITE);
 
-    OzoneAcl ozAcl4 = new OzoneAcl(ACLIdentityType.GROUP, "dev", ACCESS, WRITE);
+    OzoneAcl ozAcl4 = OzoneAcl.of(ACLIdentityType.GROUP, "dev", ACCESS, WRITE);
 
-    OzoneAcl ozAcl5 = new OzoneAcl(ACLIdentityType.GROUP, "dev", ACCESS, READ);
+    OzoneAcl ozAcl5 = OzoneAcl.of(ACLIdentityType.GROUP, "dev", ACCESS, READ);
 
     acls.add(ozAcl2);
     acls.add(ozAcl3);
@@ -558,7 +558,7 @@ public class TestKeyManagerImpl {
 
     // Invalid prefix not ending with "/"
     String invalidPrefix = "invalid/pf";
-    OzoneAcl ozAcl1 = new OzoneAcl(ACLIdentityType.USER, "user1",
+    OzoneAcl ozAcl1 = OzoneAcl.of(ACLIdentityType.USER, "user1",
         ACCESS, ACLType.READ);
 
     OzoneObj ozInvalidPrefix = new OzoneObjInfo.Builder()
@@ -622,7 +622,7 @@ public class TestKeyManagerImpl {
         .setStoreType(OzoneObj.StoreType.OZONE)
         .build();
 
-    OzoneAcl ozAcl1 = new OzoneAcl(ACLIdentityType.USER, "user1",
+    OzoneAcl ozAcl1 = OzoneAcl.of(ACLIdentityType.USER, "user1",
         ACCESS, ACLType.READ);
     writeClient.addAcl(ozPrefix1, ozAcl1);
 

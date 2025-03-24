@@ -1587,14 +1587,14 @@ public class SCMNodeManager implements NodeManager {
   public void addContainer(final DatanodeDetails datanodeDetails,
       final ContainerID containerId)
       throws NodeNotFoundException {
-    nodeStateManager.addContainer(datanodeDetails.getUuid(), containerId);
+    nodeStateManager.addContainer(datanodeDetails.getID(), containerId);
   }
 
   @Override
   public void removeContainer(final DatanodeDetails datanodeDetails,
                            final ContainerID containerId)
       throws NodeNotFoundException {
-    nodeStateManager.removeContainer(datanodeDetails.getUuid(), containerId);
+    nodeStateManager.removeContainer(datanodeDetails.getID(), containerId);
   }
 
   /**
@@ -1608,8 +1608,7 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public void setContainers(DatanodeDetails datanodeDetails,
       Set<ContainerID> containerIds) throws NodeNotFoundException {
-    nodeStateManager.setContainers(datanodeDetails.getUuid(),
-        containerIds);
+    nodeStateManager.setContainers(datanodeDetails.getID(), containerIds);
   }
 
   /**
@@ -1623,12 +1622,12 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public Set<ContainerID> getContainers(DatanodeDetails datanodeDetails)
       throws NodeNotFoundException {
-    return nodeStateManager.getContainers(datanodeDetails.getUuid());
+    return nodeStateManager.getContainers(datanodeDetails.getID());
   }
 
   public int getContainerCount(DatanodeDetails datanodeDetails)
       throws NodeNotFoundException {
-    return nodeStateManager.getContainerCount(datanodeDetails.getUuid());
+    return nodeStateManager.getContainerCount(datanodeDetails.getID());
   }
 
   public int getPipeLineCount(DatanodeDetails datanodeDetails)
@@ -1711,7 +1710,7 @@ public class SCMNodeManager implements NodeManager {
     }
 
     try {
-      return nodeStateManager.getNode(uuid);
+      return nodeStateManager.getNode(DatanodeID.of(uuid));
     } catch (NodeNotFoundException e) {
       LOG.warn("Cannot find node for uuid {}", uuid);
       return null;
@@ -1850,7 +1849,7 @@ public class SCMNodeManager implements NodeManager {
         if (clusterMap.contains(datanodeDetails)) {
           clusterMap.remove(datanodeDetails);
         }
-        nodeStateManager.removeNode(datanodeDetails);
+        nodeStateManager.removeNode(datanodeDetails.getID());
         removeFromDnsToDnIdMap(datanodeDetails.getID(), datanodeDetails.getIpAddress());
         final List<SCMCommand<?>> cmdList = getCommandQueue(datanodeDetails.getUuid());
         LOG.info("Clearing command queue of size {} for DN {}", cmdList.size(), datanodeDetails);

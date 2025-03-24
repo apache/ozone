@@ -210,24 +210,12 @@
   </property>
   <property>
     <name>hdds.datanode.volume.choosing.policy</name>
-    <value/>
+    <value>org.apache.hadoop.ozone.container.common.volume.CapacityVolumeChoosingPolicy</value>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
     <description>
-      The class name of the policy for choosing volumes in the list of
-      directories.  Defaults to
-      org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy.
-      This volume choosing policy selects volumes in a round-robin order.
-    </description>
-  </property>
-  <property>
-    <name>hdds.datanode.volume.min.free.space</name>
-    <value>5GB</value>
-    <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
-    <description>
-      This determines the free space to be used for closing containers
-      When the difference between volume capacity and used reaches this number,
-      containers that reside on this volume will be closed and no new containers
-      would be allocated on this volume.
+      The class name of the policy for choosing volumes in the list of directories.
+      Defaults to org.apache.hadoop.ozone.container.common.volume.CapacityVolumeChoosingPolicy.
+      This volume choosing policy randomly chooses two volumes with remaining space and then picks the one with lower utilization.
     </description>
   </property>
   <property>
