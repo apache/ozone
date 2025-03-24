@@ -21,7 +21,6 @@ import java.util.Set;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 
 /**
  * This interface specifies the policy for choosing containers to balance.
@@ -29,10 +28,14 @@ import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 public interface ContainerChoosingPolicy {
   /**
    * Choose a container for balancing.
-   *
+   * @param inProgressContainerIDs -> containerIDs present in this set should be
+   - avoided as these containers are already under move by diskBalancer.
+   * @param replicationContainerIDs -> containerIDs present in this set should be
+   - avoided as these containers are in replication mode which has a chance
+   - to get deleted in the future.
    * @return a Container
    */
   ContainerData chooseContainer(OzoneContainer ozoneContainer,
       HddsVolume volume, Set<Long> inProgressContainerIDs,
-      ReplicationSupervisor replicationSupervisor);
+      Set<Long> replicationContainerIDs);
 }

@@ -26,7 +26,6 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -35,11 +34,6 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask;
-import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
-import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
-import org.apache.hadoop.ozone.container.replication.ReplicationTask;
-import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -49,50 +43,45 @@ import org.junit.jupiter.api.Test;
 public class TestDefaultContainerChoosingPolicy {
 
   private OzoneContainer ozoneContainer;
-  private ReplicationSupervisor replicationSupervisor;
   private DefaultContainerChoosingPolicy containerChoosingPolicy;
   private HddsVolume hddsVolume;
   private ContainerController containerController;
   private Collection<Container<?>> containers;
-  private Set<AbstractReplicationTask> inFlight;
   private Set<Long> inProgressContainerIDs;
+  private Set<Long> replicationContainerIDs;
 
   private static final AtomicLong CONTAINER_SEQ_ID = new AtomicLong(100);
-  private static final long CURRENT_TERM = 1;
-  private final AtomicReference<ContainerReplicator> replicatorRef = new AtomicReference<>();
 
   @BeforeEach
   public void init() {
     ozoneContainer = mock(OzoneContainer.class);
-    replicationSupervisor = mock(ReplicationSupervisor.class);
     containerChoosingPolicy = new DefaultContainerChoosingPolicy();
     inProgressContainerIDs = ConcurrentHashMap.newKeySet();
+    replicationContainerIDs = ConcurrentHashMap.newKeySet();
     hddsVolume = mock(HddsVolume.class);
     containerController = mock(ContainerController.class);
     when(ozoneContainer.getController()).thenReturn(containerController);
     containers = new ArrayList<>();
-    inFlight = ConcurrentHashMap.newKeySet();
   }
 
   @Test
   public void testChooseContainer() {
+    // container 101, container 102 -> in replication.
+    replicationContainerIDs.add(101L);
+    replicationContainerIDs.add(102L);
+
     //container 103 -> inProgressContainerIds.
     inProgressContainerIDs.add(103L);
-
-    // container 101, container 102 -> inFlight.
-    inFlight.add(createTask(101L));
-    inFlight.add(createTask(102L));
 
     for (int i = 0; i < 6; i++) {
       containers.add(createMockContainers());
     }
 
-    when(replicationSupervisor.getInFlightTasks()).thenReturn(inFlight);
     when(containerController.getContainers(hddsVolume))
         .thenAnswer(i -> this.containers.iterator());
 
     ContainerData result = containerChoosingPolicy.chooseContainer(ozoneContainer, hddsVolume,
-        inProgressContainerIDs, replicationSupervisor);
+        inProgressContainerIDs, replicationContainerIDs);
 
     assertEquals(106L, result.getContainerID(),
         "Only container 106 is choosen rest others are skipped");
@@ -118,20 +107,7 @@ public class TestDefaultContainerChoosingPolicy {
     } else {
       when(data.isClosed()).thenReturn(true);
     }
-
     when(container.getContainerData()).thenReturn(data);
     return container;
-  }
-
-  private static ReplicateContainerCommand createCommand(long containerId) {
-    ReplicateContainerCommand cmd =
-        ReplicateContainerCommand.forTest(containerId);
-    cmd.setTerm(CURRENT_TERM);
-    return cmd;
-  }
-
-  private ReplicationTask createTask(long containerId) {
-    ReplicateContainerCommand cmd = createCommand(containerId);
-    return new ReplicationTask(cmd, replicatorRef.get());
   }
 }
