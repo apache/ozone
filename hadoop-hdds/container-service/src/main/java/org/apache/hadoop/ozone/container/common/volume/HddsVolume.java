@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
 /**
  * HddsVolume represents volume in a datanode. {@link MutableVolumeSet}
  * maintains a list of HddsVolumes, one for each volume in the Datanode.
- * {@link VolumeInfo} in encompassed by this class.
+ * {@link VolumeUsage} in encompassed by this class.
  * <p>
  * The disk layout per volume is as follows:
  * <p>../hdds/VERSION
