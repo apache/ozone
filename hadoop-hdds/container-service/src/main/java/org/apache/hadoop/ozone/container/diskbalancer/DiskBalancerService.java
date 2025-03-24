@@ -94,7 +94,6 @@ public class DiskBalancerService extends BackgroundService {
 
   private Map<DiskBalancerTask, Integer> inProgressTasks;
   private Set<Long> inProgressContainers;
-  private Set<Long> replicationContainerIDs;
 
   /**
    * A map that tracks the total bytes which will be freed from each source volume
@@ -132,7 +131,6 @@ public class DiskBalancerService extends BackgroundService {
 
     inProgressTasks = new ConcurrentHashMap<>();
     inProgressContainers = ConcurrentHashMap.newKeySet();
-    replicationContainerIDs = ConcurrentHashMap.newKeySet();
     deltaSizes = new ConcurrentHashMap<>();
     volumeSet = ozoneContainer.getVolumeSet();
 
@@ -327,7 +325,8 @@ public class DiskBalancerService extends BackgroundService {
         .build();
   }
 
-  public Set<Long> getReplicationContainerIDs(ReplicationSupervisor supervisor) {
+  private Set<Long> getReplicationContainerIDs(ReplicationSupervisor supervisor) {
+    Set<Long> replicationContainerIDs = ConcurrentHashMap.newKeySet();
     for (AbstractReplicationTask task : supervisor.getInFlightTasks()) {
       replicationContainerIDs.add(task.getContainerId());
     }
