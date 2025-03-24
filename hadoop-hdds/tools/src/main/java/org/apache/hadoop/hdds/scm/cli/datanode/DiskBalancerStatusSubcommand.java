@@ -60,7 +60,7 @@ public class DiskBalancerStatusSubcommand extends ScmSubcommand {
   private String generateStatus(
       List<HddsProtos.DatanodeDiskBalancerInfoProto> protos) {
     StringBuilder formatBuilder = new StringBuilder("Status result:%n" +
-        "%-40s %-20s %-10s %-10s %-15s %-15s %-15s %-15s%n");
+        "%-35s %-25s %-15s %-15s %-15s %-12s %-12s %-12s %-12s %-12s%n");
 
     List<String> contentList = new ArrayList<>();
     contentList.add("Datanode");
@@ -71,11 +71,16 @@ public class DiskBalancerStatusSubcommand extends ScmSubcommand {
     contentList.add("Threads");
     contentList.add("SuccessMove");
     contentList.add("FailureMove");
+    contentList.add("EstBytesToMove(MB)");
+    contentList.add("EstTimeLeft(min)");
 
     for (HddsProtos.DatanodeDiskBalancerInfoProto proto: protos) {
-      formatBuilder.append("%-40s %-20s %-10s %-10s %-15s %-15s %-15s %-15s%n");
+      formatBuilder.append("%-35s %-25s %-15s %-15s %-15s %-12s %-12s %-12s %-12s %-12s%n");
+      long estimatedTimeLeft = calculateEstimatedTimeLeft(proto);
+      long bytesToMoveMB = proto.getBytesToMove() / (1024 * 1024);
+
       contentList.add(proto.getNode().getHostName());
-      contentList.add(String.valueOf(proto.getCurrentVolumeDensitySum()));
+      contentList.add(String.format("%.18f", proto.getCurrentVolumeDensitySum()));
       contentList.add(proto.getRunningStatus().name());
       contentList.add(
           String.format("%.4f", proto.getDiskBalancerConf().getThreshold()));
@@ -85,9 +90,28 @@ public class DiskBalancerStatusSubcommand extends ScmSubcommand {
           String.valueOf(proto.getDiskBalancerConf().getParallelThread()));
       contentList.add(String.valueOf(proto.getSuccessMoveCount()));
       contentList.add(String.valueOf(proto.getFailureMoveCount()));
+      contentList.add(String.valueOf(bytesToMoveMB));
+      contentList.add(estimatedTimeLeft >= 0 ? String.valueOf(estimatedTimeLeft) : "N/A");
     }
+
+    formatBuilder.append("%nNote: Estimated time left is calculated" +
+        " based on the estimated bytes to move and the configured disk bandwidth.");
 
     return String.format(formatBuilder.toString(),
         contentList.toArray(new String[0]));
+  }
+
+  private long calculateEstimatedTimeLeft(HddsProtos.DatanodeDiskBalancerInfoProto proto) {
+    long bytesToMove = proto.getBytesToMove();
+
+    if (bytesToMove == 0) {
+      return 0;
+    }
+    long bandwidth = proto.getDiskBalancerConf().getDiskBandwidthInMB();
+
+    // Convert estimated data from bytes to MB
+    double estimatedDataPendingMB = bytesToMove / (1024.0 * 1024.0);
+    double estimatedTimeLeft = (bandwidth > 0) ? (estimatedDataPendingMB / bandwidth) / 60 : -1;
+    return (long) Math.ceil(estimatedTimeLeft);
   }
 }

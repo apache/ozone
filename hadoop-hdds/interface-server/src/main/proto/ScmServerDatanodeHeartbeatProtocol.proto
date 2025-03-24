@@ -501,6 +501,7 @@ message DiskBalancerReportProto {
   optional DiskBalancerConfigurationProto diskBalancerConf = 3;
   optional uint64 successMoveCount = 4;
   optional uint64 failureMoveCount = 5;
+  optional uint64 bytesToMove = 6;
 }
 
 /**
