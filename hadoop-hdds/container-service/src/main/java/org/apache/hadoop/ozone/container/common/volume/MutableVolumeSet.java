@@ -464,7 +464,7 @@ public class MutableVolumeSet implements VolumeSet {
       StorageVolume volume;
       for (Map.Entry<String, StorageVolume> entry : volumeMap.entrySet()) {
         volume = entry.getValue();
-        Optional<VolumeUsage> volumeInfo = volume.getVolumeInfo();
+        Optional<VolumeUsage> volumeUsage = volume.getVolumeUsage();
         long scmUsed = 0;
         long remaining = 0;
         long capacity = 0;
@@ -472,9 +472,9 @@ public class MutableVolumeSet implements VolumeSet {
         long spare = 0;
         String rootDir = volume.getVolumeRootDir();
         failed = true;
-        if (volumeInfo.isPresent()) {
+        if (volumeUsage.isPresent()) {
           try {
-            SpaceUsageSource usage = volumeInfo.get().getCurrentUsage();
+            SpaceUsageSource usage = volumeUsage.get().getCurrentUsage();
             scmUsed = usage.getUsedSpace();
             remaining = usage.getAvailable();
             capacity = usage.getCapacity();

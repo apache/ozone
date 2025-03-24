@@ -476,7 +476,7 @@ public abstract class StorageVolume
   }
 
   /** @see #getCurrentUsage() */
-  public Optional<VolumeUsage> getVolumeInfo() {
+  public Optional<VolumeUsage> getVolumeUsage() {
     return volumeUsage;
   }
 
