@@ -119,6 +119,7 @@ public abstract class StorageVolume
   private final DatanodeConfiguration dnConf;
 
   private final StorageType storageType;
+  private final String volumeRoot;
   private final File storageDir;
   private String workingDirName;
   private File tmpDir;
@@ -141,8 +142,9 @@ public abstract class StorageVolume
 
   protected StorageVolume(Builder<?> b) throws IOException {
     storageType = b.storageType;
+    volumeRoot = b.volumeRootStr;
     if (!b.failedVolume) {
-      StorageLocation location = StorageLocation.parse(b.volumeRootStr);
+      StorageLocation location = StorageLocation.parse(volumeRoot);
       storageDir = new File(location.getUri().getPath(), b.storageDirStr);
       this.volumeInfo = Optional.of(
               new VolumeInfo.Builder(b.volumeRootStr, b.conf)
@@ -444,7 +446,7 @@ public abstract class StorageVolume
   }
 
   public String getVolumeRootDir() {
-    return volumeInfo.map(VolumeInfo::getRootDir).orElse(null);
+    return volumeRoot;
   }
 
   public SpaceUsageSource getCurrentUsage() {

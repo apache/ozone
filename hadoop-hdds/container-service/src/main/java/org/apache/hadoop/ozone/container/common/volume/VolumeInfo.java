@@ -88,8 +88,6 @@ public final class VolumeInfo {
 
   private static final Logger LOG = LoggerFactory.getLogger(VolumeInfo.class);
 
-  private final String rootDir;
-
   // Space usage calculator
   private final VolumeUsage usage;
 
@@ -118,8 +116,7 @@ public final class VolumeInfo {
 
   private VolumeInfo(Builder b) throws IOException {
 
-    this.rootDir = b.rootDir;
-    File root = new File(this.rootDir);
+    File root = new File(b.rootDir);
 
     boolean succeeded = root.isDirectory() || root.mkdirs();
 
@@ -156,10 +153,6 @@ public final class VolumeInfo {
 
   void shutdownUsageThread() {
     usage.shutdown();
-  }
-
-  public String getRootDir() {
-    return this.rootDir;
   }
 
   /**

@@ -470,11 +470,10 @@ public class MutableVolumeSet implements VolumeSet {
         long capacity = 0;
         long committed = 0;
         long spare = 0;
-        String rootDir = "";
+        String rootDir = volume.getVolumeRootDir();
         failed = true;
         if (volumeInfo.isPresent()) {
           try {
-            rootDir = volumeInfo.get().getRootDir();
             SpaceUsageSource usage = volumeInfo.get().getCurrentUsage();
             scmUsed = usage.getUsedSpace();
             remaining = usage.getAvailable();
@@ -485,7 +484,7 @@ public class MutableVolumeSet implements VolumeSet {
             failed = false;
           } catch (UncheckedIOException ex) {
             LOG.warn("Failed to get scmUsed and remaining for container " +
-                    "storage location {}", volumeInfo.get().getRootDir(), ex);
+                    "storage location {}", rootDir, ex);
             // reset scmUsed and remaining if df/du failed.
             scmUsed = 0;
             remaining = 0;
