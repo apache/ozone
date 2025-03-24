@@ -85,7 +85,6 @@ public class DiskBalancerService extends BackgroundService {
 
   private DiskBalancerVersion version;
 
-  private AtomicLong totalBalancedBytes = new AtomicLong(0L);
   private AtomicLong balancedBytesInLastWindow = new AtomicLong(0L);
   private AtomicLong nextAvailableTime = new AtomicLong(Time.monotonicNow());
 
@@ -512,7 +511,7 @@ public class DiskBalancerService extends BackgroundService {
   public DiskBalancerInfo getDiskBalancerInfo() {
     return new DiskBalancerInfo(shouldRun, threshold, bandwidthInMB,
         parallelThread, version, metrics.getSuccessCount(),
-        metrics.getFailureCount(), bytesToMove);
+        metrics.getFailureCount(), bytesToMove, metrics.getSuccessBytes());
   }
 
   public long calculateBytesToMove(MutableVolumeSet inputVolumeSet) {
