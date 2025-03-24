@@ -19,12 +19,12 @@ package org.apache.hadoop.ozone.debug.replicas.chunk;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.keys.KeyHandler;
+import org.apache.ratis.thirdparty.com.google.protobuf.util.JsonFormat;
 import picocli.CommandLine.Command;
 
 /**
@@ -72,8 +73,11 @@ public class ChunkKeyHandler extends KeyHandler {
       String bucketName = address.getBucketName();
       String keyName = address.getKeyName();
       List<ContainerProtos.ChunkInfo> tempchunks;
-      List<ChunkDetails> chunkDetailsList = new ArrayList<>();
-      HashSet<String> chunkPaths = new HashSet<>();
+
+      result.put("Volume-Name", volumeName);
+      result.put("Bucket-Name", bucketName);
+      result.put("Key-Name", keyName);
+
       OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
           .setBucketName(bucketName).setKeyName(keyName).build();
       OmKeyInfo keyInfo = ozoneManagerClient.lookupKey(keyArgs);
@@ -90,10 +94,6 @@ public class ChunkKeyHandler extends KeyHandler {
           .getConfiguredVersion(getConf());
       ArrayNode responseArrayList = JsonUtils.createArrayNode();
       for (OmKeyLocationInfo keyLocation : locationInfos) {
-        ContainerChunkInfo containerChunkInfoVerbose = new ContainerChunkInfo();
-        ContainerChunkInfo containerChunkInfo = new ContainerChunkInfo();
-        long containerId = keyLocation.getContainerID();
-        chunkPaths.clear();
         Pipeline keyPipeline = keyLocation.getPipeline();
         boolean isECKey =
             keyPipeline.getReplicationConfig().getReplicationType() ==
@@ -108,11 +108,6 @@ public class ChunkKeyHandler extends KeyHandler {
         }
         XceiverClientSpi xceiverClient = xceiverClientManager.acquireClientForReadData(pipeline);
         try {
-          // Datanode is queried to get chunk information.Thus querying the
-          // OM,SCM and datanode helps us get chunk location information
-          ContainerProtos.DatanodeBlockID datanodeBlockID =
-              keyLocation.getBlockID().getDatanodeBlockIDProtobuf();
-          // doing a getBlock on all nodes
           Map<DatanodeDetails, ContainerProtos.GetBlockResponseProto>
               responses =
               ContainerProtocolCalls.getBlockFromAllNodes(xceiverClient,
@@ -123,51 +118,36 @@ public class ChunkKeyHandler extends KeyHandler {
                   keyLocation.getContainerID(), pipeline);
           ArrayNode responseFromAllNodes = JsonUtils.createArrayNode();
           for (Map.Entry<DatanodeDetails, ContainerProtos.GetBlockResponseProto> entry : responses.entrySet()) {
-            chunkPaths.clear();
             ObjectNode jsonObj = JsonUtils.createObjectNode(null);
             if (entry.getValue() == null) {
-              LOG.error("Cant execute getBlock on this node");
+              LOG.error("Can't execute getBlock on this node");
               continue;
             }
             tempchunks = entry.getValue().getBlockData().getChunksList();
             ContainerProtos.ContainerDataProto containerData =
                 readContainerResponses.get(entry.getKey()).getContainerData();
+            ArrayNode chunkFilePaths = JsonUtils.createArrayNode();
             for (ContainerProtos.ChunkInfo chunkInfo : tempchunks) {
               String fileName = containerLayoutVersion.getChunkFile(new File(
                       getChunkLocationPath(containerData.getContainerPath())),
                   keyLocation.getBlockID(),
                   chunkInfo.getChunkName()).toString();
-              chunkPaths.add(fileName);
-              ChunkDetails chunkDetails = new ChunkDetails();
-              chunkDetails.setChunkName(fileName);
-              chunkDetails.setChunkOffset(chunkInfo.getOffset());
-              chunkDetailsList.add(chunkDetails);
-            }
-            containerChunkInfoVerbose.setContainerPath(containerData
-                .getContainerPath());
-            containerChunkInfoVerbose.setPipeline(keyPipeline);
-            containerChunkInfoVerbose.setChunkInfos(chunkDetailsList);
-            containerChunkInfo.setFiles(chunkPaths);
-            containerChunkInfo.setPipelineID(keyPipeline.getId().getId());
-            if (isECKey) {
-              ChunkType blockChunksType =
-                  isECParityBlock(keyPipeline, entry.getKey()) ?
-                      ChunkType.PARITY : ChunkType.DATA;
-              containerChunkInfoVerbose.setChunkType(blockChunksType);
-              containerChunkInfo.setChunkType(blockChunksType);
-            }
-
-            if (isVerbose()) {
-              jsonObj.set("Locations",
-                  JsonUtils.createObjectNode(containerChunkInfoVerbose));
-            } else {
-              jsonObj.set("Locations",
-                  JsonUtils.createObjectNode(containerChunkInfo));
+              chunkFilePaths.add(fileName);
             }
             jsonObj.put("Datanode-HostName", entry.getKey().getHostName());
             jsonObj.put("Datanode-IP", entry.getKey().getIpAddress());
-            jsonObj.put("Container-ID", containerId);
-            jsonObj.put("Block-ID", keyLocation.getLocalID());
+
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode blockDataNode = objectMapper.readTree(JsonFormat.printer().print(entry.getValue().getBlockData()));
+            jsonObj.set("Block-Data", blockDataNode);
+
+            jsonObj.set("Chunk-Files", chunkFilePaths);
+
+            if (isECKey) {
+              ChunkType blockChunksType = isECParityBlock(keyPipeline, entry.getKey()) ?
+                  ChunkType.PARITY : ChunkType.DATA;
+              jsonObj.put("Chunk-Type", blockChunksType.name());
+            }
             responseFromAllNodes.add(jsonObj);
           }
           responseArrayList.add(responseFromAllNodes);

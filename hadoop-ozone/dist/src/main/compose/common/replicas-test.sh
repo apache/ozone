@@ -30,7 +30,7 @@ host="$(jq -r '.KeyLocations[0][0]["Datanode-HostName"]' ${chunkinfo})"
 container="${host%%.*}"
 
 # corrupt the first block of key on one of the datanodes
-datafile="$(jq -r '.KeyLocations[0][0].Locations.files[0]' ${chunkinfo})"
+datafile="$(jq -r '.KeyLocations[0][0].Chunk-Files[0]' ${chunkinfo})"
 docker exec "${container}" sed -i -e '1s/^/a/' "${datafile}"
 
 execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "CORRUPT_DATANODE:${host}" debug/ozone-debug-corrupt-block.robot
