@@ -17,41 +17,60 @@
 
 package org.apache.hadoop.ozone.repair.datanode.schemaupgrade;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
+import static org.apache.ozone.test.IntLambda.withTextFromSystemIn;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.CodecTestUtil;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -72,19 +91,22 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import picocli.CommandLine;
 
 /**
  * Tests for {@link UpgradeContainerSchema} class.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TestUpgradeContainerSchema {
   private static final String SCM_ID = UUID.randomUUID().toString();
-  private static final OzoneConfiguration CONF = new OzoneConfiguration();
+  private OzoneConfiguration conf;
 
-  @TempDir
-  private File testRoot;
   private MutableVolumeSet volumeSet;
-  private UUID datanodeId;
+  private DatanodeDetails datanodeDetails;
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
 
   private BlockManager blockManager;
@@ -92,40 +114,49 @@ class TestUpgradeContainerSchema {
   private ContainerSet containerSet;
   private List<HddsVolume> volumes;
 
+  @BeforeAll
+  void init() {
+    CodecBuffer.enableLeakDetection();
+  }
+
   @BeforeEach
-  public void setup() throws Exception {
-    DatanodeConfiguration dc = CONF.getObject(DatanodeConfiguration.class);
+  void setup(@TempDir Path testRoot) throws Exception {
+    conf = new OzoneConfiguration();
+
+    DatanodeConfiguration dc = conf.getObject(DatanodeConfiguration.class);
     dc.setContainerSchemaV3Enabled(true);
-    CONF.setFromObject(dc);
+    conf.setFromObject(dc);
 
-    final File volume1Path = new File(testRoot, "volume1");
-    final File volume2Path = new File(testRoot, "volume2");
+    final Path volume1Path = Files.createDirectories(testRoot.resolve("volume1").toAbsolutePath());
+    final Path volume2Path = Files.createDirectories(testRoot.resolve("volume2").toAbsolutePath());
+    final Path metadataPath = Files.createDirectories(testRoot.resolve("metadata").toAbsolutePath());
 
-    assertTrue(volume1Path.mkdirs());
-    assertTrue(volume2Path.mkdirs());
+    conf.set(HDDS_DATANODE_DIR_KEY, volume1Path + "," + volume2Path);
+    conf.set(OZONE_METADATA_DIRS, metadataPath.toString());
 
-    final File metadataPath = new File(testRoot, "metadata");
-    assertTrue(metadataPath.mkdirs());
+    datanodeDetails = MockDatanodeDetails.randomDatanodeDetails();
+  }
 
-    CONF.set(HDDS_DATANODE_DIR_KEY,
-        volume1Path.getAbsolutePath() + "," + volume2Path.getAbsolutePath());
-    CONF.set(OZONE_METADATA_DIRS, metadataPath.getAbsolutePath());
-    datanodeId = UUID.randomUUID();
-    volumeSet = new MutableVolumeSet(datanodeId.toString(), SCM_ID, CONF,
+  private void initDatanode(HDDSLayoutFeature layoutFeature) throws IOException {
+    DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+        datanodeDetails.getUuidString(),
+        layoutFeature.layoutVersion());
+    layoutStorage.initialize();
+
+    String idFilePath = Objects.requireNonNull(HddsServerUtil.getDatanodeIdFilePath(conf), "datanode.id path");
+    ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, new File(idFilePath), conf);
+
+    volumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(), SCM_ID, conf,
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
 
     // create rocksdb instance in volume dir
     volumes = new ArrayList<>();
     for (StorageVolume storageVolume : volumeSet.getVolumesList()) {
       HddsVolume hddsVolume = (HddsVolume) storageVolume;
-      StorageVolumeUtil.checkVolume(hddsVolume, SCM_ID, SCM_ID, CONF, null,
+      StorageVolumeUtil.checkVolume(hddsVolume, SCM_ID, SCM_ID, conf, null,
           null);
       volumes.add(hddsVolume);
     }
-
-    DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
-    when(datanodeDetails.getUuidString()).thenReturn(datanodeId.toString());
-    when(datanodeDetails.getUuid()).thenReturn(datanodeId);
 
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
     final AtomicInteger loopCount = new AtomicInteger(0);
@@ -137,38 +168,84 @@ class TestUpgradeContainerSchema {
 
     containerSet = newContainerSet();
 
-    blockManager = new BlockManagerImpl(CONF);
+    blockManager = new BlockManagerImpl(conf);
     chunkManager = new FilePerBlockStrategy(true, blockManager);
   }
 
-  @BeforeAll
-  public static void beforeClass() {
-    CodecBuffer.enableLeakDetection();
-  }
-
   @AfterEach
-  public void after() throws Exception {
+  void after() throws Exception {
     CodecTestUtil.gc();
   }
 
   @Test
-  public void testUpgrade() throws IOException {
-    int num = 2;
+  void failsBeforeOzoneUpgrade() throws IOException {
+    initDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V2);
+    genSchemaV2Containers(1);
+    shutdownAllVolume();
+    List<VolumeUpgradeResult> results = runCommand(false, GenericCli.EXECUTION_ERROR_EXIT_CODE);
+    assertNull(results);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testUpgrade(boolean dryRun) throws IOException {
+    initDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3);
 
     final Map<KeyValueContainerData, Map<String, BlockData>>
-        keyValueContainerBlockDataMap = genSchemaV2Containers(num);
-    assertEquals(num, keyValueContainerBlockDataMap.size());
+        keyValueContainerBlockDataMap = genSchemaV2Containers(2);
 
     shutdownAllVolume();
 
-    UpgradeContainerSchema subject = (UpgradeContainerSchema) new OzoneRepair().getCmd()
+    List<VolumeUpgradeResult> results = runCommand(dryRun, 0);
+    assertNotNull(results);
+    assertEquals(2, results.size());
+    for (VolumeUpgradeResult result : results) {
+      assertTrue(result.isSuccess());
+      for (ContainerUpgradeResult cr : result.getResultMap().values()) {
+        assertSame(ContainerUpgradeResult.Status.SUCCESS, cr.getStatus());
+        KeyValueContainerData pre = assertInstanceOf(KeyValueContainerData.class, cr.getOriginContainerData());
+        KeyValueContainerData post = assertInstanceOf(KeyValueContainerData.class, cr.getNewContainerData());
+        assertEquals(SCHEMA_V2, pre.getSchemaVersion());
+        assertEquals(SCHEMA_V3, post.getSchemaVersion());
+        assertEquals(pre.getState(), post.getState());
+        String schemaVersionKey = "schemaVersion\\s*:\\W*";
+        assertThat(new File(cr.getBackupContainerFilePath()))
+            .exists()
+            .content(UTF_8)
+            .containsPattern(schemaVersionKey + SCHEMA_V2);
+        assertThat(new File(cr.getNewContainerFilePath()))
+            .exists()
+            .content(UTF_8)
+            .containsPattern(schemaVersionKey + (dryRun ? SCHEMA_V2 : SCHEMA_V3));
+      }
+    }
+
+    if (!dryRun) {
+      checkV3MetaData(keyValueContainerBlockDataMap, results);
+    }
+  }
+
+  private List<VolumeUpgradeResult> runCommand(boolean dryRun, int expectedExitCode) {
+    CommandLine cmd = new OzoneRepair().getCmd();
+
+    List<String> argList = Stream.of(HDDS_DATANODE_DIR_KEY, OZONE_METADATA_DIRS)
+        .flatMap(key -> Stream.of("-D", key + "=" + conf.get(key)))
+        .collect(Collectors.toList());
+    argList.addAll(Arrays.asList("datanode", "upgrade-container-schema"));
+    if (dryRun) {
+      argList.add("--dry-run");
+    }
+
+    int exitCode = withTextFromSystemIn("y")
+        .execute(() -> cmd.execute(argList.toArray(new String[0])));
+    assertEquals(expectedExitCode, exitCode);
+
+    UpgradeContainerSchema subject = cmd
         .getSubcommands().get("datanode")
         .getSubcommands().get("upgrade-container-schema")
-        .getCommandSpec().userObject();
+        .getCommand();
 
-    final List<VolumeUpgradeResult> results = subject.run(CONF, volumes);
-
-    checkV3MetaData(keyValueContainerBlockDataMap, results);
+    return subject.getLastResults();
   }
 
   private Map<String, BlockData> putAnyBlockData(KeyValueContainerData data,
@@ -183,7 +260,7 @@ class TestUpgradeContainerSchema {
       BlockID blockID =
           ContainerTestHelper.getTestBlockID(data.getContainerID());
       BlockData kd = new BlockData(blockID);
-      List<ContainerProtos.ChunkInfo> chunks = Lists.newArrayList();
+      List<ContainerProtos.ChunkInfo> chunks = new ArrayList<>();
       putChunksInBlock(1, i, chunks, container, blockID);
       kd.setChunks(chunks);
 
@@ -230,7 +307,7 @@ class TestUpgradeContainerSchema {
 
   private Map<KeyValueContainerData, Map<String, BlockData>>
       genSchemaV2Containers(int numContainers) throws IOException {
-    CONF.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED, false);
+    conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED, false);
 
     // container id ==> blocks
     final Map<KeyValueContainerData, Map<String, BlockData>> checkBlockDataMap =
@@ -243,16 +320,16 @@ class TestUpgradeContainerSchema {
       KeyValueContainerData data = new KeyValueContainerData(containerId,
           ContainerLayoutVersion.FILE_PER_BLOCK,
           ContainerTestHelper.CONTAINER_MAX_SIZE, UUID.randomUUID().toString(),
-          datanodeId.toString());
-      data.setSchemaVersion(OzoneConsts.SCHEMA_V2);
+          datanodeDetails.getUuidString());
+      data.setSchemaVersion(SCHEMA_V2);
 
-      KeyValueContainer container = new KeyValueContainer(data, CONF);
+      KeyValueContainer container = new KeyValueContainer(data, conf);
       container.create(volumeSet, volumeChoosingPolicy, SCM_ID);
 
       containerSet.addContainer(container);
       data = (KeyValueContainerData) containerSet.getContainer(containerId)
           .getContainerData();
-      data.setSchemaVersion(OzoneConsts.SCHEMA_V2);
+      data.setSchemaVersion(SCHEMA_V2);
 
       final Map<String, BlockData> blockDataMap =
           putAnyBlockData(data, container, 10);
@@ -262,6 +339,9 @@ class TestUpgradeContainerSchema {
 
       checkBlockDataMap.put(data, blockDataMap);
     }
+
+    assertEquals(numContainers, checkBlockDataMap.size());
+
     return checkBlockDataMap;
   }
 

@@ -82,6 +82,8 @@ public class UpgradeContainerSchema extends RepairTool {
       description = "volume path")
   private String volume;
 
+  private List<VolumeUpgradeResult> lastResults;
+
   List<VolumeUpgradeResult> run(OzoneConfiguration configuration, List<HddsVolume> volumes) {
     List<VolumeUpgradeResult> results = new ArrayList<>();
     Map<HddsVolume, CompletableFuture<VolumeUpgradeResult>> volumeFutures = new HashMap<>();
@@ -184,7 +186,11 @@ public class UpgradeContainerSchema extends RepairTool {
     }
 
     // do upgrade
-    run(configuration, allVolume);
+    lastResults = run(configuration, allVolume);
+  }
+
+  List<VolumeUpgradeResult> getLastResults() {
+    return lastResults;
   }
 
   /**

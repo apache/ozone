@@ -51,6 +51,10 @@ class ContainerUpgradeResult {
     this.newContainerData = newContainerData;
   }
 
+  ContainerData getNewContainerData() {
+    return newContainerData;
+  }
+
   public long getCostMs() {
     return endTimeMs - startTimeMs;
   }
@@ -63,8 +67,16 @@ class ContainerUpgradeResult {
     this.backupContainerFilePath = backupContainerFilePath;
   }
 
+  String getBackupContainerFilePath() {
+    return backupContainerFilePath;
+  }
+
   public void setNewContainerFilePath(String newContainerFilePath) {
     this.newContainerFilePath = newContainerFilePath;
+  }
+
+  String getNewContainerFilePath() {
+    return newContainerFilePath;
   }
 
   public void success(long rowCount) {
