@@ -27,8 +27,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedBloomFilter;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedLRUCache;
-import org.eclipse.jetty.util.StringUtil;
-import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.CompactionStyle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,6 +94,8 @@ public enum DBProfile {
 
       if (option != null) {
         LOG.info("Using RocksDB CFOptions from {}.ini file", dbPath);
+        // TODO HDDS-12695: RocksDB 7.x doesn't read TableConfigs from files, remove this setting once upgraded
+        option.setTableFormatConfig(createDefaultBlockBasedTableConfig());
         return option;
       }
 
@@ -110,6 +110,9 @@ public enum DBProfile {
 
     @Override
     public ManagedBlockBasedTableConfig getBlockBasedTableConfig(Path dbPath, String cfName) {
+      // TODO HDDS-12695: RocksDB 7.x doesn't read TableConfigs from files,
+      //  so this can be commented out once upgrade happens.
+      /*
       ManagedBlockBasedTableConfig option = new ManagedBlockBasedTableConfig();
       if (dbPath != null && dbPath.toFile().exists() && StringUtil.isNotBlank(cfName)) {
         try {
@@ -123,7 +126,7 @@ public enum DBProfile {
           option.close();
           LOG.error("Unable to read RocksDB BlockBasedTableConfig from {}, exception {}", dbPath, ex);
         }
-      }
+      }*/
       return createDefaultBlockBasedTableConfig();
     }
 
