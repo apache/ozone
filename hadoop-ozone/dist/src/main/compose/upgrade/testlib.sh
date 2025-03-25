@@ -99,7 +99,7 @@ callback() {
 ## @param The version of Ozone to upgrade from.
 ## @param The version of Ozone to upgrade to.
 run_test() {
-  export COMPOSE_CLUSTER="$1"
+  local compose_cluster="$1"
   local upgrade_type="$2"
   export OZONE_UPGRADE_FROM="$3"
   export OZONE_UPGRADE_TO="$4"
@@ -107,7 +107,7 @@ run_test() {
   local test_dir="$_upgrade_dir/upgrades/$upgrade_type"
   local callback_dir="$test_dir"/callbacks
   local execution_dir="$test_dir"/execution/"${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}"
-  local compose_dir="$_upgrade_dir"/compose/"${COMPOSE_CLUSTER}"
+  local compose_dir="$_upgrade_dir"/compose/"$compose_cluster"
   # Export variables needed by test, since it is run in a subshell.
   export OZONE_UPGRADE_CALLBACK="$callback_dir"/"$OZONE_UPGRADE_TO"/callback.sh
   export OZONE_COMMON_CALLBACK="$callback_dir"/common/callback.sh
