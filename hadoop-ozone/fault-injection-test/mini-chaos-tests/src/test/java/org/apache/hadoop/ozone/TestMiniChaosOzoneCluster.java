@@ -62,60 +62,60 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
   @Option(names = {"-d", "--num-datanodes", "--numDatanodes"},
       description = "num of datanodes. Full name --numDatanodes will be" +
           " removed in later versions.")
-  private static int numDatanodes = 20;
+  private int numDatanodes = 20;
 
   @Option(names = {"-o", "--num-ozone-manager", "--numOzoneManager"},
       description = "num of ozoneManagers. Full name --numOzoneManager will" +
           " be removed in later versions.")
-  private static int numOzoneManagers = 1;
+  private int numOzoneManagers = 1;
 
   @Option(names = {"-s", "--num-storage-container-manager",
       "--numStorageContainerManagers"},
       description = "num of storageContainerManagers." +
           "Full name --numStorageContainerManagers will" +
           " be removed in later versions.")
-  private static int numStorageContainerManagerss = 1;
+  private int numStorageContainerManagerss = 1;
 
   @Option(names = {"-t", "--num-threads", "--numThreads"},
       description = "num of IO threads. Full name --numThreads will be" +
           " removed in later versions.")
-  private static int numThreads = 5;
+  private int numThreads = 5;
 
   @Option(names = {"-b", "--num-buffers", "--numBuffers"},
       description = "num of IO buffers. Full name --numBuffers will be" +
           " removed in later versions.")
-  private static int numBuffers = 16;
+  private int numBuffers = 16;
 
   @Option(names = {"-m", "--num-minutes", "--numMinutes"},
       description = "total run time. Full name --numMinutes will be " +
           "removed in later versions.")
-  private static int numMinutes = 1440; // 1 day by default
+  private int numMinutes = 1440; // 1 day by default
 
   @Option(names = {"-v", "--num-data-volume", "--numDataVolume"},
       description = "number of datanode volumes to create. Full name " +
           "--numDataVolume will be removed in later versions.")
-  private static int numDataVolumes = 3;
+  private int numDataVolumes = 3;
 
   @Option(names = {"-i", "--failure-interval", "--failureInterval"},
       description = "time between failure events in seconds. Full name " +
           "--failureInterval will be removed in later versions.")
-  private static int failureInterval = 300; // 5 minute period between failures.
+  private int failureInterval = 300; // 5 minute period between failures.
 
   @CommandLine.Mixin
-  private static FreonReplicationOptions freonReplication =
+  private FreonReplicationOptions freonReplication =
           new FreonReplicationOptions();
 
   @Option(names = {"-l", "--layout"},
       description = "Allowed Bucket Layouts: ${COMPLETION-CANDIDATES}")
-  private static AllowedBucketLayouts allowedBucketLayout =
+  private AllowedBucketLayouts allowedBucketLayout =
       AllowedBucketLayouts.FILE_SYSTEM_OPTIMIZED;
 
   private MiniOzoneChaosCluster cluster;
   private OzoneClient client;
   private MiniOzoneLoadGenerator loadGenerator;
 
-  private String omServiceId = null;
-  private String scmServiceId = null;
+  private String omServiceId;
+  private String scmServiceId;
 
   private static final String OM_SERVICE_ID = "ozoneChaosTest";
   private static final String SCM_SERVICE_ID = "scmChaosTest";
