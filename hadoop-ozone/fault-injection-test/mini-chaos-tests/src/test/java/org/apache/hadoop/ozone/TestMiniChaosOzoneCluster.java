@@ -33,9 +33,10 @@ import org.apache.hadoop.ozone.failure.Failures;
 import org.apache.hadoop.ozone.freon.FreonReplicationOptions;
 import org.apache.hadoop.ozone.loadgenerators.LoadGenerator;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -45,12 +46,13 @@ import picocli.CommandLine.Option;
  */
 @Command(description = "Starts IO with MiniOzoneChaosCluster",
     name = "chaos", mixinStandardHelpOptions = true)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestMiniChaosOzoneCluster extends GenericCli {
 
-  private static List<Class<? extends Failures>> failureClasses
+  private final List<Class<? extends Failures>> failureClasses
       = new ArrayList<>();
 
-  private static List<Class<? extends LoadGenerator>> loadClasses
+  private final List<Class<? extends LoadGenerator>> loadClasses
       = new ArrayList<>();
 
   enum AllowedBucketLayouts { FILE_SYSTEM_OPTIMIZED, OBJECT_STORE }
@@ -106,18 +108,18 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
   private static AllowedBucketLayouts allowedBucketLayout =
       AllowedBucketLayouts.FILE_SYSTEM_OPTIMIZED;
 
-  private static MiniOzoneChaosCluster cluster;
-  private static OzoneClient client;
-  private static MiniOzoneLoadGenerator loadGenerator;
+  private MiniOzoneChaosCluster cluster;
+  private OzoneClient client;
+  private MiniOzoneLoadGenerator loadGenerator;
 
-  private static String omServiceId = null;
-  private static String scmServiceId = null;
+  private String omServiceId = null;
+  private String scmServiceId = null;
 
   private static final String OM_SERVICE_ID = "ozoneChaosTest";
   private static final String SCM_SERVICE_ID = "scmChaosTest";
 
-  @BeforeAll
-  public static void init() throws Exception {
+  @BeforeEach
+  void init() throws Exception {
     OzoneConfiguration configuration = new OzoneConfiguration();
 
     MiniOzoneChaosCluster.Builder chaosBuilder =
@@ -164,19 +166,19 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
     loadGenerator = loadBuilder.build();
   }
 
-  static void addFailureClasses(Class<? extends Failures> clz) {
+  void addFailureClasses(Class<? extends Failures> clz) {
     failureClasses.add(clz);
   }
 
-  static void addLoadClasses(Class<? extends LoadGenerator> clz) {
+  void addLoadClasses(Class<? extends LoadGenerator> clz) {
     loadClasses.add(clz);
   }
 
-  static void setNumDatanodes(int nDns) {
+  void setNumDatanodes(int nDns) {
     numDatanodes = nDns;
   }
 
-  static void setNumManagers(int nOms, int numScms, boolean enableHA) {
+  void setNumManagers(int nOms, int numScms, boolean enableHA) {
 
     if (nOms > 1 || enableHA) {
       omServiceId = OM_SERVICE_ID;
@@ -189,11 +191,8 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
     numStorageContainerManagerss = numScms;
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
-  @AfterAll
-  public static void shutdown() {
+  @AfterEach
+  void shutdown() {
     if (loadGenerator != null) {
       loadGenerator.shutdownLoadGenerator();
     }
