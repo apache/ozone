@@ -99,6 +99,10 @@
     <value>4MB</value>
   </property>
   <property>
+    <name>ozone.scm.container.size</name>
+    <value>128MB</value>
+  </property>
+  <property>
     <name>ozone.client.stream.buffer.flush.size</name>
     <value>1MB</value>
   </property>
