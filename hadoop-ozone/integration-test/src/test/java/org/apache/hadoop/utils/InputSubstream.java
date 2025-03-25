@@ -15,12 +15,12 @@
  * limitations under the License.
  */
 
-package org.apache.ozone.test;
+package org.apache.hadoop.utils;
 
+import com.google.common.base.Preconditions;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Objects;
 
 /**
  * A filter input stream implementation that exposes a range of the underlying input stream.
@@ -33,7 +33,8 @@ public class InputSubstream extends FilterInputStream {
   private long markedPosition = 0;
 
   public InputSubstream(InputStream in, long skip, long length) {
-    super(Objects.requireNonNull(in, "in == null"));
+    super(in);
+    Preconditions.checkNotNull(in);
     this.currentPosition = 0;
     this.requestedSkipOffset = skip;
     this.requestedLength = length;
