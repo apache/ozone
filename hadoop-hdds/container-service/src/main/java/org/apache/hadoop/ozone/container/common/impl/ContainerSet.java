@@ -1,33 +1,46 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.common.impl;
+
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.Message;
+import java.io.IOException;
+import java.time.Clock;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentNavigableMap;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
-
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -36,24 +49,6 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.time.Clock;
-import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentNavigableMap;
-import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
-
-
 /**
  * Class that manages Containers created on the datanode.
  */
@@ -61,41 +56,37 @@ public class ContainerSet implements Iterable<Container<?>> {
 
   private static final Logger LOG = LoggerFactory.getLogger(ContainerSet.class);
 
+  public static ContainerSet newReadOnlyContainerSet(long recoveringTimeout) {
+    return new ContainerSet(null, recoveringTimeout);
+  }
+
+  public static ContainerSet newRwContainerSet(Table<Long, String> containerIdsTable, long recoveringTimeout) {
+    Objects.requireNonNull(containerIdsTable, "containerIdsTable == null");
+    return new ContainerSet(containerIdsTable, recoveringTimeout);
+  }
+
   private final ConcurrentSkipListMap<Long, Container<?>> containerMap = new
       ConcurrentSkipListMap<>();
   private final ConcurrentSkipListSet<Long> missingContainerSet =
       new ConcurrentSkipListSet<>();
   private final ConcurrentSkipListMap<Long, Long> recoveringContainerMap =
       new ConcurrentSkipListMap<>();
-  private Clock clock;
+  private final Clock clock;
   private long recoveringTimeout;
   private final Table<Long, String> containerIdsTable;
 
-  @VisibleForTesting
-  public ContainerSet(long recoveringTimeout) {
-    this(new InMemoryTestTable<>(), recoveringTimeout);
+  private ContainerSet(Table<Long, String> continerIdsTable, long recoveringTimeout) {
+    this(continerIdsTable, recoveringTimeout, null);
   }
 
-  public ContainerSet(Table<Long, String> continerIdsTable, long recoveringTimeout) {
-    this(continerIdsTable, recoveringTimeout, false);
-  }
-
-  public ContainerSet(Table<Long, String> continerIdsTable, long recoveringTimeout, boolean readOnly) {
-    this.clock = Clock.system(ZoneOffset.UTC);
+  ContainerSet(Table<Long, String> continerIdsTable, long recoveringTimeout, Clock clock) {
+    this.clock = clock != null ? clock : Clock.systemUTC();
     this.containerIdsTable = continerIdsTable;
     this.recoveringTimeout = recoveringTimeout;
-    if (!readOnly && containerIdsTable == null) {
-      throw new IllegalArgumentException("Container table cannot be null when container set is not read only");
-    }
   }
 
   public long getCurrentTime() {
     return clock.millis();
-  }
-
-  @VisibleForTesting
-  public void setClock(Clock clock) {
-    this.clock = clock;
   }
 
   @VisibleForTesting

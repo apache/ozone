@@ -1,26 +1,34 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.nio.file.Files.newInputStream;
+import static java.nio.file.Files.newOutputStream;
+import static org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker.CONTAINER_FILE_NAME;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -34,15 +42,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
-
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.Archiver;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
 import org.apache.ozone.test.SpyInputStream;
 import org.apache.ozone.test.SpyOutputStream;
@@ -51,16 +58,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.nio.file.Files.newInputStream;
-import static java.nio.file.Files.newOutputStream;
-import static org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker.CONTAINER_FILE_NAME;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test the tar/untar for a given container.
@@ -195,7 +192,7 @@ public class TestTarContainerPacker {
 
     //THEN: check the result
     TarArchiveInputStream tarStream = null;
-    try (FileInputStream input = new FileInputStream(targetFile.toFile())) {
+    try (InputStream input = newInputStream(targetFile)) {
       InputStream uncompressed = packer.decompress(input);
       tarStream = new TarArchiveInputStream(uncompressed);
 
@@ -348,7 +345,7 @@ public class TestTarContainerPacker {
 
   private KeyValueContainerData unpackContainerData(File containerFile)
       throws IOException {
-    try (FileInputStream input = new FileInputStream(containerFile)) {
+    try (InputStream input = newInputStream(containerFile.toPath())) {
       KeyValueContainerData data = createContainer(DEST_CONTAINER_ROOT, false);
       KeyValueContainer container = new KeyValueContainer(data, conf);
       packer.unpackContainerData(container, input, TEMP_DIR,
@@ -358,10 +355,8 @@ public class TestTarContainerPacker {
   }
 
   private void writeDescriptor(KeyValueContainer container) throws IOException {
-    FileOutputStream fileStream = new FileOutputStream(
-        container.getContainerFile());
-    try (OutputStreamWriter writer = new OutputStreamWriter(fileStream,
-        UTF_8)) {
+    try (OutputStream fileStream = newOutputStream(container.getContainerFile().toPath());
+        OutputStreamWriter writer = new OutputStreamWriter(fileStream, UTF_8)) {
       IOUtils.write(TEST_DESCRIPTOR_FILE_CONTENT, writer);
     }
   }
@@ -383,11 +378,12 @@ public class TestTarContainerPacker {
   private File writeSingleFile(Path parentPath, String fileName,
       String content) throws IOException {
     Path path = parentPath.resolve(fileName).normalize();
-    Files.createDirectories(path.getParent());
+    Path parent = path.getParent();
+    assertNotNull(parent);
+    Files.createDirectories(parent);
     File file = path.toFile();
-    FileOutputStream fileStream = new FileOutputStream(file);
-    try (OutputStreamWriter writer = new OutputStreamWriter(fileStream,
-        UTF_8)) {
+    try (OutputStream fileStream = newOutputStream(file.toPath());
+        OutputStreamWriter writer = new OutputStreamWriter(fileStream, UTF_8)) {
       IOUtils.write(content, writer);
     }
     return file;
@@ -396,12 +392,10 @@ public class TestTarContainerPacker {
   private File packContainerWithSingleFile(File file, String entryName)
       throws Exception {
     File targetFile = TEMP_DIR.resolve("container.tar").toFile();
-    try (FileOutputStream output = new FileOutputStream(targetFile);
-         OutputStream compressed = packer.compress(output);
-         TarArchiveOutputStream archive =
-             new TarArchiveOutputStream(compressed)) {
+    Path path = targetFile.toPath();
+    try (TarArchiveOutputStream archive = new TarArchiveOutputStream(packer.compress(newOutputStream(path)))) {
       archive.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
-      TarContainerPacker.includeFile(file, entryName, archive);
+      Archiver.includeFile(file, entryName, archive);
     }
     return targetFile;
   }
@@ -425,8 +419,8 @@ public class TestTarContainerPacker {
         "example file is missing after pack/unpackContainerData: " +
             exampleFile);
 
-    try (FileInputStream testFile =
-             new FileInputStream(exampleFile.toFile())) {
+    try (InputStream testFile =
+             newInputStream(exampleFile)) {
       List<String> strings = IOUtils.readLines(testFile, UTF_8);
       assertEquals(1, strings.size());
       assertEquals(content, strings.get(0));

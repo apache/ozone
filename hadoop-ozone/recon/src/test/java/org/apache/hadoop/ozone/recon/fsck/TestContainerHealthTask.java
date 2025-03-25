@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,23 +18,23 @@
 package org.apache.hadoop.ozone.recon.fsck;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.ALL_REPLICAS_BAD;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.ALL_REPLICAS_BAD;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -44,7 +43,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -61,6 +59,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.TestContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
+import org.apache.hadoop.ozone.recon.metrics.ContainerHealthMetrics;
+import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
@@ -68,13 +68,12 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
+import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
+import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
+import org.apache.ozone.recon.schema.generated.tables.daos.UnhealthyContainersDao;
+import org.apache.ozone.recon.schema.generated.tables.pojos.ReconTaskStatus;
+import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
-import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
-import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
-import org.hadoop.ozone.recon.schema.tables.daos.UnhealthyContainersDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
-import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -187,7 +186,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     long currentTime = System.currentTimeMillis();
     ReconTaskStatusDao reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
     ReconTaskConfig reconTaskConfig = new ReconTaskConfig();
-    reconTaskConfig.setMissingContainerTaskInterval(Duration.ofSeconds(5));
+    reconTaskConfig.setMissingContainerTaskInterval(Duration.ofSeconds(10));
 
     // Start container health task
     ContainerHealthTask containerHealthTask =
@@ -229,6 +228,18 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     assertEquals("MISSING", rec.getContainerState());
     assertEquals(3, rec.getReplicaDelta().intValue());
 
+    Field field = ContainerHealthTask.class.getDeclaredField("containerHealthMetrics");
+    field.setAccessible(true);
+
+    // Read private field value
+    ContainerHealthMetrics containerHealthMetrics = (ContainerHealthMetrics) field.get(containerHealthTask);
+
+    // Only Container ID: 7 is MISSING, so count of missing container count metrics should be equal to 1
+    assertEquals(1, containerHealthMetrics.getMissingContainerCount());
+    // Container ID: 1 and Container ID: 2, both are UNDER_REPLICATED, so UNDER_REPLICATED
+    // container count metric should be 2
+    assertEquals(2, containerHealthMetrics.getUnderReplicatedContainerCount());
+
     rec = unHealthyContainersTableHandle.fetchByContainerId(4L).get(0);
     assertEquals("OVER_REPLICATED", rec.getContainerState());
     assertEquals(-2, rec.getReplicaDelta().intValue());
@@ -249,7 +260,8 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(1L)))
         .thenReturn(getMockReplicas(1L, State.CLOSED, State.CLOSED));
 
-    // ID 2 was missing - make it healthy now
+    // ID 2 was UNDER_REPLICATED - make it healthy now and after this step, UNDER_REPLICATED
+    // container count metric will be 1.
     when(containerManagerMock.getContainerReplicas(ContainerID.valueOf(2L)))
         .thenReturn(getMockReplicas(2L,
             State.CLOSED, State.CLOSED, State.CLOSED));
@@ -281,9 +293,17 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     assertEquals(0,
         unHealthyContainersTableHandle.fetchByContainerId(2L).size());
 
+    // Now since container ID: 2 is gone back to HEALTHY state in above step, so UNDER-REPLICATED
+    // container count should be just 1 (denoting only for container ID : 1)
+    assertEquals(1, containerHealthMetrics.getUnderReplicatedContainerCount());
+
     // Assert that for container 7 no records exist in DB because it's now EMPTY_MISSING
     assertEquals(0,
         unHealthyContainersTableHandle.fetchByContainerId(7L).size());
+
+    // Since Container ID: 7 is now EMPTY_MISSING, so MISSING container count metric
+    // will now be 0 as there is no missing container now.
+    assertEquals(0, containerHealthMetrics.getMissingContainerCount());
 
     rec = unHealthyContainersTableHandle.fetchByContainerId(4L).get(0);
     assertEquals("OVER_REPLICATED", rec.getContainerState());
@@ -296,6 +316,14 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     // Just check once again that count remains consistent
     LambdaTestUtils.await(60000, 1000, () ->
         (unHealthyContainersTableHandle.count() == 2));
+
+    // Since other container states have been changing, but no change in UNDER_REPLICATED
+    // container count, UNDER_REPLICATED count metric should not be affected from previous
+    // assertion count.
+    assertEquals(1, containerHealthMetrics.getUnderReplicatedContainerCount());
+    assertEquals(0, containerHealthMetrics.getMissingContainerCount());
+
+    containerHealthTask.stop();
   }
 
   @Test
@@ -464,6 +492,69 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
           "The inserted container state does not match for state " +
               state.name() + ".");
     }
+  }
+
+  @Test
+  public void testInsertFailureAndUpdateBehavior() {
+    UnhealthyContainersDao unHealthyContainersTableHandle =
+        getDao(UnhealthyContainersDao.class);
+
+    ContainerHealthSchemaManager containerHealthSchemaManager =
+        new ContainerHealthSchemaManager(
+            getSchemaDefinition(ContainerSchemaDefinition.class),
+            unHealthyContainersTableHandle);
+
+    ContainerSchemaDefinition.UnHealthyContainerStates state =
+        ContainerSchemaDefinition.UnHealthyContainerStates.MISSING;
+
+    long insertedTime = System.currentTimeMillis();
+    // Create a dummy UnhealthyContainer record with the current state
+    UnhealthyContainers unhealthyContainer = new UnhealthyContainers();
+    unhealthyContainer.setContainerId(state.ordinal() + 1L);
+    unhealthyContainer.setExpectedReplicaCount(3);
+    unhealthyContainer.setActualReplicaCount(0);
+    unhealthyContainer.setReplicaDelta(3);
+    unhealthyContainer.setContainerState(state.name());
+    unhealthyContainer.setInStateSince(insertedTime);
+
+    // Try inserting the record and catch any exception that occurs
+    Exception exception = null;
+    try {
+      containerHealthSchemaManager.insertUnhealthyContainerRecords(
+          Collections.singletonList(unhealthyContainer));
+    } catch (Exception e) {
+      exception = e;
+    }
+
+    // Assert no exception should be thrown for each state
+    assertNull(exception,
+        "Exception was thrown during insertion for state " + state.name() +
+            ": " + exception);
+
+    long updatedTime = System.currentTimeMillis();
+    unhealthyContainer.setExpectedReplicaCount(3);
+    unhealthyContainer.setActualReplicaCount(0);
+    unhealthyContainer.setReplicaDelta(3);
+    unhealthyContainer.setContainerState(state.name());
+    unhealthyContainer.setInStateSince(updatedTime);
+
+    try {
+      containerHealthSchemaManager.insertUnhealthyContainerRecords(
+          Collections.singletonList(unhealthyContainer));
+    } catch (Exception e) {
+      exception = e;
+    }
+
+    // Optionally, verify the record was updated correctly
+    List<UnhealthyContainers> updatedRecords =
+        unHealthyContainersTableHandle.fetchByContainerId(
+            state.ordinal() + 1L);
+    assertFalse(updatedRecords.isEmpty(),
+        "Record was not updated for state " + state.name() + ".");
+    assertEquals(updatedRecords.get(0).getContainerState(), state.name(),
+        "The inserted container state does not match for state " +
+            state.name() + ".");
+    assertEquals(updatedRecords.get(0).getInStateSince(), updatedTime);
   }
 
   @Test

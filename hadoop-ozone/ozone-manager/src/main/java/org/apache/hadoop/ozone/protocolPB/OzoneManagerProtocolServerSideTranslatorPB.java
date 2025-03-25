@@ -1,31 +1,34 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.protocolPB;
 
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER;
-import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createClientRequest;
+import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createErrorResponse;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.PrepareStatus;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.protobuf.ProtocolMessageEnum;
+import com.google.protobuf.RpcController;
+import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
-
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ipc.ProcessingDetails.Timing;
@@ -35,21 +38,15 @@ import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
-import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.validation.RequestValidations;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-
-import com.google.protobuf.ProtocolMessageEnum;
-import com.google.protobuf.RpcController;
-import com.google.protobuf.ServiceException;
 import org.apache.hadoop.ozone.security.S3SecurityUtil;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.slf4j.Logger;
@@ -174,41 +171,11 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         return cached;
       }
 
-      // process new request
-      OMClientRequest omClientRequest = null;
-      final OMRequest requestToSubmit;
-      try {
-        omClientRequest = createClientRequest(request, ozoneManager);
-        // TODO: Note: Due to HDDS-6055, createClientRequest() could now
-        //  return null, which triggered the findbugs warning.
-        //  Added the assertion.
-        assert (omClientRequest != null);
-        OMClientRequest finalOmClientRequest = omClientRequest;
-
-        requestToSubmit = preExecute(finalOmClientRequest);
-        this.lastRequestToSubmit = requestToSubmit;
-      } catch (IOException ex) {
-        if (omClientRequest != null) {
-          OMAuditLogger.log(omClientRequest.getAuditBuilder());
-          omClientRequest.handleRequestFailure(ozoneManager);
-        }
-        return createErrorResponse(request, ex);
-      }
-
-      final OMResponse response = omRatisServer.submitRequest(requestToSubmit);
-      if (!response.getSuccess()) {
-        omClientRequest.handleRequestFailure(ozoneManager);
-      }
-      return response;
+      this.lastRequestToSubmit = request;
+      return ozoneManager.getOmExecutionFlow().submit(request);
     } finally {
       OzoneManager.setS3Auth(null);
     }
-  }
-
-  private OMRequest preExecute(OMClientRequest finalOmClientRequest)
-      throws IOException {
-    return captureLatencyNs(perfMetrics.getPreExecuteLatencyNs(),
-        () -> finalOmClientRequest.preExecute(ozoneManager));
   }
 
   @VisibleForTesting
@@ -247,23 +214,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     LOG.debug(leaderNotReadyException.getMessage());
 
     return new ServiceException(leaderNotReadyException);
-  }
-
-  /** @return an {@link OMResponse} from the given {@link OMRequest} and the given exception. */
-  private OMResponse createErrorResponse(
-      OMRequest omRequest, IOException exception) {
-    // Added all write command types here, because in future if any of the
-    // preExecute is changed to return IOException, we can return the error
-    // OMResponse to the client.
-    OMResponse.Builder omResponse = OMResponse.newBuilder()
-        .setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(exception))
-        .setCmdType(omRequest.getCmdType())
-        .setTraceID(omRequest.getTraceID())
-        .setSuccess(false);
-    if (exception.getMessage() != null) {
-      omResponse.setMessage(exception.getMessage());
-    }
-    return omResponse.build();
   }
 
   public static Logger getLog() {

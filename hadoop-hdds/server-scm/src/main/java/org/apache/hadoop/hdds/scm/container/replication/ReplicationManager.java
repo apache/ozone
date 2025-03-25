@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,8 +17,29 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
+import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
+import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.isDecommission;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.isMaintenance;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
+import java.io.IOException;
+import java.time.Clock;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -31,8 +51,8 @@ import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -40,18 +60,18 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
-import org.apache.hadoop.hdds.scm.container.replication.health.ECMisReplicationCheckHandler;
-import org.apache.hadoop.hdds.scm.container.replication.health.MismatchedReplicasHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosedWithUnhealthyReplicasHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosingContainerHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.DeletingContainerHandler;
+import org.apache.hadoop.hdds.scm.container.replication.health.ECMisReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ECReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.EmptyContainerHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.HealthCheck;
+import org.apache.hadoop.hdds.scm.container.replication.health.MismatchedReplicasHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.OpenContainerHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.QuasiClosedContainerHandler;
+import org.apache.hadoop.hdds.scm.container.replication.health.QuasiClosedStuckReplicationCheck;
 import org.apache.hadoop.hdds.scm.container.replication.health.RatisReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.RatisUnhealthyReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.VulnerableUnhealthyReplicasHandler;
@@ -75,28 +95,6 @@ import org.apache.hadoop.util.ExitUtil;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.time.Clock;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-
-import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
-import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
-import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
-import static org.apache.hadoop.hdds.protocol.DatanodeDetails.isDecommission;
-import static org.apache.hadoop.hdds.protocol.DatanodeDetails.isMaintenance;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 
 /**
  * Replication Manager (RM) is the one which is responsible for making sure
@@ -185,6 +183,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   private final RatisUnderReplicationHandler ratisUnderReplicationHandler;
   private final RatisOverReplicationHandler ratisOverReplicationHandler;
   private final RatisMisReplicationHandler ratisMisReplicationHandler;
+  private final QuasiClosedStuckUnderReplicationHandler quasiClosedStuckUnderReplicationHandler;
+  private final QuasiClosedStuckOverReplicationHandler quasiClosedStuckOverReplicationHandler;
   private Thread underReplicatedProcessorThread;
   private Thread overReplicatedProcessorThread;
   private final UnderReplicatedProcessor underReplicatedProcessor;
@@ -251,6 +251,9 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         new RatisOverReplicationHandler(ratisContainerPlacement, this);
     ratisMisReplicationHandler = new RatisMisReplicationHandler(
         ratisContainerPlacement, conf, this);
+    quasiClosedStuckUnderReplicationHandler =
+        new QuasiClosedStuckUnderReplicationHandler(ratisContainerPlacement, conf, this);
+    quasiClosedStuckOverReplicationHandler = new QuasiClosedStuckOverReplicationHandler(this);
     underReplicatedProcessor =
         new UnderReplicatedProcessor(this, rmConf::getUnderReplicatedInterval);
     overReplicatedProcessor =
@@ -265,6 +268,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         .addNext(new MismatchedReplicasHandler(this))
         .addNext(new EmptyContainerHandler(this))
         .addNext(new DeletingContainerHandler(this))
+        .addNext(new QuasiClosedStuckReplicationCheck())
         .addNext(ecReplicationCheckHandler)
         .addNext(ratisReplicationCheckHandler)
         .addNext(new ClosedWithUnhealthyReplicasHandler(this))
@@ -308,6 +312,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   /**
    * Stops Replication Monitor thread.
    */
+  @Override
   public synchronized void stop() {
     if (running) {
       LOG.info("Stopping Replication Monitor Thread.");
@@ -748,8 +753,15 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
 
     if (result.getHealthState()
         == ContainerHealthResult.HealthState.UNDER_REPLICATED) {
-      handler = isEC ? ecUnderReplicationHandler
-          : ratisUnderReplicationHandler;
+      if (isEC) {
+        handler = ecUnderReplicationHandler;
+      } else {
+        if (QuasiClosedStuckReplicationCheck.shouldHandleAsQuasiClosedStuck(result.getContainerInfo(), replicas)) {
+          handler = quasiClosedStuckUnderReplicationHandler;
+        } else {
+          handler = ratisUnderReplicationHandler;
+        }
+      }
     } else if (result.getHealthState()
         == ContainerHealthResult.HealthState.MIS_REPLICATED) {
       handler = isEC ? ecMisReplicationHandler : ratisMisReplicationHandler;
@@ -771,8 +783,16 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         containerReplicaPendingOps.getPendingOps(containerID);
 
     final boolean isEC = isEC(result.getContainerInfo().getReplicationConfig());
-    final UnhealthyReplicationHandler handler = isEC ? ecOverReplicationHandler
-        : ratisOverReplicationHandler;
+    UnhealthyReplicationHandler handler;
+    if (isEC) {
+      handler = ecOverReplicationHandler;
+    } else {
+      if (QuasiClosedStuckReplicationCheck.shouldHandleAsQuasiClosedStuck(result.getContainerInfo(), replicas)) {
+        handler = quasiClosedStuckOverReplicationHandler;
+      } else {
+        handler = ratisOverReplicationHandler;
+      }
+    }
 
     return handler.processAndSendCommands(replicas,
           pendingOps, result, getRemainingMaintenanceRedundancy(isEC));
@@ -997,20 +1017,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   public NodeStatus getNodeStatus(DatanodeDetails datanode)
       throws NodeNotFoundException {
     return nodeManager.getNodeStatus(datanode);
-  }
-
-  /**
-   * An open container is healthy if all its replicas are in the same state as
-   * the container.
-   * @param container The container to check
-   * @param replicas The replicas belonging to the container
-   * @return True if the container is healthy, false otherwise
-   */
-  private boolean isOpenContainerHealthy(
-      ContainerInfo container, Set<ContainerReplica> replicas) {
-    HddsProtos.LifeCycleState state = container.getState();
-    return replicas.stream()
-        .allMatch(r -> compareState(state, r.getState()));
   }
 
   /**

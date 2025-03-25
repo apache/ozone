@@ -1,19 +1,20 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds;
 
 /**
@@ -57,14 +58,6 @@ public final class HddsConfigKeys {
   // Configuration to allow volume choosing policy.
   public static final String HDDS_DATANODE_VOLUME_CHOOSING_POLICY =
       "hdds.datanode.volume.choosing.policy";
-
-  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE =
-      "hdds.datanode.volume.min.free.space";
-  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT =
-      "5GB";
-
-  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT =
-      "hdds.datanode.volume.min.free.space.percent";
 
   public static final String HDDS_DB_PROFILE = "hdds.db.profile";
 
@@ -404,4 +397,30 @@ public final class HddsConfigKeys {
 
   public static final String OZONE_DATANODE_IO_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY =
       "ozone.volume.io.percentiles.intervals.seconds";
+
+  public static final String HDDS_DATANODE_DNS_INTERFACE_KEY =
+      "hdds.datanode.dns.interface";
+  public static final String HDDS_DATANODE_DNS_NAMESERVER_KEY =
+      "hdds.datanode.dns.nameserver";
+  public static final String HDDS_DATANODE_HOST_NAME_KEY =
+      "hdds.datanode.hostname";
+  public static final String HDDS_DATANODE_USE_DN_HOSTNAME =
+      "hdds.datanode.use.datanode.hostname";
+  public static final boolean HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT = false;
+
+  public static final String HDDS_XFRAME_OPTION_ENABLED = "hdds.xframe.enabled";
+  public static final boolean HDDS_XFRAME_OPTION_ENABLED_DEFAULT = true;
+  public static final String HDDS_XFRAME_OPTION_VALUE = "hdds.xframe.value";
+  public static final String HDDS_XFRAME_OPTION_VALUE_DEFAULT = "SAMEORIGIN";
+
+  public static final String HDDS_METRICS_SESSION_ID_KEY =
+      "hdds.metrics.session-id";
+
+  public static final String HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY =
+      "hdds.datanode.kerberos.principal";
+  public static final String HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY =
+      "hdds.datanode.kerberos.keytab.file";
+  public static final String HDDS_METRICS_PERCENTILES_INTERVALS_KEY =
+      "hdds.metrics.percentiles.intervals";
+
 }

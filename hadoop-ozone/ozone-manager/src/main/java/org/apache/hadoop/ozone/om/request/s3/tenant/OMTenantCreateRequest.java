@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,12 +13,22 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
+
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.USER_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
+
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import java.io.IOException;
+import java.nio.file.InvalidPathException;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
@@ -31,6 +40,7 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -52,54 +62,37 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.nio.file.InvalidPathException;
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_ALREADY_EXISTS;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.USER_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_ALREADY_EXISTS;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
-
-/*
-  Ratis execution flow for OMTenantCreate
-
-- preExecute (perform checks and init)
-  - Check tenant name validity (again)
-    - If name is invalid, throw exception to client; else continue
-- validateAndUpdateCache (update DB)
-  - Grab VOLUME_LOCK write lock
-  - Check volume existence
-    - If tenant already exists, throw exception to client; else continue
-  - Check tenant existence by checking tenantStateTable keys
-    - If tenant already exists, throw exception to client; else continue
-  - tenantStateTable: New entry
-    - Key: tenant name. e.g. finance
-    - Value: new OmDBTenantState for the tenant
-      - tenantId: finance
-      - bucketNamespaceName: finance
-      - accountNamespaceName: finance
-      - userPolicyGroupName: finance-users
-      - bucketPolicyGroupName: finance-buckets
-  - tenantPolicyTable: Generate default policies for the new tenant
-    - K: finance-Users, V: finance-users-default
-    - K: finance-Buckets, V: finance-buckets-default
-  - Grab USER_LOCK write lock
-  - Create volume finance (See OMVolumeCreateRequest)
-  - Release VOLUME_LOCK write lock
-  - Release USER_LOCK write lock
-  - Queue Ranger policy sync that pushes default policies:
-      OMMultiTenantManager#createTenant
- */
-
 /**
  * Handles OMTenantCreate request.
- *
  * Extends OMVolumeRequest but not OMClientRequest since tenant creation
  *  involves volume creation.
+ * Ratis execution flow for OMTenantCreate
+ * - preExecute (perform checks and init)
+ *   - Check tenant name validity (again)
+ *     - If name is invalid, throw exception to client; else continue
+ * - validateAndUpdateCache (update DB)
+ *   - Grab VOLUME_LOCK write lock
+ *   - Check volume existence
+ *     - If tenant already exists, throw exception to client; else continue
+ *   - Check tenant existence by checking tenantStateTable keys
+ *     - If tenant already exists, throw exception to client; else continue
+ *   - tenantStateTable: New entry
+ *     - Key: tenant name. e.g. finance
+ *     - Value: new OmDBTenantState for the tenant
+ *       - tenantId: finance
+ *       - bucketNamespaceName: finance
+ *       - accountNamespaceName: finance
+ *       - userPolicyGroupName: finance-users
+ *       - bucketPolicyGroupName: finance-buckets
+ *   - tenantPolicyTable: Generate default policies for the new tenant
+ *     - K: finance-Users, V: finance-users-default
+ *     - K: finance-Buckets, V: finance-buckets-default
+ *   - Grab USER_LOCK write lock
+ *   - Create volume finance (See OMVolumeCreateRequest)
+ *   - Release VOLUME_LOCK write lock
+ *   - Release USER_LOCK write lock
+ *   - Queue Ranger policy sync that pushes default policies:
+ *       OMMultiTenantManager#createTenant
  */
 public class OMTenantCreateRequest extends OMVolumeRequest {
   public static final Logger LOG =

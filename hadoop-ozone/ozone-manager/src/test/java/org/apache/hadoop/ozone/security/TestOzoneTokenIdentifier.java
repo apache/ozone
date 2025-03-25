@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,19 +14,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.security;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import javax.crypto.KeyGenerator;
-import javax.crypto.Mac;
-import javax.crypto.SecretKey;
+
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
@@ -44,16 +42,17 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-
+import javax.crypto.KeyGenerator;
+import javax.crypto.Mac;
+import javax.crypto.SecretKey;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.codec.TokenIdentifierCodec;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
-
-import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.RandomUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
@@ -66,16 +65,6 @@ public class TestOzoneTokenIdentifier {
 
   private static final Logger LOG = LoggerFactory
       .getLogger(TestOzoneTokenIdentifier.class);
-  private static String sslConfsDir;
-  private static final String EXCLUDE_CIPHERS =
-      "TLS_ECDHE_RSA_WITH_RC4_128_SHA,"
-          + "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA,  \n"
-          + "SSL_RSA_WITH_DES_CBC_SHA,"
-          + "SSL_DHE_RSA_WITH_DES_CBC_SHA,  "
-          + "SSL_RSA_EXPORT_WITH_RC4_40_MD5,\t \n"
-          + "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA,"
-          + "SSL_RSA_WITH_RC4_128_MD5";
-
 
   @Test
   public void testSignToken(@TempDir Path baseDir) throws GeneralSecurityException, IOException {
@@ -209,7 +198,6 @@ public class TestOzoneTokenIdentifier {
   public void testSymmetricTokenPerfHelper(String hmacAlgorithm, int keyLen) {
     final int testTokenCount = 1000;
     List<OzoneTokenIdentifier> tokenIds = new ArrayList<>();
-    List<byte[]> tokenPasswordSym = new ArrayList<>();
     for (int i = 0; i < testTokenCount; i++) {
       tokenIds.add(generateTestToken());
     }
@@ -235,8 +223,7 @@ public class TestOzoneTokenIdentifier {
 
     long startTime = Time.monotonicNowNanos();
     for (int i = 0; i < testTokenCount; i++) {
-      tokenPasswordSym.add(
-          signTokenSymmetric(tokenIds.get(i), mac, secretKey));
+      signTokenSymmetric(tokenIds.get(i), mac, secretKey);
     }
     long duration = Time.monotonicNowNanos() - startTime;
     LOG.info("Average token sign time with {}({} symmetric key) is {} ns",
@@ -249,19 +236,20 @@ public class TestOzoneTokenIdentifier {
   @Test
   public void testReadWriteInProtobuf(@TempDir Path baseDir) throws IOException {
     OzoneTokenIdentifier id = getIdentifierInst();
-    File idFile = baseDir.resolve("tokenFile").toFile();
+    Path idFile = baseDir.resolve("tokenFile");
 
-    FileOutputStream fop = new FileOutputStream(idFile);
-    DataOutputStream dataOutputStream = new DataOutputStream(fop);
-    id.write(dataOutputStream);
-    fop.close();
+    try (OutputStream fop = Files.newOutputStream(idFile)) {
+      DataOutputStream dataOutputStream = new DataOutputStream(fop);
+      id.write(dataOutputStream);
+    }
 
-    FileInputStream fis = new FileInputStream(idFile);
-    DataInputStream dis = new DataInputStream(fis);
-    OzoneTokenIdentifier id2 = new OzoneTokenIdentifier();
+    try (InputStream fis = Files.newInputStream(idFile)) {
+      DataInputStream dis = new DataInputStream(fis);
+      OzoneTokenIdentifier id2 = new OzoneTokenIdentifier();
 
-    id2.readFields(dis);
-    assertEquals(id, id2);
+      id2.readFields(dis);
+      assertEquals(id, id2);
+    }
   }
 
 
