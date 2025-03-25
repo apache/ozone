@@ -80,8 +80,11 @@ public class ContainerDatanodeDatabase {
   public void createDatanodeContainerLogTable() {
     String createTableSQL = queries.get("CREATE_DATANODE_CONTAINER_LOG_TABLE");
     try (Connection connection = getConnection();
-         Statement stmt = connection.createStatement()) {
-      stmt.execute(createTableSQL);
+         Statement dropStmt = connection.createStatement();
+         Statement createStmt = connection.createStatement()) {
+      dropTable(DBConsts.DATANODE_CONTAINER_LOG_TABLE_NAME,dropStmt);
+      createStmt.execute(createTableSQL);
+      createDatanodeContainerIndex(createStmt);
     } catch (SQLException e) {
       System.err.println("Error while creating the table: " + e.getMessage());
     } catch (Exception e) {
@@ -89,11 +92,13 @@ public class ContainerDatanodeDatabase {
     }
   }
 
-  public void createContainerLogTable() {
+  private void createContainerLogTable() {
     String createTableSQL = queries.get("CREATE_CONTAINER_LOG_TABLE");
     try (Connection connection = getConnection();
-         Statement stmt = connection.createStatement()) {
-      stmt.execute(createTableSQL);
+         Statement dropStmt = connection.createStatement();
+         Statement createStmt = connection.createStatement()) {
+      dropTable(DBConsts.CONTAINER_LOG_TABLE_NAME,dropStmt);
+      createStmt.execute(createTableSQL);
     } catch (SQLException e) {
       System.err.println("Error while creating the table: " + e.getMessage());
     } catch (Exception e) {
@@ -150,16 +155,9 @@ public class ContainerDatanodeDatabase {
     }
   }
 
-  public void createDatanodeContainerIndex() {
+  private void createDatanodeContainerIndex(Statement stmt) throws SQLException {
     String createIndexSQL = queries.get("CREATE_DATANODE_CONTAINER_INDEX");
-    try (Connection connection = getConnection();
-         Statement stmt = connection.createStatement()) {
-      stmt.execute(createIndexSQL);
-    } catch (SQLException e) {
-      System.err.println("Error while creating the index: " + e.getMessage());
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+    stmt.execute(createIndexSQL);
   }
 
   public void insertLatestContainerLogData() {
@@ -204,19 +202,9 @@ public class ContainerDatanodeDatabase {
     }
   }
 
-  public void dropTable(String tableName) throws SQLException {
+  private void dropTable(String tableName, Statement stmt) throws SQLException {
     String dropTableSQL = queries.get("DROP_TABLE").replace("{table_name}", tableName);
-    Connection connection = null;
-    try {
-      connection = getConnection();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-    try (Statement stmt = connection.createStatement()) {
-      stmt.executeUpdate(dropTableSQL);
-    } catch (SQLException e) {
-      System.err.println("Error while dropping table: " + e.getMessage());
-    }
+    stmt.executeUpdate(dropTableSQL);
   }
 
   public void closeConnection(Connection connection) {
