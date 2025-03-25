@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.request.snapshot;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.getFromProtobuf;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.getTableKey;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.createSnapshotRequest;
@@ -70,7 +69,6 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
   public void setup() throws Exception {
     snapshotName1 = UUID.randomUUID().toString();
     snapshotName2 = UUID.randomUUID().toString();
-    when(getOzoneManager().getFsSnapshotMaxLimit()).thenReturn(OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT);
   }
 
   @ValueSource(strings = {
