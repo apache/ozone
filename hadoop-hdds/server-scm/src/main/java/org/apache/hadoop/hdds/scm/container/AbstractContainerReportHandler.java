@@ -67,7 +67,7 @@ public class AbstractContainerReportHandler {
     this.logger = Objects.requireNonNull(logger, "logger == null");
   }
 
-  public Logger getLogger() {
+  protected Logger getLogger() {
     return logger;
   }
 
