@@ -261,7 +261,7 @@ public class AbstractContainerReportHandler {
    * Updates the container state based on the given replica state.
    *
    * @param datanode Datanode from which the report is received
-   * @param container ContainerInfo representing the the container
+   * @param container ContainerInfo representing the container
    * @param replica ContainerReplica
    * @return true iff replica must be ignored in the next process
    * @throws IOException In case of Exception
