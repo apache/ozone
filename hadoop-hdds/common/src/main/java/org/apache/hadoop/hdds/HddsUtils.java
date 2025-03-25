@@ -639,7 +639,7 @@ public final class HddsUtils {
         "Ancestor should not be null");
     Preconditions.checkArgument(
         path.normalize().startsWith(ancestor.normalize()),
-        "Path should be a descendant of %s", ancestor);
+        "Path %s should be a descendant of %s", path, ancestor);
   }
 
   public static File createDir(String dirPath) {
