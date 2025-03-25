@@ -77,7 +77,7 @@ public class ReplicasVerify extends Handler {
     replicaVerifiers = new ArrayList<>();
 
     if (verification.doExecuteChecksums) {
-      replicaVerifiers.add(new Checksums(client, outputDir, LOG, getConf()));
+      replicaVerifiers.add(new Checksums(client, outputDir));
     }
 
     if (verification.doExecutePadding) {

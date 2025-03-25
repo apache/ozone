@@ -30,16 +30,13 @@ import java.util.Date;
 import java.util.Map;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.NullOutputStream;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
-import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.slf4j.Logger;
 
 /**
  * Class that downloads every replica for all the blocks associated with a
@@ -63,16 +60,11 @@ public class Checksums implements ReplicaVerifier {
 
 
   private String outputDir;
-  private RpcClient rpcClient = null;
   private OzoneClient client;
-  private Logger log;
-  private OzoneConfiguration ozoneConfiguration;
 
-  public Checksums(OzoneClient client, String outputDir, Logger log, OzoneConfiguration conf) {
+  public Checksums(OzoneClient client, String outputDir) {
     this.client = client;
     this.outputDir = outputDir;
-    this.log = log;
-    this.ozoneConfiguration = conf;
   }
 
   private void downloadReplicasAndCreateManifest(
