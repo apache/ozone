@@ -406,7 +406,8 @@ Apache License 2.0
    org.apache.ratis:ratis-client
    org.apache.ratis:ratis-common
    org.apache.ratis:ratis-grpc
-   org.apache.ratis:ratis-metrics
+   org.apache.ratis:ratis-metrics-api
+   org.apache.ratis:ratis-metrics-dropwizard3
    org.apache.ratis:ratis-proto
    org.apache.ratis:ratis-server
    org.apache.ratis:ratis-server-api
