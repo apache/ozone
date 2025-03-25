@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.failure.Failures;
 import org.apache.hadoop.ozone.freon.FreonReplicationOptions;
 import org.apache.hadoop.ozone.loadgenerators.LoadGenerator;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,7 @@ import picocli.CommandLine.Option;
 @Command(description = "Starts IO with MiniOzoneChaosCluster",
     name = "chaos", mixinStandardHelpOptions = true)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Unhealthy("HDDS-3131")
 public class TestMiniChaosOzoneCluster extends GenericCli {
 
   private final List<Class<? extends Failures>> failureClasses
