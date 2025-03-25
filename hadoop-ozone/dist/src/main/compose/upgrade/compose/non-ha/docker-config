@@ -18,11 +18,7 @@ OZONE-SITE.XML_ozone.metadata.dirs=/data/metadata
 
 OZONE-SITE.XML_ozone.client.failover.max.attempts=6
 
-OZONE-SITE.XML_ozone.om.service.ids=omservice
-OZONE-SITE.XML_ozone.om.nodes.omservice=om1
-OZONE-SITE.XML_ozone.om.address.omservice.om1=om
-
-#OZONE-SITE.XML_ozone.om.address=om
+OZONE-SITE.XML_ozone.om.address=om
 OZONE-SITE.XML_ozone.om.http-address=om:9874
 
 OZONE-SITE.XML_ozone.scm.container.size=1GB
@@ -48,8 +44,6 @@ OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop
 
 no_proxy=om,scm,s3g,kdc,localhost,127.0.0.1
-
-OM_SERVICE_ID=omservice
 
 # Explicitly enable filesystem snapshot feature for this Docker compose cluster
 # Does not take effect on Ozone versions < 1.4.0
