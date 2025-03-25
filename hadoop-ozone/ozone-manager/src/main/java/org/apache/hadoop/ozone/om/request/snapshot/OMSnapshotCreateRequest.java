@@ -165,6 +165,14 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
         throw new OMException("Snapshot already exists", FILE_ALREADY_EXISTS);
       }
 
+      // Check snapshot limit
+      int maxSnapshots = ozoneManager.getFsSnapshotMaxLimit();
+      if (omMetrics.getNumSnapshotActive() >= maxSnapshots) {
+        throw new OMException(
+            String.format("Snapshot limit of %d reached. Cannot create more snapshots.", maxSnapshots),
+            OMException.ResultCodes.INVALID_SNAPSHOT_ERROR);
+      }
+
       // Note down RDB latest transaction sequence number, which is used
       // as snapshot generation in the Differ.
       final long dbLatestSequenceNumber =

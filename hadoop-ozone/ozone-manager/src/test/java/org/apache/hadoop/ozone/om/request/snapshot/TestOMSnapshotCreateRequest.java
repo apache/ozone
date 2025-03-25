@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.request.snapshot;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT;;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.getFromProtobuf;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.getTableKey;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.createSnapshotRequest;
@@ -28,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.any;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -69,6 +70,7 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
   public void setup() throws Exception {
     snapshotName1 = UUID.randomUUID().toString();
     snapshotName2 = UUID.randomUUID().toString();
+    when(getOzoneManager().getFsSnapshotMaxLimit()).thenReturn(OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT);
   }
 
   @ValueSource(strings = {
@@ -257,6 +259,39 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
     OMResponse omResponse = omClientResponse.getOMResponse();
     assertNotNull(omResponse.getCreateSnapshotResponse());
     assertEquals(OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS,
+        omResponse.getStatus());
+
+    assertEquals(1, getOmMetrics().getNumSnapshotCreateFails());
+    assertEquals(1, getOmMetrics().getNumSnapshotActive());
+    assertEquals(2, getOmMetrics().getNumSnapshotCreates());
+  }
+
+  @Test
+  public void testSnapshotLimit() throws Exception {
+    when(getOzoneManager().isAdmin(any())).thenReturn(true);
+
+    when(getOzoneManager().getFsSnapshotMaxLimit()).thenReturn(1);
+
+    String key1 = getTableKey(getVolumeName(), getBucketName(), snapshotName1);
+
+    OMRequest omRequest =
+        createSnapshotRequest(getVolumeName(), getBucketName(), snapshotName1);
+    OMSnapshotCreateRequest omSnapshotCreateRequest = doPreExecute(omRequest);
+
+    assertNull(getOmMetadataManager().getSnapshotInfoTable().get(key1));
+    omSnapshotCreateRequest.validateAndUpdateCache(getOzoneManager(), 1);
+
+    assertNotNull(getOmMetadataManager().getSnapshotInfoTable().get(key1));
+
+    // Should fail as snapshot limit is 1
+    omRequest = createSnapshotRequest(getVolumeName(), getBucketName(), snapshotName2);
+    omSnapshotCreateRequest = doPreExecute(omRequest);
+    OMClientResponse omClientResponse =
+        omSnapshotCreateRequest.validateAndUpdateCache(getOzoneManager(), 2);
+
+    OMResponse omResponse = omClientResponse.getOMResponse();
+    assertNotNull(omResponse.getCreateSnapshotResponse());
+    assertEquals(OzoneManagerProtocolProtos.Status.INVALID_SNAPSHOT_ERROR,
         omResponse.getStatus());
 
     assertEquals(1, getOmMetrics().getNumSnapshotCreateFails());
