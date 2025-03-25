@@ -16,7 +16,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.ozone</groupId>
   <artifactId>ozone-main</artifactId>
-  <version>2.0.0-SNAPSHOT</version>
+  <version>2.1.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Apache Ozone Main</name>
   <description>Apache Ozone Main</description>
@@ -36,7 +36,7 @@
     <aspectj.version>1.9.7</aspectj.version>
     <assertj.version>3.27.3</assertj.version>
     <aws-java-sdk.version>1.12.661</aws-java-sdk.version>
-    <aws-java-sdk2.version>2.30.34</aws-java-sdk2.version>
+    <aws-java-sdk2.version>2.31.6</aws-java-sdk2.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.80</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.0</build-helper-maven-plugin.version>
@@ -62,6 +62,7 @@
     <commons-text.version>1.12.0</commons-text.version>
     <commons-validator.version>1.6</commons-validator.version>
     <compile-testing.version>0.21.0</compile-testing.version>
+    <copy-rename-maven-plugin.version>1.0.1</copy-rename-maven-plugin.version>
     <curator.version>4.2.0</curator.version>
     <cyclonedx.version>2.9.1</cyclonedx.version>
     <!-- the version of Hadoop declared in the version resources; can be overridden
@@ -139,7 +140,7 @@
     <json-simple.version>1.1.1</json-simple.version>
     <jsp-api.version>2.1</jsp-api.version>
     <jsr311-api.version>1.1.1</jsr311-api.version>
-    <junit5.version>5.12.0</junit5.version>
+    <junit5.version>5.12.1</junit5.version>
     <kerby.version>1.0.1</kerby.version>
     <kotlin.version>1.9.25</kotlin.version>
     <license-maven-plugin.version>2.5.0</license-maven-plugin.version>
@@ -183,13 +184,13 @@
     <okhttp3.version>4.12.0</okhttp3.version>
     <opentracing.version>0.33.0</opentracing.version>
     <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
-    <ozone.release>Indiana Dunes</ozone.release>
-    <ozone.version>2.0.0-SNAPSHOT</ozone.version>
+    <ozone.release>Joshua Tree</ozone.release>
+    <ozone.version>2.1.0-SNAPSHOT</ozone.version>
     <picocli.version>4.7.5</picocli.version>
     <plexus-archiver.version>4.2.2</plexus-archiver.version>
     <pmd.version>3.26.0</pmd.version>
     <!-- Enable Reproducible Builds mode -->
-    <project.build.outputTimestamp>2023-01-01T00:00:00Z</project.build.outputTimestamp>
+    <project.build.outputTimestamp>2025-03-12T22:12:52Z</project.build.outputTimestamp>
     <!-- platform encoding override -->
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -234,7 +235,7 @@
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
     <woodstox.version>5.4.0</woodstox.version>
     <zookeeper.version>3.8.4</zookeeper.version>
-    <zstd-jni.version>1.5.7-1</zstd-jni.version>
+    <zstd-jni.version>1.5.7-2</zstd-jni.version>
   </properties>
 
   <dependencyManagement>
@@ -1776,6 +1777,11 @@
             <printFailingErrors>true</printFailingErrors>
             <includeTests>true</includeTests>
           </configuration>
+        </plugin>
+        <plugin>
+          <groupId>com.coderplus.maven.plugins</groupId>
+          <artifactId>copy-rename-maven-plugin</artifactId>
+          <version>${copy-rename-maven-plugin.version}</version>
         </plugin>
       </plugins>
     </pluginManagement>

@@ -210,24 +210,12 @@
   </property>
   <property>
     <name>hdds.datanode.volume.choosing.policy</name>
-    <value/>
+    <value>org.apache.hadoop.ozone.container.common.volume.CapacityVolumeChoosingPolicy</value>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
     <description>
-      The class name of the policy for choosing volumes in the list of
-      directories.  Defaults to
-      org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy.
-      This volume choosing policy selects volumes in a round-robin order.
-    </description>
-  </property>
-  <property>
-    <name>hdds.datanode.volume.min.free.space</name>
-    <value>5GB</value>
-    <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
-    <description>
-      This determines the free space to be used for closing containers
-      When the difference between volume capacity and used reaches this number,
-      containers that reside on this volume will be closed and no new containers
-      would be allocated on this volume.
+      The class name of the policy for choosing volumes in the list of directories.
+      Defaults to org.apache.hadoop.ozone.container.common.volume.CapacityVolumeChoosingPolicy.
+      This volume choosing policy randomly chooses two volumes with remaining space and then picks the one with lower utilization.
     </description>
   </property>
   <property>
@@ -648,18 +636,6 @@
       needs to set policies accordingly to allow all volume listing
       e.g. for Ranger, a new policy with special volume "/" can be added to
       allow group public LIST access.
-    </description>
-  </property>
-  <property>
-    <name>ozone.om.user.max.volume</name>
-    <value>1024</value>
-    <tag>OM, MANAGEMENT</tag>
-    <description>
-      The maximum number of volumes a user can have on a cluster.Increasing or
-      decreasing this number has no real impact on ozone cluster. This is
-      defined only for operational purposes. Only an administrator can create a
-      volume, once a volume is created there are no restrictions on the number
-      of buckets or keys inside each bucket a user can create.
     </description>
   </property>
   <property>
@@ -3549,6 +3525,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.container.ratis.statemachine.write.wait.interval</name>
+    <tag>OZONE, DATANODE</tag>
+    <value>10m</value>
+    <description>
+      Timeout for the write path for container blocks.
+    </description>
+  </property>
+  <property>
     <name>hdds.datanode.slow.op.warning.threshold</name>
     <tag>OZONE, DATANODE, PERFORMANCE</tag>
     <value>500ms</value>
@@ -4672,6 +4656,32 @@
       invokes a script specified in net.topology.script.file.name to resolve
       node names. If the value for net.topology.script.file.name is not set, the
       default value of DEFAULT_RACK is returned for all node names.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.edekcacheloader.interval.ms</name>
+    <value>1000</value>
+    <description>When KeyProvider is configured, the interval time of warming
+      up edek cache on OM starts up. All edeks will be loaded
+      from KMS into provider cache. The edek cache loader will try to warm up the
+      cache until succeed or OM leaves active state.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.edekcacheloader.initial.delay.ms</name>
+    <value>3000</value>
+    <description>When KeyProvider is configured, the time delayed until the first
+      attempt to warm up edek cache on OM start up.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.edekcacheloader.max-retries</name>
+    <value>10</value>
+    <description>When KeyProvider is configured, the max retries allowed to attempt
+      warm up edek cache if none of key successful on OM start up.
     </description>
   </property>
 </configuration>

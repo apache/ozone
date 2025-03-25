@@ -127,10 +127,10 @@ public class SimpleMockNodeManager implements NodeManager {
       throws NodeNotFoundException {
     DatanodeInfo dni = nodeMap.get(dn.getUuid());
     if (dni == null) {
-      throw new NodeNotFoundException();
+      throw new NodeNotFoundException(dn.getID());
     }
     dni.setNodeStatus(
-        new NodeStatus(
+        NodeStatus.valueOf(
             newState, dni.getNodeStatus().getHealth(), opStateExpiryEpocSec));
   }
 

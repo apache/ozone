@@ -522,19 +522,20 @@ public final class Pipeline {
   @Override
   public String toString() {
     final StringBuilder b =
-        new StringBuilder(getClass().getSimpleName()).append("[");
+        new StringBuilder(getClass().getSimpleName()).append("{");
     b.append(" Id: ").append(id.getId());
-    b.append(", Nodes: ");
+    b.append(", Nodes: [");
     for (DatanodeDetails datanodeDetails : nodeStatus.keySet()) {
-      b.append(datanodeDetails);
-      b.append(" ReplicaIndex: ").append(this.getReplicaIndex(datanodeDetails));
+      b.append(" {").append(datanodeDetails);
+      b.append(", ReplicaIndex: ").append(this.getReplicaIndex(datanodeDetails)).append("},");
     }
+    b.append("]");
     b.append(", ReplicationConfig: ").append(replicationConfig);
     b.append(", State:").append(getPipelineState());
     b.append(", leaderId:").append(leaderId != null ? leaderId.toString() : "");
     b.append(", CreationTimestamp").append(getCreationTimestamp()
         .atZone(ZoneId.systemDefault()));
-    b.append("]");
+    b.append("}");
     return b.toString();
   }
 

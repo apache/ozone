@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -149,7 +150,7 @@ public class ContainerImporter {
     // Choose volume that can hold both container in tmp and dest directory
     return volumeChoosingPolicy.chooseVolume(
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
-        containerSize * 2);
+        HddsServerUtil.requiredReplicationSpace(containerSize));
   }
 
   public static Path getUntarDirectory(HddsVolume hddsVolume)

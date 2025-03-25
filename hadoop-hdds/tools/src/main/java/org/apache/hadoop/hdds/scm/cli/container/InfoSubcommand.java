@@ -216,14 +216,13 @@ public class InfoSubcommand extends ScmSubcommand {
   }
 
   private static String buildReplicaDetails(ContainerReplicaInfo replica) {
-    StringBuilder sb = new StringBuilder();
-    sb.append("State: " + replica.getState() + ";");
+    StringBuilder sb = new StringBuilder()
+        .append("State: ").append(replica.getState()).append(";");
     if (replica.getReplicaIndex() != -1) {
-      sb.append(" ReplicaIndex: " + replica.getReplicaIndex() + ";");
+      sb.append(" ReplicaIndex: ").append(replica.getReplicaIndex()).append(";");
     }
-    sb.append(" Origin: " + replica.getPlaceOfBirth().toString() + ";");
-    sb.append(" Location: "
-        + buildDatanodeDetails(replica.getDatanodeDetails()));
+    sb.append(" Origin: ").append(replica.getPlaceOfBirth().toString()).append(";")
+        .append(" Location: ").append(buildDatanodeDetails(replica.getDatanodeDetails()));
     return sb.toString();
   }
 

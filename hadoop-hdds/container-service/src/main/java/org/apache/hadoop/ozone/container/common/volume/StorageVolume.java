@@ -115,7 +115,8 @@ public abstract class StorageVolume
   private long cTime;             // creation time of the file system state
   private int layoutVersion;      // layout version of the storage data
 
-  private ConfigurationSource conf;
+  private final ConfigurationSource conf;
+  private final DatanodeConfiguration dnConf;
 
   private final File storageDir;
   private String workingDirName;
@@ -150,10 +151,9 @@ public abstract class StorageVolume
       this.state = VolumeState.NOT_INITIALIZED;
       this.clusterID = b.clusterID;
       this.datanodeUuid = b.datanodeUuid;
-      this.conf = b.conf;
 
-      DatanodeConfiguration dnConf =
-          conf.getObject(DatanodeConfiguration.class);
+      this.conf = b.conf;
+      this.dnConf = conf.getObject(DatanodeConfiguration.class);
       this.ioTestCount = dnConf.getVolumeIOTestCount();
       this.ioFailureTolerance = dnConf.getVolumeIOFailureTolerance();
       this.ioTestSlidingWindow = new LinkedList<>();
@@ -167,6 +167,8 @@ public abstract class StorageVolume
       this.state = VolumeState.FAILED;
       this.ioTestCount = 0;
       this.ioFailureTolerance = 0;
+      this.conf = null;
+      this.dnConf = null;
     }
   }
 
@@ -527,6 +529,10 @@ public abstract class StorageVolume
 
   public ConfigurationSource getConf() {
     return conf;
+  }
+
+  public DatanodeConfiguration getDatanodeConfig() {
+    return dnConf;
   }
 
   public void failVolume() {

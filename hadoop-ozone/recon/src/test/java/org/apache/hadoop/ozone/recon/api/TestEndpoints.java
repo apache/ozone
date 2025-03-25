@@ -489,12 +489,12 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .setQuotaInBytes(OzoneConsts.GB)
             .setQuotaInNamespace(1000)
             .setUsedNamespace(500)
-            .addOzoneAcls(new OzoneAcl(
+            .addOzoneAcls(OzoneAcl.of(
                 IAccessAuthorizer.ACLIdentityType.USER,
                 "TestUser2",
                 OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE
             ))
-            .addOzoneAcls(new OzoneAcl(
+            .addOzoneAcls(OzoneAcl.of(
                 IAccessAuthorizer.ACLIdentityType.USER,
                 "TestUser2",
                 OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.READ
@@ -505,7 +505,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName("sampleVol2")
         .setBucketName("bucketOne")
-        .addAcl(new OzoneAcl(
+        .addAcl(OzoneAcl.of(
             IAccessAuthorizer.ACLIdentityType.GROUP,
             "TestGroup2",
             OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE
@@ -528,7 +528,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     OmBucketInfo bucketInfo2 = OmBucketInfo.newBuilder()
         .setVolumeName("sampleVol2")
         .setBucketName("bucketTwo")
-        .addAcl(new OzoneAcl(
+        .addAcl(OzoneAcl.of(
             IAccessAuthorizer.ACLIdentityType.GROUP,
             "TestGroup2",
             OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.READ
