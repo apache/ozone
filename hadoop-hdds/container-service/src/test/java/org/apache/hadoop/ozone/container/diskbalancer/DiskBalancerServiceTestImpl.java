@@ -25,8 +25,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
-
 
 /**
  * A test class implementation for {@link DiskBalancerService}.
@@ -43,10 +41,10 @@ public class DiskBalancerServiceTestImpl extends DiskBalancerService {
 
   public DiskBalancerServiceTestImpl(OzoneContainer container,
       int serviceInterval, ConfigurationSource conf,
-      int threadCount, ReplicationSupervisor supervisor)
+      int threadCount)
       throws IOException {
     super(container, serviceInterval, SERVICE_TIMEOUT_IN_MILLISECONDS,
-        TimeUnit.MILLISECONDS, threadCount, conf, supervisor);
+        TimeUnit.MILLISECONDS, threadCount, conf);
   }
 
   public void runBalanceTasks() {
