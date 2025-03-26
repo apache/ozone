@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common.impl;
 
 import java.io.IOException;
+import net.jcip.annotations.Immutable;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -28,8 +29,8 @@ import org.apache.hadoop.ozone.container.common.interfaces.StorageLocationReport
  * Storage location stats of datanodes that provide back store for containers.
  *
  */
-public final class StorageLocationReport implements
-    StorageLocationReportMXBean {
+@Immutable
+public final class StorageLocationReport implements StorageLocationReportMXBean {
 
   private final String id;
   private final boolean failed;
