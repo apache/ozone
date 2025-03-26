@@ -123,7 +123,7 @@ public class TestStorageVolumeHealthChecks {
     for (boolean result : checkResult) {
       StorageVolume volume = builder.build();
 
-      VolumeUsage usage = volume.getVolumeInfo().get().getUsageForTesting();
+      VolumeUsage usage = volume.getVolumeUsage().get();
       DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
       int minimumDiskSpace = dnConf.getVolumeHealthCheckFileSize() * 2;
       // Keep remaining space as just less than double of VolumeHealthCheckFileSize.

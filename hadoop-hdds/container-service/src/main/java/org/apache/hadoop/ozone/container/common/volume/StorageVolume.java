@@ -627,7 +627,7 @@ public abstract class StorageVolume
     // If there are not enough space remaining,
     // to avoid volume failure we can ignore checking disk read/write
     int minimumDiskSpace = healthCheckFileSize * 2;
-    if (volumeInfo.get().getCurrentUsage().getAvailable() < minimumDiskSpace) {
+    if (getCurrentUsage().getAvailable() < minimumDiskSpace) {
       ioTestSlidingWindow.add(true);
       return VolumeCheckResult.HEALTHY;
     }
@@ -646,7 +646,7 @@ public abstract class StorageVolume
     // As WRITE keeps happening there is probability, disk has become full during above check.
     // We can check again if disk is full. If it is full,
     // in this case keep volume as healthy so that READ can still be served
-    if (!diskChecksPassed && volumeInfo.get().getCurrentUsage().getAvailable() < minimumDiskSpace) {
+    if (!diskChecksPassed && getCurrentUsage().getAvailable() < minimumDiskSpace) {
       ioTestSlidingWindow.add(true);
       return VolumeCheckResult.HEALTHY;
     }
