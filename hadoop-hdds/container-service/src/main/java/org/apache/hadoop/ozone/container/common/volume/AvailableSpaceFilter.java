@@ -40,12 +40,15 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
   @Override
   public boolean test(HddsVolume vol) {
     StorageLocationReport report = vol.getReport();
+    long free = report.getRemaining();
+    long committed = vol.getCommittedBytes();
+    long available = free - committed;
     boolean hasEnoughSpace = VolumeUsage.hasVolumeEnoughSpace(report, requiredSpace);
 
-    mostAvailableSpace = Math.max(report.getRemaining(), mostAvailableSpace);
+    mostAvailableSpace = Math.max(available, mostAvailableSpace);
 
     if (!hasEnoughSpace) {
-      fullVolumes.put(vol, new AvailableSpace(report.getRemaining(), report.getCommitted()));
+      fullVolumes.put(vol, new AvailableSpace(free, committed));
     }
 
     return hasEnoughSpace;
