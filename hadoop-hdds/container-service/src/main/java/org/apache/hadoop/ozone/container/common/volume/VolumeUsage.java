@@ -179,11 +179,9 @@ public class VolumeUsage {
     return reservedInBytes;
   }
 
-  public static boolean hasVolumeEnoughSpace(long volumeAvailableSpace,
-                                             long volumeCommittedBytesCount,
-                                             long requiredSpace,
-                                             long volumeFreeSpaceToSpare) {
-    return (volumeAvailableSpace - volumeCommittedBytesCount - volumeFreeSpaceToSpare) > requiredSpace;
+  private static boolean hasVolumeEnoughSpace(
+      long available, long committed, long required, long minFreeSpace) {
+    return (available - committed - minFreeSpace) > required;
   }
 
   public static boolean hasVolumeEnoughSpace(StorageReportProto report, long requiredSpace) {
