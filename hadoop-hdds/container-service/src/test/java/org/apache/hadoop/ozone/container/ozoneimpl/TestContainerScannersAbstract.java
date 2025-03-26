@@ -163,6 +163,7 @@ public abstract class TestContainerScannersAbstract {
 
     KeyValueContainerData data = mock(KeyValueContainerData.class);
     when(data.getContainerID()).thenReturn(CONTAINER_SEQ_ID.incrementAndGet());
+    when(data.getVolume()).thenReturn(vol);
     when(unhealthy.getContainerData()).thenReturn(data);
     when(unhealthy.getContainerState()).thenReturn(CLOSED);
     // The above mocks should be enough for the scanners to call this method

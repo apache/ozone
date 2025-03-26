@@ -40,11 +40,15 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import org.apache.commons.compress.utils.Lists;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -102,7 +106,7 @@ public class TestOnDemandContainerDataScanner extends
   public void testScanTimestampUpdated() throws Exception {
     OnDemandContainerDataScanner.init(conf, controller);
     Optional<Future<?>> scanFuture =
-        OnDemandContainerDataScanner.scanContainer(healthy);
+        OnDemandContainerDataScanner.scanContainer(healthy, null);
     assertTrue(scanFuture.isPresent());
     scanFuture.get().get();
     verify(controller, atLeastOnce())
@@ -111,7 +115,7 @@ public class TestOnDemandContainerDataScanner extends
 
     // Metrics for deleted container should not be updated.
     scanFuture =
-        OnDemandContainerDataScanner.scanContainer(healthy);
+        OnDemandContainerDataScanner.scanContainer(healthy, null);
     assertTrue(scanFuture.isPresent());
     scanFuture.get().get();
     verify(controller, never())
@@ -126,7 +130,7 @@ public class TestOnDemandContainerDataScanner extends
     OnDemandContainerDataScanner.shutdown();
     OnDemandContainerDataScanner.shutdown();
     //There shouldn't be an interaction after shutdown:
-    OnDemandContainerDataScanner.scanContainer(corruptData);
+    OnDemandContainerDataScanner.scanContainer(corruptData, null);
     verifyContainerMarkedUnhealthy(corruptData, never());
   }
 
@@ -143,12 +147,12 @@ public class TestOnDemandContainerDataScanner extends
           return getUnhealthyScanResult();
         });
     Optional<Future<?>> onGoingScan = OnDemandContainerDataScanner
-        .scanContainer(corruptData);
+        .scanContainer(corruptData, null);
     assertTrue(onGoingScan.isPresent());
     assertFalse(onGoingScan.get().isDone());
     //When scheduling the same container again
     Optional<Future<?>> secondScan = OnDemandContainerDataScanner
-        .scanContainer(corruptData);
+        .scanContainer(corruptData, null);
     //Then the second scan is not scheduled and the first scan can still finish
     assertFalse(secondScan.isPresent());
     latch.countDown();
@@ -163,12 +167,12 @@ public class TestOnDemandContainerDataScanner extends
     OnDemandContainerDataScanner.init(conf, controller);
     ArrayList<Optional<Future<?>>> resultFutureList = Lists.newArrayList();
     resultFutureList.add(OnDemandContainerDataScanner.scanContainer(
-        corruptData));
+        corruptData, null));
     resultFutureList.add(
-        OnDemandContainerDataScanner.scanContainer(openContainer));
+        OnDemandContainerDataScanner.scanContainer(openContainer, null));
     resultFutureList.add(
-        OnDemandContainerDataScanner.scanContainer(openCorruptMetadata));
-    resultFutureList.add(OnDemandContainerDataScanner.scanContainer(healthy));
+        OnDemandContainerDataScanner.scanContainer(openCorruptMetadata, null));
+    resultFutureList.add(OnDemandContainerDataScanner.scanContainer(healthy, null));
     waitOnScannerToFinish(resultFutureList);
     OnDemandScannerMetrics metrics = OnDemandContainerDataScanner.getMetrics();
     //Containers with shouldScanData = false shouldn't increase
@@ -184,7 +188,7 @@ public class TestOnDemandContainerDataScanner extends
     String metricsName = OnDemandContainerDataScanner.getMetrics().getName();
     assertNotNull(DefaultMetricsSystem.instance().getSource(metricsName));
     OnDemandContainerDataScanner.shutdown();
-    OnDemandContainerDataScanner.scanContainer(healthy);
+    OnDemandContainerDataScanner.scanContainer(healthy, null);
     assertNull(DefaultMetricsSystem.instance().getSource(metricsName));
   }
 
@@ -193,7 +197,7 @@ public class TestOnDemandContainerDataScanner extends
   public void testUnhealthyContainersDetected() throws Exception {
     // Without initialization,
     // there shouldn't be interaction with containerController
-    OnDemandContainerDataScanner.scanContainer(corruptData);
+    OnDemandContainerDataScanner.scanContainer(corruptData, null);
     verifyNoInteractions(controller);
 
     scanContainer(healthy);
@@ -246,7 +250,7 @@ public class TestOnDemandContainerDataScanner extends
 
     // Start the blocking scan.
     OnDemandContainerDataScanner.init(conf, controller);
-    OnDemandContainerDataScanner.scanContainer(healthy);
+    OnDemandContainerDataScanner.scanContainer(healthy, null);
     // Shut down the on demand scanner. This will interrupt the blocked scan
     // on the healthy container.
     OnDemandContainerDataScanner.shutdown();
@@ -290,10 +294,45 @@ public class TestOnDemandContainerDataScanner extends
     assertEquals(0, metrics.getNumUnHealthyContainers());
   }
 
+  @Test
+  public void testOnDemandVolumeFailure() throws Exception {
+    Container<?> container = mockKeyValueContainer();
+    when(container.scanMetaData()).thenReturn(ScanResult.healthy());
+    when(container.scanData(
+        any(DataTransferThrottler.class), any(Canceler.class)))
+        .thenReturn(getUnhealthyScanResult());
+
+    // Mock IO failure count lesser than tolerance value
+    when(vol.incrementAndGetCumulativeIOFailureCount()).thenReturn(conf.getOnDemandIOErrorToleranceCount() - 1);
+    MutableVolumeSet volumeSet = new MutableVolumeSet("dnId123", new OzoneConfiguration(), null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
+    assertEquals(1, volumeSet.getVolumesList().size());
+    when(vol.getVolumeRootDir()).thenReturn(volumeSet.getVolumesList().get(0).getStorageDir().getPath());
+    scanContainer(container, volumeSet);
+    // After scan container still volume remains healthy and present in volumeSet
+    assertEquals(1, volumeSet.getVolumesList().size());
+
+    // Mock IO failure count higher than tolerance value
+    when(vol.incrementAndGetCumulativeIOFailureCount()).thenReturn(conf.getOnDemandIOErrorToleranceCount() + 1);
+    scanContainer(container, volumeSet);
+    // After scan container volume has failed and moved out of volumeSet
+    assertEquals(0, volumeSet.getVolumesList().size());
+    when(vol.incrementAndGetCumulativeIOFailureCount()).thenReturn(0);
+  }
+
   private void scanContainer(Container<?> container) throws Exception {
     OnDemandContainerDataScanner.init(conf, controller);
     Optional<Future<?>> scanFuture =
-        OnDemandContainerDataScanner.scanContainer(container);
+        OnDemandContainerDataScanner.scanContainer(container, null);
+    if (scanFuture.isPresent()) {
+      scanFuture.get().get();
+    }
+  }
+
+  private void scanContainer(Container<?> container, VolumeSet volumeSet) throws Exception {
+    OnDemandContainerDataScanner.init(conf, controller);
+    Optional<Future<?>> scanFuture =
+        OnDemandContainerDataScanner.scanContainer(container, volumeSet);
     if (scanFuture.isPresent()) {
       scanFuture.get().get();
     }

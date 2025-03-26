@@ -35,6 +35,8 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,6 +57,7 @@ public final class OnDemandContainerDataScanner {
       .KeySetView<Long, Boolean> containerRescheduleCheckSet;
   private final OnDemandScannerMetrics metrics;
   private final long minScanGap;
+  private final int onDemandIOErrorToleranceCount;
 
   private OnDemandContainerDataScanner(
       ContainerScannerConfiguration conf, ContainerController controller) {
@@ -66,6 +69,7 @@ public final class OnDemandContainerDataScanner {
     scanExecutor = Executors.newSingleThreadExecutor();
     containerRescheduleCheckSet = ConcurrentHashMap.newKeySet();
     minScanGap = conf.getContainerScanMinGap();
+    onDemandIOErrorToleranceCount = conf.getOnDemandIOErrorToleranceCount();
   }
 
   public static synchronized void init(
@@ -100,7 +104,7 @@ public final class OnDemandContainerDataScanner {
         LOG) && container.shouldScanData();
   }
 
-  public static Optional<Future<?>> scanContainer(Container<?> container) {
+  public static Optional<Future<?>> scanContainer(Container<?> container, VolumeSet volumeSet) {
     if (!shouldScan(container)) {
       return Optional.empty();
     }
@@ -109,7 +113,7 @@ public final class OnDemandContainerDataScanner {
     long containerId = container.getContainerData().getContainerID();
     if (addContainerToScheduledContainers(containerId)) {
       resultFuture = instance.scanExecutor.submit(() -> {
-        performOnDemandScan(container);
+        performOnDemandScan(container, volumeSet);
         removeContainerFromScheduledContainers(containerId);
       });
     }
@@ -125,7 +129,7 @@ public final class OnDemandContainerDataScanner {
     instance.containerRescheduleCheckSet.remove(containerId);
   }
 
-  private static void performOnDemandScan(Container<?> container) {
+  private static void performOnDemandScan(Container<?> container, VolumeSet volumeSet) {
     if (!shouldScan(container)) {
       return;
     }
@@ -149,6 +153,15 @@ public final class OnDemandContainerDataScanner {
         instance.metrics.incNumUnHealthyContainers();
         instance.containerController.markContainerUnhealthy(containerId,
             result);
+        if (volumeSet instanceof MutableVolumeSet) {
+          MutableVolumeSet mutableVolumeSet = (MutableVolumeSet) volumeSet;
+          HddsVolume hddsVolume = container.getContainerData().getVolume();
+          if (hddsVolume.incrementAndGetCumulativeIOFailureCount() > getIOErrorToleranceCount()
+              && !(getIOErrorToleranceCount() == 0)) {
+            // If IOErrorToleranceCount is configured as 0, disable making fail volume.
+            mutableVolumeSet.failVolume(container.getContainerData().getVolume().getVolumeRootDir());
+          }
+        }
       }
 
       instance.metrics.incNumContainersScanned();
@@ -182,6 +195,10 @@ public final class OnDemandContainerDataScanner {
 
   public static OnDemandScannerMetrics getMetrics() {
     return instance.metrics;
+  }
+
+  public static int getIOErrorToleranceCount() {
+    return instance.onDemandIOErrorToleranceCount;
   }
 
   @VisibleForTesting
