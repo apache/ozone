@@ -26,11 +26,11 @@ execute_robot_test ${SCM} -v "PREFIX:${prefix}" debug/ozone-debug-tests.robot
 # get block locations for key
 chunkinfo="${key}-blocks-${prefix}"
 docker-compose exec -T ${SCM} bash -c "ozone debug replicas chunk-info ${volume}/${bucket}/${key}" > "$chunkinfo"
-host="$(jq -r '.KeyLocations[0][0]["Datanode-HostName"]' ${chunkinfo})"
+host="$(jq -r '.keyLocations[0][0]["datanodeHostName"]' ${chunkinfo})"
 container="${host%%.*}"
 
 # corrupt the first block of key on one of the datanodes
-datafile="$(jq -r '.KeyLocations[0][0]["Chunk-Files"][0]' ${chunkinfo})"
+datafile="$(jq -r '.keyLocations[0][0]["chunkFiles"][0]' ${chunkinfo})"
 docker exec "${container}" sed -i -e '1s/^/a/' "${datafile}"
 
 execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "CORRUPT_DATANODE:${host}" debug/ozone-debug-corrupt-block.robot

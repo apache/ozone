@@ -224,10 +224,10 @@ public class TestOzoneDebugShell {
       ObjectMapper objectMapper = new ObjectMapper();
       // Parse the JSON array string into a JsonNode
       JsonNode jsonNode = objectMapper.readTree(output);
-      JsonNode keyLocations = jsonNode.get("KeyLocations").get(0);
+      JsonNode keyLocations = jsonNode.get("keyLocations").get(0);
       for (JsonNode element : keyLocations) {
         String fileName =
-            element.get("Chunk-Files").get(0).toString();
+            element.get("chunkFiles").get(0).toString();
         blockFilePaths.add(fileName);
       }
       // DN storage directories are set differently for each DN

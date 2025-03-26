@@ -74,9 +74,9 @@ public class ChunkKeyHandler extends KeyHandler {
       String keyName = address.getKeyName();
       List<ContainerProtos.ChunkInfo> tempchunks;
 
-      result.put("Volume-Name", volumeName);
-      result.put("Bucket-Name", bucketName);
-      result.put("Key-Name", keyName);
+      result.put("volumeName", volumeName);
+      result.put("bucketName", bucketName);
+      result.put("keyName", keyName);
 
       OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
           .setBucketName(bucketName).setKeyName(keyName).build();
@@ -134,19 +134,19 @@ public class ChunkKeyHandler extends KeyHandler {
                   chunkInfo.getChunkName()).toString();
               chunkFilePaths.add(fileName);
             }
-            jsonObj.put("Datanode-HostName", entry.getKey().getHostName());
-            jsonObj.put("Datanode-IP", entry.getKey().getIpAddress());
+            jsonObj.put("datanodeHostName", entry.getKey().getHostName());
+            jsonObj.put("datanodeIP", entry.getKey().getIpAddress());
 
             ObjectMapper objectMapper = new ObjectMapper();
             JsonNode blockDataNode = objectMapper.readTree(JsonFormat.printer().print(entry.getValue().getBlockData()));
-            jsonObj.set("Block-Data", blockDataNode);
+            jsonObj.set("blockData", blockDataNode);
 
-            jsonObj.set("Chunk-Files", chunkFilePaths);
+            jsonObj.set("chunkFiles", chunkFilePaths);
 
             if (isECKey) {
               ChunkType blockChunksType = isECParityBlock(keyPipeline, entry.getKey()) ?
                   ChunkType.PARITY : ChunkType.DATA;
-              jsonObj.put("Chunk-Type", blockChunksType.name());
+              jsonObj.put("chunkType", blockChunksType.name());
             }
             responseFromAllNodes.add(jsonObj);
           }
@@ -157,7 +157,7 @@ public class ChunkKeyHandler extends KeyHandler {
           xceiverClientManager.releaseClientForReadData(xceiverClient, false);
         }
       }
-      result.set("KeyLocations", responseArrayList);
+      result.set("keyLocations", responseArrayList);
       String prettyJson = JsonUtils.toJsonStringWithDefaultPrettyPrinter(result);
       System.out.println(prettyJson);
     }
