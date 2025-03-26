@@ -18,10 +18,14 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
+import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE;
 
 import com.google.common.primitives.Longs;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
@@ -110,17 +114,19 @@ public class DatanodeSchemaThreeDBDefinition
     DatanodeDBProfile dbProfile = DatanodeDBProfile
         .getProfile(config.getEnum(HDDS_DB_PROFILE, HDDS_DEFAULT_DB_PROFILE));
 
+    Path pathToDb = Paths.get(
+        config.get(HddsConfigKeys.ROCKS_DB_CONFIG_PATH, HddsConfigKeys.ROCKS_DB_CONFIG_PATH_DEFAULT));
     ManagedColumnFamilyOptions cfOptions =
-        dbProfile.getColumnFamilyOptions(config);
+        dbProfile.getColumnFamilyOptions(config, pathToDb, DEFAULT_COLUMN_FAMILY_NAME);
     // Use prefix seek to mitigating seek overhead.
     // See: https://github.com/facebook/rocksdb/wiki/Prefix-Seek
     cfOptions.useFixedLengthPrefixExtractor(getContainerKeyPrefixLength());
 
-    BLOCK_DATA.setCfOptions(cfOptions);
-    METADATA.setCfOptions(cfOptions);
-    DELETE_TRANSACTION.setCfOptions(cfOptions);
-    FINALIZE_BLOCKS.setCfOptions(cfOptions);
-    LAST_CHUNK_INFO.setCfOptions(cfOptions);
+    BLOCK_DATA.setCfOptions(getCFOptions(config, dbProfile, pathToDb, "block_data"));
+    METADATA.setCfOptions(getCFOptions(config, dbProfile, pathToDb, "metadata"));
+    DELETE_TRANSACTION.setCfOptions(getCFOptions(config, dbProfile, pathToDb, "delete_txns"));
+    FINALIZE_BLOCKS.setCfOptions(getCFOptions(config, dbProfile, pathToDb, "finalize_blocks"));
+    LAST_CHUNK_INFO.setCfOptions(getCFOptions(config, dbProfile, pathToDb, "last_chunk_info"));
   }
 
   @Override
@@ -189,5 +195,12 @@ public class DatanodeSchemaThreeDBDefinition
 
   private void setSeparator(String keySeparator) {
     separator = keySeparator;
+  }
+
+  private ManagedColumnFamilyOptions getCFOptions(
+      ConfigurationSource config, DatanodeDBProfile dbProfile, Path pathToDb, String cfName) {
+    return (ManagedColumnFamilyOptions) dbProfile
+        .getColumnFamilyOptions(config, pathToDb, cfName)
+        .useFixedLengthPrefixExtractor(getContainerKeyPrefixLength());
   }
 }
