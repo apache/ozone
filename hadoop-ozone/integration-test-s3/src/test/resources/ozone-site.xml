@@ -77,8 +77,7 @@
   </property>
 
   <property>
-    <name>hdds.container.ratis.log.appender.queue.byte-limit
-</name>
+    <name>hdds.container.ratis.log.appender.queue.byte-limit</name>
     <value>32MB</value>
   </property>
   <property>
