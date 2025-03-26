@@ -180,18 +180,18 @@ public class VolumeUsage {
   }
 
   private static boolean hasVolumeEnoughSpace(
-      long available, long committed, long required, long minFreeSpace) {
+      long required, long available, long committed, long minFreeSpace) {
     return (available - committed - minFreeSpace) > required;
   }
 
   public static boolean hasVolumeEnoughSpace(StorageReportProto report, long requiredSpace) {
-    return hasVolumeEnoughSpace(report.getRemaining(), report.getCommitted(), requiredSpace,
-        report.getFreeSpaceToSpare());
+    return hasVolumeEnoughSpace(requiredSpace,
+        report.getRemaining(), report.getCommitted(), report.getFreeSpaceToSpare());
   }
 
   public static boolean hasVolumeEnoughSpace(StorageLocationReport report, long requiredSpace) {
-    return hasVolumeEnoughSpace(report.getRemaining(), report.getCommitted(), requiredSpace,
-        report.getFreeSpaceToSpare());
+    return hasVolumeEnoughSpace(requiredSpace,
+        report.getRemaining(), report.getCommitted(), report.getFreeSpaceToSpare());
   }
 
   private static long getReserved(ConfigurationSource conf, String rootDir,
