@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import org.apache.hadoop.ozone.debug.OzoneDebug;
 import org.apache.hadoop.ozone.shell.checknative.CheckNative;
 import org.apache.ozone.test.tag.Native;
 import org.junit.jupiter.api.AfterAll;
@@ -52,8 +53,7 @@ public class TestCheckNative {
   @Test
   public void testCheckNativeNotLoaded() throws UnsupportedEncodingException {
     outputStream.reset();
-    new CheckNative()
-        .run(new String[] {});
+    new OzoneDebug().getCmd().execute("checknative");
     // trims multiple spaces
     String stdOut = outputStream.toString(DEFAULT_ENCODING)
         .replaceAll(" +", " ");
@@ -67,8 +67,7 @@ public class TestCheckNative {
   @Test
   public void testCheckNativeRocksToolsLoaded() throws UnsupportedEncodingException {
     outputStream.reset();
-    new CheckNative()
-        .run(new String[] {});
+    new OzoneDebug().getCmd().execute("checknative");
     // trims multiple spaces
     String stdOut = outputStream.toString(DEFAULT_ENCODING)
         .replaceAll(" +", " ");
