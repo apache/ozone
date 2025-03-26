@@ -179,20 +179,9 @@ public class DatanodeStateMachine implements Closeable {
     // past to its constructor, so we much synchronize its access. See
     // HDDS-3116 for more details.
     constructionLock.writeLock().lock();
-
-    ReplicationConfig replicationConfig =
-        conf.getObject(ReplicationConfig.class);
-    supervisor = ReplicationSupervisor.newBuilder()
-        .stateContext(context)
-        .datanodeConfig(dnConf)
-        .replicationConfig(replicationConfig)
-        .clock(clock)
-        .build();
-
     try {
       container = new OzoneContainer(hddsDatanodeService, this.datanodeDetails,
           conf, context, certClient, secretKeyClient);
-      container.setReplicationSupervisor(supervisor);
     } finally {
       constructionLock.writeLock().unlock();
     }
@@ -213,6 +202,15 @@ public class DatanodeStateMachine implements Closeable {
 
     pullReplicatorWithMetrics = new MeasuredReplicator(pullReplicator, "pull");
     pushReplicatorWithMetrics = new MeasuredReplicator(pushReplicator, "push");
+
+    ReplicationConfig replicationConfig =
+        conf.getObject(ReplicationConfig.class);
+    supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .datanodeConfig(dnConf)
+        .replicationConfig(replicationConfig)
+        .clock(clock)
+        .build();
 
     replicationSupervisorMetrics =
         ReplicationSupervisorMetrics.create(supervisor);
