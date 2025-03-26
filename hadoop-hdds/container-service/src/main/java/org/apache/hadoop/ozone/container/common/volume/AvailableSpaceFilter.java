@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.container.common.volume;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Predicate;
-import org.apache.hadoop.hdds.fs.SpaceUsageSource;
+import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 
 /**
  * Filter for selecting volumes with enough space for a new container.
@@ -39,19 +39,13 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
 
   @Override
   public boolean test(HddsVolume vol) {
-    SpaceUsageSource usage = vol.getCurrentUsage();
-    long volumeCapacity = usage.getCapacity();
-    long free = usage.getAvailable();
-    long committed = vol.getCommittedBytes();
-    long available = free - committed;
-    long volumeFreeSpaceToSpare = vol.getFreeSpaceToSpare(volumeCapacity);
-    boolean hasEnoughSpace = VolumeUsage.hasVolumeEnoughSpace(free, committed,
-        requiredSpace, volumeFreeSpaceToSpare);
+    StorageLocationReport report = vol.getReport();
+    boolean hasEnoughSpace = VolumeUsage.hasVolumeEnoughSpace(report, requiredSpace);
 
-    mostAvailableSpace = Math.max(available, mostAvailableSpace);
+    mostAvailableSpace = Math.max(report.getRemaining(), mostAvailableSpace);
 
     if (!hasEnoughSpace) {
-      fullVolumes.put(vol, new AvailableSpace(free, committed));
+      fullVolumes.put(vol, new AvailableSpace(report.getRemaining(), report.getCommitted()));
     }
 
     return hasEnoughSpace;

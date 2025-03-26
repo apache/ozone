@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -616,10 +615,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         .orElse(Boolean.FALSE);
     if (isOpen) {
       HddsVolume volume = container.getContainerData().getVolume();
-      SpaceUsageSource usage = volume.getCurrentUsage();
-      long volumeFreeSpaceToSpare = volume.getFreeSpaceToSpare(usage.getCapacity());
-      return !VolumeUsage.hasVolumeEnoughSpace(usage.getAvailable(), volume.getCommittedBytes(), 0,
-          volumeFreeSpaceToSpare);
+      return !VolumeUsage.hasVolumeEnoughSpace(volume.getReport(), 0);
     }
     return false;
   }

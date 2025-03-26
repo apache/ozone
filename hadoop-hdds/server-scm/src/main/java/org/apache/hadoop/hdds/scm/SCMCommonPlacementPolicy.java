@@ -309,9 +309,7 @@ public abstract class SCMCommonPlacementPolicy implements
 
     if (dataSizeRequired > 0) {
       for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
-        if (VolumeUsage.hasVolumeEnoughSpace(reportProto.getRemaining(),
-              reportProto.getCommitted(), dataSizeRequired,
-              reportProto.getFreeSpaceToSpare())) {
+        if (VolumeUsage.hasVolumeEnoughSpace(reportProto, dataSizeRequired)) {
           enoughForData = true;
           break;
         }

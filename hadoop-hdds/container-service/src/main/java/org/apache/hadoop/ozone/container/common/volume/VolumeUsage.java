@@ -31,6 +31,8 @@ import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.hdds.fs.CachingSpaceUsageSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckParams;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -182,6 +184,16 @@ public class VolumeUsage {
                                              long requiredSpace,
                                              long volumeFreeSpaceToSpare) {
     return (volumeAvailableSpace - volumeCommittedBytesCount - volumeFreeSpaceToSpare) > requiredSpace;
+  }
+
+  public static boolean hasVolumeEnoughSpace(StorageReportProto report, long requiredSpace) {
+    return hasVolumeEnoughSpace(report.getRemaining(), report.getCommitted(), requiredSpace,
+        report.getFreeSpaceToSpare());
+  }
+
+  public static boolean hasVolumeEnoughSpace(StorageLocationReport report, long requiredSpace) {
+    return hasVolumeEnoughSpace(report.getRemaining(), report.getCommitted(), requiredSpace,
+        report.getFreeSpaceToSpare());
   }
 
   private static long getReserved(ConfigurationSource conf, String rootDir,
