@@ -42,10 +42,10 @@ public class DiskBalancerServiceTestImpl extends DiskBalancerService {
 
   public DiskBalancerServiceTestImpl(OzoneContainer container,
       int serviceInterval, ConfigurationSource conf,
-      int threadCount, ReplicationSupervisor supervisor)
+      int threadCount, ReplicationSupervisor replicationSupervisor)
       throws IOException {
     super(container, serviceInterval, SERVICE_TIMEOUT_IN_MILLISECONDS,
-        TimeUnit.MILLISECONDS, threadCount, conf, supervisor);
+        TimeUnit.MILLISECONDS, threadCount, conf, replicationSupervisor);
   }
 
   public void runBalanceTasks() {

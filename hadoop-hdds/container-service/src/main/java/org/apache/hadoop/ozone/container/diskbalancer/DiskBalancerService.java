@@ -117,12 +117,13 @@ public class DiskBalancerService extends BackgroundService {
 
   public DiskBalancerService(OzoneContainer ozoneContainer,
       long serviceCheckInterval, long serviceCheckTimeout, TimeUnit timeUnit,
-      int workerSize, ConfigurationSource conf)
+      int workerSize, ConfigurationSource conf, ReplicationSupervisor replicationSupervisor)
       throws IOException {
     super("DiskBalancerService", serviceCheckInterval, timeUnit, workerSize,
         serviceCheckTimeout);
     this.ozoneContainer = ozoneContainer;
     this.conf = conf;
+    this.replicationSupervisor = replicationSupervisor;
 
     String diskBalancerInfoPath = getDiskBalancerInfoPath();
     Preconditions.checkNotNull(diskBalancerInfoPath);
@@ -324,14 +325,12 @@ public class DiskBalancerService extends BackgroundService {
         .build();
   }
 
-  public void setReplicationSupervisor(ReplicationSupervisor replicationSupervisor) {
-    this.replicationSupervisor = replicationSupervisor;
-  }
-
   private Set<Long> getReplicationContainerIDs(ReplicationSupervisor supervisor) {
     Set<Long> replicationContainerIDs = ConcurrentHashMap.newKeySet();
-    for (AbstractReplicationTask task : supervisor.getInFlightTasks()) {
-      replicationContainerIDs.add(task.getContainerId());
+    if (supervisor != null) {
+      for (AbstractReplicationTask task : supervisor.getInFlightTasks()) {
+        replicationContainerIDs.add(task.getContainerId());
+      }
     }
     return replicationContainerIDs;
   }

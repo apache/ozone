@@ -279,10 +279,17 @@ public class OzoneContainer {
     Duration diskBalancerSvcTimeout = conf.getObject(
         DiskBalancerConfiguration.class).getDiskBalancerTimeout();
 
+    if (hddsDatanodeService == null ||
+        hddsDatanodeService.getDatanodeStateMachine() == null) {
+      replicationSupervisor = null;
+    } else {
+      replicationSupervisor = hddsDatanodeService.getDatanodeStateMachine().getSupervisor();
+    }
+
     diskBalancerService =
         new DiskBalancerService(this, diskBalancerSvcInterval.toMillis(),
             diskBalancerSvcTimeout.toMillis(), TimeUnit.MILLISECONDS, 1,
-            config);
+            config, replicationSupervisor);
 
     Duration recoveringContainerScrubbingSvcInterval =
         dnConf.getRecoveringContainerScrubInterval();
@@ -313,12 +320,6 @@ public class OzoneContainer {
 
     initializingStatus =
         new AtomicReference<>(InitializingStatus.UNINITIALIZED);
-  }
-
-  public void setReplicationSupervisor(
-      ReplicationSupervisor replicationSupervisor) {
-    this.replicationSupervisor = replicationSupervisor;
-    diskBalancerService.setReplicationSupervisor(replicationSupervisor);
   }
 
   /**
