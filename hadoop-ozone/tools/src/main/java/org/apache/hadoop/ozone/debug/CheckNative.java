@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.shell.checknative;
+package org.apache.hadoop.ozone.debug;
 
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
 
