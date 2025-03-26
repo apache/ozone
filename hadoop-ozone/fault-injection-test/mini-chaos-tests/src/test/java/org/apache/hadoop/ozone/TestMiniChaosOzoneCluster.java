@@ -34,8 +34,6 @@ import org.apache.hadoop.ozone.freon.FreonReplicationOptions;
 import org.apache.hadoop.ozone.loadgenerators.LoadGenerator;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ozone.test.tag.Unhealthy;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import picocli.CommandLine;
@@ -96,6 +94,10 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
           "--numDataVolume will be removed in later versions.")
   private int numDataVolumes = 3;
 
+  @Option(names = {"--initial-delay"},
+      description = "time (in seconds) before first failure event")
+  private int initialDelay = 300; // seconds
+
   @Option(names = {"-i", "--failure-interval", "--failureInterval"},
       description = "time between failure events in seconds. Full name " +
           "--failureInterval will be removed in later versions.")
@@ -120,8 +122,7 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
   private static final String OM_SERVICE_ID = "ozoneChaosTest";
   private static final String SCM_SERVICE_ID = "scmChaosTest";
 
-  @BeforeEach
-  void init() throws Exception {
+  private void init() throws Exception {
     OzoneConfiguration configuration = new OzoneConfiguration();
 
     MiniOzoneChaosCluster.Builder chaosBuilder =
@@ -193,23 +194,18 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
     numStorageContainerManagerss = numScms;
   }
 
-  @AfterEach
-  void shutdown() {
+  private void shutdown() {
     if (loadGenerator != null) {
       loadGenerator.shutdownLoadGenerator();
     }
 
-    IOUtils.closeQuietly(client);
-
-    if (cluster != null) {
-      cluster.shutdown();
-    }
+    IOUtils.closeQuietly(client, cluster);
   }
 
   public void startChaosCluster() throws Exception {
     try {
       init();
-      cluster.startChaos(failureInterval, failureInterval, TimeUnit.SECONDS);
+      cluster.startChaos(initialDelay, failureInterval, TimeUnit.SECONDS);
       loadGenerator.startIO(numMinutes, TimeUnit.MINUTES);
     } finally {
       shutdown();
@@ -217,8 +213,10 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
   }
 
   @Test
-  public void testReadWriteWithChaosCluster() throws Exception {
-    cluster.startChaos(5, 10, TimeUnit.SECONDS);
-    loadGenerator.startIO(120, TimeUnit.SECONDS);
+  void test() throws Exception {
+    initialDelay = 5; // seconds
+    failureInterval = 10; // seconds
+    numMinutes = 2;
+    startChaosCluster();
   }
 }
