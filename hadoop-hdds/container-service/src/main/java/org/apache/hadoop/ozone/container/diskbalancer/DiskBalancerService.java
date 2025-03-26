@@ -85,6 +85,7 @@ public class DiskBalancerService extends BackgroundService {
 
   private DiskBalancerVersion version;
 
+  private AtomicLong totalBalancedBytes = new AtomicLong(0L);
   private AtomicLong balancedBytesInLastWindow = new AtomicLong(0L);
   private AtomicLong nextAvailableTime = new AtomicLong(Time.monotonicNow());
 
@@ -299,6 +300,7 @@ public class DiskBalancerService extends BackgroundService {
     DiskBalancerReportProto.Builder builder =
         DiskBalancerReportProto.newBuilder();
     return builder.setIsRunning(shouldRun)
+        .setBalancedBytes(totalBalancedBytes.get())
         .setDiskBalancerConf(
             HddsProtos.DiskBalancerConfigurationProto.newBuilder()
                 .setThreshold(threshold)
@@ -456,6 +458,7 @@ public class DiskBalancerService extends BackgroundService {
         balancedBytesInLastWindow.addAndGet(containerSize);
         metrics.incrSuccessCount(1);
         metrics.incrSuccessBytes(containerSize);
+        totalBalancedBytes.addAndGet(containerSize);
       } catch (IOException e) {
         moveSucceeded = false;
         if (diskBalancerTmpDir != null) {

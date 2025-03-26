@@ -60,27 +60,26 @@ public class DiskBalancerStatusSubcommand extends ScmSubcommand {
   private String generateStatus(
       List<HddsProtos.DatanodeDiskBalancerInfoProto> protos) {
     StringBuilder formatBuilder = new StringBuilder("Status result:%n" +
-        "%-35s %-25s %-15s %-15s %-15s %-12s %-12s %-12s %-12s %-12s%n");
+        "%-35s %-15s %-15s %-15s %-12s %-12s %-12s %-15s %-15s %-15s%n");
 
     List<String> contentList = new ArrayList<>();
     contentList.add("Datanode");
-    contentList.add("BalancedBytes");
     contentList.add("Status");
     contentList.add("Threshold(%)");
     contentList.add("BandwidthInMB");
     contentList.add("Threads");
     contentList.add("SuccessMove");
     contentList.add("FailureMove");
+    contentList.add("BytesMoved(MB)");
     contentList.add("EstBytesToMove(MB)");
     contentList.add("EstTimeLeft(min)");
 
     for (HddsProtos.DatanodeDiskBalancerInfoProto proto: protos) {
-      formatBuilder.append("%-35s %-25s %-15s %-15s %-15s %-12s %-12s %-12s %-12s %-12s%n");
+      formatBuilder.append("%-35s %-15s %-15s %-15s %-12s %-12s %-12s %-15s %-15s %-15s%n");
       long estimatedTimeLeft = calculateEstimatedTimeLeft(proto);
       long bytesToMoveMB = proto.getBytesToMove() / (1024 * 1024);
 
       contentList.add(proto.getNode().getHostName());
-      contentList.add(String.valueOf(proto.getBalancedBytes()));
       contentList.add(proto.getRunningStatus().name());
       contentList.add(
           String.format("%.4f", proto.getDiskBalancerConf().getThreshold()));
@@ -90,6 +89,7 @@ public class DiskBalancerStatusSubcommand extends ScmSubcommand {
           String.valueOf(proto.getDiskBalancerConf().getParallelThread()));
       contentList.add(String.valueOf(proto.getSuccessMoveCount()));
       contentList.add(String.valueOf(proto.getFailureMoveCount()));
+      contentList.add(String.valueOf(proto.getBytesMoved() / (1024 * 1024)));
       contentList.add(String.valueOf(bytesToMoveMB));
       contentList.add(estimatedTimeLeft >= 0 ? String.valueOf(estimatedTimeLeft) : "N/A");
     }

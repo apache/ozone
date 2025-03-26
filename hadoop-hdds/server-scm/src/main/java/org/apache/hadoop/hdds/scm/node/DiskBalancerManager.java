@@ -269,7 +269,7 @@ public class DiskBalancerManager {
             .setSuccessMoveCount(status.getSuccessMoveCount())
             .setFailureMoveCount(status.getFailureMoveCount())
             .setBytesToMove(status.getBytesToMove())
-            .setBalancedBytes(status.getBalancedBytes());
+            .setBytesMoved(status.getBalancedBytes());
     if (status.getRunningStatus() != DiskBalancerRunningStatus.UNKNOWN) {
       builder.setDiskBalancerConf(statusMap.get(dn)
           .getDiskBalancerConfiguration().toProtobufBuilder());
