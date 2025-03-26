@@ -301,6 +301,10 @@ public final class StorageLocationReport implements
       return this;
     }
 
+    public boolean isFailed() {
+      return failed;
+    }
+
     /**
      * Sets the capacity of volume.
      *
@@ -311,6 +315,11 @@ public final class StorageLocationReport implements
       this.capacity = capacityValue;
       return this;
     }
+
+    public long getCapacity() {
+      return capacity;
+    }
+
     /**
      * Sets the scmUsed Value.
      *
