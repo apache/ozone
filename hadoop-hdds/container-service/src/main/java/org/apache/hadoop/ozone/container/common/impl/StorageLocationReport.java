@@ -41,19 +41,16 @@ public final class StorageLocationReport implements
   private final StorageType storageType;
   private final String storageLocation;
 
-  @SuppressWarnings("checkstyle:parameternumber")
-  private StorageLocationReport(String id, boolean failed, long capacity,
-      long scmUsed, long remaining, long committed, long freeSpaceToSpare,
-      StorageType storageType, String storageLocation) {
-    this.id = id;
-    this.failed = failed;
-    this.capacity = capacity;
-    this.scmUsed = scmUsed;
-    this.remaining = remaining;
-    this.committed = committed;
-    this.freeSpaceToSpare = freeSpaceToSpare;
-    this.storageType = storageType;
-    this.storageLocation = storageLocation;
+  private StorageLocationReport(Builder builder) {
+    this.id = builder.id;
+    this.failed = builder.failed;
+    this.capacity = builder.capacity;
+    this.scmUsed = builder.scmUsed;
+    this.remaining = builder.remaining;
+    this.committed = builder.committed;
+    this.freeSpaceToSpare = builder.freeSpaceToSpare;
+    this.storageType = builder.storageType;
+    this.storageLocation = builder.storageLocation;
   }
 
   @Override
@@ -387,8 +384,7 @@ public final class StorageLocationReport implements
      * @return StorageLocationReport
      */
     public StorageLocationReport build() {
-      return new StorageLocationReport(id, failed, capacity, scmUsed,
-          remaining, committed, freeSpaceToSpare, storageType, storageLocation);
+      return new StorageLocationReport(this);
     }
 
   }
