@@ -623,6 +623,15 @@ public abstract class StorageVolume
       return VolumeCheckResult.HEALTHY;
     }
 
+    // At least some space required to check disk read/write
+    // If there are not enough space remaining,
+    // to avoid volume failure we can ignore checking disk read/write
+    int minimumDiskSpace = healthCheckFileSize * 2;
+    if (getCurrentUsage().getAvailable() < minimumDiskSpace) {
+      ioTestSlidingWindow.add(true);
+      return VolumeCheckResult.HEALTHY;
+    }
+
     // Since IO errors may be intermittent, volume remains healthy until the
     // threshold of failures is crossed.
     boolean diskChecksPassed = DiskCheckUtil.checkReadWrite(storageDir,
@@ -632,6 +641,14 @@ public abstract class StorageVolume
       // consider this a failure.
       throw new InterruptedException("IO check of volume " + this +
           " interrupted.");
+    }
+
+    // As WRITE keeps happening there is probability, disk has become full during above check.
+    // We can check again if disk is full. If it is full,
+    // in this case keep volume as healthy so that READ can still be served
+    if (!diskChecksPassed && getCurrentUsage().getAvailable() < minimumDiskSpace) {
+      ioTestSlidingWindow.add(true);
+      return VolumeCheckResult.HEALTHY;
     }
 
     // Move the sliding window of IO test results forward 1 by adding the
