@@ -17,15 +17,6 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_BATCH_NUMBER;
-import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
-import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FILTER_FOR_MISSING_CONTAINERS;
-import static org.apache.hadoop.ozone.recon.ReconConstants.PREV_CONTAINER_ID_DEFAULT_VALUE;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_BATCH_PARAM;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_FILTER;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
-
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -56,7 +47,9 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -85,6 +78,11 @@ import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContaine
 import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
+import static org.apache.hadoop.ozone.recon.ReconConstants.*;
+import static org.apache.hadoop.ozone.recon.ReconResponseUtils.createBadRequestResponse;
+import static org.apache.hadoop.ozone.recon.ReconUtils.validateStartPrefix;
 
 
 /**
@@ -209,25 +207,13 @@ public class ContainerEndpoint {
   }
 
 
-  /**
-   * Return @{@link org.apache.hadoop.ozone.recon.api.types.KeyMetadata} for
-   * all keys that belong to the container identified by the id param
-   * starting from the given "prev-key" query param for the given "limit".
-   * The given prevKeyPrefix is skipped from the results returned.
-   *
-   * @param containerID   the given containerID.
-   * @param limit         max no. of keys to get.
-   * @param prevKeyPrefix the key prefix after which results are returned.
-   * @return {@link Response}
-   */
   @GET
   @Path("/{id}/keys")
   public Response getKeysForContainer(
       @PathParam("id") Long containerID,
-      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
-          int limit,
-      @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_PREVKEY)
-          String prevKeyPrefix) {
+      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT) int limit,
+      @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_PREVKEY) String prevKeyPrefix,
+      @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_START_PREFIX) String startPrefix) {
     Map<String, KeyMetadata> keyMetadataMap = new LinkedHashMap<>();
 
     // Total count of keys in the container.
@@ -241,60 +227,114 @@ public class ContainerEndpoint {
     }
 
     try {
-      Map<ContainerKeyPrefix, Integer> containerKeyPrefixMap =
-          reconContainerMetadataManager.getKeyPrefixesForContainer(containerID, prevKeyPrefix, limit);
-      // Get set of Container-Key mappings for given containerId.
-      for (ContainerKeyPrefix containerKeyPrefix : containerKeyPrefixMap
-          .keySet()) {
+      if (StringUtils.isNotBlank(startPrefix)) {
 
-        // Directly calling getSkipCache() on the Key/FileTable table
-        // instead of iterating since only full keys are supported now. We will
-        // try to get the OmKeyInfo object by searching the KEY_TABLE table with
-        // the key prefix. If it's not found, we will then search the FILE_TABLE
-        OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(BucketLayout.LEGACY)
-            .getSkipCache(containerKeyPrefix.getKeyPrefix());
-        if (omKeyInfo == null) {
-          omKeyInfo =
-              omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-                  .getSkipCache(containerKeyPrefix.getKeyPrefix());
+        // Ensure startPrefix starts with '/' for non-empty values.
+        // Validate startPrefix if it's provided
+        if (isNotBlank(startPrefix) && !validateStartPrefix(startPrefix)) {
+          return createBadRequestResponse("Invalid startPrefix: Path must be at the bucket level or deeper.");
         }
 
-        if (null != omKeyInfo) {
-          // Filter keys by version.
-          List<OmKeyLocationInfoGroup> matchedKeys = omKeyInfo
-              .getKeyLocationVersions()
-              .stream()
-              .filter(k -> (k.getVersion() ==
-                  containerKeyPrefix.getKeyVersion()))
-              .collect(Collectors.toList());
+        // Convert the provided startPrefix to object-id path if bucket layout is FSO.
+        boolean isFSO = isFSOBucket(startPrefix);
+        if (isFSO) {
+          Table<String, OmKeyInfo> fileTable = omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+          startPrefix = ReconUtils.convertToObjectPathForSearch(startPrefix, omMetadataManager,
+              reconNamespaceSummaryManager, reconSCM, fileTable);
+        }
 
-          List<ContainerBlockMetadata> blockIds =
-              getBlocks(matchedKeys, containerID);
+        // If a startPrefix is provided, fetch only the specific matching record(s).
+        List<ContainerKeyPrefix> keyRecords =
+            reconContainerMetadataManager.getKeyRecordsForPrefix(containerID, startPrefix, limit, isFSO);
+        for (ContainerKeyPrefix keyRecord : keyRecords) {
 
-          String ozoneKey = containerKeyPrefix.getKeyPrefix();
-          lastKey = ozoneKey;
-          if (keyMetadataMap.containsKey(ozoneKey)) {
-            keyMetadataMap.get(ozoneKey).getVersions()
-                .add(containerKeyPrefix.getKeyVersion());
-
-            keyMetadataMap.get(ozoneKey).getBlockIds()
-                .put(containerKeyPrefix.getKeyVersion(), blockIds);
+          OmKeyInfo omKeyInfo;
+          if (isFSO) {
+            omKeyInfo = omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+                .getSkipCache(keyRecord.getKeyPrefix());
           } else {
-            KeyMetadata keyMetadata = new KeyMetadata();
-            keyMetadata.setBucket(omKeyInfo.getBucketName());
-            keyMetadata.setVolume(omKeyInfo.getVolumeName());
-            keyMetadata.setKey(omKeyInfo.getKeyName());
-            keyMetadata.setCompletePath(ReconUtils.constructFullPath(omKeyInfo,
-                reconNamespaceSummaryManager, omMetadataManager));
-            keyMetadata.setCreationTime(
-                Instant.ofEpochMilli(omKeyInfo.getCreationTime()));
-            keyMetadata.setModificationTime(
-                Instant.ofEpochMilli(omKeyInfo.getModificationTime()));
-            keyMetadata.setDataSize(omKeyInfo.getDataSize());
-            keyMetadata.getVersions().add(containerKeyPrefix.getKeyVersion());
-            keyMetadataMap.put(ozoneKey, keyMetadata);
-            keyMetadata.getBlockIds().put(containerKeyPrefix.getKeyVersion(),
-                blockIds);
+            omKeyInfo = omMetadataManager.getKeyTable(BucketLayout.LEGACY)
+                .getSkipCache(keyRecord.getKeyPrefix());
+          }
+
+          if (omKeyInfo != null) {
+            // Filter keys by version.
+            List<OmKeyLocationInfoGroup> matchedKeys = omKeyInfo.getKeyLocationVersions()
+                .stream()
+                .filter(k -> (k.getVersion() == keyRecord.getKeyVersion()))
+                .collect(Collectors.toList());
+            List<ContainerBlockMetadata> blockIds = getBlocks(matchedKeys, containerID);
+            String ozoneKey = keyRecord.getKeyPrefix();
+            lastKey = ozoneKey;
+            if (keyMetadataMap.containsKey(ozoneKey)) {
+              keyMetadataMap.get(ozoneKey).getVersions().add(keyRecord.getKeyVersion());
+              keyMetadataMap.get(ozoneKey).getBlockIds().put(keyRecord.getKeyVersion(), blockIds);
+            } else {
+              // break the for loop if limit has been reached
+              if (keyMetadataMap.size() == limit) {
+                break;
+              }
+              KeyMetadata keyMetadata = new KeyMetadata();
+              keyMetadata.setBucket(omKeyInfo.getBucketName());
+              keyMetadata.setVolume(omKeyInfo.getVolumeName());
+              keyMetadata.setKey(omKeyInfo.getKeyName());
+              keyMetadata.setCompletePath(ReconUtils.constructFullPath(omKeyInfo,
+                  reconNamespaceSummaryManager, omMetadataManager));
+              keyMetadata.setCreationTime(Instant.ofEpochMilli(omKeyInfo.getCreationTime()));
+              keyMetadata.setModificationTime(Instant.ofEpochMilli(omKeyInfo.getModificationTime()));
+              keyMetadata.setDataSize(omKeyInfo.getDataSize());
+              keyMetadata.getVersions().add(keyRecord.getKeyVersion());
+              keyMetadataMap.put(ozoneKey, keyMetadata);
+              keyMetadata.getBlockIds().put(keyRecord.getKeyVersion(), blockIds);
+            }
+          }
+        }
+      } else {
+        Map<ContainerKeyPrefix, Integer> containerKeyPrefixMap =
+            reconContainerMetadataManager.getKeyPrefixesForContainer(containerID, prevKeyPrefix, limit);
+        // Get set of Container-Key mappings for given containerId.
+        for (ContainerKeyPrefix containerKeyPrefix : containerKeyPrefixMap.keySet()) {
+
+          // Directly calling getSkipCache() on the Key/FileTable table
+          // instead of iterating since only full keys are supported now. We will
+          // try to get the OmKeyInfo object by searching the KEY_TABLE table with
+          // the key prefix. If it's not found, we will then search the FILE_TABLE.
+          OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(BucketLayout.LEGACY)
+              .getSkipCache(containerKeyPrefix.getKeyPrefix());
+          if (omKeyInfo == null) {
+            omKeyInfo = omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+                .getSkipCache(containerKeyPrefix.getKeyPrefix());
+          }
+
+          if (null != omKeyInfo) {
+            // Filter keys by version.
+            List<OmKeyLocationInfoGroup> matchedKeys = omKeyInfo.getKeyLocationVersions()
+                .stream()
+                .filter(k -> (k.getVersion() == containerKeyPrefix.getKeyVersion()))
+                .collect(Collectors.toList());
+
+            List<ContainerBlockMetadata> blockIds = getBlocks(matchedKeys, containerID);
+
+            String ozoneKey = containerKeyPrefix.getKeyPrefix();
+
+            lastKey = ozoneKey;
+            if (keyMetadataMap.containsKey(ozoneKey)) {
+              keyMetadataMap.get(ozoneKey).getVersions().add(containerKeyPrefix.getKeyVersion());
+              keyMetadataMap.get(ozoneKey).getBlockIds().put(containerKeyPrefix.getKeyVersion(), blockIds);
+            } else {
+              KeyMetadata keyMetadata = new KeyMetadata();
+              keyMetadata.setBucket(omKeyInfo.getBucketName());
+              keyMetadata.setVolume(omKeyInfo.getVolumeName());
+              keyMetadata.setKey(omKeyInfo.getKeyName());
+              keyMetadata.setCompletePath(ReconUtils.constructFullPath(omKeyInfo,
+                  reconNamespaceSummaryManager, omMetadataManager));
+              keyMetadata.setCreationTime(Instant.ofEpochMilli(omKeyInfo.getCreationTime()));
+              keyMetadata.setModificationTime(Instant.ofEpochMilli(omKeyInfo.getModificationTime()));
+              keyMetadata.setDataSize(omKeyInfo.getDataSize());
+              keyMetadata.getVersions().add(containerKeyPrefix.getKeyVersion());
+              keyMetadataMap.put(ozoneKey, keyMetadata);
+              keyMetadata.getBlockIds().put(containerKeyPrefix.getKeyVersion(), blockIds);
+            }
           }
         }
       }
@@ -306,6 +346,32 @@ public class ContainerEndpoint {
     }
     KeysResponse keysResponse = new KeysResponse(totalCount, keyMetadataMap.values(), lastKey);
     return Response.ok(keysResponse).build();
+  }
+
+  /**
+   * Helper method to check if the bucket layout for a given startPrefix is FILE_SYSTEM_OPTIMIZED (FSO).
+   *
+   * @param startPrefix The user-provided startPrefix.
+   * @return True if the bucket layout is FILE_SYSTEM_OPTIMIZED; false otherwise.
+   * @throws IOException if a DB operation fails.
+   */
+  private boolean isFSOBucket(String startPrefix) throws IOException {
+    // Ensure startPrefix starts with '/' for non-empty values.
+    startPrefix = startPrefix.startsWith("/") ? startPrefix : "/" + startPrefix;
+
+    // Split the path: expecting format "/volume/bucket/..."
+    String[] parts = startPrefix.split("/");
+    if (parts.length < 3) {
+      return false;
+    }
+
+    String volume = parts[1];
+    String bucket = parts[2];
+    String bucketKey = omMetadataManager.getBucketKey(volume, bucket);
+    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().getSkipCache(bucketKey);
+
+    return bucketInfo != null &&
+        bucketInfo.getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 
   /**

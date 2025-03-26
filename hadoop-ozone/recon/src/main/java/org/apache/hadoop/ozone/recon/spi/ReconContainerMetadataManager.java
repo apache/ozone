@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.spi;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
@@ -262,4 +263,18 @@ public interface ReconContainerMetadataManager {
    */
   Map<KeyPrefixContainer, Integer> getContainerForKeyPrefixes(
       String prevKeyPrefix, long keyVersion) throws IOException;
+
+  /**
+   * Get container key records from the containerKeyTable that exactly match the given
+   * startPrefix for the provided containerId.
+   *
+   * @param containerId the container ID.
+   * @param startPrefix the key prefix to search for.
+   * @param isFSO boolean flag to check if its FSO bucket.
+   * @return A List of ContainerKeyPrefix records if found; an empty list otherwise.
+   * @throws IOException if a DB operation fails.
+   */
+  List<ContainerKeyPrefix> getKeyRecordsForPrefix(long containerId, String startPrefix, int limit, boolean isFSO)
+      throws IOException;
+
 }
