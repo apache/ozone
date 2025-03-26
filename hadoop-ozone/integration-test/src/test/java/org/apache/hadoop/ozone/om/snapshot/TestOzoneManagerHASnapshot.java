@@ -559,7 +559,7 @@ public class TestOzoneManagerHASnapshot {
   }
 
   private OzoneManager getFirstNonLeader() {
-    OzoneManager omLeader = cluster.getOzoneManager();
+    OzoneManager omLeader = cluster.getOMLeader();
     // Get the first non-leader OM
     OzoneManager nonLeaderOM = null;
     for (OzoneManager ozoneManager : cluster.getOzoneManagersList()) {
