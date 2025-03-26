@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests for {@link CheckNative}.
  */
-public class TestCheckNative {
+class TestCheckNative {
 
   private GenericTestUtils.PrintStreamCapturer out;
 
