@@ -114,7 +114,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: 8
+          java-version: ${{ github.event.inputs.java-version }}
       - name: Find tests
         run: |
           # find tests to be run in splits by running them with very short timeout
