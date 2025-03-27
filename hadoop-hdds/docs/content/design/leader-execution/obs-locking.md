@@ -24,16 +24,12 @@ author: Sumit Agrawal
 
 OBS case just involves volume, bucket and key. So this is more simplified in terms of locking.
 
-Like for key commit operation, it needs,
-1. Volume: `<No lock required similar to existing>`
-1. Bucket: Read lock
-2. Key: write lock
-
 There will be:
-1. BucketStripLock: locking bucket operation
-2. KeyStripLock: Locking key operation
+1. Volume Strip Lock: locking for volume
+2. Bucket Strip Lock: locking for bucket
+3. Key Strip Lock: Locking for key
 
-**Note**: Multiple keys locking (like delete multiple keys or rename operation), lock needs to be taken in order, i.e. using StrippedLocking order to avoid dead lock.
+**Note**: Multiple keys locking (like delete multiple keys or rename operation), lock needs to be taken in order, i.e. using StrippedLocking order to avoid deadlock.
 
 Stripped locking ordering:
 - Strip lock is obtained over a hash bucket.
@@ -41,25 +37,30 @@ Stripped locking ordering:
 - And then need take lock in sequence order
 
 ## OBS operation
-Bucket read lock will be there default.
+Bucket read lock will be there default. This is to ensure:
+- key operation uses updated bucket acl, quota and other properties
+- key does not becomes dandling when parallel bucket is deleted
+
+Note: Volume lock is not required as key depends on bucket only to retrieve information and bucket as parent.
 
 For key operations in OBS buckets, the following concurrency control is proposed:
 
-| API Name                | Locking Key                           | Notes                                                                                                     |
-|-------------------------|---------------------------------------|-----------------------------------------------------------------------------------------------------------|
-| CreateKey               | `No Lock` (Only bucket read lock)     | Key can be created parallel by client in open key table and all are exclusive to each other               |
-| CommitKey               | WriteLock: Key Name                   | Only one key can be committed at a time with the same name: Without locking OM can leave dangling blocks  |
-| InitiateMultiPartUpload | `No Lock` (Only bucket read lock)     | no lock is required as key will be created with upload Id and can be parallel                             |
-| CommitMultiPartUpload   | WriteLock: PartKey Name               | Only one part can be committed at a time with the same name: Without locking OM can leave dangling blocks |
-| CompleteMultiPartUpload | WriteLock: Key Name                   | Only one key can be completed at a time with the same name: Without locking OM can leave dangling blocks  |
-| AbortMultiPartUpload    | WriteLock: Key Name                   | Need avoid abort and commit parallel                                                                      |
-| DeleteKey               | WriteLock: Key Name                   | Only one key can be deleted at a time with the same name: Without locking write to DB can fail            |
-| RenameKey               | WriteLock: sort(Key Name1, Key Name 2) | Only one key can be renamed at a time with the same name: Without locking OM can leave dangling blocks    |
-| SetAcl                  | WriteLock: Key Name                   | Only one key can be updated at a time with the same name                                                  |
-| AddAcl                  | WriteLock: Key Name                   | Only one key can be updated at a time with the same name                                                  |
-| RemoveAcl               | WriteLock: Key Name                   | Only one key can be updated at a time with the same name                                                  |
-| AllocateBlock           | WriteLock: Key Name                   | Only one key can be updated at a time with the same name                                                  |
-| SetTimes                | WriteLock: Key Name                   | Only one key can be updated at a time with the same name                                                  |
+| API Name                | Locking Key                               | Notes                                                                                                       |
+|-------------------------|-------------------------------------------|-------------------------------------------------------------------------------------------------------------|
+| CreateKey               | Bucket Read Lock, `No Lock` for key       | Key can be created parallel by client in open key table, so do not need key lock                            |
+| CommitKey               | Bucket Read, Key Write lock               | Avoid parallel key commit by different client, otherwise it can leave dangling blocks on overwrite          |
+| InitiateMultiPartUpload | Bucket Read Lock, `No Lock` for key       | Key can be created parallel by client with different uploadId in open key table, so do not need key lock    |
+| CommitMultiPartUpload   | WriteLock: PartKey Name                   | Avoid same part commit in parallel, else it can leave dangling blocks on overwrite                          |
+| CompleteMultiPartUpload | Bucket Read, Key Write lock               | Avoid parallel multi-part upload complete with different uploadId, else overwrite can cause dangling blocks |
+| AbortMultiPartUpload    | Bucket Read, Key Write lock               | Need to avoid other operation in parallel like commit part                                                  |
+| DeleteKey               | Bucket Read, Key Write lock               | Avoid create and delete in parallel                                                                         |
+| DeleteKeys              | Bucket Read, Key Write with ordered lock  | Avoid create and delete in parallel, ordered key locks to avoid deadlock                                    |
+| RenameKey               | Bucket Read, Keys Write with ordered lock | lock in order to delete key from original location and move to new location                                 |
+| SetAcl                  | Bucket Read, Key Write lock               | Avoid parallel delete key                                                                                   |
+| AddAcl                  | Bucket Read, Key Write lock               | Avoid parallel delete key                                                                                   |
+| RemoveAcl               | Bucket Read, Key Write lock               | Avoid parallel delete key                                                                                   |
+| AllocateBlock           | Bucket Read, Key Write lock               | Need lock key to avoid wrong update of key, if same client does parallel allocate                           |
+| SetTimes                | Bucket Read, Key Write lock               | Avoid parallel delete key                                                                                   |
 
 Batch Operation:
 1. deleteKeys: batch will be divided to multiple threads in Execution Pool to run parallel calling DeleteKey
@@ -70,23 +71,27 @@ For batch operation, atomicity is not guranteed for above api, and same is behav
 ## Bucket and volume locking as required for concurrency for obs key handling
 
 ### Volume Operation
+All operation over volume has taken write lock to avoid,
+- delete volume which may add entry if parallel operation add entry with updated volume info to rocksdb.
+- bucket creation which takes read lock to retrieve latest information from volume as present like acls
+- bucket deletion which takes read lock
 
-| API Name     | Locking Key       | Notes                                                                                                                   |
-|--------------|-------------------|-------------------------------------------------------------------------------------------------------------------------|
-| CreateVolume | Volume Write lock | volume level write lock to avoid parallel volume creation and deletion                                                  |
-| DeleteVolume | Volume Write lock | volume level write lock to avoid parallel volume creation and deletion                                                  |
-| SetProperty  | Volume Write lock | volume property update like owner and quota, lock to avoid parallel operation over volume |
-| SetAcl       | Volume Write lock | volume acl updated avoid parallel operation over volume                                                              |
-| AddAcl       | Volume Write lock | volume acl updated avoid parallel operation over volume                                                                   |
-| RemoveAcl    | Volume Write lock | volume acl updated avoid parallel operation over volume                                                                   |
+| API Name     | Locking Key       | Notes                                                                                          |
+|--------------|-------------------|------------------------------------------------------------------------------------------------|
+| CreateVolume | Volume Write lock | volume level write lock to avoid parallel volume creation and deletion                         |
+| DeleteVolume | Volume Write lock | volume level write lock to avoid parallel volume creation and deletion                         |
+| SetProperty  | Volume Write lock | volume property update like owner and quota, avoid parallel operation like delete volume       |
+| SetAcl       | Volume Write lock | volume acl updated, avoid parallel operation like delete volume and bucket creation / deletion |
+| AddAcl       | Volume Write lock | volume acl updated, avoid parallel operation like delete volume and bucket creation / deletion |
+| RemoveAcl    | Volume Write lock | volume acl updated, avoid parallel operation like delete volume and bucket creation / deletion |
 
 ### Bucket Operation
 
-| API Name     | Locking Key                       | Notes                                                                                                                    |
-|--------------|-----------------------------------|--------------------------------------------------------------------------------------------------------------------------|
-| CreateBucket | Volume Read and Bucket Write lock | volume level write lock to avoid parallel volume creation and deletion                                                   |
-| DeleteBucket | Bucket Write lock                 | volume level write lock to avoid parallel volume creation and deletion                                                   |
-| SetProperty  | Bucket Write lock                 | volume property update like owner and quota, lock to avoid any operation happening inside volume at bucket and key level |
-| SetAcl       | Bucket Write lock                 | bucket acl updated blocking any operation over bucket and key                                                    |
-| AddAcl       | Bucket Write lock                 | bucket acl updated blocking any operation over bucket and key                                                    |
-| RemoveAcl    | Bucket Write lock                 | bucket acl updated blocking any operation over bucket and key                                                    |
+| API Name     | Locking Key                    | Notes                                                                                                                           |
+|--------------|--------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
+| CreateBucket | Volume Read, Bucket Write lock | creates bucket, volume level read lock to avoid parallel volume deletion                                                        |
+| DeleteBucket | Volume Read, Bucket Write lock | creates bucket, volume level read lock to avoid parallel volume deletion                                                        |
+| SetProperty  | Bucket Write lock              | bucket property update like owner, replication, quota and so on, lock to avoid key operation which depends on bucket properties |
+| SetAcl       | Bucket Write lock              | bucket acl updated, block key operation                                                                                         |
+| AddAcl       | Bucket Write lock              | bucket acl updated, block key operation                                                                                         |
+| RemoveAcl    | Bucket Write lock              | bucket acl updated, block key operation                                                                                         |

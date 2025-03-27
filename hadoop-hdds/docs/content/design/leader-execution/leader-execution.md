@@ -26,8 +26,10 @@ Here is the summary of the challenges:
 
 - The current implementation depends on consensus on the order of requests received and not on consensus on the processing of the requests.
 - The double buffer implementation currently is meant to optimize the rate at which writes get flushed to RocksDB but the effective batching achieved is 1.2 request (on average) at best. It is also a source of continuous bugs and added complexity for new features.
+  - effective batching means, at any point of time on average, 1.2 requests are batched for flush. (example, 6 request are flushed in 5 batch flush => 6/5 (or 1.2) request batch)
 - The number of transactions that can be pushed through Ratis currently caps out around 25k.
 - The Current performance envelope for OM is around 12k transactions per second. The early testing with prototype for this feature pushes this to 40k transactions per second.
+
 
 ## Execution at leader node needs deal with below cases
 1. Parallel execution: Currently, ratis serialize all the execution in order. With this new feature, it is possible to execute the request in parallel which are independent.
@@ -37,11 +39,11 @@ Here is the summary of the challenges:
 5. Request execution flow optimization: With new feature, its planned to optimize request execution flow, removing un-necessary operation and improve testability.
 6. Performance and resource Optimization: Currently, same execution is repeated at all nodes, and have more failure points. With this new feature, its going to add parallelism in execution, and will improve performance and resource utilization.
 
-### Object ID generation
+### Object ID generation (future perspective)
 Currently, the Object ID is tied to Ratis transaction metadata. This has multiple challenges in the long run.
 
 - If OM adopts multi Ratis to scale writes further, Object IDs will not longer be unique.
-- If we shard OM, then across OMs the object ID will not be unique.
+- If we shared OM, then across OMs the object ID will not be unique.
 - When batching multiple requests, we cannot utilize Ratis metadata to generate object IDs.
 
 Longer term, we should move to a UUID based object ID generation. This will allow us to generate object IDs that are globally unique. In the mean time, we are moving to a persistent counter based object ID generation. The counter is persisted during apply transaction and is incremented for each new object created.
@@ -59,6 +61,10 @@ Refer [performance prototype result](performance-prototype-result.pdf)
 
 # Leader execution
 
+## Changes as compared to current flow
+![flow-change-context.png](flow-change-context.png)
+
+## Flow
 ![high-level-flow.png](high-level-flow.png)
 
 Client --> OM --> Gatekeeper ---> Executor --> Batching (ratis request) --{Ratis sync to all nodes}--> apply transaction {db update}
@@ -81,10 +87,13 @@ This prepares context for execution, process the request, communicate to all nod
 All requests executed in parallel are batched and send as single request to other nodes. This helps improve performance over network with batching.
 
 Batching of Request:
-- Request 1..n are executed and db changes are identified and added to queue (and request will be waiting for update via ratis over Future waiting)
-- Batcher will retrieve Request 1..n and db changes, merge those request to single Ratis Request message
-- Send Merged Request message to all nodes via ratis and receive reply
-- Batcher will reply to each request 1..n with db update success notifying future object of each request.
+- Request 1..n (executed and db changes identified during execution) are added to the queue (and it will be waiting via future for db update to all nodes using ratis)
+- Batcher will retrieve Request 1..n and db changes is merged to single ratis Request message
+- Send Merged Request message to all nodes via ratis and changes are flushed to db in apply transaction
+- Receive reply from ratis and batcher will notify future object of each waiting request 1..n with db update success
+
+Note: Requests added to queue for batching are independent (i.e. different keys as passed through granular lock obtaining the lock).
+So this ensures that request ordering is not required while processing db updates at all nodes via ratis.
 
 There are multiple batchers waiting over queue,
 - As soon as queue have entry, and the batcher is available, it will pick all request from queue for processing
