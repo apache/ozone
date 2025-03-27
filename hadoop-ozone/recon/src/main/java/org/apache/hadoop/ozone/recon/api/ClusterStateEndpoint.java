@@ -27,6 +27,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 
 import java.util.List;
+import java.util.Optional;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -104,7 +105,7 @@ public class ClusterStateEndpoint {
     List<UnhealthyContainers> missingContainers = containerHealthSchemaManager
         .getUnhealthyContainers(
             ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
-            0, MISSING_CONTAINER_COUNT_LIMIT);
+            0L, Optional.empty(), MISSING_CONTAINER_COUNT_LIMIT);
 
     containerStateCounts.setMissingContainerCount(
         missingContainers.size() == MISSING_CONTAINER_COUNT_LIMIT ?
