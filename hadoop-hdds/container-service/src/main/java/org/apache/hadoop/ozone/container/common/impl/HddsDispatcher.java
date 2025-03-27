@@ -615,7 +615,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         .orElse(Boolean.FALSE);
     if (isOpen) {
       HddsVolume volume = container.getContainerData().getVolume();
-      return VolumeUsage.getUsableSpace(volume.getReport()) > 0;
+      return VolumeUsage.getUsableSpace(volume.getReport()) <= 0;
     }
     return false;
   }
