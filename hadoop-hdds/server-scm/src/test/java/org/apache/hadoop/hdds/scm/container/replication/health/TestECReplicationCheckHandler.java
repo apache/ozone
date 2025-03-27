@@ -58,8 +58,11 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.He
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.OverReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.UnderReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManagerMetrics;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -75,13 +78,21 @@ public class TestECReplicationCheckHandler {
   private ContainerCheckRequest.Builder requestBuilder;
   private ReplicationManagerReport report;
   private PlacementPolicy placementPolicy;
+  private ReplicationManagerMetrics metrics;
 
   @BeforeEach
   public void setup() {
     placementPolicy = mock(PlacementPolicy.class);
     when(placementPolicy.validateContainerPlacement(anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
-    healthCheck = new ECReplicationCheckHandler();
+    ReplicationManager replicationManager = mock(ReplicationManager.class);
+    ReplicationManager.ReplicationManagerConfiguration rmConf =
+        new ReplicationManager.ReplicationManagerConfiguration();
+    when(replicationManager.getConfig())
+        .thenReturn(rmConf);
+    metrics = ReplicationManagerMetrics.create(replicationManager);
+    when(replicationManager.getMetrics()).thenReturn(metrics);
+    healthCheck = new ECReplicationCheckHandler(metrics);
     repConfig = new ECReplicationConfig(3, 2);
     repQueue = new ReplicationQueue();
     report = new ReplicationManagerReport();
@@ -90,6 +101,13 @@ public class TestECReplicationCheckHandler {
         .setMaintenanceRedundancy(maintenanceRedundancy)
         .setPendingOps(Collections.emptyList())
         .setReport(report);
+  }
+
+  @AfterEach
+  void cleanup() {
+    if (metrics != null) {
+      metrics.unRegister();
+    }
   }
 
   @Test
@@ -131,6 +149,8 @@ public class TestECReplicationCheckHandler {
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+
+    assertEquals(1, metrics.getEcUnderReplicatedContainers());
   }
 
   @Test
@@ -160,6 +180,8 @@ public class TestECReplicationCheckHandler {
     // Still under replicated until the pending complete
     assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+
+    assertEquals(1, metrics.getEcUnderReplicatedContainers());
   }
 
   @Test
@@ -187,6 +209,8 @@ public class TestECReplicationCheckHandler {
     // Still under replicated until the pending complete
     assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+
+    assertEquals(1, metrics.getEcUnderReplicatedContainers());
   }
 
   @Test
@@ -219,6 +243,8 @@ public class TestECReplicationCheckHandler {
     // Still under replicated until the pending complete
     assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+
+    assertEquals(1, metrics.getEcUnderReplicatedContainers());
   }
 
   @Test
@@ -248,6 +274,8 @@ public class TestECReplicationCheckHandler {
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+
+    assertEquals(1, metrics.getEcUnderReplicatedContainers());
   }
 
   @Test
@@ -278,6 +306,8 @@ public class TestECReplicationCheckHandler {
         ReplicationManagerReport.HealthState.MISSING));
     assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.UNHEALTHY));
+
+    assertEquals(1, metrics.getEcMissingContainers());
   }
 
   @Test
@@ -311,6 +341,8 @@ public class TestECReplicationCheckHandler {
         ReplicationManagerReport.HealthState.MISSING));
     assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.UNHEALTHY));
+
+    assertEquals(1, metrics.getEcUnhealthyReplicatedContainers());
   }
 
   @Test
@@ -351,6 +383,9 @@ public class TestECReplicationCheckHandler {
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.MISSING));
+
+    assertEquals(1, metrics.getEcUnderReplicatedContainers());
+    assertEquals(1, metrics.getEcMissingContainers());
   }
 
   @Test
@@ -397,6 +432,9 @@ public class TestECReplicationCheckHandler {
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.MISSING));
+
+    assertEquals(1, metrics.getEcUnderReplicatedContainers());
+    assertEquals(1, metrics.getEcMissingContainers());
   }
 
   /**
@@ -437,6 +475,9 @@ public class TestECReplicationCheckHandler {
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+
+    assertEquals(1, metrics.getEcUnderReplicatedContainers());
+    assertEquals(1, metrics.getEcCriticalUnderReplicatedContainers());
   }
 
   /**
@@ -580,6 +621,8 @@ public class TestECReplicationCheckHandler {
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
+
+    assertEquals(1, metrics.getEcUnderReplicatedContainers());
   }
 
   @Test
@@ -613,6 +656,8 @@ public class TestECReplicationCheckHandler {
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
     assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.MIS_REPLICATED));
+
+    assertEquals(1, metrics.getEcUnderReplicatedContainers());
   }
 
   @Test
