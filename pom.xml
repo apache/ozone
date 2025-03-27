@@ -1623,6 +1623,7 @@
                       <bannedImport>org.apache.hadoop.test.GenericTestUtils</bannedImport>
                       <bannedImport>org.apache.hadoop.test.LambdaTestUtils</bannedImport>
                       <bannedImport>org.apache.hadoop.test.MetricsAssert</bannedImport>
+                      <bannedImport>org.apache.hadoop.test.Whitebox</bannedImport>
                       <bannedImport>org.apache.hadoop.classification.InterfaceAudience</bannedImport>
                       <bannedImport>org.apache.hadoop.classification.InterfaceStability</bannedImport>
                     </bannedImports>
