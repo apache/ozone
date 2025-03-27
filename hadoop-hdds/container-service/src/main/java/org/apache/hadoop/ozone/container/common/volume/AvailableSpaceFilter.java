@@ -40,15 +40,13 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
   @Override
   public boolean test(HddsVolume vol) {
     StorageLocationReport report = vol.getReport();
-    long free = report.getRemaining();
-    long committed = vol.getCommittedBytes();
-    long available = free - committed;
-    boolean hasEnoughSpace = VolumeUsage.hasVolumeEnoughSpace(report, requiredSpace);
+    long available = VolumeUsage.getUsableSpace(report);
+    boolean hasEnoughSpace = available > requiredSpace;
 
     mostAvailableSpace = Math.max(available, mostAvailableSpace);
 
     if (!hasEnoughSpace) {
-      fullVolumes.put(vol, new AvailableSpace(free, committed));
+      fullVolumes.put(vol, new AvailableSpace(report));
     }
 
     return hasEnoughSpace;
@@ -69,18 +67,16 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
   }
 
   private static class AvailableSpace {
-    private final long free;
-    private final long committed;
+    private final StorageLocationReport report;
 
-    AvailableSpace(long free, long committed) {
-      this.free = free;
-      this.committed = committed;
+    AvailableSpace(StorageLocationReport report) {
+      this.report = report;
     }
 
     @Override
     public String toString() {
-      return "free: " + free +
-          ", committed: " + committed;
+      return "free: " + report.getRemaining() +
+          ", committed: " + report.getCommitted();
     }
   }
 }
