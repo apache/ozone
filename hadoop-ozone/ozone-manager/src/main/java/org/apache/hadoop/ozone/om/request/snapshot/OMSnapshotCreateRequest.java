@@ -147,6 +147,14 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
     String key = snapshotInfo.getTableKey();
     try {
+      // Check snapshot limit
+      int maxSnapshots = ozoneManager.getFsSnapshotMaxLimit();
+      if (omMetrics.getNumSnapshotActive() >= maxSnapshots) {
+        throw new OMException(
+            String.format("Snapshot limit of %d reached. Cannot create more snapshots.", maxSnapshots),
+            OMException.ResultCodes.INVALID_SNAPSHOT_ERROR);
+      }
+
       // Lock bucket so it doesn't
       //  get deleted while creating snapshot
       mergeOmLockDetails(
@@ -163,14 +171,6 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       if (omMetadataManager.getSnapshotInfoTable().isExist(key)) {
         LOG.debug("Snapshot '{}' already exists under '{}'", key, snapshotPath);
         throw new OMException("Snapshot already exists", FILE_ALREADY_EXISTS);
-      }
-
-      // Check snapshot limit
-      int maxSnapshots = ozoneManager.getFsSnapshotMaxLimit();
-      if (omMetrics.getNumSnapshotActive() >= maxSnapshots) {
-        throw new OMException(
-            String.format("Snapshot limit of %d reached. Cannot create more snapshots.", maxSnapshots),
-            OMException.ResultCodes.INVALID_SNAPSHOT_ERROR);
       }
 
       // Note down RDB latest transaction sequence number, which is used

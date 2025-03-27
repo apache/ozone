@@ -36,6 +36,7 @@ import java.util.UUID;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -272,11 +273,16 @@ public class TestOMSnapshotDeleteRequest extends TestSnapshotRequestAndResponse 
 
   private OMSnapshotDeleteRequest doPreExecute(
       OMRequest originalRequest) throws Exception {
+    return doPreExecute(originalRequest, getOzoneManager());
+  }
+
+  public static OMSnapshotDeleteRequest doPreExecute(
+      OMRequest originalRequest, OzoneManager ozoneManager) throws Exception {
     OMSnapshotDeleteRequest omSnapshotDeleteRequest =
         new OMSnapshotDeleteRequest(originalRequest);
 
     OMRequest modifiedRequest =
-        omSnapshotDeleteRequest.preExecute(getOzoneManager());
+        omSnapshotDeleteRequest.preExecute(ozoneManager);
     return new OMSnapshotDeleteRequest(modifiedRequest);
   }
 

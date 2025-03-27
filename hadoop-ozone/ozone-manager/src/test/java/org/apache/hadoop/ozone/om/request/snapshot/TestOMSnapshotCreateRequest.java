@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.getFromProtobuf;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.getTableKey;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.createSnapshotRequest;
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.deleteSnapshotRequest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateSnapshot;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -267,7 +268,6 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
   @Test
   public void testSnapshotLimit() throws Exception {
     when(getOzoneManager().isAdmin(any())).thenReturn(true);
-
     when(getOzoneManager().getFsSnapshotMaxLimit()).thenReturn(1);
 
     String key1 = getTableKey(getVolumeName(), getBucketName(), snapshotName1);
@@ -292,9 +292,23 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
     assertEquals(OzoneManagerProtocolProtos.Status.INVALID_SNAPSHOT_ERROR,
         omResponse.getStatus());
 
-    assertEquals(1, getOmMetrics().getNumSnapshotCreateFails());
-    assertEquals(1, getOmMetrics().getNumSnapshotActive());
-    assertEquals(2, getOmMetrics().getNumSnapshotCreates());
+    // delete snapshot
+    omRequest = deleteSnapshotRequest(getVolumeName(), getBucketName(), snapshotName1);
+    OMSnapshotDeleteRequest omSnapshotDeleteRequest = TestOMSnapshotDeleteRequest.doPreExecute(omRequest,
+            getOzoneManager());
+    omClientResponse =
+        omSnapshotDeleteRequest.validateAndUpdateCache(getOzoneManager(), 3);
+
+    // create snapshot again, should be successful
+    omRequest = createSnapshotRequest(getVolumeName(), getBucketName(), snapshotName2);
+    omSnapshotCreateRequest = doPreExecute(omRequest);
+    omClientResponse =
+        omSnapshotCreateRequest.validateAndUpdateCache(getOzoneManager(), 4);
+
+    omResponse = omClientResponse.getOMResponse();
+    assertNotNull(omResponse.getCreateSnapshotResponse());
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omResponse.getStatus());
   }
 
   private void renameKey(String fromKey, String toKey, long offset)
