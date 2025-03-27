@@ -1009,7 +1009,7 @@ public class RpcClient implements ClientProtocol {
   public OzoneSnapshot getSnapshotInfo(String volumeName,
                                        String bucketName,
                                        String snapshotName) throws IOException {
-    return getSnapshotInfo(volumeName, bucketName, snapshotName);
+    return getSnapshotInfo(volumeName, bucketName, snapshotName, null);
   }
 
   /**
