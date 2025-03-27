@@ -30,11 +30,12 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROVIDER
 
 import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -183,7 +184,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
    */
   public static void downloadFileWithProgress(InputStream inputStream, File targetFile)
           throws IOException {
-    try (FileOutputStream outputStream = new FileOutputStream(targetFile)) {
+    try (OutputStream outputStream = Files.newOutputStream(targetFile.toPath())) {
       byte[] buffer = new byte[8 * 1024];
       long totalBytesRead = 0;
       int bytesRead;

@@ -59,14 +59,6 @@ public final class HddsConfigKeys {
   public static final String HDDS_DATANODE_VOLUME_CHOOSING_POLICY =
       "hdds.datanode.volume.choosing.policy";
 
-  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE =
-      "hdds.datanode.volume.min.free.space";
-  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT =
-      "5GB";
-
-  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT =
-      "hdds.datanode.volume.min.free.space.percent";
-
   public static final String HDDS_DB_PROFILE = "hdds.db.profile";
 
   // Once a container usage crosses this threshold, it is eligible for
@@ -412,8 +404,6 @@ public final class HddsConfigKeys {
       "hdds.datanode.dns.nameserver";
   public static final String HDDS_DATANODE_HOST_NAME_KEY =
       "hdds.datanode.hostname";
-  public static final String HDDS_DATANODE_DATA_DIR_KEY =
-      "hdds.datanode.data.dir";
   public static final String HDDS_DATANODE_USE_DN_HOSTNAME =
       "hdds.datanode.use.datanode.hostname";
   public static final boolean HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT = false;

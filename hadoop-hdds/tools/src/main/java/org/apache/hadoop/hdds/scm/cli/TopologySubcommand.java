@@ -94,7 +94,7 @@ public class TopologySubcommand extends ScmSubcommand
     for (HddsProtos.NodeState state : STATES) {
       List<HddsProtos.Node> nodes = scmClient.queryNode(null, state,
           HddsProtos.QueryScope.CLUSTER, "");
-      if (nodes != null && nodes.size() > 0) {
+      if (nodes != null && !nodes.isEmpty()) {
         if (nodeOperationalState != null) {
           if (nodeOperationalState.equals("IN_SERVICE") ||
               nodeOperationalState.equals("DECOMMISSIONING") ||

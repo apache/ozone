@@ -351,13 +351,9 @@ public abstract class TestOzoneFSWithObjectStoreCreate implements NonHATests.Tes
     keys.add(OmUtils.normalizeKey(key2, false));
     keys.add(OmUtils.normalizeKey(key3, false));
 
-    int length = 10;
-    byte[] input = new byte[length];
-    Arrays.fill(input, (byte)96);
-
-    createKey(ozoneBucket, key1, 10, input);
-    createKey(ozoneBucket, key2, 10, input);
-    createKey(ozoneBucket, key3, 10, input);
+    createAndAssertKey(ozoneBucket, key1, 10);
+    createAndAssertKey(ozoneBucket, key2, 10);
+    createAndAssertKey(ozoneBucket, key3, 10);
 
     // Iterator with key name as prefix.
 
@@ -402,18 +398,18 @@ public abstract class TestOzoneFSWithObjectStoreCreate implements NonHATests.Tes
     assertEquals(keys, outputKeys);
   }
 
-  private void createKey(OzoneBucket ozoneBucket, String key, int length,
-      byte[] input)
+  private void createAndAssertKey(OzoneBucket ozoneBucket, String key, int length)
+      throws Exception {
+    
+    byte[] input = TestDataUtil.createStringKey(ozoneBucket, key, length);
+    // Read the key with given key name.
+    readKey(ozoneBucket, key, length, input);
+
+  }
+
+  private void readKey(OzoneBucket ozoneBucket, String key, int length, byte[] input)
       throws Exception {
 
-    OzoneOutputStream ozoneOutputStream =
-        ozoneBucket.createKey(key, length);
-
-    ozoneOutputStream.write(input);
-    ozoneOutputStream.write(input, 0, 10);
-    ozoneOutputStream.close();
-
-    // Read the key with given key name.
     OzoneInputStream ozoneInputStream = ozoneBucket.readKey(key);
     byte[] read = new byte[length];
     ozoneInputStream.read(read, 0, length);

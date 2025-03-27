@@ -18,8 +18,8 @@
 package org.apache.hadoop.ozone.freon;
 
 import com.codahale.metrics.Timer;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
@@ -100,9 +100,7 @@ public class StreamingGenerator extends BaseFreonGenerator
           new ContentGenerator(fileSize.toBytes(), 1024);
 
       for (int i = 0; i < numberOfFiles; i++) {
-        try (FileOutputStream out = new FileOutputStream(
-            subDir.resolve("file-" + i).toFile())
-        ) {
+        try (OutputStream out = Files.newOutputStream(subDir.resolve("file-" + i))) {
           contentGenerator.write(out);
         }
       }

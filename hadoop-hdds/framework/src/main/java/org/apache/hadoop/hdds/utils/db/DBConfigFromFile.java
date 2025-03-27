@@ -115,7 +115,7 @@ public final class DBConfigFromFile {
       List<ColumnFamilyDescriptor> cfDescs) throws IOException {
     Preconditions.checkNotNull(dbFileName);
     Preconditions.checkNotNull(cfDescs);
-    Preconditions.checkArgument(cfDescs.size() > 0);
+    Preconditions.checkArgument(!cfDescs.isEmpty());
 
     //TODO: Add Documentation on how to support RocksDB Mem Env.
     Env env = Env.getDefault();

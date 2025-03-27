@@ -369,7 +369,7 @@ public class TestECContainerRecovery {
             .filter(r -> !ReplicationManager
                 .compareState(container.getState(), r.getState()))
             .collect(Collectors.toList());
-        return unhealthyReplicas.size() == 0;
+        return unhealthyReplicas.isEmpty();
       } catch (ContainerNotFoundException e) {
         return false;
       }

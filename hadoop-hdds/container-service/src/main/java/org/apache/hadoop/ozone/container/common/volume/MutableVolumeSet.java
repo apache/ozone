@@ -189,7 +189,7 @@ public class MutableVolumeSet implements VolumeSet {
 
     // First checking if we have any volumes, if all volumes are failed the
     // volumeMap size will be zero, and we throw Exception.
-    if (volumeMap.size() == 0) {
+    if (volumeMap.isEmpty()) {
       throw new DiskOutOfSpaceException("No storage locations configured");
     }
   }
@@ -219,7 +219,7 @@ public class MutableVolumeSet implements VolumeSet {
       throw new IOException("Interrupted while running disk check", e);
     }
 
-    if (failedVolumes.size() > 0) {
+    if (!failedVolumes.isEmpty()) {
       LOG.warn("checkAllVolumes got {} failed volumes - {}",
           failedVolumes.size(), failedVolumes);
       handleVolumeFailures(failedVolumes);
@@ -266,7 +266,7 @@ public class MutableVolumeSet implements VolumeSet {
 
     volumeChecker.checkVolume(
         volume, (healthyVolumes, failedVolumes) -> {
-          if (failedVolumes.size() > 0) {
+          if (!failedVolumes.isEmpty()) {
             LOG.warn("checkVolumeAsync callback got {} failed volumes: {}",
                 failedVolumes.size(), failedVolumes);
           } else {
@@ -277,7 +277,7 @@ public class MutableVolumeSet implements VolumeSet {
   }
 
   public void refreshAllVolumeUsage() {
-    volumeMap.forEach((k, v) -> v.refreshVolumeInfo());
+    volumeMap.forEach((k, v) -> v.refreshVolumeUsage());
   }
 
   /**
@@ -441,7 +441,7 @@ public class MutableVolumeSet implements VolumeSet {
     boolean hasEnoughVolumes;
     if (maxVolumeFailuresTolerated ==
         StorageVolumeChecker.MAX_VOLUME_FAILURE_TOLERATED_LIMIT) {
-      hasEnoughVolumes = getVolumesList().size() >= 1;
+      hasEnoughVolumes = !getVolumesList().isEmpty();
     } else {
       hasEnoughVolumes = getFailedVolumesList().size() <= maxVolumeFailuresTolerated;
     }
@@ -464,26 +464,27 @@ public class MutableVolumeSet implements VolumeSet {
       StorageVolume volume;
       for (Map.Entry<String, StorageVolume> entry : volumeMap.entrySet()) {
         volume = entry.getValue();
-        Optional<VolumeInfo> volumeInfo = volume.getVolumeInfo();
+        Optional<VolumeUsage> volumeUsage = volume.getVolumeUsage();
         long scmUsed = 0;
         long remaining = 0;
         long capacity = 0;
         long committed = 0;
-        String rootDir = "";
+        long spare = 0;
+        String rootDir = volume.getVolumeRootDir();
         failed = true;
-        if (volumeInfo.isPresent()) {
+        if (volumeUsage.isPresent()) {
           try {
-            rootDir = volumeInfo.get().getRootDir();
-            SpaceUsageSource usage = volumeInfo.get().getCurrentUsage();
+            SpaceUsageSource usage = volumeUsage.get().getCurrentUsage();
             scmUsed = usage.getUsedSpace();
             remaining = usage.getAvailable();
             capacity = usage.getCapacity();
-            committed = (volume instanceof HddsVolume) ?
-                ((HddsVolume) volume).getCommittedBytes() : 0;
+            HddsVolume hddsVolume = volume instanceof HddsVolume ? (HddsVolume) volume : null;
+            committed = hddsVolume != null ? hddsVolume.getCommittedBytes() : 0;
+            spare = hddsVolume != null ? hddsVolume.getFreeSpaceToSpare(capacity) : 0;
             failed = false;
           } catch (UncheckedIOException ex) {
             LOG.warn("Failed to get scmUsed and remaining for container " +
-                    "storage location {}", volumeInfo.get().getRootDir(), ex);
+                    "storage location {}", rootDir, ex);
             // reset scmUsed and remaining if df/du failed.
             scmUsed = 0;
             remaining = 0;
@@ -500,6 +501,7 @@ public class MutableVolumeSet implements VolumeSet {
             .setRemaining(remaining)
             .setScmUsed(scmUsed)
             .setCommitted(committed)
+            .setFreeSpaceToSpare(spare)
             .setStorageType(volume.getStorageType());
         StorageLocationReport r = builder.build();
         reports[counter++] = r;

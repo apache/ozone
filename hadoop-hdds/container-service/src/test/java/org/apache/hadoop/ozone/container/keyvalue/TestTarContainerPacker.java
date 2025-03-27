@@ -29,8 +29,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -50,6 +48,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.Archiver;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
 import org.apache.ozone.test.SpyInputStream;
@@ -193,7 +192,7 @@ public class TestTarContainerPacker {
 
     //THEN: check the result
     TarArchiveInputStream tarStream = null;
-    try (FileInputStream input = new FileInputStream(targetFile.toFile())) {
+    try (InputStream input = newInputStream(targetFile)) {
       InputStream uncompressed = packer.decompress(input);
       tarStream = new TarArchiveInputStream(uncompressed);
 
@@ -346,7 +345,7 @@ public class TestTarContainerPacker {
 
   private KeyValueContainerData unpackContainerData(File containerFile)
       throws IOException {
-    try (FileInputStream input = new FileInputStream(containerFile)) {
+    try (InputStream input = newInputStream(containerFile.toPath())) {
       KeyValueContainerData data = createContainer(DEST_CONTAINER_ROOT, false);
       KeyValueContainer container = new KeyValueContainer(data, conf);
       packer.unpackContainerData(container, input, TEMP_DIR,
@@ -356,10 +355,8 @@ public class TestTarContainerPacker {
   }
 
   private void writeDescriptor(KeyValueContainer container) throws IOException {
-    FileOutputStream fileStream = new FileOutputStream(
-        container.getContainerFile());
-    try (OutputStreamWriter writer = new OutputStreamWriter(fileStream,
-        UTF_8)) {
+    try (OutputStream fileStream = newOutputStream(container.getContainerFile().toPath());
+        OutputStreamWriter writer = new OutputStreamWriter(fileStream, UTF_8)) {
       IOUtils.write(TEST_DESCRIPTOR_FILE_CONTENT, writer);
     }
   }
@@ -385,9 +382,8 @@ public class TestTarContainerPacker {
     assertNotNull(parent);
     Files.createDirectories(parent);
     File file = path.toFile();
-    FileOutputStream fileStream = new FileOutputStream(file);
-    try (OutputStreamWriter writer = new OutputStreamWriter(fileStream,
-        UTF_8)) {
+    try (OutputStream fileStream = newOutputStream(file.toPath());
+        OutputStreamWriter writer = new OutputStreamWriter(fileStream, UTF_8)) {
       IOUtils.write(content, writer);
     }
     return file;
@@ -396,12 +392,10 @@ public class TestTarContainerPacker {
   private File packContainerWithSingleFile(File file, String entryName)
       throws Exception {
     File targetFile = TEMP_DIR.resolve("container.tar").toFile();
-    try (FileOutputStream output = new FileOutputStream(targetFile);
-         OutputStream compressed = packer.compress(output);
-         TarArchiveOutputStream archive =
-             new TarArchiveOutputStream(compressed)) {
+    Path path = targetFile.toPath();
+    try (TarArchiveOutputStream archive = new TarArchiveOutputStream(packer.compress(newOutputStream(path)))) {
       archive.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
-      TarContainerPacker.includeFile(file, entryName, archive);
+      Archiver.includeFile(file, entryName, archive);
     }
     return targetFile;
   }
@@ -425,8 +419,8 @@ public class TestTarContainerPacker {
         "example file is missing after pack/unpackContainerData: " +
             exampleFile);
 
-    try (FileInputStream testFile =
-             new FileInputStream(exampleFile.toFile())) {
+    try (InputStream testFile =
+             newInputStream(exampleFile)) {
       List<String> strings = IOUtils.readLines(testFile, UTF_8);
       assertEquals(1, strings.size());
       assertEquals(content, strings.get(0));
