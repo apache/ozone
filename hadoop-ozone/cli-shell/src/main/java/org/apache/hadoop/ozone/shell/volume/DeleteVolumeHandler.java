@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.shell.volume;
 
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
+import static org.apache.hadoop.ozone.OFSPath.OFS_MOUNT_TMP_VOLUMENAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 
 import java.io.IOException;
@@ -195,8 +196,14 @@ public class DeleteVolumeHandler extends VolumeHandler {
           switch (bucket.getBucketLayout()) {
           case FILE_SYSTEM_OPTIMIZED:
           case LEGACY:
-            if (!cleanFSBucket(bucket)) {
-              throw new RuntimeException("Failed to clean bucket");
+            if (vol.getName().equals(OFS_MOUNT_TMP_VOLUMENAME)) {
+              if (!cleanOBSBucket(bucket)) {
+                throw new RuntimeException("Failed to clean bucket");
+              }
+            } else {
+              if (!cleanFSBucket(bucket)) {
+                throw new RuntimeException("Failed to clean bucket");
+              }
             }
             break;
           case OBJECT_STORE:
