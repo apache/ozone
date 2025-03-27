@@ -112,6 +112,53 @@ public class TestStorageVolumeHealthChecks {
 
   @ParameterizedTest
   @MethodSource("volumeBuilders")
+  public void testVolumeFullHealth(StorageVolume.Builder<?> builder) throws Exception {
+    verifyFullVolumeHealthWithDiskReadWriteStatus(builder, true, false);
+  }
+
+
+  public void verifyFullVolumeHealthWithDiskReadWriteStatus(StorageVolume.Builder<?> builder, boolean... checkResult)
+      throws Exception {
+
+    for (boolean result : checkResult) {
+      StorageVolume volume = builder.build();
+
+      VolumeUsage usage = volume.getVolumeUsage().get();
+      DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
+      int minimumDiskSpace = dnConf.getVolumeHealthCheckFileSize() * 2;
+      // Keep remaining space as just less than double of VolumeHealthCheckFileSize.
+      usage.incrementUsedSpace(usage.getCurrentUsage().getAvailable() - minimumDiskSpace + 1);
+      usage.realUsage();
+      DiskCheckUtil.DiskChecks ioFailure = new DiskCheckUtil.DiskChecks() {
+        @Override
+        public boolean checkReadWrite(File storageDir, File testFileDir,
+                                      int numBytesToWrite) {
+          return result;
+        }
+      };
+      DiskCheckUtil.setTestImpl(ioFailure);
+      // Volume will remain healthy as volume don't have enough space to check READ/WRITE
+      assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+      // Even in second try volume will remain HEALTHY
+      assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+
+      // Now keep enough space for read/write check to go through
+      usage.decrementUsedSpace(minimumDiskSpace + 1);
+
+      // volumeIOFailureTolerance is 1, so first time it will be HEALTHY always
+      assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+      if (result) {
+        // Volume will remain as healthy as READ/WRITE check is fine
+        assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+      } else {
+        // Second time volume will fail as READ/WRITE check has failed
+        assertEquals(VolumeCheckResult.FAILED, volume.check(false));
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("volumeBuilders")
   public void testCheckPermissions(StorageVolume.Builder<?> builder)
       throws Exception {
     StorageVolume volume = builder.build();

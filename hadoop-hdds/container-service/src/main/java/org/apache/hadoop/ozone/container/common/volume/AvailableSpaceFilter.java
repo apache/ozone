@@ -33,7 +33,7 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
       new HashMap<>();
   private long mostAvailableSpace = Long.MIN_VALUE;
 
-  AvailableSpaceFilter(long requiredSpace) {
+  public AvailableSpaceFilter(long requiredSpace) {
     this.requiredSpace = requiredSpace;
   }
 
