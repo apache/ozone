@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
+import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.RawDB;
@@ -177,6 +178,16 @@ public class HddsVolume extends StorageVolume {
 
   public VolumeInfoMetrics getVolumeInfoStats() {
     return volumeInfoMetrics;
+  }
+
+  @Override
+  protected StorageLocationReport.Builder reportBuilder() {
+    StorageLocationReport.Builder builder = super.reportBuilder();
+    if (!builder.isFailed()) {
+      builder.setCommitted(getCommittedBytes())
+          .setFreeSpaceToSpare(getFreeSpaceToSpare(builder.getCapacity()));
+    }
+    return builder;
   }
 
   @Override

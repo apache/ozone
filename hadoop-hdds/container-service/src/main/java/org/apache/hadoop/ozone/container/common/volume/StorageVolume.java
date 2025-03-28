@@ -44,6 +44,7 @@ import org.apache.hadoop.hdfs.server.datanode.checker.Checkable;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
+import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DiskCheckUtil;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
@@ -452,6 +453,27 @@ public abstract class StorageVolume
   public SpaceUsageSource getCurrentUsage() {
     return volumeUsage.map(VolumeUsage::getCurrentUsage)
         .orElse(SpaceUsageSource.UNKNOWN);
+  }
+
+  protected StorageLocationReport.Builder reportBuilder() {
+    StorageLocationReport.Builder builder = StorageLocationReport.newBuilder()
+        .setFailed(isFailed())
+        .setId(getStorageID())
+        .setStorageLocation(volumeRoot)
+        .setStorageType(storageType);
+
+    if (!builder.isFailed()) {
+      SpaceUsageSource usage = getCurrentUsage();
+      builder.setCapacity(usage.getCapacity())
+          .setRemaining(usage.getAvailable())
+          .setScmUsed(usage.getUsedSpace());
+    }
+
+    return builder;
+  }
+
+  public StorageLocationReport getReport() {
+    return reportBuilder().build();
   }
 
   public File getStorageDir() {
