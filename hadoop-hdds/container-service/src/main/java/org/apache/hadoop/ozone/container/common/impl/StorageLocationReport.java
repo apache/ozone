@@ -227,36 +227,6 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     return builder.build();
   }
 
-  /**
-   * Returns the StorageLocationReport from the protoBuf message.
-   * @param report MetadataStorageReportProto
-   * @return StorageLocationReport
-   * @throws IOException in case of invalid storage type
-   */
-
-  public static StorageLocationReport getMetadataFromProtobuf(
-      MetadataStorageReportProto report) throws IOException {
-    StorageLocationReport.Builder builder = StorageLocationReport.newBuilder();
-    builder.setStorageLocation(report.getStorageLocation());
-    if (report.hasCapacity()) {
-      builder.setCapacity(report.getCapacity());
-    }
-    if (report.hasScmUsed()) {
-      builder.setScmUsed(report.getScmUsed());
-    }
-    if (report.hasStorageType()) {
-      builder.setStorageType(getStorageType(report.getStorageType()));
-    }
-    if (report.hasRemaining()) {
-      builder.setRemaining(report.getRemaining());
-    }
-
-    if (report.hasFailed()) {
-      builder.setFailed(report.getFailed());
-    }
-    return builder.build();
-  }
-
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder(128)
