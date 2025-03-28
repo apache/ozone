@@ -24,7 +24,6 @@ import java.security.cert.X509Certificate;
 import java.util.Date;
 import java.util.concurrent.CompletableFuture;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 /**
  * Certificate Approver interface is used to inspectCSR a certificate.
@@ -36,7 +35,7 @@ public interface CertificateApprover {
    * @param csr - Certificate Signing Request.
    * @return - Future that will contain Void if the certificate is considered valid otherwise an exception.
    */
-  CompletableFuture<Void> inspectCSR(PKCS10CertificationRequest csr);
+  CompletableFuture<Void> inspectCSR(String csr);
 
   /**
    * Sign function signs a Certificate.
@@ -60,7 +59,7 @@ public interface CertificateApprover {
       X509Certificate caCertificate,
       Date validFrom,
       Date validTill,
-      PKCS10CertificationRequest certificationRequest,
+      String certificationRequest,
       String scmId,
       String clusterId,
       String certSerialId)
