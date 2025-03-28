@@ -26,8 +26,9 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
-import org.apache.hadoop.ozone.container.common.volume.AvailableSpaceFilter;
+import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,10 +84,10 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
       targetVolume = containerImporter.chooseNextVolume();
       // Increment committed bytes and verify if it doesn't cross the space left.
       targetVolume.incCommittedBytes(containerSize * 2);
+      StorageLocationReport volumeReport = targetVolume.getReport();
       // Already committed bytes increased above, so required space is not required here in AvailableSpaceFilter
-      AvailableSpaceFilter filter = new AvailableSpaceFilter(0);
-      if (!filter.test(targetVolume)) {
-        LOG.warn("Container {} replication was unsuccessful, due to no space left", containerID);
+      if (VolumeUsage.getUsableSpace(volumeReport) <= 0) {
+        LOG.warn("Container {} replication was unsuccessful, no space left on volume {}", containerID, volumeReport);
         task.setStatus(Status.FAILED);
         return;
       }

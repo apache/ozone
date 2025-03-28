@@ -32,7 +32,7 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
   private final List<StorageLocationReport> fullVolumes = new LinkedList<>();
   private long mostAvailableSpace = Long.MIN_VALUE;
 
-  public AvailableSpaceFilter(long requiredSpace) {
+  AvailableSpaceFilter(long requiredSpace) {
     this.requiredSpace = requiredSpace;
   }
 
