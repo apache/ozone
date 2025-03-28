@@ -604,6 +604,22 @@ public class ObjectStore {
   }
 
   /**
+   * Returns snapshot info for volume/bucket snapshot path.
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @param snapshotName snapshot name
+   * @param omNodeId OM node ID to get the snapshot info
+   * @return snapshot info for volume/bucket snapshot path.
+   * @throws IOException
+   */
+  public OzoneSnapshot getSnapshotInfo(String volumeName,
+                                       String bucketName,
+                                       String snapshotName,
+                                       String omNodeId) throws IOException {
+    return proxy.getSnapshotInfo(volumeName, bucketName, snapshotName, omNodeId);
+  }
+
+  /**
    * List snapshots in a volume/bucket.
    * @param volumeName     volume name
    * @param bucketName     bucket name
@@ -620,6 +636,24 @@ public class ObjectStore {
   }
 
   /**
+   * List snapshots in a volume/bucket.
+   * @param volumeName     volume name
+   * @param bucketName     bucket name
+   * @param snapshotPrefix snapshot prefix to match
+   * @param prevSnapshot   snapshots will be listed after this snapshot name
+   * @param omNodeId       OM node ID to list the snapshots
+   * @return an iterator of snapshots for volume/bucket snapshot path.
+   * @throws IOException
+   */
+  public Iterator<OzoneSnapshot> listSnapshot(String volumeName,
+                                              String bucketName,
+                                              String snapshotPrefix,
+                                              String prevSnapshot,
+                                              String omNodeId) throws IOException {
+    return new SnapshotIterator(volumeName, bucketName, snapshotPrefix, prevSnapshot, omNodeId);
+  }
+
+  /**
    * An Iterator to iterate over {@link OzoneSnapshot} list.
    */
   private final class SnapshotIterator implements Iterator<OzoneSnapshot> {
@@ -627,6 +661,7 @@ public class ObjectStore {
     private final String volumeName;
     private final String bucketName;
     private final String snapshotPrefix;
+    private final String omNodeId;
     private String lastSnapshot = null;
 
     private Iterator<OzoneSnapshot> currentIterator;
@@ -638,8 +673,22 @@ public class ObjectStore {
       this.volumeName = volumeName;
       this.bucketName = bucketName;
       this.snapshotPrefix = snapshotPrefix;
+      this.omNodeId = null;
       // Initialized the currentIterator and continuationToken.
       getNextListOfSnapshots(prevSnapshot);
+    }
+
+    SnapshotIterator(String volumeName,
+                     String bucketName,
+                     String snapshotPrefix,
+                     String prevSnapshot,
+                     String omNodeId) throws IOException {
+      this.volumeName = volumeName;
+      this.bucketName = bucketName;
+      this.snapshotPrefix = snapshotPrefix;
+      this.omNodeId = omNodeId;
+      // Initialized the currentIterator and continuationToken
+      getNextListOfSnapshots(prevSnapshot, omNodeId);
     }
 
     @Override
@@ -647,7 +696,11 @@ public class ObjectStore {
       if (!currentIterator.hasNext() && StringUtils.isNotEmpty(lastSnapshot)) {
         try {
           // fetch the next page if lastSnapshot is not null.
-          getNextListOfSnapshots(lastSnapshot);
+          if (!StringUtils.isBlank(omNodeId)) {
+            getNextListOfSnapshots(lastSnapshot, omNodeId);
+          } else {
+            getNextListOfSnapshots(lastSnapshot);
+          }
         } catch (IOException e) {
           LOG.error("Error retrieving next batch of list results", e);
         }
@@ -666,6 +719,13 @@ public class ObjectStore {
     private void getNextListOfSnapshots(String startSnapshot) throws IOException {
       ListSnapshotResponse response =
           proxy.listSnapshot(volumeName, bucketName, snapshotPrefix, startSnapshot, listCacheSize);
+      currentIterator = response.getSnapshotInfos().stream().map(OzoneSnapshot::fromSnapshotInfo).iterator();
+      lastSnapshot = response.getLastSnapshot();
+    }
+
+    private void getNextListOfSnapshots(String startSnapshot, String nodeId) throws IOException {
+      ListSnapshotResponse response =
+          proxy.listSnapshot(volumeName, bucketName, snapshotPrefix, startSnapshot, listCacheSize, nodeId);
       currentIterator = response.getSnapshotInfos().stream().map(OzoneSnapshot::fromSnapshotInfo).iterator();
       lastSnapshot = response.getLastSnapshot();
     }
@@ -712,6 +772,36 @@ public class ObjectStore {
   }
 
   /**
+   * Get the differences between two snapshots.
+   * @param volumeName Name of the volume to which the snapshot bucket belong
+   * @param bucketName Name of the bucket to which the snapshots belong
+   * @param fromSnapshot The name of the starting snapshot
+   * @param toSnapshot The name of the ending snapshot
+   * @param token to get the index to return diff report from.
+   * @param pageSize maximum entries returned to the report.
+   * @param forceFullDiff request to force full diff, skipping DAG optimization
+   * @param disableNativeDiff request to force diff to perform diffs without
+   *                           native lib
+   * @param omNodeId OM node ID to send the snapshot diff request.
+   * @return the difference report between two snapshots
+   * @throws IOException in case of any exception while generating snapshot diff
+   */
+  @SuppressWarnings("parameternumber")
+  public SnapshotDiffResponse snapshotDiff(String volumeName,
+                                           String bucketName,
+                                           String fromSnapshot,
+                                           String toSnapshot,
+                                           String token,
+                                           int pageSize,
+                                           boolean forceFullDiff,
+                                           boolean disableNativeDiff,
+                                           String omNodeId)
+      throws IOException {
+    return proxy.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
+        token, pageSize, forceFullDiff, disableNativeDiff, omNodeId);
+  }
+
+  /**
    * Cancel the snap diff jobs.
    * @param volumeName Name of the volume to which the snapshot bucket belong
    * @param bucketName Name of the bucket to which the snapshots belong
@@ -730,6 +820,26 @@ public class ObjectStore {
   }
 
   /**
+   * Cancel the snap diff jobs.
+   * @param volumeName Name of the volume to which the snapshot bucket belong
+   * @param bucketName Name of the bucket to which the snapshots belong
+   * @param fromSnapshot The name of the starting snapshot
+   * @param toSnapshot The name of the ending snapshot
+   * @param omNodeId OM node ID to send the cancel snapshot diff jobs request.
+   * @return the success if cancel succeeds.
+   * @throws IOException in case of any exception while generating snapshot diff
+   */
+  public CancelSnapshotDiffResponse cancelSnapshotDiff(String volumeName,
+                                                       String bucketName,
+                                                       String fromSnapshot,
+                                                       String toSnapshot,
+                                                       String omNodeId)
+      throws IOException {
+    return proxy.cancelSnapshotDiff(volumeName, bucketName, fromSnapshot,
+        toSnapshot, omNodeId);
+  }
+
+  /**
    * Get a list of the SnapshotDiff jobs for a bucket based on the JobStatus.
    * @param volumeName Name of the volume to which the snapshotted bucket belong
    * @param bucketName Name of the bucket to which the snapshots belong
@@ -745,5 +855,25 @@ public class ObjectStore {
       throws IOException {
     return proxy.listSnapshotDiffJobs(volumeName,
         bucketName, jobStatus, listAll);
+  }
+
+  /**
+   * Get a list of the SnapshotDiff jobs for a bucket based on the JobStatus.
+   * @param volumeName Name of the volume to which the snapshotted bucket belong
+   * @param bucketName Name of the bucket to which the snapshots belong
+   * @param jobStatus JobStatus to be used to filter the snapshot diff jobs
+   * @param listAll Option to specify whether to list all jobs or not
+   * @param omNodeId OM node ID to get the list of SnapshotDiff jobs from
+   * @return a list of SnapshotDiffJob objects from the specified OM node
+   * @throws IOException in case there is a failure while getting a response.
+   */
+  public List<OzoneSnapshotDiff> listSnapshotDiffJobs(String volumeName,
+                                                      String bucketName,
+                                                      String jobStatus,
+                                                      boolean listAll,
+                                                      String omNodeId)
+      throws IOException {
+    return proxy.listSnapshotDiffJobs(volumeName,
+        bucketName, jobStatus, listAll, omNodeId);
   }
 }
