@@ -21,7 +21,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Path;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 
 /**
  * Service to pack/unpack ContainerData container data to/from a single byte
@@ -54,4 +56,17 @@ public interface ContainerPacker<CONTAINERDATA extends ContainerData> {
    */
   byte[] unpackContainerDescriptor(InputStream inputStream)
       throws IOException;
+
+  /**
+   * Persists the custom state for a container. This method allows saving the container file to a custom location.
+   */
+  default void persistCustomContainerState(Container<? extends ContainerData> container, byte[] descriptorContent,
+      ContainerProtos.ContainerDataProto.State state, Path containerMetadataPath) throws IOException {
+    if (descriptorContent == null) {
+      return;
+    }
+    ContainerData originalContainerData = ContainerDataYaml.readContainer(descriptorContent);
+    container.getContainerData().setState(state);
+    container.update(originalContainerData.getMetadata(), true, containerMetadataPath.toString());
+  }
 }
