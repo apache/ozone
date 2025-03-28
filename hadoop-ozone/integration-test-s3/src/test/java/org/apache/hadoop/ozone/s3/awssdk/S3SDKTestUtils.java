@@ -23,7 +23,7 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.security.MessageDigest;
 import org.apache.commons.lang3.RandomUtils;
-import org.apache.hadoop.utils.InputSubstream;
+import org.apache.ozone.test.InputSubstream;
 
 /**
  * Utilities for S3 SDK tests.

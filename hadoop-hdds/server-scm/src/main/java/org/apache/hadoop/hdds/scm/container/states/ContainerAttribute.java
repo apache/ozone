@@ -20,17 +20,18 @@ package org.apache.hadoop.hdds.scm.container.states;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_CHANGE_CONTAINER_STATE;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Maps;
+import java.util.ArrayList;
 import java.util.EnumMap;
-import java.util.NavigableSet;
+import java.util.List;
+import java.util.NavigableMap;
 import java.util.Objects;
-import java.util.SortedSet;
-import java.util.TreeSet;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.ratis.util.Preconditions;
 
 /**
  * Each Attribute that we manage for a container is maintained as a map.
@@ -60,11 +61,8 @@ import org.slf4j.LoggerFactory;
  * @param <T> Attribute type
  */
 public class ContainerAttribute<T extends Enum<T>> {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ContainerAttribute.class);
-
   private final Class<T> attributeClass;
-  private final ImmutableMap<T, NavigableSet<ContainerID>> attributeMap;
+  private final ImmutableMap<T, NavigableMap<ContainerID, ContainerInfo>> attributeMap;
 
   /**
    * Create an empty Container Attribute map.
@@ -72,25 +70,21 @@ public class ContainerAttribute<T extends Enum<T>> {
   public ContainerAttribute(Class<T> attributeClass) {
     this.attributeClass = attributeClass;
 
-    final EnumMap<T, NavigableSet<ContainerID>> map = new EnumMap<>(attributeClass);
+    final EnumMap<T, NavigableMap<ContainerID, ContainerInfo>> map = new EnumMap<>(attributeClass);
     for (T t : attributeClass.getEnumConstants()) {
-      map.put(t, new TreeSet<>());
+      map.put(t, new TreeMap<>());
     }
     this.attributeMap = Maps.immutableEnumMap(map);
   }
 
   /**
-   * Insert the value in the Attribute map, keep the original value if it exists
-   * already.
-   *
-   * @param key - The key to the set where the ContainerID should exist.
-   * @param value - Actual Container ID.
-   * @return true if the value is added;
-   *         otherwise, the value already exists, return false.
+   * Add the given non-existing {@link ContainerInfo} to this attribute.
+   * @throws IllegalStateException if it already exists.
    */
-  public boolean insert(T key, ContainerID value) {
-    Objects.requireNonNull(value, "value == null");
-    return get(key).add(value);
+  public void addNonExisting(T key, ContainerInfo info) {
+    Objects.requireNonNull(info, "value == null");
+    final ContainerInfo previous = get(key).put(info.containerID(), info);
+    Preconditions.assertNull(previous, "previous");
   }
 
   /**
@@ -103,30 +97,30 @@ public class ContainerAttribute<T extends Enum<T>> {
   }
 
   /**
-   * Removes a container ID from the set pointed by the key.
-   *
-   * @param key - key to identify the set.
-   * @param value - Container ID
+   * Remove a container for the given id.
+   * @return the info if there was a mapping for the id; otherwise, return null
    */
-  public boolean remove(T key, ContainerID value) {
-    Objects.requireNonNull(value, "value == null");
-
-    if (!get(key).remove(value)) {
-      LOG.debug("Container {} not found in {} attribute", value, key);
-      return false;
-    }
-    return true;
+  public ContainerInfo remove(T key, ContainerID id) {
+    Objects.requireNonNull(id, "id == null");
+    return get(key).remove(id);
   }
 
-  NavigableSet<ContainerID> get(T attribute) {
+  /** Remove an existing {@link ContainerInfo}. */
+  public void removeExisting(T key, ContainerInfo existing) {
+    Objects.requireNonNull(existing, "existing == null");
+    final ContainerInfo removed = remove(key, existing.containerID());
+    Preconditions.assertSame(existing, removed, "removed");
+  }
+
+  NavigableMap<ContainerID, ContainerInfo> get(T attribute) {
     Objects.requireNonNull(attribute, "attribute == null");
 
-    final NavigableSet<ContainerID> set = attributeMap.get(attribute);
-    if (set == null) {
+    final NavigableMap<ContainerID, ContainerInfo> map = attributeMap.get(attribute);
+    if (map == null) {
       throw new IllegalStateException("Attribute not found: " + attribute
           + " (" + attributeClass.getSimpleName() + ")");
     }
-    return set;
+    return map;
   }
 
   /**
@@ -135,13 +129,13 @@ public class ContainerAttribute<T extends Enum<T>> {
    * @param key - Key to the bucket.
    * @return Underlying Set in immutable form.
    */
-  public NavigableSet<ContainerID> getCollection(T key) {
-    return ImmutableSortedSet.copyOf(get(key));
+  public List<ContainerInfo> getCollection(T key) {
+    return new ArrayList<>(get(key).values());
   }
 
-  public SortedSet<ContainerID> tailSet(T key, ContainerID start) {
+  public SortedMap<ContainerID, ContainerInfo> tailMap(T key, ContainerID start) {
     Objects.requireNonNull(start, "start == null");
-    return get(key).tailSet(start);
+    return get(key).tailMap(start);
   }
 
   public int count(T key) {
@@ -163,17 +157,13 @@ public class ContainerAttribute<T extends Enum<T>> {
     }
 
     Objects.requireNonNull(newKey, "newKey == null");
-    final boolean removed = remove(currentKey, value);
-    if (!removed) {
+    final ContainerInfo removed = remove(currentKey, value);
+    if (removed == null) {
       throw new SCMException("Failed to update Container " + value + " from " + currentKey + " to " + newKey
           + ": Container " + value + " not found in attribute " + currentKey,
           FAILED_TO_CHANGE_CONTAINER_STATE);
     }
 
-    final boolean inserted = insert(newKey, value);
-    if (!inserted) {
-      LOG.warn("Update Container {} from {} to {}: Container {} already exists in {}",
-          value, currentKey, newKey, value, newKey);
-    }
+    addNonExisting(newKey, removed);
   }
 }

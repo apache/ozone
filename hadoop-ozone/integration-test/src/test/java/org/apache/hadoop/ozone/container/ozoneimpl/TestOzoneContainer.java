@@ -82,6 +82,7 @@ public class TestOzoneContainer {
           .getOzoneContainer(datanodeDetails, conf);
       StorageVolumeUtil.getHddsVolumesList(container.getVolumeSet().getVolumesList())
           .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
+      ContainerTestUtils.initializeDatanodeLayout(conf, datanodeDetails);
       //Set clusterId and manually start ozone container.
       container.start(UUID.randomUUID().toString());
 
@@ -112,6 +113,7 @@ public class TestOzoneContainer {
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       container = ContainerTestUtils
           .getOzoneContainer(datanodeDetails, conf);
+      ContainerTestUtils.initializeDatanodeLayout(conf, datanodeDetails);
 
       String clusterId = UUID.randomUUID().toString();
       container.start(clusterId);

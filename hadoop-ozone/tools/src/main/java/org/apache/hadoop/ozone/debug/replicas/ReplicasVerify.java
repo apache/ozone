@@ -64,18 +64,12 @@ public class ReplicasVerify extends Handler {
         defaultValue = "false")
     private boolean doExecuteChecksums;
 
-    @CommandLine.Option(names = "--padding",
-        description = "Check for missing padding in erasure coded replicas.",
-        defaultValue = "false")
-    private boolean doExecutePadding;
-
     @CommandLine.Option(names = "--metadata",
         description = "Check for block existence on datanodes.",
         defaultValue = "false")
     private boolean doExecuteMetadataCheck;
 
   }
-  private FindMissingPadding findMissingPadding;
   private List<ReplicaVerifier> replicaVerifiers;
 
   @Override
@@ -86,20 +80,11 @@ public class ReplicasVerify extends Handler {
       replicaVerifiers.add(new Checksums(client, outputDir, LOG, getConf()));
     }
 
-    if (verification.doExecutePadding) {
-      findMissingPadding = new FindMissingPadding(client, scmOption, LOG, out(), getConf());
-      replicaVerifiers.add(findMissingPadding);
-    }
-
     if (verification.doExecuteMetadataCheck) {
       replicaVerifiers.add(new MetadataCheck(client, LOG, out(), getConf()));
     }
 
     findCandidateKeys(client, address);
-
-    if (verification.doExecutePadding) {
-      findMissingPadding.execute();
-    }
   }
 
   @Override
