@@ -64,6 +64,11 @@ public class ReplicasVerify extends Handler {
         defaultValue = "false")
     private boolean doExecuteChecksums;
 
+    @CommandLine.Option(names = "--metadata",
+        description = "Check for block existence on datanodes.",
+        defaultValue = "false")
+    private boolean doExecuteMetadataCheck;
+
   }
   private List<ReplicaVerifier> replicaVerifiers;
 
@@ -73,6 +78,10 @@ public class ReplicasVerify extends Handler {
 
     if (verification.doExecuteChecksums) {
       replicaVerifiers.add(new Checksums(client, outputDir, LOG, getConf()));
+    }
+
+    if (verification.doExecuteMetadataCheck) {
+      replicaVerifiers.add(new MetadataCheck(client, LOG, out(), getConf()));
     }
 
     findCandidateKeys(client, address);
