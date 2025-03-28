@@ -260,7 +260,6 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
-import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
@@ -315,6 +314,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
@@ -5032,10 +5032,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public List<SnapshotDiffJob> listSnapshotDiffJobs(String volume,
-                                                    String bucket,
-                                                    String jobStatus,
-                                                    boolean listAll)
+  public ListSnapshotDiffJobResponse listSnapshotDiffJobs(String volume,
+                                                          String bucket,
+                                                          String jobStatus,
+                                                          boolean listAll,
+                                                          String prevSnapshotDiffJob,
+                                                          int maxListResult)
       throws IOException {
     ResolvedBucket resolvedBucket = this.resolveBucketLink(Pair.of(volume, bucket), false);
     if (isAclEnabled) {
@@ -5043,7 +5045,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     return omSnapshotManager.getSnapshotDiffList(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
-        jobStatus, listAll);
+        jobStatus, listAll, prevSnapshotDiffJob, maxListResult);
   }
 
   @Override
