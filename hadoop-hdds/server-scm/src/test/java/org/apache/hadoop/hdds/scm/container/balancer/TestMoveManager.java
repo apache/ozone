@@ -148,7 +148,7 @@ public class TestMoveManager {
     assertMoveFailsWith(REPLICATION_FAIL_NODE_UNHEALTHY,
         containerInfo.containerID());
 
-    nodes.put(src, new NodeStatus(
+    nodes.put(src, NodeStatus.valueOf(
         HddsProtos.NodeOperationalState.DECOMMISSIONING,
         HddsProtos.NodeState.HEALTHY));
     nodes.put(tgt, NodeStatus.inServiceHealthy());
@@ -156,7 +156,7 @@ public class TestMoveManager {
         containerInfo.containerID());
 
     nodes.put(src, NodeStatus.inServiceHealthy());
-    nodes.put(tgt, new NodeStatus(
+    nodes.put(tgt, NodeStatus.valueOf(
         HddsProtos.NodeOperationalState.DECOMMISSIONING,
         HddsProtos.NodeState.HEALTHY));
     assertMoveFailsWith(REPLICATION_FAIL_NODE_NOT_IN_SERVICE,
@@ -463,7 +463,7 @@ public class TestMoveManager {
   public void testMoveCompleteSrcNotInService() throws Exception {
     CompletableFuture<MoveManager.MoveResult> res = setupSuccessfulMove();
 
-    nodes.put(src, new NodeStatus(
+    nodes.put(src, NodeStatus.valueOf(
         HddsProtos.NodeOperationalState.DECOMMISSIONING,
         HddsProtos.NodeState.HEALTHY));
     ContainerReplicaOp op = new ContainerReplicaOp(

@@ -52,7 +52,7 @@ public class TestOzoneAddress {
     address = new OzoneAddress("");
     address.ensureRootAddress();
 
-    address = new OzoneAddress(prefix + "");
+    address = new OzoneAddress(prefix);
     address.ensureRootAddress();
   }
 

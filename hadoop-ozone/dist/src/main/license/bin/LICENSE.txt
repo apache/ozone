@@ -324,6 +324,7 @@ Apache License 2.0
    io.grpc:grpc-protobuf
    io.grpc:grpc-protobuf-lite
    io.grpc:grpc-stub
+   io.grpc:grpc-util
    io.jaegertracing:jaeger-client
    io.jaegertracing:jaeger-core
    io.jaegertracing:jaeger-thrift
@@ -374,7 +375,7 @@ Apache License 2.0
    org.apache.hadoop:hadoop-hdfs
    org.apache.hadoop:hadoop-hdfs-client
    org.apache.hadoop:hadoop-shaded-guava
-   org.apache.hadoop:hadoop-shaded-protobuf
+   org.apache.hadoop:hadoop-shaded-protobuf_3_25
    org.apache.httpcomponents:httpasyncclient
    org.apache.httpcomponents:httpcore
    org.apache.httpcomponents:httpcore-nio
@@ -405,7 +406,8 @@ Apache License 2.0
    org.apache.ratis:ratis-client
    org.apache.ratis:ratis-common
    org.apache.ratis:ratis-grpc
-   org.apache.ratis:ratis-metrics
+   org.apache.ratis:ratis-metrics-api
+   org.apache.ratis:ratis-metrics-dropwizard3
    org.apache.ratis:ratis-proto
    org.apache.ratis:ratis-server
    org.apache.ratis:ratis-server-api

@@ -270,7 +270,7 @@ public class NodeEndpoint {
   private boolean preChecksSuccess(DatanodeDetails nodeByUuid, Map<String, String> failedNodeErrorResponseMap)
       throws NodeNotFoundException {
     if (null == nodeByUuid) {
-      throw new NodeNotFoundException("Node  not found !!!");
+      throw new NodeNotFoundException();
     }
     NodeStatus nodeStatus = null;
     AtomicBoolean isContainerOrPipeLineOpen = new AtomicBoolean(false);

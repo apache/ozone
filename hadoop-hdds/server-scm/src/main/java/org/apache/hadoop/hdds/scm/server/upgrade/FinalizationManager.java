@@ -25,17 +25,17 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 
 /**
  * Class to initiate SCM finalization and query its progress.
  */
 public interface FinalizationManager {
 
-  UpgradeFinalizer.StatusAndMessages finalizeUpgrade(String upgradeClientID)
+  UpgradeFinalization.StatusAndMessages finalizeUpgrade(String upgradeClientID)
       throws IOException;
 
-  UpgradeFinalizer.StatusAndMessages queryUpgradeFinalizationProgress(
+  UpgradeFinalization.StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean takeover, boolean readonly
   ) throws IOException;
 

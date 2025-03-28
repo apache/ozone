@@ -64,7 +64,7 @@ public class TestRatisDropwizardExports {
         new RatisDropwizardExports(dropWizardMetricRegistry);
 
     CollectorRegistry collector = new CollectorRegistry();
-    collector.register(new RatisDropwizardExports(dropWizardMetricRegistry));
+    collector.register(exports);
 
     //export metrics to the string
     StringWriter writer = new StringWriter();

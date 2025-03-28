@@ -205,7 +205,7 @@ public class TestDeletingContainerHandler {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
         ratisReplicationConfig, 1, DELETING);
     Set<ContainerReplica> containerReplicas = ReplicationTestUtil
-        .createReplicas(containerInfo.containerID(),
+        .createEmptyReplicas(containerInfo.containerID(),
             ContainerReplicaProto.State.CLOSED, 0, 0, 0);
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
     containerReplicas.stream().limit(2).forEach(replica -> pendingOps.add(
@@ -217,7 +217,7 @@ public class TestDeletingContainerHandler {
     containerInfo = ReplicationTestUtil.createContainerInfo(
         ecReplicationConfig, 1, DELETING);
     containerReplicas = ReplicationTestUtil
-        .createReplicas(containerInfo.containerID(),
+        .createEmptyReplicas(containerInfo.containerID(),
             ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
     pendingOps.clear();
     containerReplicas.stream().limit(3).forEach(replica -> pendingOps.add(
@@ -227,6 +227,25 @@ public class TestDeletingContainerHandler {
     //here should be 1+2 = 3 times
     verifyDeleteCommandCount(containerInfo, containerReplicas, pendingOps, 3);
 
+  }
+
+  @Test
+  public void testDeleteCommandIsNotSentForNonEmptyReplica() throws NotLeaderException {
+    // Ratis container
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        ratisReplicationConfig, 1, DELETING);
+    Set<ContainerReplica> containerReplicas = ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(),
+            ContainerReplicaProto.State.CLOSED, 0, 0, 0);
+    verifyDeleteCommandCount(containerInfo, containerReplicas, Collections.emptyList(), 0);
+
+    // EC container
+    containerInfo = ReplicationTestUtil.createContainerInfo(
+        ecReplicationConfig, 1, DELETING);
+    containerReplicas = ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(),
+            ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
+    verifyDeleteCommandCount(containerInfo, containerReplicas, Collections.emptyList(), 0);
   }
 
   private void verifyDeleteCommandCount(ContainerInfo containerInfo,

@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.metrics;
 
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.apache.ozone.test.MetricsAsserts.assertCounter;
 import static org.apache.ozone.test.MetricsAsserts.assertQuantileGauges;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
@@ -31,7 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -89,7 +90,7 @@ public class TestContainerMetrics {
   @BeforeAll
   public static void setup() {
     DefaultMetricsSystem.setMiniClusterMode(true);
-    CONF.setInt(DFSConfigKeysLegacy.DFS_METRICS_PERCENTILES_INTERVALS_KEY,
+    CONF.setInt(HddsConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY,
         DFS_METRICS_PERCENTILES_INTERVALS);
     CONF.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, false);
     CONF.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDir.toString());
@@ -132,7 +133,7 @@ public class TestContainerMetrics {
   }
 
   private HddsDispatcher createDispatcher(DatanodeDetails dd, VolumeSet volumeSet) {
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = newContainerSet();
     StateContext context = ContainerTestUtils.getMockContext(
         dd, CONF);
     ContainerMetrics metrics = ContainerMetrics.create(CONF);
@@ -241,7 +242,7 @@ public class TestContainerMetrics {
     final ContainerDispatcher dispatcher = createDispatcher(dn,
         volumeSet);
     return XceiverServerRatis.newXceiverServerRatis(null, dn, CONF, dispatcher,
-        new ContainerController(new ContainerSet(1000), Maps.newHashMap()),
+        new ContainerController(newContainerSet(), Maps.newHashMap()),
         null, null);
   }
 }

@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.container;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -224,28 +223,24 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
   private void processSingleReplica(final DatanodeDetails datanodeDetails,
       final ContainerInfo container, final ContainerReplicaProto replicaProto,
       final EventPublisher publisher) {
+    final Object detailsForLogging = getDetailsForLogging(container, replicaProto, datanodeDetails);
     if (container == null) {
       if (unknownContainerHandleAction.equals(
           UNKNOWN_CONTAINER_ACTION_WARN)) {
-        LOG.error("Received container report for an unknown container" +
-                " {} from datanode {}.", replicaProto.getContainerID(),
-            datanodeDetails);
+        getLogger().error("CONTAINER_NOT_FOUND for {}", detailsForLogging);
       } else if (unknownContainerHandleAction.equals(
           UNKNOWN_CONTAINER_ACTION_DELETE)) {
         final ContainerID containerId = ContainerID
             .valueOf(replicaProto.getContainerID());
-        deleteReplica(containerId, datanodeDetails, publisher, "unknown");
+        deleteReplica(containerId, datanodeDetails, publisher, "CONTAINER_NOT_FOUND", true, detailsForLogging);
       }
       return;
     }
     try {
       processContainerReplica(
           datanodeDetails, container, replicaProto, publisher);
-    } catch (IOException | InvalidStateTransitionException |
-             TimeoutException e) {
-      LOG.error("Exception while processing container report for container" +
-              " {} from datanode {}.", replicaProto.getContainerID(),
-          datanodeDetails, e);
+    } catch (IOException | InvalidStateTransitionException e) {
+      getLogger().error("Failed to process {}", detailsForLogging, e);
     }
   }
 

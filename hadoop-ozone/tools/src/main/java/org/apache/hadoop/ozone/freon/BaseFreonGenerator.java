@@ -117,11 +117,6 @@ public class BaseFreonGenerator implements FreonSubcommand {
       defaultValue = "")
   private String prefix = "";
 
-  @Option(names = {"--verbose"},
-          description = "More verbose output. "
-              + "Show all the command line Option info.")
-  private boolean verbose;
-
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
 
@@ -285,7 +280,7 @@ public class BaseFreonGenerator implements FreonSubcommand {
     failureCounter = new AtomicLong(0);
     attemptCounter = new AtomicLong(0);
 
-    if (prefix.length() == 0) {
+    if (prefix.isEmpty()) {
       prefix = !allowEmptyPrefix() ? RandomStringUtils.randomAlphanumeric(10).toLowerCase() : "";
     } else {
       //replace environment variables to support multi-node execution
@@ -324,7 +319,7 @@ public class BaseFreonGenerator implements FreonSubcommand {
             LOG.error("HTTP server can't be stopped.", ex);
           }
           printReport();
-          if (verbose) {
+          if (freonCommand.isVerbose()) {
             printOption();
           }
         }, 10);
@@ -456,7 +451,7 @@ public class BaseFreonGenerator implements FreonSubcommand {
       pipelines = pipelines
           .peek(p -> log.debug("Found pipeline {}", p.getId().getId()));
     }
-    if (pipelineId != null && pipelineId.length() > 0) {
+    if (pipelineId != null && !pipelineId.isEmpty()) {
       pipeline = pipelines
           .filter(p -> p.getId().toString().equals(pipelineId))
           .findFirst()

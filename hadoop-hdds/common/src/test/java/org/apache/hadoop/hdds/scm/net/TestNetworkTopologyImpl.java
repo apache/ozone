@@ -487,7 +487,7 @@ class TestNetworkTopologyImpl {
             excludedList, ancestorGen);
         for (Node key : dataNodes) {
           if (excludedList.contains(key) ||
-              (ancestorList.size() > 0 &&
+              (!ancestorList.isEmpty() &&
                   ancestorList.stream()
                       .map(a -> (InnerNode) a)
                       .anyMatch(a -> a.isAncestor(key)))) {
@@ -558,7 +558,7 @@ class TestNetworkTopologyImpl {
                 excludedList, ancestorGen);
             for (Node key : dataNodes) {
               if (excludedList.contains(key) || key.isDescendant(path) ||
-                  (ancestorList.size() > 0 &&
+                  (!ancestorList.isEmpty() &&
                       ancestorList.stream()
                           .map(a -> (InnerNode) a)
                           .anyMatch(a -> a.isAncestor(key)))) {

@@ -152,7 +152,7 @@ public class TestNSSummaryTaskWithFSO {
         OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, 3);
     nSSummaryTaskWithFso = new NSSummaryTaskWithFSO(
         reconNamespaceSummaryManager, reconOMMetadataManager,
-        ozoneConfiguration, nsSummaryFlushToDBMaxThreshold);
+         nsSummaryFlushToDBMaxThreshold);
   }
 
   /**

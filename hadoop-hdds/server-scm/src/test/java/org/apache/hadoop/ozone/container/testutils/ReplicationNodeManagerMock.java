@@ -238,10 +238,10 @@ public class ReplicationNodeManagerMock implements NodeManager {
       throws NodeNotFoundException {
     NodeStatus currentStatus = nodeStateMap.get(dd);
     if (currentStatus != null) {
-      nodeStateMap.put(dd, new NodeStatus(newState, currentStatus.getHealth(),
+      nodeStateMap.put(dd, NodeStatus.valueOf(newState, currentStatus.getHealth(),
           opStateExpiryEpocSec));
     } else {
-      throw new NodeNotFoundException();
+      throw new NodeNotFoundException(dd.getID());
     }
   }
 
@@ -372,7 +372,7 @@ public class ReplicationNodeManagerMock implements NodeManager {
    * @return SCMheartbeat response list
    */
   @Override
-  public List<SCMCommand> processHeartbeat(DatanodeDetails dd,
+  public List<SCMCommand<?>> processHeartbeat(DatanodeDetails dd,
       CommandQueueReportProto commandQueueReportProto) {
     return null;
   }
@@ -401,7 +401,7 @@ public class ReplicationNodeManagerMock implements NodeManager {
   }
 
   @Override
-  public void addDatanodeCommand(UUID dnId, SCMCommand command) {
+  public void addDatanodeCommand(UUID dnId, SCMCommand<?> command) {
     this.commandQueue.addCommand(dnId, command);
   }
 
@@ -491,7 +491,7 @@ public class ReplicationNodeManagerMock implements NodeManager {
   }
 
   @Override
-  public List<SCMCommand> getCommandQueue(UUID dnID) {
+  public List<SCMCommand<?>> getCommandQueue(UUID dnID) {
     return null;
   }
 

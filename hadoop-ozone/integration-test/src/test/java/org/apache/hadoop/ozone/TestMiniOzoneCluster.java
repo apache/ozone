@@ -279,7 +279,7 @@ public class TestMiniOzoneCluster {
 
     volumeList.forEach(storageVolume -> assertEquals(
             (long) StorageSize.parse(reservedSpace).getValue(),
-            storageVolume.getVolumeInfo().get().getReservedInBytes()));
+            storageVolume.getVolumeUsage().get().getReservedInBytes()));
   }
 
 }

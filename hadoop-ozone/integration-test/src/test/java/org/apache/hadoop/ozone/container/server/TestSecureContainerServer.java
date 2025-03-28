@@ -32,6 +32,7 @@ import static org.apache.hadoop.ozone.container.ContainerTestHelper.newGetCommit
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.newPutBlockRequestBuilder;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.newReadChunkRequestBuilder;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.newWriteChunkRequestBuilder;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -161,7 +162,7 @@ public class TestSecureContainerServer {
 
   private HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
       OzoneConfiguration conf) throws IOException {
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = newContainerSet();
     conf.set(HDDS_DATANODE_DIR_KEY,
         Paths.get(testDir.toString(), "dfs", "data", "hdds",
             RandomStringUtils.randomAlphabetic(4)).toString());
@@ -207,7 +208,7 @@ public class TestSecureContainerServer {
     final ContainerDispatcher dispatcher = createDispatcher(dn,
         UUID.randomUUID(), conf);
     return XceiverServerRatis.newXceiverServerRatis(null, dn, conf, dispatcher,
-        new ContainerController(new ContainerSet(1000), Maps.newHashMap()),
+        new ContainerController(newContainerSet(), Maps.newHashMap()),
         caClient, null);
   }
 

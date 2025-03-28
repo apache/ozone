@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.TestDataUtil.createKey;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -32,12 +33,12 @@ import java.util.UUID;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
@@ -250,7 +251,7 @@ public abstract class TestRecursiveAclWithFSO implements NonHATests.TestCase {
       byte[] input = new byte[length];
       Arrays.fill(input, (byte) 96);
       String keyName = UUID.randomUUID().toString();
-      createKey(ozoneBucket, keyName, length, input);
+      createKey(ozoneBucket, keyName, input);
       obj = OzoneObjInfo.Builder.newBuilder().setVolumeName(volume.getName())
           .setBucketName(ozoneBucket.getName()).setKeyName(keyName)
           .setResType(OzoneObj.ResourceType.KEY).setStoreType(OZONE).build();
@@ -329,24 +330,14 @@ public abstract class TestRecursiveAclWithFSO implements NonHATests.TestCase {
 
   private void createKeys(ObjectStore objectStore, OzoneBucket ozoneBucket,
       List<String> keys) throws Exception {
-    int length = 10;
+
     String aclWorldAll = "world::a";
-    byte[] input = new byte[length];
-    Arrays.fill(input, (byte) 96);
+
     for (String key : keys) {
-      createKey(ozoneBucket, key, 10, input);
+      TestDataUtil.createStringKey(ozoneBucket, key, 10);
       setKeyAcl(objectStore, ozoneBucket.getVolumeName(), ozoneBucket.getName(),
           key, aclWorldAll);
     }
   }
-
-  private void createKey(OzoneBucket ozoneBucket, String key, int length,
-      byte[] input) throws Exception {
-    OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(key, length);
-    ozoneOutputStream.write(input);
-    ozoneOutputStream.write(input, 0, 10);
-    ozoneOutputStream.close();
-  }
-
 }
 
