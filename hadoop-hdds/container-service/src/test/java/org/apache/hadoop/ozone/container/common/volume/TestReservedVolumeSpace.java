@@ -202,8 +202,8 @@ public class TestReservedVolumeSpace {
     assertEquals(minSpace, conf.getObject(DatanodeConfiguration.class).getMinFreeSpace(capacity));
 
     conf.setFloat(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT, 0.01f);
-    // default is 5GB
-    assertEquals(5L * 1024 * 1024 * 1024, conf.getObject(DatanodeConfiguration.class).getMinFreeSpace(capacity));
+    // When both are set, minSpace will be used
+    assertEquals(minSpace, conf.getObject(DatanodeConfiguration.class).getMinFreeSpace(capacity));
 
     // capacity * 1% = 10
     conf.unset(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE);
