@@ -428,7 +428,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
 
         if (summaryResponse.objectInfo?.quotaInNamespace !== undefined && summaryResponse.objectInfo?.quotaInNamespace !== -1) {
           keys.push('Quota In Namespace');
-          values.push(byteToSize(summaryResponse.objectInfo.quotaInNamespace, 3));
+          values.push(summaryResponse.objectInfo.quotaInNamespace);
         }
 
         if (summaryResponse.objectInfo?.replicationConfig?.replicationFactor !== undefined && summaryResponse.objectInfo?.replicationConfig?.replicationFactor !== -1) {
