@@ -17,14 +17,13 @@
 
 package org.apache.hadoop.ozone.debug.replicas;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
@@ -72,8 +71,7 @@ public class TestMetadataCheck {
   private static final String VOLUME_NAME = UUID.randomUUID().toString();
   private static final String BUCKET_NAME = UUID.randomUUID().toString();
   private static final String KEY_NAME = UUID.randomUUID().toString();
-  private static final String DEFAULT_ENCODING = UTF_8.name();
-  private static ByteArrayOutputStream outputStream;
+  private static final StringWriter OUT = new StringWriter();
   private static PrintWriter printWriter;
 
   @BeforeAll
@@ -87,14 +85,13 @@ public class TestMetadataCheck {
 
     writeKey(KEY_NAME);
 
-    outputStream = new ByteArrayOutputStream();
-    printWriter = new PrintWriter(outputStream, true);
+    printWriter = new PrintWriter(OUT);
     metadataCheck = new MetadataCheck(client, LOG, printWriter, conf);
   }
 
   @AfterEach
   public void cleanUp() {
-    outputStream.reset();
+    OUT.flush();
   }
 
   @AfterAll
@@ -108,7 +105,7 @@ public class TestMetadataCheck {
     OzoneKeyDetails keyDetails = client.getProxy().getKeyDetails(VOLUME_NAME, BUCKET_NAME, KEY_NAME);
 
     metadataCheck.verifyKey(keyDetails);
-    String cliOutput = outputStream.toString(DEFAULT_ENCODING);
+    String cliOutput = OUT.toString();
 
     assertThat(cliOutput).contains("\"status\":\"BLOCK_EXISTS\"");
     assertThat(cliOutput).contains("\"pass\":true");
@@ -149,7 +146,7 @@ public class TestMetadataCheck {
     }
 
     metadataCheck.verifyKey(keyDetails);
-    String cliOutput = outputStream.toString(DEFAULT_ENCODING);
+    String cliOutput = OUT.toString();
 
     assertThat(cliOutput).contains("\"status\":\"MISSING_REPLICAS\"");
     assertThat(cliOutput).contains("\"pass\":false");
