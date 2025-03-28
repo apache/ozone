@@ -1,10 +1,10 @@
 ---
-title: "Aggressive DB Compaction with Minimal Degradation"
-weight: 2
-menu:
-   main:
-      parent: Features
-summary: Automatically compactRange with statistics of SST File
+title: Aggressive DB Compaction with Minimal Degradation
+summary: Automatically compactRange on RocksDB with statistics of SST File
+date: 2025-03-27
+jira: HDDS-12682
+status: accepted
+author: Peter Lee
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
