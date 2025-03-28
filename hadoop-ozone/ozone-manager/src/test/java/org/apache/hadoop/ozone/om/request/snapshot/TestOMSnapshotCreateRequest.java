@@ -282,30 +282,23 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
     assertNotNull(getOmMetadataManager().getSnapshotInfoTable().get(key1));
 
     // Should fail as snapshot limit is 1
-    omRequest = createSnapshotRequest(getVolumeName(), getBucketName(), snapshotName2);
-    omSnapshotCreateRequest = doPreExecute(omRequest);
-    OMClientResponse omClientResponse =
-        omSnapshotCreateRequest.validateAndUpdateCache(getOzoneManager(), 2);
-
-    OMResponse omResponse = omClientResponse.getOMResponse();
-    assertNotNull(omResponse.getCreateSnapshotResponse());
-    assertEquals(OzoneManagerProtocolProtos.Status.INVALID_SNAPSHOT_ERROR,
-        omResponse.getStatus());
+    OMRequest snapshotRequest = createSnapshotRequest(getVolumeName(), getBucketName(), snapshotName2);
+    OMException omException = assertThrows(OMException.class, () -> doPreExecute(snapshotRequest));
+    assertEquals(OMException.ResultCodes.TOO_MANY_SNAPSHOTS, omException.getResult());
 
     // delete snapshot
     omRequest = deleteSnapshotRequest(getVolumeName(), getBucketName(), snapshotName1);
     OMSnapshotDeleteRequest omSnapshotDeleteRequest = TestOMSnapshotDeleteRequest.doPreExecute(omRequest,
             getOzoneManager());
-    omClientResponse =
-        omSnapshotDeleteRequest.validateAndUpdateCache(getOzoneManager(), 3);
+    omSnapshotDeleteRequest.validateAndUpdateCache(getOzoneManager(), 3);
 
     // create snapshot again, should be successful
     omRequest = createSnapshotRequest(getVolumeName(), getBucketName(), snapshotName2);
     omSnapshotCreateRequest = doPreExecute(omRequest);
-    omClientResponse =
+    OMClientResponse omClientResponse =
         omSnapshotCreateRequest.validateAndUpdateCache(getOzoneManager(), 4);
 
-    omResponse = omClientResponse.getOMResponse();
+    OMResponse omResponse = omClientResponse.getOMResponse();
     assertNotNull(omResponse.getCreateSnapshotResponse());
     assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omResponse.getStatus());

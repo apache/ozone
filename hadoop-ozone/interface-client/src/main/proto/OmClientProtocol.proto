@@ -564,6 +564,7 @@ enum Status {
     KEY_ALREADY_CLOSED = 96;
     KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD = 97;
 
+    TOO_MANY_SNAPSHOTS = 98;
 }
 
 /**

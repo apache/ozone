@@ -99,11 +99,23 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     snapshotPath = snapshotInfo.getSnapshotPath();
   }
 
+  private void validateSnapshotLimit(OzoneManager ozoneManager) throws IOException {
+    int maxSnapshots = ozoneManager.getFsSnapshotMaxLimit();
+    OMMetrics omMetrics = ozoneManager.getMetrics();
+    if (omMetrics.getNumSnapshotActive() >= maxSnapshots) {
+      throw new OMException(
+          String.format("Snapshot limit of %d reached. Cannot create more snapshots.", maxSnapshots),
+          OMException.ResultCodes.TOO_MANY_SNAPSHOTS);
+    }
+  }
+
   @Override
   @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
   @RequireSnapshotFeatureState(true)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     final OMRequest omRequest = super.preExecute(ozoneManager);
+    // verify snapshot limit
+    validateSnapshotLimit(ozoneManager);
     // Verify name
     OmUtils.validateSnapshotName(snapshotName);
     // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
@@ -147,14 +159,6 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
     String key = snapshotInfo.getTableKey();
     try {
-      // Check snapshot limit
-      int maxSnapshots = ozoneManager.getFsSnapshotMaxLimit();
-      if (omMetrics.getNumSnapshotActive() >= maxSnapshots) {
-        throw new OMException(
-            String.format("Snapshot limit of %d reached. Cannot create more snapshots.", maxSnapshots),
-            OMException.ResultCodes.INVALID_SNAPSHOT_ERROR);
-      }
-
       // Lock bucket so it doesn't
       //  get deleted while creating snapshot
       mergeOmLockDetails(
