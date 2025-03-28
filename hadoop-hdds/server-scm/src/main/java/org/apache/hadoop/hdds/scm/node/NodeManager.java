@@ -259,16 +259,6 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       ContainerID containerId) throws NodeNotFoundException;
 
   /**
-   * Remaps datanode to containers mapping to the new set of containers.
-   * @param datanodeDetails - DatanodeDetails
-   * @param containerIds - Set of containerIDs
-   * @throws NodeNotFoundException - if datanode is not known. For new datanode
-   *                        use addDatanodeInContainerMap call.
-   */
-  void setContainers(DatanodeDetails datanodeDetails,
-      Set<ContainerID> containerIds) throws NodeNotFoundException;
-
-  /**
    * Return set of containerIDs available on a datanode.
    * @param datanodeDetails DatanodeDetails
    * @return set of containerIDs

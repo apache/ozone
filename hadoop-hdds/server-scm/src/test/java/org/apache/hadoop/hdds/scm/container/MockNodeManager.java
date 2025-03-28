@@ -50,7 +50,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
@@ -617,15 +616,10 @@ public class MockNodeManager implements NodeManager {
 
   /**
    * Update set of containers available on a datanode.
-   * @param uuid - DatanodeID
-   * @param containerIds - Set of containerIDs
-   * @throws SCMException - if datanode is not known. For new datanode use
-   *                        addDatanodeInContainerMap call.
    */
-  @Override
   public void setContainers(DatanodeDetails uuid, Set<ContainerID> containerIds)
       throws NodeNotFoundException {
-    node2ContainerMap.setContainers(uuid.getID(), containerIds);
+    node2ContainerMap.setContainersForTesting(uuid.getID(), containerIds);
   }
 
   /**

@@ -697,12 +697,13 @@ public class NodeStateManager implements Runnable, Closeable {
   }
 
   /**
-   * Update set of containers available on a datanode.
+   * Set the containers for the given datanode.
+   * This method is only used for testing.
    * @throws NodeNotFoundException - if datanode is not known.
    */
-  public void setContainers(DatanodeID datanodeID, Set<ContainerID> containerIds)
+  void setContainersForTesting(DatanodeID datanodeID, Set<ContainerID> containerIds)
       throws NodeNotFoundException {
-    nodeStateMap.setContainers(datanodeID, containerIds);
+    nodeStateMap.setContainersForTesting(datanodeID, containerIds);
   }
 
   /**
