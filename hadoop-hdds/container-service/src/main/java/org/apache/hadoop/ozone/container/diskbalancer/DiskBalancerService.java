@@ -458,6 +458,7 @@ public class DiskBalancerService extends BackgroundService {
         balancedBytesInLastWindow.addAndGet(containerSize);
         metrics.incrSuccessCount(1);
         metrics.incrSuccessBytes(containerSize);
+        totalBalancedBytes.addAndGet(containerSize);
       } catch (IOException e) {
         moveSucceeded = false;
         if (diskBalancerTmpDir != null) {
@@ -513,7 +514,7 @@ public class DiskBalancerService extends BackgroundService {
   public DiskBalancerInfo getDiskBalancerInfo() {
     return new DiskBalancerInfo(shouldRun, threshold, bandwidthInMB,
         parallelThread, version, metrics.getSuccessCount(),
-        metrics.getFailureCount(), bytesToMove);
+        metrics.getFailureCount(), bytesToMove, metrics.getSuccessBytes());
   }
 
   public long calculateBytesToMove(MutableVolumeSet inputVolumeSet) {

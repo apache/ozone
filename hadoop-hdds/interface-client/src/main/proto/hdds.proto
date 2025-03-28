@@ -564,4 +564,5 @@ message DatanodeDiskBalancerInfoProto {
     optional uint64 successMoveCount = 5;
     optional uint64 failureMoveCount = 6;
     optional uint64 bytesToMove = 7;
+    optional uint64 bytesMoved = 8;
 }
