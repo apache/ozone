@@ -25,8 +25,10 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.io.IOException;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -72,11 +74,10 @@ public class ChunkKeyHandler extends KeyHandler {
       String volumeName = address.getVolumeName();
       String bucketName = address.getBucketName();
       String keyName = address.getKeyName();
-      List<ContainerProtos.ChunkInfo> tempchunks;
 
       result.put("volumeName", volumeName);
       result.put("bucketName", bucketName);
-      result.put("keyName", keyName);
+      result.put("name", keyName);
 
       OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
           .setBucketName(bucketName).setKeyName(keyName).build();
@@ -123,25 +124,53 @@ public class ChunkKeyHandler extends KeyHandler {
               LOG.error("Can't execute getBlock on this node");
               continue;
             }
-            tempchunks = entry.getValue().getBlockData().getChunksList();
-            ContainerProtos.ContainerDataProto containerData =
-                readContainerResponses.get(entry.getKey()).getContainerData();
-            ArrayNode chunkFilePaths = JsonUtils.createArrayNode();
-            for (ContainerProtos.ChunkInfo chunkInfo : tempchunks) {
-              String fileName = containerLayoutVersion.getChunkFile(new File(
+            ContainerProtos.ChunkInfo chunks = null;
+            String fileName = "";
+            if (entry.getValue().getBlockData().getChunksCount() > 0) {
+              chunks = entry.getValue().getBlockData().getChunks(0);
+              ContainerProtos.ContainerDataProto containerData =
+                  readContainerResponses.get(entry.getKey()).getContainerData();
+              fileName = containerLayoutVersion.getChunkFile(new File(
                       getChunkLocationPath(containerData.getContainerPath())),
                   keyLocation.getBlockID(),
-                  chunkInfo.getChunkName()).toString();
-              chunkFilePaths.add(fileName);
+                  chunks.getChunkName()).toString();
             }
-            jsonObj.put("datanodeHostName", entry.getKey().getHostName());
-            jsonObj.put("datanodeIP", entry.getKey().getIpAddress());
+
+            ObjectNode dnObj = JsonUtils.createObjectNode(null);
+            dnObj.put("hostname", entry.getKey().getHostName());
+            dnObj.put("ip", entry.getKey().getIpAddress());
+            dnObj.put("uuid", entry.getKey().getUuidString());
+            jsonObj.set("datanode", dnObj);
+
+            jsonObj.put("file", fileName);
 
             ObjectMapper objectMapper = new ObjectMapper();
             JsonNode blockDataNode = objectMapper.readTree(JsonFormat.printer().print(entry.getValue().getBlockData()));
-            jsonObj.set("blockData", blockDataNode);
 
-            jsonObj.set("chunkFiles", chunkFilePaths);
+            if (entry.getValue().hasBlockData()) {
+              ObjectNode blockIdNode = (ObjectNode) blockDataNode.get("blockID");
+              blockIdNode.put("containerID", blockIdNode.get("containerID").asLong());
+              blockIdNode.put("localID", blockIdNode.get("localID").asLong());
+              blockIdNode.put("blockCommitSequenceId", blockIdNode.get("blockCommitSequenceId").asLong());
+
+              ArrayNode chunkArray = (ArrayNode) blockDataNode.get("chunks");
+              for (JsonNode chunk : chunkArray) {
+                ((ObjectNode) chunk).put("offset", chunk.get("offset").asLong());
+                ((ObjectNode) chunk).put("len", chunk.get("len").asLong());
+
+                JsonNode checksumData = chunk.get("checksumData");
+                if (checksumData != null) {
+                  ArrayNode checksums = (ArrayNode) checksumData.get("checksums");
+                  for (int i = 0; i < checksums.size(); i++) {
+                    String base64Checksum = checksums.get(i).asText();
+                    checksums.set(i, convertBase64ToHex(base64Checksum));
+                  }
+                }
+              }
+              ((ObjectNode) blockDataNode).put("size", blockDataNode.get("size").asLong());
+            }
+
+            jsonObj.set("blockData", blockDataNode);
 
             if (isECKey) {
               ChunkType blockChunksType = isECParityBlock(keyPipeline, entry.getKey()) ?
@@ -161,6 +190,11 @@ public class ChunkKeyHandler extends KeyHandler {
       String prettyJson = JsonUtils.toJsonStringWithDefaultPrettyPrinter(result);
       System.out.println(prettyJson);
     }
+  }
+
+  private String convertBase64ToHex(String base64Checksum) {
+    byte[] decodedBytes = Base64.getDecoder().decode(base64Checksum);
+    return Hex.encodeHexString(decodedBytes);
   }
 
   private boolean isECParityBlock(Pipeline pipeline, DatanodeDetails dn) {
