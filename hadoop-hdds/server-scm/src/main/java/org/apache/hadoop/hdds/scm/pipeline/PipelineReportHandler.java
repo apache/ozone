@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -30,7 +29,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.safemode.SafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -50,23 +48,16 @@ public class PipelineReportHandler implements
   private static final Logger LOGGER = LoggerFactory.getLogger(
       PipelineReportHandler.class);
   private final PipelineManager pipelineManager;
-  private final SafeModeManager scmSafeModeManager;
   private final SCMContext scmContext;
-  private final boolean pipelineAvailabilityCheck;
   private final SCMPipelineMetrics metrics;
 
-  public PipelineReportHandler(SafeModeManager scmSafeModeManager,
-                               PipelineManager pipelineManager,
+  public PipelineReportHandler(PipelineManager pipelineManager,
                                SCMContext scmContext,
                                ConfigurationSource conf) {
     Preconditions.checkNotNull(pipelineManager);
-    this.scmSafeModeManager = scmSafeModeManager;
     this.pipelineManager = pipelineManager;
     this.scmContext = scmContext;
     this.metrics = SCMPipelineMetrics.create();
-    this.pipelineAvailabilityCheck = conf.getBoolean(
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK_DEFAULT);
   }
 
   @Override
@@ -140,9 +131,7 @@ public class PipelineReportHandler implements
       }
     }
     if (pipeline.isHealthy()) {
-      if (pipelineAvailabilityCheck && scmSafeModeManager.getInSafeMode()) {
-        publisher.fireEvent(SCMEvents.OPEN_PIPELINE, pipeline);
-      }
+      publisher.fireEvent(SCMEvents.OPEN_PIPELINE, pipeline);
     }
   }
 
