@@ -99,3 +99,8 @@ Verify Stale Replica
             Should Be Equal As Integers     ${json}[blocks][${block}][length]          ${filesize}
         END
     END
+
+Execute replicas verify metadata CLI tool
+    ${output} =     Execute         ozone debug replicas verify --metadata --output-dir ${TEMP_DIR} o3://om/${VOLUME}/${BUCKET}/${TESTFILE}
+    ${json} =       Evaluate        json.loads('''${output}''')    json
+    [Return]        ${json}

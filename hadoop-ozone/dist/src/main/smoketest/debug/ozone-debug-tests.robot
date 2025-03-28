@@ -54,3 +54,9 @@ Test ozone debug read-replicas
 Test ozone debug version
     ${output} =    Execute    ozone debug version
                    Execute    echo '${output}' | jq -r '.' # validate JSON
+
+Test ozone debug replicas verify metadata when block exists
+    ${json} =                           Execute replicas verify metadata CLI tool
+    Should Be Equal   ${json}[status]   BLOCK_EXISTS
+    Should Be True    ${json}[pass]
+
