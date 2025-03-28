@@ -31,6 +31,8 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.fs.OzoneManagerFS;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
@@ -40,6 +42,7 @@ import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.service.SnapshotDirectoryCleaningService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
+import org.apache.hadoop.ozone.util.CheckedFunction;
 
 /**
  * Handles key level commands.
@@ -82,7 +85,6 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    */
   OmKeyInfo getKeyInfo(OmKeyArgs args, ResolvedBucket buctket,
       String clientAddress) throws IOException;
-
 
   /**
    * Returns a list of keys represented by {@link OmKeyInfo}
@@ -133,6 +135,24 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   List<Table.KeyValue<String, String>> getRenamesKeyEntries(
       String volume, String bucket, String startKey, int size) throws IOException;
 
+
+  /**
+   * Returns the previous snapshot's ozone keyInfo corresponding for the object.
+   */
+  CheckedFunction<KeyManager, OmDirectoryInfo, IOException> getPreviousSnapshotOzoneDirInfo(
+      long volumeId, OmBucketInfo bucketInfo, OmDirectoryInfo directoryInfo) throws IOException;
+
+  /**
+   * Returns the previous snapshot's ozone keyInfo corresponding for the object.
+   */
+  CheckedFunction<KeyManager, OmDirectoryInfo, IOException> getPreviousSnapshotOzoneDirInfo(
+      long volumeId, OmBucketInfo bucketInfo, OmKeyInfo directoryInfo) throws IOException;
+
+  /**
+   * Returns the previous snapshot's ozone keyInfo corresponding for the object.
+   */
+  CheckedFunction<KeyManager, OmKeyInfo, IOException> getPreviousSnapshotOzoneKeyInfo(
+      long volumeId, OmBucketInfo bucketInfo, OmKeyInfo keyInfo) throws IOException;
 
   /**
    * Returns a list deleted entries from the deletedTable.
