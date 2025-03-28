@@ -18,13 +18,18 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.collect.ImmutableList;
+import com.google.protobuf.Descriptors;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileChecksum;
@@ -55,16 +60,20 @@ import org.slf4j.LoggerFactory;
 public final class OmKeyInfo extends WithParentObjectId
     implements CopyObject<OmKeyInfo>, WithTags {
   private static final Logger LOG = LoggerFactory.getLogger(OmKeyInfo.class);
+  private static final Map<String, Codec<OmKeyInfo>> CODEC_MAP = new ConcurrentHashMap<>();
+  private static final Codec<OmKeyInfo> CODEC_TRUE = newCodec(true, Collections.emptySet());
+  private static final Codec<OmKeyInfo> CODEC_FALSE = newCodec(false, Collections.emptySet());
 
-  private static final Codec<OmKeyInfo> CODEC_TRUE = newCodec(true);
-  private static final Codec<OmKeyInfo> CODEC_FALSE = newCodec(false);
+  public static final Set<String> FIELDS_LIST = KeyInfo.getDescriptor().getFields().stream()
+      .map(Descriptors.FieldDescriptor::getName).collect(Collectors.toSet());
 
-  private static Codec<OmKeyInfo> newCodec(boolean ignorePipeline) {
-    return new DelegatedCodec<>(
-        Proto2Codec.get(KeyInfo.getDefaultInstance()),
-        OmKeyInfo::getFromProtobuf,
-        k -> k.getProtobuf(ignorePipeline, ClientVersion.CURRENT_VERSION),
-        OmKeyInfo.class);
+  public static Codec<OmKeyInfo> newCodec(boolean ignorePipeline, Set<String> ignoredFields) {
+    return CODEC_MAP.computeIfAbsent(String.join(",", ignoredFields) + "," + ignorePipeline,
+        (key) -> new DelegatedCodec<>(
+            Proto2Codec.get(KeyInfo.getDefaultInstance(), ignoredFields),
+            OmKeyInfo::getFromProtobuf,
+            k -> k.getProtobuf(ignorePipeline, ClientVersion.CURRENT_VERSION),
+            OmKeyInfo.class));
   }
 
   public static Codec<OmKeyInfo> getCodec(boolean ignorePipeline) {
