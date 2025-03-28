@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -485,6 +486,8 @@ public class DiskBalancerService extends BackgroundService {
         long endTime = Time.monotonicNow();
         if (moveSucceeded) {
           metrics.getMoveSuccessTime().add(endTime - startTime);
+          ContainerLogger.logMoveSuccess(containerId, sourceVolume,
+              destVolume, containerSize, endTime - startTime);
         } else {
           metrics.getMoveFailureTime().add(endTime - startTime);
         }
