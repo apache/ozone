@@ -15,28 +15,27 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.shell.checknative;
+package org.apache.hadoop.ozone.debug;
 
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
 
 import java.util.Collections;
 import java.util.concurrent.Callable;
-import org.apache.hadoop.hdds.cli.GenericCli;
+import org.apache.hadoop.hdds.cli.AbstractSubcommand;
+import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.hadoop.io.erasurecode.ErasureCodeNative;
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
 /**
  * CLI command to check if native libraries are loaded.
  */
-@CommandLine.Command(name = "ozone checknative",
+@CommandLine.Command(name = "checknative",
     description = "Checks if native libraries are loaded")
-public class CheckNative extends GenericCli implements Callable<Void> {
-
-  public static void main(String[] argv) {
-    new CheckNative().run(argv);
-  }
+@MetaInfServices(DebugSubcommand.class)
+public class CheckNative extends AbstractSubcommand implements Callable<Void>, DebugSubcommand {
 
   @Override
   public Void call() throws Exception {

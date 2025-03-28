@@ -60,7 +60,6 @@ function ozone_usage
   ozone_add_subcommand "admin" client "Ozone admin tool"
   ozone_add_subcommand "debug" client "Ozone debug tool"
   ozone_add_subcommand "repair" client "Ozone repair tool"
-  ozone_add_subcommand "checknative" client "checks if native libraries are loaded"
   ozone_add_subcommand "ratis" client "Ozone ratis tool"
 
   ozone_generate_usage "${OZONE_SHELL_EXECNAME}" false
@@ -229,10 +228,6 @@ function ozonecmd_case
       OZONE_DEBUG_OPTS="${OZONE_DEBUG_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
-    checknative)
-        OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.checknative.CheckNative
-        OZONE_RUN_ARTIFACT_NAME="ozone-tools"
-    ;;
     ratis)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneRatis
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
@@ -310,8 +305,8 @@ fi
 
 OZONE_SUBCMD=$1
 
-if [[ "$OZONE_SUBCMD" == "auditparser" ]]; then
-  echo "warning: 'ozone auditparser' is deprecated, use 'ozone debug auditparser' instead."
+if [[ "$OZONE_SUBCMD" == "auditparser" ]] || [[ "$OZONE_SUBCMD" == "checknative" ]]; then
+  echo "warning: 'ozone $OZONE_SUBCMD' is deprecated, use 'ozone debug $OZONE_SUBCMD' instead."
   OZONE_SUBCMD="debug"
 else
   shift

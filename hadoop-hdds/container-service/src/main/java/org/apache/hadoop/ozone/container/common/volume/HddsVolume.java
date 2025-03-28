@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
+import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.RawDB;
@@ -49,7 +50,7 @@ import org.slf4j.LoggerFactory;
 /**
  * HddsVolume represents volume in a datanode. {@link MutableVolumeSet}
  * maintains a list of HddsVolumes, one for each volume in the Datanode.
- * {@link VolumeInfo} in encompassed by this class.
+ * {@link VolumeUsage} in encompassed by this class.
  * <p>
  * The disk layout per volume is as follows:
  * <p>../hdds/VERSION
@@ -119,7 +120,7 @@ public class HddsVolume extends StorageVolume {
   private HddsVolume(Builder b) throws IOException {
     super(b);
 
-    if (!b.getFailedVolume() && getVolumeInfo().isPresent()) {
+    if (!b.getFailedVolume()) {
       this.setState(VolumeState.NOT_INITIALIZED);
       ConfigurationSource conf = getConf();
       int[] intervals = conf.getInts(OZONE_DATANODE_IO_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY);
@@ -177,6 +178,16 @@ public class HddsVolume extends StorageVolume {
 
   public VolumeInfoMetrics getVolumeInfoStats() {
     return volumeInfoMetrics;
+  }
+
+  @Override
+  protected StorageLocationReport.Builder reportBuilder() {
+    StorageLocationReport.Builder builder = super.reportBuilder();
+    if (!builder.isFailed()) {
+      builder.setCommitted(getCommittedBytes())
+          .setFreeSpaceToSpare(getFreeSpaceToSpare(builder.getCapacity()));
+    }
+    return builder;
   }
 
   @Override
