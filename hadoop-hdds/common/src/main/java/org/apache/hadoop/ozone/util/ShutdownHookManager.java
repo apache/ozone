@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,9 +96,9 @@ public final class ShutdownHookManager {
                 LOG.info("Shutdown process invoked a second time: ignoring");
                 return;
               }
-              long started = System.currentTimeMillis();
+              long started = Time.monotonicNow();
               int timeoutCount = MGR.executeShutdown();
-              long ended = System.currentTimeMillis();
+              long ended = Time.monotonicNow();
               LOG.debug(String.format(
                   "Completed shutdown in %.3f seconds; Timeouts: %d",
                   (ended - started) / 1000.0, timeoutCount));
