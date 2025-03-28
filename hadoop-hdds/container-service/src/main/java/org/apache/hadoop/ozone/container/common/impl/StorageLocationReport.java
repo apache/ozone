@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto;
 import org.apache.hadoop.ozone.container.common.interfaces.StorageLocationReportMXBean;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 
 /**
  * Storage location stats of datanodes that provide back store for containers.
@@ -52,6 +53,10 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     this.freeSpaceToSpare = builder.freeSpaceToSpare;
     this.storageType = builder.storageType;
     this.storageLocation = builder.storageLocation;
+  }
+
+  public long getUsableSpace() {
+    return VolumeUsage.getUsableSpace(this);
   }
 
   @Override
