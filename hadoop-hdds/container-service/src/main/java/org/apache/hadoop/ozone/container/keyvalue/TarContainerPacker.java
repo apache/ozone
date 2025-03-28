@@ -42,11 +42,9 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
@@ -119,20 +117,6 @@ public class TarContainerPacker
           CONTAINER_ALREADY_EXISTS);
     }
     return descriptorFileContent;
-  }
-
-  private void persistCustomContainerState(Container<KeyValueContainerData> container, byte[] descriptorContent,
-      ContainerProtos.ContainerDataProto.State state, Path containerMetadataPath) throws IOException {
-    if (descriptorContent == null) {
-      LOG.warn("Skipping persisting of custom state. Container descriptor is null for container {}",
-          container.getContainerData().getContainerID());
-      return;
-    }
-
-    KeyValueContainerData originalContainerData =
-        (KeyValueContainerData) ContainerDataYaml.readContainer(descriptorContent);
-    container.getContainerData().setState(state);
-    container.update(originalContainerData.getMetadata(), true, containerMetadataPath.toString());
   }
 
   private void extractEntry(ArchiveEntry entry, InputStream input, long size,

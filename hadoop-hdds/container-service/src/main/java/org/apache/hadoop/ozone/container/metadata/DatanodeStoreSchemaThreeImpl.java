@@ -138,7 +138,7 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
   }
 
   public void loadKVContainerData(File dumpDir)
-      throws IOException, RocksDBException {
+      throws IOException {
 
     try (BatchOperation batch = getBatchHandler().initBatchOperation()) {
       processTable(batch, getTableDumpFile(getMetadataTable(), dumpDir),
@@ -161,6 +161,8 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
           getDeleteTransactionTable());
 
       getStore().commitBatchOperation(batch);
+    } catch (RocksDBException e) {
+      throw new IOException("Failed to load container data from dump file.", e);
     }
   }
 
