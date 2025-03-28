@@ -227,7 +227,7 @@ public class TestOzoneDebugShell {
       JsonNode keyLocations = jsonNode.get("keyLocations").get(0);
       for (JsonNode element : keyLocations) {
         String fileName =
-            element.get("chunkFiles").get(0).toString();
+            element.get("file").toString();
         blockFilePaths.add(fileName);
       }
       // DN storage directories are set differently for each DN
