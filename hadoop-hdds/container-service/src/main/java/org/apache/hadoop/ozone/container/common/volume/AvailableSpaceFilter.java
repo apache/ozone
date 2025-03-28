@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.function.Predicate;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 
@@ -29,8 +29,7 @@ import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 public class AvailableSpaceFilter implements Predicate<HddsVolume> {
 
   private final long requiredSpace;
-  private final Map<HddsVolume, AvailableSpace> fullVolumes =
-      new HashMap<>();
+  private final List<StorageLocationReport> fullVolumes = new LinkedList<>();
   private long mostAvailableSpace = Long.MIN_VALUE;
 
   public AvailableSpaceFilter(long requiredSpace) {
@@ -46,7 +45,7 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
     mostAvailableSpace = Math.max(available, mostAvailableSpace);
 
     if (!hasEnoughSpace) {
-      fullVolumes.put(vol, new AvailableSpace(report));
+      fullVolumes.add(report);
     }
 
     return hasEnoughSpace;
@@ -64,19 +63,5 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
   public String toString() {
     return "required space: " + requiredSpace +
         ", volumes: " + fullVolumes;
-  }
-
-  private static class AvailableSpace {
-    private final StorageLocationReport report;
-
-    AvailableSpace(StorageLocationReport report) {
-      this.report = report;
-    }
-
-    @Override
-    public String toString() {
-      return "free: " + report.getRemaining() +
-          ", committed: " + report.getCommitted();
-    }
   }
 }
