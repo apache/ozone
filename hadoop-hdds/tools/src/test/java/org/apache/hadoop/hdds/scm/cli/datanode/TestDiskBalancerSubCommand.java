@@ -236,7 +236,7 @@ public class TestDiskBalancerSubCommand {
     DiskBalancerStatusSubcommand statusCmd1 = new DiskBalancerStatusSubcommand();
     statusCmd1.execute(scmClient);
 
-    String output = outContent.toString().trim();
+    String output = outContent.toString(DEFAULT_ENCODING).trim();
 
     // Check if expected values appear in output
     assertTrue(output.contains(String.valueOf(bytesMovedMB)));
