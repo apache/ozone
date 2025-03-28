@@ -35,7 +35,7 @@ import org.apache.ratis.server.RaftServerConfigKeys;
 public class ScmRatisServerConfig {
   /** @see RaftServerConfigKeys.Log.Appender#WAIT_TIME_MIN_KEY */
   @Config(key = "log.appender.wait-time.min",
-      defaultValue = "0ms",
+      defaultValue = "1ms",
       type = ConfigType.TIME,
       tags = {OZONE, SCM, RATIS, PERFORMANCE},
       description = "Minimum wait time between two appendEntries calls."

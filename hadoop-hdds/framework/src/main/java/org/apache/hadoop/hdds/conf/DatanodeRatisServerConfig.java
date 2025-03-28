@@ -193,13 +193,13 @@ public class DatanodeRatisServerConfig {
 
   /** @see RaftServerConfigKeys.Log.Appender#WAIT_TIME_MIN_KEY */
   @Config(key = "log.appender.wait-time.min",
-      defaultValue = "0us",
+      defaultValue = "1ms",
       type = ConfigType.TIME,
       tags = {OZONE, DATANODE, RATIS, PERFORMANCE},
       description = "The minimum wait time between two appendEntries calls. " +
           "In some error conditions, the leader may keep retrying " +
           "appendEntries. If it happens, increasing this value to, say, " +
-          "5us (microseconds) can help avoid the leader being too busy " +
+          "1ms (millisecond) can help avoid the leader being too busy " +
           "retrying."
   )
   private long logAppenderWaitTimeMin;
