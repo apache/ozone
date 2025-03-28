@@ -257,6 +257,27 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     return builder.build();
   }
 
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder(128)
+        .append("{")
+        .append("id=").append(id)
+        .append(" dir=").append(storageLocation)
+        .append(" type=").append(storageType);
+
+    if (failed) {
+      sb.append(" failed");
+    } else {
+      sb.append(" capacity=").append(capacity)
+          .append(" used=").append(scmUsed)
+          .append(" available=").append(remaining)
+          .append(" minFree=").append(freeSpaceToSpare)
+          .append(" committed=").append(committed);
+    }
+
+    return sb.append("}").toString();
+  }
+
   /**
    * Returns StorageLocation.Builder instance.
    *
