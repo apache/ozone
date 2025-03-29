@@ -119,7 +119,7 @@ public class TestOneReplicaPipelineSafeModeRule {
 
     SCMSafeModeManager scmSafeModeManager =
         new SCMSafeModeManager(ozoneConfiguration, containerManager,
-            pipelineManager, eventQueue, serviceManager, scmContext);
+            pipelineManager, mockNodeManager, eventQueue, serviceManager, scmContext);
 
     rule = scmSafeModeManager.getOneReplicaPipelineSafeModeRule();
   }
