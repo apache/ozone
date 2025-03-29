@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.time.Duration;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
@@ -67,6 +68,7 @@ public class ContainerScannerConfiguration {
   public static final long BANDWIDTH_PER_VOLUME_DEFAULT = OzoneConsts.MB * 5L;
   public static final long ON_DEMAND_BANDWIDTH_PER_VOLUME_DEFAULT =
       OzoneConsts.MB * 5L;
+  public static final int ON_DEMAND_IO_ERROR_TOLERANCE_DEFAULT = 1000;
 
   @Config(key = "enabled",
       type = ConfigType.BOOLEAN,
@@ -136,6 +138,13 @@ public class ContainerScannerConfiguration {
           + " postfix (ns,ms,s,m,h,d)."
   )
   private long containerScanMinGap = CONTAINER_SCAN_MIN_GAP_DEFAULT;
+
+  @Config(key = "on.demand.io.failure.tolerance.count",
+      type = ConfigType.INT,
+      defaultValue = "1000",
+      tags = {ConfigTag.STORAGE},
+      description = "Config parameter to set io failure tolerance count for volume")
+  private int onDemandIOErrorToleranceCount = ON_DEMAND_IO_ERROR_TOLERANCE_DEFAULT;
 
   @PostConstruct
   public void validate() {
@@ -216,5 +225,14 @@ public class ContainerScannerConfiguration {
 
   public long getContainerScanMinGap() {
     return containerScanMinGap;
+  }
+
+  public int getOnDemandIOErrorToleranceCount() {
+    return onDemandIOErrorToleranceCount;
+  }
+
+  @VisibleForTesting
+  public void setOnDemandIOErrorToleranceCount(int onDemandIOErrorToleranceCount) {
+    this.onDemandIOErrorToleranceCount = onDemandIOErrorToleranceCount;
   }
 }

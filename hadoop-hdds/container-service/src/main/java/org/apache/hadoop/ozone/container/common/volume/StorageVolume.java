@@ -141,6 +141,7 @@ public abstract class StorageVolume
   private AtomicInteger currentIOFailureCount;
   private Queue<Boolean> ioTestSlidingWindow;
   private int healthCheckFileSize;
+  private AtomicInteger cumulativeIOFailureCount;
 
   protected StorageVolume(Builder<?> b) throws IOException {
     storageType = b.storageType;
@@ -161,6 +162,7 @@ public abstract class StorageVolume
       this.ioFailureTolerance = dnConf.getVolumeIOFailureTolerance();
       this.ioTestSlidingWindow = new LinkedList<>();
       this.currentIOFailureCount = new AtomicInteger(0);
+      this.cumulativeIOFailureCount = new AtomicInteger(0);
       this.healthCheckFileSize = dnConf.getVolumeHealthCheckFileSize();
     } else {
       storageDir = new File(b.volumeRootStr);
@@ -510,6 +512,10 @@ public abstract class StorageVolume
   public void decrementUsedSpace(long reclaimedSpace) {
     volumeUsage.ifPresent(usage -> usage
             .decrementUsedSpace(reclaimedSpace));
+  }
+
+  public int incrementAndGetCumulativeIOFailureCount() {
+    return cumulativeIOFailureCount.incrementAndGet();
   }
 
   public VolumeSet getVolumeSet() {
