@@ -196,8 +196,8 @@ public class DBCheckpointServlet extends HttpServlet
               .distinct()
               .collect(Collectors.toList()));
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Received excluding SST {}. The total excluded sst files count is {}"
-            , receivedSstList.subList(0, Math.min(5, receivedSstList.size())), receivedSstList.size());
+        LOG.debug("Received excluding SST {}. The total excluded sst files count is {}",
+            receivedSstList.subList(0, Math.min(5, receivedSstList.size())), receivedSstList.size());
       }
     }
 
