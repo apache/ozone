@@ -771,15 +771,16 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
     final boolean minFreeSpaceRatioConfigured = minFreeSpaceRatio >= 0;
 
     if (minFreeSpaceConfigured && minFreeSpaceRatioConfigured) {
-      LOG.warn("Only one of {}={} and {}={} should be set. With both set, default value ({}) will be used.",
+      LOG.warn("Only one of {}={} and {}={} should be set. With both set, minFreeSpace value will be used.",
           HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
           minFreeSpace,
           HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
-          minFreeSpaceRatio,
-          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT);
+          minFreeSpaceRatio);
+      minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
     }
 
-    if (minFreeSpaceConfigured == minFreeSpaceRatioConfigured) {
+    if (!minFreeSpaceConfigured && !minFreeSpaceRatioConfigured) {
+      // If both are not configured use defaultFreeSpace
       minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
       minFreeSpace = getDefaultFreeSpace();
     }
