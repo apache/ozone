@@ -195,7 +195,9 @@ public class DBCheckpointServlet extends HttpServlet
               .filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX))
               .distinct()
               .collect(Collectors.toList()));
-      LOG.info("Received excluding SST {}", receivedSstList);
+      if (sstParam.length % 10 == 0) {
+        LOG.debug("Received excluding SST {}", receivedSstList);
+      }
     }
 
     Path tmpdir = null;
@@ -229,9 +231,10 @@ public class DBCheckpointServlet extends HttpServlet
       long duration = Duration.between(start, end).toMillis();
       LOG.info("Time taken to write the checkpoint to response output " +
           "stream: {} milliseconds", duration);
-
-      LOG.info("Excluded SST {} from the latest checkpoint.",
-          excludedSstList);
+      if (excludedSstList.size() % 10 == 0) {
+        LOG.debug("Excluded SST {} from the latest checkpoint.",
+            excludedSstList);
+      }
       if (!excludedSstList.isEmpty()) {
         dbMetrics.incNumIncrementalCheckpoint();
       }
