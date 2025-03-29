@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto;
 import org.apache.hadoop.ozone.container.common.interfaces.StorageLocationReportMXBean;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 
 /**
  * Storage location stats of datanodes that provide back store for containers.
@@ -52,6 +53,10 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     this.freeSpaceToSpare = builder.freeSpaceToSpare;
     this.storageType = builder.storageType;
     this.storageLocation = builder.storageLocation;
+  }
+
+  public long getUsableSpace() {
+    return VolumeUsage.getUsableSpace(this);
   }
 
   @Override
@@ -227,34 +232,28 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     return builder.build();
   }
 
-  /**
-   * Returns the StorageLocationReport from the protoBuf message.
-   * @param report MetadataStorageReportProto
-   * @return StorageLocationReport
-   * @throws IOException in case of invalid storage type
-   */
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder(128)
+        .append("{")
+        .append(" dir=").append(storageLocation)
+        .append(" type=").append(storageType);
 
-  public static StorageLocationReport getMetadataFromProtobuf(
-      MetadataStorageReportProto report) throws IOException {
-    StorageLocationReport.Builder builder = StorageLocationReport.newBuilder();
-    builder.setStorageLocation(report.getStorageLocation());
-    if (report.hasCapacity()) {
-      builder.setCapacity(report.getCapacity());
-    }
-    if (report.hasScmUsed()) {
-      builder.setScmUsed(report.getScmUsed());
-    }
-    if (report.hasStorageType()) {
-      builder.setStorageType(getStorageType(report.getStorageType()));
-    }
-    if (report.hasRemaining()) {
-      builder.setRemaining(report.getRemaining());
+    if (id != null) {
+      sb.append(" id=").append(id);
     }
 
-    if (report.hasFailed()) {
-      builder.setFailed(report.getFailed());
+    if (failed) {
+      sb.append(" failed");
+    } else {
+      sb.append(" capacity=").append(capacity)
+          .append(" used=").append(scmUsed)
+          .append(" available=").append(remaining)
+          .append(" minFree=").append(freeSpaceToSpare)
+          .append(" committed=").append(committed);
     }
-    return builder.build();
+
+    return sb.append(" }").toString();
   }
 
   /**

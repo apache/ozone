@@ -123,6 +123,7 @@ public abstract class StorageVolume
   private final StorageType storageType;
   private final String volumeRoot;
   private final File storageDir;
+  private final String storageDirStr;
   private String workingDirName;
   private File tmpDir;
   private File diskCheckDir;
@@ -173,6 +174,7 @@ public abstract class StorageVolume
       this.conf = null;
       this.dnConf = null;
     }
+    this.storageDirStr = storageDir.getAbsolutePath();
   }
 
   public void format(String cid) throws IOException {
@@ -459,7 +461,7 @@ public abstract class StorageVolume
     StorageLocationReport.Builder builder = StorageLocationReport.newBuilder()
         .setFailed(isFailed())
         .setId(getStorageID())
-        .setStorageLocation(volumeRoot)
+        .setStorageLocation(storageDirStr)
         .setStorageType(storageType);
 
     if (!builder.isFailed()) {
