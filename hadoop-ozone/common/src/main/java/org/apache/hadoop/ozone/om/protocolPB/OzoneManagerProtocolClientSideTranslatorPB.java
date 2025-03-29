@@ -1330,6 +1330,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
+  @Deprecated
   public String printCompactionLogDag(String fileNamePrefix, String graphType)
       throws IOException {
     final PrintCompactionLogDagRequest.Builder request =
