@@ -162,6 +162,7 @@ public final class ContainerUtils {
 
   /**
    * Read {@link DatanodeDetails} from a local ID file.
+   * Use {@link DatanodeDetails#validateDatanodeIpAddress()} to ensure that the IP address matches with the hostname
    *
    * @param path ID file local path
    * @return {@link DatanodeDetails}

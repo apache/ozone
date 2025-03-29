@@ -27,6 +27,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSet;
 import com.google.protobuf.ByteString;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -34,6 +36,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -176,12 +179,40 @@ public class DatanodeDetails extends NodeImpl implements
   }
 
   /**
+   * Resolves and validates the IP address of the datanode based on its hostname.
+   * If the resolved IP address differs from the current IP address,
+   * it updates the IP address to the newly resolved value.
+   */
+  public void validateDatanodeIpAddress() {
+    final String oldIP = getIpAddress();
+    final String hostname = getHostName();
+    if (StringUtils.isBlank(hostname)) {
+      LOG.warn("Could not resolve IP address of datanode '{}'", this);
+      return;
+    }
+
+    try {
+      final String newIP = InetAddress.getByName(hostname).getHostAddress();
+      if (StringUtils.isBlank(newIP)) {
+        throw new UnknownHostException("New IP address is invalid: " + newIP);
+      }
+
+      if (!newIP.equals(oldIP)) {
+        LOG.info("Updating IP address of datanode {} to {}", this, newIP);
+        setIpAddress(newIP);
+      }
+    } catch (UnknownHostException e) {
+      LOG.warn("Could not resolve IP address of datanode '{}'", this, e);
+    }
+  }
+
+  /**
    * Returns IP address of DataNode.
    *
    * @return IP address
    */
   public String getIpAddress() {
-    return ipAddress.getString();
+    return ipAddress == null ? null : ipAddress.getString();
   }
 
   /**
@@ -208,7 +239,7 @@ public class DatanodeDetails extends NodeImpl implements
    * @return Hostname
    */
   public String getHostName() {
-    return hostName.getString();
+    return hostName == null ? null : hostName.getString();
   }
 
   /**
