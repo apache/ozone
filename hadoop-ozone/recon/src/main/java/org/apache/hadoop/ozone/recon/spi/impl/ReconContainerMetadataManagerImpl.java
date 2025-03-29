@@ -453,26 +453,45 @@ public class ReconContainerMetadataManagerImpl
   }
 
   private class ContainerMetadataIterator implements SeekableIterator<Long, ContainerMetadata> {
-    private TableIterator<ContainerKeyPrefix, ? extends KeyValue<ContainerKeyPrefix, Integer>> containerIterator;
-    private KeyValue<ContainerKeyPrefix, Integer> currentKey;
+    private TableIterator<ContainerKeyPrefix, ? extends KeyValue<ContainerKeyPrefix, Integer>> containerMetaIterator;
+    private TableIterator<Long, ? extends KeyValue<Long, Long>> containerIterator;
+    private KeyValue<Long, Long> currentKey;
+    private KeyValue<ContainerKeyPrefix, Integer> currentMetadata;
 
     ContainerMetadataIterator()
             throws IOException {
-      containerIterator = containerKeyTable.iterator();
+      containerMetaIterator = containerKeyTable.iterator();
+      containerIterator = containerKeyCountTable.iterator();
       currentKey = containerIterator.hasNext() ? containerIterator.next() : null;
+      currentMetadata = containerMetaIterator.hasNext() ? containerMetaIterator.next() : null;
     }
 
     @Override
     public void seek(Long containerID) throws IOException {
       ContainerKeyPrefix seekKey = ContainerKeyPrefix.get(containerID);
-      containerIterator.seek(seekKey);
+      containerIterator.seek(containerID);
+      containerMetaIterator.seek(seekKey);
       currentKey = containerIterator.hasNext() ? containerIterator.next() : null;
+      currentMetadata = containerMetaIterator.hasNext() ? containerMetaIterator.next() : null;
+    }
+
+    @Override
+    public Long peekNextKey() {
+      if (currentKey == null) {
+        return null;
+      }
+      try {
+        return currentKey.getKey();
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
     }
 
     @Override
     public void close() {
       try {
         containerIterator.close();
+        containerMetaIterator.close();
       } catch (IOException e) {
         throw new UncheckedIOException(e);
       }
@@ -489,22 +508,34 @@ public class ReconContainerMetadataManagerImpl
         if (currentKey == null) {
           return null;
         }
+
+        ContainerMetadata containerMetadata = new ContainerMetadata(currentKey.getKey());
+        if (currentMetadata == null || currentKey.getKey() != currentMetadata.getKey().getContainerId()) {
+          LOG.error("ContainerMetaData and containerIDs count do not match for container Id: {}. Container Count " +
+              "Table has {} counts and container Metadata doesn't have container and next containerId is {}",
+              currentKey.getKey(), currentMetadata.getKey().getContainerId(),
+              currentMetadata.getKey().getContainerId());
+          currentKey = containerIterator.hasNext() ? containerIterator.next() : null;
+          if (currentKey != null) {
+            seek(currentKey.getKey());
+          }
+          return containerMetadata;
+        }
+
         Map<PipelineID, Pipeline> pipelines = new HashMap<>();
-        ContainerMetadata containerMetadata = new ContainerMetadata(currentKey.getKey().getContainerId());
+        int count = 0;
         do {
-          ContainerKeyPrefix containerKeyPrefix = this.currentKey.getKey();
-          containerMetadata.setNumberOfKeys(containerMetadata.getNumberOfKeys() + 1);
+          ContainerKeyPrefix containerKeyPrefix = this.currentMetadata.getKey();
+          count++;
           getPipelines(containerKeyPrefix).forEach(pipeline -> {
             pipelines.putIfAbsent(pipeline.getId(), pipeline);
           });
-          if (containerIterator.hasNext()) {
-            currentKey = containerIterator.next();
-          } else {
-            currentKey = null;
-          }
-        } while (currentKey != null &&
-                currentKey.getKey().getContainerId() == containerMetadata.getContainerID());
+          currentMetadata = containerMetaIterator.hasNext() ? containerMetaIterator.next() : null;
+        } while (currentMetadata != null &&
+                 currentMetadata.getKey().getContainerId() == containerMetadata.getContainerID());
+        containerMetadata.setNumberOfKeys(count);
         containerMetadata.setPipelines(new ArrayList<>(pipelines.values()));
+        currentKey = containerIterator.hasNext() ? containerIterator.next() : null;
         return containerMetadata;
       } catch (IOException e) {
         throw new UncheckedIOException(e);
