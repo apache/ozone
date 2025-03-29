@@ -31,7 +31,7 @@ public class ManagedBlockBasedTableConfig extends BlockBasedTableConfig {
   public synchronized ManagedBlockBasedTableConfig closeAndSetBlockCache(
       Cache blockCache) {
     Cache previous = blockCacheHolder;
-    if (previous.isOwningHandle()) {
+    if (previous != null && previous.isOwningHandle()) {
       previous.close();
     }
     return setBlockCache(blockCache);
@@ -68,5 +68,38 @@ public class ManagedBlockBasedTableConfig extends BlockBasedTableConfig {
         blockCacheHolder.close();
       }
     }
+  }
+
+  public synchronized ManagedBlockBasedTableConfig setAllProperties(
+      BlockBasedTableConfig config) {
+    this.setBlockSize(config.blockSize());
+    this.setBlockSizeDeviation(config.blockSizeDeviation());
+    this.setBlockRestartInterval(config.blockRestartInterval());
+    this.setChecksumType(config.checksumType());
+    this.setFilterPolicy(config.filterPolicy());
+    this.setIndexType(config.indexType());
+    this.setNoBlockCache(config.noBlockCache());
+    this.setBlockCacheSize(config.blockCacheSize());
+    this.setCacheNumShardBits(config.cacheNumShardBits());
+    this.setEnableIndexCompression(config.enableIndexCompression());
+    this.setWholeKeyFiltering(config.wholeKeyFiltering());
+    this.setFormatVersion(config.formatVersion());
+    this.setBlockAlign(config.blockAlign());
+    this.setCacheIndexAndFilterBlocks(config.cacheIndexAndFilterBlocks());
+    this.setCacheIndexAndFilterBlocksWithHighPriority(config.cacheIndexAndFilterBlocksWithHighPriority());
+    this.setDataBlockHashTableUtilRatio(config.dataBlockHashTableUtilRatio());
+    this.setDataBlockIndexType(config.dataBlockIndexType());
+    this.setHashIndexAllowCollision(config.hashIndexAllowCollision());
+    this.setIndexBlockRestartInterval(config.indexBlockRestartInterval());
+    this.setIndexShortening(config.indexShortening());
+    this.setMetadataBlockSize(config.metadataBlockSize());
+    this.setOptimizeFiltersForMemory(config.optimizeFiltersForMemory());
+    this.setPartitionFilters(config.partitionFilters());
+    this.setPinL0FilterAndIndexBlocksInCache(config.pinL0FilterAndIndexBlocksInCache());
+    this.setPinTopLevelIndexAndFilter(config.pinTopLevelIndexAndFilter());
+    this.setReadAmpBytesPerBit(config.readAmpBytesPerBit());
+    this.setUseDeltaEncoding(config.useDeltaEncoding());
+    this.setVerifyCompression(config.verifyCompression());
+    return this;
   }
 }

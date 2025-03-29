@@ -115,7 +115,7 @@ public final class RocksDatabase implements Closeable {
         .stream()
         .map(TableConfig::toName)
         .filter(familyName -> !existingFamilyNames.contains(familyName))
-        .map(TableConfig::newTableConfig)
+        .map(familyName -> TableConfig.newTableConfig(file.toPath(), familyName))
         .collect(Collectors.toList());
     if (LOG.isDebugEnabled()) {
       LOG.debug("Found column families in DB {}: {}", file, columnFamilies);
@@ -139,8 +139,8 @@ public final class RocksDatabase implements Closeable {
   }
 
   static RocksDatabase open(File dbFile, ManagedDBOptions dbOptions,
-        ManagedWriteOptions writeOptions, Set<TableConfig> families,
-        boolean readOnly) throws IOException {
+                            ManagedWriteOptions writeOptions, Set<TableConfig> families,
+                            boolean readOnly) throws IOException {
     List<ColumnFamilyDescriptor> descriptors = null;
     ManagedRocksDB db = null;
     final Map<String, ColumnFamily> columnFamilies = new HashMap<>();

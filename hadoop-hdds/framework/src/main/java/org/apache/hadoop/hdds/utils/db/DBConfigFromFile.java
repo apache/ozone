@@ -18,17 +18,21 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.toIOException;
+import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
+import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedConfigOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.eclipse.jetty.util.StringUtil;
 import org.rocksdb.ColumnFamilyDescriptor;
-import org.rocksdb.Env;
 import org.rocksdb.OptionsUtil;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
@@ -106,38 +110,86 @@ public final class DBConfigFromFile {
    * control OzoneManager.db configs from a file, we need to create a file
    * called OzoneManager.db.ini and place that file in $OZONE_DIR/etc/hadoop.
    *
-   * @param dbFileName - The DB File Name, for example, OzoneManager.db.
-   * @param cfDescs - ColumnFamily Handles.
+   * @param dbPath - The DB File Name, for example, OzoneManager.db.
    * @return DBOptions, Options to be used for opening/creating the DB.
    * @throws IOException
    */
-  public static ManagedDBOptions readFromFile(String dbFileName,
-      List<ColumnFamilyDescriptor> cfDescs) throws IOException {
-    Preconditions.checkNotNull(dbFileName);
-    Preconditions.checkNotNull(cfDescs);
-    Preconditions.checkArgument(!cfDescs.isEmpty());
+  public static ManagedDBOptions readDBOptionsFromFile(Path dbPath) throws IOException {
+    List<ColumnFamilyDescriptor> descriptors = new ArrayList<>();
+    ManagedDBOptions readDBOptions = readFromFile(dbPath, descriptors);
+    //readDBOptions will be freed once the store using it is closed, but the descriptors need to be closed.
+    closeDescriptors(descriptors);
+    return readDBOptions;
+  }
+
+  public static ManagedColumnFamilyOptions readCFOptionsFromFile(Path dbPath, String cfName) throws IOException {
+    List<ColumnFamilyDescriptor> descriptors = new ArrayList<>();
+    String validatedCfName = StringUtil.isEmpty(cfName) ? StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY) : cfName;
+    ManagedColumnFamilyOptions resultCfOptions = null;
+    try (ManagedDBOptions ignored = readFromFile(dbPath, descriptors)) {
+      ColumnFamilyDescriptor descriptor = descriptors.stream()
+          .filter(desc -> StringUtils.bytes2String(desc.getName()).equals(validatedCfName))
+          .findAny().orElse(null);
+      if (descriptor != null) {
+        resultCfOptions = new ManagedColumnFamilyOptions(descriptor.getOptions());
+      }
+    } finally {
+      closeDescriptors(descriptors);
+    }
+    return resultCfOptions;
+  }
+
+  private static ManagedDBOptions readFromFile(Path dbPath, List<ColumnFamilyDescriptor> descriptors)
+      throws IOException {
+    Preconditions.checkNotNull(dbPath);
 
     //TODO: Add Documentation on how to support RocksDB Mem Env.
-    Env env = Env.getDefault();
-    ManagedDBOptions options = null;
-    File configLocation = getConfigLocation();
-    if (configLocation != null &&
-        StringUtil.isNotBlank(configLocation.toString())) {
-      Path optionsFile = Paths.get(configLocation.toString(),
-          getOptionsFileNameFromDB(dbFileName));
-
-      if (optionsFile.toFile().exists()) {
-        options = new ManagedDBOptions();
-        try {
-          OptionsUtil.loadOptionsFromFile(optionsFile.toString(),
-              env, options, cfDescs, true);
-
-        } catch (RocksDBException rdEx) {
-          throw toIOException("Unable to find/open Options file.", rdEx);
-        }
-      }
+    Path generatedDBPath = generateDBPath(dbPath);
+    if (!generatedDBPath.toFile().exists()) {
+      LOG.warn("Error trying to read generated rocksDB file: {}, file does not exists.", generatedDBPath);
+      return null;
+    }
+    ManagedDBOptions options = new ManagedDBOptions();
+    try (ManagedConfigOptions configOptions = new ManagedConfigOptions()) {
+      OptionsUtil.loadOptionsFromFile(configOptions, generatedDBPath.toString(), options, descriptors);
+    } catch (RocksDBException rdEx) {
+      options.close();
+      closeDescriptors(descriptors);
+      throw toIOException("There was an error opening rocksDB Options file.", rdEx);
     }
     return options;
+  }
+
+  private static void closeDescriptors(List<ColumnFamilyDescriptor> descriptors) {
+    //note that close() is an idempotent operation here so calling it multiple times won't cause issues.
+    descriptors.forEach(descriptor -> descriptor.getOptions().close());
+  }
+
+  /**
+   * Tries looking up possible options for the DB. If the specified dbPath exists it uses it.
+   * If not then it tries reading it from the default config location and also tries appending +.ini to the file.
+   *
+   * @param path
+   * @return
+   * @throws IOException
+   */
+  private static Path generateDBPath(Path path) throws IOException {
+    if (path.toFile().exists()) {
+      LOG.debug("RocksDB path found: {}, opening db from it.", path);
+      return path;
+    } else {
+      LOG.debug("RocksDB path: {} not found, attempting to use fallback", path);
+      File configLocation = getConfigLocation();
+      if (configLocation != null &&
+          StringUtil.isNotBlank(configLocation.toString())) {
+        Path fallbackPath = Paths.get(configLocation.toString(),
+            getOptionsFileNameFromDB(path.toString()));
+        LOG.debug("Fallback path found: {}", path);
+        return fallbackPath;
+      }
+    }
+    LOG.error("No RocksDB path found");
+    return Paths.get("");
   }
 
 }
