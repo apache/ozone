@@ -54,6 +54,7 @@ import org.apache.hadoop.util.Time;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.Preconditions;
+import org.apache.ratis.util.function.CheckedBiConsumer;
 import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,10 +78,12 @@ public final class OzoneManagerDoubleBuffer {
   private static class Entry {
     private final TermIndex termIndex;
     private final OMClientResponse response;
+    private final long index;
 
-    Entry(TermIndex termIndex, OMClientResponse response) {
+    Entry(TermIndex termIndex, OMClientResponse response, long index) {
       this.termIndex = termIndex;
       this.response = response;
+      this.index = index;
     }
 
     TermIndex getTermIndex() {
@@ -90,6 +93,10 @@ public final class OzoneManagerDoubleBuffer {
     OMClientResponse getResponse() {
       return response;
     }
+
+    long getIndex() {
+      return index;
+    }
   }
 
   /**
@@ -98,6 +105,7 @@ public final class OzoneManagerDoubleBuffer {
   public static final class Builder {
     private OMMetadataManager omMetadataManager;
     private Consumer<TermIndex> updateLastAppliedIndex = termIndex -> { };
+    private CheckedBiConsumer<BatchOperation, Long, IOException> updateOmCommitIndex = (m, n) -> { };
     private boolean isTracingEnabled = false;
     private int maxUnFlushedTransactionCount = 0;
     private FlushNotifier flushNotifier;
@@ -113,6 +121,11 @@ public final class OzoneManagerDoubleBuffer {
 
     Builder setUpdateLastAppliedIndex(Consumer<TermIndex> updateLastAppliedIndex) {
       this.updateLastAppliedIndex = updateLastAppliedIndex;
+      return this;
+    }
+
+    Builder setUpdateOmCommitIndex(CheckedBiConsumer<BatchOperation, Long, IOException> updateOmCommitIndex) {
+      this.updateOmCommitIndex = updateOmCommitIndex;
       return this;
     }
 
@@ -177,6 +190,7 @@ public final class OzoneManagerDoubleBuffer {
   private final OMMetadataManager omMetadataManager;
 
   private final Consumer<TermIndex> updateLastAppliedIndex;
+  private final CheckedBiConsumer<BatchOperation, Long, IOException> updateOmCommitIndex;
 
   private final S3SecretManager s3SecretManager;
 
@@ -196,6 +210,7 @@ public final class OzoneManagerDoubleBuffer {
     this.omMetadataManager = b.omMetadataManager;
     this.s3SecretManager = b.s3SecretManager;
     this.updateLastAppliedIndex = b.updateLastAppliedIndex;
+    this.updateOmCommitIndex = b.updateOmCommitIndex;
     this.flushNotifier = b.flushNotifier;
     this.unFlushedTransactions = newSemaphore(b.maxUnFlushedTransactionCount);
 
@@ -330,6 +345,7 @@ public final class OzoneManagerDoubleBuffer {
         .map(Entry::getTermIndex)
         .sorted()
         .collect(Collectors.toList());
+    final long index = buffer.stream().mapToLong(Entry::getIndex).max().orElse(0);
     final int flushedTransactionsSize = flushedTransactions.size();
     final TermIndex lastTransaction = flushedTransactions.get(flushedTransactionsSize - 1);
 
@@ -346,6 +362,8 @@ public final class OzoneManagerDoubleBuffer {
           lastTransaction.getIndex(),
           () -> omMetadataManager.getTransactionInfoTable().putWithBatch(
               batchOperation, TRANSACTION_INFO_KEY, TransactionInfo.valueOf(lastTransaction)));
+
+      updateOmCommitIndex.accept(batchOperation, index);
 
       long startTime = Time.monotonicNow();
       flushBatchWithTrace(lastTraceId, buffer.size(),
@@ -458,7 +476,7 @@ public final class OzoneManagerDoubleBuffer {
       }
       for (String table : cleanupTables) {
         cleanupEpochs.computeIfAbsent(table, list -> new ArrayList<>())
-            .add(entry.getTermIndex().getIndex());
+            .add(entry.getIndex());
       }
     } else {
       // This is to catch early errors, when a new response class missed to
@@ -527,7 +545,14 @@ public final class OzoneManagerDoubleBuffer {
    * Add OmResponseBufferEntry to buffer.
    */
   public synchronized void add(OMClientResponse response, TermIndex termIndex) {
-    currentBuffer.add(new Entry(termIndex, response));
+    add(response, termIndex, termIndex.getIndex());
+  }
+
+  /**
+   * Add OmResponseBufferEntry to buffer.
+   */
+  public synchronized void add(OMClientResponse response, TermIndex termIndex, long index) {
+    currentBuffer.add(new Entry(termIndex, response, index));
     notify();
   }
 
