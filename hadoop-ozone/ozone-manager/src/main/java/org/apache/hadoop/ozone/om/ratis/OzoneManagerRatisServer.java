@@ -827,7 +827,7 @@ public final class OzoneManagerRatisServer {
    *
    * @return RaftServerStatus.
    */
-  public RaftServerStatus checkLeaderStatus() {
+  public RaftServerStatus getLeaderStatus() {
     final RaftServer.Division division = getServerDivision();
     if (division == null) {
       return RaftServerStatus.NOT_LEADER;
