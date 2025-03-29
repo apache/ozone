@@ -479,6 +479,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final BucketUtilizationMetrics bucketUtilizationMetrics;
 
   private boolean fsSnapshotEnabled;
+  private int fsSnapshotMaxLimit;
 
   private String omHostName;
 
@@ -988,6 +989,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     fsSnapshotEnabled = configuration.getBoolean(
         OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY,
         OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_DEFAULT);
+    fsSnapshotMaxLimit = configuration.getInt(
+        OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT,
+        OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT);
     omSnapshotManager = new OmSnapshotManager(this);
 
     // Snapshot metrics
@@ -4363,6 +4367,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public boolean isFilesystemSnapshotEnabled() {
     return fsSnapshotEnabled;
+  }
+
+  /**
+   * Get the maximum number of Ozone filesystem snapshots allowed.
+   *
+   * @return the maximum number of Ozone filesystem snapshots allowed.
+   */
+  public int getFsSnapshotMaxLimit() {
+    return fsSnapshotMaxLimit;
   }
 
   /**
