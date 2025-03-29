@@ -259,12 +259,11 @@ public class OMDBInsightEndpoint {
                                                     int limit, String prevKey)
       throws IOException, IllegalArgumentException {
     Map<String, OmKeyInfo> matchedKeys = new LinkedHashMap<>();
+    Table<String, OmKeyInfo> openFileTable = omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
     // Convert the search prefix to an object path for FSO buckets
-    String startPrefixObjectPath = ReconUtils.convertToObjectPathForOpenKeySearch(
-            startPrefix, omMetadataManager, reconNamespaceSummaryManager, reconSCM);
+    String startPrefixObjectPath = ReconUtils.convertToObjectPathForSearch(
+        startPrefix, omMetadataManager, reconNamespaceSummaryManager, reconSCM, openFileTable);
     String[] names = parseRequestPath(startPrefixObjectPath);
-    Table<String, OmKeyInfo> openFileTable =
-        omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     // If names.length <= 2, then the search prefix is at the volume or bucket level hence
     // no need to find parent or extract id's or find subpaths as the openFileTable is
