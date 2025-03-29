@@ -186,7 +186,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   private OMResponse submitReadRequestToOM(OMRequest request)
       throws ServiceException {
     // Check if this OM is the leader.
-    RaftServerStatus raftServerStatus = omRatisServer.checkLeaderStatus();
+    RaftServerStatus raftServerStatus = omRatisServer.getLeaderStatus();
     if (raftServerStatus == LEADER_AND_READY ||
         request.getCmdType().equals(PrepareStatus)) {
       return handler.handleReadRequest(request);
