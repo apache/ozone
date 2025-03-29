@@ -195,9 +195,10 @@ public class DBCheckpointServlet extends HttpServlet
               .filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX))
               .distinct()
               .collect(Collectors.toList()));
+      LOG.info("Received excluding SST {}. The total excluded sst files count is {}",
+          receivedSstList.subList(0, Math.min(5, receivedSstList.size())), receivedSstList.size());
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Received excluding SST {}. The total excluded sst files count is {}",
-            receivedSstList.subList(0, Math.min(5, receivedSstList.size())), receivedSstList.size());
+        LOG.debug("Received excluding SST {}", receivedSstList);
       }
     }
 
@@ -232,9 +233,10 @@ public class DBCheckpointServlet extends HttpServlet
       long duration = Duration.between(start, end).toMillis();
       LOG.info("Time taken to write the checkpoint to response output " +
           "stream: {} milliseconds", duration);
+      LOG.info("Excluded SST {} from the latest checkpoint. The total excluded sst files count is {}",
+          excludedSstList.subList(0, Math.min(5, excludedSstList.size())), excludedSstList.size());
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Excluded SST {} from the latest checkpoint. The total excluded sst files count is {}",
-            excludedSstList.subList(0, Math.min(5, excludedSstList.size())), excludedSstList.size());
+        LOG.debug("Excluded SST {} from the latest checkpoint.", excludedSstList);
       }
       if (!excludedSstList.isEmpty()) {
         dbMetrics.incNumIncrementalCheckpoint();
