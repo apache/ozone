@@ -230,9 +230,9 @@ public final class DBStoreBuilder {
       }
 
       return new RDBStore(dbFile, rocksDBOption, statistics, writeOptions, tableConfigs,
-          registry.build(), openReadOnly, maxFSSnapshots, dbJmxBeanNameName,
-          enableCompactionDag, maxDbUpdatesSizeThreshold, createCheckpointDirs,
-          configuration, enableRocksDbMetrics);
+          registry.build(), openReadOnly, dbJmxBeanNameName, enableCompactionDag,
+          maxDbUpdatesSizeThreshold, createCheckpointDirs, configuration,
+          enableRocksDbMetrics);
     } finally {
       tableConfigs.forEach(TableConfig::close);
     }
