@@ -98,7 +98,6 @@ public final class DBStoreBuilder {
   private RocksDBConfiguration rocksDBConfiguration;
   // Flag to indicate if the RocksDB should be opened readonly.
   private boolean openReadOnly = false;
-  private int maxFSSnapshots = 0;
   private final DBProfile defaultCfProfile;
   private boolean enableCompactionDag;
   private boolean createCheckpointDirs = true;
