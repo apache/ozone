@@ -237,10 +237,6 @@ public final class DBStoreBuilder {
     }
   }
 
-  public DBStoreBuilder setMaxFSSnapshots(int maxFSSnapshots) {
-    this.maxFSSnapshots = maxFSSnapshots;
-    return this;
-  }
   public DBStoreBuilder setName(String name) {
     dbname = name;
     return this;
