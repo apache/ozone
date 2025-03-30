@@ -25,9 +25,6 @@ source "$TEST_DIR/testlib.sh"
 export TEST_DIR
 export COMPOSE_DIR="$TEST_DIR"
 
-RESULT=0
-run_test_scripts ${tests} || RESULT=$?
-
 RESULT_DIR="$ALL_RESULT_DIR" create_results_dir
 
 # Upgrade tests to be run. In CI we want to run just one set, but for a release
@@ -44,4 +41,4 @@ run_test ha     non-rolling-upgrade 1.4.1 "$OZONE_CURRENT_VERSION"
 
 generate_report "upgrade" "$ALL_RESULT_DIR"
 
-exit "$RESULT"
+exit "$?"
