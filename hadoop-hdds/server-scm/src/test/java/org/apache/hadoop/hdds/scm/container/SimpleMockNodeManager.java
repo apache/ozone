@@ -158,10 +158,7 @@ public class SimpleMockNodeManager implements NodeManager {
     return 0;
   }
 
-  @Override
-  public void setContainers(DatanodeDetails dn,
-                            Set<ContainerID> containerIds)
-      throws NodeNotFoundException {
+  public void setContainers(DatanodeDetails dn, Set<ContainerID> containerIds) {
     containerMap.put(dn.getUuid(), containerIds);
   }
 
