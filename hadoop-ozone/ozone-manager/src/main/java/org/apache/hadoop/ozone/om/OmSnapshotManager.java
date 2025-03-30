@@ -24,6 +24,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE;
@@ -172,6 +174,8 @@ public final class OmSnapshotManager implements AutoCloseable {
   // Soft limit of the snapshot cache size.
   private final int softCacheSize;
 
+  private int fsSnapshotMaxLimit;
+
   public OmSnapshotManager(OzoneManager ozoneManager) {
 
     boolean isFilesystemSnapshotEnabled =
@@ -246,6 +250,9 @@ public final class OmSnapshotManager implements AutoCloseable {
     this.softCacheSize = ozoneManager.getConfiguration().getInt(
         OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE,
         OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE_DEFAULT);
+      
+    fsSnapshotMaxLimit = ozoneManager.getConfiguration().getInt(OZONE_OM_FS_SNAPSHOT_MAX_LIMIT,
+        OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT);
 
     CacheLoader<UUID, OmSnapshot> loader = createCacheLoader();
 
@@ -847,6 +854,25 @@ public final class OmSnapshotManager implements AutoCloseable {
     // Block SnapDiff if either of the snapshots is not active.
     checkSnapshotActive(fromSnapInfo, false);
     checkSnapshotActive(toSnapInfo, false);
+  }
+
+  public void validateSnapshotLimit() throws IOException {
+    OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
+        ozoneManager.getMetadataManager();
+    SnapshotChainManager snapshotChainManager =
+        omMetadataManager.getSnapshotChainManager();
+    int currentSnapshotNum = snapshotChainManager.getGlobalSnapshotChain().size();
+    if (currentSnapshotNum >= fsSnapshotMaxLimit) {
+      throw new OMException(
+          String.format("Snapshot limit of %d reached. Cannot create more snapshots.",
+              fsSnapshotMaxLimit) + " If you already deleted some snapshots, " +
+              "please wait for the background service to complete the cleanup.",
+          OMException.ResultCodes.TOO_MANY_SNAPSHOTS);
+    }
+  }
+
+  public void setFsSnapshotMaxLimit(int fsSnapshotMaxLimit) {
+    this.fsSnapshotMaxLimit = fsSnapshotMaxLimit;
   }
 
   private int getIndexFromToken(final String token) throws IOException {
