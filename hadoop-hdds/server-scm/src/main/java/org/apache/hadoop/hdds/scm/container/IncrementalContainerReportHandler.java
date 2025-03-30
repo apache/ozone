@@ -57,11 +57,9 @@ public class IncrementalContainerReportHandler extends
                         final EventPublisher publisher) {
     final DatanodeDetails dnFromReport = report.getDatanodeDetails();
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Processing incremental container report from data node {}",
-          dnFromReport.getUuid());
+      LOG.debug("Processing incremental container report from data node {}", dnFromReport);
     }
-    DatanodeDetails dd =
-        nodeManager.getNodeByUuid(dnFromReport.getUuid());
+    final DatanodeDetails dd = nodeManager.getNode(dnFromReport.getID());
     if (dd == null) {
       LOG.warn("Received container report from unknown datanode {}",
           dnFromReport);

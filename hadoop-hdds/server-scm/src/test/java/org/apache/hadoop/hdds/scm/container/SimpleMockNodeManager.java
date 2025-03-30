@@ -344,7 +344,7 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public DatanodeDetails getNodeByUuid(String uuid) {
+  public DatanodeDetails getNode(DatanodeID id) {
     return null;
   }
 
