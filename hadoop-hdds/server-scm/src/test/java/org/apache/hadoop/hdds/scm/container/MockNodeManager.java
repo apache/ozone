@@ -699,10 +699,9 @@ public class MockNodeManager implements NodeManager {
                                     NodeReportProto nodeReport,
                                     PipelineReportsProto pipelineReportsProto,
                                     LayoutVersionProto layoutInfo) {
+    final DatanodeInfo info = new DatanodeInfo(datanodeDetails, NodeStatus.inServiceHealthy(), layoutInfo);
     try {
-      node2ContainerMap.addNode(datanodeDetails,
-          NodeStatus.inServiceHealthy(),
-          layoutInfo);
+      node2ContainerMap.addNode(info);
       addEntryTodnsToUuidMap(datanodeDetails.getIpAddress(),
           datanodeDetails.getUuidString());
       if (clusterMap != null) {
