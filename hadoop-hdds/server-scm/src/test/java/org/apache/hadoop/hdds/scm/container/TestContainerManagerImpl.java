@@ -81,7 +81,7 @@ public class TestContainerManagerImpl {
   @BeforeAll
   static void init() {
     // Print container state transition logs
-    GenericTestUtils.setLogLevel(ContainerStateMap.getLogger(), Level.TRACE);
+    GenericTestUtils.setLogLevel(ContainerStateMap.class, Level.TRACE);
   }
 
   @BeforeEach

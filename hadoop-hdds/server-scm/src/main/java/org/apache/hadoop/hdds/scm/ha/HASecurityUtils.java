@@ -63,7 +63,7 @@ public final class  HASecurityUtils {
   private HASecurityUtils() {
   }
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(HASecurityUtils.class);
 
   /**

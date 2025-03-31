@@ -63,7 +63,7 @@ public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
   /**
     * Set a timeout for each test.
     */
-  public static final Logger LOG = LoggerFactory.getLogger(
+  private static final Logger LOG = LoggerFactory.getLogger(
       TestOzoneFsHAURLs.class);
 
   private OzoneConfiguration conf;
