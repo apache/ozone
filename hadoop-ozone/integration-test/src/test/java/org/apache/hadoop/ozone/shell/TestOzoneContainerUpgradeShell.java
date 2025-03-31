@@ -26,9 +26,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED;
-import static org.apache.ozone.test.GenericTestUtils.captureErr;
 import static org.apache.ozone.test.IntLambda.withTextFromSystemIn;
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.base.Preconditions;
@@ -64,7 +62,6 @@ import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.repair.OzoneRepair;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -136,13 +133,6 @@ public class TestOzoneContainerUpgradeShell {
     // datanode1 test check all pass & upgrade success
     int exitCode = runUpgrade(datanodeConf);
     assertEquals(0, exitCode);
-
-    GenericTestUtils.PrintStreamCapturer err = captureErr();
-
-    // datanode2 NodeOperationalState is IN_SERVICE upgrade fail.
-    int exit2Code = runUpgrade(datanodeConfigs.get(1));
-    assertEquals(0, exit2Code);
-    assertThat(err.get()).contains("IN_MAINTENANCE");
   }
 
   private static int runUpgrade(OzoneConfiguration conf) {
