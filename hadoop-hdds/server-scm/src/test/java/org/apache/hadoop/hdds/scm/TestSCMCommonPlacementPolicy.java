@@ -47,6 +47,7 @@ import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -467,17 +468,17 @@ public class TestSCMCommonPlacementPolicy {
   @Test
   public void testDatanodeIsInvalidInCaseOfIncreasingCommittedBytes() {
     NodeManager nodeMngr = mock(NodeManager.class);
-    UUID datanodeUuid = UUID.randomUUID();
+    final DatanodeID datanodeID = DatanodeID.of(UUID.randomUUID());
     DummyPlacementPolicy placementPolicy =
         new DummyPlacementPolicy(nodeMngr, conf, 1);
     DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
-    when(datanodeDetails.getUuid()).thenReturn(datanodeUuid);
+    when(datanodeDetails.getID()).thenReturn(datanodeID);
 
     DatanodeInfo datanodeInfo = mock(DatanodeInfo.class);
     NodeStatus nodeStatus = mock(NodeStatus.class);
     when(nodeStatus.isNodeWritable()).thenReturn(true);
     when(datanodeInfo.getNodeStatus()).thenReturn(nodeStatus);
-    when(nodeMngr.getNodeByUuid(eq(datanodeUuid))).thenReturn(datanodeInfo);
+    when(nodeMngr.getNode(eq(datanodeID))).thenReturn(datanodeInfo);
 
     // capacity = 200000, used = 90000, remaining = 101000, committed = 500
     StorageContainerDatanodeProtocolProtos.StorageReportProto storageReport1 =

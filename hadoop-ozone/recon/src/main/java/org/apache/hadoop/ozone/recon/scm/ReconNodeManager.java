@@ -307,7 +307,7 @@ public class ReconNodeManager extends SCMNodeManager {
           nodeStatus.getOperationalState());
 
       setNodeOperationalState(dnDetails, nodeOperationalStateFromScm);
-      DatanodeDetails scmDnd = getNodeByUuid(dnDetails.getUuid());
+      DatanodeDetails scmDnd = getNode(dnDetails.getID());
       scmDnd.setPersistedOpState(nodeOperationalStateFromScm);
     }
   }

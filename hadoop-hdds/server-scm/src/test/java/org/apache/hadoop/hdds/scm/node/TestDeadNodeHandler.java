@@ -219,7 +219,7 @@ public class TestDeadNodeHandler {
 
     // First set the node to IN_MAINTENANCE and ensure the container replicas
     // are not removed on the dead event
-    datanode1 = nodeManager.getNodeByUuid(datanode1.getUuidString());
+    datanode1 = nodeManager.getNode(datanode1.getID());
     assertTrue(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
     nodeManager.setNodeOperationalState(datanode1,

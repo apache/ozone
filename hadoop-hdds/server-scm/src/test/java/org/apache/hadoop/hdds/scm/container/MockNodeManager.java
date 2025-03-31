@@ -36,6 +36,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
@@ -831,8 +832,8 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public DatanodeDetails getNodeByUuid(String uuid) {
-    Node node = clusterMap.getNode(NetConstants.DEFAULT_RACK + "/" + uuid);
+  public DatanodeDetails getNode(DatanodeID id) {
+    Node node = clusterMap.getNode(NetConstants.DEFAULT_RACK + "/" + id);
     return node == null ? null : (DatanodeDetails)node;
   }
 
@@ -844,7 +845,7 @@ public class MockNodeManager implements NodeManager {
       return results;
     }
     for (String uuid : uuids) {
-      DatanodeDetails dn = getNodeByUuid(uuid);
+      DatanodeDetails dn = getNode(DatanodeID.fromUuidString(uuid));
       if (dn != null) {
         results.add(dn);
       }
