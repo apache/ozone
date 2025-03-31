@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedBloomFilter;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedLRUCache;
+import org.rocksdb.CompactionPriority;
 import org.rocksdb.CompactionStyle;
 
 /**
@@ -65,10 +66,12 @@ public enum DBProfile {
       final long bytesPerSync = toLong(StorageUnit.MB.toBytes(1.00));
       final boolean createIfMissing = true;
       final boolean createMissingColumnFamilies = true;
+      final int maxBackgroundJobs = 2;
       ManagedDBOptions dbOptions = new ManagedDBOptions();
       dbOptions
           .setIncreaseParallelism(Runtime.getRuntime().availableProcessors())
           .setMaxBackgroundCompactions(maxBackgroundCompactions)
+          .setMaxBackgroundJobs(maxBackgroundJobs)
           .setMaxBackgroundFlushes(maxBackgroundFlushes)
           .setBytesPerSync(bytesPerSync)
           .setCreateIfMissing(createIfMissing)
@@ -88,6 +91,7 @@ public enum DBProfile {
       config.setBlockCache(new ManagedLRUCache(blockCacheSize))
             .setBlockSize(blockSize)
             .setPinL0FilterAndIndexBlocksInCache(true)
+            .setCacheIndexAndFilterBlocks(true)
             .setFilterPolicy(new ManagedBloomFilter());
       return config;
     }
@@ -111,6 +115,7 @@ public enum DBProfile {
     public ManagedColumnFamilyOptions getColumnFamilyOptions() {
       ManagedColumnFamilyOptions cfOptions = SSD.getColumnFamilyOptions();
       cfOptions.setCompactionStyle(CompactionStyle.LEVEL);
+      cfOptions.setCompactionPriority(CompactionPriority.MinOverlappingRatio);
       return cfOptions;
     }
 
