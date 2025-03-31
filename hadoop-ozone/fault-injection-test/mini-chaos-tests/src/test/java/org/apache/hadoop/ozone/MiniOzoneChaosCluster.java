@@ -132,12 +132,12 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
   public void shutdown() {
     try {
       failureManager.stop();
-      //this should be called after stopChaos to be sure that the
-      //datanode collection is not modified during the shutdown
-      super.shutdown();
     } catch (Exception e) {
-      LOG.error("failed to shutdown MiniOzoneChaosCluster", e);
+      LOG.error("failed to stop FailureManager", e);
     }
+    //this should be called after failureManager.stop to be sure that the
+    //datanode collection is not modified during the shutdown
+    super.shutdown();
   }
 
   /**

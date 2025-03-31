@@ -801,6 +801,7 @@ public class SCMClientProtocolServer implements
     } catch (Exception ex) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
           SCMAction.CLOSE_PIPELINE, auditMap, ex));
+      throw ex;
     }
   }
 

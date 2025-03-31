@@ -22,7 +22,6 @@ import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 /**
@@ -35,10 +34,6 @@ import picocli.CommandLine.Command;
     versionProvider = HddsVersionProvider.class)
 public class SafeModeCheckSubcommand extends ScmSubcommand {
 
-  @CommandLine.Option(names = {"--verbose"},
-      description = "Show detailed status of rules.")
-  private boolean verbose;
-
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     boolean execReturn = scmClient.inSafeMode();
@@ -49,7 +44,7 @@ public class SafeModeCheckSubcommand extends ScmSubcommand {
     } else {
       System.out.println("SCM is out of safe mode.");
     }
-    if (verbose) {
+    if (isVerbose()) {
       for (Map.Entry<String, Pair<Boolean, String>> entry :
           scmClient.getSafeModeRuleStatuses().entrySet()) {
         Pair<Boolean, String> value = entry.getValue();

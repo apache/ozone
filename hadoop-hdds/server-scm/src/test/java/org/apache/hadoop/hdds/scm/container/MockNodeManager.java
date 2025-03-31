@@ -23,7 +23,6 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -51,7 +50,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
@@ -61,7 +59,9 @@ import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.Node2PipelineMap;
+import org.apache.hadoop.hdds.scm.node.states.NodeAlreadyExistsException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.node.states.NodeStateMap;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -104,7 +104,7 @@ public class MockNodeManager implements NodeManager {
   private final SCMNodeStat aggregateStat;
   private final Map<UUID, List<SCMCommand<?>>> commandMap;
   private Node2PipelineMap node2PipelineMap;
-  private final Node2ContainerMap node2ContainerMap;
+  private final NodeStateMap node2ContainerMap;
   private NetworkTopology clusterMap;
   private ConcurrentMap<String, Set<String>> dnsToUuidMap;
   private int numHealthyDisksPerDatanode;
@@ -117,7 +117,7 @@ public class MockNodeManager implements NodeManager {
     this.deadNodes = new LinkedList<>();
     this.nodeMetricMap = new HashMap<>();
     this.node2PipelineMap = new Node2PipelineMap();
-    this.node2ContainerMap = new Node2ContainerMap();
+    this.node2ContainerMap = new NodeStateMap();
     this.dnsToUuidMap = new ConcurrentHashMap<>();
     this.aggregateStat = new SCMNodeStat();
     this.clusterMap = new NetworkTopologyImpl(new OzoneConfiguration());
@@ -276,9 +276,8 @@ public class MockNodeManager implements NodeManager {
             HddsTestUtils.createMetadataStorageReport(
                 "/metadata1-" + di.getUuidString(), capacity, used,
                 remaining, null);
-        di.updateStorageReports(new ArrayList<>(Arrays.asList(storage1)));
-        di.updateMetaDataStorageReports(
-            new ArrayList<>(Arrays.asList(metaStorage1)));
+        di.updateStorageReports(Collections.singletonList(storage1));
+        di.updateMetaDataStorageReports(Collections.singletonList(metaStorage1));
 
         healthyNodesWithInfo.add(di);
       }
@@ -428,7 +427,7 @@ public class MockNodeManager implements NodeManager {
     } else if (deadNodes.contains(dd)) {
       return NodeStatus.inServiceDead();
     } else {
-      throw new NodeNotFoundException();
+      throw new NodeNotFoundException(dd.getID());
     }
   }
 
@@ -511,25 +510,13 @@ public class MockNodeManager implements NodeManager {
   public void addContainer(DatanodeDetails dd,
                            ContainerID containerId)
       throws NodeNotFoundException {
-    try {
-      Set<ContainerID> set = node2ContainerMap.getContainers(dd.getUuid());
-      set.add(containerId);
-      node2ContainerMap.setContainersForDatanode(dd.getUuid(), set);
-    } catch (SCMException e) {
-      e.printStackTrace();
-    }
+    node2ContainerMap.getContainers(dd.getID()).add(containerId);
   }
 
   @Override
   public void removeContainer(DatanodeDetails dd,
-      ContainerID containerId) {
-    try {
-      Set<ContainerID> set = node2ContainerMap.getContainers(dd.getUuid());
-      set.remove(containerId);
-      node2ContainerMap.setContainersForDatanode(dd.getUuid(), set);
-    } catch (SCMException e) {
-      e.printStackTrace();
-    }
+      ContainerID containerId) throws NodeNotFoundException {
+    node2ContainerMap.getContainers(dd.getID()).remove(containerId);
   }
 
   @Override
@@ -629,19 +616,10 @@ public class MockNodeManager implements NodeManager {
 
   /**
    * Update set of containers available on a datanode.
-   * @param uuid - DatanodeID
-   * @param containerIds - Set of containerIDs
-   * @throws SCMException - if datanode is not known. For new datanode use
-   *                        addDatanodeInContainerMap call.
    */
-  @Override
   public void setContainers(DatanodeDetails uuid, Set<ContainerID> containerIds)
       throws NodeNotFoundException {
-    try {
-      node2ContainerMap.setContainersForDatanode(uuid.getUuid(), containerIds);
-    } catch (SCMException e) {
-      throw new NodeNotFoundException(e.getMessage());
-    }
+    node2ContainerMap.setContainersForTesting(uuid.getID(), containerIds);
   }
 
   /**
@@ -650,8 +628,8 @@ public class MockNodeManager implements NodeManager {
    * @return - set of containerIDs
    */
   @Override
-  public Set<ContainerID> getContainers(DatanodeDetails uuid) {
-    return node2ContainerMap.getContainers(uuid.getUuid());
+  public Set<ContainerID> getContainers(DatanodeDetails uuid) throws NodeNotFoundException {
+    return node2ContainerMap.getContainers(uuid.getID());
   }
 
   // Returns the number of commands that is queued to this node manager.
@@ -721,15 +699,16 @@ public class MockNodeManager implements NodeManager {
                                     PipelineReportsProto pipelineReportsProto,
                                     LayoutVersionProto layoutInfo) {
     try {
-      node2ContainerMap.insertNewDatanode(datanodeDetails.getUuid(),
-          Collections.emptySet());
+      node2ContainerMap.addNode(datanodeDetails,
+          NodeStatus.inServiceHealthy(),
+          layoutInfo);
       addEntryTodnsToUuidMap(datanodeDetails.getIpAddress(),
           datanodeDetails.getUuidString());
       if (clusterMap != null) {
         datanodeDetails.setNetworkName(datanodeDetails.getUuidString());
         clusterMap.add(datanodeDetails);
       }
-    } catch (SCMException e) {
+    } catch (NodeAlreadyExistsException e) {
       e.printStackTrace();
     }
     return null;
