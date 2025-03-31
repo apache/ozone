@@ -361,6 +361,8 @@ public class ContainerChecksumTreeManager {
       throw new IOException("Error occurred when writing container merkle tree for containerID "
           + data.getContainerID(), ex);
     }
+    // Set in-memory data checksum.
+    data.setDataChecksum(checksumInfo.getContainerMerkleTree().getDataChecksum());
   }
 
   /**
@@ -375,6 +377,21 @@ public class ContainerChecksumTreeManager {
     File checksumFile = getContainerChecksumFile(data);
     try (FileInputStream inStream = new FileInputStream(checksumFile)) {
       return ByteString.readFrom(inStream);
+    }
+  }
+
+  public static Optional<ContainerProtos.ContainerChecksumInfo> readChecksumInfo(KeyValueContainerData data) {
+    File checksumFile = getContainerChecksumFile(data);
+    if (!checksumFile.exists()) {
+      LOG.error("Checksum file not found for container {}", data.getContainerID());
+      return Optional.empty();
+    }
+
+    try (FileInputStream inStream = new FileInputStream(checksumFile)) {
+      return Optional.of(ContainerProtos.ContainerChecksumInfo.parseFrom(inStream));
+    } catch (Exception e) {
+      LOG.error("Error while reading the checksum file for container {}", data.getContainerID());
+      return Optional.empty();
     }
   }
 

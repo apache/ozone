@@ -24,6 +24,7 @@ import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -32,6 +33,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.io.IOUtils;
@@ -40,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -244,6 +247,36 @@ public class TestContainerCommandReconciliation {
       ContainerProtos.ContainerChecksumInfo containerChecksumInfo =
           dnClient.getContainerChecksumInfo(containerID, dn);
       assertTreesSortedAndMatch(tree.toProto(), containerChecksumInfo.getContainerMerkleTree());
+    }
+  }
+
+  @Test
+  public void testDataChecksumReportedAtSCM() throws Exception {
+    long containerID = writeDataAndGetContainer(true);
+    // Check non-zero checksum after container close
+    Set<ContainerReplica> containerReplicas = cluster.getStorageContainerManager().getContainerManager()
+        .getContainerReplicas(ContainerID.valueOf(containerID));
+    for (ContainerReplica containerReplica: containerReplicas) {
+      assertNotEquals(0, containerReplica.getDataChecksum());
+    }
+    cluster.getStorageContainerLocationClient().reconcileContainer(containerID);
+    Thread.sleep(10000);
+
+    // Check non-zero checksum after container reconciliation
+    containerReplicas = cluster.getStorageContainerManager().getContainerManager()
+        .getContainerReplicas(ContainerID.valueOf(containerID));
+    for (ContainerReplica containerReplica: containerReplicas) {
+      assertNotEquals(0, containerReplica.getDataChecksum());
+    }
+
+    // Check non-zero checksum after datanode restart
+    cluster.shutdownHddsDatanodes();
+    cluster.startHddsDatanodes();
+    cluster.waitForClusterToBeReady();
+    containerReplicas = cluster.getStorageContainerManager().getContainerManager()
+        .getContainerReplicas(ContainerID.valueOf(containerID));
+    for (ContainerReplica containerReplica: containerReplicas) {
+      assertNotEquals(0, containerReplica.getDataChecksum());
     }
   }
 
