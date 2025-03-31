@@ -54,6 +54,12 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOU
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INTERVAL_MS_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INTERVAL_MS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_MAX_RETRIES_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_MAX_RETRIES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
@@ -95,6 +101,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 import static org.apache.hadoop.util.ExitUtil.terminate;
+import static org.apache.hadoop.util.Time.monotonicNow;
 import static org.apache.ozone.graph.PrintableGraph.GraphType.FILE_NAME;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -103,6 +110,7 @@ import com.fasterxml.jackson.databind.ObjectWriter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
 import java.io.BufferedWriter;
@@ -135,6 +143,8 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -386,6 +396,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private KeyManager keyManager;
   private PrefixManagerImpl prefixManager;
   private final UpgradeFinalizer<OzoneManager> upgradeFinalizer;
+  private ExecutorService edekCacheLoader = null;
 
   /**
    * OM super user / admin list.
@@ -723,6 +734,110 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     bucketUtilizationMetrics = BucketUtilizationMetrics.create(metadataManager);
     omHostName = HddsUtils.getHostName(conf);
+  }
+
+  public void initializeEdekCache(OzoneConfiguration conf) {
+    int edekCacheLoaderDelay =
+        conf.getInt(OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY, OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_DEFAULT);
+    int edekCacheLoaderInterval =
+        conf.getInt(OZONE_OM_EDEKCACHELOADER_INTERVAL_MS_KEY, OZONE_OM_EDEKCACHELOADER_INTERVAL_MS_DEFAULT);
+    int edekCacheLoaderMaxRetries =
+        conf.getInt(OZONE_OM_EDEKCACHELOADER_MAX_RETRIES_KEY, OZONE_OM_EDEKCACHELOADER_MAX_RETRIES_DEFAULT);
+    if (kmsProvider != null) {
+      edekCacheLoader = Executors.newSingleThreadExecutor(
+          new ThreadFactoryBuilder().setDaemon(true)
+              .setNameFormat("Warm Up EDEK Cache Thread #%d")
+              .build());
+      warmUpEdekCache(edekCacheLoader, edekCacheLoaderDelay, edekCacheLoaderInterval, edekCacheLoaderMaxRetries);
+    }
+  }
+
+  static class EDEKCacheLoader implements Runnable {
+    private final String[] keyNames;
+    private final KeyProviderCryptoExtension kp;
+    private int initialDelay;
+    private int retryInterval;
+    private int maxRetries;
+
+    EDEKCacheLoader(final String[] names, final KeyProviderCryptoExtension kp,
+        final int delay, final int interval, final int maxRetries) {
+      this.keyNames = names;
+      this.kp = kp;
+      this.initialDelay = delay;
+      this.retryInterval = interval;
+      this.maxRetries = maxRetries;
+    }
+
+    @Override
+    public void run() {
+      LOG.info("Warming up {} EDEKs... (initialDelay={}, "
+              + "retryInterval={}, maxRetries={})", keyNames.length, initialDelay, retryInterval,
+          maxRetries);
+      try {
+        Thread.sleep(initialDelay);
+      } catch (InterruptedException ie) {
+        LOG.info("EDEKCacheLoader interrupted before warming up.");
+        return;
+      }
+
+      boolean success = false;
+      int retryCount = 0;
+      IOException lastSeenIOE = null;
+      long warmUpEDEKStartTime = monotonicNow();
+
+      while (!success && retryCount < maxRetries) {
+        try {
+          kp.warmUpEncryptedKeys(keyNames);
+          LOG.info("Successfully warmed up {} EDEKs.", keyNames.length);
+          success = true;
+        } catch (IOException ioe) {
+          lastSeenIOE = ioe;
+          LOG.info("Failed to warm up EDEKs.", ioe);
+        } catch (Exception e) {
+          LOG.error("Cannot warm up EDEKs.", e);
+          throw e;
+        }
+
+        if (!success) {
+          try {
+            Thread.sleep(retryInterval);
+          } catch (InterruptedException ie) {
+            LOG.info("EDEKCacheLoader interrupted during retry.");
+            break;
+          }
+          retryCount++;
+        }
+      }
+
+      long warmUpEDEKTime = monotonicNow() - warmUpEDEKStartTime;
+      LOG.debug("Time taken to load EDEK keys to the cache: {}", warmUpEDEKTime);
+      if (!success) {
+        LOG.warn("Max retry {} reached, unable to warm up EDEKs.", maxRetries);
+        if (lastSeenIOE != null) {
+          LOG.warn("Last seen exception:", lastSeenIOE);
+        }
+      }
+    }
+  }
+
+  public void warmUpEdekCache(final ExecutorService executor, final int delay, final int interval, int maxRetries) {
+    Set<String> keys = new HashSet<>();
+    try (
+        TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>> iterator =
+            metadataManager.getBucketTable().iterator()) {
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmBucketInfo> entry = iterator.next();
+        if (entry.getValue().getEncryptionKeyInfo() != null) {
+          String encKey = entry.getValue().getEncryptionKeyInfo().getKeyName();
+          keys.add(encKey);
+        }
+      }
+    } catch (IOException ex) {
+      LOG.error("Error while retrieving encryption keys for warming up EDEK cache", ex);
+    }
+    String[] edeks = new String[keys.size()];
+    edeks = keys.toArray(edeks);
+    executor.execute(new EDEKCacheLoader(edeks, getKmsProvider(), delay, interval, maxRetries));
   }
 
   public boolean isStopped() {
@@ -2297,6 +2412,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (versionManager != null) {
         versionManager.close();
       }
+
+      if (edekCacheLoader != null) {
+        edekCacheLoader.shutdown();
+      }
       return true;
     } catch (Exception e) {
       LOG.error("OzoneManager stop failed.", e);
@@ -3051,7 +3170,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (null == omRatisServer) {
       return getRatisRolesException("Server is shutting down");
     }
-    String leaderReadiness = omRatisServer.checkLeaderStatus().name();
+    String leaderReadiness = omRatisServer.getLeaderStatus().name();
     final RaftPeerId leaderId = omRatisServer.getLeaderId();
     if (leaderId == null) {
       LOG.error(NO_LEADER_ERROR_MESSAGE);
@@ -4214,7 +4333,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public boolean isLeaderReady() {
     final OzoneManagerRatisServer ratisServer = omRatisServer;
-    return ratisServer != null && ratisServer.checkLeaderStatus() == LEADER_AND_READY;
+    return ratisServer != null && ratisServer.getLeaderStatus() == LEADER_AND_READY;
   }
 
   /**
@@ -4225,7 +4344,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void checkLeaderStatus() throws OMNotLeaderException,
       OMLeaderNotReadyException {
     OzoneManagerRatisServer.RaftServerStatus raftServerStatus =
-        omRatisServer.checkLeaderStatus();
+        omRatisServer.getLeaderStatus();
     RaftPeerId raftPeerId = omRatisServer.getRaftPeerId();
 
     switch (raftServerStatus) {

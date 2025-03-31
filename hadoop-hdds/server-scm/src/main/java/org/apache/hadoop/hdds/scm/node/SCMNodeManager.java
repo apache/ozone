@@ -1598,20 +1598,6 @@ public class SCMNodeManager implements NodeManager {
   }
 
   /**
-   * Update set of containers available on a datanode.
-   *
-   * @param datanodeDetails - DatanodeID
-   * @param containerIds    - Set of containerIDs
-   * @throws NodeNotFoundException - if datanode is not known. For new datanode
-   *                               use addDatanodeInContainerMap call.
-   */
-  @Override
-  public void setContainers(DatanodeDetails datanodeDetails,
-      Set<ContainerID> containerIds) throws NodeNotFoundException {
-    nodeStateManager.setContainers(datanodeDetails.getID(), containerIds);
-  }
-
-  /**
    * Return set of containerIDs available on a datanode. This is a copy of the
    * set which resides inside NodeManager and hence can be modified without
    * synchronization or side effects.

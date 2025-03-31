@@ -304,7 +304,11 @@ public class NodeStateMap {
     }
   }
 
-  public void setContainers(DatanodeID id, Set<ContainerID> containers)
+  /**
+   * Set the containers for the given datanode.
+   * This method is only used for testing.
+   */
+  public void setContainersForTesting(DatanodeID id, Set<ContainerID> containers)
       throws NodeNotFoundException {
     lock.writeLock().lock();
     try {

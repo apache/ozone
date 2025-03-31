@@ -299,15 +299,12 @@ public class TestDeadNodeHandler {
 
   /**
    * Update containers available on the datanode.
-   * @param datanode
-   * @param containers
-   * @throws NodeNotFoundException
    */
   private void registerContainers(DatanodeDetails datanode,
       ContainerInfo... containers)
       throws NodeNotFoundException {
-    nodeManager
-        .setContainers(datanode,
+    ScmNodeTestUtil.setContainers(nodeManager,
+        datanode,
             Arrays.stream(containers)
                 .map(ContainerInfo::containerID)
                 .collect(Collectors.toSet()));
