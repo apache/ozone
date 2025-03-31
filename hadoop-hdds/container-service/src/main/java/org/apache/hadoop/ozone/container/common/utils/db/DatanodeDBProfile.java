@@ -120,16 +120,20 @@ public abstract class DatanodeDBProfile {
 
     private ManagedColumnFamilyOptions getColumnFamilyOptions(
         ConfigurationSource config, Path pathToDb, String cfName) {
-      final MemoizedSupplier<ManagedColumnFamilyOptions> supplier =
-          MemoizedSupplier.valueOf(() -> {
-            ManagedColumnFamilyOptions options =
-                baseProfile.getColumnFamilyOptions(pathToDb, cfName);
-            options.setReused(true);
-            return options.closeAndSetTableFormatConfig(
-                getBlockBasedTableConfig(pathToDb, cfName, config));
-          });
+      final MemoizedSupplier<ManagedColumnFamilyOptions> supplier = MemoizedSupplier.valueOf(() ->
+          createColumnFamilyOptions(config, pathToDb, cfName)
+      );
       cfOpts.compareAndSet(null, supplier);
       return cfOpts.get().get();
+    }
+
+    private ManagedColumnFamilyOptions createColumnFamilyOptions(
+        ConfigurationSource config, Path pathToDb, String cfName) {
+      ManagedColumnFamilyOptions options =
+          baseProfile.getColumnFamilyOptions(pathToDb, cfName);
+      options.setReused(true);
+      return options.closeAndSetTableFormatConfig(
+          getBlockBasedTableConfig(pathToDb, cfName, config));
     }
 
     private ManagedBlockBasedTableConfig getBlockBasedTableConfig(Path dbPath, String cfName,

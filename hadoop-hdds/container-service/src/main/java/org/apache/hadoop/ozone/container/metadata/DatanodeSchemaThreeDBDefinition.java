@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
-import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE;
 
 import com.google.common.primitives.Longs;
@@ -116,11 +115,6 @@ public class DatanodeSchemaThreeDBDefinition
 
     Path pathToDb = Paths.get(
         config.get(HddsConfigKeys.ROCKS_DB_CONFIG_PATH, HddsConfigKeys.ROCKS_DB_CONFIG_PATH_DEFAULT));
-    ManagedColumnFamilyOptions cfOptions =
-        dbProfile.getColumnFamilyOptions(config, pathToDb, DEFAULT_COLUMN_FAMILY_NAME);
-    // Use prefix seek to mitigating seek overhead.
-    // See: https://github.com/facebook/rocksdb/wiki/Prefix-Seek
-    cfOptions.useFixedLengthPrefixExtractor(getContainerKeyPrefixLength());
 
     BLOCK_DATA.setCfOptions(getCFOptions(config, dbProfile, pathToDb, "block_data"));
     METADATA.setCfOptions(getCFOptions(config, dbProfile, pathToDb, "metadata"));

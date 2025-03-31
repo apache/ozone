@@ -116,11 +116,14 @@ public final class DBConfigFromFile {
    */
   public static ManagedDBOptions readDBOptionsFromFile(Path dbPath) throws IOException {
     List<ColumnFamilyDescriptor> descriptors = new ArrayList<>();
-    ManagedDBOptions readDBOptions = readFromFile(dbPath, descriptors);
-    //readDBOptions will be freed once the store using it is closed, but the descriptors need to be closed.
-    closeDescriptors(descriptors);
-    return readDBOptions;
+    try {
+      return readFromFile(dbPath, descriptors);
+    } finally {
+      //readDBOptions will be freed once the store using it is closed, but the descriptors need to be closed.
+      closeDescriptors(descriptors);
+    }
   }
+
 
   public static ManagedColumnFamilyOptions readCFOptionsFromFile(Path dbPath, String cfName) throws IOException {
     List<ColumnFamilyDescriptor> descriptors = new ArrayList<>();
@@ -154,7 +157,6 @@ public final class DBConfigFromFile {
       OptionsUtil.loadOptionsFromFile(configOptions, generatedDBPath.toString(), options, descriptors);
     } catch (RocksDBException rdEx) {
       options.close();
-      closeDescriptors(descriptors);
       throw toIOException("There was an error opening rocksDB Options file.", rdEx);
     }
     return options;

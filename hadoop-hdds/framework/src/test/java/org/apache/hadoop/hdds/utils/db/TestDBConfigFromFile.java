@@ -24,24 +24,16 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.rocksdb.ColumnFamilyDescriptor;
-import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.CompactionStyle;
 import org.rocksdb.DBOptions;
-import org.rocksdb.RocksDB;
 
 /**
  * DBConf tests.
@@ -66,19 +58,6 @@ public class TestDBConfigFromFile {
 
   @Test
   public void readFromFile() throws IOException {
-    final List<String> families =
-        Arrays.asList(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
-            "First", "Second", "Third",
-            "Fourth", "Fifth",
-            "Sixth");
-    final List<ColumnFamilyDescriptor> columnFamilyDescriptors =
-        new ArrayList<>();
-    for (String family : families) {
-      columnFamilyDescriptors.add(
-          new ColumnFamilyDescriptor(family.getBytes(StandardCharsets.UTF_8),
-              new ColumnFamilyOptions()));
-    }
-
     final DBOptions options = DBConfigFromFile.readDBOptionsFromFile(Paths.get(DB_FILE));
 
     // Some Random Values Defined in the test.db.ini, we verify that we are
@@ -91,22 +70,7 @@ public class TestDBConfigFromFile {
 
   @Test
   public void readFromFileInvalidConfig() throws IOException {
-    final List<String> families =
-        Arrays.asList(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
-            "First", "Second", "Third",
-            "Fourth", "Fifth",
-            "Sixth");
-    final List<ColumnFamilyDescriptor> columnFamilyDescriptors =
-        new ArrayList<>();
-    for (String family : families) {
-      columnFamilyDescriptors.add(
-          new ColumnFamilyDescriptor(family.getBytes(StandardCharsets.UTF_8),
-              new ColumnFamilyOptions()));
-    }
-
-    final DBOptions options = DBConfigFromFile.readDBOptionsFromFile(Paths.get("badfile.db.ini")
-    );
-
+    final DBOptions options = DBConfigFromFile.readDBOptionsFromFile(Paths.get("badfile.db.ini"));
     // This has to return a Null, since we have config defined for badfile.db
     assertNull(options);
   }
