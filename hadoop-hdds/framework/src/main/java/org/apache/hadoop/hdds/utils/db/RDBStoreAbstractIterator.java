@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
@@ -41,12 +42,14 @@ abstract class RDBStoreAbstractIterator<RAW>
   // This is for schemas that use a fixed-length
   // prefix for each key.
   private final RAW prefix;
+  private boolean seekDoneAtleastOnce;
 
   RDBStoreAbstractIterator(ManagedRocksIterator iterator, RDBTable table,
       RAW prefix) {
     this.rocksDBIterator = iterator;
     this.rocksDBTable = table;
     this.prefix = prefix;
+    this.seekDoneAtleastOnce = false;
   }
 
   /** @return the key for the current entry. */
@@ -85,6 +88,7 @@ abstract class RDBStoreAbstractIterator<RAW>
   }
 
   private void setCurrentEntry() {
+    seekDoneAtleastOnce = true;
     if (rocksDBIterator.get().isValid()) {
       currentEntry = getKeyValue();
     } else {
@@ -94,16 +98,25 @@ abstract class RDBStoreAbstractIterator<RAW>
 
   @Override
   public final boolean hasNext() {
-    return rocksDBIterator.get().isValid() &&
-        (prefix == null || startsWithPrefix(key()));
+    try {
+      if (!seekDoneAtleastOnce) {
+        throw new NoSuchElementException("Cannot check iterator hasNext before seeking either to start of iter or " +
+            "seeking to a specific key");
+      }
+      return currentEntry != null &&
+          (prefix == null || startsWithPrefix(currentEntry.getKey()));
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
   }
 
   @Override
   public final Table.KeyValue<RAW, RAW> next() {
-    setCurrentEntry();
     if (currentEntry != null) {
+      Table.KeyValue<RAW, RAW> prevEntry = currentEntry;
       rocksDBIterator.get().next();
-      return currentEntry;
+      setCurrentEntry();
+      return prevEntry;
     }
     throw new NoSuchElementException("RocksDB Store has no more elements");
   }
