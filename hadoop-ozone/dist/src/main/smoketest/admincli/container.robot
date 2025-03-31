@@ -153,8 +153,8 @@ Reconcile closed container
     # TODO When the scanner is computing checksums automatically, this test may need to be updated.
     ${container} =      Execute          ozone admin container list --state CLOSED | jq -r 'select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
     ${data_checksum} =  Execute          ozone admin container info "${container}" --json | jq -r '.replicas[].dataChecksum' | head -n1
-    # 0 is the hex value of an empty checksum.
-    Should Be Equal As Strings    0    ${data_checksum}
+    # 0 is the hex value of an empty checksum. After container close the data checksum should not be 0.
+    Should Not Be Equal As Strings    0    ${data_checksum}
     # When reconciliation finishes, replica checksums should be shown.
     Execute    ozone admin container reconcile ${container}
     Wait until keyword succeeds    1min    5sec    Reconciliation complete    ${container}
