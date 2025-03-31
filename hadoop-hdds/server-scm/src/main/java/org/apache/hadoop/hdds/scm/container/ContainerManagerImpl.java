@@ -167,12 +167,6 @@ public class ContainerManagerImpl implements ContainerManager {
   }
 
   @Override
-  public Iterator<ContainerInfo> getContainerInfoIterator() {
-    return getContainerInfoIterator(ContainerID.MIN);
-  }
-
-
-  @Override
   public List<ContainerInfo> getContainers(final LifeCycleState state) {
     scmContainerManagerMetrics.incNumListContainersOps();
     return containerStateManager.getContainerInfos(state);

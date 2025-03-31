@@ -283,11 +283,6 @@ public final class ContainerStateManagerImpl
   }
 
   @Override
-  public Iterator<ContainerInfo> getContainerInfoIterator(ContainerID start) {
-    return getContainerInfoIterator(start, null);
-  }
-
-  @Override
   public Iterator<ContainerInfo> getContainerInfoIterator(LifeCycleState state, ContainerID start) {
     return containers.getContainerInfoIterator(state, start);
   }

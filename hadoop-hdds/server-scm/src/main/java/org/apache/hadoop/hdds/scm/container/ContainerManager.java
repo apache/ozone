@@ -106,12 +106,6 @@ public interface ContainerManager extends Closeable {
    */
   Iterator<ContainerInfo> getContainerInfoIterator(LifeCycleState state, ContainerID startID);
 
-  /**
-   * Return the container iterator.
-   * @return
-   */
-  Iterator<ContainerInfo> getContainerInfoIterator();
-
 
   List<ContainerInfo> getContainers(ReplicationType type);
 

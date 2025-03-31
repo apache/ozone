@@ -128,14 +128,6 @@ public interface ContainerStateManager {
    * @param start the start {@link ContainerID} (inclusive)
    * @return an iterator of {@link ContainerInfo};
    */
-  Iterator<ContainerInfo> getContainerInfoIterator(ContainerID start);
-
-  /**
-   * Get {@link ContainerInfo}s for the given state.
-   *
-   * @param start the start {@link ContainerID} (inclusive)
-   * @return an iterator of {@link ContainerInfo};
-   */
   Iterator<ContainerInfo> getContainerInfoIterator(LifeCycleState state, ContainerID start);
 
   /**

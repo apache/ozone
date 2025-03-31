@@ -511,10 +511,12 @@ public class ReconContainerMetadataManagerImpl
 
         ContainerMetadata containerMetadata = new ContainerMetadata(currentKey.getKey());
         if (currentMetadata == null || currentKey.getKey() != currentMetadata.getKey().getContainerId()) {
-          LOG.error("ContainerMetaData and containerIDs count do not match for container Id: {}. Container Count " +
-              "Table has {} counts and container Metadata doesn't have container and next containerId is {}",
-              currentKey.getKey(), currentMetadata.getKey().getContainerId(),
-              currentMetadata.getKey().getContainerId());
+          if (currentKey.getValue() > 0) {
+            Long containerID = currentMetadata == null ? null : currentMetadata.getKey().getContainerId();
+            LOG.error("ContainerMetaData and containerIDs count do not match for container Id: {}. Container Count " +
+                "Table has {} counts and container Metadata doesn't have container and next containerId is {}",
+                currentKey.getKey(), currentKey.getValue(), containerID);
+          }
           currentKey = containerIterator.hasNext() ? containerIterator.next() : null;
           if (currentKey != null) {
             seek(currentKey.getKey());
@@ -535,6 +537,11 @@ public class ReconContainerMetadataManagerImpl
                  currentMetadata.getKey().getContainerId() == containerMetadata.getContainerID());
         containerMetadata.setNumberOfKeys(count);
         containerMetadata.setPipelines(new ArrayList<>(pipelines.values()));
+        if (currentKey.getValue() != count) {
+          LOG.error("ContainerMetaData and containerIDs count do not match for container Id: {}. Container Count " +
+              "Table has {} counts and container Metadata only has {} keys",
+              currentKey.getKey(), currentKey.getValue(), count);
+        }
         currentKey = containerIterator.hasNext() ? containerIterator.next() : null;
         return containerMetadata;
       } catch (IOException e) {
