@@ -65,7 +65,7 @@ public enum DBProfile {
       final long bytesPerSync = toLong(StorageUnit.MB.toBytes(1.00));
       final boolean createIfMissing = true;
       final boolean createMissingColumnFamilies = true;
-      final int maxBackgroundJobs = 2;
+      final int maxBackgroundJobs = 6;
       ManagedDBOptions dbOptions = new ManagedDBOptions();
       dbOptions
           .setIncreaseParallelism(Runtime.getRuntime().availableProcessors())

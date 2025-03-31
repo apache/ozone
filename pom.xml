@@ -1546,6 +1546,7 @@
                       <!-- Allow non-RocksObject classes. -->
                       <allowedImport>org.rocksdb.ColumnFamilyDescriptor</allowedImport>
                       <allowedImport>org.rocksdb.CompactionStyle</allowedImport>
+                      <allowedImport>org.rocksdb.CompactionPriority</allowedImport>
                       <allowedImport>org.rocksdb.KeyMayExist</allowedImport>
                       <allowedImport>org.rocksdb.HistogramData</allowedImport>
                       <allowedImport>org.rocksdb.HistogramType</allowedImport>
