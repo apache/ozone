@@ -389,8 +389,8 @@ public class ContainerChecksumTreeManager {
 
     try (FileInputStream inStream = new FileInputStream(checksumFile)) {
       return Optional.of(ContainerProtos.ContainerChecksumInfo.parseFrom(inStream));
-    } catch (Exception e) {
-      LOG.error("Error while reading the checksum file for container {}", data.getContainerID());
+    } catch (IOException ex) {
+      LOG.error("Error while reading the checksum file for container {}", data.getContainerID(), ex);
       return Optional.empty();
     }
   }
