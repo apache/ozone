@@ -403,6 +403,14 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     return releaseLock(resource, false, keys);
   }
 
+  /**
+   * Release write lock on multiple resources.
+   * @param resource - Type of the resource.
+   * @param keys - List of resource names on which user want to acquire lock.
+   * For Resource type BUCKET_LOCK, first param should be volume, second param
+   * should be bucket name. For remaining all resource only one param should
+   * be passed.
+   */
   @Override
   public OMLockDetails releaseWriteLocks(Resource resource, Collection<String[]> keys) {
     return releaseLocks(resource, false, keys);
