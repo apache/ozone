@@ -520,11 +520,20 @@ public class OzoneManagerServiceProviderImpl
         }
 
         File outputFile = new File(untarredDbDir.toFile(), entryData.fileName);
-        Files.createDirectories(outputFile.toPath().getParent());
+        Path parentDir = outputFile.toPath().getParent();
+
+        // Fix: Check if parentDir is null before calling createDirectories
+        if (parentDir != null && !Files.exists(parentDir)) {
+          Files.createDirectories(parentDir);
+        }
 
         // Use new writeFile method that takes InputStream
-        try (InputStream inputStream = entryData.inputStream) {
-          writeFile(untarredDbDir, entryData.fileName, inputStream, entryData.fileSize);
+        if (entryData.inputStream != null) {
+          try (InputStream inputStream = entryData.inputStream) {
+            writeFile(untarredDbDir, entryData.fileName, inputStream, entryData.fileSize);
+          }
+        } else {
+          LOG.warn("Skipping file {} as inputStream is null", entryData.fileName);
         }
       }
     } catch (IOException e) {
